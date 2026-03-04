@@ -1,0 +1,24 @@
+{
+  "name": "vite-template-solid",
+  "version": "0.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "start": "panda cssgen & vite",
+    "dev": "panda cssgen && panda watch & vite",
+    "build": "panda codegen --clean && panda cssgen && vite build",
+    "serve": "vite preview",
+    "prepare": "panda codegen --clean"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@pandacss/dev": "^1.8.2",
+    "solid-devtools": "^0.34.3",
+    "typescript": "^5.7.2",
+    "vite": "^7.1.4",
+    "vite-plugin-solid": "^2.11.8"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.5"
+  }
+}

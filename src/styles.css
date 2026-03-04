@@ -1,0 +1,13 @@
+html {
+  --grass-green: #77a15d;
+  --grass-green-dark: #5f814a;
+}
+
+body {
+  background-color: var(--grass-green);
+  background-image: url('/bg.png');
+}
+
+* {
+  image-rendering: pixelated;
+}
