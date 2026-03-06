@@ -1,3 +1,7 @@
+const pandacss = require('@pandacss/postcss');
+
 module.exports = {
-  plugins: {},
-}
+  plugins: [
+    pandacss.default(),
+  ],
+};
