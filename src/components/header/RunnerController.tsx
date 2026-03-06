@@ -14,6 +14,7 @@ export function createRunnerController(id: string, runnerId: keyof typeof runner
         id,
         type: 'runner',
         state: () => 'play',
+        runnerId,
         frameInterval: () => runner.frameInterval,
         ...createObjectSignal(1000 * Math.random(), 'x'),
         ...createObjectSignal(baseY, 'y'),
@@ -28,6 +29,18 @@ export function createRunnerController(id: string, runnerId: keyof typeof runner
       }
     },
     onEnterFrame({ $, $scene }) {
+      // If connected to another runner, follow them instead of running
+      if (runner.connectedTo) {
+        const connectedController = $scene.getControllersByType<RunnerController>('runner').find(
+          controller => controller.data.runnerId === runner.connectedTo,
+        )
+        if (connectedController) {
+          $.setX(connectedController.data.x() + 28)
+          if (!$.scooped() && !connectedController.data.scooped()) {
+            $.setSitting(connectedController.data.sitting())
+          }
+        }
+      }
 
       // Sitting
       if ($.sitting() > 0) {

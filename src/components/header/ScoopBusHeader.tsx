@@ -15,7 +15,7 @@ export function ScoopBusHeader() {
       $scene.addController(createBusController('bus', sceneWidth))
 
       const runnerIds = Object.keys(runners) as (keyof typeof runners)[]
-      const runnerControllers = Array(runnerIds.length * 10).fill(0).map((_, i) =>
+      const runnerControllers = Array(runnerIds.length * 1).fill(0).map((_, i) =>
         createRunnerController(`runner${i}`, runnerIds[i % runnerIds.length], Math.ceil(Math.random() * 10) * 3),
       ).sort((a, b) => a.data.y() - b.data.y()) // Sort by y position so they render in the correct order
       $scene.addController(...runnerControllers)
