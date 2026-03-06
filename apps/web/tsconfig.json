@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@style/*": ["./styled-system/*"],
+      "@assets/*": ["./src/assets/*"]
+    }
+  },
+  "include": ["src", "misc.d.ts"]
+}

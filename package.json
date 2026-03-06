@@ -1,18 +1,22 @@
 {
-  "name": "vite-template-solid",
+  "name": "@scoopbus/root",
   "version": "0.0.0",
-  "description": "",
+  "private": true,
+  "description": "Scoop Bus Run Club monorepo",
   "type": "module",
   "scripts": {
-    "start": "panda cssgen & vite",
-    "dev": "panda cssgen && panda watch & vite",
-    "build": "panda codegen --clean && panda cssgen && vite build",
-    "serve": "vite preview",
-    "prepare": "panda codegen --clean"
+    "dev": "nx run web:dev",
+    "build": "nx run web:build",
+    "serve": "nx run web:serve",
+    "dev:web": "nx run web:dev",
+    "build:web": "nx run web:build"
   },
   "license": "MIT",
   "devDependencies": {
     "@pandacss/dev": "^1.8.2",
+    "@pandacss/postcss": "^1.8.2",
+    "nx": "^21.1.2",
+    "postcss": "^8.5.8",
     "solid-devtools": "^0.34.3",
     "typescript": "^5.7.2",
     "vite": "^7.1.4",
