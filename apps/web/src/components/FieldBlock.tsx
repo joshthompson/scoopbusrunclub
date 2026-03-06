@@ -69,7 +69,6 @@ const styles = {
     mt: '12px',
     textAlign: 'center',
     py: '4px',
-
   }),
   center: css({
     pt: '30px',

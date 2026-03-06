@@ -1,0 +1,15 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-web:
+    uses: ./.github/workflows/deploy-web.yml
+    permissions:
+      contents: write
+
+  deploy-backend:
+    uses: ./.github/workflows/deploy-backend.yml

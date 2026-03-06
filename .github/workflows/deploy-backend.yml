@@ -1,0 +1,14 @@
+name: Deploy Backend to Convex
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: Add Convex deployment steps once the backend app is created
+      - run: echo "Backend deployment placeholder – Convex app not yet configured"
