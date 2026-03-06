@@ -4,6 +4,7 @@ import path from 'path'
 import devtools from 'solid-devtools/vite';
 
 export default defineConfig({
+  base: '/scoopbusrunclub/',
   plugins: [devtools(), solidPlugin()],
   server: {
     port: 3005,
