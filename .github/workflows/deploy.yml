@@ -13,3 +13,4 @@ jobs:
 
   deploy-backend:
     uses: ./.github/workflows/deploy-backend.yml
+    secrets: inherit

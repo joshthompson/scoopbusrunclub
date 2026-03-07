@@ -9,6 +9,7 @@ app.config.timestamp_*.js
 # Environment
 .env
 .env*.local
+.env*.prod
 
 # dependencies
 node_modules

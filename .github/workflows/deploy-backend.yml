@@ -7,8 +7,28 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: github-pages
     steps:
       - uses: actions/checkout@v4
 
-      # TODO: Add Convex deployment steps once the backend app is created
-      - run: echo "Backend deployment placeholder – Convex app not yet configured"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: |
+          if [ -z "${{ secrets.CONVEX_DEPLOY_KEY }}" ]; then
+            echo "CONVEX_DEPLOY_KEY is empty"
+          else
+            echo "CONVEX_DEPLOY_KEY is set"
+          fi
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm nx run api:deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}

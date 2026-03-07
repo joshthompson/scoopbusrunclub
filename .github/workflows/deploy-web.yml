@@ -14,6 +14,7 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment: github-pages
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +30,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm nx run web:build
+        env:
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
 
       - uses: JamesIves/github-pages-deploy-action@v4
         with:

@@ -1,0 +1,33 @@
+name: Fetch Parkrun Results
+
+on:
+  schedule:
+    # Every Saturday at 18:00 UTC
+    - cron: "0 18 * * 6"
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @scoopbus/api exec playwright install chromium --with-deps
+
+      - name: Fetch Parkrun data and ingest into Convex
+        run: pnpm --filter @scoopbus/api run fetch-parkrun
+        env:
+          CONVEX_URL: ${{ secrets.CONVEX_URL }}
+          INGEST_SECRET: ${{ secrets.INGEST_SECRET }}

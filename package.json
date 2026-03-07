@@ -9,7 +9,9 @@
     "build": "nx run web:build",
     "serve": "nx run web:serve",
     "dev:web": "nx run web:dev",
-    "build:web": "nx run web:build"
+    "build:web": "nx run web:build",
+    "test-crons": "pnpm --filter @scoopbus/api run test-parse",
+    "fetch-results": "pnpm --filter @scoopbus/api run fetch-results"
   },
   "license": "MIT",
   "devDependencies": {
