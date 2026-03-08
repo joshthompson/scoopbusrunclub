@@ -1,6 +1,7 @@
 html {
   --grass-green: #77a15d;
-  --grass-green-dark: #5f814a;
+  --sky-blue-top: #cdfbff;
+  --sky-blue-bottom: #5ae2ff;
 
   font-family: "Cabin", sans-serif;
   font-optical-sizing: auto;
@@ -10,8 +11,13 @@ html {
 }
 
 body {
-  background-color: var(--grass-green);
+  background-color: var(--sky-blue-top);
   background-image: url('/bg.png');
+}
+
+#root {
+  background: var(--grass-green);
+  padding-bottom: 2rem;
 }
 
 * {

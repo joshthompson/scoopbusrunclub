@@ -1,31 +1,69 @@
 import { createController, createObjectSignal } from "@/engine"
 import { RUNNER_SIZE, runners } from "./data"
+import { css } from "@style/css"
+import { Accessor } from "solid-js"
 
-export function createRunnerController(id: string, runnerId: keyof typeof runners, yShift = 0) {
+export function createRunnerController(
+  id: string,
+  runnerId: keyof typeof runners,
+  yShift: number,
+  mousePosition: Accessor<{ x: number, y: number }>,
+) {
   const runner = runners[runnerId]
-
   let baseY = 125 + yShift
 
   return createController({
     frames: [...runner.frames],
     randomStartFrame: true,
     init() {
+
+      const { x, setX } = createObjectSignal(1000 * Math.random(), 'x')
+      const { y, setY } = createObjectSignal(baseY, 'y')
+      const width = () => runner.width * RUNNER_SIZE
+      const height = () => runner.height * RUNNER_SIZE
       return {
         id,
         type: 'runner',
         state: () => 'play',
         runnerId,
         frameInterval: () => runner.frameInterval,
-        ...createObjectSignal(1000 * Math.random(), 'x'),
-        ...createObjectSignal(baseY, 'y'),
+        x, setX,
+        y, setY,
         ...createObjectSignal(baseY, 'baseY'),
         ...createObjectSignal(0, 'rotation'),
         ...createObjectSignal(0, 'ySpeed'),
         ...createObjectSignal(false, 'scooped'),
         ...createObjectSignal(runner.frames, 'frames'),
         ...createObjectSignal(0, 'sitting'),
-        width: () => runner.width * RUNNER_SIZE,
-        height: () => runner.height * RUNNER_SIZE,
+        width,
+        height,
+        children: () => {
+          const mouseDist = Math.hypot(
+            mousePosition().x - (x() + width() / 2),
+            mousePosition().y - (y() + height() / 2),
+          )
+          
+          return <div
+            style={{
+              display: mouseDist < 40 ? 'block' : 'none',
+              transform:
+                runnerId === 'lyra' || runnerId === 'link'
+                  ? 'translate(-50%, -50%)'
+                  : 'translate(-50%, -150%)'
+            }}
+            class={css({
+              position: 'absolute',
+              background: 'black',
+              left: '50%',
+              color: 'white',
+              fontFamily: '"Pixelify Sans", sans-serif',
+              fontSize: '12px',
+              p: '0px 8px',
+              width: 'max-content',
+            })}
+            children={runner.name}
+          />
+        },
       }
     },
     onEnterFrame({ $, $scene }) {
