@@ -86,17 +86,14 @@ http.route({
 });
 
 // --- GET /api/results?since=YYYY-MM-DD ---
+// `since` is optional; omitting it returns all results.
 
 http.route({
   path: "/api/results",
   method: "GET",
   handler: httpAction(async (ctx, request) => {
     const url = new URL(request.url);
-    const sinceDate = url.searchParams.get("since");
-
-    if (!sinceDate) {
-      return jsonResponse({ error: "Missing 'since' query parameter" }, 400);
-    }
+    const sinceDate = url.searchParams.get("since") ?? "0000-00-00";
 
     const results = await ctx.runQuery(api.queries.getRecentResults, {
       sinceDate,

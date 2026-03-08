@@ -7,7 +7,7 @@ export function ordinal(n: number) {
 export function formatDate(date: Date) {
   const day = date.getDate()
   const month = date.toLocaleString('en-GB', { month: 'long' })
-  return `${ordinal(day)} ${month}`
+  return `${ordinal(day)} ${month} ${date.getFullYear()}`
 }
 
 export function formatName(name: string) {

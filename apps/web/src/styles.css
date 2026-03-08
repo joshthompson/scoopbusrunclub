@@ -1,6 +1,12 @@
 html {
   --grass-green: #77a15d;
   --grass-green-dark: #5f814a;
+
+  font-family: "Cabin", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-variation-settings: "wdth" 100;
 }
 
 body {

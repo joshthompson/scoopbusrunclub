@@ -7,17 +7,11 @@ import { css } from '@style/css';
 import { LatestResults } from './components/LatestResults';
 import { RaceCalendar } from './components/RaceCalendar';
 import { Milestones } from './components/Milestones';
-import { fetchRunners, fetchRecentResults } from './utils/api';
-
-const sinceDate = (() => {
-  const d = new Date()
-  d.setMonth(d.getMonth() - 2)
-  return d.toISOString().split('T')[0]
-})()
+import { fetchRunners, fetchAllResults } from './utils/api';
 
 const App: Component = () => {
   const [runners] = createResource(fetchRunners)
-  const [results] = createResource(() => fetchRecentResults(sinceDate))
+  const [results] = createResource(fetchAllResults)
 
   return (
     <>

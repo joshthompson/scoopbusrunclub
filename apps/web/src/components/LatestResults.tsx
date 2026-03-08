@@ -1,6 +1,6 @@
-import { createMemo, For } from "solid-js"
+import { createMemo, createSignal, For, Show } from "solid-js"
 import { FieldBlock } from "./FieldBlock"
-import { css } from "@style/css"
+import { css, cx } from "@style/css"
 import { type RunResultItem, type Runner } from "../utils/api"
 import { formatDate, formatName, ordinal } from "@/utils/misc"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
@@ -61,6 +61,55 @@ interface Props {
   runners: Runner[]
 }
 
+// Parses a time string like "23:45" or "1:23:45" into total seconds.
+function parseTimeToSeconds(time: string): number {
+  const parts = time.split(":").map(Number)
+  if (parts.length === 2) return parts[0] * 60 + parts[1]
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  return Infinity
+}
+
+// Returns a map of "parkrunId:date:eventName:eventNumber" -> "pb" | "coursePb".
+// "pb" means a new overall personal best, "coursePb" means a new PB for that specific event.
+function buildPBMap(results: RunResultItem[]): Map<string, "pb" | "coursePb" | "first-run"> {
+  const map = new Map<string, "pb" | "coursePb" | "first-run">()
+
+  const byRunner = new Map<string, RunResultItem[]>()
+  for (const item of results) {
+    if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
+    byRunner.get(item.parkrunId)!.push(item)
+  }
+
+  for (const runs of byRunner.values()) {
+    runs.sort((a, b) => a.date.localeCompare(b.date))
+    let bestOverall = Infinity
+    const bestPerCourse = new Map<string, number>()
+
+    for (const run of runs) {
+      const secs = parseTimeToSeconds(run.time)
+      const bestCourse = bestPerCourse.get(run.eventName) ?? Infinity
+      const key = `${run.parkrunId}:${run.date}:${run.eventName}:${run.eventNumber}`
+
+      if (bestOverall === Infinity) {
+        map.set(key, "first-run")
+        bestOverall = secs
+        bestPerCourse.set(run.eventName, secs)
+      } else if (secs < bestOverall) {
+        map.set(key, "pb")
+        bestOverall = secs
+        bestPerCourse.set(run.eventName, secs)
+      } else if (bestCourse !== Infinity && secs < bestCourse) {
+        map.set(key, "coursePb")
+        bestPerCourse.set(run.eventName, secs)
+      } else {
+        bestPerCourse.set(run.eventName, Math.min(bestCourse, secs))
+      }
+    }
+  }
+
+  return map
+}
+
 // Returns a map of "parkrunId:date" -> milestone number for runs where a milestone was achieved.
 // Works backwards from each runner's totalRuns through the visible results to find which
 // date corresponds to each milestone run number.
@@ -93,12 +142,28 @@ function buildMilestoneMap(results: RunResultItem[], runners: Runner[]): Map<str
 
 export function LatestResults(props: Props) {
   const milestoneMap = createMemo(() => buildMilestoneMap(props.results, props.runners))
+  const pbMap = createMemo(() => buildPBMap(props.results))
 
   const grouped = createMemo(() => groupResults(props.results))
 
+  const [showAll, setShowAll] = createSignal(false)
+
+  const cutoffDate = createMemo(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 2)
+    return d.toISOString().split('T')[0]
+  })
+
+  const visibleGroups = createMemo(() => {
+    if (showAll()) return grouped()
+    return grouped().filter((g) => g.date >= cutoffDate())
+  })
+
+  const hasMore = createMemo(() => grouped().some((g) => g.date < cutoffDate()))
+
   return (
     <div class={styles.container}>
-      <For each={grouped()}>
+      <For each={visibleGroups()}>
         {(result) => (
           <div class={styles.results}>
             <h3 class={styles.date}>{formatDate(new Date(result.date + "T00:00:00"))}</h3>
@@ -106,19 +171,29 @@ export function LatestResults(props: Props) {
               {(parkrun) => (
                 <FieldBlock>
                   <div class={styles.parkrun}>
-                    <h4>{parkrun.name} #{parkrun.eventNumber}</h4>
+                    <h4 class={styles.parkrunName}>{parkrun.name} #{parkrun.eventNumber}</h4>
                     <ul>
                       <For each={parkrun.results}>
                         {(res) => {
                           const milestone = milestoneMap().get(`${res.parkrunId}:${result.date}`)
+                          const pb = pbMap().get(`${res.parkrunId}:${result.date}:${parkrun.name}:${parkrun.eventNumber}`)
                           return (
                             <li>
                               <em>{formatName(res.name)}</em> finished in{" "}
                               <em>{ordinal(res.position)}</em> place with a time of{" "}
                               <em>{res.time}</em>
+                              {pb === "first-run" && (
+                                <span class={cx(styles.tag, styles.pb)}>Parkrun debut! 🎉</span>
+                              )}
+                              {pb === "pb" && (
+                                <span class={cx(styles.tag, styles.pb)}>New PB! 🏅</span>
+                              )}
+                              {pb === "coursePb" && (
+                                <span class={cx(styles.tag, styles.coursePb)}>New Course PB! ⭐</span>
+                              )}
                               {milestone !== undefined && (
-                                <span class={styles.milestone}>
-                                  {" - "}{ordinalSuffix(milestone)} run! 🎉
+                                <span class={cx(styles.tag, styles.milestone)}>
+                                  {ordinalSuffix(milestone)} run! 🎉
                                 </span>
                               )}
                             </li>
@@ -133,6 +208,11 @@ export function LatestResults(props: Props) {
           </div>
         )}
       </For>
+      <Show when={hasMore() && !showAll()}>
+        <button class={styles.showMore} onClick={() => setShowAll(true)}>
+          Show all results
+        </button>
+      </Show>
     </div>
   )
 }
@@ -151,6 +231,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '0.5rem',
+    textAlign: 'center',
   }),
   parkrun: css({
     display: 'flex',
@@ -161,10 +242,39 @@ const styles = {
       fontWeight: 'bold',
     },
   }),
-  milestone: css({
+  parkrunName: css({
     fontWeight: 'bold',
-    color: 'green.600',
-    fontSize: '1.25em',
-    lineHeight: 1,
+    fontSize: '1.5em',
+    m: 0,
+  }),
+  tag: css({
+    display: 'inline-block',
+    background: 'rgba(255, 255, 255, 1)',
+    p: '0rem 0.3rem',
+    m: '0.1rem 0.5rem',
+    borderRadius: '0.25rem',
+    fontWeight: 'bold',
+  }),
+  pb: css({
+    color: '#2563eb',
+  }),
+  coursePb: css({
+    color: '#16a34a',
+  }),
+  milestone: css({
+    color: '#db2777',
+  }),
+  showMore: css({
+    alignSelf: 'center',
+    padding: '0.5rem 1.5rem',
+    border: '2px solid currentColor',
+    borderRadius: '0.375rem',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '1rem',
+    _hover: {
+      background: 'rgba(0,0,0,0.05)',
+    },
   }),
 }

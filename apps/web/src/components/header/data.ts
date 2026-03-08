@@ -19,6 +19,8 @@ import linkAsset from '@/assets/runners/link.png'
 import linkSitAsset from '@/assets/runners/link-sit.png'
 import lyraAsset from '@/assets/runners/lyra.png'
 import lyraSitAsset from '@/assets/runners/lyra-sit.png'
+import otherJoshAsset from '@/assets/runners/other-josh.png'
+import otherJoshSitAsset from '@/assets/runners/other-josh-sit.png'
 import rickAsset from '@/assets/runners/rick.png'
 import rickSitAsset from '@/assets/runners/rick-sit.png'
 import sophieAsset from '@/assets/runners/sophie.png'
@@ -137,5 +139,13 @@ export const runners: Record<string, RunnerData> = {
     speed: 2.5,
     frameInterval: 75,
     connectedTo: 'alisa',
+  },
+  otherJosh: {
+    frames: generateFrames(otherJoshAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+    sitFrames: [otherJoshSitAsset],
+    width: 21,
+    height: 28,
+    speed: 2.5,
+    frameInterval: 80,
   },
 }

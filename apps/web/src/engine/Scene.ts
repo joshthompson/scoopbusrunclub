@@ -125,10 +125,15 @@ export class Scene<C extends Controller<any> = Controller<any>> {
     window.removeEventListener('pause-game', this.togglePause.bind(this))
   }
 
+  setWidth(width: number) {
+    this.options.width = width
+    this.canvas.get().setWidth(width)
+  }
+
   createCanvas(): Canvas {
     return {
-      width: this.options.width,
-      height: this.options.height,
+      ...createObjectSignal(this.options.width, 'width'),
+      ...createObjectSignal(this.options.height, 'height'),
       controllers: this.controllers.get,
       ...createObjectSignal(this.options.x ?? 0, 'x'),
       ...createObjectSignal(this.options.y ?? 0, 'y'),

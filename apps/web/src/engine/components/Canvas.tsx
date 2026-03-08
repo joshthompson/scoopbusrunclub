@@ -25,8 +25,10 @@ export interface CanvasProps {
 }
 
 export interface Canvas<T extends CanvasControllers = CanvasControllers> {
-  width: number
-  height: number
+  width: Accessor<number>
+  setWidth: Setter<number>
+  height: Accessor<number>
+  setHeight: Setter<number>
   x: Accessor<number>
   setX: Setter<number>
   y: Accessor<number>
@@ -84,8 +86,8 @@ export function Canvas<T extends CanvasControllers = CanvasControllers>(
         data-game-scene={props.scene.id}
         class={cx(styles.canvas, props.class)}
         style={{
-          width: `${props.scene.canvas.get().width}px`,
-          height: `${props.scene.canvas.get().height}px`,
+          width: `${props.scene.canvas.get().width()}px`,
+          height: `${props.scene.canvas.get().height()}px`,
           ...props.style,
         }}
         onClick={handleClick}

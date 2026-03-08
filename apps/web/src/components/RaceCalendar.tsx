@@ -31,6 +31,11 @@ const races: RaceCalendarItem[] = [
     runners: [],
   },
   {
+    date: "2026-09-05",
+    name: "Tjejmilen",
+    runners: [],
+  },
+  {
     date: "2026-09-26",
     name: "Lidingöloppet",
     runners: ["Josh", "Adam", "Eline"],

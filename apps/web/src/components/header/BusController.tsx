@@ -1,4 +1,4 @@
-import { createConnectedController, createController } from '@/engine'
+import { createConnectedController, createController, Scene } from '@/engine'
 import { createObjectSignal } from '@/engine'
 
 import busBackAsset from '@/assets/bus/bus-back.png'
@@ -15,10 +15,11 @@ import { type RunnerController } from './RunnerController'
 const BUS_SPEED = 10
 const SCOOP_SPEED = 50
 const SCOOP_DURATION = 125
+const MIN_BUS_START_X = 800
 
-export function createBusController(id: string, sceneWidth: number) {
+export function createBusController(id: string, scene: Scene) {
 
-  const startX = sceneWidth + 22 // 22 is the width of the scoop, which is the leftmost part of the bus
+  const startX = Math.max(scene.canvas.get().width() + 22, MIN_BUS_START_X) // 22 is the width of the scoop, which is the leftmost part of the bus
   const endX = -247 // 247 is the width of the bus, which is the rightmost part of the bus
 
   const baseY = 50
@@ -44,7 +45,7 @@ export function createBusController(id: string, sceneWidth: number) {
 
       // Reset
       if ($.x() < endX) {
-        $.setX(startX)
+        $.setX(Math.max($scene.canvas.get().width() + 22, MIN_BUS_START_X))
       }
 
       // Scoop the runners

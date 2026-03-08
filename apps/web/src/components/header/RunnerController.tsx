@@ -69,7 +69,7 @@ export function createRunnerController(id: string, runnerId: keyof typeof runner
       }
 
       if ($.x() < -100) {
-        $.setX($scene.canvas.get().width + Math.random() * 300)
+        $.setX($scene.canvas.get().width() + Math.random() * 300)
         $.setY(baseY)
       }
     }
