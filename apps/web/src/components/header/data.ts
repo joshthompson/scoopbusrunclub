@@ -31,6 +31,8 @@ export const RUNNER_SIZE = 2
 export const FRAME_COUNT = 4
 
 interface RunnerData {
+  name: string
+  id: string
   frames: string[]
   sitFrames: string[]
   width: number
@@ -42,6 +44,8 @@ interface RunnerData {
 
 export const runners: Record<string, RunnerData> = {
   josh: {
+    name: 'Josh',
+    id: '8070821',
     frames: generateFrames(joshAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [joshSitAsset],
     width: 21,
@@ -50,6 +54,8 @@ export const runners: Record<string, RunnerData> = {
     frameInterval: 62,
   },
   keith: {
+    name: 'Keith',
+    id: '5635044',
     frames: generateFrames(keithAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [keithSitAsset],
     width: 21,
@@ -58,6 +64,8 @@ export const runners: Record<string, RunnerData> = {
     frameInterval: 80,
   },
   claire: {
+    name: 'Claire',
+    id: '377595',
     frames: generateFrames(claireAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [claireSitAsset],
     width: 21,
@@ -67,6 +75,8 @@ export const runners: Record<string, RunnerData> = {
     // connectedTo: 'anna',
   },
   lyra: {
+    name: 'Lyra',
+    id: '8009111',
     frames: generateFrames(lyraAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [lyraSitAsset],
     width: 21,
@@ -75,6 +85,8 @@ export const runners: Record<string, RunnerData> = {
     frameInterval: 80,
   },
   adam: {
+    name: 'Adam',
+    id: '7758658',
     frames: generateFrames(adamAsset,  22 * FRAME_COUNT, 30, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [adamSitAsset],
     width: 21,
@@ -83,6 +95,8 @@ export const runners: Record<string, RunnerData> = {
     frameInterval: 65,
   },
   anna: {
+    name: 'Anna',
+    id: '850764',
     frames: generateFrames(annaAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [annaSitAsset],
     width: 21,
@@ -92,6 +106,8 @@ export const runners: Record<string, RunnerData> = {
     connectedTo: 'lyra',
   },
   eline: {
+    name: 'Eline',
+    id: '8943925',
     frames: generateFrames(elineAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [elineSitAsset],
     width: 21,
@@ -100,6 +116,8 @@ export const runners: Record<string, RunnerData> = {
     frameInterval: 75,
   },
   rick: {
+    name: 'Rick',
+    id: '9679233',
     frames: generateFrames(rickAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [rickSitAsset],
     width: 21,
@@ -108,6 +126,8 @@ export const runners: Record<string, RunnerData> = {
     frameInterval: 75,
   },
   sophie: {
+    name: 'Sophie',
+    id: '6076813',
     frames: generateFrames(sophieAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [sophieSitAsset],
     width: 21,
@@ -116,6 +136,8 @@ export const runners: Record<string, RunnerData> = {
     frameInterval: 75,
   },
   august: {
+    name: 'August',
+    id: '545803',
     frames: generateFrames(augustAsset, 50 * FRAME_COUNT, 30, 50 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [augustSitAsset],
     width: 49,
@@ -124,6 +146,8 @@ export const runners: Record<string, RunnerData> = {
     frameInterval: 100,
   },
   alisa: {
+    name: 'Alisa',
+    id: '10663604',
     frames: generateFrames(alisaAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [alisaSitAsset],
     width: 21,
@@ -132,6 +156,8 @@ export const runners: Record<string, RunnerData> = {
     frameInterval: 75,
   },
   link: {
+    name: 'Link',
+    id: '10663604', // Uses Alisa's parkrun ID to mirror her progress
     frames: generateFrames(linkAsset, 20 * 2, 28, 20 * 2, 2, true),
     sitFrames: [linkSitAsset],
     width: 20,
@@ -141,6 +167,8 @@ export const runners: Record<string, RunnerData> = {
     connectedTo: 'alisa',
   },
   otherJosh: {
+    name: 'Other Josh',
+    id: '5346109',
     frames: generateFrames(otherJoshAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
     sitFrames: [otherJoshSitAsset],
     width: 21,

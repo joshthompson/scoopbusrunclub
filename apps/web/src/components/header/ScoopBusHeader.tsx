@@ -6,6 +6,7 @@ import { createRunnerController } from './RunnerController'
 import { runners } from './data'
 import { onCleanup, onMount } from 'solid-js'
 import { createShadowController } from './ShadowController'
+import { createSignController } from './SignController'
 
 export function ScoopBusHeader() {
   const sceneWidth = window.innerWidth
@@ -28,6 +29,9 @@ export function ScoopBusHeader() {
 
       // Add runners
       $scene.addController(...runnerControllers)
+
+      // Add sign
+      // $scene.addController(createSignController('sign'))
     }
   })
 
