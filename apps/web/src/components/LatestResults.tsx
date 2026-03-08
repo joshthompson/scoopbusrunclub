@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Show } from "solid-js"
 import { FieldBlock } from "./FieldBlock"
 import { css, cx } from "@style/css"
 import { type RunResultItem, type Runner } from "../utils/api"
-import { formatDate, formatName, ordinal } from "@/utils/misc"
+import { formatDate, formatName, ordinal, parseTimeToSeconds } from "@/utils/misc"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
 
 interface ParkrunResult {
@@ -56,18 +56,12 @@ function groupResults(items: RunResultItem[]): DateGroup[] {
     }))
 }
 
-interface Props {
+interface LatestResultsProps {
   results: RunResultItem[]
   runners: Runner[]
 }
 
-// Parses a time string like "23:45" or "1:23:45" into total seconds.
-function parseTimeToSeconds(time: string): number {
-  const parts = time.split(":").map(Number)
-  if (parts.length === 2) return parts[0] * 60 + parts[1]
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-  return Infinity
-}
+
 
 // Returns a map of "parkrunId:date:eventName:eventNumber" -> "pb" | "coursePb".
 // "pb" means a new overall personal best, "coursePb" means a new PB for that specific event.
@@ -140,7 +134,7 @@ function buildMilestoneMap(results: RunResultItem[], runners: Runner[]): Map<str
   return map
 }
 
-export function LatestResults(props: Props) {
+export function LatestResults(props: LatestResultsProps) {
   const milestoneMap = createMemo(() => buildMilestoneMap(props.results, props.runners))
   const pbMap = createMemo(() => buildPBMap(props.results))
 

@@ -14,3 +14,11 @@ export function formatName(name: string) {
   const parts = name.trim().split(/\s+/)
   return parts.map((part) => part[0].toUpperCase() + part.slice(1).toLowerCase()).join(' ')
 }
+
+/** Parses a time string like "23:45" or "1:23:45" into total seconds. */
+export function parseTimeToSeconds(time: string): number {
+  const parts = time.split(':').map(Number)
+  if (parts.length === 2) return parts[0] * 60 + parts[1]
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  return Infinity
+}

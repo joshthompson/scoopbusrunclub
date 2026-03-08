@@ -1,5 +1,5 @@
 import { createController, createObjectSignal } from "@/engine"
-import { RUNNER_SIZE, runners } from "./data"
+import { RUNNER_SIZE, runners } from "./runners"
 import { css } from "@style/css"
 import { Accessor } from "solid-js"
 
@@ -9,31 +9,31 @@ export function createRunnerController(
   yShift: number,
   mousePosition: Accessor<{ x: number, y: number }>,
 ) {
-  const runner = runners[runnerId]
+  const [runner] = runners[runnerId]
   let baseY = 125 + yShift
 
   return createController({
-    frames: [...runner.frames],
+    frames: [...runner().frames],
     randomStartFrame: true,
     init() {
 
       const { x, setX } = createObjectSignal(1000 * Math.random(), 'x')
       const { y, setY } = createObjectSignal(baseY, 'y')
-      const width = () => runner.width * RUNNER_SIZE
-      const height = () => runner.height * RUNNER_SIZE
+      const width = () => runner().width * RUNNER_SIZE
+      const height = () => runner().height * RUNNER_SIZE
       return {
         id,
         type: 'runner',
         state: () => 'play',
         runnerId,
-        frameInterval: () => runner.frameInterval,
+        frameInterval: () => runner().frameInterval,
         x, setX,
         y, setY,
         ...createObjectSignal(baseY, 'baseY'),
         ...createObjectSignal(0, 'rotation'),
         ...createObjectSignal(0, 'ySpeed'),
         ...createObjectSignal(false, 'scooped'),
-        ...createObjectSignal(runner.frames, 'frames'),
+        ...createObjectSignal(runner().frames, 'frames'),
         ...createObjectSignal(0, 'sitting'),
         width,
         height,
@@ -61,16 +61,16 @@ export function createRunnerController(
               p: '0px 8px',
               width: 'max-content',
             })}
-            children={runner.name}
+            children={runner().name + (runner().latestTime ? ` - ${runner().latestTime}` : '')}
           />
         },
       }
     },
     onEnterFrame({ $, $scene }) {
       // If connected to another runner, follow them instead of running
-      if (runner.connectedTo) {
+      if (runner().connectedTo) {
         const connectedController = $scene.getControllersByType<RunnerController>('runner').find(
-          controller => controller.data.runnerId === runner.connectedTo,
+          controller => controller.data.runnerId === runner().connectedTo,
         )
         if (connectedController) {
           $.setX(connectedController.data.x() + 28)
@@ -83,13 +83,13 @@ export function createRunnerController(
       // Sitting
       if ($.sitting() > 0) {
         $.setSitting($.sitting() - 1)
-        $.setFrames(runner.frames.map(() => runner.sitFrames[0]))
+        $.setFrames(runner().frames.map(() => runner().sitFrames[0]))
       }
 
       // Running
       else if (!$.scooped()) {
-        $.setFrames(runner.frames)
-        $.setX($.x() - runner.speed * (1 + Math.random() * 0.4))
+        $.setFrames(runner().frames)
+        $.setX($.x() - runner().speed * (1 + Math.random() * 0.4))
         $.setRotation(Math.random() * 3 - 0.5)
       }
 

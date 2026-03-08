@@ -15,7 +15,7 @@ const App: Component = () => {
 
   return (
     <>
-      <ScoopBusHeader />
+      <ScoopBusHeader results={results() ?? []} />
       <div class={styles.content}>
         <main class={styles.main}>
           <FieldBlock title="Latest Results" class={styles.results}>

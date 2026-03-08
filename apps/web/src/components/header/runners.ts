@@ -26,6 +26,7 @@ import rickSitAsset from '@/assets/runners/rick-sit.png'
 import sophieAsset from '@/assets/runners/sophie.png'
 import sophieSitAsset from '@/assets/runners/sophie-sit.png'
 import { generateFrames } from '@/utils'
+import { Accessor, createSignal, Setter } from 'solid-js'
 
 export const RUNNER_SIZE = 2
 export const FRAME_COUNT = 4
@@ -40,10 +41,11 @@ interface RunnerData {
   speed: number
   frameInterval: number
   connectedTo?: string
+  latestTime?: string
 }
 
-export const runners: Record<string, RunnerData> = {
-  josh: {
+export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]> = {
+  josh: createSignal<RunnerData>({
     name: 'Josh',
     id: '8070821',
     frames: generateFrames(joshAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -52,8 +54,8 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 4,
     frameInterval: 62,
-  },
-  keith: {
+  }),
+  keith: createSignal<RunnerData>({
     name: 'Keith',
     id: '5635044',
     frames: generateFrames(keithAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -62,8 +64,8 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 3,
     frameInterval: 80,
-  },
-  claire: {
+  }),
+  claire: createSignal<RunnerData>({
     name: 'Claire',
     id: '377595',
     frames: generateFrames(claireAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -72,9 +74,8 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 2,
     frameInterval: 125,
-    // connectedTo: 'anna',
-  },
-  lyra: {
+  }),
+  lyra: createSignal<RunnerData>({
     name: 'Lyra',
     id: '8009111',
     frames: generateFrames(lyraAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -83,8 +84,8 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 1.5,
     frameInterval: 80,
-  },
-  adam: {
+  }),
+  adam: createSignal<RunnerData>({
     name: 'Adam',
     id: '7758658',
     frames: generateFrames(adamAsset,  22 * FRAME_COUNT, 30, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -93,8 +94,8 @@ export const runners: Record<string, RunnerData> = {
     height: 30,
     speed: 3.9,
     frameInterval: 65,
-  },
-  anna: {
+  }),
+  anna: createSignal<RunnerData>({
     name: 'Anna',
     id: '850764',
     frames: generateFrames(annaAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -103,9 +104,8 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 1.5,
     frameInterval: 120,
-    connectedTo: 'lyra',
-  },
-  eline: {
+  }),
+  eline: createSignal<RunnerData>({
     name: 'Eline',
     id: '8943925',
     frames: generateFrames(elineAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -114,8 +114,8 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 3.2,
     frameInterval: 75,
-  },
-  rick: {
+  }),
+  rick: createSignal<RunnerData>({
     name: 'Rick',
     id: '9679233',
     frames: generateFrames(rickAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -124,8 +124,8 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 3.2,
     frameInterval: 75,
-  },
-  sophie: {
+  }),
+  sophie: createSignal<RunnerData>({
     name: 'Sophie',
     id: '6076813',
     frames: generateFrames(sophieAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -134,8 +134,8 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 3.2,
     frameInterval: 75,
-  },
-  august: {
+  }),
+  august: createSignal<RunnerData>({
     name: 'August',
     id: '545803',
     frames: generateFrames(augustAsset, 50 * FRAME_COUNT, 30, 50 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -144,8 +144,8 @@ export const runners: Record<string, RunnerData> = {
     height: 30,
     speed: 3.2,
     frameInterval: 100,
-  },
-  alisa: {
+  }),
+  alisa: createSignal<RunnerData>({
     name: 'Alisa',
     id: '10663604',
     frames: generateFrames(alisaAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -154,8 +154,8 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 2.5,
     frameInterval: 75,
-  },
-  link: {
+  }),
+  link: createSignal<RunnerData>({
     name: 'Link',
     id: '10663604', // Uses Alisa's parkrun ID to mirror her progress
     frames: generateFrames(linkAsset, 20 * 2, 28, 20 * 2, 2, true),
@@ -165,8 +165,8 @@ export const runners: Record<string, RunnerData> = {
     speed: 2.5,
     frameInterval: 75,
     connectedTo: 'alisa',
-  },
-  otherJosh: {
+  }),
+  otherJosh: createSignal<RunnerData>({
     name: 'Other Josh',
     id: '5346109',
     frames: generateFrames(otherJoshAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
@@ -175,5 +175,5 @@ export const runners: Record<string, RunnerData> = {
     height: 28,
     speed: 2.5,
     frameInterval: 80,
-  },
+  }),
 }
