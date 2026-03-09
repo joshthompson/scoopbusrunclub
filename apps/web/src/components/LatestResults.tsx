@@ -261,14 +261,16 @@ const styles = {
   showMore: css({
     alignSelf: 'center',
     padding: '0.5rem 1.5rem',
-    border: '2px solid currentColor',
-    borderRadius: '0.375rem',
+    border: '3px double currentColor',
     background: 'transparent',
     cursor: 'pointer',
     fontWeight: 'bold',
     fontSize: '1rem',
+    textTransform: 'uppercase',
+    cornerShape: 'notch',
+    borderRadius: '4px',
     _hover: {
-      background: 'rgba(0,0,0,0.05)',
+      background: 'rgba(255, 255, 255, 0.1)',
     },
   }),
 }

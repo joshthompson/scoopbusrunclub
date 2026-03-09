@@ -15,14 +15,14 @@ import { type RunnerController } from './RunnerController'
 const BUS_SPEED = 10
 const SCOOP_SPEED = 50
 const SCOOP_DURATION = 125
-const MIN_BUS_START_X = 800
+const MIN_BUS_START_X = 1000
 
 export function createBusController(id: string, scene: Scene) {
 
   const startX = Math.max(scene.canvas.get().width() + 22, MIN_BUS_START_X) // 22 is the width of the scoop, which is the leftmost part of the bus
   const endX = -247 // 247 is the width of the bus, which is the rightmost part of the bus
 
-  const baseY = 50
+  const baseY = 65
   const bus = createController({
     frames: [busBackAsset],
     init() {

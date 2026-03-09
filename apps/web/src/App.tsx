@@ -13,12 +13,20 @@ const App: Component = () => {
   const [runners] = createResource(fetchRunners)
   const [results] = createResource(fetchAllResults)
 
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 100) {
+      document.body.classList.add('scrolled')
+    } else {
+      document.body.classList.remove('scrolled')
+    }
+  })
+
   return (
     <>
       <ScoopBusHeader results={results() ?? []} />
       <div class={styles.content}>
         <main class={styles.main}>
-          <FieldBlock title="Latest Results" class={styles.results}>
+          <FieldBlock title="Latest Results">
             <Show when={!results.loading && !runners.loading} fallback={<div>Loading...</div>}>
               <LatestResults results={results() ?? []} runners={runners() ?? []} />
             </Show>
@@ -28,10 +36,21 @@ const App: Component = () => {
           <Show when={!runners.loading}>
             <Milestones runners={runners() ?? []} />
           </Show>
-          <FieldBlock title="Race Calendar" class={styles.races}>
+          <FieldBlock title="Race Calendar">
             <RaceCalendar />
           </FieldBlock>
-          <FieldBlock title="Strava Activity" class={styles.strava}><StravaWidget /></FieldBlock>
+          <FieldBlock title="Strava Activity"><StravaWidget /></FieldBlock>
+          <FieldBlock title="About">
+            <p>The Scoop Bus Run Club is a casual, inclusive running club based in the Stockholm.</p>
+            <br />
+            <p>We are most often found at Haga Parkrun but occasionally venture out to other Parkruns and also meet most Wednesday evenings for track and food.</p>
+          </FieldBlock>
+          <FieldBlock title="FAQ">
+            <strong>What is a Scoop Bus?</strong>
+            <p>
+              A scoop bus is a vehicle that follows the very last participants in a race, such as a marathon or half-marathon, to pick up runners who are falling behind the required pace or can no longer continue.
+            </p>
+          </FieldBlock>
         </aside>
       </div>
     </>
@@ -64,17 +83,5 @@ const styles = {
    '@media (max-width: 768px)': {
       width: '100%',
     }
-  }),
-  results: css({
-    gridArea: 'results',
-  }),
-  milestones: css({
-    gridArea: 'milestones',
-  }),
-  races: css({
-    gridArea: 'races',
-  }),
-  strava: css({
-    gridArea: 'strava',
   }),
 }

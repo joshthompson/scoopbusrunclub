@@ -12,6 +12,11 @@ html {
 
 body {
   background-color: var(--sky-blue-top);
+  transition: background-color 0.1s linear;
+
+  &.scrolled {
+    background-color: var(--grass-green);
+  }
 }
 
 #root {

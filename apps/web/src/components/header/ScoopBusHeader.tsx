@@ -2,13 +2,16 @@ import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
 import { createBusController } from './BusController'
 import bgAsset from '@/assets/misc/bg.png'
+import pathAsset from '@/assets/misc/path.png'
 import { createRunnerController } from './RunnerController'
 import { runners } from './runners'
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { createShadowController } from './ShadowController'
 import { type RunResultItem } from '@/utils/api'
 import { parseTimeToSeconds } from '@/utils/misc'
-// import { createSignController } from './SignController'
+import { createTreeController } from './TreeController'
+import { createCloudController } from './CloudController'
+import { createSignController } from './SignController'
 
 function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
   // Find the latest result for each parkrunId
@@ -42,13 +45,6 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
 
     // Clear dynamic connections (keep only static ones like link→alisa)
     const connectedTo = key === 'link' ? 'alisa' : undefined
-
-    console.log(
-      'name', runnerData.name,
-      'time', latestResult.time,
-      'speed', speed.toFixed(2),
-      'frameInterval', frameInterval.toFixed(0),
-    )
 
     setter({ ...runnerData, speed, frameInterval, connectedTo, latestTime: latestResult.time })
   }
@@ -136,6 +132,22 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
         ),
       ).sort((a, b) => a.data.y() - b.data.y()) // Sort by y position so they render in the correct order
 
+      // Add clouds
+      const CLOUD_DIST = 360
+      const CLOUD_COUNT = 10
+      for (let i = 0; i < CLOUD_COUNT; i++) {
+        $scene.addController(createCloudController(`cloud${i}`, 150 + i * CLOUD_DIST, CLOUD_DIST * CLOUD_COUNT))
+      }
+
+      // Add trees
+      const trees = Array(40).fill(0)
+        .map((_, i) => createTreeController(`tree${i}`, 150 + i * 180))
+        .sort((a, b) => (a.data.y() + a.data.height()) - (b.data.y() + b.data.height()))
+      $scene.addController(...trees)
+      
+      // Add sign
+      $scene.addController(createSignController('sign'))
+
       // Add runner shadows
       $scene.addController(...runnerControllers.map(runner =>
         createShadowController(`shadow-${runner.data.id}`, runner)),
@@ -146,9 +158,6 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
       // Add runners
       $scene.addController(...runnerControllers)
-
-      // Add sign
-      // $scene.addController(createSignController('sign'))
     }
   })
 
@@ -174,6 +183,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
   return (
     <Canvas scene={scene} style={{
       background: `
+        url(${pathAsset}) repeat-x 0px 158px,
         url(${bgAsset}) repeat-x bottom,
         linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))
       `,

@@ -8,6 +8,9 @@ export function createShadowController(id: string, runner: RunnerController) {
   const runnerJumpHeight = () => runner.data.baseY() - runner.data.y()
   const JUMP_SHADOW_SIZE = 100
 
+  const sizeMultiplier = () => runnerData().name === 'Lyra' ? 0.7 : 1
+  const xShift = () => runnerData().name === 'Lyra' ? 6 : 0
+
   return createController({
     frames: [shadowAsset],
     randomStartFrame: true,
@@ -15,11 +18,14 @@ export function createShadowController(id: string, runner: RunnerController) {
       return {
         id,
         type: 'shadow',
-        x: () => runner.data.x() - runnerJumpHeight() / (JUMP_SHADOW_SIZE * 2),
+        x: () => runner.data.x() - runnerJumpHeight() / (JUMP_SHADOW_SIZE * 2) + xShift(),
         y: () => runner.data.baseY() + runnerData().height + 20,
-        width: () => runnerData().width * RUNNER_SIZE + runnerJumpHeight() / JUMP_SHADOW_SIZE,
+        width: () => 
+          runnerData().width * RUNNER_SIZE * sizeMultiplier()
+          + runnerJumpHeight() / JUMP_SHADOW_SIZE
+        ,
         height: () => 12,
-        style: () => ({ opacity: 0.1 * Math.max(0, 1 - runnerJumpHeight() / (JUMP_SHADOW_SIZE * 4)) }),
+        style: () => ({ opacity: 1 * Math.max(0, 1 - runnerJumpHeight() / (JUMP_SHADOW_SIZE * 4)) }),
       }
     },
   })

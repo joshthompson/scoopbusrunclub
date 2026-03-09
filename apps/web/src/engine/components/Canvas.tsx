@@ -1,6 +1,5 @@
 import { Accessor, Component, For, JSX, onCleanup, Setter } from 'solid-js'
 import { css, cx } from '@style/css'
-import { Debugger } from './Debugger'
 import { Sprite } from './Sprite'
 import { Modal } from './Modal'
 import { Scene } from '../Scene'
@@ -17,8 +16,7 @@ export interface CanvasProps {
   overlay?: JSX.Element
   underlay?: JSX.Element
   style?: JSX.CSSProperties
-  class?: string
-  debug?: boolean
+  class?: String
   onClick?: (event: Vector) => void
   onMouseDown?: (event: Vector) => void
   onMouseUp?: (event: Vector) => void
@@ -109,7 +107,6 @@ export function Canvas<T extends CanvasControllers = CanvasControllers>(
         {props.scene.modal.get() && <Modal>{props.scene.modal.get()}</Modal>}
         {props.overlay}
         {props.loading && props.scene.loading.get() && <props.loading scene={props.scene} />}
-        {!!props.debug && <Debugger scene={props.scene} />}
       </div>
     </SceneContext.Provider>
   )

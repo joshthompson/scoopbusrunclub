@@ -108,7 +108,7 @@ export function createRunnerController(
       }
 
       if ($.x() < -100) {
-        $.setX($scene.canvas.get().width() + Math.random() * 300)
+        $.setX($scene.canvas.get().width() + 50 + Math.random() * 50)
         $.setY(baseY)
       }
     }
