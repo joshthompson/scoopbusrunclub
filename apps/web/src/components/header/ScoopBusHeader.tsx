@@ -20,13 +20,6 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
     }
   }
 
-  // Helper to get a runner's latest time in seconds (or null if no result)
-  const getTime = (key: string): number | null => {
-    const [getter] = runners[key]
-    const result = latestByParkrunId.get(getter().id)
-    return result ? parseTimeToSeconds(result.time) : null
-  }
-
   // --- Update speeds ---
   for (const [key, [getter, setter]] of Object.entries(runners)) {
     const runnerData = getter()
@@ -61,53 +54,50 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
   }
 
   // --- Update dynamic connections ---
-  const lyraTime = getTime('lyra')
-  const annaTime = getTime('anna')
-  const augustTime = getTime('august')
-  const claireTime = getTime('claire')
-
-  // Anna/August/Lyra pairing
-  if (lyraTime != null && annaTime != null && augustTime != null) {
-    const allWithin30 =
-      Math.abs(lyraTime - annaTime) <= 30 &&
-      Math.abs(lyraTime - augustTime) <= 30 &&
-      Math.abs(annaTime - augustTime) <= 30
-
-    if (allWithin30) {
-      // Chain: anna ← lyra ← august
-      const [lyraGet, lyraSet] = runners['lyra']
-      lyraSet({ ...lyraGet(), connectedTo: 'anna' })
-      const [augGet, augSet] = runners['august']
-      augSet({ ...augGet(), connectedTo: 'lyra' })
-    } else {
-      // Whichever of anna/august is closest to lyra connects to her
-      const annaDiff = Math.abs(lyraTime - annaTime)
-      const augustDiff = Math.abs(lyraTime - augustTime)
-      const closerKey = annaDiff <= augustDiff ? 'anna' : 'august'
-      const [closerGet, closerSet] = runners[closerKey]
-      closerSet({ ...closerGet(), connectedTo: 'lyra' })
-    }
-  } else if (lyraTime != null) {
-    // Only one of anna/august has results — connect whichever does
-    if (annaTime != null) {
-      const [annaGet, annaSet] = runners['anna']
-      annaSet({ ...annaGet(), connectedTo: 'lyra' })
-    } else if (augustTime != null) {
-      const [augGet, augSet] = runners['august']
-      augSet({ ...augGet(), connectedTo: 'lyra' })
-    }
+  // For each runner (except "link"), find the next-fastest runner at the same event
+  // and connect to them if within 30 seconds.
+  // Build a map: runner key → their latest result
+  const runnerLatest = new Map<string, { key: string; result: RunResultItem; timeSeconds: number }>()
+  for (const [key, [getter]] of Object.entries(runners)) {
+    if (key === 'link') continue // link is always connected to alisa
+    const runnerData = getter()
+    const result = latestByParkrunId.get(runnerData.id)
+    if (!result) continue
+    const timeSeconds = parseTimeToSeconds(result.time)
+    runnerLatest.set(key, { key, result, timeSeconds })
   }
 
-  // Claire/Anna pairing: if within 30s, slower connectedTo faster
-  if (claireTime != null && annaTime != null && Math.abs(claireTime - annaTime) <= 30) {
-    if (claireTime > annaTime) {
-      // Claire is slower, connect to anna
-      const [claireGet, claireSet] = runners['claire']
-      claireSet({ ...claireGet(), connectedTo: 'anna' })
-    } else {
-      // Anna is slower (or equal), connect to claire
-      const [annaGet, annaSet] = runners['anna']
-      annaSet({ ...annaGet(), connectedTo: 'claire' })
+  // For each runner, find others at the same event and pick the next-fastest
+  for (const [key, current] of runnerLatest) {
+    const eventKey = `${current.result.eventName}:${current.result.eventNumber}`
+
+    // Find all other runners at the same event
+    const sameEvent: { key: string; timeSeconds: number; position: number }[] = []
+    for (const [otherKey, other] of runnerLatest) {
+      if (otherKey === key) continue
+      const otherEventKey = `${other.result.eventName}:${other.result.eventNumber}`
+      if (otherEventKey === eventKey) {
+        sameEvent.push({ key: otherKey, timeSeconds: other.timeSeconds, position: other.result.position })
+      }
+    }
+
+    if (sameEvent.length === 0) continue
+
+    // Next fastest = the runner who finished just ahead of the current runner.
+    // "Ahead" means faster time, or same time but better (lower) position.
+    const faster = sameEvent
+      .filter(r => r.timeSeconds < current.timeSeconds
+        || (r.timeSeconds === current.timeSeconds && r.position < current.result.position))
+      .sort((a, b) => {
+        // Sort descending by time (closest slower first), then descending by position (closest position first)
+        if (a.timeSeconds !== b.timeSeconds) return b.timeSeconds - a.timeSeconds
+        return b.position - a.position
+      })
+
+    const nextFastest = faster[0]
+    if (nextFastest && current.timeSeconds - nextFastest.timeSeconds <= 30) {
+      const [getter, setter] = runners[key]
+      setter({ ...getter(), connectedTo: nextFastest.key })
     }
   }
 }
@@ -141,6 +131,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
           `runner${i}`,
           runnerIds[i % runnerIds.length],
           Math.ceil(Math.random() * 10) * 3,
+          $scene,
           mousePosition,
         ),
       ).sort((a, b) => a.data.y() - b.data.y()) // Sort by y position so they render in the correct order

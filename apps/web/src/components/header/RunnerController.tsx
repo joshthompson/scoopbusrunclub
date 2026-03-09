@@ -1,4 +1,4 @@
-import { createController, createObjectSignal } from "@/engine"
+import { createController, createObjectSignal, Scene } from "@/engine"
 import { RUNNER_SIZE, runners } from "./runners"
 import { css } from "@style/css"
 import { Accessor } from "solid-js"
@@ -7,6 +7,7 @@ export function createRunnerController(
   id: string,
   runnerId: keyof typeof runners,
   yShift: number,
+  scene: Scene,
   mousePosition: Accessor<{ x: number, y: number }>,
 ) {
   const [runner] = runners[runnerId]
@@ -17,7 +18,7 @@ export function createRunnerController(
     randomStartFrame: true,
     init() {
 
-      const { x, setX } = createObjectSignal(1000 * Math.random(), 'x')
+      const { x, setX } = createObjectSignal(scene.canvas.get().width() * Math.random(), 'x')
       const { y, setY } = createObjectSignal(baseY, 'y')
       const width = () => runner().width * RUNNER_SIZE
       const height = () => runner().height * RUNNER_SIZE
