@@ -12,11 +12,11 @@ html {
 
 body {
   background-color: var(--sky-blue-top);
-  background-image: url('/bg.png');
 }
 
 #root {
-  background: var(--grass-green);
+  background-color: var(--grass-green);
+  background-image: url('/bg.png');
   padding-bottom: 2rem;
 }
 

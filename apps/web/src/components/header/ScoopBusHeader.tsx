@@ -146,7 +146,9 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
       ).sort((a, b) => a.data.y() - b.data.y()) // Sort by y position so they render in the correct order
 
       // Add runner shadows
-      $scene.addController(...runnerControllers.map(runner => createShadowController(`shadow-${runner.data.id}`, runner)))
+      $scene.addController(...runnerControllers.map(runner =>
+        createShadowController(`shadow-${runner.data.id}`, runner)),
+      )
 
       // Add bus
       $scene.addController(createBusController('bus', $scene))

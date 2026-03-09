@@ -68,10 +68,10 @@ export function createBusController(id: string, scene: Scene) {
     type: 'bus-shadow',
     base: bus,
     frames: [shadowAsset],
-    width: () => 232,
+    width: () => 270,
     height: () => 50,
-    offset: { x:13, y: 107 },
-    style: () => ({ opacity: 0.25 }),
+    offset: { x: -20, y: 107 },
+    style: () => ({ opacity: 0.1 }),
   }))
   bus.attach(createConnectedController({
     type: 'bus-wheel1',
