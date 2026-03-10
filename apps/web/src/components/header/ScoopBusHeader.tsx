@@ -1,7 +1,7 @@
 import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
 import { createBusController } from './BusController'
-import bgAsset from '@/assets/misc/bg.png'
+import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
 import pathAsset from '@/assets/misc/path.png'
@@ -131,7 +131,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
         createRunnerController(
           `runner${i}`,
           runnerIds[i % runnerIds.length],
-          Math.ceil(Math.random() * 10) * 3,
+          Math.ceil(Math.random() * 30),
           $scene,
           mousePosition,
         ),
@@ -197,7 +197,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
         <Canvas scene={scene} style={{
           background: `
             url(${pathAsset}) repeat-x 0px 158px,
-            url(${bgAsset}) repeat-x bottom,
+            url(${bg1Asset}) repeat-x bottom,
             url(${bg2Asset}) repeat-x 0px 90px,
             url(${bg3Asset}) repeat-x 0px 70px,
             linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))

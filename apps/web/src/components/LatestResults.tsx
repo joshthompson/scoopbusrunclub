@@ -5,6 +5,7 @@ import { type RunResultItem, type Runner } from "../utils/api"
 import { formatDate, formatName, ordinal, parseTimeToSeconds } from "@/utils/misc"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
 import { FloatingEmoji } from "./FloatingEmoji"
+import { DirtBlock } from "./DirtBlock"
 
 interface ParkrunResult {
   parkrunId: string
@@ -105,6 +106,11 @@ function buildPBMap(results: RunResultItem[]): Map<string, "pb" | "coursePb" | "
   return map
 }
 
+function isMilestoneEvent(eventNumber: string) {
+  const num = Number(eventNumber)
+  return !isNaN(num) && MILESTONE_SET.has(num)
+}
+
 // Returns a map of "parkrunId:date" -> milestone number for runs where a milestone was achieved.
 // Works backwards from each runner's totalRuns through the visible results to find which
 // date corresponds to each milestone run number.
@@ -164,9 +170,14 @@ export function LatestResults(props: LatestResultsProps) {
             <h3 class={styles.date}>{formatDate(new Date(result.date + "T00:00:00"))}</h3>
             <For each={result.parkruns}>
               {(parkrun) => (
-                <FieldBlock>
+                <DirtBlock>
                   <div class={styles.parkrun}>
-                    <h4 class={styles.parkrunName}>{parkrun.name} #{parkrun.eventNumber}</h4>
+                    <h4 class={styles.parkrunName}>
+                      {isMilestoneEvent(parkrun.eventNumber) && <FloatingEmoji emoji="🎉" flipped /> }{' '}
+                      {parkrun.name}{' '}
+                      #{parkrun.eventNumber}{' '}
+                      {isMilestoneEvent(parkrun.eventNumber) && <FloatingEmoji emoji="🎉" /> }
+                    </h4>
                     <ol>
                       <For each={parkrun.results}>
                         {(res) => {
@@ -197,7 +208,7 @@ export function LatestResults(props: LatestResultsProps) {
                       </For>
                     </ol>
                   </div>
-                </FieldBlock>
+                </DirtBlock>
               )}
             </For>
           </div>
@@ -244,11 +255,14 @@ const styles = {
   }),
   tag: css({
     display: 'inline-block',
-    background: 'rgba(255, 255, 255, 1)',
+    background: '#FFFC',
     p: '0rem 0.3rem',
     m: '0.1rem 0.5rem',
-    borderRadius: '0.25rem',
+    borderRadius: '2px',
+    cornerShape: 'notch',
     fontWeight: 'bold',
+    outline: '2px solid currentColor',
+    outlineOffset: '-1px',
   }),
   pb: css({
     color: '#2563eb',

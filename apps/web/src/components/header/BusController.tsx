@@ -22,7 +22,7 @@ export function createBusController(id: string, scene: Scene) {
   const startX = Math.max(scene.canvas.get().width() + 22, MIN_BUS_START_X) // 22 is the width of the scoop, which is the leftmost part of the bus
   const endX = -247 // 247 is the width of the bus, which is the rightmost part of the bus
 
-  const baseY = 65
+  const baseY = 58
   const bus = createController({
     frames: [busBackAsset],
     init() {

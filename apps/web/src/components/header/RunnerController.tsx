@@ -17,7 +17,6 @@ export function createRunnerController(
     frames: [...runner().frames],
     randomStartFrame: true,
     init() {
-
       const { x, setX } = createObjectSignal(scene.canvas.get().width() * Math.random(), 'x')
       const { y, setY } = createObjectSignal(baseY, 'y')
       const width = () => runner().width * RUNNER_SIZE

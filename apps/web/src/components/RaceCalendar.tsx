@@ -58,7 +58,7 @@ export function RaceCalendar() {
     <div class={styles.races}>
       <For each={upcoming}>
         {(race) => (
-          <div class={styles.race}>
+          <div>
             <h4 class={styles.raceName}>{race.name}</h4>
             <p>{formatDate(new Date(race.date + "T00:00:00"))}</p>
             <p>{race.runners.join(", ")}</p>
@@ -74,9 +74,6 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "1rem",
-  }),
-  race: css({
-    textAlign: "center",
   }),
   raceName: css({
     fontWeight: "bold",

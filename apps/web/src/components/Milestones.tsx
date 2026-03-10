@@ -1,10 +1,10 @@
 import { createMemo, For, Show } from "solid-js"
 import { css } from "@style/css"
 import { type Runner } from "../utils/api"
-import { FieldBlock } from "./FieldBlock"
 import { MILESTONE_SET, UPCOMING_THRESHOLD, nextMilestone, ordinalSuffix } from "../utils/milestones"
 import { formatName } from "@/utils/misc"
 import { FloatingEmoji } from "./FloatingEmoji"
+import { DirtBlock } from "./DirtBlock"
 
 interface Props {
   runners: Runner[]
@@ -38,7 +38,7 @@ export function Milestones(props: Props) {
   return (
     <>
       <Show when={groups().celebrated.length > 0}>
-        <FieldBlock title="Milestones!">
+        <DirtBlock title="Milestones">
           <ul class={styles.list}>
             <For each={groups().celebrated}>
               {(row) => (
@@ -48,10 +48,10 @@ export function Milestones(props: Props) {
               )}
             </For>
           </ul>
-        </FieldBlock>
+        </DirtBlock>
       </Show>
       <Show when={groups().upcoming.length > 0}>
-        <FieldBlock title="Upcoming Milestones">
+        <DirtBlock title="Upcoming Milestones">
           <ul class={styles.list}>
             <For each={groups().upcoming}>
               {(row) => (
@@ -63,7 +63,7 @@ export function Milestones(props: Props) {
               )}
             </For>
           </ul>
-        </FieldBlock>
+        </DirtBlock>
       </Show>
     </>
   )
@@ -92,11 +92,9 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "0.4rem",
-    textAlign: "center",
   }),
   celebRow: css({
     fontSize: "0.95rem",
-    textAlign: "center",
     fontStyle: "normal",
     fontWeight: "bold",
   }),

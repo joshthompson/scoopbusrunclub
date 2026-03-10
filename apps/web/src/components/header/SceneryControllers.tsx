@@ -56,17 +56,25 @@ export function createPlantController(id: string, x: number) {
   })
 }
 
-import cloudAsset from '@/assets/misc/cloud1.png'
+import cloud1Asset from '@/assets/misc/cloud1.png'
+import cloud2Asset from '@/assets/misc/cloud2.png'
+const clouds = [
+  { asset: cloud1Asset, w: 74, h: 26 },
+  { asset: cloud2Asset, w: 74, h: 26 },
+]
 export function createCloudController(id: string, x: number, startX: number) {
   const size = Math.random() * 0.5 + 1
+  const cloud = clouds[Math.floor(Math.random() * clouds.length)]
+  const xScale = Math.random() < 0.5 ? -1 : 1
   return createController({
-    frames: [cloudAsset],
+    frames: [cloud.asset],
     init() {
       return {
         id,
         type: 'cloud',
-        width: () => 74 * size,
-        height: () => 26 * size,
+        width: () => cloud.w * size,
+        height: () => cloud.h * size,
+        xScale: () => xScale,
         ...createObjectSignal(x + Math.random() * 200 - 100, 'x'),
         ...createObjectSignal(Math.random() * 20 + 5, 'y'),
       }
