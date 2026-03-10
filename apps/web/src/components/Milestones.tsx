@@ -4,6 +4,7 @@ import { type Runner } from "../utils/api"
 import { FieldBlock } from "./FieldBlock"
 import { MILESTONE_SET, UPCOMING_THRESHOLD, nextMilestone, ordinalSuffix } from "../utils/milestones"
 import { formatName } from "@/utils/misc"
+import { FloatingEmoji } from "./FloatingEmoji"
 
 interface Props {
   runners: Runner[]
@@ -42,7 +43,7 @@ export function Milestones(props: Props) {
             <For each={groups().celebrated}>
               {(row) => (
                 <li class={styles.celebRow}>
-                  {formatName(row.name)} {ordinalSuffix(row.milestone)} run! 🎉
+                  {formatName(row.name)} {ordinalSuffix(row.milestone)} run! <FloatingEmoji emoji="🎉" shadow />
                 </li>
               )}
             </For>

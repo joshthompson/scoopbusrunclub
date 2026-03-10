@@ -11,8 +11,9 @@ export function formatDate(date: Date) {
 }
 
 export function formatName(name: string) {
-  const parts = name.trim().split(/\s+/)
-  return parts.map((part) => part[0].toUpperCase() + part.slice(1).toLowerCase()).join(' ')
+  return name
+    .toLowerCase()
+    .replace(/(?<=^|[\s-])\w/g, (char) => char.toUpperCase())
 }
 
 /** Parses a time string like "23:45" or "1:23:45" into total seconds. */

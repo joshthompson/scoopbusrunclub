@@ -1,5 +1,5 @@
 import { Accessor, Component, For, JSX, onCleanup, Setter } from 'solid-js'
-import { css, cx } from '@style/css'
+import { css } from '@style/css'
 import { Sprite } from './Sprite'
 import { Modal } from './Modal'
 import { Scene } from '../Scene'
@@ -82,7 +82,7 @@ export function Canvas<T extends CanvasControllers = CanvasControllers>(
       <div
         ref={props.ref}
         data-game-scene={props.scene.id}
-        class={cx(styles.canvas, props.class)}
+        class={styles.canvas}
         style={{
           width: `${props.scene.canvas.get().width()}px`,
           height: `${props.scene.canvas.get().height()}px`,

@@ -45,6 +45,20 @@ export default defineConfig({
       md: '600px',
       lg: '800px',
     },
+    keyframes: {
+      float: {
+        '0%, 100%': { transform: 'translateY(-0.25em) scale(1)' },
+        '50%': { transform: 'translateY(-0.5em) scale(1.3)' },
+      },
+      buldge: {
+        '0%, 100%': { transform: 'scale(1)' },
+        '50%': { transform: 'scale(1.3)' },
+      },
+      floatShadow: {
+        '0%, 100%': { transform: 'scaleX(1)', opacity: 0.1 },
+        '50%': { transform: 'scaleX(1.3)', opacity: 0.06 },
+      },
+    },
   },
 
   // The output directory for your css system

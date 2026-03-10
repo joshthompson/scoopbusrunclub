@@ -4,6 +4,7 @@ import { css, cx } from "@style/css"
 import { type RunResultItem, type Runner } from "../utils/api"
 import { formatDate, formatName, ordinal, parseTimeToSeconds } from "@/utils/misc"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
+import { FloatingEmoji } from "./FloatingEmoji"
 
 interface ParkrunResult {
   parkrunId: string
@@ -166,7 +167,7 @@ export function LatestResults(props: LatestResultsProps) {
                 <FieldBlock>
                   <div class={styles.parkrun}>
                     <h4 class={styles.parkrunName}>{parkrun.name} #{parkrun.eventNumber}</h4>
-                    <ul>
+                    <ol>
                       <For each={parkrun.results}>
                         {(res) => {
                           const milestone = milestoneMap().get(`${res.parkrunId}:${result.date}`)
@@ -177,24 +178,24 @@ export function LatestResults(props: LatestResultsProps) {
                               <em>{ordinal(res.position)}</em> place with a time of{" "}
                               <em>{res.time}</em>
                               {pb === "first-run" && (
-                                <span class={cx(styles.tag, styles.pb)}>Parkrun debut! 🎉</span>
+                                <span class={cx(styles.tag, styles.pb)}>Parkrun debut! <FloatingEmoji emoji="🎉" /></span>
                               )}
                               {pb === "pb" && (
-                                <span class={cx(styles.tag, styles.pb)}>New PB! 🏅</span>
+                                <span class={cx(styles.tag, styles.pb)}>New PB! <FloatingEmoji emoji="🏅" /></span>
                               )}
                               {pb === "coursePb" && (
-                                <span class={cx(styles.tag, styles.coursePb)}>New Course PB! ⭐</span>
+                                <span class={cx(styles.tag, styles.coursePb)}>New Course PB! <FloatingEmoji emoji="⭐" /></span>
                               )}
                               {milestone !== undefined && (
                                 <span class={cx(styles.tag, styles.milestone)}>
-                                  {ordinalSuffix(milestone)} run! 🎉
+                                  {ordinalSuffix(milestone)} run! <FloatingEmoji emoji="🎉" />
                                 </span>
                               )}
                             </li>
                           )
                         }}
                       </For>
-                    </ul>
+                    </ol>
                   </div>
                 </FieldBlock>
               )}

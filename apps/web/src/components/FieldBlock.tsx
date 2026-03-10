@@ -21,7 +21,7 @@ export function FieldBlock(props: {
   return (
     <div class={cx(styles.fieldBlock, props.class)}>
       <Show when={props.title}>
-        <div class={styles.sign} style={{ 'background-image': `url(${sign})` }}>
+        <div aria-role="heading" class={styles.sign} style={{ 'background-image': `url(${sign})` }}>
           <div class={styles.signInner}>{props.title}</div>
         </div>
       </Show>

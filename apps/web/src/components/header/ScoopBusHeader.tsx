@@ -9,7 +9,7 @@ import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { createShadowController } from './ShadowController'
 import { type RunResultItem } from '@/utils/api'
 import { parseTimeToSeconds } from '@/utils/misc'
-import { createTreeController } from './TreeController'
+import { createFlowerController, createShrubController, createTreeController } from './ItemControllers'
 import { createCloudController } from './CloudController'
 import { createSignController } from './SignController'
 
@@ -117,7 +117,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
   const sceneWidth = window.innerWidth
   const scene = new Scene('header', {
     width: sceneWidth,
-    height: 230,
+    height: 240,
     images: [],
     setup($scene) {
       // Create Runners
@@ -144,6 +144,12 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
         .map((_, i) => createTreeController(`tree${i}`, 150 + i * 180))
         .sort((a, b) => (a.data.y() + a.data.height()) - (b.data.y() + b.data.height()))
       $scene.addController(...trees)
+
+      // Add flowers
+      const flowers = Array(100).fill(0)
+        .map((_, i) => createFlowerController(`flower${i}`, 20 + i * 25))
+        .sort((a, b) => (a.data.y() + a.data.height()) - (b.data.y() + b.data.height()))
+      $scene.addController(...flowers)
       
       // Add sign
       $scene.addController(createSignController('sign'))
@@ -158,6 +164,12 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
       // Add runners
       $scene.addController(...runnerControllers)
+
+      // Add shrubs
+      // const shrubs = Array(40).fill(0)
+      //   .map((_, i) => createShrubController(`shrub${i}`, 20 + i * 70))
+      //   .sort((a, b) => (a.data.y() + a.data.height()) - (b.data.y() + b.data.height()))
+      // $scene.addController(...shrubs)
     }
   })
 
@@ -181,12 +193,16 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
   })
 
   return (
-    <Canvas scene={scene} style={{
-      background: `
-        url(${pathAsset}) repeat-x 0px 158px,
-        url(${bgAsset}) repeat-x bottom,
-        linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))
-      `,
-    }}/>
+    <div aria-role="heading" aria-label="Welcome to the Scoop Bus Run Club!">
+      <div aria-hidden="true">
+        <Canvas scene={scene} style={{
+          background: `
+            url(${pathAsset}) repeat-x 0px 158px,
+            url(${bgAsset}) repeat-x bottom,
+            linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))
+          `,
+        }}/>
+      </div>
+    </div>
   )
 }
