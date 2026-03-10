@@ -15,7 +15,7 @@ import { type RunnerController } from './RunnerController'
 const BUS_SPEED = 10
 const SCOOP_SPEED = 50
 const SCOOP_DURATION = 125
-const MIN_BUS_START_X = 1000
+const MIN_BUS_START_X = 1100
 
 export function createBusController(id: string, scene: Scene) {
 

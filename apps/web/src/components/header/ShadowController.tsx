@@ -8,7 +8,7 @@ export function createShadowController(id: string, runner: RunnerController) {
   const runnerJumpHeight = () => runner.data.baseY() - runner.data.y()
   const JUMP_SHADOW_SIZE = 100
 
-  const sizeMultiplier = () => runnerData().name === 'Lyra' ? 0.7 : 1
+  const sizeMultiplier = () => runnerData().name === 'Lyra' ? 0.6 : 1
   const xShift = () => runnerData().name === 'Lyra' ? 6 : 0
 
   return createController({

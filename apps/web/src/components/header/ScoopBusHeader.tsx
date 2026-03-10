@@ -2,6 +2,8 @@ import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
 import { createBusController } from './BusController'
 import bgAsset from '@/assets/misc/bg.png'
+import bg2Asset from '@/assets/misc/bg2.png'
+import bg3Asset from '@/assets/misc/bg3.png'
 import pathAsset from '@/assets/misc/path.png'
 import { createRunnerController } from './RunnerController'
 import { runners } from './runners'
@@ -9,9 +11,12 @@ import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { createShadowController } from './ShadowController'
 import { type RunResultItem } from '@/utils/api'
 import { parseTimeToSeconds } from '@/utils/misc'
-import { createFlowerController, createShrubController, createTreeController } from './ItemControllers'
-import { createCloudController } from './CloudController'
-import { createSignController } from './SignController'
+import {
+  createCloudController,
+  createPlantController,
+  createSignController,
+  createTreeController,
+} from './SceneryControllers'
 
 function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
   // Find the latest result for each parkrunId
@@ -147,7 +152,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
       // Add flowers
       const flowers = Array(100).fill(0)
-        .map((_, i) => createFlowerController(`flower${i}`, 20 + i * 25))
+        .map((_, i) => createPlantController(`flower${i}`, 20 + i * 25))
         .sort((a, b) => (a.data.y() + a.data.height()) - (b.data.y() + b.data.height()))
       $scene.addController(...flowers)
       
@@ -164,12 +169,6 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
       // Add runners
       $scene.addController(...runnerControllers)
-
-      // Add shrubs
-      // const shrubs = Array(40).fill(0)
-      //   .map((_, i) => createShrubController(`shrub${i}`, 20 + i * 70))
-      //   .sort((a, b) => (a.data.y() + a.data.height()) - (b.data.y() + b.data.height()))
-      // $scene.addController(...shrubs)
     }
   })
 
@@ -199,6 +198,8 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
           background: `
             url(${pathAsset}) repeat-x 0px 158px,
             url(${bgAsset}) repeat-x bottom,
+            url(${bg2Asset}) repeat-x 0px 90px,
+            url(${bg3Asset}) repeat-x 0px 70px,
             linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))
           `,
         }}/>

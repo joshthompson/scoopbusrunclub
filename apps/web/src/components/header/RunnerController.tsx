@@ -43,6 +43,9 @@ export function createRunnerController(
             mousePosition().x - (x() + width() / 2),
             mousePosition().y - (y() + height() / 2),
           )
+
+          const name = runner().name
+          const time = runner().latestTime && runnerId !== 'link' ? ` - ${runner().latestTime}` : ''
           
           return <div
             style={{
@@ -62,7 +65,7 @@ export function createRunnerController(
               p: '0px 8px',
               width: 'max-content',
             })}
-            children={runner().name + (runner().latestTime ? ` - ${runner().latestTime}` : '')}
+            children={name + time}
           />
         },
       }

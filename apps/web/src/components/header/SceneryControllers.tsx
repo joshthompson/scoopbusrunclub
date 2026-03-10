@@ -1,4 +1,4 @@
-import { createController } from "@/engine";
+import { createController, createObjectSignal } from "@/engine";
 
 import tree1Asset from '@/assets/misc/tree1.png'
 import tree2Asset from '@/assets/misc/tree2.png'
@@ -6,7 +6,6 @@ const trees = [
   { asset: tree1Asset, w: 87, h: 120 },
   { asset: tree2Asset, w: 56, h: 110 },
 ]
-
 export function createTreeController(id: string, x: number) {
   const size = Math.random() * 0.25 + 1
   const tree = trees[Math.floor(Math.random() * trees.length)]
@@ -29,27 +28,26 @@ import flower1Asset from '@/assets/misc/flower1.png'
 import flower2Asset from '@/assets/misc/flower2.png'
 import flower3Asset from '@/assets/misc/flower3.png'
 import flower4Asset from '@/assets/misc/flower4.png'
-
-const flowers = [
+import shrub1Asset from '@/assets/misc/shrub1.png'
+const plants = [
   { asset: flower1Asset, w: 12, h: 14 },
   { asset: flower2Asset, w: 11, h: 11 },
   { asset: flower3Asset, w: 12, h: 12 },
   { asset: flower4Asset, w: 11, h: 9 },
   { asset: shrub1Asset, w: 24, h: 14 },
 ]
-
-export function createFlowerController(id: string, x: number) {
+export function createPlantController(id: string, x: number) {
   const size = Math.random() * 1 + 1
-  const flower = flowers[Math.floor(Math.random() * flowers.length)]
+  const plant = plants[Math.floor(Math.random() * plants.length)]
   const xScale = Math.random() < 0.5 ? -1 : 1
   return createController({
-    frames: [flower.asset],
+    frames: [plant.asset],
     init() {
       return {
         id,
-        type: 'flower',
-        width: () => flower.w * size,
-        height: () => flower.h * size,
+        type: 'plant',
+        width: () => plant.w * size,
+        height: () => plant.h * size,
         x: () => x + Math.random() * 100 - 50,
         y: () => 130 + Math.random() * 11,
        xScale: () => xScale,
@@ -58,29 +56,46 @@ export function createFlowerController(id: string, x: number) {
   })
 }
 
-import shrub1Asset from '@/assets/misc/shrub1.png'
-import shrub2Asset from '@/assets/misc/shrub2.png'
-
-const shrubs = [
-  { asset: shrub1Asset, w: 24, h: 14 },
-  // { asset: shrub2Asset, w: 24, h: 14 },
-]
-
-export function createShrubController(id: string, x: number) {
+import cloudAsset from '@/assets/misc/cloud1.png'
+export function createCloudController(id: string, x: number, startX: number) {
   const size = Math.random() * 0.5 + 1
-  const shrub = shrubs[Math.floor(Math.random() * shrubs.length)]
-  const xScale = Math.random() < 0.5 ? -1 : 1
   return createController({
-    frames: [shrub.asset],
+    frames: [cloudAsset],
     init() {
       return {
         id,
-        type: 'shrub',
-        width: () => shrub.w * size,
-        height: () => shrub.h * size,
-        x: () => x + Math.random() * 100 - 50,
-        y: () => 210 + Math.random() * 11,
-       xScale: () => xScale,
+        type: 'cloud',
+        width: () => 74 * size,
+        height: () => 26 * size,
+        ...createObjectSignal(x + Math.random() * 200 - 100, 'x'),
+        ...createObjectSignal(Math.random() * 20 + 5, 'y'),
+      }
+    },
+    onEnterFrame({ $, $age }) {
+      if ($age % 3 === 0) $.setX($.x() - 1)
+
+      if ($.x() < -100) {
+        $.setX(startX)
+        $.setY(Math.random() * 40 + 5)
+      }
+    }
+  })
+}
+
+import signAsset from "@/assets/misc/pr-sign.png"
+const SIGN_SCALE = 1
+export function createSignController(id: string) {
+  return createController({
+    frames: [signAsset],
+    randomStartFrame: true,
+    init() {
+      return {
+        id,
+        type: 'sign',
+        x: () => 50,
+        y: () => 160 - 35 * SIGN_SCALE, // 34 is the height of the sign asset
+        width: () => 70 * SIGN_SCALE,
+        height: () => 35 * SIGN_SCALE,
       }
     },
   })
