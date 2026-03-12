@@ -3,16 +3,29 @@ import MedalEmoji from '@/assets/emoji/medal.png'
 import PartyEmoji from '@/assets/emoji/party.png'
 import StarEmoji from '@/assets/emoji/star.png'
 
-const emojiMap: Record<string, string> = {
+const emojiMap: Record<string, string | undefined> = {
   "🏅": MedalEmoji,
   "🎉": PartyEmoji,
   "⭐": StarEmoji,
+  "🇸🇪": undefined,
+  "🚌": undefined,
+  "🎂": undefined,
+  "😱": undefined,
+  "☃️": undefined,
+  "❄️": undefined,
+  "🎄": undefined,
+  "🏃‍♂️": undefined,
+  "🏃": undefined,
+  "🏃‍♀️": undefined,
+  "💯": undefined,
+  "🪞": undefined,
+  "🌳": undefined,
+  "🎪": undefined,
 }
 
 export function FloatingEmoji(props: { emoji: string, shadow?: boolean, flipped?: boolean }) {
-
   const emoji = emojiMap[props.emoji] ? <img src={emojiMap[props.emoji]} class={styles.image} />: props.emoji
-
+  
   return <div class={styles.emoji({ hasShadow: props.shadow })}>
     <div class={styles.float({ hasShadow: props.shadow, flipped: props.flipped })}>{emoji}</div>
   </div>

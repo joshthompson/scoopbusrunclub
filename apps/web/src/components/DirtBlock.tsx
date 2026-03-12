@@ -10,17 +10,18 @@ import center from '@/assets/dirt-block/center.png'
 import left from '@/assets/dirt-block/left.png'
 import right from '@/assets/dirt-block/right.png'
 import { Show } from "solid-js"
-import { TitleSign } from "./TitleSign"
+import { SignType, TitleSign } from "./TitleSign"
 
 export function DirtBlock(props: {
   children: JSX.Element
   title?: string,
-  class?: string
+  class?: string,
+  signType?: SignType
 }) {
   return (
     <div class={cx(styles.dirtBlock, props.class)}>
       <Show when={props.title}>
-        <TitleSign title={props.title!} />
+        <TitleSign title={props.title!} type={props.signType} />
       </Show>
       <div class={styles.top} style={{ 'background-image': `url(${top})` }} />
       <div class={styles.topLeft} style={{ 'background-image': `url(${topLeft})` }} />

@@ -1,10 +1,12 @@
 import { createMemo, For, Show } from "solid-js"
 import { css } from "@style/css"
+import { A } from "@solidjs/router"
 import { type Runner } from "../utils/api"
 import { MILESTONE_SET, UPCOMING_THRESHOLD, nextMilestone, ordinalSuffix } from "../utils/milestones"
 import { formatName } from "@/utils/misc"
 import { FloatingEmoji } from "./FloatingEmoji"
 import { DirtBlock } from "./DirtBlock"
+import { getMemberRoute } from "@/utils/memberRoute"
 
 interface Props {
   runners: Runner[]
@@ -15,16 +17,16 @@ export function Milestones(props: Props) {
     const data = props.runners
     if (!data) return { celebrated: [], upcoming: [] }
 
-    const celebrated: { name: string; milestone: number }[] = []
-    const upcoming: { name: string; totalRuns: number; next: number; runsUntil: number }[] = []
+    const celebrated: { name: string; parkrunId: string; milestone: number }[] = []
+    const upcoming: { name: string; parkrunId: string; totalRuns: number; next: number; runsUntil: number }[] = []
 
     for (const r of data) {
       if (MILESTONE_SET.has(r.totalRuns)) {
-        celebrated.push({ name: r.name, milestone: r.totalRuns })
+        celebrated.push({ name: r.name, parkrunId: r.parkrunId, milestone: r.totalRuns })
       } else {
         const next = nextMilestone(r.totalRuns)
         if (next !== null && next - r.totalRuns <= UPCOMING_THRESHOLD) {
-          upcoming.push({ name: r.name, totalRuns: r.totalRuns, next, runsUntil: next - r.totalRuns })
+          upcoming.push({ name: r.name, parkrunId: r.parkrunId, totalRuns: r.totalRuns, next, runsUntil: next - r.totalRuns })
         }
       }
     }
@@ -43,7 +45,9 @@ export function Milestones(props: Props) {
             <For each={groups().celebrated}>
               {(row) => (
                 <li class={styles.celebRow}>
-                  {formatName(row.name)} {ordinalSuffix(row.milestone)} run! <FloatingEmoji emoji="🎉" shadow />
+                  <Show when={getMemberRoute(row.parkrunId, row.name)} fallback={<span>{formatName(row.name)}</span>}>
+                    {(href) => <A href={href()} class={styles.memberLink}>{formatName(row.name)}</A>}
+                  </Show> {ordinalSuffix(row.milestone)} run! <FloatingEmoji emoji="🎉" shadow />
                 </li>
               )}
             </For>
@@ -56,7 +60,11 @@ export function Milestones(props: Props) {
             <For each={groups().upcoming}>
               {(row) => (
                 <li class={styles.row}>
-                  <em>{formatName(row.name)}</em>&nbsp;
+                  <em>
+                    <Show when={getMemberRoute(row.parkrunId, row.name)} fallback={<span>{formatName(row.name)}</span>}>
+                      {(href) => <A href={href()} class={styles.memberLink}>{formatName(row.name)}</A>}
+                    </Show>
+                  </em>&nbsp;
                   {row.runsUntil} run{row.runsUntil === 1 ? "" : "s"} until{" "}
                   {row.next}
                 </li>
@@ -103,5 +111,9 @@ const styles = {
       fontStyle: "normal",
       fontWeight: "bold",
     },
+  }),
+  memberLink: css({
+    color: 'inherit',
+    textDecoration: 'underline',
   }),
 }

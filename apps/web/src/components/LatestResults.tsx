@@ -1,11 +1,15 @@
 import { createMemo, createSignal, For, Show } from "solid-js"
-import { FieldBlock } from "./FieldBlock"
-import { css, cx } from "@style/css"
+import { css } from "@style/css"
+import { A } from "@solidjs/router"
 import { type RunResultItem, type Runner } from "../utils/api"
-import { formatDate, formatName, ordinal, parseTimeToSeconds } from "@/utils/misc"
-import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
+import { formatDate, formatName, ordinal } from "@/utils/misc"
+import { MILESTONE_SET } from "../utils/milestones"
 import { FloatingEmoji } from "./FloatingEmoji"
 import { DirtBlock } from "./DirtBlock"
+import { ResultCelebrations, buildCelebrationData } from "./ResultCelebrations"
+import { Button } from "./Button"
+import { getMemberRoute } from "@/utils/memberRoute"
+import { runners } from "./header/runners"
 
 interface ParkrunResult {
   parkrunId: string
@@ -63,87 +67,46 @@ interface LatestResultsProps {
   runners: Runner[]
 }
 
-
-
-// Returns a map of "parkrunId:date:eventName:eventNumber" -> "pb" | "coursePb".
-// "pb" means a new overall personal best, "coursePb" means a new PB for that specific event.
-function buildPBMap(results: RunResultItem[]): Map<string, "pb" | "coursePb" | "first-run"> {
-  const map = new Map<string, "pb" | "coursePb" | "first-run">()
-
-  const byRunner = new Map<string, RunResultItem[]>()
-  for (const item of results) {
-    if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-    byRunner.get(item.parkrunId)!.push(item)
-  }
-
-  for (const runs of byRunner.values()) {
-    runs.sort((a, b) => a.date.localeCompare(b.date))
-    let bestOverall = Infinity
-    const bestPerCourse = new Map<string, number>()
-
-    for (const run of runs) {
-      const secs = parseTimeToSeconds(run.time)
-      const bestCourse = bestPerCourse.get(run.eventName) ?? Infinity
-      const key = `${run.parkrunId}:${run.date}:${run.eventName}:${run.eventNumber}`
-
-      if (bestOverall === Infinity) {
-        map.set(key, "first-run")
-        bestOverall = secs
-        bestPerCourse.set(run.eventName, secs)
-      } else if (secs < bestOverall) {
-        map.set(key, "pb")
-        bestOverall = secs
-        bestPerCourse.set(run.eventName, secs)
-      } else if (bestCourse !== Infinity && secs < bestCourse) {
-        map.set(key, "coursePb")
-        bestPerCourse.set(run.eventName, secs)
-      } else {
-        bestPerCourse.set(run.eventName, Math.min(bestCourse, secs))
-      }
-    }
-  }
-
-  return map
-}
-
 function isMilestoneEvent(eventNumber: string) {
   const num = Number(eventNumber)
   return !isNaN(num) && MILESTONE_SET.has(num)
 }
 
-// Returns a map of "parkrunId:date" -> milestone number for runs where a milestone was achieved.
-// Works backwards from each runner's totalRuns through the visible results to find which
-// date corresponds to each milestone run number.
-function buildMilestoneMap(results: RunResultItem[], runners: Runner[]): Map<string, number> {
-  const totalRunsMap = new Map<string, number>()
-  for (const r of runners) totalRunsMap.set(r.parkrunId, r.totalRuns)
+function isChristmas(date: string) {
+  return date.slice(5) === "12-25"
+}
 
-  const byRunner = new Map<string, RunResultItem[]>()
-  for (const item of results) {
-    if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-    byRunner.get(item.parkrunId)!.push(item)
-  }
+function getDisplayName(name: string, resultCount: number) {
+  const totalMembers = Object.values(runners).filter((runner) => runner[0]().id).length
+  if (name === "Bushy Park") return "Scoop Bushy Park"
+  if (name !== "Haga" && resultCount === totalMembers) return `Whole Gang Scoop Bus trip to ${name}`
+  if (name !== "Haga" && resultCount >= 4) return `Scoop Bus trip to ${name}`
+  if (resultCount === totalMembers) return `Full Scoop Gang at ${name}`
+  return name
+}
 
-  const map = new Map<string, number>()
-  for (const [parkrunId, runs] of byRunner) {
-    const totalRuns = totalRunsMap.get(parkrunId)
-    if (totalRuns === undefined) continue
-    // Sort ascending so index 0 is the oldest visible run
-    runs.sort((a, b) => a.date.localeCompare(b.date))
-    for (let i = 0; i < runs.length; i++) {
-      // Most recent run = totalRuns, second most recent = totalRuns-1, etc.
-      const runNumber = totalRuns - (runs.length - 1 - i)
-      if (MILESTONE_SET.has(runNumber)) {
-        map.set(`${parkrunId}:${runs[i].date}`, runNumber)
-      }
-    }
-  }
-  return map
+function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
+  const isBusTrip = () => props.parkrun.name !== "Haga" && props.parkrun.results.length >= 4
+  const isMilestone = () => isMilestoneEvent(props.parkrun.eventNumber)
+  const isXmas = () => isChristmas(props.date)
+  const displayName = () => getDisplayName(props.parkrun.name, props.parkrun.results.length)
+
+  return (
+    <h4 class={styles.parkrunName}>
+      {isXmas() && <FloatingEmoji emoji="🎄" flipped />}
+      {isMilestone() && <FloatingEmoji emoji="🎉" flipped />}
+      {isBusTrip() && <FloatingEmoji emoji="🚌" flipped />}{' '}
+      {displayName()}{' '}
+      #{props.parkrun.eventNumber}{' '}
+      {isBusTrip() && <FloatingEmoji emoji="🚌" />}
+      {isMilestone() && <FloatingEmoji emoji="🎉" />}
+      {isXmas() && <FloatingEmoji emoji="🎄" />}
+    </h4>
+  )
 }
 
 export function LatestResults(props: LatestResultsProps) {
-  const milestoneMap = createMemo(() => buildMilestoneMap(props.results, props.runners))
-  const pbMap = createMemo(() => buildPBMap(props.results))
+  const celebrations = createMemo(() => buildCelebrationData(props.results, props.runners))
 
   const grouped = createMemo(() => groupResults(props.results))
 
@@ -169,39 +132,34 @@ export function LatestResults(props: LatestResultsProps) {
           <div class={styles.results}>
             <h3 class={styles.date}>{formatDate(new Date(result.date + "T00:00:00"))}</h3>
             <For each={result.parkruns}>
-              {(parkrun) => (
+              {(parkrun) => {
+                return (
                 <DirtBlock>
                   <div class={styles.parkrun}>
-                    <h4 class={styles.parkrunName}>
-                      {isMilestoneEvent(parkrun.eventNumber) && <FloatingEmoji emoji="🎉" flipped /> }{' '}
-                      {parkrun.name}{' '}
-                      #{parkrun.eventNumber}{' '}
-                      {isMilestoneEvent(parkrun.eventNumber) && <FloatingEmoji emoji="🎉" /> }
-                    </h4>
+                    <ParkrunName parkrun={parkrun} date={result.date} />
                     <ol>
                       <For each={parkrun.results}>
                         {(res) => {
-                          const milestone = milestoneMap().get(`${res.parkrunId}:${result.date}`)
-                          const pb = pbMap().get(`${res.parkrunId}:${result.date}:${parkrun.name}:${parkrun.eventNumber}`)
+                          const resultKey = `${res.parkrunId}:${result.date}:${parkrun.name}:${parkrun.eventNumber}`
+                          const runnerDateKey = `${res.parkrunId}:${result.date}`
+                          const memberRoute = getMemberRoute(res.parkrunId, res.name)
                           return (
                             <li>
-                              <em>{formatName(res.name)}</em> finished in{" "}
+                              <em>
+                                <Show
+                                  when={memberRoute}
+                                  fallback={<span>{formatName(res.name)}</span>}
+                                >
+                                  {(href) => (
+                                    <A href={href()} class={styles.memberLink}>
+                                      {formatName(res.name)}
+                                    </A>
+                                  )}
+                                </Show>
+                              </em> finished in{" "}
                               <em>{ordinal(res.position)}</em> place with a time of{" "}
                               <em>{res.time}</em>
-                              {pb === "first-run" && (
-                                <span class={cx(styles.tag, styles.pb)}>Parkrun debut! <FloatingEmoji emoji="🎉" /></span>
-                              )}
-                              {pb === "pb" && (
-                                <span class={cx(styles.tag, styles.pb)}>New PB! <FloatingEmoji emoji="🏅" /></span>
-                              )}
-                              {pb === "coursePb" && (
-                                <span class={cx(styles.tag, styles.coursePb)}>New Course PB! <FloatingEmoji emoji="⭐" /></span>
-                              )}
-                              {milestone !== undefined && (
-                                <span class={cx(styles.tag, styles.milestone)}>
-                                  {ordinalSuffix(milestone)} run! <FloatingEmoji emoji="🎉" />
-                                </span>
-                              )}
+                              <ResultCelebrations data={celebrations()} resultKey={resultKey} runnerDateKey={runnerDateKey} parkrunId={res.parkrunId} date={result.date} />
                             </li>
                           )
                         }}
@@ -209,15 +167,16 @@ export function LatestResults(props: LatestResultsProps) {
                     </ol>
                   </div>
                 </DirtBlock>
-              )}
+                )
+              }}
             </For>
           </div>
         )}
       </For>
       <Show when={hasMore() && !showAll()}>
-        <button class={styles.showMore} onClick={() => setShowAll(true)}>
+        <Button onClick={() => setShowAll(true)}>
           Show all results
-        </button>
+        </Button>
       </Show>
     </div>
   )
@@ -253,39 +212,8 @@ const styles = {
     fontSize: '1.5em',
     m: 0,
   }),
-  tag: css({
-    display: 'inline-block',
-    background: '#FFFC',
-    p: '0rem 0.3rem',
-    m: '0.1rem 0.5rem',
-    borderRadius: '2px',
-    cornerShape: 'notch',
-    fontWeight: 'bold',
-    outline: '2px solid currentColor',
-    outlineOffset: '-1px',
-  }),
-  pb: css({
-    color: '#2563eb',
-  }),
-  coursePb: css({
-    color: '#16a34a',
-  }),
-  milestone: css({
-    color: '#db2777',
-  }),
-  showMore: css({
-    alignSelf: 'center',
-    padding: '0.5rem 1.5rem',
-    border: '3px double currentColor',
-    background: 'transparent',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '1rem',
-    textTransform: 'uppercase',
-    cornerShape: 'notch',
-    borderRadius: '4px',
-    _hover: {
-      background: 'rgba(255, 255, 255, 0.1)',
-    },
+  memberLink: css({
+    color: 'inherit',
+    textDecoration: 'underline',
   }),
 }

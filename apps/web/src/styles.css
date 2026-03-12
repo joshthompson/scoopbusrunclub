@@ -23,6 +23,7 @@ body {
   background-color: var(--grass-green);
   background-image: url('/bg.png');
   padding-bottom: 2rem;
+  min-height: 100vh;
 }
 
 * {

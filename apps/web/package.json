@@ -8,5 +8,8 @@
     "dev": "panda codegen --clean && panda cssgen && vite",
     "build": "panda codegen --clean && panda cssgen && vite build",
     "serve": "vite preview"
+  },
+  "dependencies": {
+    "@solidjs/router": "^0.15.4"
   }
 }

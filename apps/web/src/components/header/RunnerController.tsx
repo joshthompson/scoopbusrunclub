@@ -3,6 +3,8 @@ import { RUNNER_SIZE, runners } from "./runners"
 import { css } from "@style/css"
 import { Accessor } from "solid-js"
 
+const LABEL_RENDER_DISTANCE = 100
+
 export function createRunnerController(
   id: string,
   runnerId: keyof typeof runners,
@@ -38,17 +40,23 @@ export function createRunnerController(
         width,
         height,
         children: () => {
-          const mouseDist = Math.hypot(
-            mousePosition().x - (x() + width() / 2),
-            mousePosition().y - (y() + height() / 2),
-          )
+          const closest = scene.getControllersByType<RunnerController>('runner')
+            .map(c => ({
+              id: c.data.id,
+              dist: Math.hypot(
+                c.data.x() + c.data.width() / 2 - mousePosition().x,
+                c.data.y() + c.data.height() / 2 - mousePosition().y
+              )
+            }))
+            .filter(({ dist }) => dist < LABEL_RENDER_DISTANCE)
+            .sort((a, b) => a.dist - b.dist)[0]
 
           const name = runner().name
           const time = runner().latestTime && runnerId !== 'link' ? ` - ${runner().latestTime}` : ''
           
           return <div
             style={{
-              display: mouseDist < 40 ? 'block' : 'none',
+              display: closest?.id === id ? 'block' : 'none',
               transform:
                 runnerId === 'lyra' || runnerId === 'link'
                   ? 'translate(-50%, -50%)'

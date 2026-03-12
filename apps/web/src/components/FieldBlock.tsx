@@ -11,17 +11,18 @@ import cornerSE from '@/assets/block/corner-se.png'
 import cornerSW from '@/assets/block/corner-sw.png'
 import center from '@/assets/block/center.png'
 import { Show } from "solid-js"
-import { TitleSign } from "./TitleSign"
+import { SignType, TitleSign } from "./TitleSign"
 
 export function FieldBlock(props: {
   children: JSX.Element
   title?: string,
-  class?: string
+  class?: string,
+  signType?: SignType
 }) {
   return (
     <div class={cx(styles.fieldBlock, props.class)}>
       <Show when={props.title}>
-        <TitleSign title={props.title!} />
+        <TitleSign title={props.title!} type={props.signType} />
       </Show>
       <div style={{ 'background-image': `url(${cornerNW})` }} />
       <div style={{ 'background-image': `url(${edgeN})` }} />
