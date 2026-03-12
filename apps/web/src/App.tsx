@@ -6,6 +6,7 @@ import { css } from '@style/css';
 import { fetchRunners, fetchAllResults } from './utils/api';
 import { MemberPage } from './pages/MemberPage';
 import { HomePage } from './pages/HomePage';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 const App: Component = () => {
   const [runners] = createResource(fetchRunners)
@@ -47,6 +48,7 @@ const App: Component = () => {
             </Show>
           )}
         />
+        <Route path="*404" component={NotFoundPage} />
     </Router>
   );
 };

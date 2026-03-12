@@ -33,6 +33,9 @@ jobs:
         env:
           VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
 
+      - name: Copy index.html to 404.html
+        run: cp apps/web/dist/index.html apps/web/dist/404.html
+
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: apps/web/dist

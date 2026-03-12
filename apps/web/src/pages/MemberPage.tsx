@@ -1,6 +1,6 @@
 import { css } from "@style/css"
 import { createMemo, createSignal, For, Show } from "solid-js"
-import { A, Navigate, useNavigate, useParams } from "@solidjs/router"
+import { A, useNavigate, useParams } from "@solidjs/router"
 import { DirtBlock } from "../components/DirtBlock"
 import { Button } from "../components/Button"
 import { runners as runnerSignals } from "../components/header/runners"
@@ -11,6 +11,7 @@ import { getMemberRoute, getRunnerKeyFromRouteName } from "@/utils/memberRoute"
 import { CharacterImage } from "@/components/CharacterImage"
 import { FieldBlock } from "@/components/FieldBlock"
 import { RunnerSummaryStat } from "./RunnerSummaryStat"
+import { NotFoundPage } from "./NotFoundPage"
 
 interface MemberPageProps {
   results: RunResultItem[]
@@ -293,9 +294,9 @@ export function MemberPage(props: MemberPageProps) {
   )
 
   return (
-    <div class={styles.container}>
-      <Show when={runnerData()} fallback={<Navigate href="/" />}>
-        {(runner) => (
+    <Show when={runnerData()} fallback={<NotFoundPage />}>
+      {(runner) => (
+        <div class={styles.container}>
           <FieldBlock title={runner().name} signType="purple">
             <div class={styles.runnerSummary}>
               <CharacterImage runner={runner()} pose="sitting" />
@@ -316,33 +317,33 @@ export function MemberPage(props: MemberPageProps) {
               )}
             </div>
           </FieldBlock>
-        )}
-      </Show>
 
-      <div class={styles.twoColumnGrid}>
-        <DirtBlock title="Celebrations">
-          <Show when={nonPbCelebrations().length > 0} fallback={<p>No celebrations yet.</p>}>
-            <ul class={styles.list}>
-              <For each={nonPbCelebrations()}>
-                {(celebration) => <AchievementItem celebration={celebration} />}
-              </For>
-            </ul>
-          </Show>
-        </DirtBlock>
+          <div class={styles.twoColumnGrid}>
+            <DirtBlock title="Celebrations">
+              <Show when={nonPbCelebrations().length > 0} fallback={<p>No celebrations yet.</p>}>
+                <ul class={styles.list}>
+                  <For each={nonPbCelebrations()}>
+                    {(celebration) => <AchievementItem celebration={celebration} />}
+                  </For>
+                </ul>
+              </Show>
+            </DirtBlock>
 
-        <DirtBlock title="PBs">
-          <Show when={pbCelebrations().length > 0} fallback={<p>No PBs yet.</p>}>
-            <ul class={styles.list}>
-              <For each={pbCelebrations()}>
-                {(celebration) => <AchievementItem celebration={celebration} />}
-              </For>
-            </ul>
-          </Show>
-        </DirtBlock>
-      </div>
+            <DirtBlock title="PBs">
+              <Show when={pbCelebrations().length > 0} fallback={<p>No PBs yet.</p>}>
+                <ul class={styles.list}>
+                  <For each={pbCelebrations()}>
+                    {(celebration) => <AchievementItem celebration={celebration} />}
+                  </For>
+                </ul>
+              </Show>
+            </DirtBlock>
+          </div>
 
-      <Button onClick={() => navigate("/")}>Back</Button>
-    </div>
+          <Button onClick={() => navigate("/")}>Back</Button>
+        </div>
+      )}
+    </Show>
   )
 }
 
