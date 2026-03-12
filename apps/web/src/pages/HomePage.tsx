@@ -13,7 +13,7 @@ export const HomePage: Component<{ resultsLoading: boolean; runnersLoading: bool
   return (
     <div class={styles.content}>
       <main class={styles.main}>
-        <FieldBlock title="Latest Results">
+        <FieldBlock title="Latest Results" signType="purple">
           <Show when={!props.resultsLoading && !props.runnersLoading} fallback={<div>Loading...</div>}>
             <LatestResults results={props.results} runners={props.runners} />
           </Show>

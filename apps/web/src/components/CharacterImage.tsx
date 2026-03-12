@@ -8,11 +8,11 @@ export function CharacterImage(props: { runner: RunnerData, pose: "sitting" | "r
   
   return <div class={styles.characterImage} role="img" aria-label={`Image of ${runner().name}`}>
     <img src={runner().sitFrames[0]} class={styles.sitting} />
-    <img src={shadowAsset} class={styles.shadow} />
-    {runner().name === 'Alisa' && <>
-      <img src={runners.link[0]().sitFrames[0]} alt={`${runner().name} sitting`} class={styles.linkSitting} />
-      <img src={shadowAsset} class={styles.linkShadow} />
-    </>}
+    {runner().name === 'Alisa' && <img src={runners.link[0]().sitFrames[0]} alt={`${runner().name} sitting`} class={styles.linkSitting} />}
+    <div class={styles.shadows}>
+      <img src={shadowAsset} class={styles.shadow} />
+      {runner().name === 'Alisa' && <img src={shadowAsset} class={styles.linkShadow} />}
+    </div>
   </div>
 }
 
@@ -21,14 +21,9 @@ const styles = {
     display: 'inline-block',
     position: "relative",
     height: '100px',
+    mt: '-35px',
     mb: '-20px',
-  }),
-  shadow: css({
-    width: '100%',
-    height: '20%',
-    position: 'relative',
-    zIndex: 1,
-    mt: '-10px',
+    zIndex: 5,
   }),
   sitting: css({
     zIndex: 2,
@@ -43,12 +38,24 @@ const styles = {
     left: '50%',
     height: '100%',
   }),
+  shadows: css({
+    filter: 'brightness(0)',
+    opacity: 0.1,
+    height: '20%',
+  }),
+  shadow: css({
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    zIndex: 1,
+    mt: '-10px',
+  }),
   linkShadow: css({
     zIndex: 1,
     position: 'absolute',
-    bottom: '10%',
+    bottom: '-50%',
     left: '50%',
-    height: '20%',
+    height: '100%',
     width: '100%',
   }),
 }

@@ -9,6 +9,8 @@ import { formatDate, formatName, parseTimeToSeconds } from "@/utils/misc"
 import { buildCelebrationData, CelebrationPill, getCelebrationTags } from "../components/ResultCelebrations"
 import { getMemberRoute, getRunnerKeyFromRouteName } from "@/utils/memberRoute"
 import { CharacterImage } from "@/components/CharacterImage"
+import { FieldBlock } from "@/components/FieldBlock"
+import { RunnerSummaryStat } from "./RunnerSummaryStat"
 
 interface MemberPageProps {
   results: RunResultItem[]
@@ -108,6 +110,19 @@ export function MemberPage(props: MemberPageProps) {
     result.eventName === "Haga" && result.parkrunId === runnerId()
   ).length)
   const totalEvents = createMemo(() => new Set(runnerResults().map((result) => result.eventName)).size)
+  const runnerNameById = createMemo(() => {
+    const map = new Map<string, string>()
+    for (const [, [runner]] of Object.entries(runnerSignals)) {
+      const data = runner()
+      if (data.id) map.set(data.id, data.name)
+    }
+
+    for (const runner of props.runners) {
+      if (!map.has(runner.parkrunId)) map.set(runner.parkrunId, formatName(runner.name))
+    }
+
+    return map
+  })
   const eventResultsMap = createMemo(() => {
     const map = new Map<string, RunResultItem[]>()
     for (const result of props.results) {
@@ -126,7 +141,7 @@ export function MemberPage(props: MemberPageProps) {
 
   const oftenRunsWith = (withinSeconds: number) =>
     createMemo(() => {
-      if (!runnerId()) return "Unknown"
+      if (!runnerId()) return "-"
 
       const nearbyCounts = new Map<string, number>()
 
@@ -152,7 +167,6 @@ export function MemberPage(props: MemberPageProps) {
 
       if (nearbyCounts.size === 0) return "Unknown"
 
-      const runnerNameById = new Map(props.runners.map((runner) => [runner.parkrunId, runner.name]))
       let bestParkrunId = ""
       let bestCount = -1
 
@@ -164,15 +178,15 @@ export function MemberPage(props: MemberPageProps) {
         }
 
         if (count === bestCount) {
-          const currentName = formatName(runnerNameById.get(otherParkrunId) ?? "")
-          const bestName = formatName(runnerNameById.get(bestParkrunId) ?? "")
+          const currentName = runnerNameById().get(otherParkrunId) ?? ""
+          const bestName = runnerNameById().get(bestParkrunId) ?? ""
           if (currentName.localeCompare(bestName) < 0) {
             bestParkrunId = otherParkrunId
           }
         }
       }
 
-      const bestName = formatName(runnerNameById.get(bestParkrunId) ?? "")
+      const bestName = runnerNameById().get(bestParkrunId) ?? ""
       if (!bestName) return "Unknown"
 
       const countText = `${bestCount} ${bestCount === 1 ? "time" : "times"}`
@@ -182,7 +196,7 @@ export function MemberPage(props: MemberPageProps) {
 
       return (
         <>
-          <A href={memberRoute} class={styles.link}>{bestName}</A> ({countText})
+          <A href={memberRoute} class={styles.link}>{bestName}</A><br />{countText}
         </>
       )
     })
@@ -282,31 +296,17 @@ export function MemberPage(props: MemberPageProps) {
     <div class={styles.container}>
       <Show when={runnerData()} fallback={<Navigate href="/" />}>
         {(runner) => (
-          <DirtBlock title={runner().name} signType="purple">
+          <FieldBlock title={runner().name} signType="purple">
             <div class={styles.runnerSummary}>
               <CharacterImage runner={runner()} pose="sitting" />
-              <Show
-                when={personalBest()}
-                fallback={<p>Personal Best: <strong>--:--</strong></p>}
-              >
-                {(pb) => (
-                  <div>
-                    Personal Best: <strong>{pb().time}</strong>{' '}
-                    achieved at {pb().eventName} #{pb().eventNumber} on {formatDate(new Date(`${pb().date}T00:00:00`))}
-                  </div>
-                )}
-              </Show>
-              <p>
-                Total runs: <strong>{totalRuns()}</strong>
-              </p>
-              <p>
-                Total runs at Haga: <strong>{totalRunsAtHaga()}</strong>
-              </p>
-              <p>
-                Total different events: <strong>{totalEvents()}</strong>
-              </p>
-              <p>Most often runs with: {oftenRunsWith(Infinity)()}</p>
-              <p>Most often finishes with: {oftenRunsWith(30)()}</p>
+              
+              <div class={styles.runnerSummaryStats}>
+                <RunnerSummaryStat label="Total runs">{totalRuns()}</RunnerSummaryStat>
+                <RunnerSummaryStat label="Haga runs">{totalRunsAtHaga()}</RunnerSummaryStat>
+                <RunnerSummaryStat label="Events">{totalEvents()}</RunnerSummaryStat>
+                <RunnerSummaryStat label="Runs with" type="text">{oftenRunsWith(Infinity)()}</RunnerSummaryStat>
+                <RunnerSummaryStat label="Finishes with" type="text">{oftenRunsWith(30)()}</RunnerSummaryStat>
+              </div>
               {runner().id && (
                 <p>
                   <a href={`https://www.parkrun.se/parkrunner/${runner().id}/all`} target="_blank" rel="noopener noreferrer" class={styles.link}>
@@ -315,7 +315,7 @@ export function MemberPage(props: MemberPageProps) {
                 </p>
               )}
             </div>
-          </DirtBlock>
+          </FieldBlock>
         )}
       </Show>
 
@@ -360,6 +360,26 @@ const styles = {
     flexDirection: 'column',
     gap: '0.5rem',
     alignItems: 'center',
+  }),
+  personalBest: css({
+    minWidth: '80%',
+    fontSize: '1.2rem',
+    textAlign: 'center',
+  }),
+  personalBestValue: css({
+    fontSize: '2rem',
+    fontWeight: 'bold',
+  }),
+  personalBestDetails: css({
+    fontSize: '1rem',
+    fontWeight: 'normal',
+  }),
+  runnerSummaryStats: css({
+    display: 'flex',
+    gap: '0.5rem',
+    alignItems: 'center',
+    width: '100%',
+    flexWrap: 'wrap',
   }),
   twoColumnGrid: css({
     display: 'grid',
