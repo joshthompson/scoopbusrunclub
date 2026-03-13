@@ -2,6 +2,15 @@ import { createController, createObjectSignal } from "@/engine";
 
 import tree1Asset from '@/assets/misc/tree1.png'
 import tree2Asset from '@/assets/misc/tree2.png'
+import flower1Asset from '@/assets/misc/flower1.png'
+import flower2Asset from '@/assets/misc/flower2.png'
+import flower3Asset from '@/assets/misc/flower3.png'
+import flower4Asset from '@/assets/misc/flower4.png'
+import shrub1Asset from '@/assets/misc/shrub1.png'
+import cloud1Asset from '@/assets/misc/cloud1.png'
+import cloud2Asset from '@/assets/misc/cloud2.png'
+import signAsset from "@/assets/misc/pr-sign.png"
+
 const trees = [
   { asset: tree1Asset, w: 87, h: 120 },
   { asset: tree2Asset, w: 56, h: 110 },
@@ -19,16 +28,12 @@ export function createTreeController(id: string, x: number) {
         height: () => 120 * size,
         x: () => x + Math.random() * 150 - 75,
         y: () => 10 + Math.random() * 5,
+        frameInterval: () => Infinity,
       }
     },
   })
 }
 
-import flower1Asset from '@/assets/misc/flower1.png'
-import flower2Asset from '@/assets/misc/flower2.png'
-import flower3Asset from '@/assets/misc/flower3.png'
-import flower4Asset from '@/assets/misc/flower4.png'
-import shrub1Asset from '@/assets/misc/shrub1.png'
 const plants = [
   { asset: flower1Asset, w: 12, h: 14 },
   { asset: flower2Asset, w: 11, h: 11 },
@@ -50,14 +55,13 @@ export function createPlantController(id: string, x: number) {
         height: () => plant.h * size,
         x: () => x + Math.random() * 100 - 50,
         y: () => 130 + Math.random() * 11,
-       xScale: () => xScale,
+        xScale: () => xScale,
+        frameInterval: () => Infinity,
       }
     },
   })
 }
 
-import cloud1Asset from '@/assets/misc/cloud1.png'
-import cloud2Asset from '@/assets/misc/cloud2.png'
 const clouds = [
   { asset: cloud1Asset, w: 74, h: 26 },
   { asset: cloud2Asset, w: 74, h: 26 },
@@ -77,6 +81,7 @@ export function createCloudController(id: string, x: number, startX: number) {
         xScale: () => xScale,
         ...createObjectSignal(x + Math.random() * 200 - 100, 'x'),
         ...createObjectSignal(Math.random() * 20 + 5, 'y'),
+        frameInterval: () => Infinity,
       }
     },
     onEnterFrame({ $, $age }) {
@@ -90,7 +95,6 @@ export function createCloudController(id: string, x: number, startX: number) {
   })
 }
 
-import signAsset from "@/assets/misc/pr-sign.png"
 const SIGN_SCALE = 1
 export function createSignController(id: string) {
   return createController({
@@ -104,6 +108,7 @@ export function createSignController(id: string) {
         y: () => 160 - 35 * SIGN_SCALE, // 34 is the height of the sign asset
         width: () => 70 * SIGN_SCALE,
         height: () => 35 * SIGN_SCALE,
+        frameInterval: () => Infinity,
       }
     },
   })

@@ -51,8 +51,12 @@ export function createBusController(id: string, scene: Scene) {
       // Scoop the runners
       const bodyController = $scene.getControllersByType('bus-bus-body')?.[0]
       if (bodyController && !$.scooping()) {
+        const scoopXStart = $.x()
+        const scoopXEnd = scoopXStart + 88
+
         $scene.getControllersByType<RunnerController>('runner').forEach(controller => {
-          if (bodyController.hitTest(controller) && controller.data.y() > $.y() + 50 && !controller.data.scooped()) {
+          const x = controller.data.x() + controller.data.width()
+          if (!controller.data.scooped() && x >= scoopXStart && x <= scoopXEnd) {
             controller.data.setScooped(true)
             controller.data.setYSpeed(SCOOP_SPEED * -1 * (1 + Math.random() * 0.6))
             $.setScooping(true)

@@ -81,7 +81,7 @@ export function createController<
 >(options: ControllerProps<CP>): Controller<CP> {
 
   const [age, setAge] = createSignal<number>(0)
-  const onEnterFrame = options.onEnterFrame ?? (() => {})
+  const onEnterFrame = options.onEnterFrame
   const [currentFrame, setCurrentFrame] = createSignal<number>(0)
   const [childControllers, setChildControllers] = createSignal<Controller<any>[]>([])
   const data: CP = options.init()
@@ -112,7 +112,7 @@ export function createController<
       const prevX = data.x()
       const prevY = data.y()
 
-      onEnterFrame({
+      onEnterFrame?.({
         $: data,
         $scene,
         $age: age(),

@@ -1,6 +1,6 @@
-import { css } from "@style/css"
-import { RunnerData, runners } from "./header/runners"
-import shadowAsset from "@/assets/runners/shadow.png"
+import { css } from '@style/css'
+import { RunnerData, runners } from './header/runners'
+import shadowAsset from '@/assets/runners/shadow.png'
 
 export function CharacterImage(props: { runner: RunnerData, pose: "sitting" | "running" }) {
   const runner = () => props.runner
