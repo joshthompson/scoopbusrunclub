@@ -1,7 +1,6 @@
 import { css } from "@style/css"
-import { useNavigate } from "@solidjs/router"
 import { DirtBlock } from "@/components/DirtBlock"
-import { Button } from "@/components/Button"
+import { BackSignButton } from "@/components/BackSignButton"
 
 const reasons = [
   "A volunteer shortage",
@@ -22,10 +21,7 @@ const reasons = [
 ]
 
 export function NotFoundPage() {
-  const navigate = useNavigate()
-
   const reason = reasons[Math.floor(Math.random() * reasons.length)]
-  
   return (
     <div class={styles.container}>
       <DirtBlock title="404" signType="purple">
@@ -38,7 +34,7 @@ export function NotFoundPage() {
         </div>
       </DirtBlock>
       <div class={styles.button}>
-        <Button onClick={() => navigate("/")}>Back to home</Button>
+        <BackSignButton />
       </div>
     </div>
   )

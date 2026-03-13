@@ -12,6 +12,7 @@ import { CharacterImage } from "@/components/CharacterImage"
 import { FieldBlock } from "@/components/FieldBlock"
 import { RunnerSummaryStat } from "./RunnerSummaryStat"
 import { NotFoundPage } from "./NotFoundPage"
+import { BackSignButton } from "@/components/BackSignButton"
 
 interface MemberPageProps {
   results: RunResultItem[]
@@ -64,7 +65,7 @@ function AchievementItem(props: { celebration: GroupedCelebration }) {
         }} />
         <Show when={props.celebration.occurrences.length > 1}> × {props.celebration.occurrences.length}</Show>
       </div>
-      <div>{props.celebration.description}</div>
+      <div class={styles.celebrationDescription}>{props.celebration.description}</div>
 
       <div>
         <Show when={showTime()}>
@@ -339,8 +340,7 @@ export function MemberPage(props: MemberPageProps) {
               </Show>
             </DirtBlock>
           </div>
-
-          <Button onClick={() => navigate("/")}>Back</Button>
+          <BackSignButton />
         </div>
       )}
     </Show>
@@ -414,6 +414,9 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '0.25rem',
+  }),
+  celebrationDescription: css({
+    fontWeight: 'bold',
   }),
   showMoreInline: css({
     border: 'none',

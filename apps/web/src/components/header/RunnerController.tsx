@@ -13,7 +13,7 @@ export function createRunnerController(
   mousePosition: Accessor<{ x: number, y: number }>,
 ) {
   const [runner] = runners[runnerId]
-  let baseY = 125 + yShift
+  let baseY = 124 + yShift
 
   return createController({
     frames: [...runner().frames],
@@ -67,7 +67,7 @@ export function createRunnerController(
               background: 'black',
               left: '50%',
               color: 'white',
-              fontFamily: '"Pixelify Sans", sans-serif',
+              fontFamily: '"Jersey 10", sans-serif',
               fontSize: '12px',
               p: '0px 8px',
               width: 'max-content',

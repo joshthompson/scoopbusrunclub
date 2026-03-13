@@ -3,7 +3,6 @@ import { RunnerData, runners } from "./header/runners"
 import shadowAsset from "@/assets/runners/shadow.png"
 
 export function CharacterImage(props: { runner: RunnerData, pose: "sitting" | "running" }) {
-
   const runner = () => props.runner
   
   return <div class={styles.characterImage} role="img" aria-label={`Image of ${runner().name}`}>
@@ -24,6 +23,7 @@ const styles = {
     mt: '-35px',
     mb: '-20px',
     zIndex: 5,
+    pointerEvents: 'none',
   }),
   sitting: css({
     zIndex: 2,

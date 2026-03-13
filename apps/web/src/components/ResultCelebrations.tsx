@@ -145,6 +145,7 @@ const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
       "Örebro",
       "Vallaskogen",
       "Uppsala",
+      "Boulognerskogen",
     ],
   },
   {
