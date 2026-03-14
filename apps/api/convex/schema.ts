@@ -6,6 +6,7 @@ export default defineSchema({
     parkrunId: v.string(),
     name: v.string(),
     totalRuns: v.number(),
+    totalJuniorRuns: v.optional(v.number()),
     lastUpdated: v.number(),
   }).index("by_parkrunId", ["parkrunId"]),
 

@@ -14,6 +14,7 @@ export const storeRunnerData = internalMutation({
     parkrunId: v.string(),
     name: v.string(),
     totalRuns: v.number(),
+    totalJuniorRuns: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -25,6 +26,7 @@ export const storeRunnerData = internalMutation({
       await ctx.db.patch(existing._id, {
         name: args.name,
         totalRuns: args.totalRuns,
+        totalJuniorRuns: args.totalJuniorRuns ?? 0,
         lastUpdated: Date.now(),
       });
     } else {
@@ -32,6 +34,7 @@ export const storeRunnerData = internalMutation({
         parkrunId: args.parkrunId,
         name: args.name,
         totalRuns: args.totalRuns,
+        totalJuniorRuns: args.totalJuniorRuns ?? 0,
         lastUpdated: Date.now(),
       });
     }

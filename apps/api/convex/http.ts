@@ -136,6 +136,7 @@ http.route({
         parkrunId,
         name: runner.name,
         totalRuns: runner.totalRuns,
+        totalJuniorRuns: runner.totalJuniorRuns ?? 0,
       });
 
       if (Array.isArray(runResults)) {

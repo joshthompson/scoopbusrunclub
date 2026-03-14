@@ -60,6 +60,12 @@ const TRACKED_ATHLETES: { parkrunId: string; name: string }[] = [
   { parkrunId: "5346109", name: "Other Josh" },
 ];
 
+/** Delay range (in ms) between fetching each athlete's page to avoid rate-limiting. */
+const DELAY_BETWEEN_FETCHES_MS = { min: 30_000, max: 60_000 };
+
+/** Number of times to retry a failed page load before giving up. */
+const MAX_RETRIES = 4;
+
 const CONVEX_SITE_URL = process.env.CONVEX_SITE_URL;
 const INGEST_SECRET = process.env.INGEST_SECRET;
 
@@ -84,16 +90,38 @@ interface IngestPayload {
 
 // --- Helpers ---
 
+function randomDelay({ min, max }: { min: number; max: number }): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchPage(
   context: Awaited<ReturnType<Awaited<ReturnType<typeof chromium.launch>>["newContext"]>>,
   url: string,
 ): Promise<string> {
-  const page = await context.newPage();
-  await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-  await page.waitForTimeout(2000);
-  const html = await page.content();
-  await page.close();
-  return html;
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    const page = await context.newPage();
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForTimeout(3000);
+      const html = await page.content();
+      return html;
+    } catch (error) {
+      if (attempt <= MAX_RETRIES) {
+        const backoff = randomDelay({ min: 10_000, max: 20_000 });
+        console.log(`  ⟳ Attempt ${attempt} failed, retrying in ${(backoff / 1000).toFixed(1)}s...`);
+        await sleep(backoff);
+      } else {
+        throw error;
+      }
+    } finally {
+      await page.close();
+    }
+  }
+  throw new Error("Unreachable");
 }
 
 // --- Main ---
@@ -130,6 +158,13 @@ async function main() {
       });
     } catch (error) {
       console.error(`  ✗ Error fetching ${name} (${parkrunId}):`, error);
+    }
+
+    // Pause between athletes to avoid being blocked by the server
+    if (parkrunId !== TRACKED_ATHLETES[TRACKED_ATHLETES.length - 1].parkrunId) {
+      const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS);
+      console.log(`  Waiting ${(delay / 1000).toFixed(1)}s before next fetch...`);
+      await sleep(delay);
     }
   }
 

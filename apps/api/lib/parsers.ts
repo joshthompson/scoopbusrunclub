@@ -8,6 +8,7 @@
 export interface RunnerInfo {
   name: string;
   totalRuns: number;
+  totalJuniorRuns: number;
 }
 
 export interface RunResult {
@@ -33,10 +34,15 @@ export function parseRunnerData(html: string): RunnerInfo {
   const name = nameMatch ? nameMatch[1].trim() : "Unknown";
 
   // Total runs: <h3>136 parkruns total</h3>  or  <h3>\n  136 parkruns total\n</h3>
-  const totalMatch = html.match(/<h3>\s*(\d+)\s*parkruns?\s*total/i);
+  // With junior parkruns: <h3>10 parkruns &amp; 4 junior parkruns totalt</h3>
+  const totalMatch = html.match(
+    /<h3>\s*(\d+)\s*parkruns?\s*(?:&amp;|&)?\s*(?:(\d+)\s*junior\s*parkruns?\s*)?total/i,
+  );
   const totalRuns = totalMatch ? parseInt(totalMatch[1], 10) : 0;
+  const totalJuniorRuns =
+    totalMatch && totalMatch[2] ? parseInt(totalMatch[2], 10) : 0;
 
-  return { name, totalRuns };
+  return { name, totalRuns, totalJuniorRuns };
 }
 
 // --- Parse all run results from the /all/ page ---
