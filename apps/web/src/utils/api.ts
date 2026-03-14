@@ -123,6 +123,7 @@ export interface Runner {
   parkrunId: string;
   name: string;
   totalRuns: number;
+  totalJuniorRuns?: number;
   lastUpdated: number;
 }
 

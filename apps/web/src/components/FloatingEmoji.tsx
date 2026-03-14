@@ -21,6 +21,7 @@ const emojiMap: Record<string, string | undefined> = {
   "🪞": undefined,
   "🌳": undefined,
   "🎪": undefined,
+  "💫": undefined,
 }
 
 export function FloatingEmoji(props: { emoji: string, shadow?: boolean, flipped?: boolean }) {

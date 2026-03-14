@@ -9,7 +9,11 @@
     "build": "nx run web:build",
     "serve": "nx run web:serve",
     "dev:web": "nx run web:dev",
+    "dev:backend": "nx run api:dev",
     "build:web": "nx run web:build",
+    "deploy:backend": "nx run api:deploy",
+    "deploy:backend:prod": "nx run api:deployProd",
+    "deploy:backend:dev": "nx run api:deployDev",
     "test-crons": "pnpm --filter @scoopbus/api run test-parse",
     "fetch-results": "pnpm --filter @scoopbus/api run fetch-results"
   },

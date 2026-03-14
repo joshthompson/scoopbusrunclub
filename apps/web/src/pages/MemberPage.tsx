@@ -98,7 +98,6 @@ function AchievementItem(props: { celebration: GroupedCelebration }) {
 
 export function MemberPage(props: MemberPageProps) {
   const params = useParams<{ name: string }>()
-  const navigate = useNavigate()
 
   const runnerKey = createMemo(() => getRunnerKeyFromRouteName(params.name) ?? "")
   const runnerSignal = createMemo(() => runnerSignals[runnerKey()])
@@ -107,6 +106,7 @@ export function MemberPage(props: MemberPageProps) {
 
   const runnerResults = createMemo(() => props.results.filter((result) => result.parkrunId === runnerId()))
   const totalRuns = createMemo(() => props.runners.find((runner) => runner.parkrunId === runnerId())?.totalRuns ?? runnerResults().length)
+  const totalJuniorRuns = createMemo(() => props.runners.find((runner) => runner.parkrunId === runnerId())?.totalJuniorRuns ?? 0)
   const totalRunsAtHaga = createMemo(() => runnerResults().filter((result) =>
     result.eventName === "Haga" && result.parkrunId === runnerId()
   ).length)
@@ -277,6 +277,10 @@ export function MemberPage(props: MemberPageProps) {
     groupedCelebrations()
       .filter((item) => isPbCelebration(item.name))
       .sort((a, b) => {
+        if (a.name === "New Junior PB!" && b.name === "New PB!") return 1
+        if (a.name === "New PB!" && b.name === "New Junior PB!") return -1
+        if (a.name === "New Junior PB!" && b.name !== "New PB!") return -1
+        if (a.name !== "New PB!" && b.name === "New Junior PB!") return 1
         if (a.name === "New PB!" && b.name !== "New PB!") return -1
         if (a.name !== "New PB!" && b.name === "New PB!") return 1
         return a.name.localeCompare(b.name)
@@ -303,6 +307,7 @@ export function MemberPage(props: MemberPageProps) {
               
               <div class={styles.runnerSummaryStats}>
                 <RunnerSummaryStat label="Total runs">{totalRuns()}</RunnerSummaryStat>
+                {totalJuniorRuns() > 0 && <RunnerSummaryStat label="Junior runs">{totalJuniorRuns()}</RunnerSummaryStat>}
                 <RunnerSummaryStat label="Haga runs">{totalRunsAtHaga()}</RunnerSummaryStat>
                 <RunnerSummaryStat label="Events">{totalEvents()}</RunnerSummaryStat>
                 <RunnerSummaryStat label="Runs with" type="text">{oftenRunsWith(Infinity)()}</RunnerSummaryStat>

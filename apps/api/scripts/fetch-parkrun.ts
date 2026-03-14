@@ -147,9 +147,12 @@ async function main() {
       const runner = parseRunnerData(allHtml);
       const runResults = parseRunResults(allHtml);
 
-      console.log(
-        `  → ${runner.name}: ${runner.totalRuns} runs, ${runResults.length} run results`,
-      );
+      console.log(`  → ${runner.name}: ${runner.totalRuns} runs, ${runner.totalJuniorRuns} junior runs, ${runResults.length} run results`);
+      console.log(`    ${runner.totalRuns} runs`);
+      if (runner.totalJuniorRuns) {
+        console.log(`    ${runner.totalJuniorRuns} junior runs`);
+      }
+      console.log(`    ${runResults.length} run results`);
 
       payload.athletes.push({
         parkrunId,

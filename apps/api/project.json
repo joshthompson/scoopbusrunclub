@@ -15,6 +15,18 @@
       "options": {
         "cwd": "apps/api"
       }
+    },
+    "deployDev": {
+      "command": "npx convex deploy --env-file .env.local",
+      "options": {
+        "cwd": "apps/api"
+      }
+    },
+    "deployProd": {
+      "command": "npx convex deploy --env-file .env.prod",
+      "options": {
+        "cwd": "apps/api"
+      }
     }
   }
 }

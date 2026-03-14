@@ -1,5 +1,4 @@
 import { For } from "solid-js"
-import { FieldBlock } from "./FieldBlock"
 import { css } from "@style/css"
 import { formatDate } from "@/utils/misc"
 
@@ -28,22 +27,22 @@ const races: RaceCalendarItem[] = [
   {
     date: "2026-08-29",
     name: "Stockholm Half Marathon",
-    runners: [],
+    runners: ["Rick", "Sophie"],
   },
   {
     date: "2026-09-05",
     name: "Tjejmilen",
-    runners: [],
+    runners: ["Anna", "Lyra", "Eline"],
   },
   {
     date: "2026-09-26",
     name: "Lidingöloppet",
-    runners: ["Josh", "Adam", "Eline"],
+    runners: ["Josh", "Adam"],
   },
   {
     date: "2026-10-03",
     name: "Förbifartspremiären",
-    runners: ["Keith", "Claire", "Anna", "Eline", "Josh", "Rick", "Alisa"],
+    runners: ["Keith", "Claire", "Anna", "Eline", "Josh", "Rick", "Alisa", "Sophie"],
   },
   {
     date: "2026-10-17",

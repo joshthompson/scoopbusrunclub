@@ -13,7 +13,12 @@ import { runners as runnerSignals } from "./header/runners"
 interface PBStatus {
   firstRun?: boolean
   pb?: boolean
+  juniorPb?: boolean
   coursePb?: boolean
+}
+
+function isJuniorEventName(eventName: string) {
+  return eventName.trim().toLowerCase().includes("juniors")
 }
 
 /** "parkrunId:date:eventName:eventNumber" → PB flags */
@@ -29,18 +34,36 @@ function buildPBMap(results: RunResultItem[]): Map<string, PBStatus> {
   for (const runs of byRunner.values()) {
     runs.sort((a, b) => a.date.localeCompare(b.date))
     let bestOverall = Infinity
+    let bestJunior = Infinity
     const bestPerCourse = new Map<string, number>()
 
-    for (const run of runs) {
+    for (let i = 0; i < runs.length; i++) {
+      const run = runs[i]
       const secs = parseTimeToSeconds(run.time)
       const bestCourse = bestPerCourse.get(run.eventName) ?? Infinity
       const key = `${run.parkrunId}:${run.date}:${run.eventName}:${run.eventNumber}`
+      const isJuniorEvent = isJuniorEventName(run.eventName)
 
-      if (bestOverall === Infinity) {
+      if (i === 0) {
         map.set(key, { firstRun: true })
-        bestOverall = secs
-        bestPerCourse.set(run.eventName, secs)
+        if (isJuniorEvent) {
+          bestJunior = secs
+        } else {
+          bestOverall = secs
+          bestPerCourse.set(run.eventName, secs)
+        }
       } else {
+        if (isJuniorEvent) {
+          const isJuniorPb = secs < bestJunior
+
+          if (isJuniorPb) {
+            map.set(key, { juniorPb: true })
+          }
+
+          bestJunior = Math.min(bestJunior, secs)
+          continue
+        }
+
         const isOverallPb = secs < bestOverall
         const isCoursePb = bestCourse !== Infinity && secs < bestCourse
 
@@ -107,6 +130,7 @@ interface EventListAchievement {
 
 const TAG_COLORS = {
   pb: "#2563eb",
+  juniorPb: "#E11584",
   coursePb: "#16a34a",
   milestone: "#db2777",
   haga1: "#6026d3",
@@ -536,6 +560,10 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
     if (pb.firstRun) return { label: "Parkrun debut!", description: "First ever parkrun result recorded", emoji: "🎉", color: TAG_COLORS.pb }
 
     const tags: CelebrationTag[] = []
+
+    if (pb.juniorPb) {
+      tags.push({ label: "New Junior PB!", description: "New personal best time at a junior parkrun", emoji: "💫", color: TAG_COLORS.juniorPb })
+    }
 
     if (pb.pb) {
       tags.push({ label: "New PB!", description: "New overall personal best time", emoji: "🏅", color: TAG_COLORS.pb })
