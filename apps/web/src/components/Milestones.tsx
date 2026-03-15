@@ -1,7 +1,7 @@
 import { createMemo, For, Show } from "solid-js"
 import { css } from "@style/css"
 import { A } from "@solidjs/router"
-import { type Runner } from "../utils/api"
+import { type RunResultItem, type Runner } from "../utils/api"
 import { MILESTONE_SET, UPCOMING_THRESHOLD, nextMilestone, ordinalSuffix } from "../utils/milestones"
 import { formatName } from "@/utils/misc"
 import { FloatingEmoji } from "./FloatingEmoji"
@@ -10,18 +10,27 @@ import { getMemberRoute } from "@/utils/memberRoute"
 
 interface Props {
   runners: Runner[]
+  results: RunResultItem[]
 }
 
 export function Milestones(props: Props) {
   const groups = createMemo(() => {
     const data = props.runners
+    const results = props.results
     if (!data) return { celebrated: [], upcoming: [] }
 
     const celebrated: { name: string; parkrunId: string; milestone: number }[] = []
     const upcoming: { name: string; parkrunId: string; totalRuns: number; next: number; runsUntil: number }[] = []
 
+    const latestDate = results.reduce((maxDate, item) => (item.date > maxDate ? item.date : maxDate), "")
+    const latestEventRunnerIds = new Set(
+      results
+        .filter((item) => item.date === latestDate)
+        .map((item) => item.parkrunId)
+    )
+
     for (const r of data) {
-      if (MILESTONE_SET.has(r.totalRuns)) {
+      if (MILESTONE_SET.has(r.totalRuns) && latestEventRunnerIds.has(r.parkrunId)) {
         celebrated.push({ name: r.name, parkrunId: r.parkrunId, milestone: r.totalRuns })
       } else {
         const next = nextMilestone(r.totalRuns)

@@ -21,7 +21,7 @@ export const HomePage: Component<{ resultsLoading: boolean; runnersLoading: bool
       </main>
       <aside class={styles.sidebar}>
         <Show when={!props.runnersLoading}>
-          <Milestones runners={props.runners} />
+          <Milestones runners={props.runners} results={props.results} />
         </Show>
         <DirtBlock title="Race Calendar">
           <RaceCalendar />
