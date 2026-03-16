@@ -2,6 +2,7 @@ import { createController, createObjectSignal, Scene } from "@/engine"
 import { RUNNER_SIZE, runners } from "./runners"
 import { css } from "@style/css"
 import { Accessor } from "solid-js"
+import { parseTimeToSeconds } from "@/utils/misc"
 
 const LABEL_RENDER_DISTANCE = 100
 
@@ -16,7 +17,7 @@ export function createRunnerController(
   let baseY = 124 + yShift
 
   return createController({
-    frames: [...runner().frames],
+    frames: [...runner().frames.run],
     randomStartFrame: true,
     init() {
       const { x, setX } = createObjectSignal(scene.canvas.get().width() * Math.random(), 'x')
@@ -35,7 +36,7 @@ export function createRunnerController(
         ...createObjectSignal(0, 'rotation'),
         ...createObjectSignal(0, 'ySpeed'),
         ...createObjectSignal(false, 'scooped'),
-        ...createObjectSignal(runner().frames, 'frames'),
+        ...createObjectSignal(runner().frames.run, 'frames'),
         ...createObjectSignal(0, 'sitting'),
         width,
         height,
@@ -78,6 +79,11 @@ export function createRunnerController(
       }
     },
     onEnterFrame({ $, $scene }) {
+
+      // Volunteer
+      const time = runner().time
+      const volunteer = time && parseTimeToSeconds(time) > 50 * 60
+
       // If connected to another runner, follow them instead of running
       if (runner().connectedTo) {
         const connectedController = $scene.getControllersByType<RunnerController>('runner').find(
@@ -94,12 +100,19 @@ export function createRunnerController(
       // Sitting
       if ($.sitting() > 0) {
         $.setSitting($.sitting() - 1)
-        $.setFrames(runner().frames.map(() => runner().sitFrames[0]))
+        const sitFrames = volunteer && runner().frames.volunteerSit
+          ? runner().frames.volunteerSit!
+          : runner().frames.sit
+        $.setFrames(runner().frames.run.map(() => sitFrames[0]))
       }
 
       // Running
       else if (!$.scooped()) {
-        $.setFrames(runner().frames)
+        if (volunteer && runner().frames.volunteer) {
+          $.setFrames(runner().frames.volunteer!)
+        } else {
+          $.setFrames(runner().frames.run)
+        }
         $.setX($.x() - runner().speed * (1 + Math.random() * 0.4))
         $.setRotation(Math.random() * 3 - 0.5)
       }

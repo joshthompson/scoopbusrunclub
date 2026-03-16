@@ -1,32 +1,6 @@
-
-import adamAsset from '@/assets/runners/adam.png'
-import adamSitAsset from '@/assets/runners/adam-sit.png'
-import alisaAsset from '@/assets/runners/alisa.png'
-import alisaSitAsset from '@/assets/runners/alisa-sit.png'
-import annaAsset from '@/assets/runners/anna.png'
-import annaSitAsset from '@/assets/runners/anna-sit.png'
-import augustAsset from '@/assets/runners/august.png'
-import augustSitAsset from '@/assets/runners/august-sit.png'
-import claireAsset from '@/assets/runners/claire.png'
-import claireSitAsset from '@/assets/runners/claire-sit.png'
-import elineAsset from '@/assets/runners/eline.png'
-import elineSitAsset from '@/assets/runners/eline-sit.png'
-import joshAsset from '@/assets/runners/josh.png'
-import joshSitAsset from '@/assets/runners/josh-sit.png'
-import keithAsset from '@/assets/runners/keith.png'
-import keithSitAsset from '@/assets/runners/keith-sit.png'
-import linkAsset from '@/assets/runners/link.png'
-import linkSitAsset from '@/assets/runners/link-sit.png'
-import lyraAsset from '@/assets/runners/lyra.png'
-import lyraSitAsset from '@/assets/runners/lyra-sit.png'
-import otherJoshAsset from '@/assets/runners/other-josh.png'
-import otherJoshSitAsset from '@/assets/runners/other-josh-sit.png'
-import rickAsset from '@/assets/runners/rick.png'
-import rickSitAsset from '@/assets/runners/rick-sit.png'
-import sophieAsset from '@/assets/runners/sophie.png'
-import sophieSitAsset from '@/assets/runners/sophie-sit.png'
 import { generateFrames } from '@/utils'
 import { Accessor, createSignal, Setter } from 'solid-js'
+import * as assets from './runner-assets'
 
 export const RUNNER_SIZE = 2
 export const FRAME_COUNT = 4
@@ -36,16 +10,22 @@ type Birthday = `${Digit}${Digit}/${Digit}${Digit}`
 
 export interface RunnerData {
   name: string
+  altNames?: string[]
   id: string
   birthday: Birthday // Format: DD/MM
-  frames: string[]
-  sitFrames: string[]
+  frames: {
+    run: string[]
+    sit: string[]
+    volunteer?: string[]
+    volunteerSit?: string[]
+  }
   width: number
   height: number
   speed: number
   frameInterval: number
   connectedTo?: string
   latestTime?: string
+  time?: string
 }
 
 export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]> = {
@@ -53,8 +33,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Josh',
     id: '8070821',
     birthday: '15/12',
-    frames: generateFrames(joshAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [joshSitAsset],
+    frames: {
+      run: generateFrames(assets.joshRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.joshSit],
+    },
     width: 21,
     height: 28,
     speed: 4,
@@ -64,8 +46,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Keith',
     id: '5635044',
     birthday: '01/08',
-    frames: generateFrames(keithAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [keithSitAsset],
+    frames: {
+      run: generateFrames(assets.keithRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.keithSit],
+    },
     width: 21,
     height: 28,
     speed: 3,
@@ -75,8 +59,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Claire',
     id: '377595',
     birthday: '06/06',
-    frames: generateFrames(claireAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [claireSitAsset],
+    frames: {
+      run: generateFrames(assets.claireRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.claireSit],
+    },
     width: 21,
     height: 28,
     speed: 2,
@@ -86,8 +72,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Lyra',
     id: '8009111',
     birthday: '00/00',
-    frames: generateFrames(lyraAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [lyraSitAsset],
+    frames: {
+      run: generateFrames(assets.lyraRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.lyraSit],
+    },
     width: 21,
     height: 28,
     speed: 1.5,
@@ -97,8 +85,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Adam',
     id: '7758658',
     birthday: '12/05',
-    frames: generateFrames(adamAsset,  22 * FRAME_COUNT, 30, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [adamSitAsset],
+    frames: {
+      run: generateFrames(assets.adamRun, 22 * FRAME_COUNT, 30, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.adamSit],
+    },
     width: 21,
     height: 30,
     speed: 3.9,
@@ -108,8 +98,12 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Anna',
     id: '850764',
     birthday: '02/12',
-    frames: generateFrames(annaAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [annaSitAsset],
+    frames: {
+      run: generateFrames(assets.annaRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.annaSit],
+      volunteer: generateFrames(assets.annaVolunteer, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      volunteerSit: [assets.annaVolunteerSit],
+    },
     width: 21,
     height: 28,
     speed: 1.5,
@@ -119,8 +113,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Eline',
     id: '8943925',
     birthday: '06/12',
-    frames: generateFrames(elineAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [elineSitAsset],
+    frames: {
+      run: generateFrames(assets.elineRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.elineSit],
+    },
     width: 21,
     height: 28,
     speed: 3.2,
@@ -130,8 +126,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Rick',
     id: '9679233',
     birthday: '10/08',
-    frames: generateFrames(rickAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [rickSitAsset],
+    frames: {
+      run: generateFrames(assets.rickRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.rickSit],
+    },
     width: 21,
     height: 28,
     speed: 3.2,
@@ -141,8 +139,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Sophie',
     id: '6076813',
     birthday: '28/11',
-    frames: generateFrames(sophieAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [sophieSitAsset],
+    frames: {
+      run: generateFrames(assets.sophieRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.sophieSit],
+    },
     width: 21,
     height: 28,
     speed: 3.2,
@@ -152,8 +152,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'August',
     id: '545803',
     birthday: '02/12',
-    frames: generateFrames(augustAsset, 50 * FRAME_COUNT, 30, 50 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [augustSitAsset],
+    frames: {
+      run: generateFrames(assets.augustRun, 50 * FRAME_COUNT, 30, 50 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.augustSit],
+    },
     width: 49,
     height: 30,
     speed: 3.2,
@@ -163,8 +165,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Alisa',
     id: '10663604',
     birthday: '22/11',
-    frames: generateFrames(alisaAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [alisaSitAsset],
+    frames: {
+      run: generateFrames(assets.alisaRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.alisaSit],
+    },
     width: 21,
     height: 28,
     speed: 2.5,
@@ -174,8 +178,10 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
     name: 'Link',
     id: '', // Uses Alisa's speed/data
     birthday: '09/03',
-    frames: generateFrames(linkAsset, 20 * 2, 28, 20 * 2, 2, true),
-    sitFrames: [linkSitAsset],
+    frames: {
+      run: generateFrames(assets.linkRun, 20 * 2, 28, 20 * 2, 2, true),
+      sit: [assets.linkSit],
+    },
     width: 20,
     height: 28,
     speed: 2.5,
@@ -184,10 +190,13 @@ export const runners: Record<string, [Accessor<RunnerData>, Setter<RunnerData>]>
   }),
   otherJosh: createSignal<RunnerData>({
     name: 'Other Josh',
+    altNames: ['Other Josh', 'Josh 2', 'Joshua II', 'Cass', 'Josh Cass', 'Ozzy Josh', 'OJ'],
     id: '5346109',
     birthday: '02/07',
-    frames: generateFrames(otherJoshAsset,  22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-    sitFrames: [otherJoshSitAsset],
+    frames: {
+      run: generateFrames(assets.otherJoshRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.otherJoshSit],
+    },
     width: 21,
     height: 28,
     speed: 2.5,

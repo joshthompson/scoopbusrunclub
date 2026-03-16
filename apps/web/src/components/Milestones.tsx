@@ -3,10 +3,44 @@ import { css } from "@style/css"
 import { A } from "@solidjs/router"
 import { type RunResultItem, type Runner } from "../utils/api"
 import { MILESTONE_SET, UPCOMING_THRESHOLD, nextMilestone, ordinalSuffix } from "../utils/milestones"
-import { formatName } from "@/utils/misc"
+import { formatDate, formatName } from "@/utils/misc"
 import { FloatingEmoji } from "./FloatingEmoji"
 import { DirtBlock } from "./DirtBlock"
 import { getMemberRoute } from "@/utils/memberRoute"
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function parseIsoDate(isoDate: string): Date | null {
+  if (!isoDate) return null
+  const date = new Date(`${isoDate}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function firstSaturdayOnOrAfter(date: Date): Date {
+  const normalized = startOfDay(date)
+  const daysUntilSaturday = (6 - normalized.getDay() + 7) % 7
+  return new Date(normalized.getTime() + daysUntilSaturday * DAY_MS)
+}
+
+function calculatePossibleDate(runsUntil: number, latestResultDate: string): string {
+  if (runsUntil <= 0) return ""
+
+  const latest = parseIsoDate(latestResultDate)
+  const today = startOfDay(new Date())
+  const dayAfterLatest = latest ? new Date(startOfDay(latest).getTime() + DAY_MS) : today
+
+  let firstPossibleSaturday = firstSaturdayOnOrAfter(dayAfterLatest)
+  while (firstPossibleSaturday < today) {
+    firstPossibleSaturday = new Date(firstPossibleSaturday.getTime() + 7 * DAY_MS)
+  }
+
+  const milestoneDate = new Date(firstPossibleSaturday.getTime() + (runsUntil - 1) * 7 * DAY_MS)
+  return formatDate(milestoneDate)
+}
 
 interface Props {
   runners: Runner[]
@@ -20,7 +54,14 @@ export function Milestones(props: Props) {
     if (!data) return { celebrated: [], upcoming: [] }
 
     const celebrated: { name: string; parkrunId: string; milestone: number }[] = []
-    const upcoming: { name: string; parkrunId: string; totalRuns: number; next: number; runsUntil: number }[] = []
+    const upcoming: {
+      name: string;
+      parkrunId: string;
+      totalRuns: number;
+      next: number;
+      runsUntil: number;
+      possibleDate: string;
+    }[] = []
 
     const latestDate = results.reduce((maxDate, item) => (item.date > maxDate ? item.date : maxDate), "")
     const latestEventRunnerIds = new Set(
@@ -35,7 +76,15 @@ export function Milestones(props: Props) {
       } else {
         const next = nextMilestone(r.totalRuns)
         if (next !== null && next - r.totalRuns <= UPCOMING_THRESHOLD) {
-          upcoming.push({ name: r.name, parkrunId: r.parkrunId, totalRuns: r.totalRuns, next, runsUntil: next - r.totalRuns })
+          const runsUntil = next - r.totalRuns
+          upcoming.push({
+            name: r.name,
+            parkrunId: r.parkrunId,
+            totalRuns: r.totalRuns,
+            next,
+            runsUntil,
+            possibleDate: calculatePossibleDate(runsUntil, latestDate),
+          })
         }
       }
     }
@@ -76,6 +125,7 @@ export function Milestones(props: Props) {
                   </em>&nbsp;
                   {row.runsUntil} run{row.runsUntil === 1 ? "" : "s"} until{" "}
                   {row.next}
+                  <div class={styles.possibleDate}>Potentially {row.possibleDate}</div>
                 </li>
               )}
             </For>
@@ -124,5 +174,9 @@ const styles = {
   memberLink: css({
     color: 'inherit',
     textDecoration: 'underline',
+  }),
+  possibleDate: css({
+    fontStyle: "italic",
+    fontSize: "0.85rem",
   }),
 }

@@ -6,8 +6,8 @@ export function CharacterImage(props: { runner: RunnerData, pose: "sitting" | "r
   const runner = () => props.runner
   
   return <div class={styles.characterImage} role="img" aria-label={`Image of ${runner().name}`}>
-    <img src={runner().sitFrames[0]} class={styles.sitting} />
-    {runner().name === 'Alisa' && <img src={runners.link[0]().sitFrames[0]} alt={`${runner().name} sitting`} class={styles.linkSitting} />}
+    <img src={runner().frames.sit[0]} class={styles.sitting} />
+    {runner().name === 'Alisa' && <img src={runners.link[0]().frames.sit[0]} alt={`${runner().name} sitting`} class={styles.linkSitting} />}
     <div class={styles.shadows}>
       <img src={shadowAsset} class={styles.shadow} />
       {runner().name === 'Alisa' && <img src={shadowAsset} class={styles.linkShadow} />}

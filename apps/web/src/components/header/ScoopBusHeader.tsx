@@ -38,6 +38,7 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
     // 18:00 (1080s) → 4, 36:00 (2160s) → 2, 59:16 (3556s) → ~1.2
     const timeInSeconds = parseTimeToSeconds(latestResult.time)
     const speed = Math.max(0.5, 4320 / timeInSeconds)
+    const time = latestResult.time
 
     // Frame interval proportional to speed:
     // speed 4 → 62, speed 2 → 124
@@ -51,7 +52,7 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
     // Clear dynamic connections (keep only static ones like link→alisa)
     const connectedTo = key === 'link' ? 'alisa' : undefined
 
-    setter({ ...runnerData, speed, frameInterval, connectedTo, latestTime: latestResult.time })
+    setter({ ...runnerData, speed, time, frameInterval, connectedTo, latestTime: latestResult.time })
   }
 
   // --- Update dynamic connections ---

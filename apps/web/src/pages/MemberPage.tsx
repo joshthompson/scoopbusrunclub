@@ -297,11 +297,17 @@ export function MemberPage(props: MemberPageProps) {
       }),
   )
 
+  const name = createMemo(() => {
+    if (!runnerData()) return ""
+    const possibleNames = runnerData()?.altNames ?? [runnerData().name]
+    return possibleNames[Math.floor(Math.random() * possibleNames.length)]
+  })
+
   return (
     <Show when={runnerData()} fallback={<NotFoundPage />}>
       {(runner) => (
         <div class={styles.container}>
-          <FieldBlock title={runner().name} signType="purple">
+          <FieldBlock title={name()} signType="purple">
             <div class={styles.runnerSummary}>
               <CharacterImage runner={runner()} pose="sitting" />
               
@@ -310,13 +316,15 @@ export function MemberPage(props: MemberPageProps) {
                 {totalJuniorRuns() > 0 && <RunnerSummaryStat label="Junior runs">{totalJuniorRuns()}</RunnerSummaryStat>}
                 <RunnerSummaryStat label="Haga runs">{totalRunsAtHaga()}</RunnerSummaryStat>
                 <RunnerSummaryStat label="Events">{totalEvents()}</RunnerSummaryStat>
-                <RunnerSummaryStat label="Runs with" type="text">{oftenRunsWith(Infinity)()}</RunnerSummaryStat>
-                <RunnerSummaryStat label="Finishes with" type="text">{oftenRunsWith(30)()}</RunnerSummaryStat>
+                <div class={styles.pairedStats}>
+                  <RunnerSummaryStat label="Runs with" type="text">{oftenRunsWith(Infinity)()}</RunnerSummaryStat>
+                  <RunnerSummaryStat label="Finishes with" type="text">{oftenRunsWith(30)()}</RunnerSummaryStat>
+                </div>
               </div>
               {runner().id && (
                 <p>
                   <a href={`https://www.parkrun.se/parkrunner/${runner().id}/all`} target="_blank" rel="noopener noreferrer" class={styles.link}>
-                    View {runner().name} on parkrun.se
+                    View {name()} on parkrun.se
                   </a>
                 </p>
               )}
@@ -385,6 +393,14 @@ const styles = {
     alignItems: 'center',
     width: '100%',
     flexWrap: 'wrap',
+  }),
+  pairedStats: css({
+    display: 'flex',
+    gap: '0.5rem',
+    flex: '2',
+    minWidth: '280px',
+    flexWrap: 'wrap',
+    alignItems: 'center',
   }),
   twoColumnGrid: css({
     display: 'grid',
