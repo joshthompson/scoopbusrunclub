@@ -3,7 +3,7 @@ import { createSignal, Show } from "solid-js"
 import { FloatingEmoji } from "./FloatingEmoji"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
 import { type RunResultItem, type Runner } from "../utils/api"
-import { parseTimeToSeconds } from "@/utils/misc"
+import { formatName, parseTimeToSeconds } from "@/utils/misc"
 import { runners as runnerSignals } from "./header/runners"
 
 // ---------------------------------------------------------------------------
@@ -146,6 +146,10 @@ const TAG_COLORS = {
   hagaCancelled: "#0891b2",
   uppsalaCancelled: "#4338ca",
   palindrome: "#0d9488",
+  runBuddy: "#e67e22",
+  bestie: "#6c5ce7",
+  bff: "#e84393",
+  parkrunPal: "#00b894",
 } as const
 
 const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
@@ -450,6 +454,177 @@ function buildUppsalaCancelledMap(results: RunResultItem[]): Set<string> {
 }
 
 // ---------------------------------------------------------------------------
+// Run Buddy & BFF maps
+// ---------------------------------------------------------------------------
+
+/** Build a parkrunId → name lookup from the runners signals. */
+function buildRunnerNameMap(): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const [, [accessor]] of Object.entries(runnerSignals)) {
+    const data = accessor()
+    if (data.id) map.set(data.id, data.name)
+  }
+  return map
+}
+
+interface PairAchievements {
+  runBuddyMap: Map<string, string[]>
+  bestieMap: Map<string, string[]>
+  bffMap: Map<string, string[]>
+}
+
+/**
+ * Run Buddy: first time two runners finish within 10 seconds of each other.
+ * Bestie: 10th time two runners finish within 10 seconds of each other.
+ * BFF: 50th time two runners finish within 10 seconds of each other.
+ * All are earned once per unique pair.
+ */
+function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
+  const runBuddyMap = new Map<string, string[]>()
+  const bestieMap = new Map<string, string[]>()
+  const bffMap = new Map<string, string[]>()
+  const nameMap = buildRunnerNameMap()
+
+  // Group results by event instance (eventName + date)
+  const byEvent = new Map<string, RunResultItem[]>()
+  const eventInstances: { eventKey: string; date: string }[] = []
+  for (const r of results) {
+    const eventKey = `${r.eventName}\0${r.date}`
+    if (!byEvent.has(eventKey)) {
+      byEvent.set(eventKey, [])
+      eventInstances.push({ eventKey, date: r.date })
+    }
+    byEvent.get(eventKey)!.push(r)
+  }
+
+  // Process events in chronological order
+  eventInstances.sort((a, b) => a.date.localeCompare(b.date))
+
+  const buddyCount = new Map<string, number>()
+  const earnedBuddy = new Set<string>()
+  const earnedBestie = new Set<string>()
+  const earnedBFF = new Set<string>()
+
+  for (const { eventKey } of eventInstances) {
+    const eventResults = byEvent.get(eventKey)!
+
+    for (let i = 0; i < eventResults.length; i++) {
+      for (let j = i + 1; j < eventResults.length; j++) {
+        const a = eventResults[i]
+        const b = eventResults[j]
+
+        const timeA = parseTimeToSeconds(a.time)
+        const timeB = parseTimeToSeconds(b.time)
+        if (!Number.isFinite(timeA) || !Number.isFinite(timeB)) continue
+        if (Math.abs(timeA - timeB) > 10) continue
+
+        const pairKey = [a.parkrunId, b.parkrunId].sort().join(":")
+        const count = (buddyCount.get(pairKey) ?? 0) + 1
+        buddyCount.set(pairKey, count)
+
+        // Run Buddy — first occurrence
+        if (!earnedBuddy.has(pairKey)) {
+          earnedBuddy.add(pairKey)
+          const keyA = `${a.parkrunId}:${a.date}:${a.eventName}:${a.eventNumber}`
+          const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
+          const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
+          const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
+          const exA = runBuddyMap.get(keyA) ?? []; exA.push(nameB); runBuddyMap.set(keyA, exA)
+          const exB = runBuddyMap.get(keyB) ?? []; exB.push(nameA); runBuddyMap.set(keyB, exB)
+        }
+
+        // Bestie — 10th occurrence
+        if (count === 10 && !earnedBestie.has(pairKey)) {
+          earnedBestie.add(pairKey)
+          const keyA = `${a.parkrunId}:${a.date}:${a.eventName}:${a.eventNumber}`
+          const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
+          const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
+          const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
+          const exA = bestieMap.get(keyA) ?? []; exA.push(nameB); bestieMap.set(keyA, exA)
+          const exB = bestieMap.get(keyB) ?? []; exB.push(nameA); bestieMap.set(keyB, exB)
+        }
+
+        // BFF — 50th occurrence
+        if (count === 50 && !earnedBFF.has(pairKey)) {
+          earnedBFF.add(pairKey)
+          const keyA = `${a.parkrunId}:${a.date}:${a.eventName}:${a.eventNumber}`
+          const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
+          const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
+          const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
+          const exA = bffMap.get(keyA) ?? []; exA.push(nameB); bffMap.set(keyA, exA)
+          const exB = bffMap.get(keyB) ?? []; exB.push(nameA); bffMap.set(keyB, exB)
+        }
+      }
+    }
+  }
+
+  return { runBuddyMap, bestieMap, bffMap }
+}
+
+// ---------------------------------------------------------------------------
+// Parkrun Pal map
+// ---------------------------------------------------------------------------
+
+/**
+ * Parkrun Pal: earned when two runners attend 50 events together.
+ * Earned once per unique pair.
+ */
+function buildParkrunPalMap(results: RunResultItem[]): Map<string, string[]> {
+  const map = new Map<string, string[]>()
+  const nameMap = buildRunnerNameMap()
+
+  // Group results by event instance (eventName + date)
+  const byEvent = new Map<string, RunResultItem[]>()
+  const eventInstances: { eventKey: string; date: string }[] = []
+  for (const r of results) {
+    const eventKey = `${r.eventName}\0${r.date}`
+    if (!byEvent.has(eventKey)) {
+      byEvent.set(eventKey, [])
+      eventInstances.push({ eventKey, date: r.date })
+    }
+    byEvent.get(eventKey)!.push(r)
+  }
+
+  eventInstances.sort((a, b) => a.date.localeCompare(b.date))
+
+  const coAttendCount = new Map<string, number>()
+  const earnedPal = new Set<string>()
+
+  for (const { eventKey } of eventInstances) {
+    const eventResults = byEvent.get(eventKey)!
+    // Deduplicate runners (one result per runner per event)
+    const runners = new Map<string, RunResultItem>()
+    for (const r of eventResults) {
+      if (!runners.has(r.parkrunId)) runners.set(r.parkrunId, r)
+    }
+    const runnerList = [...runners.values()]
+
+    for (let i = 0; i < runnerList.length; i++) {
+      for (let j = i + 1; j < runnerList.length; j++) {
+        const a = runnerList[i]
+        const b = runnerList[j]
+        const pairKey = [a.parkrunId, b.parkrunId].sort().join(":")
+
+        const count = (coAttendCount.get(pairKey) ?? 0) + 1
+        coAttendCount.set(pairKey, count)
+
+        if (count === 50 && !earnedPal.has(pairKey)) {
+          earnedPal.add(pairKey)
+          const keyA = `${a.parkrunId}:${a.date}:${a.eventName}:${a.eventNumber}`
+          const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
+          const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
+          const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
+          const exA = map.get(keyA) ?? []; exA.push(nameB); map.set(keyA, exA)
+          const exB = map.get(keyB) ?? []; exB.push(nameA); map.set(keyB, exB)
+        }
+      }
+    }
+  }
+
+  return map
+}
+
+// ---------------------------------------------------------------------------
 // 100 at Haga! map
 // ---------------------------------------------------------------------------
 
@@ -501,10 +676,15 @@ export interface CelebrationData {
   hagaCancelledMap: Set<string>
   uppsalaCancelledMap: Set<string>
   palindromeMap: Set<string>
+  runBuddyMap: Map<string, string[]>
+  bestieMap: Map<string, string[]>
+  bffMap: Map<string, string[]>
+  parkrunPalMap: Map<string, string[]>
 }
 
 /** Call once per render cycle (inside a createMemo) to pre-compute all celebration lookups. */
 export function buildCelebrationData(results: RunResultItem[], runners: Runner[]): CelebrationData {
+  const { runBuddyMap, bestieMap, bffMap } = buildRunBuddyAndBFFMaps(results)
   return {
     pbMap: buildPBMap(results),
     milestoneMap: buildMilestoneMap(results, runners),
@@ -518,6 +698,10 @@ export function buildCelebrationData(results: RunResultItem[], runners: Runner[]
     hagaCancelledMap: buildHagaCancelledMap(results),
     uppsalaCancelledMap: buildUppsalaCancelledMap(results),
     palindromeMap: buildPalindromeMap(results),
+    runBuddyMap,
+    bestieMap,
+    bffMap,
+    parkrunPalMap: buildParkrunPalMap(results),
   }
 }
 
@@ -661,6 +845,54 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
           color: TAG_COLORS.palindrome,
         }
       : null,
+
+  // Run Buddy
+  ({ data, resultKey }) => {
+    const names = data.runBuddyMap.get(resultKey)
+    if (!names || names.length === 0) return null
+    return names.map((name) => ({
+      label: `${formatName(name)}'s Run Buddy`,
+      description: `First time finished within 10 seconds of ${formatName(name)}`,
+      emoji: "🤝",
+      color: TAG_COLORS.runBuddy,
+    }))
+  },
+
+  // Bestie
+  ({ data, resultKey }) => {
+    const names = data.bestieMap.get(resultKey)
+    if (!names || names.length === 0) return null
+    return names.map((name) => ({
+      label: `${formatName(name)}'s Bestie`,
+      description: `Finished within 10 seconds of ${formatName(name)} for the 10th time!`,
+      emoji: "👥",
+      color: TAG_COLORS.bestie,
+    }))
+  },
+
+  // BFF
+  ({ data, resultKey }) => {
+    const names = data.bffMap.get(resultKey)
+    if (!names || names.length === 0) return null
+    return names.map((name) => ({
+      label: `${formatName(name)}'s BFF`,
+      description: `Finished within 10 seconds of ${formatName(name)} for the 50th time!`,
+      emoji: "💕",
+      color: TAG_COLORS.bff,
+    }))
+  },
+
+  // Parkrun Pal
+  ({ data, resultKey }) => {
+    const names = data.parkrunPalMap.get(resultKey)
+    if (!names || names.length === 0) return null
+    return names.map((name) => ({
+      label: `${formatName(name)}'s Parkrun Pal`,
+      description: `Attended 50 parkrun events together with ${formatName(name)}!`,
+      emoji: "🤗",
+      color: TAG_COLORS.parkrunPal,
+    }))
+  },
 ]
 
 export function getCelebrationTags(ctx: CelebrationRuleContext): CelebrationTag[] {
