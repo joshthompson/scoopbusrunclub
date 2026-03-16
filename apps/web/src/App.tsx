@@ -7,6 +7,7 @@ import { fetchRunners, fetchAllResults } from './utils/api';
 import { MemberPage } from './pages/MemberPage';
 import { HomePage } from './pages/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { MemberGraphPage } from './pages/MemberGraphPage';
 
 const App: Component = () => {
   const [runners] = createResource(fetchRunners)
@@ -46,6 +47,12 @@ const App: Component = () => {
             <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
               <MemberPage results={results() ?? []} runners={runners() ?? []} />
             </Show>
+          )}
+        />
+        <Route
+          path="/member/:name/graph"
+          component={() => (
+            <MemberGraphPage results={results() ?? []} runners={runners() ?? []} />
           )}
         />
         <Route path="*404" component={NotFoundPage} />

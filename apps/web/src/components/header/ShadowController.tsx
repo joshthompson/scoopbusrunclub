@@ -1,5 +1,5 @@
 import { createController } from "@/engine"
-import { RUNNER_SIZE, runners } from "./runners"
+import { RUNNER_SIZE, runners } from '@/data/runners'
 import shadowAsset from "@/assets/runners/shadow.png"
 import { RunnerController } from "./RunnerController"
 

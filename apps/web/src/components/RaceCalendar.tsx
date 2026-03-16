@@ -1,55 +1,8 @@
 import { For } from "solid-js"
 import { css } from "@style/css"
 import { formatDate } from "@/utils/misc"
-
-interface RaceCalendarItem {
-  date: string
-  name: string
-  runners: string[]
-}
-
-const races: RaceCalendarItem[] = [
-  {
-    date: "2026-03-22",
-    name: "Rome Marathon",
-    runners: ["Eline"],
-  },
-  {
-    date: "2026-08-15",
-    name: "Midnattsloppet",
-    runners: ["Josh", "Alisa", "Claire", "Rick", "Eline"],
-  },
-  {
-    date: "2026-19-20",
-    name: "Convinistafetten",
-    runners: ["Josh"],
-  },
-  {
-    date: "2026-08-29",
-    name: "Stockholm Half Marathon",
-    runners: ["Rick", "Sophie"],
-  },
-  {
-    date: "2026-09-05",
-    name: "Tjejmilen",
-    runners: ["Anna", "Lyra", "Eline"],
-  },
-  {
-    date: "2026-09-26",
-    name: "Lidingöloppet",
-    runners: ["Josh", "Adam"],
-  },
-  {
-    date: "2026-10-03",
-    name: "Förbifartspremiären",
-    runners: ["Keith", "Claire", "Anna", "Eline", "Josh", "Rick", "Alisa", "Sophie"],
-  },
-  {
-    date: "2026-10-17",
-    name: "Rönninge Backyard Ultra",
-    runners: ["Keith", "August", "Josh", "Eline"],
-  },
-]
+import { races } from "@/data/races"
+import { runners } from "@/data/runners"
 
 export function RaceCalendar() {
   const upcoming = races.filter((r) => new Date(r.date) >= new Date())
@@ -60,7 +13,7 @@ export function RaceCalendar() {
           <div>
             <h4 class={styles.raceName}>{race.name}</h4>
             <p>{formatDate(new Date(race.date + "T00:00:00"))}</p>
-            <p>{race.runners.join(", ")}</p>
+            <p>{race.runners.map((r) => runners[r.name][0]().name).join(", ")}</p>
           </div>
         )}
       </For>

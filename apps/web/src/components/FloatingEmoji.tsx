@@ -3,6 +3,7 @@ import { createMemo } from "solid-js"
 import MedalEmoji from '@/assets/emoji/medal.png'
 import PartyEmoji from '@/assets/emoji/party.png'
 import StarEmoji from '@/assets/emoji/star.png'
+import CorgiEmoji from '@/assets/emoji/corgi.png'
 
 const emojiMap: Record<string, string | undefined> = {
   "🏅": MedalEmoji,
@@ -23,6 +24,7 @@ const emojiMap: Record<string, string | undefined> = {
   "🌳": undefined,
   "🎪": undefined,
   "💫": undefined,
+  "🐶": CorgiEmoji,
 }
 
 export function FloatingEmoji(props: { emoji: string, shadow?: boolean, flipped?: boolean }) {

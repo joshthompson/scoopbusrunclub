@@ -4,9 +4,10 @@ import { createBusController } from './BusController'
 import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
+import sunAsset from '@/assets/misc/sun.png'
 import pathAsset from '@/assets/misc/path.png'
 import { createRunnerController } from './RunnerController'
-import { runners } from './runners'
+import { RunnerName, runners } from '@/data/runners'
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { createShadowController } from './ShadowController'
 import { type RunResultItem } from '@/utils/api'
@@ -98,7 +99,7 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
 
     const nextFastest = faster[0]
     if (nextFastest && current.timeSeconds - nextFastest.timeSeconds <= 30) {
-      const [getter, setter] = runners[key]
+      const [getter, setter] = runners[key as RunnerName]
       setter({ ...getter(), connectedTo: nextFastest.key })
     }
   }
@@ -201,6 +202,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
             url(${bg1Asset}) repeat-x bottom,
             url(${bg2Asset}) repeat-x 0px 90px,
             url(${bg3Asset}) repeat-x 0px 70px,
+            url(${sunAsset}) no-repeat 70% 40px,
             linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))
           `,
         }}/>

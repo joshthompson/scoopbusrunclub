@@ -1,4 +1,4 @@
-import { runners as runnerSignals } from "@/components/header/runners"
+import { runners as runnerSignals } from '@/data/runners'
 
 function normalizeName(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "")

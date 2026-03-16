@@ -4,7 +4,7 @@ import { FloatingEmoji } from "./FloatingEmoji"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
 import { type RunResultItem, type Runner } from "../utils/api"
 import { formatName, parseTimeToSeconds } from "@/utils/misc"
-import { runners as runnerSignals } from "./header/runners"
+import { runners as runnerSignals } from '@/data/runners'
 
 // ---------------------------------------------------------------------------
 // PB map
@@ -150,6 +150,7 @@ const TAG_COLORS = {
   bestie: "#6c5ce7",
   bff: "#e84393",
   parkrunPal: "#00b894",
+  palindromicPal: "#fd79a8",
 } as const
 
 const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
@@ -467,10 +468,15 @@ function buildRunnerNameMap(): Map<string, string> {
   return map
 }
 
+interface PairPartner {
+  name: string
+  parkrunId: string
+}
+
 interface PairAchievements {
-  runBuddyMap: Map<string, string[]>
-  bestieMap: Map<string, string[]>
-  bffMap: Map<string, string[]>
+  runBuddyMap: Map<string, PairPartner[]>
+  bestieMap: Map<string, PairPartner[]>
+  bffMap: Map<string, PairPartner[]>
 }
 
 /**
@@ -480,9 +486,9 @@ interface PairAchievements {
  * All are earned once per unique pair.
  */
 function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
-  const runBuddyMap = new Map<string, string[]>()
-  const bestieMap = new Map<string, string[]>()
-  const bffMap = new Map<string, string[]>()
+  const runBuddyMap = new Map<string, PairPartner[]>()
+  const bestieMap = new Map<string, PairPartner[]>()
+  const bffMap = new Map<string, PairPartner[]>()
   const nameMap = buildRunnerNameMap()
 
   // Group results by event instance (eventName + date)
@@ -529,8 +535,8 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
           const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
           const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
           const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
-          const exA = runBuddyMap.get(keyA) ?? []; exA.push(nameB); runBuddyMap.set(keyA, exA)
-          const exB = runBuddyMap.get(keyB) ?? []; exB.push(nameA); runBuddyMap.set(keyB, exB)
+          const exA = runBuddyMap.get(keyA) ?? []; exA.push({name: nameB, parkrunId: b.parkrunId}); runBuddyMap.set(keyA, exA)
+          const exB = runBuddyMap.get(keyB) ?? []; exB.push({name: nameA, parkrunId: a.parkrunId}); runBuddyMap.set(keyB, exB)
         }
 
         // Bestie — 10th occurrence
@@ -540,8 +546,8 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
           const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
           const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
           const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
-          const exA = bestieMap.get(keyA) ?? []; exA.push(nameB); bestieMap.set(keyA, exA)
-          const exB = bestieMap.get(keyB) ?? []; exB.push(nameA); bestieMap.set(keyB, exB)
+          const exA = bestieMap.get(keyA) ?? []; exA.push({name: nameB, parkrunId: b.parkrunId}); bestieMap.set(keyA, exA)
+          const exB = bestieMap.get(keyB) ?? []; exB.push({name: nameA, parkrunId: a.parkrunId}); bestieMap.set(keyB, exB)
         }
 
         // BFF — 50th occurrence
@@ -551,8 +557,8 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
           const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
           const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
           const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
-          const exA = bffMap.get(keyA) ?? []; exA.push(nameB); bffMap.set(keyA, exA)
-          const exB = bffMap.get(keyB) ?? []; exB.push(nameA); bffMap.set(keyB, exB)
+          const exA = bffMap.get(keyA) ?? []; exA.push({name: nameB, parkrunId: b.parkrunId}); bffMap.set(keyA, exA)
+          const exB = bffMap.get(keyB) ?? []; exB.push({name: nameA, parkrunId: a.parkrunId}); bffMap.set(keyB, exB)
         }
       }
     }
@@ -569,8 +575,8 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
  * Parkrun Pal: earned when two runners attend 50 events together.
  * Earned once per unique pair.
  */
-function buildParkrunPalMap(results: RunResultItem[]): Map<string, string[]> {
-  const map = new Map<string, string[]>()
+function buildParkrunPalMap(results: RunResultItem[]): Map<string, PairPartner[]> {
+  const map = new Map<string, PairPartner[]>()
   const nameMap = buildRunnerNameMap()
 
   // Group results by event instance (eventName + date)
@@ -614,8 +620,8 @@ function buildParkrunPalMap(results: RunResultItem[]): Map<string, string[]> {
           const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
           const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
           const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
-          const exA = map.get(keyA) ?? []; exA.push(nameB); map.set(keyA, exA)
-          const exB = map.get(keyB) ?? []; exB.push(nameA); map.set(keyB, exB)
+          const exA = map.get(keyA) ?? []; exA.push({name: nameB, parkrunId: b.parkrunId}); map.set(keyA, exA)
+          const exB = map.get(keyB) ?? []; exB.push({name: nameA, parkrunId: a.parkrunId}); map.set(keyB, exB)
         }
       }
     }
@@ -660,6 +666,88 @@ function buildHagaMap(results: RunResultItem[], targetRunCount: number): Set<str
 }
 
 // ---------------------------------------------------------------------------
+// Palindrome Pal map
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert total seconds to a 4-digit string "MMSS" (no colon).
+ * Returns null if the time doesn't fit in MM:SS form.
+ */
+function toMMSSDigits(totalSeconds: number): string | null {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return null
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  if (minutes > 99) return null
+  return `${String(minutes).padStart(2, "0")}${String(seconds).padStart(2, "0")}`
+}
+
+/**
+ * Palindrome Pal: two runners at the same event whose times are the
+ * digit-reverse of each other in MM:SS form.  e.g. 23:54 ↔ 45:32.
+ * Exception: both runners cannot have the exact same time.
+ * Can be earned multiple times.
+ *
+ * Map: "parkrunId:date:eventName:eventNumber" → partner name[]
+ */
+function buildPalindromePalMap(results: RunResultItem[]): Map<string, PairPartner[]> {
+  const map = new Map<string, PairPartner[]>()
+  const nameMap = buildRunnerNameMap()
+
+  // Group results by event instance
+  const byEvent = new Map<string, RunResultItem[]>()
+  for (const r of results) {
+    const eventKey = `${r.eventName}\0${r.date}\0${r.eventNumber}`
+    if (!byEvent.has(eventKey)) byEvent.set(eventKey, [])
+    byEvent.get(eventKey)!.push(r)
+  }
+
+  for (const eventResults of byEvent.values()) {
+    // Pre-compute digits and build a lookup from reversed digits → runners
+    const digitEntries: { result: RunResultItem; digits: string; seconds: number }[] = []
+    for (const r of eventResults) {
+      const secs = parseTimeToSeconds(r.time)
+      const digits = toMMSSDigits(secs)
+      if (digits) digitEntries.push({ result: r, digits, seconds: secs })
+    }
+
+    // Build a map from digits → list of entries with that digit string
+    const digitLookup = new Map<string, typeof digitEntries>()
+    for (const entry of digitEntries) {
+      if (!digitLookup.has(entry.digits)) digitLookup.set(entry.digits, [])
+      digitLookup.get(entry.digits)!.push(entry)
+    }
+
+    for (const entry of digitEntries) {
+      const reversed = [...entry.digits].reverse().join("")
+      // Reversed digits must form a valid time (seconds part < 60)
+      const reversedSecs = parseInt(reversed.slice(2), 10)
+      if (reversedSecs >= 60) continue
+
+      const matches = digitLookup.get(reversed)
+      if (!matches) continue
+
+      for (const match of matches) {
+        // Can't match yourself
+        if (match.result.parkrunId === entry.result.parkrunId) continue
+        // Exception: both cannot have the exact same time
+        if (entry.seconds === match.seconds) continue
+
+        const key = `${entry.result.parkrunId}:${entry.result.date}:${entry.result.eventName}:${entry.result.eventNumber}`
+        const partnerName = nameMap.get(match.result.parkrunId) ?? match.result.runnerName
+        const existing = map.get(key) ?? []
+        // Avoid duplicate partners for a single result key
+        if (!existing.some(p => p.parkrunId === match.result.parkrunId)) {
+          existing.push({name: partnerName, parkrunId: match.result.parkrunId})
+          map.set(key, existing)
+        }
+      }
+    }
+  }
+
+  return map
+}
+
+// ---------------------------------------------------------------------------
 // Public API: pre-computed celebration data
 // ---------------------------------------------------------------------------
 
@@ -676,10 +764,11 @@ export interface CelebrationData {
   hagaCancelledMap: Set<string>
   uppsalaCancelledMap: Set<string>
   palindromeMap: Set<string>
-  runBuddyMap: Map<string, string[]>
-  bestieMap: Map<string, string[]>
-  bffMap: Map<string, string[]>
-  parkrunPalMap: Map<string, string[]>
+  runBuddyMap: Map<string, PairPartner[]>
+  bestieMap: Map<string, PairPartner[]>
+  bffMap: Map<string, PairPartner[]>
+  parkrunPalMap: Map<string, PairPartner[]>
+  palindromePalMap: Map<string, PairPartner[]>
 }
 
 /** Call once per render cycle (inside a createMemo) to pre-compute all celebration lookups. */
@@ -702,6 +791,7 @@ export function buildCelebrationData(results: RunResultItem[], runners: Runner[]
     bestieMap,
     bffMap,
     parkrunPalMap: buildParkrunPalMap(results),
+    palindromePalMap: buildPalindromePalMap(results),
   }
 }
 
@@ -725,6 +815,7 @@ export interface CelebrationTag {
   description: string
   emoji: string
   color: string
+  otherRunnerId?: string // for pair achievements, the parkrunId of the other runner involved (to link to their profile)
 }
 
 interface CelebrationRuleContext {
@@ -848,49 +939,66 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
 
   // Run Buddy
   ({ data, resultKey }) => {
-    const names = data.runBuddyMap.get(resultKey)
-    if (!names || names.length === 0) return null
-    return names.map((name) => ({
-      label: `${formatName(name)}'s Run Buddy`,
-      description: `First time finished within 10 seconds of ${formatName(name)}`,
+    const partners = data.runBuddyMap.get(resultKey)
+    if (!partners || partners.length === 0) return null
+    return partners.map((partner) => ({
+      label: `${formatName(partner.name)}'s Run Buddy`,
+      description: `First time finished within 10 seconds of ${formatName(partner.name)}`,
       emoji: "🤝",
       color: TAG_COLORS.runBuddy,
+      otherRunnerId: partner.parkrunId,
     }))
   },
 
   // Bestie
   ({ data, resultKey }) => {
-    const names = data.bestieMap.get(resultKey)
-    if (!names || names.length === 0) return null
-    return names.map((name) => ({
-      label: `${formatName(name)}'s Bestie`,
-      description: `Finished within 10 seconds of ${formatName(name)} for the 10th time!`,
+    const partners = data.bestieMap.get(resultKey)
+    if (!partners || partners.length === 0) return null
+    return partners.map((partner) => ({
+      label: `${formatName(partner.name)}'s Bestie`,
+      description: `Finished within 10 seconds of ${formatName(partner.name)} for the 10th time!`,
       emoji: "👥",
       color: TAG_COLORS.bestie,
+      otherRunnerId: partner.parkrunId,
     }))
   },
 
   // BFF
   ({ data, resultKey }) => {
-    const names = data.bffMap.get(resultKey)
-    if (!names || names.length === 0) return null
-    return names.map((name) => ({
-      label: `${formatName(name)}'s BFF`,
-      description: `Finished within 10 seconds of ${formatName(name)} for the 50th time!`,
+    const partners = data.bffMap.get(resultKey)
+    if (!partners || partners.length === 0) return null
+    return partners.map((partner) => ({
+      label: `${formatName(partner.name)}'s BFF`,
+      description: `Finished within 10 seconds of ${formatName(partner.name)} for the 50th time!`,
       emoji: "💕",
       color: TAG_COLORS.bff,
+      otherRunnerId: partner.parkrunId,
     }))
   },
 
   // Parkrun Pal
   ({ data, resultKey }) => {
-    const names = data.parkrunPalMap.get(resultKey)
-    if (!names || names.length === 0) return null
-    return names.map((name) => ({
-      label: `${formatName(name)}'s Parkrun Pal`,
-      description: `Attended 50 parkrun events together with ${formatName(name)}!`,
+    const partners = data.parkrunPalMap.get(resultKey)
+    if (!partners || partners.length === 0) return null
+    return partners.map((partner) => ({
+      label: `${formatName(partner.name)}'s Parkrun Pal`,
+      description: `Attended 50 parkrun events with ${formatName(partner.name)}!`,
       emoji: "🤗",
       color: TAG_COLORS.parkrunPal,
+      otherRunnerId: partner.parkrunId,
+    }))
+  },
+
+  // Palindrome Pal
+  ({ data, resultKey }) => {
+    const partners = data.palindromePalMap.get(resultKey)
+    if (!partners || partners.length === 0) return null
+    return partners.map((partner) => ({
+      label: `${formatName(partner.name)}'s Palindromic Pal`,
+      description: `Run the reverse of ${formatName(partner.name)}'s time`,
+      emoji: "🔄",
+      color: TAG_COLORS.palindromicPal,
+      otherRunnerId: partner.parkrunId,
     }))
   },
 ]
@@ -925,10 +1033,23 @@ export function ResultCelebrations(props: ResultCelebrationsProps) {
   )
 }
 
+/** Look up a runner's face image by their parkrunId. */
+function getRunnerFace(parkrunId: string): string | undefined {
+  for (const [, [accessor]] of Object.entries(runnerSignals)) {
+    const data = accessor()
+    if (data.id === parkrunId && data.frames.face.length > 0) {
+      return data.frames.face[0]
+    }
+  }
+  return undefined
+}
+
 export function CelebrationPill(props: { tag: CelebrationTag; showTooltip?: boolean }) {
   const [hovered, setHovered] = createSignal(false)
   let anchorRef!: HTMLSpanElement
   const [tooltipStyle, setTooltipStyle] = createSignal<Record<string, string>>({})
+
+  const otherRunnerFace = () => props.tag.otherRunnerId ? getRunnerFace(props.tag.otherRunnerId) : undefined
 
   const positionTooltip = () => {
     if (!anchorRef) return
@@ -959,7 +1080,11 @@ export function CelebrationPill(props: { tag: CelebrationTag; showTooltip?: bool
       }}
       onMouseLeave={() => setHovered(false)}
     >
-      {props.tag.label} <FloatingEmoji emoji={props.tag.emoji} />
+      {props.tag.label}{" "}
+      <Show when={otherRunnerFace()}>
+        {(face) => <img src={face()} alt="" class={styles.runnerFace} />}
+      </Show>
+      <FloatingEmoji emoji={props.tag.emoji} />
       <Show when={props.showTooltip && hovered()}>
         <div class={styles.tooltip} style={tooltipStyle()}>
           {props.tag.description}
@@ -995,5 +1120,12 @@ const styles = {
     zIndex: 1000,
     textAlign: "center",
     whiteSpace: "normal",
+  }),
+  runnerFace: css({
+    height: "1em",
+    verticalAlign: "middle",
+    imageRendering: "pixelated",
+    display: "inline-block",
+    mr: "0.3rem",
   }),
 }

@@ -9,8 +9,9 @@ import { DirtBlock } from "./DirtBlock"
 import { ResultCelebrations, buildCelebrationData } from "./ResultCelebrations"
 import { Button } from "./Button"
 import { getMemberRoute } from "@/utils/memberRoute"
-import { runners } from "./header/runners"
-import { BackSignButton } from "./BackSignButton"
+import { runners } from '@/data/runners'
+import { races, type RaceCalendarItem } from '@/data/races'
+import extLinkAsset from "@/assets/misc/ext-link.png"
 
 interface ParkrunResult {
   parkrunId: string
@@ -28,6 +29,7 @@ interface ParkrunEvent {
 interface DateGroup {
   date: string
   parkruns: ParkrunEvent[]
+  races: RaceCalendarItem[]
 }
 
 function groupResults(items: RunResultItem[]): DateGroup[] {
@@ -52,6 +54,13 @@ function groupResults(items: RunResultItem[]): DateGroup[] {
     })
   }
 
+  const today = new Date().toISOString().split('T')[0]
+  const pastRaces = races.filter((r) => r.date <= today)
+
+  for (const race of pastRaces) {
+    if (!byDate.has(race.date)) byDate.set(race.date, new Map())
+  }
+
   return Array.from(byDate.entries())
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([date, events]) => ({
@@ -60,6 +69,7 @@ function groupResults(items: RunResultItem[]): DateGroup[] {
         ...e,
         results: e.results.sort((a, b) => a.position - b.position),
       })),
+      races: pastRaces.filter((r) => r.date === date),
     }))
 }
 
@@ -84,6 +94,66 @@ function getDisplayName(name: string, resultCount: number) {
   if (name !== "Haga" && resultCount >= 4) return `Scoop Bus trip to ${name}`
   if (resultCount === totalMembers) return `Full Scoop Gang at ${name}`
   return name
+}
+
+function formatRaceTime(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  const mm = String(m).padStart(2, '0')
+  const ss = String(s).padStart(2, '0')
+  if (h > 0) return `${h}:${mm}:${ss}`
+  return `${mm}:${ss}`
+}
+
+function RaceBlock(props: { race: RaceCalendarItem }) {
+  return (
+    <DirtBlock>
+      <div class={styles.parkrun}>
+        <h4 class={styles.parkrunName}>
+          <FloatingEmoji emoji="🔥" /> {props.race.name} <FloatingEmoji emoji="🔥" />
+        </h4>
+        {props.race.website && <A href={props.race.website} target="_blank">
+          <img src={extLinkAsset} class={styles.externalRaceLink} />
+        </A>}
+        <ul style={{ "list-style": "none", padding: "0" }}>
+          <For each={props.race.runners}>
+            {(raceRunner) => {
+              const runnerData = () => runners[raceRunner.name][0]()
+              const href = () => `/member/${raceRunner.name}`
+              const hasPosition = () => raceRunner.position != null
+              const hasTime = () => raceRunner.time != null
+              const isToday = () => props.race.date === new Date().toISOString().split('T')[0]
+              const linkedName = () => (
+                <em><A href={href()} class={styles.memberLink}>{runnerData().name}</A></em>
+              )
+              return (
+                <li>
+                  <Show
+                    when={hasPosition() || hasTime()}
+                    fallback={
+                      <>
+                        {linkedName()}{" "}
+                        {isToday() ? "is running today" : "participated"}
+                      </>
+                    }
+                  >
+                    {linkedName()} finished
+                    <Show when={hasPosition()}>
+                      {" "}in <em>{ordinal(raceRunner.position!)}</em> place
+                    </Show>
+                    <Show when={hasTime()}>
+                      {" "}with a time of <em>{formatRaceTime(raceRunner.time!)}</em>
+                    </Show>
+                  </Show>
+                </li>
+              )
+            }}
+          </For>
+        </ul>
+      </div>
+    </DirtBlock>
+  )
 }
 
 function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
@@ -132,6 +202,9 @@ export function LatestResults(props: LatestResultsProps) {
         {(result) => (
           <div class={styles.results}>
             <h3 class={styles.date}>{formatDate(new Date(result.date + "T00:00:00"))}</h3>
+            <For each={result.races}>
+              {(race) => <RaceBlock race={race} />}
+            </For>
             <For each={result.parkruns}>
               {(parkrun) => {
                 return (
@@ -216,5 +289,17 @@ const styles = {
   memberLink: css({
     color: 'inherit',
     textDecoration: 'underline',
+  }),
+  externalRaceLink: css({
+    position: 'absolute',
+    top: '0',
+    right: '0',
+    width: '24px',
+    height: '24px',
+    p: '4px',
+
+    _hover: {
+      background: '#00000018',
+    }
   }),
 }

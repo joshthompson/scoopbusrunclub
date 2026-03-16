@@ -2,6 +2,9 @@ html {
   --grass-green: #77a15d;
   --sky-blue-top: #cdfbff;
   --sky-blue-bottom: #5ae2ff;
+  --dirt-brown: #D1A671;
+  --dirt-dark-brown: #AD855A;
+  --dirt-darker-brown: #4A3215;
 
   font-family: "Cabin", sans-serif;
   font-optical-sizing: auto;

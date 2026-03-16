@@ -1,8 +1,8 @@
 import { css } from "@style/css"
 import { createMemo, createSignal, For, Show } from "solid-js"
-import { A, useNavigate, useParams } from "@solidjs/router"
+import { A, useParams } from "@solidjs/router"
 import { DirtBlock } from "../components/DirtBlock"
-import { runners as runnerSignals } from "../components/header/runners"
+import { RunnerName, runners as runnerSignals } from '@/data/runners'
 import { type RunResultItem, type Runner } from "../utils/api"
 import { formatDate, formatName, parseTimeToSeconds } from "@/utils/misc"
 import { buildCelebrationData, CelebrationPill, getCelebrationTags } from "../components/ResultCelebrations"
@@ -12,6 +12,8 @@ import { FieldBlock } from "@/components/FieldBlock"
 import { RunnerSummaryStat } from "./RunnerSummaryStat"
 import { NotFoundPage } from "./NotFoundPage"
 import { BackSignButton } from "@/components/BackSignButton"
+import rock1Asset from "@/assets/misc/rock1.png"
+import graphIcon from "@/assets/misc/graph-icon.png"
 
 interface MemberPageProps {
   results: RunResultItem[]
@@ -30,6 +32,7 @@ interface GroupedCelebration {
   emoji: string
   color: string
   description: string
+  otherRunnerId?: string
   occurrences: CelebrationOccurrence[]
 }
 
@@ -38,7 +41,7 @@ function isPbCelebration(name: string) {
 }
 
 function shouldShowCelebrationTime(name: string) {
-  return isPbCelebration(name) || name === "Palindrome!"
+  return isPbCelebration(name) || name === "Palindrome!" || name.endsWith("Palindrome Pal")
 }
 
 function secondsToMMSS(seconds: number) {
@@ -61,36 +64,39 @@ function AchievementItem(props: { celebration: GroupedCelebration }) {
           emoji: props.celebration.emoji,
           color: props.celebration.color,
           description: props.celebration.description,
+          otherRunnerId: props.celebration.otherRunnerId,
         }} />
         <Show when={props.celebration.occurrences.length > 1}> × {props.celebration.occurrences.length}</Show>
       </div>
       <div class={styles.celebrationDescription}>{props.celebration.description}</div>
 
-      <div>
-        <Show when={showTime()}>
-          <strong>{latest().time}</strong> -{' '}
-        </Show>
-        Achieved at {latest().eventName} #{latest().eventNumber} on {formatDate(new Date(`${latest().date}T00:00:00`))}
-        <Show when={props.celebration.occurrences.length > 1 && !showMore()}>
-          <div>
-            <button class={styles.showMoreInline} type="button" onClick={() => setShowMore(true)}>
-              Show more
-            </button>
-          </div>
-        </Show>
-      </div>
-
-      <Show when={showMore()}>
-        <For each={earlier()}>
-          {(occurrence) => (
+      <Show when={latest()}>
+        <div>
+          <Show when={showTime()}>
+            <strong>{latest().time}</strong> -{' '}
+          </Show>
+          Achieved at {latest().eventName} #{latest().eventNumber} on {formatDate(new Date(`${latest().date}T00:00:00`))}
+          <Show when={props.celebration.occurrences.length > 1 && !showMore()}>
             <div>
-              <Show when={showTime()}>
-                <strong>{occurrence.time}</strong> -{' '}
-              </Show>
-              Achieved at {occurrence.eventName} #{occurrence.eventNumber} on {formatDate(new Date(`${occurrence.date}T00:00:00`))}
+              <button class={styles.showMoreInline} type="button" onClick={() => setShowMore(true)}>
+                Show more
+              </button>
             </div>
-          )}
-        </For>
+          </Show>
+        </div>
+
+        <Show when={showMore()}>
+          <For each={earlier()}>
+            {(occurrence) => (
+              <div>
+                <Show when={showTime()}>
+                  <strong>{occurrence.time}</strong> -{' '}
+                </Show>
+                Achieved at {occurrence.eventName} #{occurrence.eventNumber} on {formatDate(new Date(`${occurrence.date}T00:00:00`))}
+              </div>
+            )}
+          </For>
+        </Show>
       </Show>
     </li>
   )
@@ -100,7 +106,7 @@ export function MemberPage(props: MemberPageProps) {
   const params = useParams<{ name: string }>()
 
   const runnerKey = createMemo(() => getRunnerKeyFromRouteName(params.name) ?? "")
-  const runnerSignal = createMemo(() => runnerSignals[runnerKey()])
+  const runnerSignal = createMemo(() => runnerSignals[runnerKey() as RunnerName])
   const runnerData = createMemo(() => runnerSignal()?.[0]())
   const runnerId = createMemo(() => runnerData()?.id ?? "")
 
@@ -202,28 +208,6 @@ export function MemberPage(props: MemberPageProps) {
       )
     })
 
-  const personalBest = createMemo(() => {
-    let bestSeconds = Infinity
-    let bestResult: RunResultItem | null = null
-
-    for (const result of runnerResults()) {
-      const seconds = parseTimeToSeconds(result.time)
-      if (seconds < bestSeconds) {
-        bestSeconds = seconds
-        bestResult = result
-      }
-    }
-
-    if (!bestResult || !Number.isFinite(bestSeconds)) return null
-
-    return {
-      time: secondsToMMSS(bestSeconds),
-      eventName: bestResult.eventName,
-      eventNumber: bestResult.eventNumber,
-      date: bestResult.date,
-    }
-  })
-
   const celebrationData = createMemo(() => buildCelebrationData(props.results, props.runners))
 
   const groupedCelebrations = createMemo<GroupedCelebration[]>(() => {
@@ -256,6 +240,7 @@ export function MemberPage(props: MemberPageProps) {
             emoji: tag.emoji,
             color: tag.color,
             description: tag.description,
+            otherRunnerId: tag.otherRunnerId,
             occurrences: [occurrence],
           })
           continue
@@ -286,16 +271,28 @@ export function MemberPage(props: MemberPageProps) {
         return a.name.localeCompare(b.name)
       }),
   )
-  const nonPbCelebrations = createMemo(() =>
-    groupedCelebrations()
+  const nonPbCelebrations = createMemo(() => {
+    const items = groupedCelebrations()
       .filter((item) => !isPbCelebration(item.name))
       .sort((a, b) => {
         const latestA = a.occurrences[0]?.date ?? ""
         const latestB = b.occurrences[0]?.date ?? ""
         if (latestA !== latestB) return latestB.localeCompare(latestA)
         return a.name.localeCompare(b.name)
-      }),
-  )
+      })
+
+    if (runnerKey() === "link") {
+      items.unshift({
+        name: "Be a good boy",
+        emoji: "🐶",
+        color: "#f0c040",
+        description: "Achieved everyday!",
+        occurrences: [],
+      })
+    }
+
+    return items
+  })
 
   const name = createMemo(() => {
     if (!runnerData()) return ""
@@ -308,6 +305,12 @@ export function MemberPage(props: MemberPageProps) {
       {(runner) => (
         <div class={styles.container}>
           <FieldBlock title={name()} signType="purple">
+            <A href="./graph" class={styles.rockButton}>
+              <img src={rock1Asset} width={59} />
+              <img src={graphIcon} class={styles.rockButtonIcon} />
+              <span class={styles.rockButtonText}>View graph</span>
+            </A>
+
             <div class={styles.runnerSummary}>
               <CharacterImage runner={runner()} pose="sitting" />
               
@@ -452,5 +455,26 @@ const styles = {
     color: 'inherit',
     textDecoration: 'underline',
     fontWeight: 'bold',
+  }),
+  rockButton: css({
+    position: 'absolute',
+    top: '-15px',
+    right: '0.5rem',
+
+    transformOrigin: 'center',
+    transition: 'filter 0.2s ease',
+    _hover: {
+      filter: 'brightness(1.2)',
+    }
+  }),
+  rockButtonIcon: css({
+    position: 'absolute',
+    top: '40%',
+    left: '45%',
+    transform: 'translate(-50%, -50%)',
+  }),
+  rockButtonText: css({
+    position: 'absolute',
+    fontSize: '0.75rem',
   }),
 }

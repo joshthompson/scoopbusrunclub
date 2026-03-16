@@ -1,12 +1,11 @@
 import backSignAsset from "@/assets/misc/back-sign.png"
 import { useNavigate } from "@solidjs/router"
-import { css } from "@style/css"
+import { css, cx } from "@style/css"
 
-export function BackSignButton(props: { to?: string, children?: string }) {
+export function BackSignButton(props: { to?: string, children?: string, class?: string }) {
   const navigate = useNavigate()
 
-
-  return <button class={styles.button} onClick={() => navigate(props.to ?? "/")}>
+  return <button class={cx(styles.button, props.class)} onClick={() => navigate(props.to ?? "/")}>
     <img class={styles.image} src={backSignAsset} alt="Back to home" />
     <span class={styles.text}>{props.children ?? 'Back to homepage'}</span>
 

@@ -1,5 +1,5 @@
 import { createController, createObjectSignal, Scene } from "@/engine"
-import { RUNNER_SIZE, runners } from "./runners"
+import { RUNNER_SIZE, runners } from '@/data/runners'
 import { css } from "@style/css"
 import { Accessor } from "solid-js"
 import { parseTimeToSeconds } from "@/utils/misc"
