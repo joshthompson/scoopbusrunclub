@@ -1,6 +1,6 @@
 import { css } from "@style/css"
 import { createMemo, createSignal, For, Show } from "solid-js"
-import { A, useNavigate, useParams } from "@solidjs/router"
+import { A, useParams } from "@solidjs/router"
 import { DirtBlock } from "../components/DirtBlock"
 import { runners as runnerSignals } from "../components/header/runners"
 import { type RunResultItem, type Runner } from "../utils/api"
@@ -30,6 +30,7 @@ interface GroupedCelebration {
   emoji: string
   color: string
   description: string
+  otherRunnerId?: string
   occurrences: CelebrationOccurrence[]
 }
 
@@ -38,7 +39,7 @@ function isPbCelebration(name: string) {
 }
 
 function shouldShowCelebrationTime(name: string) {
-  return isPbCelebration(name) || name === "Palindrome!"
+  return isPbCelebration(name) || name === "Palindrome!" || name.endsWith("Palindrome Pal")
 }
 
 function secondsToMMSS(seconds: number) {
@@ -61,36 +62,39 @@ function AchievementItem(props: { celebration: GroupedCelebration }) {
           emoji: props.celebration.emoji,
           color: props.celebration.color,
           description: props.celebration.description,
+          otherRunnerId: props.celebration.otherRunnerId,
         }} />
         <Show when={props.celebration.occurrences.length > 1}> × {props.celebration.occurrences.length}</Show>
       </div>
       <div class={styles.celebrationDescription}>{props.celebration.description}</div>
 
-      <div>
-        <Show when={showTime()}>
-          <strong>{latest().time}</strong> -{' '}
-        </Show>
-        Achieved at {latest().eventName} #{latest().eventNumber} on {formatDate(new Date(`${latest().date}T00:00:00`))}
-        <Show when={props.celebration.occurrences.length > 1 && !showMore()}>
-          <div>
-            <button class={styles.showMoreInline} type="button" onClick={() => setShowMore(true)}>
-              Show more
-            </button>
-          </div>
-        </Show>
-      </div>
-
-      <Show when={showMore()}>
-        <For each={earlier()}>
-          {(occurrence) => (
+      <Show when={latest()}>
+        <div>
+          <Show when={showTime()}>
+            <strong>{latest().time}</strong> -{' '}
+          </Show>
+          Achieved at {latest().eventName} #{latest().eventNumber} on {formatDate(new Date(`${latest().date}T00:00:00`))}
+          <Show when={props.celebration.occurrences.length > 1 && !showMore()}>
             <div>
-              <Show when={showTime()}>
-                <strong>{occurrence.time}</strong> -{' '}
-              </Show>
-              Achieved at {occurrence.eventName} #{occurrence.eventNumber} on {formatDate(new Date(`${occurrence.date}T00:00:00`))}
+              <button class={styles.showMoreInline} type="button" onClick={() => setShowMore(true)}>
+                Show more
+              </button>
             </div>
-          )}
-        </For>
+          </Show>
+        </div>
+
+        <Show when={showMore()}>
+          <For each={earlier()}>
+            {(occurrence) => (
+              <div>
+                <Show when={showTime()}>
+                  <strong>{occurrence.time}</strong> -{' '}
+                </Show>
+                Achieved at {occurrence.eventName} #{occurrence.eventNumber} on {formatDate(new Date(`${occurrence.date}T00:00:00`))}
+              </div>
+            )}
+          </For>
+        </Show>
       </Show>
     </li>
   )
@@ -202,28 +206,6 @@ export function MemberPage(props: MemberPageProps) {
       )
     })
 
-  const personalBest = createMemo(() => {
-    let bestSeconds = Infinity
-    let bestResult: RunResultItem | null = null
-
-    for (const result of runnerResults()) {
-      const seconds = parseTimeToSeconds(result.time)
-      if (seconds < bestSeconds) {
-        bestSeconds = seconds
-        bestResult = result
-      }
-    }
-
-    if (!bestResult || !Number.isFinite(bestSeconds)) return null
-
-    return {
-      time: secondsToMMSS(bestSeconds),
-      eventName: bestResult.eventName,
-      eventNumber: bestResult.eventNumber,
-      date: bestResult.date,
-    }
-  })
-
   const celebrationData = createMemo(() => buildCelebrationData(props.results, props.runners))
 
   const groupedCelebrations = createMemo<GroupedCelebration[]>(() => {
@@ -256,6 +238,7 @@ export function MemberPage(props: MemberPageProps) {
             emoji: tag.emoji,
             color: tag.color,
             description: tag.description,
+            otherRunnerId: tag.otherRunnerId,
             occurrences: [occurrence],
           })
           continue
@@ -286,16 +269,28 @@ export function MemberPage(props: MemberPageProps) {
         return a.name.localeCompare(b.name)
       }),
   )
-  const nonPbCelebrations = createMemo(() =>
-    groupedCelebrations()
+  const nonPbCelebrations = createMemo(() => {
+    const items = groupedCelebrations()
       .filter((item) => !isPbCelebration(item.name))
       .sort((a, b) => {
         const latestA = a.occurrences[0]?.date ?? ""
         const latestB = b.occurrences[0]?.date ?? ""
         if (latestA !== latestB) return latestB.localeCompare(latestA)
         return a.name.localeCompare(b.name)
-      }),
-  )
+      })
+
+    if (runnerKey() === "link") {
+      items.unshift({
+        name: "Be a good boy",
+        emoji: "🐶",
+        color: "#f0c040",
+        description: "Achieved everyday!",
+        occurrences: [],
+      })
+    }
+
+    return items
+  })
 
   const name = createMemo(() => {
     if (!runnerData()) return ""
@@ -308,6 +303,7 @@ export function MemberPage(props: MemberPageProps) {
       {(runner) => (
         <div class={styles.container}>
           <FieldBlock title={name()} signType="purple">
+            <A href="./graph" class={styles.graphLink}>📊 View graph</A>
             <div class={styles.runnerSummary}>
               <CharacterImage runner={runner()} pose="sitting" />
               
@@ -452,5 +448,14 @@ const styles = {
     color: 'inherit',
     textDecoration: 'underline',
     fontWeight: 'bold',
+  }),
+  graphLink: css({
+    position: 'absolute',
+    top: '0.5rem',
+    right: '0.5rem',
+    color: 'inherit',
+    textDecoration: 'underline',
+    fontWeight: 'bold',
+    fontSize: '0.9rem',
   }),
 }
