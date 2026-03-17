@@ -21,6 +21,7 @@ interface MemberPageProps {
 }
 
 interface CelebrationOccurrence {
+  event: string
   eventName: string
   eventNumber: number
   date: string
@@ -114,9 +115,9 @@ export function MemberPage(props: MemberPageProps) {
   const totalRuns = createMemo(() => props.runners.find((runner) => runner.parkrunId === runnerId())?.totalRuns ?? runnerResults().length)
   const totalJuniorRuns = createMemo(() => props.runners.find((runner) => runner.parkrunId === runnerId())?.totalJuniorRuns ?? 0)
   const totalRunsAtHaga = createMemo(() => runnerResults().filter((result) =>
-    result.eventName === "Haga" && result.parkrunId === runnerId()
+    result.event === "haga" && result.parkrunId === runnerId()
   ).length)
-  const totalEvents = createMemo(() => new Set(runnerResults().map((result) => result.eventName)).size)
+  const totalEvents = createMemo(() => new Set(runnerResults().map((result) => result.event)).size)
   const runnerNameById = createMemo(() => {
     const map = new Map<string, string>()
     for (const [, [runner]] of Object.entries(runnerSignals)) {
@@ -133,7 +134,7 @@ export function MemberPage(props: MemberPageProps) {
   const eventResultsMap = createMemo(() => {
     const map = new Map<string, RunResultItem[]>()
     for (const result of props.results) {
-      const eventKey = `${result.date}:${result.eventName}:${result.eventNumber}`
+      const eventKey = `${result.date}:${result.event}:${result.eventNumber}`
       if (!map.has(eventKey)) map.set(eventKey, [])
       map.get(eventKey)!.push(result)
     }
@@ -156,7 +157,7 @@ export function MemberPage(props: MemberPageProps) {
         const mySeconds = parseTimeToSeconds(myResult.time)
         if (!Number.isFinite(mySeconds)) continue
 
-        const eventKey = `${myResult.date}:${myResult.eventName}:${myResult.eventNumber}`
+        const eventKey = `${myResult.date}:${myResult.event}:${myResult.eventNumber}`
         const eventResults = eventResultsMap().get(eventKey) ?? []
 
         for (const otherResult of eventResults) {
@@ -214,7 +215,7 @@ export function MemberPage(props: MemberPageProps) {
     const groups = new Map<string, GroupedCelebration>()
 
     for (const result of runnerResults()) {
-      const resultKey = `${result.parkrunId}:${result.date}:${result.eventName}:${result.eventNumber}`
+      const resultKey = `${result.parkrunId}:${result.date}:${result.event}:${result.eventNumber}`
       const runnerDateKey = `${result.parkrunId}:${result.date}`
       const tags = getCelebrationTags({
         data: celebrationData(),
@@ -228,6 +229,7 @@ export function MemberPage(props: MemberPageProps) {
         const key = `${tag.label}:${tag.emoji}:${tag.description}`
         const existing = groups.get(key)
         const occurrence = {
+          event: result.event,
           eventName: result.eventName,
           eventNumber: result.eventNumber,
           date: result.date,

@@ -17,8 +17,10 @@ import { fileURLToPath } from "url";
 import {
   parseRunnerData,
   parseRunResults,
+  extractEvents,
   type RunnerInfo,
   type RunResult,
+  type EventInfo,
 } from "../lib/parsers";
 
 // --- Env file loading ---
@@ -86,6 +88,7 @@ interface IngestPayload {
     runner: RunnerInfo;
     runResults: RunResult[];
   }[];
+  events: EventInfo[];
 }
 
 // --- Helpers ---
@@ -133,7 +136,10 @@ async function main() {
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   });
 
-  const payload: IngestPayload = { athletes: [] };
+  const payload: IngestPayload = { athletes: [], events: [] };
+
+  /** Collect all events across athletes, deduplicating by eventId */
+  const allEvents = new Map<string, EventInfo>();
 
   for (const { parkrunId, name } of TRACKED_ATHLETES) {
     console.log(`Fetching results for ${name} (${parkrunId})...`);
@@ -154,6 +160,14 @@ async function main() {
       }
       console.log(`    ${runResults.length} run results`);
 
+      // Extract unique events from this athlete's results
+      const events = extractEvents(runResults);
+      for (const event of events) {
+        if (!allEvents.has(event.eventId)) {
+          allEvents.set(event.eventId, event);
+        }
+      }
+
       payload.athletes.push({
         parkrunId,
         runner,
@@ -172,6 +186,10 @@ async function main() {
   }
 
   await browser.close();
+
+  // Attach deduplicated events to payload
+  payload.events = Array.from(allEvents.values());
+  console.log(`\nCollected ${payload.events.length} unique event(s).`);
 
   if (payload.athletes.length === 0) {
     console.log("No athlete data fetched, skipping ingest.");

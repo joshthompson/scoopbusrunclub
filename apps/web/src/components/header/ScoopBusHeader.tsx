@@ -72,13 +72,13 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
 
   // For each runner, find others at the same event and pick the next-fastest
   for (const [key, current] of runnerLatest) {
-    const eventKey = `${current.result.eventName}:${current.result.eventNumber}`
+    const eventKey = `${current.result.event}:${current.result.eventNumber}`
 
     // Find all other runners at the same event
     const sameEvent: { key: string; timeSeconds: number; position: number }[] = []
     for (const [otherKey, other] of runnerLatest) {
       if (otherKey === key) continue
-      const otherEventKey = `${other.result.eventName}:${other.result.eventNumber}`
+      const otherEventKey = `${other.result.event}:${other.result.eventNumber}`
       if (otherEventKey === eventKey) {
         sameEvent.push({ key: otherKey, timeSeconds: other.timeSeconds, position: other.result.position })
       }

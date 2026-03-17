@@ -4,6 +4,7 @@ import { ScoopBusHeader } from './components/header/ScoopBusHeader';
 import './styles.css';
 import { css } from '@style/css';
 import { fetchRunners, fetchAllResults } from './utils/api';
+import { loadEvents } from './utils/events';
 import { MemberPage } from './pages/MemberPage';
 import { HomePage } from './pages/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -12,6 +13,9 @@ import { MemberGraphPage } from './pages/MemberGraphPage';
 const App: Component = () => {
   const [runners] = createResource(fetchRunners)
   const [results] = createResource(fetchAllResults)
+
+  // Populate the event name lookup cache
+  createResource(loadEvents)
 
   const RootLayout: Component<RouteSectionProps> = (routeProps) => (
     <>

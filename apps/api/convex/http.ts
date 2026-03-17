@@ -102,6 +102,17 @@ http.route({
   }),
 });
 
+// --- GET /api/events ---
+
+http.route({
+  path: "/api/events",
+  method: "GET",
+  handler: httpAction(async (ctx) => {
+    const events = await ctx.runQuery(api.queries.getAllEvents);
+    return jsonResponse(events);
+  }),
+});
+
 // --- POST /api/ingest ---
 // Receives pre-parsed athlete data from the GitHub Actions Playwright scraper.
 // Protected by a shared secret in the Authorization header.
@@ -120,6 +131,7 @@ http.route({
 
     const body = await request.json();
     const athletes = body?.athletes;
+    const events = body?.events;
 
     if (!Array.isArray(athletes)) {
       return jsonResponse({ error: "Invalid payload: expected { athletes: [...] }" }, 400);
@@ -143,7 +155,7 @@ http.route({
         for (const result of runResults) {
           await ctx.runMutation(internal.parkrun.storeRunResult, {
             parkrunId,
-            eventName: result.eventName,
+            event: result.event,
             eventNumber: result.eventNumber,
             position: result.position,
             time: result.time,
@@ -156,7 +168,22 @@ http.route({
       stored++;
     }
 
-    return jsonResponse({ status: "ok", athletesStored: stored });
+    // Store events (deduplicated by eventId in the mutation)
+    let eventsStored = 0;
+    if (Array.isArray(events)) {
+      for (const event of events) {
+        if (!event.eventId || !event.name || !event.url || !event.country) continue;
+        await ctx.runMutation(internal.parkrun.storeEvent, {
+          eventId: event.eventId,
+          name: event.name,
+          url: event.url,
+          country: event.country,
+        });
+        eventsStored++;
+      }
+    }
+
+    return jsonResponse({ status: "ok", athletesStored: stored, eventsStored });
   }),
 });
 
@@ -167,6 +194,7 @@ for (const path of [
   "/api/runner",
   "/api/runner/runs",
   "/api/results",
+  "/api/events",
   "/api/ingest",
 ]) {
   http.route({

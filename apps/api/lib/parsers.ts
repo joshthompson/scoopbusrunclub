@@ -12,12 +12,91 @@ export interface RunnerInfo {
 }
 
 export interface RunResult {
-  eventName: string;
+  event: string;     // eventId, e.g. "haga"
+  eventName: string; // display name, e.g. "Haga" (used by extractEvents, not stored in runResults)
+  eventUrl: string;  // e.g. "https://www.parkrun.se/haga/results/394/"
   eventNumber: number;
   position: number;
   time: string;
   ageGrade: string;
   date: string; // YYYY-MM-DD
+}
+
+export interface EventInfo {
+  eventId: string;   // e.g. "haga"
+  name: string;      // e.g. "Haga"
+  url: string;       // e.g. "https://www.parkrun.se/haga/results/"
+  country: string;   // e.g. "SE"
+}
+
+// --- Country code mapping from parkrun domain ---
+
+const NAMIBIA_EVENTS = new Set(["walvisbay", "windhoek", "swakopmund"]);
+
+const DOMAIN_TO_COUNTRY: Record<string, string> = {
+  "parkrun.com.au": "AU",
+  "parkrun.co.at": "AT",
+  "parkrun.ca": "CA",
+  "parkrun.dk": "DK",
+  "parkrun.fi": "FI",
+  "parkrun.com.de": "DE",
+  "parkrun.ie": "IE",
+  "parkrun.it": "IT",
+  "parkrun.jp": "JP",
+  "parkrun.lt": "LT",
+  "parkrun.my": "MY",
+  "parkrun.nl": "NL",
+  "parkrun.co.nz": "NZ",
+  "parkrun.no": "NO",
+  "parkrun.pl": "PL",
+  "parkrun.sg": "SG",
+  "parkrun.co.za": "ZA",
+  "parkrun.se": "SE",
+  "parkrun.org.uk": "UK",
+  "parkrun.us": "US",
+};
+
+function getCountryFromUrl(url: string, eventId: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, "");
+    if (hostname === "parkrun.co.za" && NAMIBIA_EVENTS.has(eventId)) {
+      return "NA";
+    }
+    return DOMAIN_TO_COUNTRY[hostname] ?? "??";
+  } catch {
+    return "??";
+  }
+}
+
+/**
+ * Extract unique event info from parsed run results.
+ * Derives eventId, name, base URL, and country from the result URLs.
+ */
+export function extractEvents(runResults: RunResult[]): EventInfo[] {
+  const seen = new Map<string, EventInfo>();
+
+  for (const result of runResults) {
+    if (!result.eventUrl || !result.event) continue;
+    if (seen.has(result.event)) continue;
+
+    // URL looks like https://www.parkrun.se/haga/results/394/
+    // We want base: https://www.parkrun.se/haga/
+    const urlMatch = result.eventUrl.match(
+      /^(https?:\/\/[^/]+\/[^/]+)\/results\/?\d*\/?$/,
+    );
+    if (!urlMatch) continue;
+
+    const baseUrl = urlMatch[1] + "/";
+
+    seen.set(result.event, {
+      eventId: result.event,
+      name: result.eventName,
+      url: baseUrl,
+      country: getCountryFromUrl(result.eventUrl, result.event),
+    });
+  }
+
+  return Array.from(seen.values());
 }
 
 // --- Helper: strip HTML tags ---
@@ -76,9 +155,14 @@ export function parseRunResults(html: string): RunResult[] {
     // Columns: Event, Run Date, Run Number, Pos, Time, Age Grade, PB?
     if (cells.length < 6) continue;
 
-    // Event name: <a href="...">Haga</a>
-    const eventNameMatch = cells[0].match(/>([^<]+)<\/a>/);
-    const eventName = eventNameMatch ? eventNameMatch[1].trim() : stripTags(cells[0]);
+    // Event name + URL: <a href="https://www.parkrun.se/haga/results/394/">Haga</a>
+    const eventLinkMatch = cells[0].match(/<a\s+href="([^"]+)"[^>]*>([^<]+)<\/a>/);
+    const eventUrl = eventLinkMatch ? eventLinkMatch[1].trim() : "";
+    const eventName = eventLinkMatch ? eventLinkMatch[2].trim() : stripTags(cells[0]);
+
+    // Derive eventId from URL (e.g. "haga" from ".../haga/results/394/")
+    const eventIdMatch = eventUrl.match(/\/([^/]+)\/results\//);
+    const event = eventIdMatch ? eventIdMatch[1] : eventName.toLowerCase().replace(/[^a-z0-9]/g, "");
 
     // Run Date: <a href="..."><span class="format-date">07/03/2026</span></a>
     const dateMatch = cells[1].match(/>(\d{2})\/(\d{2})\/(\d{4})</);
@@ -99,7 +183,7 @@ export function parseRunResults(html: string): RunResult[] {
     const ageGrade = stripTags(cells[5]);
 
     if (eventName && time) {
-      results.push({ eventName, eventNumber, position, time, ageGrade, date });
+      results.push({ event, eventName, eventUrl, eventNumber, position, time, ageGrade, date });
     }
   }
 

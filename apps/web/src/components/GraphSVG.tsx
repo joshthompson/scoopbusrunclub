@@ -24,6 +24,8 @@ export interface GraphMarker {
   time?: string
   /** Event name (e.g. "Haga parkrun") */
   eventName?: string
+  /** Event ID (e.g. "haga") */
+  event?: string
   /** Date string (e.g. "2025-03-15") */
   date?: string
   /** Filter category */
@@ -209,7 +211,7 @@ export function GraphSVG(props: GraphProps) {
 
     for (let i = 0; i < data.length; i++) {
       const r = data[i]
-      const resultKey = `${r.parkrunId}:${r.date}:${r.eventName}:${r.eventNumber}`
+      const resultKey = `${r.parkrunId}:${r.date}:${r.event}:${r.eventNumber}`
       const runnerDateKey = `${r.parkrunId}:${r.date}`
       const tags = getCelebrationTags({
         data: celData,
@@ -229,6 +231,7 @@ export function GraphSVG(props: GraphProps) {
           description: tag.description,
           time: r.time,
           eventName: r.eventName,
+          event: r.event,
           date: r.date,
           category: isPb ? "pb" : isCoursePb ? "coursePb" : "other",
         })

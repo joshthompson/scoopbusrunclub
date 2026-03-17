@@ -85,9 +85,11 @@ function isSpecialDate(date: Date): boolean {
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
+  version?: number;
 }
 
 const CACHE_PREFIX = "sbrc:";
+const CACHE_VERSION = 2;
 
 function activeCacheTTL(): number {
   const now = new Date();
@@ -100,7 +102,7 @@ function getCached<T>(key: string): T | null {
     const raw = localStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return null;
     const entry: CacheEntry<T> = JSON.parse(raw);
-    if (Date.now() - entry.timestamp > activeCacheTTL()) {
+    if (entry.version !== CACHE_VERSION || Date.now() - entry.timestamp > activeCacheTTL()) {
       localStorage.removeItem(CACHE_PREFIX + key);
       return null;
     }
@@ -112,7 +114,7 @@ function getCached<T>(key: string): T | null {
 
 function setCache<T>(key: string, data: T): void {
   try {
-    const entry: CacheEntry<T> = { data, timestamp: Date.now() };
+    const entry: CacheEntry<T> = { data, timestamp: Date.now(), version: CACHE_VERSION };
     localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
   } catch {
     // localStorage full or unavailable — silently skip
@@ -130,7 +132,8 @@ export interface Runner {
 export interface RunResultItem {
   parkrunId: string;
   runnerName: string;
-  eventName: string;
+  event: string; // eventId, e.g. "haga"
+  eventName: string; // resolved display name, e.g. "Haga"
   eventNumber: number;
   position: number;
   time: string;
@@ -173,6 +176,26 @@ export async function fetchRunners(): Promise<Runner[]> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`API error: ${response.status}`);
   const data: Runner[] = await response.json();
+  setCache(cacheKey, data);
+  return data;
+}
+
+export interface EventItem {
+  eventId: string;
+  name: string;
+  url: string;
+  country: string;
+}
+
+export async function fetchEvents(): Promise<EventItem[]> {
+  const cacheKey = "events";
+  const cached = getCached<EventItem[]>(cacheKey);
+  if (cached) return cached;
+
+  const url = `${CONVEX_URL}/api/events`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const data: EventItem[] = await response.json();
   setCache(cacheKey, data);
   return data;
 }

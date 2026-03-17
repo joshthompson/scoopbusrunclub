@@ -49,6 +49,9 @@ export const getRecentResults = query({
     const runners = await ctx.db.query("runners").collect();
     const runnerMap = new Map(runners.map((r) => [r.parkrunId, r.name]));
 
+    const events = await ctx.db.query("events").collect();
+    const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]));
+
     const allResults = await ctx.db.query("runResults").collect();
 
     return allResults
@@ -56,12 +59,20 @@ export const getRecentResults = query({
       .map((r) => ({
         parkrunId: r.parkrunId,
         runnerName: runnerMap.get(r.parkrunId) ?? "Unknown",
-        eventName: r.eventName,
+        event: r.event,
+        eventName: eventNameMap.get(r.event) ?? r.event,
         eventNumber: r.eventNumber,
         position: r.position,
         time: r.time,
         ageGrade: r.ageGrade,
         date: r.date,
       }));
+  },
+});
+
+export const getAllEvents = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("events").collect();
   },
 });

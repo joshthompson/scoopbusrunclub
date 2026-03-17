@@ -46,7 +46,7 @@ export const storeRunnerData = internalMutation({
 export const storeRunResult = internalMutation({
   args: {
     parkrunId: v.string(),
-    eventName: v.string(),
+    event: v.string(),
     eventNumber: v.number(),
     position: v.number(),
     time: v.string(),
@@ -59,7 +59,7 @@ export const storeRunResult = internalMutation({
       .withIndex("by_unique_result", (q) =>
         q
           .eq("parkrunId", args.parkrunId)
-          .eq("eventName", args.eventName)
+          .eq("event", args.event)
           .eq("eventNumber", args.eventNumber),
       )
       .unique();
@@ -76,6 +76,38 @@ export const storeRunResult = internalMutation({
       await ctx.db.insert("runResults", {
         ...args,
         fetchedAt: Date.now(),
+      });
+    }
+  },
+});
+
+// --- Upsert event ---
+
+export const storeEvent = internalMutation({
+  args: {
+    eventId: v.string(),
+    name: v.string(),
+    url: v.string(),
+    country: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("events")
+      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        name: args.name,
+        url: args.url,
+        country: args.country,
+      });
+    } else {
+      await ctx.db.insert("events", {
+        eventId: args.eventId,
+        name: args.name,
+        url: args.url,
+        country: args.country,
       });
     }
   },

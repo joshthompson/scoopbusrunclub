@@ -4,6 +4,7 @@ import { FloatingEmoji } from "./FloatingEmoji"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
 import { type RunResultItem, type Runner } from "../utils/api"
 import { formatName, parseTimeToSeconds } from "@/utils/misc"
+import { getEventName } from "@/utils/events"
 import { runners as runnerSignals } from '@/data/runners'
 
 // ---------------------------------------------------------------------------
@@ -17,11 +18,11 @@ interface PBStatus {
   coursePb?: boolean
 }
 
-function isJuniorEventName(eventName: string) {
-  return eventName.trim().toLowerCase().includes("juniors")
+function isJuniorEvent(eventId: string) {
+  return getEventName(eventId).trim().toLowerCase().includes("juniors")
 }
 
-/** "parkrunId:date:eventName:eventNumber" → PB flags */
+/** "parkrunId:date:event:eventNumber" → PB flags */
 function buildPBMap(results: RunResultItem[]): Map<string, PBStatus> {
   const map = new Map<string, PBStatus>()
 
@@ -40,20 +41,20 @@ function buildPBMap(results: RunResultItem[]): Map<string, PBStatus> {
     for (let i = 0; i < runs.length; i++) {
       const run = runs[i]
       const secs = parseTimeToSeconds(run.time)
-      const bestCourse = bestPerCourse.get(run.eventName) ?? Infinity
-      const key = `${run.parkrunId}:${run.date}:${run.eventName}:${run.eventNumber}`
-      const isJuniorEvent = isJuniorEventName(run.eventName)
+      const bestCourse = bestPerCourse.get(run.event) ?? Infinity
+      const key = `${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`
+      const isJunior = isJuniorEvent(run.event)
 
       if (i === 0) {
         map.set(key, { firstRun: true })
-        if (isJuniorEvent) {
+        if (isJunior) {
           bestJunior = secs
         } else {
           bestOverall = secs
-          bestPerCourse.set(run.eventName, secs)
+          bestPerCourse.set(run.event, secs)
         }
       } else {
-        if (isJuniorEvent) {
+        if (isJunior) {
           const isJuniorPb = secs < bestJunior
 
           if (isJuniorPb) {
@@ -78,7 +79,7 @@ function buildPBMap(results: RunResultItem[]): Map<string, PBStatus> {
           bestOverall = secs
         }
 
-        bestPerCourse.set(run.eventName, Math.min(bestCourse, secs))
+        bestPerCourse.set(run.event, Math.min(bestCourse, secs))
       }
     }
   }
@@ -160,21 +161,21 @@ const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
     emoji: "🇸🇪",
     color: TAG_COLORS.svensk,
     events: [
-      "Haga",
-      "Judarskogen",
-      "Huddinge",
-      "Lillsjön",
-      "Malmö Ribersborg",
-      "Bulltofta",
-      "Billdalsparken",
-      "Skatås",
-      "Djäkneberget",
-      "Broparken",
-      "Växjösjön",
-      "Örebro",
-      "Vallaskogen",
-      "Uppsala",
-      "Boulognerskogen",
+      "haga",
+      "judarskogen",
+      "huddinge",
+      "lillsjon",
+      "malmoribersborg",
+      "bulltofta",
+      "billdalsparken",
+      "skatas",
+      "djakneberget",
+      "broparken",
+      "vaxjosjon",
+      "orebro",
+      "vallaskogen",
+      "uppsala",
+      "boulognerskogen",
     ],
   },
   {
@@ -182,26 +183,26 @@ const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
     description: "Completed all parkruns in Stockholm",
     emoji: "🏃‍♂️",
     color: TAG_COLORS.stockholmSprint,
-    events: ["Haga", "Huddinge", "Lillsjön", "Judarskogen"],
+    events: ["haga", "huddinge", "lillsjon", "judarskogen"],
   },
   {
     name: "Malmö Double",
     description: "Completed both parkruns in Malmö",
     emoji: "🏃",
     color: TAG_COLORS.malmoDouble,
-    events: ["Malmö Ribersborg", "Bulltofta"],
+    events: ["malmoribersborg", "bulltofta"],
   },
   {
     name: "Göteborg Double",
     description: "Completed both parkruns in Göteborg",
     emoji: "🏃‍♀️",
     color: TAG_COLORS.goteborgDouble,
-    events: ["Skatås", "Billdalsparken"],
+    events: ["skatas", "billdalsparken"],
   },
 ]
 
 /**
- * "parkrunId:date:eventName:eventNumber" -> event-list achievements first completed on that result.
+ * "parkrunId:date:event:eventNumber" -> event-list achievements first completed on that result.
  */
 function buildEventListMap(results: RunResultItem[]): Map<string, EventListAchievement[]> {
   const map = new Map<string, EventListAchievement[]>()
@@ -222,11 +223,11 @@ function buildEventListMap(results: RunResultItem[]): Map<string, EventListAchie
 
       for (const run of runs) {
         if (completed) break
-        if (!requiredEvents.has(run.eventName)) continue
-        visited.add(run.eventName)
+        if (!requiredEvents.has(run.event)) continue
+        visited.add(run.event)
 
         if (visited.size === requiredEvents.size) {
-          const key = `${run.parkrunId}:${run.date}:${run.eventName}:${run.eventNumber}`
+          const key = `${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`
           const existing = map.get(key) ?? []
           existing.push(achievement)
           map.set(key, existing)
@@ -267,7 +268,7 @@ const SPELLING_ACHIEVEMENTS: SpellingAchievement[] = [
 
 /**
  * For every registered spelling achievement, return a set of
- * "parkrunId:date:eventName:eventNumber" keys where the achievement was first completed.
+ * "parkrunId:date:event:eventNumber" keys where the achievement was first completed.
  */
 function buildSpellingMap(results: RunResultItem[]): Map<string, SpellingAchievement> {
   const map = new Map<string, SpellingAchievement>()
@@ -283,19 +284,19 @@ function buildSpellingMap(results: RunResultItem[]): Map<string, SpellingAchieve
 
     for (const achievement of SPELLING_ACHIEVEMENTS) {
       const remaining = [...achievement.word.toUpperCase()]
-      const usedEvents = new Set<string>() // each event name counts at most once
+      const usedEvents = new Set<string>() // each event counts at most once
       let completed = false
 
       for (const run of runs) {
         if (completed) break
-        if (usedEvents.has(run.eventName)) continue
-        const firstLetter = run.eventName[0]?.toUpperCase()
+        if (usedEvents.has(run.event)) continue
+        const firstLetter = getEventName(run.event)[0]?.toUpperCase()
         const idx = remaining.indexOf(firstLetter)
         if (idx !== -1) {
-          usedEvents.add(run.eventName)
+          usedEvents.add(run.event)
           remaining.splice(idx, 1)
           if (remaining.length === 0) {
-            const key = `${run.parkrunId}:${run.date}:${run.eventName}:${run.eventNumber}`
+            const key = `${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`
             map.set(key, achievement)
             completed = true
           }
@@ -348,14 +349,14 @@ function isPalindromeTime(time: string): boolean {
 }
 
 /**
- * Set of "parkrunId:date:eventName:eventNumber" keys where the finish time
+ * Set of "parkrunId:date:event:eventNumber" keys where the finish time
  * is palindromic when converted to mm:ss.
  */
 function buildPalindromeMap(results: RunResultItem[]): Set<string> {
   const set = new Set<string>()
   for (const r of results) {
     if (!isPalindromeTime(r.time)) continue
-    set.add(`${r.parkrunId}:${r.date}:${r.eventName}:${r.eventNumber}`)
+    set.add(`${r.parkrunId}:${r.date}:${r.event}:${r.eventNumber}`)
   }
   return set
 }
@@ -365,16 +366,14 @@ function buildPalindromeMap(results: RunResultItem[]): Set<string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Set of "parkrunId:date:eventName:eventNumber" keys where a runner was the
- * only club member at a Haga event.
- */
-function buildAloneAtHagaMap(results: RunResultItem[]): Set<string> {
+ * Set of "parkrunId:date:event:eventNumber" keys where a runner was the
+ * only club member at a Haga event.(results: RunResultItem[]): Set<string> {
   const set = new Set<string>()
 
   // Group Haga results by date+eventNumber
   const hagaByEvent = new Map<string, RunResultItem[]>()
   for (const r of results) {
-    if (r.eventName !== "Haga") continue
+    if (r.event !== "haga") continue
     const evKey = `${r.date}:${r.eventNumber}`
     if (!hagaByEvent.has(evKey)) hagaByEvent.set(evKey, [])
     hagaByEvent.get(evKey)!.push(r)
@@ -386,7 +385,7 @@ function buildAloneAtHagaMap(results: RunResultItem[]): Set<string> {
   for (const [, runners] of sortedEvents) {
     if (runners.length === 1) {
       const r = runners[0]
-      set.add(`${r.parkrunId}:${r.date}:${r.eventName}:${r.eventNumber}`)
+      set.add(`${r.parkrunId}:${r.date}:${r.event}:${r.eventNumber}`)
     }
   }
 
@@ -398,7 +397,7 @@ function buildAloneAtHagaMap(results: RunResultItem[]): Set<string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Set of "parkrunId:date:eventName:eventNumber" keys where a runner ran
+ * Set of "parkrunId:date:event:eventNumber" keys where a runner ran
  * Uppsala in winter and no club member ran Haga that same date.
  */
 function buildHagaCancelledMap(results: RunResultItem[]): Set<string> {
@@ -407,14 +406,14 @@ function buildHagaCancelledMap(results: RunResultItem[]): Set<string> {
   // Collect dates where someone ran Haga
   const hagaDates = new Set<string>()
   for (const r of results) {
-    if (r.eventName === "Haga") hagaDates.add(r.date)
+    if (r.event === "haga") hagaDates.add(r.date)
   }
 
   for (const r of results) {
-    if (r.eventName !== "Uppsala") continue
+    if (r.event !== "uppsala") continue
     if (!isWinterMonth(r.date)) continue
     if (!hagaDates.has(r.date)) {
-      set.add(`${r.parkrunId}:${r.date}:${r.eventName}:${r.eventNumber}`)
+      set.add(`${r.parkrunId}:${r.date}:${r.event}:${r.eventNumber}`)
     }
   }
 
@@ -426,7 +425,7 @@ function buildHagaCancelledMap(results: RunResultItem[]): Set<string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Set of "parkrunId:date:eventName:eventNumber" keys where a runner ran
+ * Set of "parkrunId:date:event:eventNumber" keys where a runner ran
  * Djäkneberget or Örebro in winter and no club member ran Haga or Uppsala
  * that same date.
  */
@@ -436,18 +435,18 @@ function buildUppsalaCancelledMap(results: RunResultItem[]): Set<string> {
   // Collect dates where someone ran Haga or Uppsala
   const coveredDates = new Set<string>()
   for (const r of results) {
-    if (r.eventName === "Haga" || r.eventName === "Uppsala") {
+    if (r.event === "haga" || r.event === "uppsala") {
       coveredDates.add(r.date)
     }
   }
 
-  const fallbackEvents = new Set(["Djäkneberget", "Örebro"])
+  const fallbackEvents = new Set(["djakneberget", "orebro"])
 
   for (const r of results) {
-    if (!fallbackEvents.has(r.eventName)) continue
+    if (!fallbackEvents.has(r.event)) continue
     if (!isWinterMonth(r.date)) continue
     if (!coveredDates.has(r.date)) {
-      set.add(`${r.parkrunId}:${r.date}:${r.eventName}:${r.eventNumber}`)
+      set.add(`${r.parkrunId}:${r.date}:${r.event}:${r.eventNumber}`)
     }
   }
 
@@ -491,11 +490,11 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
   const bffMap = new Map<string, PairPartner[]>()
   const nameMap = buildRunnerNameMap()
 
-  // Group results by event instance (eventName + date)
+  // Group results by event instance (event + date)
   const byEvent = new Map<string, RunResultItem[]>()
   const eventInstances: { eventKey: string; date: string }[] = []
   for (const r of results) {
-    const eventKey = `${r.eventName}\0${r.date}`
+    const eventKey = `${r.event}\0${r.date}`
     if (!byEvent.has(eventKey)) {
       byEvent.set(eventKey, [])
       eventInstances.push({ eventKey, date: r.date })
@@ -531,8 +530,8 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
         // Run Buddy — first occurrence
         if (!earnedBuddy.has(pairKey)) {
           earnedBuddy.add(pairKey)
-          const keyA = `${a.parkrunId}:${a.date}:${a.eventName}:${a.eventNumber}`
-          const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
+          const keyA = `${a.parkrunId}:${a.date}:${a.event}:${a.eventNumber}`
+          const keyB = `${b.parkrunId}:${b.date}:${b.event}:${b.eventNumber}`
           const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
           const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
           const exA = runBuddyMap.get(keyA) ?? []; exA.push({name: nameB, parkrunId: b.parkrunId}); runBuddyMap.set(keyA, exA)
@@ -542,8 +541,8 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
         // Bestie — 10th occurrence
         if (count === 10 && !earnedBestie.has(pairKey)) {
           earnedBestie.add(pairKey)
-          const keyA = `${a.parkrunId}:${a.date}:${a.eventName}:${a.eventNumber}`
-          const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
+          const keyA = `${a.parkrunId}:${a.date}:${a.event}:${a.eventNumber}`
+          const keyB = `${b.parkrunId}:${b.date}:${b.event}:${b.eventNumber}`
           const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
           const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
           const exA = bestieMap.get(keyA) ?? []; exA.push({name: nameB, parkrunId: b.parkrunId}); bestieMap.set(keyA, exA)
@@ -553,8 +552,8 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
         // BFF — 50th occurrence
         if (count === 50 && !earnedBFF.has(pairKey)) {
           earnedBFF.add(pairKey)
-          const keyA = `${a.parkrunId}:${a.date}:${a.eventName}:${a.eventNumber}`
-          const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
+          const keyA = `${a.parkrunId}:${a.date}:${a.event}:${a.eventNumber}`
+          const keyB = `${b.parkrunId}:${b.date}:${b.event}:${b.eventNumber}`
           const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
           const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
           const exA = bffMap.get(keyA) ?? []; exA.push({name: nameB, parkrunId: b.parkrunId}); bffMap.set(keyA, exA)
@@ -579,11 +578,11 @@ function buildParkrunPalMap(results: RunResultItem[]): Map<string, PairPartner[]
   const map = new Map<string, PairPartner[]>()
   const nameMap = buildRunnerNameMap()
 
-  // Group results by event instance (eventName + date)
+  // Group results by event instance (event + date)
   const byEvent = new Map<string, RunResultItem[]>()
   const eventInstances: { eventKey: string; date: string }[] = []
   for (const r of results) {
-    const eventKey = `${r.eventName}\0${r.date}`
+    const eventKey = `${r.event}\0${r.date}`
     if (!byEvent.has(eventKey)) {
       byEvent.set(eventKey, [])
       eventInstances.push({ eventKey, date: r.date })
@@ -616,8 +615,8 @@ function buildParkrunPalMap(results: RunResultItem[]): Map<string, PairPartner[]
 
         if (count === 50 && !earnedPal.has(pairKey)) {
           earnedPal.add(pairKey)
-          const keyA = `${a.parkrunId}:${a.date}:${a.eventName}:${a.eventNumber}`
-          const keyB = `${b.parkrunId}:${b.date}:${b.eventName}:${b.eventNumber}`
+          const keyA = `${a.parkrunId}:${a.date}:${a.event}:${a.eventNumber}`
+          const keyB = `${b.parkrunId}:${b.date}:${b.event}:${b.eventNumber}`
           const nameA = nameMap.get(a.parkrunId) ?? a.runnerName
           const nameB = nameMap.get(b.parkrunId) ?? b.runnerName
           const exA = map.get(keyA) ?? []; exA.push({name: nameB, parkrunId: b.parkrunId}); map.set(keyA, exA)
@@ -635,7 +634,7 @@ function buildParkrunPalMap(results: RunResultItem[]): Map<string, PairPartner[]
 // ---------------------------------------------------------------------------
 
 /**
- * Set of "parkrunId:date:eventName:eventNumber" keys where a runner
+ * Set of "parkrunId:date:event:eventNumber" keys where a runner
  * completes their 100th run at Haga.
  */
 function buildHagaMap(results: RunResultItem[], targetRunCount: number): Set<string> {
@@ -652,11 +651,11 @@ function buildHagaMap(results: RunResultItem[], targetRunCount: number): Set<str
     let hagaRuns = 0
 
     for (const run of runs) {
-      if (run.eventName !== "Haga") continue
+      if (run.event !== "haga") continue
       hagaRuns += 1
 
       if (hagaRuns === targetRunCount) {
-        set.add(`${run.parkrunId}:${run.date}:${run.eventName}:${run.eventNumber}`)
+        set.add(`${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`)
         break
       }
     }
@@ -687,7 +686,7 @@ function toMMSSDigits(totalSeconds: number): string | null {
  * Exception: both runners cannot have the exact same time.
  * Can be earned multiple times.
  *
- * Map: "parkrunId:date:eventName:eventNumber" → partner name[]
+ * Map: "parkrunId:date:event:eventNumber" → partner name[]
  */
 function buildPalindromePalMap(results: RunResultItem[]): Map<string, PairPartner[]> {
   const map = new Map<string, PairPartner[]>()
@@ -696,7 +695,7 @@ function buildPalindromePalMap(results: RunResultItem[]): Map<string, PairPartne
   // Group results by event instance
   const byEvent = new Map<string, RunResultItem[]>()
   for (const r of results) {
-    const eventKey = `${r.eventName}\0${r.date}\0${r.eventNumber}`
+    const eventKey = `${r.event}\0${r.date}\0${r.eventNumber}`
     if (!byEvent.has(eventKey)) byEvent.set(eventKey, [])
     byEvent.get(eventKey)!.push(r)
   }
@@ -732,7 +731,7 @@ function buildPalindromePalMap(results: RunResultItem[]): Map<string, PairPartne
         // Exception: both cannot have the exact same time
         if (entry.seconds === match.seconds) continue
 
-        const key = `${entry.result.parkrunId}:${entry.result.date}:${entry.result.eventName}:${entry.result.eventNumber}`
+        const key = `${entry.result.parkrunId}:${entry.result.date}:${entry.result.event}:${entry.result.eventNumber}`
         const partnerName = nameMap.get(match.result.parkrunId) ?? match.result.runnerName
         const existing = map.get(key) ?? []
         // Avoid duplicate partners for a single result key
@@ -801,7 +800,7 @@ export function buildCelebrationData(results: RunResultItem[], runners: Runner[]
 
 export interface ResultCelebrationsProps {
   data: CelebrationData
-  /** "parkrunId:date:eventName:eventNumber" */
+  /** "parkrunId:date:event:eventNumber" */
   resultKey: string
   /** "parkrunId:date" */
   runnerDateKey: string
@@ -845,8 +844,9 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
     }
 
     if (pb.coursePb) {
-      const eventName = resultKey.split(":")[2]
-      tags.push({ label: `New ${eventName} PB!`, description: `New personal best time at ${eventName}`, emoji: "⭐", color: TAG_COLORS.coursePb })
+      const eventId = resultKey.split(":")[2]
+      const eventDisplayName = getEventName(eventId)
+      tags.push({ label: `New ${eventDisplayName} PB!`, description: `New personal best time at ${eventDisplayName}`, emoji: "⭐", color: TAG_COLORS.coursePb })
     }
 
     return tags.length > 0 ? tags : null

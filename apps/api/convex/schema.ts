@@ -12,7 +12,7 @@ export default defineSchema({
 
   runResults: defineTable({
     parkrunId: v.string(),
-    eventName: v.string(),
+    event: v.string(), // eventId, e.g. "haga"
     eventNumber: v.number(),
     position: v.number(),
     time: v.string(),
@@ -21,5 +21,12 @@ export default defineSchema({
     fetchedAt: v.number(),
   })
     .index("by_parkrunId", ["parkrunId"])
-    .index("by_unique_result", ["parkrunId", "eventName", "eventNumber"]),
+    .index("by_unique_result", ["parkrunId", "event", "eventNumber"]),
+
+  events: defineTable({
+    eventId: v.string(), // e.g. "haga"
+    name: v.string(), // e.g. "Haga"
+    url: v.string(), // e.g. "https://www.parkrun.se/haga/results/"
+    country: v.string(), // e.g. "SE"
+  }).index("by_eventId", ["eventId"]),
 });

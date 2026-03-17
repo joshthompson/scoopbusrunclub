@@ -38,7 +38,7 @@ function groupResults(items: RunResultItem[]): DateGroup[] {
   for (const item of items) {
     if (!byDate.has(item.date)) byDate.set(item.date, new Map())
     const eventMap = byDate.get(item.date)!
-    const key = `${item.eventName}#${item.eventNumber}`
+    const key = `${item.event}#${item.eventNumber}`
     if (!eventMap.has(key)) {
       eventMap.set(key, {
         name: item.eventName,
