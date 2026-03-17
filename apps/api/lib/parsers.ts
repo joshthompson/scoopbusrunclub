@@ -45,7 +45,7 @@ const DOMAIN_TO_COUNTRY: Record<string, string> = {
   "parkrun.jp": "JP",
   "parkrun.lt": "LT",
   "parkrun.my": "MY",
-  "parkrun.nl": "NL",
+  "parkrun.co.nl": "NL",
   "parkrun.co.nz": "NZ",
   "parkrun.no": "NO",
   "parkrun.pl": "PL",

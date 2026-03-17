@@ -4,7 +4,7 @@ import { FloatingEmoji } from "./FloatingEmoji"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
 import { type RunResultItem, type Runner } from "../utils/api"
 import { formatName, parseTimeToSeconds } from "@/utils/misc"
-import { getEventName } from "@/utils/events"
+import { getEvent, getEventName } from "@/utils/events"
 import { runners as runnerSignals } from '@/data/runners'
 
 // ---------------------------------------------------------------------------
@@ -152,6 +152,7 @@ const TAG_COLORS = {
   bff: "#e84393",
   parkrunPal: "#00b894",
   palindromicPal: "#fd79a8",
+  viking: "#b91c1c",
 } as const
 
 const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
@@ -366,8 +367,10 @@ function buildPalindromeMap(results: RunResultItem[]): Set<string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Set of "parkrunId:date:event:eventNumber" keys where a runner was the
- * only club member at a Haga event.(results: RunResultItem[]): Set<string> {
+ * Set of "parkrunId:date:eventName:eventNumber" keys where a runner was the
+ * only club member at a Haga event.
+ */
+function buildAloneAtHagaMap(results: RunResultItem[]): Set<string> {
   const set = new Set<string>()
 
   // Group Haga results by date+eventNumber
@@ -747,6 +750,47 @@ function buildPalindromePalMap(results: RunResultItem[]): Map<string, PairPartne
 }
 
 // ---------------------------------------------------------------------------
+// Viking map
+// ---------------------------------------------------------------------------
+
+const VIKING_COUNTRIES = new Set(["SE", "FI", "DK", "NO"])
+
+/**
+ * Viking: earned once per runner when they have completed a parkrun in
+ * Sweden, Finland, Denmark and Norway (based on event country).
+ * Returns "parkrunId:date:event:eventNumber" keys for the completing result.
+ */
+function buildVikingMap(results: RunResultItem[]): Set<string> {
+  const set = new Set<string>()
+
+  const byRunner = new Map<string, RunResultItem[]>()
+  for (const item of results) {
+    if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
+    byRunner.get(item.parkrunId)!.push(item)
+  }
+
+  for (const runs of byRunner.values()) {
+    runs.sort((a, b) => a.date.localeCompare(b.date))
+    const visitedCountries = new Set<string>()
+    let completed = false
+
+    for (const run of runs) {
+      if (completed) break
+      const country = getEvent(run.event)?.country
+      if (!country || !VIKING_COUNTRIES.has(country)) continue
+      visitedCountries.add(country)
+
+      if (visitedCountries.size === VIKING_COUNTRIES.size) {
+        set.add(`${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`)
+        completed = true
+      }
+    }
+  }
+
+  return set
+}
+
+// ---------------------------------------------------------------------------
 // Public API: pre-computed celebration data
 // ---------------------------------------------------------------------------
 
@@ -768,6 +812,7 @@ export interface CelebrationData {
   bffMap: Map<string, PairPartner[]>
   parkrunPalMap: Map<string, PairPartner[]>
   palindromePalMap: Map<string, PairPartner[]>
+  vikingMap: Set<string>
 }
 
 /** Call once per render cycle (inside a createMemo) to pre-compute all celebration lookups. */
@@ -791,6 +836,7 @@ export function buildCelebrationData(results: RunResultItem[], runners: Runner[]
     bffMap,
     parkrunPalMap: buildParkrunPalMap(results),
     palindromePalMap: buildPalindromePalMap(results),
+    vikingMap: buildVikingMap(results),
   }
 }
 
@@ -1001,6 +1047,17 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
       otherRunnerId: partner.parkrunId,
     }))
   },
+
+  // Viking
+  ({ data, resultKey }) =>
+    data.vikingMap.has(resultKey)
+      ? {
+          label: "Viking!",
+          description: "Completed a parkrun in Sweden, Finland, Denmark and Norway",
+          emoji: "⚔️",
+          color: TAG_COLORS.viking,
+        }
+      : null,
 ]
 
 export function getCelebrationTags(ctx: CelebrationRuleContext): CelebrationTag[] {

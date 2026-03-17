@@ -10,6 +10,7 @@ import { ResultCelebrations, buildCelebrationData } from "./ResultCelebrations"
 import { Button } from "./Button"
 import { getMemberRoute } from "@/utils/memberRoute"
 import { runners } from '@/data/runners'
+import { getEvent } from '@/utils/events'
 import { races, type RaceCalendarItem } from '@/data/races'
 import extLinkAsset from "@/assets/misc/ext-link.png"
 
@@ -22,6 +23,7 @@ interface ParkrunResult {
 
 interface ParkrunEvent {
   name: string
+  eventId: string
   eventNumber: string
   results: ParkrunResult[]
 }
@@ -42,6 +44,7 @@ function groupResults(items: RunResultItem[]): DateGroup[] {
     if (!eventMap.has(key)) {
       eventMap.set(key, {
         name: item.eventName,
+        eventId: item.event,
         eventNumber: String(item.eventNumber),
         results: [],
       })
@@ -176,6 +179,19 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
   )
 }
 
+function ParkrunExternalLink(props: { parkrun: ParkrunEvent }) {
+  const event = () => getEvent(props.parkrun.eventId)
+  return (
+    <Show when={event()}>
+      {(ev) => (
+        <A href={`${ev().url}results/${props.parkrun.eventNumber}/`} target="_blank">
+          <img src={extLinkAsset} class={styles.externalRaceLink} />
+        </A>
+      )}
+    </Show>
+  )
+}
+
 export function LatestResults(props: LatestResultsProps) {
   const celebrations = createMemo(() => buildCelebrationData(props.results, props.runners))
 
@@ -211,10 +227,11 @@ export function LatestResults(props: LatestResultsProps) {
                 <DirtBlock>
                   <div class={styles.parkrun}>
                     <ParkrunName parkrun={parkrun} date={result.date} />
+                    <ParkrunExternalLink parkrun={parkrun} />
                     <ol>
                       <For each={parkrun.results}>
                         {(res) => {
-                          const resultKey = `${res.parkrunId}:${result.date}:${parkrun.name}:${parkrun.eventNumber}`
+                          const resultKey = `${res.parkrunId}:${result.date}:${parkrun.eventId}:${parkrun.eventNumber}`
                           const runnerDateKey = `${res.parkrunId}:${result.date}`
                           const memberRoute = getMemberRoute(res.parkrunId, res.name)
                           return (
@@ -293,7 +310,7 @@ const styles = {
   externalRaceLink: css({
     position: 'absolute',
     top: '0',
-    right: '0',
+    right: '-8px',
     width: '24px',
     height: '24px',
     p: '4px',
