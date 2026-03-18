@@ -14,6 +14,16 @@ import { getEvent } from '@/utils/events'
 import { races, type RaceCalendarItem } from '@/data/races'
 import extLinkAsset from "@/assets/misc/ext-link.png"
 
+const parkrunIdToRunnerName = new Map<string, string>()
+for (const [, [runner]] of Object.entries(runners)) {
+  const data = runner()
+  if (data.id) parkrunIdToRunnerName.set(data.id, data.name)
+}
+
+function getRunnerDisplayName(parkrunId: string, fallbackName: string): string {
+  return parkrunIdToRunnerName.get(parkrunId) ?? formatName(fallbackName)
+}
+
 interface ParkrunResult {
   parkrunId: string
   name: string
@@ -239,11 +249,11 @@ export function LatestResults(props: LatestResultsProps) {
                               <em>
                                 <Show
                                   when={memberRoute}
-                                  fallback={<span>{formatName(res.name)}</span>}
+                                  fallback={<span>{getRunnerDisplayName(res.parkrunId, res.name)}</span>}
                                 >
                                   {(href) => (
                                     <A href={href()} class={styles.memberLink}>
-                                      {formatName(res.name)}
+                                      {getRunnerDisplayName(res.parkrunId, res.name)}
                                     </A>
                                   )}
                                 </Show>
