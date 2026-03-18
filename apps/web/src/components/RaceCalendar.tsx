@@ -13,7 +13,7 @@ export function RaceCalendar() {
           <div>
             <h4 class={styles.raceName}>{race.name}</h4>
             <p>{formatDate(new Date(race.date + "T00:00:00"))}</p>
-            <p>{race.runners.map((r) => runners[r.name][0]().name).join(", ")}</p>
+            <p>{race.attendees.map((r) => runners[r.name][0]().name).join(", ")}</p>
           </div>
         )}
       </For>

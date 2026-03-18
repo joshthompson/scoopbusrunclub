@@ -11,7 +11,7 @@ import { Button } from "./Button"
 import { getMemberRoute } from "@/utils/memberRoute"
 import { runners } from '@/data/runners'
 import { getEvent } from '@/utils/events'
-import { races, type RaceCalendarItem } from '@/data/races'
+import { races, type EventItem } from '@/data/races'
 import extLinkAsset from "@/assets/misc/ext-link.png"
 
 const parkrunIdToRunnerName = new Map<string, string>()
@@ -41,7 +41,7 @@ interface ParkrunEvent {
 interface DateGroup {
   date: string
   parkruns: ParkrunEvent[]
-  races: RaceCalendarItem[]
+  races: EventItem[]
 }
 
 function groupResults(items: RunResultItem[]): DateGroup[] {
@@ -119,7 +119,7 @@ function formatRaceTime(totalSeconds: number): string {
   return `${mm}:${ss}`
 }
 
-function RaceBlock(props: { race: RaceCalendarItem }) {
+function RaceBlock(props: { race: EventItem }) {
   return (
     <DirtBlock>
       <div class={styles.parkrun}>
@@ -130,7 +130,7 @@ function RaceBlock(props: { race: RaceCalendarItem }) {
           <img src={extLinkAsset} class={styles.externalRaceLink} />
         </A>}
         <ul style={{ "list-style": "none", padding: "0" }}>
-          <For each={props.race.runners}>
+          <For each={props.race.attendees}>
             {(raceRunner) => {
               const runnerData = () => runners[raceRunner.name][0]()
               const href = () => `/member/${raceRunner.name}`
