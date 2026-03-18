@@ -5,6 +5,8 @@ import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
 import sunAsset from '@/assets/misc/sun.png'
+import house1Asset from '@/assets/misc/house1.png'
+import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
 import { createRunnerController } from './RunnerController'
 import { RunnerName, runners } from '@/data/runners'
@@ -201,6 +203,8 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
             url(${pathAsset}) repeat-x 0px 158px,
             url(${bg1Asset}) repeat-x bottom,
             url(${bg2Asset}) repeat-x 0px 90px,
+            url(${house2Asset}) no-repeat calc(40% + 70px) 65px,
+            url(${house1Asset}) no-repeat 30% 65px,
             url(${bg3Asset}) repeat-x 0px 70px,
             url(${sunAsset}) no-repeat 70% 40px,
             linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))
