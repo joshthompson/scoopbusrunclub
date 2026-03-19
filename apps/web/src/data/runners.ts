@@ -125,7 +125,6 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       face: [assets.annaFace],
       volunteer: generateFrames(assets.annaVolunteer, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       volunteerSit: [assets.annaVolunteerSit],
-      face: [assets.annaVolunteerFace],
     },
     width: 21,
     height: 28,

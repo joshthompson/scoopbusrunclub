@@ -4,6 +4,7 @@ import {
   createResource,
   Show,
   createMemo,
+  For,
 } from "solid-js";
 import { css, cx } from "@style/css";
 import { DirtBlock } from "@/components/ui/DirtBlock";
@@ -22,6 +23,7 @@ import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminDropdown, AdminDropdownItem } from "@/components/admin/AdminDropdown";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { EventModal } from "./EventModal";
+import { AdminAvatar } from "@/components/admin/AdminAvatar";
 
 type SortKey = "date" | "name" | "attendees" | "public";
 type SortDir = "asc" | "desc";
@@ -162,7 +164,9 @@ export const EventsPage: Component = () => {
               </Show>,
               race.type ?? '—',
               <span title={race.attendees.map((a) => runnerDisplayName(a.runnerId)).join(", ")}>
-                {race.attendees.length} runner{race.attendees.length !== 1 ? "s" : ""}
+                <For each={race.attendees}>
+                  {(att) => <AdminAvatar user={att.runnerId} size="small" title={runnerDisplayName(att.runnerId)} />}
+                </For>
               </span>,
               race.public ? "✓" : "✗",
               race.majorEvent ? "✓" : "✗",

@@ -9,13 +9,13 @@ const colours = [
   "#ff8a65", "#a1887f", "#e0e0e0", "#90a4ae",
 ];
 
-export function AdminAvatar(props: { user: string, size?: "small" | "medium" | "large" }) {
+export function AdminAvatar(props: { user: string, size?: "small" | "medium" | "large", title?: string }) {
   const initial = () => props.user.charAt(0).toUpperCase()
   const colour = () => colours[props.user.charCodeAt(0) % colours.length]
 
   const face = () => runners[props.user as RunnerName]?.[0]().frames.face[0] ?? undefined
 
-  return <div class={styles.avatar({ size: props.size })} style={{ background: colour() }}>
+  return <div class={styles.avatar({ size: props.size })} style={{ background: colour() }} title={props.title}>
     <Show when={face()} fallback={initial()}>
       <img src={face()} class={styles.face} />
     </Show>
