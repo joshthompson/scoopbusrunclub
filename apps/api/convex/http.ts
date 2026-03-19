@@ -8,7 +8,7 @@ const http = httpRouter();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
@@ -187,6 +187,230 @@ http.route({
   }),
 });
 
+// --- Admin: POST /api/admin/login ---
+
+http.route({
+  path: "/api/admin/login",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    const result = await ctx.runMutation(api.auth.login, {
+      username: body.username ?? "",
+      password: body.password ?? "",
+    });
+    if ("error" in result) {
+      return jsonResponse({ error: result.error }, 401);
+    }
+    return jsonResponse(result);
+  }),
+});
+
+// --- Admin: POST /api/admin/logout ---
+
+http.route({
+  path: "/api/admin/logout",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    await ctx.runMutation(api.auth.logout, { token: body.token ?? "" });
+    return jsonResponse({ ok: true });
+  }),
+});
+
+// --- Admin: GET /api/admin/validate ---
+
+http.route({
+  path: "/api/admin/validate",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token") ?? "";
+    const result = await ctx.runQuery(api.auth.validateToken, { token });
+    if (!result) return jsonResponse({ error: "Invalid token" }, 401);
+    return jsonResponse(result);
+  }),
+});
+
+// --- Admin: GET /api/admin/users ---
+
+http.route({
+  path: "/api/admin/users",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token") ?? "";
+    const users = await ctx.runQuery(api.auth.listUsers, { token });
+    return jsonResponse(users);
+  }),
+});
+
+// --- Admin: POST /api/admin/users ---
+
+http.route({
+  path: "/api/admin/users",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    const result = await ctx.runMutation(api.auth.createUser, {
+      token: body.token ?? "",
+      username: body.username ?? "",
+      password: body.password ?? "",
+      isSuperAdmin: body.isSuperAdmin ?? false,
+    });
+    if ("error" in result) {
+      return jsonResponse({ error: result.error }, 400);
+    }
+    return jsonResponse(result);
+  }),
+});
+
+// --- Admin: PUT /api/admin/users ---
+
+http.route({
+  path: "/api/admin/users",
+  method: "PUT",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    const result = await ctx.runMutation(api.auth.updateUser, {
+      token: body.token ?? "",
+      userId: body.userId ?? "",
+      username: body.username,
+      password: body.password,
+      isSuperAdmin: body.isSuperAdmin,
+    });
+    if ("error" in result) {
+      return jsonResponse({ error: result.error }, 400);
+    }
+    return jsonResponse(result);
+  }),
+});
+
+// --- Admin: POST /api/admin/account/password ---
+
+http.route({
+  path: "/api/admin/account/password",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    const result = await ctx.runMutation(api.auth.changePassword, {
+      token: body.token ?? "",
+      currentPassword: body.currentPassword ?? "",
+      newPassword: body.newPassword ?? "",
+    });
+    if ("error" in result) {
+      return jsonResponse({ error: result.error }, 400);
+    }
+    return jsonResponse(result);
+  }),
+});
+
+// --- GET /api/races (public) ---
+
+http.route({
+  path: "/api/races",
+  method: "GET",
+  handler: httpAction(async (ctx) => {
+    const races = await ctx.runQuery(api.races.listPublic);
+    return jsonResponse(races);
+  }),
+});
+
+// --- Admin: GET /api/admin/races ---
+
+http.route({
+  path: "/api/admin/races",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token") ?? "";
+    const includeOld = url.searchParams.get("includeOld") === "true";
+    const races = await ctx.runQuery(api.races.list, { token, includeOld });
+    return jsonResponse(races);
+  }),
+});
+
+// --- Admin: POST /api/admin/races ---
+
+http.route({
+  path: "/api/admin/races",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    const result = await ctx.runMutation(api.races.create, {
+      token: body.token ?? "",
+      date: body.date ?? "",
+      name: body.name ?? "",
+      website: body.website,
+      type: body.type,
+      attendees: body.attendees ?? [],
+      majorEvent: body.majorEvent,
+      public: body.public ?? true,
+    });
+    if ("error" in result) {
+      return jsonResponse({ error: result.error }, 400);
+    }
+    return jsonResponse(result);
+  }),
+});
+
+// --- Admin: PUT /api/admin/races ---
+
+http.route({
+  path: "/api/admin/races",
+  method: "PUT",
+  handler: httpAction(async (ctx, request) => {
+    const body = await request.json();
+    const result = await ctx.runMutation(api.races.update, {
+      token: body.token ?? "",
+      raceId: body.raceId ?? "",
+      date: body.date,
+      name: body.name,
+      website: body.website,
+      type: body.type,
+      attendees: body.attendees,
+      majorEvent: body.majorEvent,
+      public: body.public,
+    });
+    if ("error" in result) {
+      return jsonResponse({ error: result.error }, 400);
+    }
+    return jsonResponse(result);
+  }),
+});
+
+// --- Admin: DELETE /api/admin/races ---
+
+http.route({
+  path: "/api/admin/races",
+  method: "DELETE",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token") ?? "";
+    const raceId = url.searchParams.get("id") ?? "";
+    const result = await ctx.runMutation(api.races.remove, {
+      token,
+      raceId: raceId as any,
+    });
+    if ("error" in result) {
+      return jsonResponse({ error: result.error }, 400);
+    }
+    return jsonResponse(result);
+  }),
+});
+
+// --- Admin: GET /api/admin/races/today ---
+
+http.route({
+  path: "/api/admin/races/today",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token") ?? "";
+    const races = await ctx.runQuery(api.races.getToday, { token });
+    return jsonResponse(races);
+  }),
+});
+
 // --- CORS preflight for all API routes ---
 
 for (const path of [
@@ -195,7 +419,15 @@ for (const path of [
   "/api/runner/runs",
   "/api/results",
   "/api/events",
+  "/api/races",
   "/api/ingest",
+  "/api/admin/login",
+  "/api/admin/logout",
+  "/api/admin/validate",
+  "/api/admin/users",
+  "/api/admin/account/password",
+  "/api/admin/races",
+  "/api/admin/races/today",
 ]) {
   http.route({
     path,

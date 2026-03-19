@@ -40,6 +40,7 @@ export function DirtBlock(props: {
 const styles = {
   dirtBlock: css({
     position: 'relative',
+    display: 'flow-root',
   }),
   content: cva({
     base: {

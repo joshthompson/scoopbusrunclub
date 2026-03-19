@@ -1,28 +1,37 @@
 import { type Component, createResource, Show } from 'solid-js';
-import { Router, Route, type RouteSectionProps } from '@solidjs/router';
+import { Router, Route, type RouteSectionProps, useLocation } from '@solidjs/router';
 import { ScoopBusHeader } from './components/header/ScoopBusHeader';
 import './styles.css';
 import { css } from '@style/css';
-import { fetchRunners, fetchAllResults } from './utils/api';
+import { fetchRunners, fetchAllResults, fetchPublicRaces } from './utils/api';
 import { loadEvents } from './utils/events';
 import { MemberPage } from './pages/MemberPage';
 import { HomePage } from './pages/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { MemberGraphPage } from './pages/MemberGraphPage';
+import { AdminPage, AdminScanPage, AdminUsersPage, AdminAccountPage } from './pages/AdminPage';
 
 const App: Component = () => {
   const [runners] = createResource(fetchRunners)
   const [results] = createResource(fetchAllResults)
+  const [races] = createResource(fetchPublicRaces)
 
   // Populate the event name lookup cache
   createResource(loadEvents)
 
-  const RootLayout: Component<RouteSectionProps> = (routeProps) => (
-    <>
-      <ScoopBusHeader results={results() ?? []} />
-      {routeProps.children}
-    </>
-  )
+  const RootLayout: Component<RouteSectionProps> = (routeProps) => {
+    const location = useLocation()
+    const isAdmin = () => location.pathname.startsWith('/admin')
+
+    return (
+      <>
+        <Show when={!isAdmin()}>
+          <ScoopBusHeader results={results() ?? []} />
+        </Show>
+        {routeProps.children}
+      </>
+    )
+  }
 
   window.addEventListener('scroll', () => {
     if (window.scrollY > 100) {
@@ -42,6 +51,7 @@ const App: Component = () => {
               runnersLoading={runners.loading}
               results={results() ?? []}
               runners={runners() ?? []}
+              races={races() ?? []}
             />
           )}
         />
@@ -59,6 +69,10 @@ const App: Component = () => {
             <MemberGraphPage results={results() ?? []} runners={runners() ?? []} />
           )}
         />
+        <Route path="/admin" component={AdminPage} />
+        <Route path="/admin/scan" component={AdminScanPage} />
+        <Route path="/admin/users" component={AdminUsersPage} />
+        <Route path="/admin/account" component={AdminAccountPage} />
         <Route path="*404" component={NotFoundPage} />
     </Router>
   );

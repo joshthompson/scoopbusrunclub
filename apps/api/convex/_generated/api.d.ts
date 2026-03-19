@@ -8,10 +8,12 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as parkrun from "../parkrun.js";
 import type * as queries from "../queries.js";
+import type * as races from "../races.js";
 
 import type {
   ApiFromModules,
@@ -20,10 +22,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
   crons: typeof crons;
   http: typeof http;
   parkrun: typeof parkrun;
   queries: typeof queries;
+  races: typeof races;
 }>;
 
 /**

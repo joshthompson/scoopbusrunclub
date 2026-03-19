@@ -1,17 +1,16 @@
-import { createMemo, createSignal, For, Show } from "solid-js"
+import { createMemo, createSignal, For, Show, type JSX } from "solid-js"
 import { css } from "@style/css"
 import { A } from "@solidjs/router"
-import { type RunResultItem, type Runner } from "../utils/api"
+import { type RunResultItem, type Runner, type RaceItem } from "../utils/api"
 import { formatDate, formatName, ordinal } from "@/utils/misc"
 import { MILESTONE_SET } from "../utils/milestones"
-import { FloatingEmoji } from "./FloatingEmoji"
-import { DirtBlock } from "./DirtBlock"
+import { FloatingEmoji } from "./ui/FloatingEmoji"
+import { DirtBlock } from "./ui/DirtBlock"
 import { ResultCelebrations, buildCelebrationData } from "./ResultCelebrations"
-import { Button } from "./Button"
+import { Button } from "./ui/Button"
 import { getMemberRoute } from "@/utils/memberRoute"
 import { runners } from '@/data/runners'
 import { getEvent } from '@/utils/events'
-import { races, type EventItem } from '@/data/races'
 import extLinkAsset from "@/assets/misc/ext-link.png"
 
 const parkrunIdToRunnerName = new Map<string, string>()
@@ -41,10 +40,10 @@ interface ParkrunEvent {
 interface DateGroup {
   date: string
   parkruns: ParkrunEvent[]
-  races: EventItem[]
+  races: RaceItem[]
 }
 
-function groupResults(items: RunResultItem[]): DateGroup[] {
+function groupResults(items: RunResultItem[], allRaces: RaceItem[]): DateGroup[] {
   const byDate = new Map<string, Map<string, ParkrunEvent>>()
 
   for (const item of items) {
@@ -68,7 +67,7 @@ function groupResults(items: RunResultItem[]): DateGroup[] {
   }
 
   const today = new Date().toISOString().split('T')[0]
-  const pastRaces = races.filter((r) => r.date <= today)
+  const pastRaces = allRaces.filter((r) => r.date <= today && r.attendees.length > 0)
 
   for (const race of pastRaces) {
     if (!byDate.has(race.date)) byDate.set(race.date, new Map())
@@ -89,6 +88,7 @@ function groupResults(items: RunResultItem[]): DateGroup[] {
 interface LatestResultsProps {
   results: RunResultItem[]
   runners: Runner[]
+  races: RaceItem[]
 }
 
 function isMilestoneEvent(eventNumber: string) {
@@ -109,59 +109,127 @@ function getDisplayName(name: string, resultCount: number) {
   return name
 }
 
-function formatRaceTime(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600)
-  const m = Math.floor((totalSeconds % 3600) / 60)
-  const s = totalSeconds % 60
-  const mm = String(m).padStart(2, '0')
-  const ss = String(s).padStart(2, '0')
-  if (h > 0) return `${h}:${mm}:${ss}`
-  return `${mm}:${ss}`
+function formatRaceTime(time: string): string {
+  return time
 }
 
-function RaceBlock(props: { race: EventItem }) {
+/** Render a string, converting *text* segments to bold <em> elements */
+function renderBold(text: string): JSX.Element {
+  const parts = text.split(/(\*[^*]+\*)/)
+  return (
+    <>
+      {parts.map((part) =>
+        part.startsWith("*") && part.endsWith("*")
+          ? <em>{part.slice(1, -1)}</em>
+          : part
+      )}
+    </>
+  )
+}
+
+/** Join names with commas and "and": ["A","B","C"] → "A, B and C" */
+function joinNames(elements: JSX.Element[]): JSX.Element {
+  if (elements.length === 1) return elements[0]
+  if (elements.length === 2) return <>{elements[0]} and {elements[1]}</>
+  return (
+    <>
+      {elements.slice(0, -1).map((el, i) => (
+        <>{el}{i < elements.length - 2 ? ", " : ""}</>
+      ))}
+      {" "}and {elements[elements.length - 1]}
+    </>
+  )
+}
+
+/** Build a signature string to group attendees with identical result shape */
+function attendeeSignature(a: import("@/utils/api").RaceAttendee, isToday: boolean): string {
+  return JSON.stringify({
+    position: a.position ?? null,
+    time: a.time || null,
+    distance: a.distance ?? null,
+    laps: a.laps ?? null,
+    isToday,
+  })
+}
+
+function RaceBlock(props: { race: RaceItem }) {
+  const isToday = () => props.race.date === new Date().toISOString().split('T')[0]
+
+  const groups = createMemo(() => {
+    const today = isToday()
+    const map = new Map<string, import("@/utils/api").RaceAttendee[]>()
+    for (const a of props.race.attendees) {
+      const key = attendeeSignature(a, today)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(a)
+    }
+    return Array.from(map.values())
+  })
+
+  const linkedName = (runnerId: string) => {
+    const runnerEntry = runners[runnerId as import('@/data/runners').RunnerName]
+    const name = runnerEntry?.[0]()?.name ?? runnerId
+    return <em><A href={`/member/${runnerId}`} class={styles.memberLink}>{name}</A></em>
+  }
+
+  /** Build a text description for a group of attendees with identical results */
+  const describeGroup = (group: import("@/utils/api").RaceAttendee[]): string => {
+    const rep = group[0]
+    const hasPosition = rep.position != null
+    const hasTime = rep.time != null
+    const hasDistance = rep.distance != null
+    const hasLaps = rep.laps != null
+    const hasResults = hasPosition || hasTime || hasDistance || hasLaps
+
+    if (!hasResults) {
+      if (isToday()) return group.length > 1 ? "are running today" : "is running today"
+      return "participated"
+    }
+
+    const parts: string[] = []
+
+    if (hasPosition || hasTime) {
+      let finished = "finished"
+      if (hasPosition) finished += ` in *${ordinal(rep.position!)}* place`
+      if (hasTime) finished += ` with a time of *${formatRaceTime(rep.time!)}*`
+      parts.push(finished)
+    }
+
+    if (hasDistance || hasLaps) {
+      let ran = (hasPosition || hasTime) ? "and ran" : "ran"
+      if (hasDistance) ran += ` *${rep.distance}km*`
+      if (hasLaps) ran += `${hasDistance ? " over" : ""} *${rep.laps} ${rep.laps === 1 ? "lap" : "laps"}*`
+      parts.push(ran)
+    }
+
+    return parts.join(" ")
+  }
+
+  const eventEmojis = (): [string, string] | undefined => {
+    if (props.race.type === "Track and Food") return ["🏟️", "🍕"]
+    if (props.race.majorEvent) return ["🔥", "🔥"]
+    return undefined
+  }
+
   return (
     <DirtBlock>
       <div class={styles.parkrun}>
         <h4 class={styles.parkrunName}>
-          <FloatingEmoji emoji="🔥" /> {props.race.name} <FloatingEmoji emoji="🔥" />
+          <Show when={eventEmojis()}><FloatingEmoji emoji={eventEmojis()![0]} />{' '}</Show>
+          {props.race.name}
+          <Show when={eventEmojis()}>{' '}<FloatingEmoji emoji={eventEmojis()![1]} /></Show>
         </h4>
         {props.race.website && <A href={props.race.website} target="_blank">
           <img src={extLinkAsset} class={styles.externalRaceLink} />
         </A>}
         <ul style={{ "list-style": "none", padding: "0" }}>
-          <For each={props.race.attendees}>
-            {(raceRunner) => {
-              const runnerData = () => runners[raceRunner.name][0]()
-              const href = () => `/member/${raceRunner.name}`
-              const hasPosition = () => raceRunner.position != null
-              const hasTime = () => raceRunner.time != null
-              const isToday = () => props.race.date === new Date().toISOString().split('T')[0]
-              const linkedName = () => (
-                <em><A href={href()} class={styles.memberLink}>{runnerData().name}</A></em>
-              )
-              return (
-                <li>
-                  <Show
-                    when={hasPosition() || hasTime()}
-                    fallback={
-                      <>
-                        {linkedName()}{" "}
-                        {isToday() ? "is running today" : "participated"}
-                      </>
-                    }
-                  >
-                    {linkedName()} finished
-                    <Show when={hasPosition()}>
-                      {" "}in <em>{ordinal(raceRunner.position!)}</em> place
-                    </Show>
-                    <Show when={hasTime()}>
-                      {" "}with a time of <em>{formatRaceTime(raceRunner.time!)}</em>
-                    </Show>
-                  </Show>
-                </li>
-              )
-            }}
+          <For each={groups()}>
+            {(group) => (
+              <li>
+                {joinNames(group.map((a) => linkedName(a.runnerId)))}{" "}
+                {renderBold(describeGroup(group))}
+              </li>
+            )}
           </For>
         </ul>
       </div>
@@ -205,7 +273,7 @@ function ParkrunExternalLink(props: { parkrun: ParkrunEvent }) {
 export function LatestResults(props: LatestResultsProps) {
   const celebrations = createMemo(() => buildCelebrationData(props.results, props.runners))
 
-  const grouped = createMemo(() => groupResults(props.results))
+  const grouped = createMemo(() => groupResults(props.results, props.races))
 
   const [showAll, setShowAll] = createSignal(false)
 

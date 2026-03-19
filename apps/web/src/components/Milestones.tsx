@@ -4,8 +4,8 @@ import { A } from "@solidjs/router"
 import { type RunResultItem, type Runner } from "../utils/api"
 import { MILESTONE_SET, UPCOMING_THRESHOLD, nextMilestone, ordinalSuffix } from "../utils/milestones"
 import { formatDate, formatName } from "@/utils/misc"
-import { FloatingEmoji } from "./FloatingEmoji"
-import { DirtBlock } from "./DirtBlock"
+import { FloatingEmoji } from "@/components/ui/FloatingEmoji"
+import { DirtBlock } from "@/components/ui/DirtBlock"
 import { getMemberRoute } from "@/utils/memberRoute"
 
 const DAY_MS = 24 * 60 * 60 * 1000

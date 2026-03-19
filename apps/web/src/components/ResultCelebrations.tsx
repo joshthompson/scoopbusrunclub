@@ -1,6 +1,6 @@
 import { css } from "@style/css"
 import { createSignal, Show } from "solid-js"
-import { FloatingEmoji } from "./FloatingEmoji"
+import { FloatingEmoji } from "@/components/ui/FloatingEmoji"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
 import { type RunResultItem, type Runner } from "../utils/api"
 import { formatName, parseTimeToSeconds } from "@/utils/misc"

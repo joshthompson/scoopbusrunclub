@@ -8,7 +8,7 @@ export interface EventItem {
   attendees: {
     name: RunnerName,
     position?: number
-    time?: number
+    time?: string
     distance?: number
     laps?: number
   }[]

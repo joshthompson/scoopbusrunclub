@@ -1,5 +1,5 @@
 import { css } from "@style/css"
-import { FieldBlock } from "@/components/FieldBlock"
+import { FieldBlock } from "@/components/ui/FieldBlock"
 import { JSX } from "solid-js"
 
 interface RunnerSummaryStatProps {

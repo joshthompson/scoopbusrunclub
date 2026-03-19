@@ -1,10 +1,13 @@
 html {
   --grass-green: #77a15d;
+  --grass-dark-green: #61864a;
+  --grass-darker-green: #2f4323;
   --sky-blue-top: #cdfbff;
   --sky-blue-bottom: #5ae2ff;
   --dirt-brown: #D1A671;
   --dirt-dark-brown: #AD855A;
   --dirt-darker-brown: #4A3215;
+  --error-red: #d32727;
 
   font-family: "Cabin", sans-serif;
   font-optical-sizing: auto;
@@ -17,8 +20,13 @@ body {
   background-color: var(--sky-blue-top);
   transition: background-color 0.1s linear;
 
-  &.scrolled {
+  &.scrolled,
+  &:has(.admin-page) {
     background-color: var(--grass-green);
+  }
+
+  &:has(.full-screen-section) {
+    overflow-y: hidden;
   }
 }
 
@@ -26,7 +34,12 @@ body {
   background-color: var(--grass-green);
   background-image: url('/bg.png');
   padding-bottom: 2rem;
-  min-height: 100vh;
+  min-height: 100dvh;
+
+  &:has(.full-screen-section) {
+    padding-bottom: 0;
+    overflow-y: hidden;
+  }
 }
 
 * {

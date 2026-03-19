@@ -180,6 +180,34 @@ export async function fetchRunners(): Promise<Runner[]> {
   return data;
 }
 
+export interface RaceAttendee {
+  runnerId: string;
+  position?: number;
+  time?: string;
+  distance?: number;
+  laps?: number;
+  scanned?: boolean;
+}
+
+export interface RaceItem {
+  _id: string;
+  date: string;
+  name: string;
+  website?: string;
+  type?: string;
+  attendees: RaceAttendee[];
+  majorEvent?: boolean;
+  public: boolean;
+}
+
+export async function fetchPublicRaces(): Promise<RaceItem[]> {
+  const url = `${CONVEX_URL}/api/races`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const data: RaceItem[] = await response.json();
+  return data;
+}
+
 export interface EventItem {
   eventId: string;
   name: string;

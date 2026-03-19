@@ -5,7 +5,7 @@ import { css } from "@style/css"
 import { createMemo, Show } from "solid-js"
 import { RunnerName, runners as runnerSignals } from '@/data/runners'
 import { NotFoundPage } from "./NotFoundPage"
-import { DirtBlock } from "@/components/DirtBlock"
+import { DirtBlock } from "@/components/ui/DirtBlock"
 import { GraphSVG } from "@/components/GraphSVG"
 import { BackSignButton } from "@/components/BackSignButton"
 

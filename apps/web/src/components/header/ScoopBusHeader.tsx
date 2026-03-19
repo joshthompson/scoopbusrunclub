@@ -9,8 +9,10 @@ import house1Asset from '@/assets/misc/house1.png'
 import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
 import { createRunnerController } from './RunnerController'
+import type { RunnerController } from './RunnerController'
 import { RunnerName, runners } from '@/data/runners'
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import { createShadowController } from './ShadowController'
 import { type RunResultItem } from '@/utils/api'
 import { parseTimeToSeconds } from '@/utils/misc'
@@ -113,6 +115,7 @@ interface ScoopBusHeaderProps {
 
 export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
+  const navigate = useNavigate()
   const [mousePosition, setMousePosition] = createSignal({ x: 0, y: 0 })
   const [updatedSpeeds, setUpdatedSpeeds] = createSignal(false)
   createEffect(() => {
@@ -198,18 +201,41 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
   return (
     <div aria-role="heading" aria-label="Welcome to the Scoop Bus Run Club!">
       <div aria-hidden="true">
-        <Canvas scene={scene} style={{
-          background: `
-            url(${pathAsset}) repeat-x 0px 158px,
-            url(${bg1Asset}) repeat-x bottom,
-            url(${bg2Asset}) repeat-x 0px 90px,
-            url(${house2Asset}) no-repeat calc(40% + 70px) 65px,
-            url(${house1Asset}) no-repeat 30% 65px,
-            url(${bg3Asset}) repeat-x 0px 70px,
-            url(${sunAsset}) no-repeat 70% 40px,
-            linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))
-          `,
-        }}/>
+        <Canvas
+          scene={scene}
+          style={{
+            background: `
+              url(${pathAsset}) repeat-x 0px 158px,
+              url(${bg1Asset}) repeat-x bottom,
+              url(${bg2Asset}) repeat-x 0px 90px,
+              url(${house2Asset}) no-repeat calc(40% + 70px) 65px,
+              url(${house1Asset}) no-repeat 30% 65px,
+              url(${bg3Asset}) repeat-x 0px 70px,
+              url(${sunAsset}) no-repeat 70% 40px,
+              linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))
+            `,
+            cursor: 'pointer',
+          }}
+          onClick={({ x, y }) => {
+            const LABEL_RENDER_DISTANCE = 100
+            const closest = scene.getControllersByType<RunnerController>('runner')
+              .map(c => ({
+                runnerId: c.data.runnerId,
+                dist: Math.hypot(
+                  c.data.x() + c.data.width() / 2 - x,
+                  c.data.y() + c.data.height() / 2 - y
+                )
+              }))
+              .filter(({ dist }) => dist < LABEL_RENDER_DISTANCE)
+              .sort((a, b) => a.dist - b.dist)[0]
+
+            if (closest) {
+              navigate(`/member/${closest.runnerId}`)
+            } else {
+              navigate('/')
+            }
+          }}
+        />
       </div>
     </div>
   )

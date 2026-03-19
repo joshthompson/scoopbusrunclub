@@ -1,5 +1,5 @@
 import { css } from "@style/css"
-import { DirtBlock } from "@/components/DirtBlock"
+import { DirtBlock } from "@/components/ui/DirtBlock"
 import { BackSignButton } from "@/components/BackSignButton"
 
 const reasons = [
