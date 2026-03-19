@@ -13,6 +13,7 @@ import { css } from "@style/css";
 import { fetchTodayRaces, updateRace } from "@/utils/adminApi";
 import { runners, type RunnerName } from "@/data/runners";
 import QrScanner from "qr-scanner";
+import { BarcodeDetector as BarcodeDetectorPolyfill } from "barcode-detector/pure";
 import { AdminModal } from "@/components/admin/AdminModal";
 import { AdminButton } from "@/components/admin/AdminButton";
 
@@ -116,20 +117,18 @@ export const ScanPage: Component = () => {
     });
   };
 
-  // Native BarcodeDetector for 1D barcodes (Code 128, etc.)
+  // Barcode detector for 1D barcodes (Code 128, etc.) using polyfill
   const startBarcodeDetector = async () => {
-    if (!('BarcodeDetector' in window)) return;
     try {
-      const BD = (window as any).BarcodeDetector;
-      const supported: string[] = await BD.getSupportedFormats();
-      const wanted = ['code_128', 'code_39', 'ean_13', 'ean_8', 'itf'];
-      const formats = wanted.filter((f) => supported.includes(f));
+      const supported = await BarcodeDetectorPolyfill.getSupportedFormats();
+      const wanted = ['code_128', 'code_39', 'ean_13', 'ean_8', 'itf'] as const;
+      const formats = wanted.filter((f) => (supported as readonly string[]).includes(f));
       if (formats.length === 0) return;
-      barcodeDetector = new BD({ formats });
+      barcodeDetector = new BarcodeDetectorPolyfill({ formats: [...formats] });
       // Scan every 250ms to avoid hammering the CPU
       barcodeIntervalId = setInterval(scanBarcodeFrame, 250);
-    } catch {
-      // BarcodeDetector not available or errored
+    } catch (err) {
+      console.error('BarcodeDetector polyfill init failed', err);
     }
   };
 
