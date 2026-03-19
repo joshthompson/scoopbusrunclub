@@ -43,6 +43,8 @@ export const ScanPage: Component = () => {
   let overlayRef!: HTMLDivElement;
   let cameraAreaRef!: HTMLDivElement;
   let qrScanner: QrScanner | null = null;
+  let barcodeDetector: any = null;
+  let barcodeIntervalId: ReturnType<typeof setInterval> | null = null;
   const [squareSize, setSquareSize] = createSignal<number>(0);
 
   const selectedRace = createMemo(() => {
@@ -104,7 +106,9 @@ export const ScanPage: Component = () => {
       }
     );
 
-    qrScanner.start().catch((err) => {
+    qrScanner.start().then(() => {
+      startBarcodeDetector();
+    }).catch((err) => {
       console.error("Failed to start scanner", err);
       setCameraActive(false);
       setToast("Could not start camera. Please check permissions.");
@@ -112,10 +116,47 @@ export const ScanPage: Component = () => {
     });
   };
 
+  // Native BarcodeDetector for 1D barcodes (Code 128, etc.)
+  const startBarcodeDetector = async () => {
+    if (!('BarcodeDetector' in window)) return;
+    try {
+      const BD = (window as any).BarcodeDetector;
+      const supported: string[] = await BD.getSupportedFormats();
+      const wanted = ['code_128', 'code_39', 'ean_13', 'ean_8', 'itf'];
+      const formats = wanted.filter((f) => supported.includes(f));
+      if (formats.length === 0) return;
+      barcodeDetector = new BD({ formats });
+      // Scan every 250ms to avoid hammering the CPU
+      barcodeIntervalId = setInterval(scanBarcodeFrame, 250);
+    } catch {
+      // BarcodeDetector not available or errored
+    }
+  };
+
+  const scanBarcodeFrame = async () => {
+    if (!barcodeDetector || !videoRef || videoRef.readyState < 2) return;
+    try {
+      const results = await barcodeDetector.detect(videoRef);
+      if (results.length > 0) {
+        handleBarcode(results[0].rawValue);
+      }
+    } catch {
+      // ignore transient detection errors
+    }
+  };
+
+  const stopBarcodeDetector = () => {
+    if (barcodeIntervalId) {
+      clearInterval(barcodeIntervalId);
+      barcodeIntervalId = null;
+    }
+  };
+
   const stopScanning = () => {
     if (qrScanner) {
       qrScanner.stop();
     }
+    stopBarcodeDetector();
   };
 
   const handleBarcode = (rawData: string) => {
@@ -214,6 +255,7 @@ export const ScanPage: Component = () => {
       qrScanner.destroy();
       qrScanner = null;
     }
+    stopBarcodeDetector();
     if (resizeObserver) {
       resizeObserver.disconnect();
       resizeObserver = null;
