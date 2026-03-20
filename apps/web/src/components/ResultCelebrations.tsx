@@ -2,7 +2,7 @@ import { css } from "@style/css"
 import { createSignal, Show } from "solid-js"
 import { FloatingEmoji } from "@/components/ui/FloatingEmoji"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
-import { type RunResultItem, type Runner } from "../utils/api"
+import { type RunResultItem, type Runner, getCached, setCache } from "../utils/api"
 import { formatName, parseTimeToSeconds } from "@/utils/misc"
 import { getEvent, getEventName } from "@/utils/events"
 import { runners as runnerSignals } from '@/data/runners'
@@ -153,13 +153,42 @@ const TAG_COLORS = {
   parkrunPal: "#00b894",
   palindromicPal: "#fd79a8",
   viking: "#b91c1c",
+  hagaStreak: "#15803d",
+} as const
+
+const TAG_EMOJIS = {
+  debut: "🎉",
+  pb: "🏅",
+  juniorPb: "💫",
+  coursePb: "⭐",
+  milestone: "🎉",
+  haga1: "🌳",
+  haga100: "💯",
+  haga200: "🎪",
+  svensk: "🇸🇪",
+  stockholmSprint: "🏃‍♂️",
+  malmoDouble: "🏃",
+  goteborgDouble: "🏃‍♀️",
+  birthday: "🎂",
+  spellingBus: "🚌",
+  aloneHaga: "😱",
+  hagaCancelled: "☃️",
+  uppsalaCancelled: "❄️",
+  palindrome: "🪞",
+  runBuddy: "🤝",
+  bestie: "👥",
+  bff: "💕",
+  parkrunPal: "🤗",
+  palindromicPal: "🔄",
+  viking: "⚔️",
+  hagaStreak: "🌲",
 } as const
 
 const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
   {
     name: "Svenskspringare",
     description: "Completed all Swedish parkrun events",
-    emoji: "🇸🇪",
+    emoji: TAG_EMOJIS.svensk,
     color: TAG_COLORS.svensk,
     events: [
       "haga",
@@ -182,21 +211,21 @@ const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
   {
     name: "Stockholm Sprint",
     description: "Completed all parkruns in Stockholm",
-    emoji: "🏃‍♂️",
+    emoji: TAG_EMOJIS.stockholmSprint,
     color: TAG_COLORS.stockholmSprint,
     events: ["haga", "huddinge", "lillsjon", "judarskogen"],
   },
   {
     name: "Malmö Double",
     description: "Completed both parkruns in Malmö",
-    emoji: "🏃",
+    emoji: TAG_EMOJIS.malmoDouble,
     color: TAG_COLORS.malmoDouble,
     events: ["malmoribersborg", "bulltofta"],
   },
   {
     name: "Göteborg Double",
     description: "Completed both parkruns in Göteborg",
-    emoji: "🏃‍♀️",
+    emoji: TAG_EMOJIS.goteborgDouble,
     color: TAG_COLORS.goteborgDouble,
     events: ["skatas", "billdalsparken"],
   },
@@ -260,7 +289,7 @@ const SPELLING_ACHIEVEMENTS: SpellingAchievement[] = [
   {
     name: "SCOOP BUS",
     word: "SCOOPBUS",
-    emoji: "🚌",
+    emoji: TAG_EMOJIS.spellingBus,
     description: "Spell SCOOP BUS with parkrun event first letters (duplicate letters need duplicate runs)",
     color: TAG_COLORS.spellingBus,
   },
@@ -753,6 +782,63 @@ function buildPalindromePalMap(results: RunResultItem[]): Map<string, PairPartne
 // Viking map
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Haga Streak map
+// ---------------------------------------------------------------------------
+
+/**
+ * Haga Streak: earned every time a runner completes 10 consecutive Saturdays at Haga.
+ * Can be earned multiple times. Returns "parkrunId:date:event:eventNumber" keys.
+ */
+function buildHagaStreakMap(results: RunResultItem[]): Set<string> {
+  const STREAK_LENGTH = 10
+
+  const set = new Set<string>()
+
+  const byRunner = new Map<string, RunResultItem[]>()
+  for (const item of results) {
+    if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
+    byRunner.get(item.parkrunId)!.push(item)
+  }
+
+  // Collect all Haga event dates (Saturdays) in sorted order
+  const hagaDates = new Set<string>()
+  for (const r of results) {
+    if (r.event === "haga") hagaDates.add(r.date)
+  }
+  const sortedHagaDates = [...hagaDates].sort()
+
+  for (const runs of byRunner.values()) {
+    // Get only Haga runs sorted by date
+    const hagaRuns = runs
+      .filter((r) => r.event === "haga")
+      .sort((a, b) => a.date.localeCompare(b.date))
+    if (hagaRuns.length < STREAK_LENGTH) continue
+
+    // Build set of dates this runner ran Haga
+    const ranHagaDates = new Set(hagaRuns.map((r) => r.date))
+    let streak = 0
+
+    for (const date of sortedHagaDates) {
+      if (ranHagaDates.has(date)) {
+        streak += 1
+        if (streak >= STREAK_LENGTH && streak % STREAK_LENGTH === 0) {
+          const run = hagaRuns.find((r) => r.date === date)!
+          set.add(`${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`)
+        }
+      } else {
+        streak = 0
+      }
+    }
+  }
+
+  return set
+}
+
+// ---------------------------------------------------------------------------
+// Viking map
+// ---------------------------------------------------------------------------
+
 const VIKING_COUNTRIES = new Set(["SE", "FI", "DK", "NO"])
 
 /**
@@ -813,6 +899,7 @@ export interface CelebrationData {
   parkrunPalMap: Map<string, PairPartner[]>
   palindromePalMap: Map<string, PairPartner[]>
   vikingMap: Set<string>
+  hagaStreakMap: Set<string>
 }
 
 /** Call once per render cycle (inside a createMemo) to pre-compute all celebration lookups. */
@@ -837,7 +924,56 @@ export function buildCelebrationData(results: RunResultItem[], runners: Runner[]
     parkrunPalMap: buildParkrunPalMap(results),
     palindromePalMap: buildPalindromePalMap(results),
     vikingMap: buildVikingMap(results),
+    hagaStreakMap: buildHagaStreakMap(results),
   }
+}
+
+// ---------------------------------------------------------------------------
+// Serialization helpers for CelebrationData (Map/Set ↔ JSON)
+// ---------------------------------------------------------------------------
+
+function serializeCelebrationData(data: CelebrationData): string {
+  return JSON.stringify(data, (_key, value) => {
+    if (value instanceof Map) return { __t: "M", e: [...value.entries()] }
+    if (value instanceof Set) return { __t: "S", v: [...value.values()] }
+    return value
+  })
+}
+
+function deserializeCelebrationData(raw: string): CelebrationData {
+  return JSON.parse(raw, (_key, value) => {
+    if (value && typeof value === "object") {
+      if (value.__t === "M") return new Map(value.e)
+      if (value.__t === "S") return new Set(value.v)
+    }
+    return value
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Cached celebration data — compute once per fetch cycle
+// ---------------------------------------------------------------------------
+
+const CELEBRATION_CACHE_KEY = "celebrations"
+
+/**
+ * Returns cached CelebrationData if available, otherwise builds it from
+ * the supplied results/runners and stores it in localStorage with the same
+ * TTL as the result data.
+ */
+export function getOrBuildCelebrationData(results: RunResultItem[], runners: Runner[]): CelebrationData {
+  const cached = getCached<string>(CELEBRATION_CACHE_KEY)
+  if (cached) {
+    try {
+      return deserializeCelebrationData(cached)
+    } catch {
+      // corrupt cache — fall through and rebuild
+    }
+  }
+
+  const data = buildCelebrationData(results, runners)
+  setCache(CELEBRATION_CACHE_KEY, serializeCelebrationData(data))
+  return data
 }
 
 // ---------------------------------------------------------------------------
@@ -877,22 +1013,22 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
   ({ data, resultKey }) => {
     const pb = data.pbMap.get(resultKey)
     if (!pb) return null
-    if (pb.firstRun) return { label: "Parkrun debut!", description: "First ever parkrun result recorded", emoji: "🎉", color: TAG_COLORS.pb }
+    if (pb.firstRun) return { label: "Parkrun debut!", description: "First ever parkrun result recorded", emoji: TAG_EMOJIS.debut, color: TAG_COLORS.pb }
 
     const tags: CelebrationTag[] = []
 
     if (pb.juniorPb) {
-      tags.push({ label: "New Junior PB!", description: "New personal best time at a junior parkrun", emoji: "💫", color: TAG_COLORS.juniorPb })
+      tags.push({ label: "New Junior PB!", description: "New personal best time at a junior parkrun", emoji: TAG_EMOJIS.juniorPb, color: TAG_COLORS.juniorPb })
     }
 
     if (pb.pb) {
-      tags.push({ label: "New PB!", description: "New overall personal best time", emoji: "🏅", color: TAG_COLORS.pb })
+      tags.push({ label: "New PB!", description: "New overall personal best time", emoji: TAG_EMOJIS.pb, color: TAG_COLORS.pb })
     }
 
     if (pb.coursePb) {
       const eventId = resultKey.split(":")[2]
       const eventDisplayName = getEventName(eventId)
-      tags.push({ label: `New ${eventDisplayName} PB!`, description: `New personal best time at ${eventDisplayName}`, emoji: "⭐", color: TAG_COLORS.coursePb })
+      tags.push({ label: `New ${eventDisplayName} PB!`, description: `New personal best time at ${eventDisplayName}`, emoji: TAG_EMOJIS.coursePb, color: TAG_COLORS.coursePb })
     }
 
     return tags.length > 0 ? tags : null
@@ -902,26 +1038,26 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
   ({ data, runnerDateKey }) => {
     const milestone = data.milestoneMap.get(runnerDateKey)
     return milestone !== undefined
-      ? { label: `${ordinalSuffix(milestone)} run!`, description: `Completed ${milestone} parkruns!`, emoji: "🎉", color: TAG_COLORS.milestone }
+      ? { label: `${ordinalSuffix(milestone)} run!`, description: `Completed ${milestone} parkruns!`, emoji: TAG_EMOJIS.milestone, color: TAG_COLORS.milestone }
       : null
   },
 
   // Haga Debut!
   ({ data, resultKey }) =>
     data.haga1Map.has(resultKey)
-      ? { label: "Haga Debut", description: "First run at Haga park!", emoji: "🌳", color: TAG_COLORS.haga1 }
+      ? { label: "Haga Debut", description: "First run at Haga park!", emoji: TAG_EMOJIS.haga1, color: TAG_COLORS.haga1 }
       : null,
 
   // 100 at Haga!
   ({ data, resultKey }) =>
     data.haga100Map.has(resultKey)
-      ? { label: "100 at Haga!", description: "100 beautiful runs in Haga park!", emoji: "💯", color: TAG_COLORS.haga100 }
+      ? { label: "100 at Haga!", description: "100 beautiful runs in Haga park!", emoji: TAG_EMOJIS.haga100, color: TAG_COLORS.haga100 }
       : null,
 
   // 250 at Haga!
   ({ data, resultKey }) =>
     data.haga200Map.has(resultKey)
-      ? { label: "1000km at Haga!", description: "Making Deri proud!", emoji: "🎪", color: TAG_COLORS.haga200 }
+      ? { label: "1000km at Haga!", description: "Making Deri proud!", emoji: TAG_EMOJIS.haga200, color: TAG_COLORS.haga200 }
       : null,
 
   // Event-list achievements (Svenskspringare, Stockholm Sprint, etc.)
@@ -942,7 +1078,7 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
     if (!birthday) return null
     const [, mm, dd] = date.split("-")
     return `${dd}/${mm}` === birthday
-      ? { label: "Birthday Runner!", description: "Ran a parkrun on their birthday", emoji: "🎂", color: TAG_COLORS.birthday }
+      ? { label: "Birthday Runner!", description: "Ran a parkrun on their birthday", emoji: TAG_EMOJIS.birthday, color: TAG_COLORS.birthday }
       : null
   },
 
@@ -957,19 +1093,19 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
   // Alone At Haga
   ({ data, resultKey }) =>
     data.aloneAtHagaMap.has(resultKey)
-      ? { label: "Alone At Haga!", description: "Was the only club member to run at Haga that event", emoji: "😱", color: TAG_COLORS.aloneHaga }
+      ? { label: "Alone At Haga!", description: "Was the only club member to run at Haga that event", emoji: TAG_EMOJIS.aloneHaga, color: TAG_COLORS.aloneHaga }
       : null,
 
   // Haga Cancelled?
   ({ data, resultKey }) =>
     data.hagaCancelledMap.has(resultKey)
-      ? { label: "Haga Cancelled?", description: "Ran Uppsala instead of Haga during the winter - was Haga cancelled due to ice?", emoji: "☃️", color: TAG_COLORS.hagaCancelled }
+      ? { label: "Haga Cancelled?", description: "Ran Uppsala instead of Haga during the winter - was Haga cancelled due to ice?", emoji: TAG_EMOJIS.hagaCancelled, color: TAG_COLORS.hagaCancelled }
       : null,
 
   // Uppsala Cancelled!?!
   ({ data, resultKey }) =>
     data.uppsalaCancelledMap.has(resultKey)
-      ? { label: "Uppsala Cancelled!?!", description: "Both Haga and Uppsala were cancelled? Had to flee to Djäkneberget or Örebro!", emoji: "❄️", color: TAG_COLORS.uppsalaCancelled }
+      ? { label: "Uppsala Cancelled!?!", description: "Both Haga and Uppsala were cancelled? Had to flee to Djäkneberget or Örebro!", emoji: TAG_EMOJIS.uppsalaCancelled, color: TAG_COLORS.uppsalaCancelled }
       : null,
 
   // Palindrome
@@ -978,7 +1114,7 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
       ? {
           label: "Palindrome!",
           description: "Finish with a time that reads the same forwards and backwards in mm:ss",
-          emoji: "🪞",
+          emoji: TAG_EMOJIS.palindrome,
           color: TAG_COLORS.palindrome,
         }
       : null,
@@ -990,7 +1126,7 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
     return partners.map((partner) => ({
       label: `${formatName(partner.name)}'s Run Buddy`,
       description: `First time finished within 10 seconds of ${formatName(partner.name)}`,
-      emoji: "🤝",
+      emoji: TAG_EMOJIS.runBuddy,
       color: TAG_COLORS.runBuddy,
       otherRunnerId: partner.parkrunId,
     }))
@@ -1003,7 +1139,7 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
     return partners.map((partner) => ({
       label: `${formatName(partner.name)}'s Bestie`,
       description: `Finished within 10 seconds of ${formatName(partner.name)} for the 10th time!`,
-      emoji: "👥",
+      emoji: TAG_EMOJIS.bestie,
       color: TAG_COLORS.bestie,
       otherRunnerId: partner.parkrunId,
     }))
@@ -1016,7 +1152,7 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
     return partners.map((partner) => ({
       label: `${formatName(partner.name)}'s BFF`,
       description: `Finished within 10 seconds of ${formatName(partner.name)} for the 50th time!`,
-      emoji: "💕",
+      emoji: TAG_EMOJIS.bff,
       color: TAG_COLORS.bff,
       otherRunnerId: partner.parkrunId,
     }))
@@ -1029,7 +1165,7 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
     return partners.map((partner) => ({
       label: `${formatName(partner.name)}'s Parkrun Pal`,
       description: `Attended 50 parkrun events with ${formatName(partner.name)}!`,
-      emoji: "🤗",
+      emoji: TAG_EMOJIS.parkrunPal,
       color: TAG_COLORS.parkrunPal,
       otherRunnerId: partner.parkrunId,
     }))
@@ -1042,7 +1178,7 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
     return partners.map((partner) => ({
       label: `${formatName(partner.name)}'s Palindromic Pal`,
       description: `Run the reverse of ${formatName(partner.name)}'s time`,
-      emoji: "🔄",
+      emoji: TAG_EMOJIS.palindromicPal,
       color: TAG_COLORS.palindromicPal,
       otherRunnerId: partner.parkrunId,
     }))
@@ -1054,8 +1190,19 @@ const celebrationRules: ((ctx: CelebrationRuleContext) => CelebrationTag | Celeb
       ? {
           label: "Viking!",
           description: "Completed a parkrun in Sweden, Finland, Denmark and Norway",
-          emoji: "⚔️",
+          emoji: TAG_EMOJIS.viking,
           color: TAG_COLORS.viking,
+        }
+      : null,
+
+  // Haga Streak
+  ({ data, resultKey }) =>
+    data.hagaStreakMap.has(resultKey)
+      ? {
+          label: "Haga Streak!",
+          description: "Run Haga Parkrun 10 Saturdays in a row",
+          emoji: TAG_EMOJIS.hagaStreak,
+          color: TAG_COLORS.hagaStreak,
         }
       : null,
 ]

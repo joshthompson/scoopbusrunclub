@@ -24,6 +24,8 @@ import { AdminDropdown, AdminDropdownItem } from "@/components/admin/AdminDropdo
 import { Checkbox } from "@/components/ui/Checkbox";
 import { EventModal } from "./EventModal";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
+import { AdminTooltip } from "@/components/admin/AdminTooltip";
+import { Icon } from "@/components/ui/Icon";
 
 type SortKey = "date" | "name" | "attendees" | "public";
 type SortDir = "asc" | "desc";
@@ -152,20 +154,28 @@ export const EventsPage: Component = () => {
               { id: "type", title: "Type", sortable: true },
               { id: "attendees", title: "Attendees", sortable: true },
               { id: "public", title: "Public", sortable: true },
-              { id: "major", title: "Major Event", sortable: true },
+              { id: "major", title: "Calendar", sortable: true },
               { id: "actions", title: "Actions", width: '10px' },
             ]}
             data={(sortedRaces() ?? []).map(race => [
               formatDate(race.date),
-              <Show when={race.website} fallback={race.name}>
-                <a href={race.website} target="_blank" rel="noopener" class={styles.link}>
-                  {race.name}
-                </a>
-              </Show>,
+              <>
+                {race.name}
+                <Show when={race.website}>
+                  &nbsp;&nbsp;<a href={race.website} target="_blank" rel="noopener">
+                    <Icon name="external" alt={`${race.name} Website`} size="small" />
+                  </a>
+                </Show>
+              </>,
+              
               race.type ?? '—',
               <span title={race.attendees.map((a) => runnerDisplayName(a.runnerId)).join(", ")}>
                 <For each={race.attendees}>
-                  {(att) => <AdminAvatar user={att.runnerId} size="small" title={runnerDisplayName(att.runnerId)} />}
+                  {(att) =>
+                    <AdminTooltip content={runnerDisplayName(att.runnerId)}>
+                      <AdminAvatar user={att.runnerId} size="small" title={runnerDisplayName(att.runnerId)} />
+                    </AdminTooltip>
+                  }
                 </For>
               </span>,
               race.public ? "✓" : "✗",
@@ -183,6 +193,7 @@ export const EventsPage: Component = () => {
               setSortKey(key as SortKey)
               setSortDir(dir)
             }}
+            onDoubleClick={(n) => handleEdit(sortedRaces()[n])}
           />
         </Show>
       </DirtBlock>

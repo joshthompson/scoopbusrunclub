@@ -224,15 +224,15 @@ export const EventModal: Component<EventModalProps> = (props) => {
         </div>
 
         <Checkbox
-          label="Major event"
-          checked={isMajorEvent()}
-          onChange={(e) => setIsMajorEvent(e.currentTarget.checked)}
+          label="Public (visible on the site)"
+          checked={isPublic()}
+          onChange={(e) => setIsPublic(e.currentTarget.checked)}
         />
 
         <Checkbox
-          label="Public (visible on main site)"
-          checked={isPublic()}
-          onChange={(e) => setIsPublic(e.currentTarget.checked)}
+          label="Race Calendar (tick this for major events)"
+          checked={isMajorEvent()}
+          onChange={(e) => setIsMajorEvent(e.currentTarget.checked)}
         />
 
         {/* Attendees */}

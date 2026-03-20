@@ -5,7 +5,7 @@ import { DirtBlock } from "../components/ui/DirtBlock"
 import { RunnerName, runners as runnerSignals } from '@/data/runners'
 import { type RunResultItem, type Runner } from "../utils/api"
 import { formatDate, formatName, parseTimeToSeconds } from "@/utils/misc"
-import { buildCelebrationData, CelebrationPill, getCelebrationTags } from "../components/ResultCelebrations"
+import { buildCelebrationData, CelebrationPill, getCelebrationTags, type CelebrationData, getOrBuildCelebrationData } from "../components/ResultCelebrations"
 import { getMemberRoute, getRunnerKeyFromRouteName } from "@/utils/memberRoute"
 import { CharacterImage } from "@/components/CharacterImage"
 import { FieldBlock } from "@/components/ui/FieldBlock"
@@ -18,6 +18,7 @@ import graphIcon from "@/assets/misc/graph-icon.png"
 interface MemberPageProps {
   results: RunResultItem[]
   runners: Runner[]
+  celebrationData?: CelebrationData
 }
 
 interface CelebrationOccurrence {
@@ -209,7 +210,7 @@ export function MemberPage(props: MemberPageProps) {
       )
     })
 
-  const celebrationData = createMemo(() => buildCelebrationData(props.results, props.runners))
+  const celebrationData = createMemo(() => props.celebrationData ?? getOrBuildCelebrationData(props.results, props.runners))
 
   const groupedCelebrations = createMemo<GroupedCelebration[]>(() => {
     const groups = new Map<string, GroupedCelebration>()

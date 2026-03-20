@@ -97,7 +97,7 @@ function activeCacheTTL(): number {
   return CACHE_TTL_MS;
 }
 
-function getCached<T>(key: string): T | null {
+export function getCached<T>(key: string): T | null {
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return null;
@@ -112,7 +112,7 @@ function getCached<T>(key: string): T | null {
   }
 }
 
-function setCache<T>(key: string, data: T): void {
+export function setCache<T>(key: string, data: T): void {
   try {
     const entry: CacheEntry<T> = { data, timestamp: Date.now(), version: CACHE_VERSION };
     localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));

@@ -6,16 +6,17 @@ import { RaceCalendar } from '../components/RaceCalendar';
 import { Milestones } from '../components/Milestones';
 import { FieldBlock } from '../components/ui/FieldBlock';
 import { type RunResultItem, type Runner, type RaceItem } from '../utils/api';
+import { type CelebrationData } from '../components/ResultCelebrations';
 import { css } from "@style/css";
 
 
-export const HomePage: Component<{ resultsLoading: boolean; runnersLoading: boolean; results: RunResultItem[]; runners: Runner[]; races: RaceItem[] }> = (props) => {
+export const HomePage: Component<{ resultsLoading: boolean; runnersLoading: boolean; results: RunResultItem[]; runners: Runner[]; races: RaceItem[]; celebrationData?: CelebrationData }> = (props) => {
   return (
     <div class={styles.content}>
       <main class={styles.main}>
         <FieldBlock title="Latest Results" signType="purple">
           <Show when={!props.resultsLoading && !props.runnersLoading} fallback={<div>Loading...</div>}>
-            <LatestResults results={props.results} runners={props.runners} races={props.races} />
+            <LatestResults results={props.results} runners={props.runners} races={props.races} celebrationData={props.celebrationData} />
           </Show>
         </FieldBlock>
       </main>

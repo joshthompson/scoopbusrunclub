@@ -5,7 +5,7 @@ import { type RunResultItem, type Runner } from "@/utils/api"
 import { parseTimeToSeconds } from "@/utils/misc"
 import { getRunnerKeyFromRouteName } from "@/utils/memberRoute"
 import { RunnerName, runners as runnerSignals } from '@/data/runners'
-import { buildCelebrationData, getCelebrationTags } from "@/components/ResultCelebrations"
+import { buildCelebrationData, getCelebrationTags, type CelebrationData, getOrBuildCelebrationData } from "@/components/ResultCelebrations"
 
 /** Category of celebration for filtering */
 export type GraphMarkerCategory = "pb" | "coursePb" | "other"
@@ -35,6 +35,7 @@ export interface GraphMarker {
 interface GraphProps {
   results: RunResultItem[]
   runners: Runner[]
+  celebrationData?: CelebrationData
 }
 
 const HEIGHT = 400
@@ -102,6 +103,35 @@ export function GraphSVG(props: GraphProps) {
   const [showOther, setShowOther] = createSignal(true)
   const [filterLowest, setFilterLowest] = createSignal(false)
 
+  /** Whether a touch interaction started on the graph */
+  let isTouching = false
+
+  /** Convert a clientX to SVG-local X */
+  const clientXToLocal = (clientX: number) => {
+    const rect = svgRef.getBoundingClientRect()
+    return clientX - rect.left
+  }
+
+  const handleTouchStart = (e: TouchEvent) => {
+    e.preventDefault()
+    isTouching = true
+    const touch = e.touches[0]
+    if (touch) setMouseX(clientXToLocal(touch.clientX))
+  }
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!isTouching) return
+    e.preventDefault()
+    const touch = e.touches[0]
+    if (touch) setMouseX(clientXToLocal(touch.clientX))
+  }
+
+  const handleTouchEnd = () => {
+    if (!isTouching) return
+    isTouching = false
+    setMouseX(null)
+  }
+
   onMount(() => {
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -109,7 +139,18 @@ export function GraphSVG(props: GraphProps) {
       }
     })
     ro.observe(containerRef)
-    onCleanup(() => ro.disconnect())
+
+    // Attach touchmove/touchend on document so dragging outside the graph still works
+    document.addEventListener("touchmove", handleTouchMove, { passive: false })
+    document.addEventListener("touchend", handleTouchEnd)
+    document.addEventListener("touchcancel", handleTouchEnd)
+
+    onCleanup(() => {
+      ro.disconnect()
+      document.removeEventListener("touchmove", handleTouchMove)
+      document.removeEventListener("touchend", handleTouchEnd)
+      document.removeEventListener("touchcancel", handleTouchEnd)
+    })
   })
 
   const params = useParams<{ name: string }>()
@@ -139,7 +180,7 @@ export function GraphSVG(props: GraphProps) {
     return sorted.filter((r) => parseTimeToSeconds(r.time) <= cutoff)
   })
 
-  const celebrationData = createMemo(() => buildCelebrationData(props.results, props.runners))
+  const celebrationData = createMemo(() => props.celebrationData ?? getOrBuildCelebrationData(props.results, props.runners))
 
   const chartData = createMemo(() => {
     const data = runnerResults()
@@ -399,6 +440,7 @@ export function GraphSVG(props: GraphProps) {
               setMouseX(e.clientX - rect.left)
             }}
             onMouseLeave={() => setMouseX(null)}
+            onTouchStart={handleTouchStart}
           >
             {/* Horizontal grid lines */}
             <For each={data().yLabels}>
@@ -618,6 +660,7 @@ const styles = {
   container: css({
     width: "100%",
     position: "relative",
+    touchAction: "none",
   }),
   graph: css({
     '& text': {

@@ -1,4 +1,5 @@
 import { Runner, RunResultItem } from "@/utils/api"
+import { type CelebrationData } from "@/components/ResultCelebrations"
 import { getRunnerKeyFromRouteName } from "@/utils/memberRoute"
 import { useParams } from "@solidjs/router"
 import { css } from "@style/css"
@@ -13,6 +14,7 @@ import { BackSignButton } from "@/components/BackSignButton"
 interface MemberGraphProps {
   results: RunResultItem[]
   runners: Runner[]
+  celebrationData?: CelebrationData
 }
 
 export function MemberGraphPage(props: MemberGraphProps) {

@@ -1,10 +1,11 @@
-import { type Component, createResource, Show } from 'solid-js';
+import { type Component, createMemo, createResource, Show } from 'solid-js';
 import { Router, Route, type RouteSectionProps, useLocation } from '@solidjs/router';
 import { ScoopBusHeader } from './components/header/ScoopBusHeader';
 import './styles.css';
 import { css } from '@style/css';
 import { fetchRunners, fetchAllResults, fetchPublicRaces } from './utils/api';
 import { loadEvents } from './utils/events';
+import { getOrBuildCelebrationData } from './components/ResultCelebrations';
 import { MemberPage } from './pages/MemberPage';
 import { HomePage } from './pages/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -18,6 +19,14 @@ const App: Component = () => {
 
   // Populate the event name lookup cache
   createResource(loadEvents)
+
+  // Pre-compute celebration + PB data once (cached in localStorage alongside results)
+  const celebrationData = createMemo(() => {
+    const r = results()
+    const u = runners()
+    if (!r || !u || r.length === 0 || u.length === 0) return undefined
+    return getOrBuildCelebrationData(r, u)
+  })
 
   const RootLayout: Component<RouteSectionProps> = (routeProps) => {
     const location = useLocation()
@@ -52,6 +61,7 @@ const App: Component = () => {
               results={results() ?? []}
               runners={runners() ?? []}
               races={races() ?? []}
+              celebrationData={celebrationData()}
             />
           )}
         />
@@ -59,14 +69,14 @@ const App: Component = () => {
           path="/member/:name"
           component={() => (
             <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
-              <MemberPage results={results() ?? []} runners={runners() ?? []} />
+              <MemberPage results={results() ?? []} runners={runners() ?? []} celebrationData={celebrationData()} />
             </Show>
           )}
         />
         <Route
           path="/member/:name/graph"
           component={() => (
-            <MemberGraphPage results={results() ?? []} runners={runners() ?? []} />
+            <MemberGraphPage results={results() ?? []} runners={runners() ?? []} celebrationData={celebrationData()} />
           )}
         />
         <Route path="/admin" component={AdminPage} />

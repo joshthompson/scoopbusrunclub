@@ -6,7 +6,7 @@ import { formatDate, formatName, ordinal } from "@/utils/misc"
 import { MILESTONE_SET } from "../utils/milestones"
 import { FloatingEmoji } from "./ui/FloatingEmoji"
 import { DirtBlock } from "./ui/DirtBlock"
-import { ResultCelebrations, buildCelebrationData } from "./ResultCelebrations"
+import { ResultCelebrations, type CelebrationData, getOrBuildCelebrationData } from "./ResultCelebrations"
 import { Button } from "./ui/Button"
 import { getMemberRoute } from "@/utils/memberRoute"
 import { runners } from '@/data/runners'
@@ -89,6 +89,7 @@ interface LatestResultsProps {
   results: RunResultItem[]
   runners: Runner[]
   races: RaceItem[]
+  celebrationData?: CelebrationData
 }
 
 function isMilestoneEvent(eventNumber: string) {
@@ -271,7 +272,7 @@ function ParkrunExternalLink(props: { parkrun: ParkrunEvent }) {
 }
 
 export function LatestResults(props: LatestResultsProps) {
-  const celebrations = createMemo(() => buildCelebrationData(props.results, props.runners))
+  const celebrations = createMemo(() => props.celebrationData ?? getOrBuildCelebrationData(props.results, props.runners))
 
   const grouped = createMemo(() => groupResults(props.results, props.races))
 

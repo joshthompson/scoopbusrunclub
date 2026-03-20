@@ -15,10 +15,8 @@ export function AdminTable(props: {
   sortKey?: string;
   sortDir?: 'asc' | 'desc';
   onSortChange?: (key: string, dir: 'asc' | 'desc') => void;
+  onDoubleClick?: (index: number) => void;
 }) {
-
-
-
   return (
     <Show
       when={props.data.length > 0 || props.empty === undefined}
@@ -54,8 +52,8 @@ export function AdminTable(props: {
           </thead>
           <tbody>
             <For each={props.data}>
-              {(row) => (
-                <tr class={styles.row}>
+              {(row, n) => (
+                <tr class={styles.row} onDblClick={() => props.onDoubleClick?.(n())}>
                   <For each={row}>
                     {(cell) => <td class={styles.cell}>{cell}</td>}
                   </For>
