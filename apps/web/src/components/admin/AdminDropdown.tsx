@@ -109,6 +109,8 @@ const styles = {
     color: "#fff",
     fontSize: "0.8rem",
     padding: "0.5rem 0.75rem",
+    borderRadius: "inherit",
+    cornerShape: "inherit",
     cursor: "pointer",
     textAlign: "left",
     _hover: {

@@ -4,7 +4,7 @@ import { css } from "@style/css"
 import { Accessor } from "solid-js"
 import { parseTimeToSeconds } from "@/utils/misc"
 
-const LABEL_RENDER_DISTANCE = 100
+export const RUNNER_LABEL_RENDER_DISTANCE = 50
 
 export function createRunnerController(
   id: string,
@@ -49,7 +49,7 @@ export function createRunnerController(
                 c.data.y() + c.data.height() / 2 - mousePosition().y
               )
             }))
-            .filter(({ dist }) => dist < LABEL_RENDER_DISTANCE)
+            .filter(({ dist }) => dist < RUNNER_LABEL_RENDER_DISTANCE)
             .sort((a, b) => a.dist - b.dist)[0]
 
           const name = runner().name

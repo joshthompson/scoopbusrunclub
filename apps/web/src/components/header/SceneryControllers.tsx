@@ -10,6 +10,7 @@ import shrub1Asset from '@/assets/misc/shrub1.png'
 import cloud1Asset from '@/assets/misc/cloud1.png'
 import cloud2Asset from '@/assets/misc/cloud2.png'
 import signAsset from "@/assets/misc/pr-sign.png"
+import { css } from "@style/css";
 
 const trees = [
   { asset: tree1Asset, w: 87, h: 120 },
@@ -82,6 +83,7 @@ export function createCloudController(id: string, x: number, startX: number) {
         ...createObjectSignal(x + Math.random() * 200 - 100, 'x'),
         ...createObjectSignal(Math.random() * 20 + 5, 'y'),
         frameInterval: () => Infinity,
+        class: () => css({ opacity: 'var(--cloud-opacity)' }),
       }
     },
     onEnterFrame({ $, $age }) {

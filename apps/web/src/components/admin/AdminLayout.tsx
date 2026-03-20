@@ -1,4 +1,4 @@
-import { type Component, type JSX, Show } from "solid-js";
+import { type Component, type JSX, onCleanup, onMount, Show } from "solid-js";
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { css, cva, cx } from "@style/css";
 import { useAuth } from "./AuthGuard";
@@ -15,11 +15,18 @@ export const AdminLayout: Component<{ children: JSX.Element, fullPage?: boolean 
     return current.startsWith(path);
   };
 
+  onMount(() => {
+    document.body.classList.add('admin-page')
+  })
+
+  onCleanup(() => {
+    document.body.classList.remove('admin-page')
+  })
+
   return (
     <div class={cx(
       styles.page({ fullPage: props.fullPage }),
       props.fullPage && "full-screen-section",
-      'admin-page',
     )}>
       <nav class={styles.nav}>
         <div class={styles.navInner}>

@@ -1,17 +1,18 @@
-import { css, cva } from "@style/css"
+import { css, cva, cx } from "@style/css"
 import { JSX } from "solid-js"
 
 interface AdminInputProps {
   label?: string;
   size?: "small" | "medium";
   width?: string;
+  fullWidth?: boolean;
 }
 
 export function AdminInput(props: JSX.InputHTMLAttributes<HTMLInputElement> & AdminInputProps) {
-  return <label class={styles.label}>
+  return <label class={cx(styles.label({ fullWidth: props.fullWidth }), props.class)}>
     {props.label}{props.required ? " *" : ""}
     <input
-      class={styles.input({ size: props.size })}
+      class={styles.input({ size: props.size, fullWidth: props.fullWidth })}
       type="text"
       style={{ width: props.width ?? undefined }}
       {...props}
@@ -20,14 +21,26 @@ export function AdminInput(props: JSX.InputHTMLAttributes<HTMLInputElement> & Ad
 }
 
 const styles = {
-  label: css({
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.25rem",
-    fontSize: "0.8rem",
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
+  label: cva({
+    base: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "0.25rem",
+      fontSize: "0.8rem",
+      fontWeight: "bold",
+      textTransform: "uppercase",
+      letterSpacing: "0.05em",
+    },
+    variants: {
+      fullWidth: {
+        true: {
+          width: "100%",
+        },
+      },
+    },
+    defaultVariants: {
+      fullWidth: false,
+    },
   }),
   input: cva({
     base: {
@@ -52,9 +65,15 @@ const styles = {
           padding: "0.5rem 0.75rem",
         },
       },
+      fullWidth: {
+        true: {
+          width: "100%",
+        },
+      },
     },
     defaultVariants: {
       size: "medium",
+      fullWidth: false,
     },
   }),
 }

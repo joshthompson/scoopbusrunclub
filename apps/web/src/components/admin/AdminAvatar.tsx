@@ -9,7 +9,7 @@ const colours = [
   "#ff8a65", "#a1887f", "#e0e0e0", "#90a4ae",
 ];
 
-export function AdminAvatar(props: { user: string, size?: "small" | "medium" | "large", title?: string }) {
+export function AdminAvatar(props: { user: string, size?: "small" | "medium" | "large" | "huge", title?: string }) {
   const initial = () => props.user.charAt(0).toUpperCase()
   const colour = () => colours[props.user.charCodeAt(0) % colours.length]
 
@@ -25,10 +25,11 @@ export function AdminAvatar(props: { user: string, size?: "small" | "medium" | "
 const styles = {
   avatar: cva({
     base: {
+      '--notch-size': "2px",
       width: "var(--avatar-size)",
       height: "var(--avatar-size)",
       display: "inline-flex",
-      borderRadius: "2px",
+      borderRadius: "var(--notch-size)",
       cornerShape: "notch",
       backgroundColor: "#ccc",
       color: "#fff",
@@ -49,6 +50,10 @@ const styles = {
         large: {
           '--avatar-size': "2em",
         },
+        huge: {
+          '--avatar-size': "6em",
+          '--notch-size': "10px",
+        },
       },
     },
     defaultVariants: {
@@ -57,6 +62,6 @@ const styles = {
   }),
   face: css({
     width: "auto",
-    height: "calc(100% - 4px)",
+    height: "calc(100% - var(--notch-size) * 2)",
   }),
 }

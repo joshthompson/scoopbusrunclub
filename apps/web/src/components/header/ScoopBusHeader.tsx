@@ -5,15 +5,18 @@ import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
 import sunAsset from '@/assets/misc/sun.png'
+import moonAsset from '@/assets/misc/moon.png'
+import starsAsset from '@/assets/misc/stars.png'
 import house1Asset from '@/assets/misc/house1.png'
 import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
-import { createRunnerController } from './RunnerController'
+import { createRunnerController, RUNNER_LABEL_RENDER_DISTANCE } from './RunnerController'
 import type { RunnerController } from './RunnerController'
 import { RunnerName, runners } from '@/data/runners'
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createShadowController } from './ShadowController'
+import { startSkyService } from './SkyService'
 import { type RunResultItem } from '@/utils/api'
 import { parseTimeToSeconds } from '@/utils/misc'
 import {
@@ -22,6 +25,7 @@ import {
   createSignController,
   createTreeController,
 } from './SceneryControllers'
+import { css } from '@style/css'
 
 function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
   // Find the latest result for each parkrunId
@@ -114,7 +118,6 @@ interface ScoopBusHeaderProps {
 }
 
 export function ScoopBusHeader(props: ScoopBusHeaderProps) {
-
   const navigate = useNavigate()
   const [mousePosition, setMousePosition] = createSignal({ x: 0, y: 0 })
   const [updatedSpeeds, setUpdatedSpeeds] = createSignal(false)
@@ -191,6 +194,11 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
   onMount(() => {
     window.addEventListener('resize', windowResizeHandler)
     window.addEventListener('mousemove', windowMouseMoveHandler)
+
+    const stopSkyService = startSkyService()
+    onCleanup(() => {
+      stopSkyService()
+    })
   })
 
   onCleanup(() => {
@@ -201,42 +209,126 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
   return (
     <div aria-role="heading" aria-label="Welcome to the Scoop Bus Run Club!">
       <div aria-hidden="true">
-        <Canvas
-          scene={scene}
-          style={{
-            background: `
-              url(${pathAsset}) repeat-x 0px 158px,
-              url(${bg1Asset}) repeat-x bottom,
-              url(${bg2Asset}) repeat-x 0px 90px,
-              url(${house2Asset}) no-repeat calc(40% + 70px) 65px,
-              url(${house1Asset}) no-repeat 30% 65px,
-              url(${bg3Asset}) repeat-x 0px 70px,
-              url(${sunAsset}) no-repeat 70% 40px,
-              linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))
-            `,
-            cursor: 'pointer',
-          }}
-          onClick={({ x, y }) => {
-            const LABEL_RENDER_DISTANCE = 100
-            const closest = scene.getControllersByType<RunnerController>('runner')
-              .map(c => ({
-                runnerId: c.data.runnerId,
-                dist: Math.hypot(
-                  c.data.x() + c.data.width() / 2 - x,
-                  c.data.y() + c.data.height() / 2 - y
-                )
-              }))
-              .filter(({ dist }) => dist < LABEL_RENDER_DISTANCE)
-              .sort((a, b) => a.dist - b.dist)[0]
+        <div class={styles.underlay}>
+          <div class={styles.path} style={{ '--image': `url(${pathAsset})` }} />
+          <div class={styles.bg1} style={{ '--image': `url(${bg1Asset})` }} />
+          <div class={styles.bg2} style={{ '--image': `url(${bg2Asset})` }} />
+          <div class={styles.house2} style={{ '--image': `url(${house2Asset})` }} />
+          <div class={styles.house1} style={{ '--image': `url(${house1Asset})` }} />
+          <div class={styles.bg3} style={{ '--image': `url(${bg3Asset})` }} />
+          <div class={styles.sun} style={{ '--image': `url(${sunAsset})` }} />
+          <div class={styles.moon} style={{ '--image': `url(${moonAsset})` }} />
+          <div class={styles.stars} style={{ '--image': `url(${starsAsset})` }} />
+          <div class={styles.sky} style={{ '--image': 'linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))' }} />
+        </div>
+        <div class={styles.canvas}>
+          <Canvas
+            scene={scene}
+            style={{ cursor: 'pointer', background: 'transparent' }}
+            onClick={({ x, y }) => {
+              const closest = scene.getControllersByType<RunnerController>('runner')
+                .map(c => ({
+                  runnerId: c.data.runnerId,
+                  dist: Math.hypot(
+                    c.data.x() + c.data.width() / 2 - x,
+                    c.data.y() + c.data.height() / 2 - y
+                  )
+                }))
+                .filter(({ dist }) => dist < RUNNER_LABEL_RENDER_DISTANCE)
+                .sort((a, b) => a.dist - b.dist)[0]
 
-            if (closest) {
-              navigate(`/member/${closest.runnerId}`)
-            } else {
-              navigate('/')
-            }
-          }}
-        />
+              if (closest) {
+                navigate(`/member/${closest.runnerId}`)
+              } else {
+                navigate('/')
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   )
 }
+
+const styles = {
+  canvas: css({
+    position: 'relative',
+    zIndex: 100,
+  }),
+  underlay: css({
+    height: '240px',
+    mb: '-240px',
+    width: '100%',
+    position: 'relative',
+    '& > div': {
+      position: 'absolute',
+      inset: 0,
+      backgroundImage: 'var(--image)',
+    },
+  }),
+  sky: css({
+    zIndex: 1,
+    backgroundRepeat: 'repeat',
+  }),
+  stars: css({
+    zIndex: 2,
+    backgroundRepeat: 'x-repeat',
+    backgroundPosition: '0px 0px',
+    opacity: 'var(--stars-opacity)',
+    backgroundSize: '600px',
+  }),
+  moon: css({
+    zIndex: 3,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: '30% calc(-40px + var(--moon-y) * 160px)',
+    opacity: 'var(--moon-opacity)',
+    filter: 'blur(2px)',
+  }),
+  sun: css({
+    zIndex: 4,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: `
+      70%
+      calc(-40px + var(--sun-y) * 120px)
+    `,
+  }),
+  bg3: css({
+    zIndex: 5,
+    backgroundRepeat: 'repeat-x',
+    backgroundPosition: '0px 70px',
+  }),
+  house1: css({
+    zIndex: 6,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: '30% 65px',
+  }),
+  house2: css({
+    zIndex: 7,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'calc(40% + 70px) 65px',
+  }),
+  bg2: css({
+    zIndex: 8,
+    backgroundRepeat: 'repeat-x',
+    backgroundPosition: '0px 90px',
+  }),
+  bg1: css({
+    zIndex: 9,
+    backgroundRepeat: 'repeat-x',
+    backgroundPosition: 'bottom',
+  }),
+  path: css({
+    zIndex: 10,
+    backgroundRepeat: 'repeat-x',
+    backgroundPosition: '0px 158px',
+  }),
+}
+
+/*
+// Test filter for making page darker
+  filter: `
+    saturate(calc(0.7 + 0.3 * var(--light)))
+    brightness(calc(0.5 + 0.5 * var(--light)))
+    hue-rotate(calc(30deg * (1 - var(--light))))
+  `,
+ */

@@ -16,6 +16,7 @@ const BUS_SPEED = 10
 const SCOOP_SPEED = 50
 const SCOOP_DURATION = 125
 const MIN_BUS_START_X = 1100
+const MIN_BUS_OFFSCREEN_PX = 250
 
 export function createBusController(id: string, scene: Scene) {
 
@@ -45,7 +46,7 @@ export function createBusController(id: string, scene: Scene) {
 
       // Reset
       if ($.x() < endX) {
-        $.setX(Math.max($scene.canvas.get().width() + 22, MIN_BUS_START_X))
+        $.setX(Math.max($scene.canvas.get().width() + 22, MIN_BUS_START_X) + MIN_BUS_OFFSCREEN_PX)
       }
 
       // Scoop the runners

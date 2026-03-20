@@ -37,7 +37,9 @@ const App: Component = () => {
         <Show when={!isAdmin()}>
           <ScoopBusHeader results={results() ?? []} />
         </Show>
-        {routeProps.children}
+        <main class={css({ zIndex: 101, position: 'relative' })}>
+          {routeProps.children}
+        </main>
       </>
     )
   }

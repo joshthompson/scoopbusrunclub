@@ -21,7 +21,7 @@ body {
   transition: background-color 0.1s linear;
 
   &.scrolled,
-  &:has(.admin-page) {
+  &.admin-page {
     background-color: var(--grass-green);
   }
 

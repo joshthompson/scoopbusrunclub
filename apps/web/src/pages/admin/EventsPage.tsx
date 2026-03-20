@@ -6,7 +6,7 @@ import {
   createMemo,
   For,
 } from "solid-js";
-import { css, cx } from "@style/css";
+import { css } from "@style/css";
 import { DirtBlock } from "@/components/ui/DirtBlock";
 import {
   fetchRaces,
@@ -25,10 +25,29 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { EventModal } from "./EventModal";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
 import { AdminTooltip } from "@/components/admin/AdminTooltip";
+import { AdminSelect } from "@/components/admin/AdminSelect";
+import { AdminInput } from "@/components/admin/AdminInput";
 import { Icon } from "@/components/ui/Icon";
 
-type SortKey = "date" | "name" | "attendees" | "public";
+export const EVENT_TYPES = [
+  {
+    groupName: "Social",
+    types: ["Track and Food", "Other Social"],
+  },
+  {
+    groupName: "Race",
+    types: ["Marathon", "Half Marathon", "Ultra", "Other"],
+  },
+  {
+    groupName: "Misc",
+    types: ["Parkrun Test Event", "5 вёрст", "Other"],
+  },
+] as const;
+
+type SortKey = "date" | "name" | "type" | "attendees" | "public" | "major";
 type SortDir = "asc" | "desc";
+
+const allRunnerKeys = Object.keys(runners) as RunnerName[];
 
 export const EventsPage: Component = () => {
   const [includeOld, setIncludeOld] = createSignal(false);
@@ -40,12 +59,42 @@ export const EventsPage: Component = () => {
   const [sortKey, setSortKey] = createSignal<SortKey>("date");
   const [sortDir, setSortDir] = createSignal<SortDir>("asc");
 
+  // Filters
+  const [filterType, setFilterType] = createSignal("");
+  const [filterCalendar, setFilterCalendar] = createSignal("");
+  const [filterPublic, setFilterPublic] = createSignal("");
+  const [filterAttendee, setFilterAttendee] = createSignal("");
+  const [searchName, setSearchName] = createSignal("");
+
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editingRace, setEditingRace] = createSignal<Race | null>(null);
   const [duplicating, setDuplicating] = createSignal(false);
 
+  const filteredRaces = createMemo(() => {
+    let list = races() ?? [];
+
+    const typeVal = filterType();
+    if (typeVal) list = list.filter((r) => (r.type ?? "") === typeVal);
+
+    const calVal = filterCalendar();
+    if (calVal === "yes") list = list.filter((r) => r.majorEvent);
+    else if (calVal === "no") list = list.filter((r) => !r.majorEvent);
+
+    const pubVal = filterPublic();
+    if (pubVal === "yes") list = list.filter((r) => r.public);
+    else if (pubVal === "no") list = list.filter((r) => !r.public);
+
+    const attendeeVal = filterAttendee();
+    if (attendeeVal) list = list.filter((r) => r.attendees.some((a) => a.runnerId === attendeeVal));
+
+    const search = searchName().toLowerCase().trim();
+    if (search) list = list.filter((r) => r.name.toLowerCase().includes(search));
+
+    return list;
+  });
+
   const sortedRaces = createMemo(() => {
-    const list = races() ?? [];
+    const list = filteredRaces();
     const key = sortKey();
     const dir = sortDir();
     return [...list].sort((a, b) => {
@@ -57,11 +106,17 @@ export const EventsPage: Component = () => {
         case "name":
           cmp = a.name.localeCompare(b.name);
           break;
+        case "type":
+          cmp = (a.type ?? "").localeCompare(b.type ?? "");
+          break;
         case "attendees":
           cmp = a.attendees.length - b.attendees.length;
           break;
         case "public":
           cmp = Number(a.public) - Number(b.public);
+          break;
+        case "major":
+          cmp = Number(a.majorEvent ?? 0) - Number(b.majorEvent ?? 0);
           break;
       }
       return dir === "asc" ? cmp : -cmp;
@@ -147,6 +202,66 @@ export const EventsPage: Component = () => {
           when={!races.loading}
           fallback={<p class={styles.emptyText}>Loading…</p>}
         >
+
+          <div class={styles.filters}>
+            <AdminInput
+              label="Search"
+              size="small"
+              placeholder="Event name…"
+              value={searchName()}
+              onInput={(e) => setSearchName(e.currentTarget.value)}
+              width="160px"
+            />
+            <AdminSelect
+              label="Type"
+              size="small"
+              value={filterType()}
+              onChange={(e) => setFilterType(e.currentTarget.value)}
+            >
+              <option value="">All</option>
+              <For each={EVENT_TYPES}>
+                {(group) =>
+                  <optgroup label={group.groupName}>
+                    <For each={group.types}>
+                      {(type) => <option value={type}>{type}</option>}
+                    </For>
+                  </optgroup>
+                }
+              </For>
+            </AdminSelect>
+            <AdminSelect
+              label="Public"
+              size="small"
+              value={filterPublic()}
+              onChange={(e) => setFilterPublic(e.currentTarget.value)}
+            >
+              <option value="">All</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </AdminSelect>
+            <AdminSelect
+              label="Calendar"
+              size="small"
+              value={filterCalendar()}
+              onChange={(e) => setFilterCalendar(e.currentTarget.value)}
+            >
+              <option value="">All</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </AdminSelect>
+            <AdminSelect
+              label="Attendee"
+              size="small"
+              value={filterAttendee()}
+              onChange={(e) => setFilterAttendee(e.currentTarget.value)}
+            >
+              <option value="">All</option>
+              <For each={allRunnerKeys}>
+                {(key) => <option value={key}>{runnerDisplayName(key)}</option>}
+              </For>
+            </AdminSelect>
+          </div>
+          
           <AdminTable
             columns={[
               { id: "date", title: "Date", sortable: true },
@@ -211,6 +326,17 @@ export const EventsPage: Component = () => {
 };
 
 const styles = {
+  filters: css({
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    gap: "1rem",
+    marginBottom: "0.75rem",
+    textAlign: "left",
+    '& > *': {
+      flex: "0 1 100px",
+    },
+  }),
   link: css({
     textDecoration: "underline",
   }),

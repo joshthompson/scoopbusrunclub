@@ -5,6 +5,7 @@ import { changeOwnPassword } from "@/utils/adminApi";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminInput } from "@/components/admin/AdminInput";
 import { useAuth } from "@/components/admin/AuthGuard";
+import { AdminAvatar } from "@/components/admin/AdminAvatar";
 
 export const AccountPage: Component = () => {
   const auth = useAuth();
@@ -47,17 +48,18 @@ export const AccountPage: Component = () => {
   };
 
   return (
-    <div>
-      <DirtBlock title="Account Settings" class={css({ mt: "2rem" })}>
+    <div class={styles.container}>
+      <DirtBlock title="Account Settings">
         <div class={styles.section}>
+          <div class={styles.avatar}>
+            <AdminAvatar user={auth.username()} size="huge" />
+          </div>
           <div class={styles.field}>
             <span class={styles.fieldLabel}>Username</span>
             <span class={styles.fieldValue}>{auth.username()}</span>
           </div>
         </div>
       </DirtBlock>
-
-      <div class={styles.spacer} />
 
       <DirtBlock title="Change Password">
         <form onSubmit={handleChangePassword} class={styles.form}>
@@ -67,6 +69,7 @@ export const AccountPage: Component = () => {
             value={currentPassword()}
             onInput={(e) => setCurrentPassword(e.currentTarget.value)}
             autocomplete="current-password"
+            fullWidth
             required
           />
           <AdminInput
@@ -75,6 +78,7 @@ export const AccountPage: Component = () => {
             value={newPassword()}
             onInput={(e) => setNewPassword(e.currentTarget.value)}
             autocomplete="new-password"
+            fullWidth
             required
           />
           <AdminInput
@@ -83,6 +87,7 @@ export const AccountPage: Component = () => {
             value={confirmPassword()}
             onInput={(e) => setConfirmPassword(e.currentTarget.value)}
             autocomplete="new-password"
+            fullWidth
             required
           />
           <Show when={error()}>
@@ -106,12 +111,36 @@ export const AccountPage: Component = () => {
 };
 
 const styles = {
+  container: css({
+    display: "flex",
+    flexDirection: "row",
+    gap: "2rem",
+    mt: "2rem",
+    alignItems: "flex-start",
+    '& > *': {
+      flex: 1,
+    },
+
+    '@media (max-width: 600px)': {
+      flexDirection: "column",
+      '& > *': {
+        width: "100%",
+        maxWidth: "none",
+      },
+    },
+  }),
   section: css({
     padding: "0.5rem 0",
+  }),
+  avatar: css({
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: "1rem",
   }),
   field: css({
     display: "flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: "1rem",
   }),
   fieldLabel: css({
@@ -129,9 +158,10 @@ const styles = {
   form: css({
     display: "flex",
     flexDirection: "column",
+    alignItems: "center",
     gap: "1rem",
     textAlign: "left",
-    maxWidth: "360px",
+    width: "100%",
   }),
   error: css({
     color: "var(--error-red)",

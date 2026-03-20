@@ -14,6 +14,7 @@ import { NotFoundPage } from "./NotFoundPage"
 import { BackSignButton } from "@/components/BackSignButton"
 import rock1Asset from "@/assets/misc/rock1.png"
 import graphIcon from "@/assets/misc/graph-icon.png"
+import { Icon } from "@/components/ui/Icon"
 
 interface MemberPageProps {
   results: RunResultItem[]
@@ -329,8 +330,9 @@ export function MemberPage(props: MemberPageProps) {
               </div>
               {runner().id && (
                 <p>
-                  <a href={`https://www.parkrun.se/parkrunner/${runner().id}/all`} target="_blank" rel="noopener noreferrer" class={styles.link}>
-                    View {name()} on parkrun.se
+                  <a href={`https://www.parkrun.se/parkrunner/${runner().id}/all`} target="_blank" rel="noopener noreferrer">
+                    <span class={styles.link}>View {name()} on parkrun.se</span>
+                    &nbsp;&nbsp;<Icon name="external" size="small" />
                   </a>
                 </p>
               )}

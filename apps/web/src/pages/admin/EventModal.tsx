@@ -15,6 +15,7 @@ import { AdminButton } from "@/components/admin/AdminButton";
 import qrIconAsset from "@/assets/misc/qr.png";
 import { AdminSelect } from "@/components/admin/AdminSelect";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
+import { EVENT_TYPES } from "./EventsPage";
 
 /** Validate time string: accepts h:mm:ss, hh:mm:ss, m:ss, mm:ss */
 const TIME_RE = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/;
@@ -206,20 +207,15 @@ export const EventModal: Component<EventModalProps> = (props) => {
             onChange={(e) => setType(e.currentTarget.value)}
           >
             <option value="">— None —</option>
-            <optgroup label="Social">
-              <option value="Track and Food">Track and Food</option>
-              <option value="Other Social">Other Social</option>
-            </optgroup>
-            <optgroup label="Race">
-              <option value="Marathon">Marathon</option>
-              <option value="Half Marathon">Half Marathon</option>
-              <option value="Ultra">Ultra</option>
-              <option value="Other Race">Other Race</option>
-            </optgroup>
-            <optgroup label="Misc">
-              <option value="Parkrun Test Event">Parkrun Test Event</option>
-              <option value="Other">Other</option>
-            </optgroup>
+            <For each={EVENT_TYPES}>
+              {(group) =>
+                <optgroup label={group.groupName}>
+                  <For each={group.types}>
+                    {(type) => <option value={type}>{type}</option>}
+                  </For>
+                </optgroup>
+              }
+            </For>
           </AdminSelect>
         </div>
 
