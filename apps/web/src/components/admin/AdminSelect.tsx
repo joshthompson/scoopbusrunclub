@@ -79,7 +79,7 @@ const styles = {
       size: {
         small: {
           fontSize: "0.75rem",
-          padding: "0.2rem 1rem 0.2rem 0.5rem",
+          padding: "0.2rem 2rem 0.2rem 0.5rem",
           borderRadius: "2px",
           borderWidth: "1px",
         },

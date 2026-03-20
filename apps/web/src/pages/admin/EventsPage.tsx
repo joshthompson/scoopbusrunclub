@@ -46,16 +46,11 @@ export const EVENT_TYPES = [
 
 type SortKey = "date" | "name" | "type" | "attendees" | "public" | "major";
 type SortDir = "asc" | "desc";
+type EventDateFilter = "all" | "past" | "upcoming";
 
 const allRunnerKeys = Object.keys(runners) as RunnerName[];
 
 export const EventsPage: Component = () => {
-  const [includeOld, setIncludeOld] = createSignal(false);
-  const [races, { refetch }] = createResource(
-    () => ({ includeOld: includeOld() }),
-    (opts) => fetchRaces(opts.includeOld)
-  );
-
   const [sortKey, setSortKey] = createSignal<SortKey>("date");
   const [sortDir, setSortDir] = createSignal<SortDir>("asc");
 
@@ -64,8 +59,15 @@ export const EventsPage: Component = () => {
   const [filterCalendar, setFilterCalendar] = createSignal("");
   const [filterPublic, setFilterPublic] = createSignal("");
   const [filterAttendee, setFilterAttendee] = createSignal("");
+  const [filterEventDate, setFilterEventDate] = createSignal<EventDateFilter>("upcoming");
   const [searchName, setSearchName] = createSignal("");
 
+  const [races, { refetch }] = createResource(
+    () => ({ includeOld: filterEventDate() !== "upcoming" }),
+    (opts) => fetchRaces(opts.includeOld)
+  );
+
+  const [filtersOpen, setFiltersOpen] = createSignal(window.innerWidth > 900);
   const [modalOpen, setModalOpen] = createSignal(false);
   const [editingRace, setEditingRace] = createSignal<Race | null>(null);
   const [duplicating, setDuplicating] = createSignal(false);
@@ -86,6 +88,18 @@ export const EventsPage: Component = () => {
 
     const attendeeVal = filterAttendee();
     if (attendeeVal) list = list.filter((r) => r.attendees.some((a) => a.runnerId === attendeeVal));
+
+    const eventDateVal = filterEventDate();
+    if (eventDateVal !== "all") {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+      if (eventDateVal === "past") {
+        list = list.filter((r) => r.date < today);
+      } else {
+        list = list.filter((r) => r.date >= today);
+      }
+    }
 
     const search = searchName().toLowerCase().trim();
     if (search) list = list.filter((r) => r.name.toLowerCase().includes(search));
@@ -190,9 +204,9 @@ export const EventsPage: Component = () => {
       <AdminToolbar>
         <AdminButton onClick={handleCreate}>+ New Event</AdminButton>
         <Checkbox
-          label="View older events"
-          checked={includeOld()}
-          onChange={(e) => setIncludeOld(e.currentTarget.checked)}
+          label="Show Filters"
+          checked={filtersOpen()}
+          onChange={() => setFiltersOpen((o) => !o)}
           variant="green"
         />
       </AdminToolbar>
@@ -202,7 +216,7 @@ export const EventsPage: Component = () => {
           when={!races.loading}
           fallback={<p class={styles.emptyText}>Loading…</p>}
         >
-
+          <Show when={filtersOpen()}>
           <div class={styles.filters}>
             <AdminInput
               label="Search"
@@ -260,7 +274,18 @@ export const EventsPage: Component = () => {
                 {(key) => <option value={key}>{runnerDisplayName(key)}</option>}
               </For>
             </AdminSelect>
+            <AdminSelect
+              label="Event Date"
+              size="small"
+              value={filterEventDate()}
+              onChange={(e) => setFilterEventDate(e.currentTarget.value as EventDateFilter)}
+            >
+              <option value="all">All</option>
+              <option value="past">Past</option>
+              <option value="upcoming">Upcoming (inc Today)</option>
+            </AdminSelect>
           </div>
+          </Show>
           
           <AdminTable
             columns={[
@@ -330,11 +355,11 @@ const styles = {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "flex-end",
-    gap: "1rem",
+    gap: "0.5rem 0.5rem",
     marginBottom: "0.75rem",
     textAlign: "left",
     '& > *': {
-      flex: "0 1 100px",
+      flex: "0 1 80px",
     },
   }),
   link: css({
