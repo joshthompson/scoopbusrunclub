@@ -438,6 +438,6 @@ const styles = {
     position: 'absolute',
     top: '-8px',
     left: '-8px',
-    fontSize: '48px',
+    fontSize: '32px',
   }),
 }
