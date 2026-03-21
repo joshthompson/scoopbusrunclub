@@ -788,10 +788,13 @@ function buildPalindromePalMap(results: RunResultItem[]): Map<string, PairPartne
 
 /**
  * Haga Streak: earned every time a runner completes 10 consecutive Saturdays at Haga.
+ * Every Saturday counts — if Haga wasn't held or the runner didn't attend, the streak
+ * breaks. Special (non-Saturday) events are ignored.
  * Can be earned multiple times. Returns "parkrunId:date:event:eventNumber" keys.
  */
 function buildHagaStreakMap(results: RunResultItem[]): Set<string> {
   const STREAK_LENGTH = 10
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
   const set = new Set<string>()
 
@@ -801,33 +804,30 @@ function buildHagaStreakMap(results: RunResultItem[]): Set<string> {
     byRunner.get(item.parkrunId)!.push(item)
   }
 
-  // Collect all Haga event dates (Saturdays) in sorted order
-  const hagaDates = new Set<string>()
-  for (const r of results) {
-    if (r.event === "haga") hagaDates.add(r.date)
-  }
-  const sortedHagaDates = [...hagaDates].sort()
-
   for (const runs of byRunner.values()) {
-    // Get only Haga runs sorted by date
+    // Get only Saturday Haga runs sorted by date (ignore midweek bonus events)
     const hagaRuns = runs
-      .filter((r) => r.event === "haga")
+      .filter((r) => r.event === "haga" && new Date(r.date).getDay() === 6)
       .sort((a, b) => a.date.localeCompare(b.date))
     if (hagaRuns.length < STREAK_LENGTH) continue
 
-    // Build set of dates this runner ran Haga
-    const ranHagaDates = new Set(hagaRuns.map((r) => r.date))
-    let streak = 0
+    let streak = 1
 
-    for (const date of sortedHagaDates) {
-      if (ranHagaDates.has(date)) {
+    for (let i = 1; i < hagaRuns.length; i++) {
+      const prevDate = new Date(hagaRuns[i - 1].date).getTime()
+      const currDate = new Date(hagaRuns[i].date).getTime()
+      const diffMs = currDate - prevDate
+
+      if (diffMs === ONE_WEEK_MS) {
+        // Exactly one week apart — streak continues
         streak += 1
         if (streak >= STREAK_LENGTH && streak % STREAK_LENGTH === 0) {
-          const run = hagaRuns.find((r) => r.date === date)!
+          const run = hagaRuns[i]
           set.add(`${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`)
         }
       } else {
-        streak = 0
+        // Gap is more than one week — streak resets
+        streak = 1
       }
     }
   }

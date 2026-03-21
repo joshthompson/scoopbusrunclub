@@ -80,6 +80,8 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
     frames: {
       run: generateFrames(assets.claireRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       sit: [assets.claireSit],
+      volunteer: generateFrames(assets.claireVolunteer, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      volunteerSit: [assets.claireVolunteerSit],
       face: [assets.claireFace],
     },
     width: 21,
@@ -194,6 +196,8 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
     frames: {
       run: generateFrames(assets.alisaRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       sit: [assets.alisaSit],
+      volunteer: generateFrames(assets.alisaVolunteer, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      volunteerSit: [assets.alisaVolunteerSit],
       face: [assets.alisaFace],
     },
     width: 21,
@@ -208,6 +212,8 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
     frames: {
       run: generateFrames(assets.linkRun, 20 * 2, 28, 20 * 2, 2, true),
       sit: [assets.linkSit],
+      volunteer: generateFrames(assets.linkVolunteer, 20 * 2, 28, 20 * 2, 2, true),
+      volunteerSit: [assets.linkVolunteerSit],
       face: [assets.linkFace],
     },
     width: 20,

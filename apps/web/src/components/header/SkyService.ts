@@ -12,17 +12,41 @@
  *   --cloud-opacity        0.1 (night) → 1 (day/sunrise/sunset)
  *   --light                0 (night) → 1 (midday) estimated light level
  *
- * Assumptions (hardcoded for now):
- *   SUNRISE  06:00 CET
- *   SUNSET   18:00 CET
+ * Sunrise/sunset are computed dynamically via suncalc for Stockholm (59.355, 18.039).
  */
+
+import SunCalc from 'suncalc'
 
 // ─── Configuration ───────────────────────────────────────────────
 
-/** Sunrise hour in CET (Central European Time, UTC+1) */
-const SUNRISE_CET = 6
-/** Sunset hour in CET */
-const SUNSET_CET = 18
+/** Location: Stockholm */
+const LAT = 59.35499
+const LNG = 18.038721
+
+/** Convert a Date to a fractional CET hour (0-24). */
+function dateToCETHour(date: Date): number {
+  const utcMinutes =
+    date.getUTCHours() * 60 + date.getUTCMinutes() + date.getUTCSeconds() / 60
+  let cetMinutes = utcMinutes + 60 // UTC+1
+  if (cetMinutes < 0) cetMinutes += 1440
+  if (cetMinutes >= 1440) cetMinutes -= 1440
+  return cetMinutes / 60
+}
+
+/**
+ * Compute sunrise and sunset as fractional CET hours for today
+ * using suncalc for the configured location.
+ */
+function getSunTimes(): { sunrise: number; sunset: number } {
+  const times = SunCalc.getTimes(new Date(), LAT, LNG)
+  return {
+    sunrise: dateToCETHour(times.sunrise),
+    sunset: dateToCETHour(times.sunset),
+  }
+}
+
+// Compute once on load; refreshed each time the service ticks.
+let { sunrise: SUNRISE, sunset: SUNSET } = getSunTimes()
 
 // ─── Colour keyframes ───────────────────────────────────────────
 // Each stop is [hourInCET, topHex, bottomHex]
@@ -142,33 +166,33 @@ function skyColoursAtHour(h: number): { top: string; bottom: string } {
 function sunPositionAtHour(h: number): number {
   h = ((h % 24) + 24) % 24
 
-  const PRE_RISE = SUNRISE_CET - 0.5   // sun starts rising from below horizon
-  const POST_SET = SUNSET_CET + 0.5    // sun finishes setting
+  const PRE_RISE = SUNRISE - 0.5   // sun starts rising from below horizon
+  const POST_SET = SUNSET + 0.5    // sun finishes setting
 
   if (h < PRE_RISE || h > POST_SET) {
     // Below horizon
     return 1
   }
 
-  if (h >= PRE_RISE && h < SUNRISE_CET) {
+  if (h >= PRE_RISE && h < SUNRISE) {
     // Rising from below horizon → horizon level
-    const t = (h - PRE_RISE) / (SUNRISE_CET - PRE_RISE)
+    const t = (h - PRE_RISE) / (SUNRISE - PRE_RISE)
     return lerp(1, 0.85, t)
   }
 
-  if (h >= SUNRISE_CET && h <= SUNSET_CET) {
+  if (h >= SUNRISE && h <= SUNSET) {
     // Arc across the sky: horizon → zenith → horizon
     // Use a sine curve for a natural arc
-    const t = (h - SUNRISE_CET) / (SUNSET_CET - SUNRISE_CET) // 0→1
+    const t = (h - SUNRISE) / (SUNSET - SUNRISE) // 0→1
     // sin(0)=0, sin(π)=0, sin(π/2)=1 — peak at solar noon
     const arc = Math.sin(t * Math.PI)
     // Map: 0 (horizon) → 0.85, 1 (zenith) → 0.1
     return lerp(0.85, 0.1, arc)
   }
 
-  if (h > SUNSET_CET && h <= POST_SET) {
+  if (h > SUNSET && h <= POST_SET) {
     // Setting from horizon → below
-    const t = (h - SUNSET_CET) / (POST_SET - SUNSET_CET)
+    const t = (h - SUNSET) / (POST_SET - SUNSET)
     return lerp(0.85, 1, t)
   }
 
@@ -182,8 +206,8 @@ function sunPositionAtHour(h: number): number {
 function moonPositionAtHour(h: number): number {
   h = ((h % 24) + 24) % 24
 
-  const MOON_RISE = SUNSET_CET + 0.5   // 18:30
-  const MOON_SET = SUNRISE_CET - 0.5   // 05:30
+  const MOON_RISE = SUNSET + 0.5   // 18:30
+  const MOON_SET = SUNRISE - 0.5   // 05:30
   // The moon is up from 18:30 → 05:30 (through midnight)
   // Total arc duration = 11 hours
 
@@ -210,10 +234,10 @@ function moonPositionAtHour(h: number): number {
 function moonOpacityAtHour(h: number): number {
   h = ((h % 24) + 24) % 24
 
-  const FADE_IN_START = SUNSET_CET         // 18:00
-  const FADE_IN_END = SUNSET_CET + 1       // 19:00
-  const FADE_OUT_START = SUNRISE_CET - 1   // 05:00
-  const FADE_OUT_END = SUNRISE_CET         // 06:00
+  const FADE_IN_START = SUNSET         // 18:00
+  const FADE_IN_END = SUNSET + 1       // 19:00
+  const FADE_OUT_START = SUNRISE - 1   // 05:00
+  const FADE_OUT_END = SUNRISE         // 06:00
 
   // Full visibility at night
   if (h >= FADE_IN_END || h <= FADE_OUT_START) {
@@ -238,10 +262,10 @@ function moonOpacityAtHour(h: number): number {
 function starsOpacityAtHour(h: number): number {
   h = ((h % 24) + 24) % 24
 
-  const FADE_IN_START = SUNSET_CET + 1
-  const FADE_IN_END = SUNSET_CET + 2
-  const FADE_OUT_START = SUNRISE_CET - 2
-  const FADE_OUT_END = SUNRISE_CET - 1
+  const FADE_IN_START = SUNSET + 1
+  const FADE_IN_END = SUNSET + 2
+  const FADE_OUT_START = SUNRISE - 2
+  const FADE_OUT_END = SUNRISE - 1
 
   if (h >= FADE_IN_END || h <= FADE_OUT_START) {
     if (h >= FADE_IN_END || h <= FADE_OUT_START) return 1
@@ -268,12 +292,12 @@ function cloudOpacityAtHour(h: number): number {
   const NIGHT_OPACITY = 0.1
 
   // Morning fade-in: 05:00 → 06:00
-  const MORNING_START = SUNRISE_CET - 1  // 05:00
-  const MORNING_END = SUNRISE_CET        // 06:00
+  const MORNING_START = SUNRISE - 1  // 05:00
+  const MORNING_END = SUNRISE        // 06:00
 
   // Evening fade-out: 17:00 → 18:00
-  const EVENING_START = SUNSET_CET - 1   // 17:00
-  const EVENING_END = SUNSET_CET         // 18:00
+  const EVENING_START = SUNSET - 1   // 17:00
+  const EVENING_END = SUNSET         // 18:00
 
   // Full daytime
   if (h >= MORNING_END && h <= EVENING_START) return 1
@@ -308,11 +332,11 @@ function cloudOpacityAtHour(h: number): number {
 function lightLevelAtHour(h: number): number {
   h = ((h % 24) + 24) % 24
 
-  const SUNRISE_START = SUNRISE_CET - 0.5
-  const SUNRISE_END = SUNRISE_CET + 1
-  const MIDDAY = (SUNRISE_CET + SUNSET_CET) / 2
-  const SUNSET_START = SUNSET_CET - 0.5
-  const SUNSET_END = SUNSET_CET + 1
+  const SUNRISE_START = SUNRISE - 0.5
+  const SUNRISE_END = SUNRISE + 1
+  const MIDDAY = (SUNRISE + SUNSET) / 2
+  const SUNSET_START = SUNSET - 0.5
+  const SUNSET_END = SUNSET + 1
 
   // Night
   if (h >= SUNSET_END || h <= SUNRISE_START) return 0
@@ -362,6 +386,8 @@ function applySkyCSSVariablesForHour(h: number): void {
 }
 
 function applySkyCSSVariables(): void {
+  // Refresh sunrise/sunset each tick (handles day rollover)
+  ;({ sunrise: SUNRISE, sunset: SUNSET } = getSunTimes())
   applySkyCSSVariablesForHour(nowAsCETHour())
 }
 

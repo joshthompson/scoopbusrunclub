@@ -4,6 +4,8 @@ export { default as adamFace } from '@/assets/runners/face/adam.png'
 
 export { default as alisaRun } from '@/assets/runners/run/alisa.png'
 export { default as alisaSit } from '@/assets/runners/sit/alisa.png'
+export { default as alisaVolunteer } from '@/assets/runners/volunteer/alisa.png'
+export { default as alisaVolunteerSit } from '@/assets/runners/volunteer-sit/alisa.png'
 export { default as alisaFace } from '@/assets/runners/face/alisa.png'
 
 export { default as annaRun } from '@/assets/runners/run/anna.png'
@@ -18,6 +20,8 @@ export { default as augustFace } from '@/assets/runners/face/august.png'
 
 export { default as claireRun } from '@/assets/runners/run/claire.png'
 export { default as claireSit } from '@/assets/runners/sit/claire.png'
+export { default as claireVolunteer } from '@/assets/runners/volunteer/claire.png'
+export { default as claireVolunteerSit } from '@/assets/runners/volunteer-sit/claire.png'
 export { default as claireFace } from '@/assets/runners/face/claire.png'
 
 export { default as elineRun } from '@/assets/runners/run/eline.png'
@@ -34,6 +38,8 @@ export { default as keithFace } from '@/assets/runners/face/keith.png'
 
 export { default as linkRun } from '@/assets/runners/run/link.png'
 export { default as linkSit } from '@/assets/runners/sit/link.png'
+export { default as linkVolunteer } from '@/assets/runners/volunteer/link.png'
+export { default as linkVolunteerSit } from '@/assets/runners/volunteer-sit/link.png'
 export { default as linkFace } from '@/assets/runners/face/link.png'
 
 export { default as lyraRun } from '@/assets/runners/run/lyra.png'

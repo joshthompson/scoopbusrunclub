@@ -1,4 +1,4 @@
-import { createSignal, type Component } from "solid-js";
+import { createSignal, onCleanup, onMount, type Component } from "solid-js";
 import { css } from "@style/css";
 import { adminLogin } from "@/utils/adminApi";
 import { DirtBlock } from "@/components/ui/DirtBlock";
@@ -8,6 +8,15 @@ export const LoginForm: Component<{ onSuccess: () => void }> = (props) => {
   const [password, setPassword] = createSignal("");
   const [error, setError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
+
+
+  onMount(() => {
+    document.body.classList.add('login-page')
+  })
+
+  onCleanup(() => {
+    document.body.classList.remove('login-page')
+  })
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();

@@ -5,7 +5,6 @@ import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
 import sunAsset from '@/assets/misc/sun.png'
-import moonAsset from '@/assets/misc/moon.png'
 import starsAsset from '@/assets/misc/stars.png'
 import house1Asset from '@/assets/misc/house1.png'
 import house2Asset from '@/assets/misc/house2.png'
@@ -26,6 +25,7 @@ import {
   createTreeController,
 } from './SceneryControllers'
 import { css } from '@style/css'
+import { moonAsset } from '@/utils/moonAsset'
 
 function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
   // Find the latest result for each parkrunId
