@@ -4,7 +4,7 @@ import { A } from "@solidjs/router"
 import { type RunResultItem, type Runner } from "../utils/api"
 import { MILESTONE_SET, UPCOMING_THRESHOLD, nextMilestone, ordinalSuffix } from "../utils/milestones"
 import { formatDate, formatName } from "@/utils/misc"
-import { FloatingEmoji } from "@/components/ui/FloatingEmoji"
+import { Emoji } from "@/components/ui/Emoji"
 import { DirtBlock } from "@/components/ui/DirtBlock"
 import { getMemberRoute } from "@/utils/memberRoute"
 
@@ -105,7 +105,7 @@ export function Milestones(props: Props) {
                 <li class={styles.celebRow}>
                   <Show when={getMemberRoute(row.parkrunId, row.name)} fallback={<span>{formatName(row.name)}</span>}>
                     {(href) => <A href={href()} class={styles.memberLink}>{formatName(row.name)}</A>}
-                  </Show> {ordinalSuffix(row.milestone)} run! <FloatingEmoji emoji="🎉" shadow />
+                  </Show> {ordinalSuffix(row.milestone)} run! <Emoji emoji="🎉" shadow />
                 </li>
               )}
             </For>

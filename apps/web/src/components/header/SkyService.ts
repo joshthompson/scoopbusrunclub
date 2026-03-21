@@ -262,7 +262,7 @@ function moonOpacityAtHour(h: number): number {
 function starsOpacityAtHour(h: number): number {
   h = ((h % 24) + 24) % 24
 
-  const FADE_IN_START = SUNSET + 1
+  const FADE_IN_START = SUNSET + 0.5
   const FADE_IN_END = SUNSET + 2
   const FADE_OUT_START = SUNRISE - 2
   const FADE_OUT_END = SUNRISE - 1

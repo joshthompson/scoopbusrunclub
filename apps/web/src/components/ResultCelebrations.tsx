@@ -1,6 +1,6 @@
 import { css } from "@style/css"
 import { createSignal, Show } from "solid-js"
-import { FloatingEmoji } from "@/components/ui/FloatingEmoji"
+import { Emoji } from "@/components/ui/Emoji"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
 import { type RunResultItem, type Runner, getCached, setCache } from "../utils/api"
 import { formatName, parseTimeToSeconds } from "@/utils/misc"
@@ -1288,7 +1288,7 @@ export function CelebrationPill(props: { tag: CelebrationTag; showTooltip?: bool
       <Show when={otherRunnerFace()}>
         {(face) => <img src={face()} alt="" class={styles.runnerFace} />}
       </Show>
-      <FloatingEmoji emoji={props.tag.emoji} />
+      <Emoji emoji={props.tag.emoji} />
       <Show when={props.showTooltip && hovered()}>
         <div class={styles.tooltip} style={tooltipStyle()}>
           {props.tag.description}

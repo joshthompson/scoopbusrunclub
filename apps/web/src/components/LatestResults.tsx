@@ -4,7 +4,7 @@ import { A } from "@solidjs/router"
 import { type RunResultItem, type Runner, type RaceItem } from "../utils/api"
 import { formatDate, formatName, ordinal } from "@/utils/misc"
 import { MILESTONE_SET } from "../utils/milestones"
-import { FloatingEmoji } from "./ui/FloatingEmoji"
+import { Emoji } from "./ui/Emoji"
 import { DirtBlock } from "./ui/DirtBlock"
 import { ResultCelebrations, type CelebrationData, getOrBuildCelebrationData } from "./ResultCelebrations"
 import { Button } from "./ui/Button"
@@ -216,9 +216,9 @@ function RaceBlock(props: { race: RaceItem }) {
     <DirtBlock>
       <div class={styles.parkrun}>
         <h4 class={styles.parkrunName}>
-          <Show when={eventEmojis()}><FloatingEmoji emoji={eventEmojis()![0]} />{' '}</Show>
+          <Show when={eventEmojis()}><Emoji emoji={eventEmojis()![0]} />{' '}</Show>
           {props.race.name}
-          <Show when={eventEmojis()}>{' '}<FloatingEmoji emoji={eventEmojis()![1]} /></Show>
+          <Show when={eventEmojis()}>{' '}<Emoji emoji={eventEmojis()![1]} /></Show>
         </h4>
         {props.race.website && <A href={props.race.website} target="_blank">
           <img src={extLinkAsset} class={styles.externalRaceLink} />
@@ -246,14 +246,14 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 
   return (
     <h4 class={styles.parkrunName}>
-      {isXmas() && <FloatingEmoji emoji="🎄" flipped />}
-      {isMilestone() && <FloatingEmoji emoji="🎉" flipped />}
-      {isBusTrip() && <FloatingEmoji emoji="🚌" flipped />}{' '}
+      {isXmas() && <Emoji emoji="🎄" flipped />}
+      {isMilestone() && <Emoji emoji="🎉" flipped />}
+      {isBusTrip() && <Emoji emoji="🚌" flipped />}{' '}
       {displayName()}{' '}
       #{props.parkrun.eventNumber}{' '}
-      {isBusTrip() && <FloatingEmoji emoji="🚌" />}
-      {isMilestone() && <FloatingEmoji emoji="🎉" />}
-      {isXmas() && <FloatingEmoji emoji="🎄" />}
+      {isBusTrip() && <Emoji emoji="🚌" />}
+      {isMilestone() && <Emoji emoji="🎉" />}
+      {isXmas() && <Emoji emoji="🎄" />}
     </h4>
   )
 }
@@ -269,6 +269,41 @@ function ParkrunExternalLink(props: { parkrun: ParkrunEvent }) {
       )}
     </Show>
   )
+}
+
+
+
+const countryFlags: Record<string, string> = {
+  AU: '🇦🇺',
+  AT: '🇦🇹',
+  CA: '🇨🇦',
+  DK: '🇩🇰',
+  FI: '🇫🇮',
+  DE: '🇩🇪',
+  IE: '🇮🇪',
+  IT: '🇮🇹',
+  JP: '🇯🇵',
+  LT: '🇱🇹',
+  MY: '🇲🇾',
+  NL: '🇳🇱',
+  NZ: '🇳🇿',
+  NO: '🇳🇴',
+  PL: '🇵🇱',
+  SG: '🇸🇬',
+  ZA: '🇿🇦',
+  SE: '🇸🇪',
+  UK: '🇬🇧',
+  US: '🇺🇸',
+}
+
+function ParkrunFlag(props: { parkrun: ParkrunEvent }) {
+  const flag = createMemo(() => {
+    const ev = getEvent(props.parkrun.eventId)
+    if (ev?.country && ev.country !== 'SE' && countryFlags[ev.country]) return countryFlags[ev.country]
+    return null
+  })
+  
+  return <Show when={flag()}>{(f) => <Emoji class={styles.flag} emoji={f()} noAnimation />}</Show>
 }
 
 export function LatestResults(props: LatestResultsProps) {
@@ -306,6 +341,7 @@ export function LatestResults(props: LatestResultsProps) {
                 <DirtBlock>
                   <div class={styles.parkrun}>
                     <ParkrunName parkrun={parkrun} date={result.date} />
+                    <ParkrunFlag parkrun={parkrun} />
                     <ParkrunExternalLink parkrun={parkrun} />
                     <ol>
                       <For each={parkrun.results}>
@@ -394,8 +430,14 @@ const styles = {
     height: '24px',
     p: '4px',
 
-    _hover: {
+    _hover: { 
       background: '#00000018',
     }
+  }),
+  flag: css({
+    position: 'absolute',
+    top: '-8px',
+    left: '-8px',
+    fontSize: '48px',
   }),
 }

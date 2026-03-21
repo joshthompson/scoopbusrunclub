@@ -1,4 +1,4 @@
-import {  css, cva } from "@style/css"
+import {  css, cva, cx } from "@style/css"
 import { createMemo } from "solid-js"
 import MedalEmoji from '@/assets/emoji/medal.png'
 import PartyEmoji from '@/assets/emoji/party.png'
@@ -27,7 +27,15 @@ const emojiMap: Record<string, string | undefined> = {
   "🐶": CorgiEmoji,
 }
 
-export function FloatingEmoji(props: { emoji: string, shadow?: boolean, flipped?: boolean }) {
+export interface EmojiProps {
+  emoji: string;
+  shadow?: boolean;
+  flipped?: boolean;
+  noAnimation?: boolean;
+  class?: string;
+}
+
+export function Emoji(props: EmojiProps) {
   const emojiSrc = createMemo(() => {
     const mappedEmoji = emojiMap[props.emoji]
     if (mappedEmoji) return mappedEmoji
@@ -37,8 +45,23 @@ export function FloatingEmoji(props: { emoji: string, shadow?: boolean, flipped?
 
   const emoji = emojiSrc() ? <img src={emojiSrc()} class={styles.image} /> : props.emoji
   
-  return <div class={styles.emoji({ hasShadow: props.shadow })}>
-    <div class={styles.float({ hasShadow: props.shadow, flipped: props.flipped })}>{emoji}</div>
+  return <div
+    class={cx(
+      styles.emoji({
+        hasShadow: props.shadow,
+        noAnimation: props.noAnimation === true,
+      }),
+      props.class,
+    )}
+  >
+    <div
+      class={styles.inner({
+        hasShadow: props.shadow,
+        flipped: props.flipped,
+        noAnimation: props.noAnimation === true,
+      })}
+      children={emoji}
+    />
   </div>
 }
 
@@ -117,6 +140,13 @@ const styles = {
           },
         },
       },
+      noAnimation: {
+        true: {
+          _after: {
+            animation: "none !important",
+          },
+        },
+      },
     },
   }),
   image: css({
@@ -125,7 +155,7 @@ const styles = {
     translate: '0 0.1em',
     imageRendering: 'pixelated',
   }),
-  float: cva({
+  inner: cva({
     base: {
       animation: "buldge 2s ease-in-out infinite",
     },
@@ -137,7 +167,12 @@ const styles = {
         true: {
           scale: '-1 1',
         }
-      }
+      },
+      noAnimation: {
+        true: {
+          animation: "none !important",
+        },
+      },
     },
   }),
 }
