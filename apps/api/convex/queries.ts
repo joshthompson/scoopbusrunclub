@@ -76,3 +76,30 @@ export const getAllEvents = query({
     return await ctx.db.query("events").collect();
   },
 });
+
+/**
+ * Get all volunteer records for tracked runners.
+ * Returns volunteer entries with runner names attached for display.
+ */
+export const getAllVolunteers = query({
+  args: {},
+  handler: async (ctx) => {
+    const runners = await ctx.db.query("runners").collect();
+    const runnerMap = new Map(runners.map((r) => [r.parkrunId, r.name]));
+
+    const events = await ctx.db.query("events").collect();
+    const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]));
+
+    const allVolunteers = await ctx.db.query("volunteers").collect();
+
+    return allVolunteers.map((v) => ({
+      parkrunId: v.parkrunId,
+      volunteerName: runnerMap.get(v.parkrunId) ?? "Unknown",
+      event: v.event,
+      eventName: eventNameMap.get(v.event) ?? v.event,
+      eventNumber: v.eventNumber,
+      roles: v.roles,
+      date: v.date,
+    }));
+  },
+});

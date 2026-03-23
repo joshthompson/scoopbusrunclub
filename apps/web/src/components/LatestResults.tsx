@@ -1,16 +1,17 @@
 import { createMemo, createSignal, For, Show, type JSX } from "solid-js"
 import { css } from "@style/css"
 import { A } from "@solidjs/router"
-import { type RunResultItem, type Runner, type RaceItem } from "../utils/api"
+import { type RunResultItem, type Runner, type RaceItem, type VolunteerItem } from "../utils/api"
 import { formatDate, formatName, ordinal } from "@/utils/misc"
 import { MILESTONE_SET } from "../utils/milestones"
 import { Emoji } from "./ui/Emoji"
 import { DirtBlock } from "./ui/DirtBlock"
-import { ResultCelebrations, type CelebrationData, getOrBuildCelebrationData } from "./ResultCelebrations"
+import { ResultCelebrations, VolunteerCelebrations, type CelebrationData, getOrBuildCelebrationData } from "./ResultCelebrations"
 import { Button } from "./ui/Button"
 import { getMemberRoute } from "@/utils/memberRoute"
 import { runners } from '@/data/runners'
 import { getEvent } from '@/utils/events'
+import { RoleTranslations } from '@/data/volunteer-roles'
 import extLinkAsset from "@/assets/misc/ext-link.png"
 
 const parkrunIdToRunnerName = new Map<string, string>()
@@ -30,11 +31,18 @@ interface ParkrunResult {
   position: number
 }
 
+interface ParkrunVolunteer {
+  parkrunId: string
+  name: string
+  roles: string[]
+}
+
 interface ParkrunEvent {
   name: string
   eventId: string
   eventNumber: string
   results: ParkrunResult[]
+  volunteers: ParkrunVolunteer[]
 }
 
 interface DateGroup {
@@ -43,7 +51,7 @@ interface DateGroup {
   races: RaceItem[]
 }
 
-function groupResults(items: RunResultItem[], allRaces: RaceItem[]): DateGroup[] {
+function groupResults(items: RunResultItem[], allRaces: RaceItem[], volunteerItems: VolunteerItem[]): DateGroup[] {
   const byDate = new Map<string, Map<string, ParkrunEvent>>()
 
   for (const item of items) {
@@ -56,6 +64,7 @@ function groupResults(items: RunResultItem[], allRaces: RaceItem[]): DateGroup[]
         eventId: item.event,
         eventNumber: String(item.eventNumber),
         results: [],
+        volunteers: [],
       })
     }
     eventMap.get(key)!.results.push({
@@ -63,6 +72,27 @@ function groupResults(items: RunResultItem[], allRaces: RaceItem[]): DateGroup[]
       name: item.runnerName,
       time: item.time,
       position: item.position,
+    })
+  }
+
+  // Merge volunteers into the same parkrun event groups
+  for (const vol of volunteerItems) {
+    if (!byDate.has(vol.date)) byDate.set(vol.date, new Map())
+    const eventMap = byDate.get(vol.date)!
+    const key = `${vol.event}#${vol.eventNumber}`
+    if (!eventMap.has(key)) {
+      eventMap.set(key, {
+        name: vol.eventName,
+        eventId: vol.event,
+        eventNumber: String(vol.eventNumber),
+        results: [],
+        volunteers: [],
+      })
+    }
+    eventMap.get(key)!.volunteers.push({
+      parkrunId: vol.parkrunId,
+      name: vol.volunteerName,
+      roles: vol.roles,
     })
   }
 
@@ -89,6 +119,7 @@ interface LatestResultsProps {
   results: RunResultItem[]
   runners: Runner[]
   races: RaceItem[]
+  volunteers: VolunteerItem[]
   celebrationData?: CelebrationData
 }
 
@@ -271,7 +302,20 @@ function ParkrunExternalLink(props: { parkrun: ParkrunEvent }) {
   )
 }
 
+function translateRole(role: string): string {
+  return (RoleTranslations as Record<string, string>)[role] ?? role
+}
 
+function joinRoles(roles: string[]): JSX.Element {
+  if (roles.length === 1) return <em>{roles[0]}</em>
+  if (roles.length === 2) return <><em>{roles[0]}</em> and <em>{roles[1]}</em></>
+  return (
+    <>
+      {roles.slice(0, -1).map((r, i) => <>{i > 0 && ", "}<em>{r}</em></>)}
+      {" and "}<em>{roles[roles.length - 1]}</em>
+    </>
+  )
+}
 
 const countryFlags: Record<string, string> = {
   AU: '🇦🇺',
@@ -309,7 +353,7 @@ function ParkrunFlag(props: { parkrun: ParkrunEvent }) {
 export function LatestResults(props: LatestResultsProps) {
   const celebrations = createMemo(() => props.celebrationData ?? getOrBuildCelebrationData(props.results, props.runners))
 
-  const grouped = createMemo(() => groupResults(props.results, props.races))
+  const grouped = createMemo(() => groupResults(props.results, props.races, props.volunteers))
 
   const [showAll, setShowAll] = createSignal(false)
 
@@ -371,6 +415,36 @@ export function LatestResults(props: LatestResultsProps) {
                         }}
                       </For>
                     </ol>
+                    <Show when={parkrun.volunteers.length > 0}>
+                      <Show when={parkrun.results.length > 0}>
+                        <hr class={styles.seperator} />
+                      </Show>
+                      <ul class={styles.volunteers}>
+                        <For each={parkrun.volunteers}>
+                          {(vol) => {
+                            const memberRoute = getMemberRoute(vol.parkrunId, vol.name)
+                            const translatedRoles = () => joinRoles(vol.roles.map(translateRole))
+                            return (
+                              <li>
+                                <em>
+                                  <Show
+                                    when={memberRoute}
+                                    fallback={<span>{getRunnerDisplayName(vol.parkrunId, vol.name)}</span>}
+                                  >
+                                    {(href) => (
+                                      <A href={href()} class={styles.memberLink}>
+                                        {getRunnerDisplayName(vol.parkrunId, vol.name)}
+                                      </A>
+                                    )}
+                                  </Show>
+                                </em>{" "}volunteered as {translatedRoles()}
+                                <VolunteerCelebrations data={celebrations()} parkrunId={vol.parkrunId} date={result.date} eventId={parkrun.eventId} eventNumber={parkrun.eventNumber} />
+                              </li>
+                            )
+                          }}
+                        </For>
+                      </ul>
+                    </Show>
                   </div>
                 </DirtBlock>
                 )
@@ -440,4 +514,13 @@ const styles = {
     left: '-8px',
     fontSize: '32px',
   }),
+  volunteers: css({
+    listStyle: 'none',
+    p: 0,
+  }),
+  seperator: css({
+    border: 'none',
+    borderTop: '1px solid #00000020',
+    margin: '0'
+  })
 }

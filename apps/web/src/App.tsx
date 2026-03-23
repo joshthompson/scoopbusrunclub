@@ -3,7 +3,7 @@ import { Router, Route, type RouteSectionProps, useLocation } from '@solidjs/rou
 import { ScoopBusHeader } from './components/header/ScoopBusHeader';
 import './styles.css';
 import { css } from '@style/css';
-import { fetchRunners, fetchAllResults, fetchPublicRaces } from './utils/api';
+import { fetchRunners, fetchAllResults, fetchPublicRaces, fetchVolunteers } from './utils/api';
 import { loadEvents } from './utils/events';
 import { getOrBuildCelebrationData } from './components/ResultCelebrations';
 import { MemberPage } from './pages/MemberPage';
@@ -16,6 +16,7 @@ const App: Component = () => {
   const [runners] = createResource(fetchRunners)
   const [results] = createResource(fetchAllResults)
   const [races] = createResource(fetchPublicRaces)
+  const [volunteers] = createResource(fetchVolunteers)
 
   // Populate the event name lookup cache
   createResource(loadEvents)
@@ -25,7 +26,7 @@ const App: Component = () => {
     const r = results()
     const u = runners()
     if (!r || !u || r.length === 0 || u.length === 0) return undefined
-    return getOrBuildCelebrationData(r, u)
+    return getOrBuildCelebrationData(r, u, volunteers() ?? [])
   })
 
   const RootLayout: Component<RouteSectionProps> = (routeProps) => {
@@ -63,6 +64,7 @@ const App: Component = () => {
               results={results() ?? []}
               runners={runners() ?? []}
               races={races() ?? []}
+              volunteers={volunteers() ?? []}
               celebrationData={celebrationData()}
             />
           )}

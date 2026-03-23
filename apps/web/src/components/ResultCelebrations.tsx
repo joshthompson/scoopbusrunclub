@@ -2,7 +2,7 @@ import { css } from "@style/css"
 import { createSignal, Show } from "solid-js"
 import { Emoji } from "@/components/ui/Emoji"
 import { MILESTONE_SET, ordinalSuffix } from "../utils/milestones"
-import { type RunResultItem, type Runner, getCached, setCache } from "../utils/api"
+import { type RunResultItem, type Runner, type VolunteerItem, getCached, setCache } from "../utils/api"
 import { formatName, parseTimeToSeconds } from "@/utils/misc"
 import { getEvent, getEventName } from "@/utils/events"
 import { runners as runnerSignals } from '@/data/runners'
@@ -154,6 +154,8 @@ const TAG_COLORS = {
   palindromicPal: "#fd79a8",
   viking: "#b91c1c",
   hagaStreak: "#15803d",
+  volunteerDebut: "#059669",
+  volunteerMilestone: "#7c3aed",
 } as const
 
 const TAG_EMOJIS = {
@@ -182,6 +184,8 @@ const TAG_EMOJIS = {
   palindromicPal: "🔄",
   viking: "⚔️",
   hagaStreak: "🌲",
+  volunteerDebut: "🙌",
+  volunteerMilestone: "🎉",
 } as const
 
 const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
@@ -900,10 +904,12 @@ export interface CelebrationData {
   palindromePalMap: Map<string, PairPartner[]>
   vikingMap: Set<string>
   hagaStreakMap: Set<string>
+  /** "parkrunId:date:event:eventNumber" → volunteer count (only for debuts/milestones) */
+  volunteerMilestoneMap: Map<string, number>
 }
 
 /** Call once per render cycle (inside a createMemo) to pre-compute all celebration lookups. */
-export function buildCelebrationData(results: RunResultItem[], runners: Runner[]): CelebrationData {
+export function buildCelebrationData(results: RunResultItem[], runners: Runner[], volunteers?: VolunteerItem[]): CelebrationData {
   const { runBuddyMap, bestieMap, bffMap } = buildRunBuddyAndBFFMaps(results)
   return {
     pbMap: buildPBMap(results),
@@ -925,7 +931,36 @@ export function buildCelebrationData(results: RunResultItem[], runners: Runner[]
     palindromePalMap: buildPalindromePalMap(results),
     vikingMap: buildVikingMap(results),
     hagaStreakMap: buildHagaStreakMap(results),
+    volunteerMilestoneMap: buildVolunteerMilestoneMap(volunteers ?? []),
   }
+}
+
+// ---------------------------------------------------------------------------
+// Volunteer milestone map
+// ---------------------------------------------------------------------------
+
+const VOLUNTEER_MILESTONE_SET = new Set([1, 5, 10, 25, 50, 100, 150, 200, 250, 500])
+
+/** "parkrunId:date:event:eventNumber" → volunteer count (only for debuts & milestones) */
+function buildVolunteerMilestoneMap(volunteers: VolunteerItem[]): Map<string, number> {
+  const byRunner = new Map<string, VolunteerItem[]>()
+  for (const v of volunteers) {
+    if (!byRunner.has(v.parkrunId)) byRunner.set(v.parkrunId, [])
+    byRunner.get(v.parkrunId)!.push(v)
+  }
+
+  const map = new Map<string, number>()
+  for (const [, vols] of byRunner) {
+    vols.sort((a, b) => a.date.localeCompare(b.date) || a.eventNumber - b.eventNumber)
+    for (let i = 0; i < vols.length; i++) {
+      const count = i + 1
+      if (VOLUNTEER_MILESTONE_SET.has(count)) {
+        const v = vols[i]
+        map.set(`${v.parkrunId}:${v.date}:${v.event}:${v.eventNumber}`, count)
+      }
+    }
+  }
+  return map
 }
 
 // ---------------------------------------------------------------------------
@@ -961,7 +996,7 @@ const CELEBRATION_CACHE_KEY = "celebrations"
  * the supplied results/runners and stores it in localStorage with the same
  * TTL as the result data.
  */
-export function getOrBuildCelebrationData(results: RunResultItem[], runners: Runner[]): CelebrationData {
+export function getOrBuildCelebrationData(results: RunResultItem[], runners: Runner[], volunteers?: VolunteerItem[]): CelebrationData {
   const cached = getCached<string>(CELEBRATION_CACHE_KEY)
   if (cached) {
     try {
@@ -971,7 +1006,7 @@ export function getOrBuildCelebrationData(results: RunResultItem[], runners: Run
     }
   }
 
-  const data = buildCelebrationData(results, runners)
+  const data = buildCelebrationData(results, runners, volunteers)
   setCache(CELEBRATION_CACHE_KEY, serializeCelebrationData(data))
   return data
 }
@@ -1226,6 +1261,35 @@ export function ResultCelebrations(props: ResultCelebrationsProps) {
     }
 
     return getCelebrationTags(ctx)
+  }
+
+  return (
+    <>
+      {tags().map((tag) => (
+        <CelebrationPill tag={tag} showTooltip />
+      ))}
+    </>
+  )
+}
+
+export interface VolunteerCelebrationsProps {
+  data: CelebrationData
+  parkrunId: string
+  date: string
+  eventId: string
+  eventNumber: string
+}
+
+export function VolunteerCelebrations(props: VolunteerCelebrationsProps) {
+  const tags = (): CelebrationTag[] => {
+    const key = `${props.parkrunId}:${props.date}:${props.eventId}:${props.eventNumber}`
+    const count = props.data.volunteerMilestoneMap?.get(key)
+    if (count === undefined) return []
+
+    if (count === 1) {
+      return [{ label: "Volunteer debut!", description: "First time volunteering at parkrun", emoji: TAG_EMOJIS.volunteerDebut, color: TAG_COLORS.volunteerDebut }]
+    }
+    return [{ label: `${ordinalSuffix(count)} volunteer!`, description: `Volunteered ${count} times at parkrun!`, emoji: TAG_EMOJIS.volunteerMilestone, color: TAG_COLORS.volunteerMilestone }]
   }
 
   return (

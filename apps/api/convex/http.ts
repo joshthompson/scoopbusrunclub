@@ -113,6 +113,17 @@ http.route({
   }),
 });
 
+// --- GET /api/volunteers ---
+
+http.route({
+  path: "/api/volunteers",
+  method: "GET",
+  handler: httpAction(async (ctx) => {
+    const volunteers = await ctx.runQuery(api.queries.getAllVolunteers);
+    return jsonResponse(volunteers);
+  }),
+});
+
 // --- POST /api/ingest ---
 // Receives pre-parsed athlete data from the GitHub Actions Playwright scraper.
 // Protected by a shared secret in the Authorization header.
@@ -183,7 +194,92 @@ http.route({
       }
     }
 
+    // Store app data (key/value pairs)
+    const appData = body?.appData;
+    if (appData && typeof appData === "object") {
+      for (const [key, value] of Object.entries(appData)) {
+        if (typeof key === "string" && typeof value === "string") {
+          await ctx.runMutation(internal.parkrun.setAppData, { key, value });
+        }
+      }
+    }
+
     return jsonResponse({ status: "ok", athletesStored: stored, eventsStored });
+  }),
+});
+
+// --- POST /api/ingest-volunteers ---
+// Receives volunteer data scraped from Haga parkrun event pages.
+// Protected by a shared secret in the Authorization header.
+
+http.route({
+  path: "/api/ingest-volunteers",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const authHeader = request.headers.get("Authorization");
+    const expectedSecret = process.env.INGEST_SECRET;
+
+    if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
+    const body = await request.json();
+    const volunteers = body?.volunteers;
+
+    if (!Array.isArray(volunteers)) {
+      return jsonResponse({ error: "Invalid payload: expected { volunteers: [...] }" }, 400);
+    }
+
+    let stored = 0;
+    for (const vol of volunteers) {
+      if (!vol.parkrunId || !vol.event || !vol.eventNumber || !vol.date || !Array.isArray(vol.roles)) continue;
+      await ctx.runMutation(internal.parkrun.storeVolunteer, {
+        parkrunId: vol.parkrunId,
+        event: vol.event,
+        eventNumber: vol.eventNumber,
+        date: vol.date,
+        roles: vol.roles,
+      });
+      stored++;
+    }
+
+    // Store app data (key/value pairs)
+    const appData = body?.appData;
+    if (appData && typeof appData === "object") {
+      for (const [key, value] of Object.entries(appData)) {
+        if (typeof key === "string" && typeof value === "string") {
+          await ctx.runMutation(internal.parkrun.setAppData, { key, value });
+        }
+      }
+    }
+
+    return jsonResponse({ status: "ok", volunteersStored: stored });
+  }),
+});
+
+// --- GET /api/app-data?key=... ---
+// Protected by INGEST_SECRET. Returns the value for a given key from the appData table.
+
+http.route({
+  path: "/api/app-data",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const authHeader = request.headers.get("Authorization");
+    const expectedSecret = process.env.INGEST_SECRET;
+
+    if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
+    const url = new URL(request.url);
+    const key = url.searchParams.get("key");
+
+    if (!key) {
+      return jsonResponse({ error: "Missing 'key' query parameter" }, 400);
+    }
+
+    const value = await ctx.runQuery(internal.parkrun.getAppData, { key });
+    return jsonResponse({ key, value });
   }),
 });
 
@@ -421,6 +517,8 @@ for (const path of [
   "/api/events",
   "/api/races",
   "/api/ingest",
+  "/api/ingest-volunteers",
+  "/api/app-data",
   "/api/admin/login",
   "/api/admin/logout",
   "/api/admin/validate",
@@ -428,6 +526,7 @@ for (const path of [
   "/api/admin/account/password",
   "/api/admin/races",
   "/api/admin/races/today",
+  "/api/volunteers",
 ]) {
   http.route({
     path,

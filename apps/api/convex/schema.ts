@@ -68,4 +68,24 @@ export default defineSchema({
     modifiedAt: v.number(),
     modifiedBy: v.string(),
   }).index("by_date", ["date"]),
+
+  // --- Volunteer tracking ---
+
+  volunteers: defineTable({
+    date: v.string(), // YYYY-MM-DD
+    event: v.string(), // e.g. "haga"
+    eventNumber: v.number(),
+    parkrunId: v.string(),
+    roles: v.array(v.string()),
+    fetchedAt: v.number(),
+  })
+    .index("by_unique_volunteer", ["parkrunId", "event", "eventNumber"])
+    .index("by_event_number", ["event", "eventNumber"]),
+
+  // --- App-level key/value store ---
+
+  appData: defineTable({
+    key: v.string(),
+    value: v.string(),
+  }).index("by_key", ["key"]),
 });

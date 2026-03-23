@@ -227,3 +227,26 @@ export async function fetchEvents(): Promise<EventItem[]> {
   setCache(cacheKey, data);
   return data;
 }
+
+export interface VolunteerItem {
+  parkrunId: string;
+  volunteerName: string;
+  event: string;       // eventId, e.g. "haga"
+  eventName: string;   // resolved display name, e.g. "Haga"
+  eventNumber: number;
+  roles: string[];
+  date: string;        // YYYY-MM-DD
+}
+
+export async function fetchVolunteers(): Promise<VolunteerItem[]> {
+  const cacheKey = "volunteers";
+  const cached = getCached<VolunteerItem[]>(cacheKey);
+  if (cached) return cached;
+
+  const url = `${CONVEX_URL}/api/volunteers`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const data: VolunteerItem[] = await response.json();
+  setCache(cacheKey, data);
+  return data;
+}

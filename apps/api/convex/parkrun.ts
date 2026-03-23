@@ -1,4 +1,4 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -110,6 +110,79 @@ export const storeEvent = internalMutation({
         country: args.country,
       });
     }
+  },
+});
+
+// --- Upsert volunteer ---
+
+export const storeVolunteer = internalMutation({
+  args: {
+    parkrunId: v.string(),
+    event: v.string(),
+    eventNumber: v.number(),
+    date: v.string(),
+    roles: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("volunteers")
+      .withIndex("by_unique_volunteer", (q) =>
+        q
+          .eq("parkrunId", args.parkrunId)
+          .eq("event", args.event)
+          .eq("eventNumber", args.eventNumber),
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        date: args.date,
+        roles: args.roles,
+        fetchedAt: Date.now(),
+      });
+    } else {
+      await ctx.db.insert("volunteers", {
+        ...args,
+        fetchedAt: Date.now(),
+      });
+    }
+  },
+});
+
+// --- App data (key/value store) ---
+
+export const setAppData = internalMutation({
+  args: {
+    key: v.string(),
+    value: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("appData")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { value: args.value });
+    } else {
+      await ctx.db.insert("appData", {
+        key: args.key,
+        value: args.value,
+      });
+    }
+  },
+});
+
+export const getAppData = internalQuery({
+  args: {
+    key: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("appData")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .unique();
+    return row?.value ?? null;
   },
 });
 

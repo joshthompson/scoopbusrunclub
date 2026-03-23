@@ -6,6 +6,8 @@
   "scripts": {
     "fetch-parkrun": "tsx scripts/fetch-parkrun.ts",
     "fetch-results": "tsx scripts/fetch-parkrun.ts",
+    "fetch-haga": "tsx scripts/fetch-haga.ts",
+    "fetch-all": "tsx scripts/fetch-all.ts",
     "test-parse": "tsx scripts/test-parse.ts"
   },
   "dependencies": {

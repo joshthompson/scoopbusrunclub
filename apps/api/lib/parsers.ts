@@ -190,3 +190,91 @@ export function parseRunResults(html: string): RunResult[] {
   return results;
 }
 
+// --- Types for event page parsing ---
+
+export interface EventHistoryEntry {
+  eventNumber: number;
+  date: string; // YYYY-MM-DD
+}
+
+export interface VolunteerEntry {
+  parkrunId: string;
+  roles: string[];
+}
+
+// --- Parse event history page ---
+// Parses https://www.parkrun.se/haga/results/eventhistory/
+// Each row: <tr class="Results-table-row" data-parkrun="396" data-date="2026-03-21" ...>
+
+export function parseEventHistory(html: string): EventHistoryEntry[] {
+  const entries: EventHistoryEntry[] = [];
+
+  const rowRegex = /<tr\s+class="Results-table-row"[^>]*data-parkrun="(\d+)"[^>]*data-date="(\d{4}-\d{2}-\d{2})"[^>]*>/gi;
+  let match;
+
+  while ((match = rowRegex.exec(html)) !== null) {
+    entries.push({
+      eventNumber: parseInt(match[1], 10),
+      date: match[2],
+    });
+  }
+
+  // Sort descending by event number (most recent first)
+  entries.sort((a, b) => b.eventNumber - a.eventNumber);
+  return entries;
+}
+
+// --- Parse event date from a single event results page ---
+// With Swedish locale (sv-SE) the format-date span contains YYYY-MM-DD.
+
+export function parseEventDate(html: string): string {
+  const match = html.match(/<span\s+class="format-date">(\d{4}-\d{2}-\d{2})<\/span>/);
+  return match ? match[1] : "";
+}
+
+// --- Parse volunteers from a single event results page ---
+// Finds tracked athletes in the Volunteers-table and extracts their roles.
+// Each volunteer row: <tr class="Volunteers-table-row" ... data-role="Funktionär,Resultatsansvarig," ...>
+//   with <a href="/haga/parkrunner/{parkrunId}" ...>
+
+export function parseEventVolunteers(
+  html: string,
+  trackedIds: Set<string>,
+): VolunteerEntry[] {
+  const volunteers: VolunteerEntry[] = [];
+
+  // Find the volunteers table section
+  const tableMatch = html.match(
+    /class="Volunteers-table[^"]*js-VolunteersTable[^"]*"[\s\S]*?<tbody[^>]*>([\s\S]*?)<\/tbody>/i,
+  );
+  if (!tableMatch) return volunteers;
+
+  const tbody = tableMatch[1];
+
+  // Match each volunteer row
+  const rowRegex = /<tr\s+class="Volunteers-table-row"[^>]*data-role="([^"]*)"[^>]*>([\s\S]*?)<\/tr>/gi;
+  let match;
+
+  while ((match = rowRegex.exec(tbody)) !== null) {
+    const dataRole = match[1];
+    const rowHtml = match[2];
+
+    // Extract parkrunId from the link
+    const idMatch = rowHtml.match(/\/parkrunner\/(\d+)/);
+    if (!idMatch) continue;
+
+    const parkrunId = idMatch[1];
+    if (!trackedIds.has(parkrunId)) continue;
+
+    // Parse roles from data-role (comma-separated, trailing comma)
+    const roles = dataRole
+      .split(",")
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0);
+
+    volunteers.push({ parkrunId, roles });
+  }
+
+  return volunteers;
+}
+
