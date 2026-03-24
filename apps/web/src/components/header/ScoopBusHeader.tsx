@@ -219,7 +219,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
           <div class={styles.sun} style={{ '--image': `url(${sunAsset})` }} />
           <div class={styles.moon} style={{ '--image': `url(${moonAsset})` }} />
           <div class={styles.stars} style={{ '--image': `url(${starsAsset})` }} />
-          <div class={styles.sky} style={{ '--image': 'linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))' }} />
+          <div class={styles.sky} style={{ '--image': 'linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom) 35%)' }} />
         </div>
         <div class={styles.canvas}>
           <Canvas

@@ -73,7 +73,7 @@ const App: Component = () => {
           path="/member/:name"
           component={() => (
             <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
-              <MemberPage results={results() ?? []} runners={runners() ?? []} celebrationData={celebrationData()} />
+              <MemberPage results={results() ?? []} runners={runners() ?? []} volunteers={volunteers() ?? []} celebrationData={celebrationData()} />
             </Show>
           )}
         />

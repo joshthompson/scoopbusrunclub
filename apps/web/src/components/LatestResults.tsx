@@ -438,7 +438,7 @@ export function LatestResults(props: LatestResultsProps) {
                                     )}
                                   </Show>
                                 </em>{" "}volunteered as {translatedRoles()}
-                                <VolunteerCelebrations data={celebrations()} parkrunId={vol.parkrunId} date={result.date} eventId={parkrun.eventId} eventNumber={parkrun.eventNumber} />
+                                <VolunteerCelebrations data={celebrations()} parkrunId={vol.parkrunId} date={result.date} eventId={parkrun.eventId} eventNumber={parkrun.eventNumber} roles={vol.roles} />
                               </li>
                             )
                           }}

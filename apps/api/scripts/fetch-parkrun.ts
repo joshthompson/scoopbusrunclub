@@ -1,9 +1,15 @@
 /**
  * Playwright script to fetch Parkrun athlete pages and POST parsed data to Convex.
  *
+ * By default, only results from the last 6 weeks are ingested (since older
+ * results can no longer be adjusted by parkrun).
+ *
  * Usage:
  *   # Load from .env.local (default):
  *   npx tsx scripts/fetch-parkrun.ts
+ *
+ *   # Ingest full history:
+ *   npx tsx scripts/fetch-parkrun.ts --all
  *
  *   # Load from .env.prod (upload to production):
  *   npx tsx scripts/fetch-parkrun.ts --env=prod
@@ -48,7 +54,22 @@ interface IngestPayload {
 
 // --- Main ---
 
+const ingestAll = process.argv.includes("--all");
+
+/** Cutoff date: only ingest results from the last 6 weeks (unless --all) */
+function getCutoffDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 42); // 6 weeks
+  return d.toISOString().split("T")[0];
+}
+
 async function main() {
+  if (ingestAll) {
+    console.log("Running with --all: ingesting full run history.");
+  } else {
+    console.log(`Ingesting results from the last 6 weeks (since ${getCutoffDate()}). Use --all for full history.`);
+  }
+
   const { browser, context } = await launchBrowser();
 
   const payload: IngestPayload = { athletes: [], events: [] };
@@ -93,10 +114,18 @@ async function main() {
         }
       }
 
+      const filteredResults = ingestAll
+        ? runResults
+        : runResults.filter((r) => r.date >= getCutoffDate());
+
+      if (!ingestAll && filteredResults.length < runResults.length) {
+        console.log(`    ${filteredResults.length} of ${runResults.length} results within 6-week window`);
+      }
+
       payload.athletes.push({
         parkrunId,
         runner,
-        runResults,
+        runResults: filteredResults,
       });
     } catch (error) {
       console.error(`  ✗ Error fetching ${name} (${parkrunId}):`, error);

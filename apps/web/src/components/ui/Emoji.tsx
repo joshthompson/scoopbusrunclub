@@ -4,27 +4,18 @@ import MedalEmoji from '@/assets/emoji/medal.png'
 import PartyEmoji from '@/assets/emoji/party.png'
 import StarEmoji from '@/assets/emoji/star.png'
 import CorgiEmoji from '@/assets/emoji/corgi.png'
+import VolunteerEmoji from '@/assets/emoji/volunteer.png'
+import RunDirectorEmoji from '@/assets/emoji/run-director.png'
+import TailWalkerEmoji from '@/assets/emoji/tail-walker.png'
 
 const emojiMap: Record<string, string | undefined> = {
   "🏅": MedalEmoji,
   "🎉": PartyEmoji,
   "⭐": StarEmoji,
-  "🇸🇪": undefined,
-  "🚌": undefined,
-  "🎂": undefined,
-  "😱": undefined,
-  "☃️": undefined,
-  "❄️": undefined,
-  "🎄": undefined,
-  "🏃‍♂️": undefined,
-  "🏃": undefined,
-  "🏃‍♀️": undefined,
-  "💯": undefined,
-  "🪞": undefined,
-  "🌳": undefined,
-  "🎪": undefined,
-  "💫": undefined,
   "🐶": CorgiEmoji,
+  "🦺🟡": VolunteerEmoji,
+  "🦺🟦": RunDirectorEmoji,
+  "🦺🟠": TailWalkerEmoji,
 }
 
 export interface EmojiProps {

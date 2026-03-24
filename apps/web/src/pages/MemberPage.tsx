@@ -3,9 +3,9 @@ import { createMemo, createSignal, For, Show } from "solid-js"
 import { A, useParams } from "@solidjs/router"
 import { DirtBlock } from "../components/ui/DirtBlock"
 import { RunnerName, runners as runnerSignals } from '@/data/runners'
-import { type RunResultItem, type Runner } from "../utils/api"
+import { type RunResultItem, type Runner, type VolunteerItem } from "../utils/api"
 import { formatDate, formatName, parseTimeToSeconds } from "@/utils/misc"
-import { buildCelebrationData, CelebrationPill, getCelebrationTags, type CelebrationData, getOrBuildCelebrationData } from "../components/ResultCelebrations"
+import { buildCelebrationData, CelebrationPill, getCelebrationTags, getVolunteerCelebrationTags, type CelebrationData, getOrBuildCelebrationData } from "../components/ResultCelebrations"
 import { getMemberRoute, getRunnerKeyFromRouteName } from "@/utils/memberRoute"
 import { CharacterImage } from "@/components/CharacterImage"
 import { FieldBlock } from "@/components/ui/FieldBlock"
@@ -19,6 +19,7 @@ import { Icon } from "@/components/ui/Icon"
 interface MemberPageProps {
   results: RunResultItem[]
   runners: Runner[]
+  volunteers: VolunteerItem[]
   celebrationData?: CelebrationData
 }
 
@@ -245,6 +246,37 @@ export function MemberPage(props: MemberPageProps) {
             color: tag.color,
             description: tag.description,
             otherRunnerId: tag.otherRunnerId,
+            occurrences: [occurrence],
+          })
+          continue
+        }
+
+        existing.occurrences.push(occurrence)
+      }
+    }
+
+    // Volunteer celebrations
+    const runnerVols = props.volunteers.filter((v) => v.parkrunId === runnerId())
+    for (const vol of runnerVols) {
+      const tags = getVolunteerCelebrationTags(celebrationData(), vol.parkrunId, vol.date, vol.event, vol.eventNumber, vol.roles)
+
+      for (const tag of tags) {
+        const key = `${tag.label}:${tag.emoji}:${tag.description}`
+        const existing = groups.get(key)
+        const occurrence = {
+          event: vol.event,
+          eventName: vol.eventName,
+          eventNumber: vol.eventNumber,
+          date: vol.date,
+          time: "",
+        }
+
+        if (!existing) {
+          groups.set(key, {
+            name: tag.label,
+            emoji: tag.emoji,
+            color: tag.color,
+            description: tag.description,
             occurrences: [occurrence],
           })
           continue

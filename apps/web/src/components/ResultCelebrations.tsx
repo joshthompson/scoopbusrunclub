@@ -156,6 +156,7 @@ const TAG_COLORS = {
   hagaStreak: "#15803d",
   volunteerDebut: "#059669",
   volunteerMilestone: "#7c3aed",
+  runDirector: "#dc2626",
 } as const
 
 const TAG_EMOJIS = {
@@ -184,8 +185,11 @@ const TAG_EMOJIS = {
   palindromicPal: "🔄",
   viking: "⚔️",
   hagaStreak: "🌲",
-  volunteerDebut: "🙌",
-  volunteerMilestone: "🎉",
+  volunteerDebut: "🦺🟡",
+  volunteerMilestone: "🦺🟡",
+  runDirector: "🦺🟦",
+  runDirector10: "📢",
+  tailWalker10: "🦺🟠",
 } as const
 
 const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
@@ -1278,19 +1282,30 @@ export interface VolunteerCelebrationsProps {
   date: string
   eventId: string
   eventNumber: string
+  roles: string[]
+}
+
+export function getVolunteerCelebrationTags(data: CelebrationData, parkrunId: string, date: string, eventId: string, eventNumber: string | number, roles: string[]): CelebrationTag[] {
+  const result: CelebrationTag[] = []
+
+  const key = `${parkrunId}:${date}:${eventId}:${eventNumber}`
+  const count = data.volunteerMilestoneMap?.get(key)
+
+  if (count === 1) {
+    result.push({ label: "Volunteer debut!", description: "First time volunteering at Haga", emoji: TAG_EMOJIS.volunteerDebut, color: TAG_COLORS.volunteerDebut })
+  } else if (count !== undefined) {
+    result.push({ label: `${ordinalSuffix(count)} volunteer!`, description: `Volunteered ${count} times at Haga`, emoji: TAG_EMOJIS.volunteerMilestone, color: TAG_COLORS.volunteerMilestone })
+  }
+
+  if (roles.includes("Loppansvarig")) {
+    result.push({ label: "Run Director!", description: "Call the shots at Haga Parkrun", emoji: TAG_EMOJIS.runDirector, color: TAG_COLORS.runDirector })
+  }
+
+  return result
 }
 
 export function VolunteerCelebrations(props: VolunteerCelebrationsProps) {
-  const tags = (): CelebrationTag[] => {
-    const key = `${props.parkrunId}:${props.date}:${props.eventId}:${props.eventNumber}`
-    const count = props.data.volunteerMilestoneMap?.get(key)
-    if (count === undefined) return []
-
-    if (count === 1) {
-      return [{ label: "Volunteer debut!", description: "First time volunteering at parkrun", emoji: TAG_EMOJIS.volunteerDebut, color: TAG_COLORS.volunteerDebut }]
-    }
-    return [{ label: `${ordinalSuffix(count)} volunteer!`, description: `Volunteered ${count} times at parkrun!`, emoji: TAG_EMOJIS.volunteerMilestone, color: TAG_COLORS.volunteerMilestone }]
-  }
+  const tags = (): CelebrationTag[] => getVolunteerCelebrationTags(props.data, props.parkrunId, props.date, props.eventId, props.eventNumber, props.roles)
 
   return (
     <>
