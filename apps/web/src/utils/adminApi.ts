@@ -159,6 +159,8 @@ export interface AdminUser {
   isSuperAdmin: boolean;
   createdAt: number;
   createdBy?: string;
+  lastLogin?: number;
+  lastActivity?: number;
 }
 
 export async function fetchAdminUsers(): Promise<AdminUser[]> {
@@ -211,5 +213,42 @@ export async function updateAdminUser(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, userId, ...data }),
   });
+  return res.json();
+}
+
+// ── Admin Event Logs API ────────────────────────────────────────────
+
+export interface AdminEventLog {
+  _id: string;
+  username: string;
+  action: string;
+  detail?: string;
+  targetType?: string;
+  targetId?: string;
+  timestamp: number;
+}
+
+export interface AdminEventLogsResult {
+  logs: AdminEventLog[];
+  hasMore: boolean;
+}
+
+export async function fetchAdminLogs(opts?: {
+  limit?: number;
+  cursor?: number;
+  username?: string;
+  action?: string;
+}): Promise<AdminEventLogsResult> {
+  const token = getAuthToken();
+  if (!token) return { logs: [], hasMore: false };
+  const params = new URLSearchParams({ token });
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.cursor) params.set("cursor", String(opts.cursor));
+  if (opts?.username) params.set("username", opts.username);
+  if (opts?.action) params.set("action", opts.action);
+  const res = await fetch(
+    `${CONVEX_URL}/api/admin/logs?${params.toString()}`
+  );
+  if (!res.ok) return { logs: [], hasMore: false };
   return res.json();
 }

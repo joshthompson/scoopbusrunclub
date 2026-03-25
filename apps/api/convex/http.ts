@@ -507,6 +507,29 @@ http.route({
   }),
 });
 
+// --- Admin: GET /api/admin/logs ---
+
+http.route({
+  path: "/api/admin/logs",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token") ?? "";
+    const limit = url.searchParams.get("limit");
+    const cursor = url.searchParams.get("cursor");
+    const filterUsername = url.searchParams.get("username") || undefined;
+    const filterAction = url.searchParams.get("action") || undefined;
+    const result = await ctx.runQuery(api.adminLogs.list, {
+      token,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      cursor: cursor ? parseInt(cursor, 10) : undefined,
+      filterUsername,
+      filterAction,
+    });
+    return jsonResponse(result);
+  }),
+});
+
 // --- CORS preflight for all API routes ---
 
 for (const path of [
@@ -526,6 +549,7 @@ for (const path of [
   "/api/admin/account/password",
   "/api/admin/races",
   "/api/admin/races/today",
+  "/api/admin/logs",
   "/api/volunteers",
 ]) {
   http.route({

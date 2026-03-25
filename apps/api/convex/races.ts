@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { validateSession } from "./auth";
+import { validateSession, logAdminEvent } from "./auth";
 
 const attendeeValidator = v.object({
   runnerId: v.string(),
@@ -78,7 +78,7 @@ export const create = mutation({
     public: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const session = await validateSession(ctx, args.token);
+    const session = await validateSession(ctx, args.token, true);
     if (!session) return { error: "Unauthorized" };
 
     const now = Date.now();
@@ -93,6 +93,15 @@ export const create = mutation({
       createdAt: now,
       modifiedAt: now,
       modifiedBy: session.username,
+    });
+
+    await logAdminEvent(ctx, {
+      userId: session.userId,
+      username: session.username,
+      action: "created_event",
+      detail: `Created event '${args.name}' on ${args.date}`,
+      targetType: "event",
+      targetId: id,
     });
 
     return { id };
@@ -112,7 +121,7 @@ export const update = mutation({
     public: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const session = await validateSession(ctx, args.token);
+    const session = await validateSession(ctx, args.token, true);
     if (!session) return { error: "Unauthorized" };
 
     const existing = await ctx.db.get(args.raceId);
@@ -132,6 +141,36 @@ export const update = mutation({
     if (args.public !== undefined) patch.public = args.public;
 
     await ctx.db.patch(args.raceId, patch);
+
+    // Detect scan check-ins: new attendees with scanned=true that weren't scanned before
+    if (args.attendees !== undefined) {
+      const oldScanned = new Set(
+        existing.attendees.filter((a) => a.scanned).map((a) => a.runnerId)
+      );
+      const newlyScanned = args.attendees.filter(
+        (a) => a.scanned && !oldScanned.has(a.runnerId)
+      );
+      for (const att of newlyScanned) {
+        await logAdminEvent(ctx, {
+          userId: session.userId,
+          username: session.username,
+          action: "scanned_user",
+          detail: `Scanned '${att.runnerId}' at '${existing.name}'`,
+          targetType: "event",
+          targetId: args.raceId,
+        });
+      }
+    }
+
+    await logAdminEvent(ctx, {
+      userId: session.userId,
+      username: session.username,
+      action: "edited_event",
+      detail: `Edited event '${existing.name}' on ${existing.date}`,
+      targetType: "event",
+      targetId: args.raceId,
+    });
+
     return { ok: true };
   },
 });
@@ -142,13 +181,23 @@ export const remove = mutation({
     raceId: v.id("races"),
   },
   handler: async (ctx, args) => {
-    const session = await validateSession(ctx, args.token);
+    const session = await validateSession(ctx, args.token, true);
     if (!session) return { error: "Unauthorized" };
 
     const existing = await ctx.db.get(args.raceId);
     if (!existing) return { error: "Race not found" };
 
     await ctx.db.delete(args.raceId);
+
+    await logAdminEvent(ctx, {
+      userId: session.userId,
+      username: session.username,
+      action: "deleted_event",
+      detail: `Deleted event '${existing.name}' on ${existing.date}`,
+      targetType: "event",
+      targetId: args.raceId,
+    });
+
     return { ok: true };
   },
 });

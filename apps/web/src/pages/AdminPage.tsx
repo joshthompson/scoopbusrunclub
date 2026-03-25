@@ -5,6 +5,7 @@ import { EventsPage } from "./admin/EventsPage";
 import { ScanPage } from "./admin/ScanPage";
 import { UsersPage } from "./admin/UsersPage";
 import { AccountPage } from "./admin/AccountPage";
+import { EventLogsPage } from "./admin/EventLogsPage";
 
 export const AdminPage: Component = () => {
   return (
@@ -41,6 +42,16 @@ export const AdminAccountPage: Component = () => {
     <AuthGuard>
       <AdminLayout>
         <AccountPage />
+      </AdminLayout>
+    </AuthGuard>
+  );
+};
+
+export const AdminLogsPage: Component = () => {
+  return (
+    <AuthGuard>
+      <AdminLayout>
+        <EventLogsPage />
       </AdminLayout>
     </AuthGuard>
   );

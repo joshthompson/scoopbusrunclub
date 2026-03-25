@@ -33,7 +33,7 @@ export const AdminLayout: Component<{ children: JSX.Element, fullPage?: boolean 
           <div class={styles.navLeft}>
             <A
               href="/admin"
-              class={cx(styles.navLink, isActive("/admin") && !isActive("/admin/scan") && !isActive("/admin/users") && !isActive("/admin/account") ? styles.navLinkActive : "")}
+              class={cx(styles.navLink, isActive("/admin") && !isActive("/admin/scan") && !isActive("/admin/users") && !isActive("/admin/account") && !isActive("/admin/logs") ? styles.navLinkActive : "")}
             >
               Events
             </A>
@@ -49,6 +49,12 @@ export const AdminLayout: Component<{ children: JSX.Element, fullPage?: boolean 
                 class={cx(styles.navLink, isActive("/admin/users") ? styles.navLinkActive : "")}
               >
                 Users
+              </A>
+              <A
+                href="/admin/logs"
+                class={cx(styles.navLink, isActive("/admin/logs") ? styles.navLinkActive : "")}
+              >
+                Logs
               </A>
             </Show>
           </div>

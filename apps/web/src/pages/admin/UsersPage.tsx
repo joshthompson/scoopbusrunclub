@@ -134,6 +134,8 @@ export const UsersPage: Component = () => {
               { title: "Role" },
               { title: "Created" },
               { title: "Created By" },
+              { title: "Last Login" },
+              { title: "Last Activity" },
               { title: "Actions", width: '10px' },
             ]}
             data={(users() ?? []).map((user) => [
@@ -142,6 +144,8 @@ export const UsersPage: Component = () => {
               user.isSuperAdmin ? "Super Admin" : "Admin",
               formatDate(user.createdAt),
               user.createdBy ?? "—",
+              user.lastLogin ? formatDate(user.lastLogin) : "—",
+              user.lastActivity ? formatDate(user.lastActivity) : "—",
               <AdminDropdown>
                 <AdminDropdownItem onClick={() => openEdit(user)}>Edit</AdminDropdownItem>
                 <AdminDropdownItem onClick={() => alert("Do that in the database")}>Delete</AdminDropdownItem>

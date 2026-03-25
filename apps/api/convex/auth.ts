@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 
 // ── Seed admin toggle ──────────────────────────────────────────────
@@ -35,7 +35,9 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 // ── Internal session validator (reused by other modules) ────────────
 export async function validateSession(
   ctx: { db: any },
-  token: string
+  token: string,
+  /** Set to true only from mutation handlers (queries are read-only). */
+  trackActivity = false,
 ): Promise<{ userId: any; username: string; isSuperAdmin: boolean } | null> {
   const session = await ctx.db
     .query("sessions")
@@ -46,7 +48,36 @@ export async function validateSession(
 
   const user = await ctx.db.get(session.userId);
   if (!user) return null;
+
+  // Update lastActivity timestamp (only in mutation context)
+  if (trackActivity) {
+    await ctx.db.patch(user._id, { lastActivity: Date.now() });
+  }
+
   return { userId: user._id, username: user.username, isSuperAdmin: !!user.isSuperAdmin };
+}
+
+// ── Admin event logger (reused by other modules) ────────────────────
+export async function logAdminEvent(
+  ctx: { db: any },
+  opts: {
+    userId: any;
+    username: string;
+    action: string;
+    detail?: string;
+    targetType?: string;
+    targetId?: string;
+  }
+) {
+  await ctx.db.insert("adminEventLogs", {
+    userId: opts.userId,
+    username: opts.username,
+    action: opts.action,
+    detail: opts.detail,
+    targetType: opts.targetType,
+    targetId: opts.targetId,
+    timestamp: Date.now(),
+  });
 }
 
 // ── Mutations / queries ─────────────────────────────────────────────
@@ -88,6 +119,9 @@ export const login = mutation({
         expiresAt: Date.now() + SESSION_TTL_MS,
       });
 
+      // Track lastLogin
+      await ctx.db.patch(adminUser!._id, { lastLogin: Date.now(), lastActivity: Date.now() });
+
       return { token, username: adminUser!.username };
     }
 
@@ -108,6 +142,9 @@ export const login = mutation({
       token,
       expiresAt: Date.now() + SESSION_TTL_MS,
     });
+
+    // Track lastLogin
+    await ctx.db.patch(user._id, { lastLogin: Date.now(), lastActivity: Date.now() });
 
     return { token, username: user.username };
   },
@@ -142,7 +179,7 @@ export const createUser = mutation({
     isSuperAdmin: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const session = await validateSession(ctx, args.token);
+    const session = await validateSession(ctx, args.token, true);
     if (!session) return { error: "Unauthorized" };
     if (!session.isSuperAdmin) return { error: "Only super admins can manage users" };
 
@@ -165,6 +202,14 @@ export const createUser = mutation({
       createdBy: session.username,
     });
 
+    await logAdminEvent(ctx, {
+      userId: session.userId,
+      username: session.username,
+      action: "created_user",
+      detail: `Created user '${args.username}'`,
+      targetType: "user",
+    });
+
     return { ok: true };
   },
 });
@@ -183,6 +228,8 @@ export const listUsers = query({
       isSuperAdmin: !!u.isSuperAdmin,
       createdAt: u.createdAt,
       createdBy: u.createdBy,
+      lastLogin: u.lastLogin,
+      lastActivity: u.lastActivity,
     }));
   },
 });
@@ -194,7 +241,7 @@ export const changePassword = mutation({
     newPassword: v.string(),
   },
   handler: async (ctx, args) => {
-    const session = await validateSession(ctx, args.token);
+    const session = await validateSession(ctx, args.token, true);
     if (!session) return { error: "Unauthorized" };
 
     const user = await ctx.db
@@ -212,6 +259,15 @@ export const changePassword = mutation({
     const passwordHash = await hashPassword(args.newPassword, salt);
     await ctx.db.patch(user._id, { passwordHash, salt });
 
+    await logAdminEvent(ctx, {
+      userId: session.userId,
+      username: session.username,
+      action: "changed_password",
+      detail: `Changed own password`,
+      targetType: "user",
+      targetId: user._id,
+    });
+
     return { ok: true };
   },
 });
@@ -225,7 +281,7 @@ export const updateUser = mutation({
     isSuperAdmin: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const session = await validateSession(ctx, args.token);
+    const session = await validateSession(ctx, args.token, true);
     if (!session) return { error: "Unauthorized" };
     if (!session.isSuperAdmin) return { error: "Only super admins can manage users" };
 
@@ -258,6 +314,16 @@ export const updateUser = mutation({
     if (Object.keys(patch).length === 0) return { ok: true };
 
     await ctx.db.patch(args.userId, patch);
+
+    await logAdminEvent(ctx, {
+      userId: session.userId,
+      username: session.username,
+      action: "edited_user",
+      detail: `Edited user '${existing.username}'${patch.username ? ` (renamed to '${patch.username}')` : ''}`,
+      targetType: "user",
+      targetId: args.userId,
+    });
+
     return { ok: true };
   },
 });

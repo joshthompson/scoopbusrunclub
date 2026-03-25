@@ -39,6 +39,8 @@ export default defineSchema({
     isSuperAdmin: v.optional(v.boolean()),
     createdAt: v.number(),
     createdBy: v.optional(v.string()),
+    lastLogin: v.optional(v.number()),
+    lastActivity: v.optional(v.number()),
   }).index("by_username", ["username"]),
 
   sessions: defineTable({
@@ -81,6 +83,21 @@ export default defineSchema({
   })
     .index("by_unique_volunteer", ["parkrunId", "event", "eventNumber"])
     .index("by_event_number", ["event", "eventNumber"]),
+
+  // --- Admin event logs ---
+
+  adminEventLogs: defineTable({
+    userId: v.id("adminUsers"),
+    username: v.string(),
+    action: v.string(), // e.g. "created_event", "edited_event", "deleted_event", etc.
+    detail: v.optional(v.string()), // human-readable detail, e.g. "Created event 'Haga parkrun'"
+    targetType: v.optional(v.string()), // "event" | "user" | "scan"
+    targetId: v.optional(v.string()), // ID of the affected record
+    timestamp: v.number(),
+  })
+    .index("by_timestamp", ["timestamp"])
+    .index("by_username", ["username"])
+    .index("by_action", ["action"]),
 
   // --- App-level key/value store ---
 

@@ -10,7 +10,7 @@ import { MemberPage } from './pages/MemberPage';
 import { HomePage } from './pages/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { MemberGraphPage } from './pages/MemberGraphPage';
-import { AdminPage, AdminScanPage, AdminUsersPage, AdminAccountPage } from './pages/AdminPage';
+import { AdminPage, AdminScanPage, AdminUsersPage, AdminAccountPage, AdminLogsPage } from './pages/AdminPage';
 
 const App: Component = () => {
   const [runners] = createResource(fetchRunners)
@@ -86,6 +86,7 @@ const App: Component = () => {
         <Route path="/admin" component={AdminPage} />
         <Route path="/admin/scan" component={AdminScanPage} />
         <Route path="/admin/users" component={AdminUsersPage} />
+        <Route path="/admin/logs" component={AdminLogsPage} />
         <Route path="/admin/account" component={AdminAccountPage} />
         <Route path="*404" component={NotFoundPage} />
     </Router>
