@@ -36,6 +36,16 @@ jobs:
       - name: Copy index.html to 404.html
         run: cp apps/web/dist/index.html apps/web/dist/404.html
 
+      - name: Create admin/index.html with admin icons
+        run: |
+          mkdir -p apps/web/dist/admin
+          sed -e 's|href="/favicon-96x96.png"|href="/admin/favicon-96x96.png"|' \
+              -e 's|href="/favicon-152x152.png"|href="/admin/favicon-152x152.png"|' \
+              -e 's|href="/apple-touch-icon.png"|href="/admin/apple-touch-icon.png"|' \
+              -e 's|href="/favicon-192x192.png"|href="/admin/favicon-192x192.png"|' \
+              -e 's|href="/favicon-512x512.png"|href="/admin/favicon-512x512.png"|' \
+              apps/web/dist/index.html > apps/web/dist/admin/index.html
+
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: apps/web/dist
