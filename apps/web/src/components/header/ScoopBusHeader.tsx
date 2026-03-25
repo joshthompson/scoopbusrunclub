@@ -280,7 +280,8 @@ const styles = {
   moon: css({
     zIndex: 3,
     backgroundRepeat: 'no-repeat',
-    backgroundPosition: '30% calc(-40px + var(--moon-y) * 160px)',
+    backgroundPosition: '30% calc(-25px + var(--moon-y) * 160px)',
+    backgroundSize: '30px',
     opacity: 'var(--moon-opacity)',
     filter: 'blur(2px)',
   }),

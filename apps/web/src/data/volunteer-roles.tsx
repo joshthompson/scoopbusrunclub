@@ -1,3 +1,4 @@
+// Roles list in english: https://support.parkrun.com/hc/en-us/articles/20047334957842-3-2-Volunteer-Roles
 export const RoleTranslations = {
   'Funktionär': 'Marshal',
   'Resultatsansvarig': 'Results Processor',
@@ -6,9 +7,16 @@ export const RoleTranslations = {
   'Loppansvarig': 'Run Director',
   'Tidtagare': 'Timekeeper',
   'Informationsansvarig för förstagångslöpare': 'First-timers Information',
-  'Ansvarig för att sätta upp banan': 'Course Setup',
+  'Ansvarig för att sätta upp banan': 'Pre-event Setup',
+  'Ansvarig för att ta ner banan': 'Post-event Teardown',
   'Fotograf': 'Photographer',
   'Bankontroll på eventdagen': 'Course Checker',
   'Kommunikationsansvarig': 'Communications',
   'Pollettsorterare': 'Token Sorter',
+  'Pollettutdelare': 'Token Distributor',
+  'Pollettutdelare assistent': 'Token Distributor Assistant',
+  'Nummerkontrollant': 'Number Checker',
+  'parkwalker': 'Park Walker',
+  'Material - förvaring och leverans': 'Equipment Storage and Delivery',
+  'Målfållaansvarig': 'Funnel Manager',
 }

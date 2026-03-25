@@ -19,6 +19,7 @@ import moon15Asset from '@/assets/background/moon15.png'
 import { css } from '@style/css'
 
 const moons = [
+  moon15Asset, // Empty
   moon0Asset,
   moon1Asset,
   moon2Asset,
@@ -34,7 +35,6 @@ const moons = [
   moon12Asset,
   moon13Asset,
   moon14Asset,
-  moon15Asset, // Empty
 ]
 
 const moon = SunCalc.getMoonIllumination(new Date())
@@ -75,32 +75,32 @@ function moonPhasePath(phase: number): string {
   }
 }
 
-const litPath = moonPhasePath(moon.phase)
-// Rotate the whole moon so the bright limb faces the sun
-const angleDeg = (moon.angle * 180) / Math.PI
+// const litPath = moonPhasePath(moon.phase)
+// // Rotate the whole moon so the bright limb faces the sun
+// const angleDeg = (moon.angle * 180) / Math.PI
 
-export const moonDiv = (
-  <div
-    class={css({
-      width: `${SIZE}px`,
-      height: `${SIZE}px`,
-      position: 'fixed',
-      left: '200px',
-      zIndex: 100000,
-      // Soft glow around the moon
-      filter: 'drop-shadow(0 0 12px rgba(254, 247, 202, 0.45))',
-    })}
-  >
-    <svg
-      width={SIZE}
-      height={SIZE}
-      viewBox={`0 0 ${SIZE} ${SIZE}`}
-      style={{ transform: `rotate(${angleDeg}deg)` }}
-    >
-      {/* Unlit moon body */}
-      <circle cx={C} cy={C} r={R} fill="#222" />
-      {/* Lit portion */}
-      {litPath && <path d={litPath} fill="#FEF7CA" />}
-    </svg>
-  </div>
-)
+// export const moonDiv = (
+//   <div
+//     class={css({
+//       width: `${SIZE}px`,
+//       height: `${SIZE}px`,
+//       position: 'fixed',
+//       left: '200px',
+//       zIndex: 100000,
+//       // Soft glow around the moon
+//       filter: 'drop-shadow(0 0 12px rgba(254, 247, 202, 0.45))',
+//     })}
+//   >
+//     <svg
+//       width={SIZE}
+//       height={SIZE}
+//       viewBox={`0 0 ${SIZE} ${SIZE}`}
+//       style={{ transform: `rotate(${angleDeg}deg)` }}
+//     >
+//       {/* Unlit moon body */}
+//       <circle cx={C} cy={C} r={R} fill="#222" />
+//       {/* Lit portion */}
+//       {litPath && <path d={litPath} fill="#FEF7CA" />}
+//     </svg>
+//   </div>
+// )

@@ -303,7 +303,9 @@ function ParkrunExternalLink(props: { parkrun: ParkrunEvent }) {
 }
 
 function translateRole(role: string): string {
-  return (RoleTranslations as Record<string, string>)[role] ?? role
+  const translations = RoleTranslations as Record<string, string>
+  if (!translations[role]) console.warn(`No translation found for volunteer role: ${role}`)
+  return translations[role] ?? role
 }
 
 function joinRoles(roles: string[]): JSX.Element {
