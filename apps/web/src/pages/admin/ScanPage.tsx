@@ -46,6 +46,9 @@ export const ScanPage: Component = () => {
   let qrScanner: QrScanner | null = null;
   let barcodeDetector: any = null;
   let barcodeIntervalId: ReturnType<typeof setInterval> | null = null;
+  let invertCanvas: HTMLCanvasElement | null = null;
+  let invertCtx: CanvasRenderingContext2D | null = null;
+  let barcodeScanning = false;
   const [squareSize, setSquareSize] = createSignal<number>(0);
 
   const selectedRace = createMemo(() => {
@@ -107,6 +110,8 @@ export const ScanPage: Component = () => {
       }
     );
 
+    qrScanner.setInversionMode('both');
+
     qrScanner.start().then(() => {
       startBarcodeDetector();
     }).catch((err) => {
@@ -134,13 +139,42 @@ export const ScanPage: Component = () => {
 
   const scanBarcodeFrame = async () => {
     if (!barcodeDetector || !videoRef || videoRef.readyState < 2) return;
+    if (barcodeScanning) return; // prevent overlapping calls
+    barcodeScanning = true;
     try {
+      // Scan original (black-on-white)
       const results = await barcodeDetector.detect(videoRef);
       if (results.length > 0) {
         handleBarcode(results[0].rawValue);
+        return;
+      }
+
+      // Scan inverted (white-on-black) by drawing to a canvas with CSS filter
+      const w = videoRef.videoWidth;
+      const h = videoRef.videoHeight;
+      if (w === 0 || h === 0) return;
+
+      if (!invertCanvas) {
+        invertCanvas = document.createElement('canvas');
+        invertCtx = invertCanvas.getContext('2d', { willReadFrequently: true });
+      }
+      if (invertCanvas.width !== w) invertCanvas.width = w;
+      if (invertCanvas.height !== h) invertCanvas.height = h;
+      if (!invertCtx) return;
+
+      // Use filter to invert colors (much faster than pixel manipulation)
+      invertCtx.filter = 'invert(1)';
+      invertCtx.drawImage(videoRef, 0, 0, w, h);
+      invertCtx.filter = 'none';
+
+      const invertedResults = await barcodeDetector.detect(invertCanvas);
+      if (invertedResults.length > 0) {
+        handleBarcode(invertedResults[0].rawValue);
       }
     } catch {
       // ignore transient detection errors
+    } finally {
+      barcodeScanning = false;
     }
   };
 
