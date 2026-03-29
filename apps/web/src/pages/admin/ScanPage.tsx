@@ -7,15 +7,15 @@ import {
   onCleanup,
   onMount,
   createMemo,
-} from "solid-js";
-import { A } from "@solidjs/router";
-import { css } from "@style/css";
-import { fetchTodayRaces, updateRace } from "@/utils/adminApi";
-import { runners, type RunnerName } from "@/data/runners";
-import QrScanner from "qr-scanner";
-import { BarcodeDetector as BarcodeDetectorPolyfill } from "barcode-detector/pure";
-import { AdminModal } from "@/components/admin/AdminModal";
-import { AdminButton } from "@/components/admin/AdminButton";
+} from "solid-js"
+import { A } from "@solidjs/router"
+import { css } from "@style/css"
+import { fetchTodayRaces, updateRace } from "@/utils/adminApi"
+import { runners, type RunnerName } from "@/data/runners"
+import QrScanner from "qr-scanner"
+import { BarcodeDetector as BarcodeDetectorPolyfill } from "barcode-detector/pure"
+import { AdminModal } from "@/components/admin/AdminModal"
+import { AdminButton } from "@/components/admin/AdminButton"
 
 
 // Build a lookup: parkrunId → { key, name }

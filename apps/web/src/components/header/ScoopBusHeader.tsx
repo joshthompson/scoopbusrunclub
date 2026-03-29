@@ -279,11 +279,13 @@ const styles = {
   }),
   moon: css({
     zIndex: 3,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: '30% calc(-25px + var(--moon-y) * 160px)',
-    backgroundSize: '30px',
+    backgroundSize: '100%',
+    height: '30px',
+    width: '30px',
+    inset: 'calc(-25px + var(--moon-y) * 160px) auto auto 30% !important',
     opacity: 'var(--moon-opacity)',
-    filter: 'blur(2px)',
+    transform: 'rotate(var(--moon-angle, 0rad))',
+    filter: 'blur(1.5px)',
   }),
   sun: css({
     zIndex: 4,

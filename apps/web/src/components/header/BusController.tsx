@@ -46,7 +46,7 @@ export function createBusController(id: string, scene: Scene) {
 
       // Reset
       if ($.x() < endX) {
-        $.setX(Math.max($scene.canvas.get().width() + 22, MIN_BUS_START_X) + MIN_BUS_OFFSCREEN_PX)
+        $.setX(Math.max($scene.canvas.get().width() + 22 + MIN_BUS_OFFSCREEN_PX, MIN_BUS_START_X))
       }
 
       // Scoop the runners

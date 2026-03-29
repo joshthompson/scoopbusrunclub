@@ -72,6 +72,8 @@ export function createRunnerController(
               fontSize: '12px',
               p: '0px 8px',
               width: 'max-content',
+              borderRadius: '3px',
+              cornerShape: 'notch',
             })}
             children={name + time}
           />

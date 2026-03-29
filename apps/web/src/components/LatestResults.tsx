@@ -289,6 +289,25 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
   )
 }
 
+function ParkrunImage(props: { parkrun: ParkrunEvent }) {
+  const image = createMemo(() => {
+    switch (props.parkrun.eventId) {
+      case 'somerdalepavilion':
+        return {
+          src: new URL('../assets/misc/curly-wurly.png', import.meta.url).href,
+          name: 'The Curly Wurly Parkrun',
+        }
+      default:
+        return null
+    }
+  })
+  return (
+    <Show when={image()}>
+      {(img) => <img src={img().src} alt={img().name} class={styles.parkrunImage} />}
+    </Show>
+  )
+}
+
 function ParkrunExternalLink(props: { parkrun: ParkrunEvent }) {
   const event = () => getEvent(props.parkrun.eventId)
   return (
@@ -387,6 +406,7 @@ export function LatestResults(props: LatestResultsProps) {
                 <DirtBlock>
                   <div class={styles.parkrun}>
                     <ParkrunName parkrun={parkrun} date={result.date} />
+                    <ParkrunImage parkrun={parkrun} />
                     <ParkrunFlag parkrun={parkrun} />
                     <ParkrunExternalLink parkrun={parkrun} />
                     <ol>
@@ -492,7 +512,8 @@ const styles = {
   parkrunName: css({
     fontWeight: 'bold',
     fontSize: '1.5em',
-    m: 0,
+    maxWidth: 'calc(100% - 40px)',
+    m: '0 auto',
   }),
   memberLink: css({
     color: 'inherit',
@@ -524,5 +545,10 @@ const styles = {
     border: 'none',
     borderTop: '1px solid #00000020',
     margin: '0'
-  })
+  }),
+  parkrunImage: css({
+    width: '236px',
+    maxWidth: '100%',
+    margin: '0 auto',
+  }),
 }
