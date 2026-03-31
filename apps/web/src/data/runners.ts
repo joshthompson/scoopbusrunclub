@@ -23,6 +23,8 @@ export type RunnerName =
   | 'link'
   | 'otherJosh'
 
+export type RunnerState = 'run' | 'tail-walker' | 'scanner'
+
 export interface RunnerData {
   name: string
   altNames?: string[]
@@ -32,9 +34,11 @@ export interface RunnerData {
     run: string[]
     sit: string[]
     face: string[]
-    volunteer?: string[]
-    volunteerSit?: string[]
+    tailWalk?: string[]
+    tailSit?: string[]
+    scanner?: string[]
   }
+  runnerState?: RunnerState
   width: number
   height: number
   speed: number
@@ -80,8 +84,8 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
     frames: {
       run: generateFrames(assets.claireRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       sit: [assets.claireSit],
-      volunteer: generateFrames(assets.claireVolunteer, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      volunteerSit: [assets.claireVolunteerSit],
+      tailWalk: generateFrames(assets.claireTailWalk, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      tailSit: [assets.claireTailSit],
       face: [assets.claireFace],
     },
     width: 21,
@@ -125,8 +129,8 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       run: generateFrames(assets.annaRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       sit: [assets.annaSit],
       face: [assets.annaFace],
-      volunteer: generateFrames(assets.annaVolunteer, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      volunteerSit: [assets.annaVolunteerSit],
+      tailWalk: generateFrames(assets.annaTailWalk, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      tailSit: [assets.annaTailSit],
     },
     width: 21,
     height: 28,
@@ -141,6 +145,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       run: generateFrames(assets.elineRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       sit: [assets.elineSit],
       face: [assets.elineFace],
+      scanner: [assets.elineScanner],
     },
     width: 21,
     height: 28,
@@ -196,9 +201,10 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
     frames: {
       run: generateFrames(assets.alisaRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       sit: [assets.alisaSit],
-      volunteer: generateFrames(assets.alisaVolunteer, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      volunteerSit: [assets.alisaVolunteerSit],
+      tailWalk: generateFrames(assets.alisaTailWalk, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      tailSit: [assets.alisaTailSit],
       face: [assets.alisaFace],
+      scanner: [assets.alisaScanner],
     },
     width: 21,
     height: 28,
@@ -212,9 +218,10 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
     frames: {
       run: generateFrames(assets.linkRun, 20 * 2, 28, 20 * 2, 2, true),
       sit: [assets.linkSit],
-      volunteer: generateFrames(assets.linkVolunteer, 20 * 2, 28, 20 * 2, 2, true),
-      volunteerSit: [assets.linkVolunteerSit],
+      tailWalk: generateFrames(assets.linkTailWalk, 20 * 2, 28, 20 * 2, 2, true),
+      tailSit: [assets.linkTailSit],
       face: [assets.linkFace],
+      scanner: [assets.linkScanner],
     },
     width: 20,
     height: 28,

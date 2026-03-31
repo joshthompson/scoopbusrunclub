@@ -9,14 +9,14 @@ import starsAsset from '@/assets/misc/stars.png'
 import house1Asset from '@/assets/misc/house1.png'
 import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
-import { createRunnerController, RUNNER_LABEL_RENDER_DISTANCE } from './RunnerController'
+import { createRunnerController, isStandingState, RUNNER_LABEL_RENDER_DISTANCE } from './RunnerController'
 import type { RunnerController } from './RunnerController'
-import { RunnerName, runners } from '@/data/runners'
+import { RunnerName, runners, type RunnerState } from '@/data/runners'
 import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createShadowController } from './ShadowController'
 import { startSkyService } from './SkyService'
-import { type RunResultItem } from '@/utils/api'
+import { type RunResultItem, type VolunteerItem } from '@/utils/api'
 import { parseTimeToSeconds } from '@/utils/misc'
 import {
   createCloudController,
@@ -27,13 +27,34 @@ import {
 import { css } from '@style/css'
 import { moonAsset } from '@/utils/moonAsset'
 
-function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
+function determineRunnerState(latestResult: RunResultItem | undefined, latestVol: VolunteerItem | undefined): RunnerState {
+  
+  if (!latestVol) return 'run'
+  // If volunteer date is more recent than (or same as) last run, use volunteer role
+  if (!latestResult || latestVol.date >= latestResult.date) {
+    console.log(`Determining state for ${latestResult?.parkrunId} based on volunteer role:`, latestVol.roles)
+    if (latestVol.roles.includes('Streckkod scanning')) return 'scanner'
+    if (latestVol.roles.includes('Sistagångare')) return 'tail-walker'
+  }
+  return 'run'
+}
+
+function updateRunnerSpeedsAndConnections(results: RunResultItem[], volunteers: VolunteerItem[]) {
   // Find the latest result for each parkrunId
   const latestByParkrunId = new Map<string, RunResultItem>()
   for (const result of results) {
     const existing = latestByParkrunId.get(result.parkrunId)
     if (!existing || result.date > existing.date) {
       latestByParkrunId.set(result.parkrunId, result)
+    }
+  }
+
+  // Find the latest volunteer entry for each parkrunId
+  const latestVolByParkrunId = new Map<string, VolunteerItem>()
+  for (const vol of volunteers) {
+    const existing = latestVolByParkrunId.get(vol.parkrunId)
+    if (!existing || vol.date > existing.date) {
+      latestVolByParkrunId.set(vol.parkrunId, vol)
     }
   }
 
@@ -61,7 +82,12 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
     // Clear dynamic connections (keep only static ones like link→alisa)
     const connectedTo = key === 'link' ? 'alisa' : undefined
 
-    setter({ ...runnerData, speed, time, frameInterval, connectedTo, latestTime: latestResult.time })
+    // Link inherits Alisa's volunteer state
+    const volData = key === 'link'
+      ? latestVolByParkrunId.get(runners.alisa[0]().id)
+      : latestVolByParkrunId.get(runnerData.id)
+
+    setter({ ...runnerData, speed, time, frameInterval, connectedTo, latestTime: latestResult.time, runnerState: determineRunnerState(latestResult, volData) })
   }
 
   // --- Update dynamic connections ---
@@ -115,19 +141,15 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[]) {
 
 interface ScoopBusHeaderProps {
   results: RunResultItem[]
+  volunteers: VolunteerItem[]
 }
 
 export function ScoopBusHeader(props: ScoopBusHeaderProps) {
   const navigate = useNavigate()
   const [mousePosition, setMousePosition] = createSignal({ x: 0, y: 0 })
-  const [updatedSpeeds, setUpdatedSpeeds] = createSignal(false)
-  createEffect(() => {
-    if (props.results.length > 0 && !updatedSpeeds()) {
-      console.log('Updating runner speeds based on latest results...')
-      updateRunnerSpeedsAndConnections(props.results)
-      setUpdatedSpeeds(true)
-    }
-  })
+
+  // Must run before scene setup so runnerState is available for render ordering
+  updateRunnerSpeedsAndConnections(props.results, props.volunteers)
 
   const sceneWidth = window.innerWidth
   const scene = new Scene('header', {
@@ -169,16 +191,29 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
       // Add sign
       $scene.addController(createSignController('sign'))
 
-      // Add runner shadows
-      $scene.addController(...runnerControllers.map(runner =>
+      // Split runners into standing (render behind bus) and moving (render in front)
+      const standingRunners = runnerControllers.filter(r => {
+        const [runner] = runners[r.data.runnerId as keyof typeof runners]
+        return isStandingState(runner().runnerState ?? 'run')
+      })
+      const movingRunners = runnerControllers.filter(r => {
+        const [runner] = runners[r.data.runnerId as keyof typeof runners]
+        return !isStandingState(runner().runnerState ?? 'run')
+      })
+
+      // Add standing runners (behind bus, no shadows)
+      $scene.addController(...standingRunners)
+
+      // Add moving runner shadows
+      $scene.addController(...movingRunners.map(runner =>
         createShadowController(`shadow-${runner.data.id}`, runner)),
       )
 
       // Add bus
       $scene.addController(createBusController('bus', $scene))
 
-      // Add runners
-      $scene.addController(...runnerControllers)
+      // Add moving runners (in front of bus)
+      $scene.addController(...movingRunners)
     }
   })
 

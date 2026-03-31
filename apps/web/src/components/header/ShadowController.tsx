@@ -1,7 +1,7 @@
 import { createController } from "@/engine"
 import { RUNNER_SIZE, runners } from '@/data/runners'
 import shadowAsset from "@/assets/runners/shadow.png"
-import { RunnerController } from "./RunnerController"
+import { isStandingState, RunnerController } from "./RunnerController"
 
 export function createShadowController(id: string, runner: RunnerController) {
   const [runnerData] = runners[runner.data.runnerId]
@@ -25,7 +25,11 @@ export function createShadowController(id: string, runner: RunnerController) {
           + runnerJumpHeight() / JUMP_SHADOW_SIZE
         ,
         height: () => 12,
-        style: () => ({ opacity: 1 * Math.max(0, 1 - runnerJumpHeight() / (JUMP_SHADOW_SIZE * 4)) }),
+        style: () => ({
+          opacity: isStandingState(runner.data.activeState())
+            ? 0
+            : 1 * Math.max(0, 1 - runnerJumpHeight() / (JUMP_SHADOW_SIZE * 4))
+        }),
       }
     },
   })

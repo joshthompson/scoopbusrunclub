@@ -39,8 +39,6 @@ const moons = [
 
 const moon = SunCalc.getMoonIllumination(new Date('2026-04-15'))
 export const moonAsset = moons[Math.floor(moon.phase * moons.length) % moons.length]
-console.log('angle (deg):', (moon.angle * 180) / Math.PI)
-console.log('angle (rad):', moon.angle)
 
 document.documentElement.style.setProperty('--moon-angle', `calc(${moon.angle - Math.PI / 2}rad)`)
 

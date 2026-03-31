@@ -35,8 +35,8 @@ const App: Component = () => {
 
     return (
       <>
-        <Show when={!isAdmin()}>
-          <ScoopBusHeader results={results() ?? []} />
+        <Show when={!isAdmin() && results() && runners() && volunteers()}>
+          <ScoopBusHeader results={results()!} volunteers={volunteers()!} />
         </Show>
         <main class={css({ zIndex: 101, position: 'relative' })}>
           {routeProps.children}

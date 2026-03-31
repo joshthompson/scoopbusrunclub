@@ -84,6 +84,7 @@ export const Sprite: Component<Sprite & SpriteExtendedProps> = props => {
 
   const frameStyle = createMemo(() => {
     const frame = frames()[currentFrame()]
+    if (!frame) return {}
     return {
       'background-image': `url(${frame.image})`,
       'background-position': `${frame.left}px ${frame.top}px`,
