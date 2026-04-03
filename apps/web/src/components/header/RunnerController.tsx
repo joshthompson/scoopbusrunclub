@@ -2,10 +2,11 @@ import { createController, createObjectSignal, Scene } from "@/engine"
 import { RUNNER_SIZE, runners, type RunnerState } from '@/data/runners'
 import { css } from "@style/css"
 import { Accessor } from "solid-js"
+import { createCameraFlashController } from "./CameraFlashController"
 
 export const RUNNER_LABEL_RENDER_DISTANCE = 50
 
-const STANDING_STATES: RunnerState[] = ['scanner']
+const STANDING_STATES: RunnerState[] = ['scanner', 'photographer', 'run-director']
 
 export function isStandingState(state: RunnerState): boolean {
   return STANDING_STATES.includes(state)
@@ -18,18 +19,37 @@ function findNonOverlappingX(
   others: { x: number; width: number }[],
 ): number {
   const margin = 40
-  // Start candidates in the 35-55% range of the canvas
-  const rangeStart = canvasWidth * 0.35
-  const rangeEnd = canvasWidth * 0.55 - myWidth
-  for (let attempts = 0; attempts < 50; attempts++) {
-    const candidate = rangeStart + Math.random() * (rangeEnd - rangeStart)
-    const overlaps = others.some(
-      o => candidate < o.x + o.width + margin && candidate + myWidth + margin > o.x,
-    )
-    if (!overlaps) return candidate
+
+  // 1. Must fit within 100% of the viewport
+  const absStart = 0
+  const absEnd = canvasWidth - myWidth
+
+  // 3. Preferred range: 35-55% of viewport
+  const prefStart = Math.max(absStart, canvasWidth * 0.35)
+  const prefEnd = Math.min(absEnd, canvasWidth * 0.55 - myWidth)
+
+  // Try preferred range first, then fall back to full viewport
+  const ranges = prefEnd > prefStart
+    ? [{ start: prefStart, end: prefEnd }, { start: absStart, end: absEnd }]
+    : [{ start: absStart, end: absEnd }]
+
+  for (const { start, end } of ranges) {
+    if (end <= start) continue
+    for (let attempts = 0; attempts < 50; attempts++) {
+      const candidate = start + Math.random() * (end - start)
+      // 2. Minimum 40px apart from others
+      const overlaps = others.some(
+        o => candidate < o.x + o.width + margin && candidate + myWidth + margin > o.x,
+      )
+      if (!overlaps) return candidate
+    }
   }
-  // Fallback: just pick a random position in the range
-  return rangeStart + Math.random() * (rangeEnd - rangeStart)
+
+  // Last resort: evenly distribute across the full viewport
+  const totalCount = others.length + 1
+  const slot = Math.round(canvasWidth / totalCount)
+  const myIndex = others.length
+  return Math.max(0, Math.min(absEnd, slot * myIndex + slot / 2 - myWidth / 2))
 }
 
 export function createRunnerController(
@@ -41,6 +61,9 @@ export function createRunnerController(
 ) {
   const [runner] = runners[runnerId]
   let baseY = 124 + yShift
+  let flashTriggered = false
+  let flashCounter = 0
+  const FLASH_PROXIMITY = 60
 
   return createController({
     frames: [...runner().frames.run],
@@ -80,7 +103,10 @@ export function createRunnerController(
             .sort((a, b) => a.dist - b.dist)[0]
 
           const name = runner().name
-          const time = runner().latestTime && runnerId !== 'link' ? ` - ${runner().latestTime}` : ''
+          const parts: string[] = []
+          if (runner().latestTime && runnerId !== 'link') parts.push(runner().latestTime!)
+          if (runner().volunteerRoles?.length) parts.push(...runner().volunteerRoles!)
+          const suffix = parts.length ? ` - ${parts.join(', ')}` : ''
           
           return <div
             style={{
@@ -102,7 +128,7 @@ export function createRunnerController(
               borderRadius: '3px',
               cornerShape: 'notch',
             })}
-            children={name + time}
+            children={name + suffix}
           />
         },
       }
@@ -129,10 +155,16 @@ export function createRunnerController(
         }
       }
 
-      // --- Standing states (scanner, etc.) ---
+      // --- Standing states (scanner, photographer, etc.) ---
       if (isStandingState(state)) {
         if (state === 'scanner' && runner().frames.scanner) {
           $.setFrames(runner().frames.scanner!)
+        }
+        if (state === 'photographer' && runner().frames.photographer) {
+          $.setFrames(runner().frames.photographer!)
+        }
+        if (state === 'run-director' && runner().frames.runDirector) {
+          $.setFrames(runner().frames.runDirector!)
         }
         // No movement, no scooping — just render in place
         return
@@ -143,15 +175,15 @@ export function createRunnerController(
 
       // If connected to another runner, follow them instead of running
       if (runner().connectedTo && !isStandingState(state)) {
-        // const connectedController = $scene.getControllersByType<RunnerController>('runner').find(
-        //   controller => controller.data.runnerId === runner().connectedTo,
-        // )
-        // if (connectedController) {
-        //   $.setX(connectedController.data.x() + 28)
-        //   if (!$.scooped() && !connectedController.data.scooped()) {
-        //     $.setSitting(connectedController.data.sitting())
-        //   }
-        // }
+        const connectedController = $scene.getControllersByType<RunnerController>('runner').find(
+          controller => controller.data.runnerId === runner().connectedTo,
+        )
+        if (connectedController) {
+          $.setX(connectedController.data.x() + 28)
+          if (!$.scooped() && !connectedController.data.scooped()) {
+            $.setSitting(connectedController.data.sitting())
+          }
+        }
       }
 
       // Sitting
@@ -190,6 +222,25 @@ export function createRunnerController(
       if ($.x() < -100) {
         $.setX($scene.canvas.get().width() + 50 + Math.random() * 50)
         $.setY(baseY)
+        flashTriggered = false
+      }
+
+      // Camera flash: when this runner passes a photographer, trigger a flash
+      if (!flashTriggered && !$.scooped()) {
+        const photographers = $scene.getControllersByType<RunnerController>('runner')
+          .filter(c => c.data.id !== id && c.data.activeState() === 'photographer')
+
+        for (const photographer of photographers) {
+          const dx = Math.abs($.x() + $.width() / 2 - (photographer.data.x() + photographer.data.width() / 2))
+          if (dx < FLASH_PROXIMITY) {
+            flashTriggered = true
+            const flashX = photographer.data.x() + photographer.data.width() / 2
+            const flashY = photographer.data.y() + photographer.data.height() * 0.3
+            const flashId = `flash-${id}-${flashCounter++}`
+            $scene.addController(createCameraFlashController(flashId, flashX, flashY))
+            break
+          }
+        }
       }
     }
   })

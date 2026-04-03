@@ -12,7 +12,7 @@ import pathAsset from '@/assets/misc/path.png'
 import { createRunnerController, isStandingState, RUNNER_LABEL_RENDER_DISTANCE } from './RunnerController'
 import type { RunnerController } from './RunnerController'
 import { RunnerName, runners, type RunnerState } from '@/data/runners'
-import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
+import { createSignal, onCleanup, onMount } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createShadowController } from './ShadowController'
 import { startSkyService } from './SkyService'
@@ -26,15 +26,16 @@ import {
 } from './SceneryControllers'
 import { css } from '@style/css'
 import { moonAsset } from '@/utils/moonAsset'
+import { RoleTranslations } from '@/data/volunteer-roles'
 
-function determineRunnerState(latestResult: RunResultItem | undefined, latestVol: VolunteerItem | undefined): RunnerState {
-  
-  if (!latestVol) return 'run'
-  // If volunteer date is more recent than (or same as) last run, use volunteer role
-  if (!latestResult || latestVol.date >= latestResult.date) {
-    console.log(`Determining state for ${latestResult?.parkrunId} based on volunteer role:`, latestVol.roles)
+function determineRunnerState(latestVol: VolunteerItem | undefined, latestSaturday: string | undefined): RunnerState {
+  if (!latestVol || !latestSaturday) return 'run'
+  // Only show volunteer state if they volunteered on the most recent Saturday with any results
+  if (latestVol.date === latestSaturday) {
     if (latestVol.roles.includes('Streckkod scanning')) return 'scanner'
     if (latestVol.roles.includes('Sistagångare')) return 'tail-walker'
+    if (latestVol.roles.includes('Fotograf')) return 'photographer'
+    if (latestVol.roles.includes('Loppansvarig')) return 'run-director'
   }
   return 'run'
 }
@@ -58,11 +59,34 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[], volunteers: 
     }
   }
 
+  // Find the latest Saturday across all results and volunteer entries
+  let latestSaturday: string | undefined
+  for (const result of results) {
+    if (!latestSaturday || result.date > latestSaturday) {
+      latestSaturday = result.date
+    }
+  }
+  for (const vol of volunteers) {
+    if (!latestSaturday || vol.date > latestSaturday) {
+      latestSaturday = vol.date
+    }
+  }
+
   // --- Update speeds ---
   for (const [key, [getter, setter]] of Object.entries(runners)) {
     const runnerData = getter()
     const latestResult = latestByParkrunId.get(runnerData.id)
-    if (!latestResult) continue
+
+    // Link stays connected to Alisa unless Alisa has a standing volunteer role
+    if (!latestResult) {
+      if (key === 'link') {
+        const alisaVol = latestVolByParkrunId.get(runners.alisa[0]().id)
+        const alisaState = determineRunnerState(alisaVol, latestSaturday)
+        const connectedTo = isStandingState(alisaState) ? undefined : 'alisa'
+        setter({ ...runnerData, connectedTo })
+      }
+      continue
+    }
 
     // Speed inversely proportional to time:
     // 18:00 (1080s) → 4, 36:00 (2160s) → 2, 59:16 (3556s) → ~1.2
@@ -79,15 +103,27 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[], volunteers: 
       frameInterval /= 2
     }
 
-    // Clear dynamic connections (keep only static ones like link→alisa)
-    const connectedTo = key === 'link' ? 'alisa' : undefined
-
     // Link inherits Alisa's volunteer state
     const volData = key === 'link'
       ? latestVolByParkrunId.get(runners.alisa[0]().id)
       : latestVolByParkrunId.get(runnerData.id)
 
-    setter({ ...runnerData, speed, time, frameInterval, connectedTo, latestTime: latestResult.time, runnerState: determineRunnerState(latestResult, volData) })
+    // Link stays connected to Alisa unless Alisa has a standing volunteer role
+    const connectedTo = key === 'link'
+      ? (isStandingState(determineRunnerState(volData, latestSaturday)) ? undefined : 'alisa')
+      : undefined
+
+    const translations = RoleTranslations as Record<string, string>
+    const volunteerRoles = volData && latestSaturday && volData.date === latestSaturday
+      ? volData.roles.map(r => translations[r] ?? r)
+      : undefined
+
+    // Only hide the time if the runner volunteered on the latest Saturday but didn't run it
+    const volunteeredLatest = volunteerRoles && volunteerRoles.length > 0
+    const ranLatest = latestResult.date === latestSaturday
+    const latestTime = (volunteeredLatest && !ranLatest) ? undefined : latestResult.time
+
+    setter({ ...runnerData, speed, time, frameInterval, connectedTo, latestTime, volunteerRoles, runnerState: determineRunnerState(volData, latestSaturday) })
   }
 
   // --- Update dynamic connections ---

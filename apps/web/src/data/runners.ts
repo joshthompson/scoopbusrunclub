@@ -23,7 +23,14 @@ export type RunnerName =
   | 'link'
   | 'otherJosh'
 
-export type RunnerState = 'run' | 'tail-walker' | 'scanner'
+export type RunnerState =
+  // Default
+  | 'run'
+  // Volunteer states
+  | 'tail-walker'
+  | 'scanner'
+  | 'photographer'
+  | 'run-director'
 
 export interface RunnerData {
   name: string
@@ -37,6 +44,8 @@ export interface RunnerData {
     tailWalk?: string[]
     tailSit?: string[]
     scanner?: string[]
+    photographer?: string[]
+    runDirector?: string[]
   }
   runnerState?: RunnerState
   width: number
@@ -45,6 +54,7 @@ export interface RunnerData {
   frameInterval: number
   connectedTo?: string
   latestTime?: string
+  volunteerRoles?: string[]
   time?: string
 }
 
@@ -71,6 +81,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       run: generateFrames(assets.keithRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       sit: [assets.keithSit],
       face: [assets.keithFace],
+      photographer: [assets.keithPhotographer],
     },
     width: 21,
     height: 28,
@@ -87,6 +98,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       tailWalk: generateFrames(assets.claireTailWalk, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       tailSit: [assets.claireTailSit],
       face: [assets.claireFace],
+      runDirector: [assets.claireRunDirector],
     },
     width: 21,
     height: 28,
