@@ -58,6 +58,7 @@ export { default as otherJoshFace } from '@/assets/runners/other-josh/face.png'
 export { default as rickRun } from '@/assets/runners/rick/run.png'
 export { default as rickSit } from '@/assets/runners/rick/sit.png'
 export { default as rickFace } from '@/assets/runners/rick/face.png'
+export { default as rickScanner } from '@/assets/runners/rick/scanner.png'
 
 export { default as sophieRun } from '@/assets/runners/sophie/run.png'
 export { default as sophieSit } from '@/assets/runners/sophie/sit.png'

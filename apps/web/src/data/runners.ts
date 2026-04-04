@@ -172,6 +172,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       run: generateFrames(assets.rickRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       sit: [assets.rickSit],
       face: [assets.rickFace],
+      scanner: [assets.rickScanner],
     },
     width: 21,
     height: 28,
