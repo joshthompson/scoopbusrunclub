@@ -1,6 +1,6 @@
 import { type Component, createMemo, createResource, Show } from 'solid-js';
 import { Router, Route, type RouteSectionProps, useLocation } from '@solidjs/router';
-import { ScoopBusHeader } from './components/header/ScoopBusHeader';
+import { ScoopBusHeader, HEADER_HEIGHT } from './components/header/ScoopBusHeader';
 import './styles.css';
 import { css } from '@style/css';
 import { fetchRunners, fetchAllResults, fetchPublicRaces, fetchVolunteers } from './utils/api';
@@ -35,8 +35,10 @@ const App: Component = () => {
 
     return (
       <>
-        <Show when={!isAdmin() && results() && runners() && volunteers()}>
-          <ScoopBusHeader results={results()!} volunteers={volunteers()!} />
+        <Show when={!isAdmin()}>
+          <Show when={results() && runners() && volunteers()} fallback={<div style={{ height: `${HEADER_HEIGHT}px` }} />}>
+            <ScoopBusHeader results={results()!} volunteers={volunteers()!} />
+          </Show>
         </Show>
         <main class={css({ zIndex: 101, position: 'relative' })}>
           {routeProps.children}

@@ -28,6 +28,8 @@ import { css } from '@style/css'
 import { moonAsset } from '@/utils/moonAsset'
 import { RoleTranslations } from '@/data/volunteer-roles'
 
+export const HEADER_HEIGHT = 240
+
 function determineRunnerState(latestVol: VolunteerItem | undefined, latestSaturday: string | undefined): RunnerState {
   if (!latestVol || !latestSaturday) return 'run'
   // Only show volunteer state if they volunteered on the most recent Saturday with any results
@@ -190,7 +192,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
   const sceneWidth = window.innerWidth
   const scene = new Scene('header', {
     width: sceneWidth,
-    height: 240,
+    height: HEADER_HEIGHT,
     images: [],
     setup($scene) {
       // Create Runners
