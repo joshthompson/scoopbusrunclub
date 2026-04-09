@@ -12,7 +12,10 @@
  *   npx tsx scripts/fetch-parkrun.ts --all
  *
  *   # Load from .env.prod (upload to production):
- *   npx tsx scripts/fetch-parkrun.ts --env=prod
+ *   npx tsx scripts/fetch-results.ts --env=prod
+ *
+ *   # Dry run (show what would be fetched without making requests):
+ *   npx tsx scripts/fetch-results.ts --dry
  *
  * Requires: playwright (install chromium with `npx playwright install chromium`)
  */
@@ -52,9 +55,10 @@ interface IngestPayload {
   appData?: Record<string, string>;
 }
 
-// --- Main ---
+// --- CLI flags ---
 
 const ingestAll = process.argv.includes("--all");
+const isDryRun = process.argv.includes("--dry");
 
 /** Cutoff date: only ingest results from the last 6 weeks (unless --all) */
 function getCutoffDate(): string {
@@ -64,10 +68,21 @@ function getCutoffDate(): string {
 }
 
 async function main() {
+  if (isDryRun) console.log("[DRY RUN] No requests will be made.\n");
+
   if (ingestAll) {
     console.log("Running with --all: ingesting full run history.");
   } else {
     console.log(`Ingesting results from the last 6 weeks (since ${getCutoffDate()}). Use --all for full history.`);
+  }
+
+  if (isDryRun) {
+    console.log("\nWould fetch the following URLs:");
+    for (const { parkrunId, name } of TRACKED_ATHLETES) {
+      console.log(`  GET https://www.parkrun.org.uk/parkrunner/${parkrunId}/all/  (${name})`);
+    }
+    console.log(`\nWould POST results to: ${CONVEX_SITE_URL}/api/ingest`);
+    return;
   }
 
   const { browser, context } = await launchBrowser();

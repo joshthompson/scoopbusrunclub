@@ -15,8 +15,9 @@
  *   npx tsx scripts/fetch-results.ts --event=haga:1-10
  *   npx tsx scripts/fetch-results.ts --event=judarskogen:10
  *   npx tsx scripts/fetch-results.ts --event=haga:50,judarskogen:10-20
- *
- * Requires: playwright (install chromium with `npx playwright install chromium`)
+ * *   # Dry run (show what would be fetched without making requests):
+ *   npx tsx scripts/fetch-parkrun.ts --dry
+ * * Requires: playwright (install chromium with `npx playwright install chromium`)
  */
 import {
   parseEventHistory,
@@ -64,6 +65,10 @@ function watermarkKey(eventId: string): string {
 loadEnv(import.meta.url);
 const { convexSiteUrl: CONVEX_SITE_URL, ingestSecret: INGEST_SECRET } =
   requireEnvVars();
+
+// --- CLI flags ---
+
+const isDryRun = process.argv.includes("--dry");
 
 // --- CLI arg parsing ---
 
@@ -151,6 +156,14 @@ async function scrapeEvent(
   config: ParkrunEventConfig,
   eventsToScrape: number[],
 ): Promise<{ volunteers: VolunteerRecord[]; highestEventNumber: number }> {
+  if (isDryRun) {
+    console.log(`\n  Would scrape ${eventsToScrape.length} event(s) for ${config.eventId}:`);
+    for (const eventNumber of eventsToScrape) {
+      console.log(`    GET ${config.baseUrl}/results/${eventNumber}/`);
+    }
+    return { volunteers: [], highestEventNumber: Math.max(...eventsToScrape, 0) };
+  }
+
   const { browser, context } = await launchBrowser();
   const volunteers: VolunteerRecord[] = [];
   let highestEventNumber = 0;
@@ -225,6 +238,14 @@ async function resolveAutoEvents(
   config: ParkrunEventConfig,
 ): Promise<number[]> {
   const key = watermarkKey(config.eventId);
+
+  if (isDryRun) {
+    console.log(`  ${config.eventId}: would read watermark "${key}" from DB`);
+    console.log(`  ${config.eventId}: would fetch ${config.baseUrl}/results/eventhistory/`);
+    console.log(`  ${config.eventId}: would scrape any events newer than watermark`);
+    return [];
+  }
+
   const latestScrapedStr = await getAppDataValue(
     CONVEX_SITE_URL,
     INGEST_SECRET,
@@ -273,6 +294,8 @@ async function main() {
   const manualRanges = parseEventArg();
   const isManualMode = manualRanges !== null;
 
+  if (isDryRun) console.log("[DRY RUN] No requests will be made.\n");
+
   const allVolunteers: VolunteerRecord[] = [];
   const appDataUpdates: Record<string, string> = {};
 
@@ -308,7 +331,7 @@ async function main() {
       }
 
       // Pause between different parkrun events
-      if (range !== manualRanges[manualRanges.length - 1]) {
+      if (!isDryRun && range !== manualRanges[manualRanges.length - 1]) {
         const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS);
         console.log(
           `\nPausing ${(delay / 1000).toFixed(1)}s before next parkrun event...`,
@@ -337,7 +360,7 @@ async function main() {
       }
 
       // Pause between different parkrun events
-      if (config !== PARKRUN_EVENTS[PARKRUN_EVENTS.length - 1]) {
+      if (!isDryRun && config !== PARKRUN_EVENTS[PARKRUN_EVENTS.length - 1]) {
         const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS);
         console.log(
           `\nPausing ${(delay / 1000).toFixed(1)}s before next parkrun event...`,
@@ -350,6 +373,11 @@ async function main() {
   // --- Ingest results ---
 
   console.log(`\nTotal volunteer records: ${allVolunteers.length}`);
+
+  if (isDryRun) {
+    console.log(`Would POST volunteer data to: ${CONVEX_SITE_URL}/api/ingest-volunteers`);
+    return;
+  }
 
   if (allVolunteers.length === 0 && Object.keys(appDataUpdates).length === 0) {
     console.log("No volunteer data to ingest.");
