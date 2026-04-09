@@ -19,4 +19,5 @@ export const RoleTranslations = {
   'parkwalker': 'Park Walker',
   'Material - förvaring och leverans': 'Equipment Storage and Delivery',
   'Målfållaansvarig': 'Funnel Manager',
+  'Farthållare': 'Pacer',
 }

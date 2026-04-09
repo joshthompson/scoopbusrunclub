@@ -209,7 +209,7 @@ http.route({
 });
 
 // --- POST /api/ingest-volunteers ---
-// Receives volunteer data scraped from Haga parkrun event pages.
+// Receives volunteer data scraped from parkrun event pages.
 // Protected by a shared secret in the Authorization header.
 
 http.route({

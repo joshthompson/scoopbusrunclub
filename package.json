@@ -15,8 +15,8 @@
     "deploy:backend:prod": "nx run api:deployProd",
     "deploy:backend:dev": "nx run api:deployDev",
     "test-crons": "pnpm --filter @scoopbus/api run test-parse",
+    "fetch-parkrun": "pnpm --filter @scoopbus/api run fetch-parkrun",
     "fetch-results": "pnpm --filter @scoopbus/api run fetch-results",
-    "fetch-haga": "pnpm --filter @scoopbus/api run fetch-haga",
     "fetch-all": "pnpm --filter @scoopbus/api run fetch-all"
   },
   "license": "MIT",

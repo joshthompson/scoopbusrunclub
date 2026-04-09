@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "fetch-parkrun": "tsx scripts/fetch-parkrun.ts",
-    "fetch-results": "tsx scripts/fetch-parkrun.ts",
-    "fetch-haga": "tsx scripts/fetch-haga.ts",
+    "fetch-results": "tsx scripts/fetch-results.ts",
     "fetch-all": "tsx scripts/fetch-all.ts",
     "test-parse": "tsx scripts/test-parse.ts"
   },

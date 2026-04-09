@@ -1,5 +1,6 @@
 /**
- * Runs both fetch-results and fetch-haga sequentially with a pause in between.
+ * Runs both fetch-results (athlete results) and fetch-parkrun (parkrun-specific
+ * data such as volunteering) sequentially with a pause in between.
  *
  * Usage:
  *   npx tsx scripts/fetch-all.ts
@@ -17,13 +18,13 @@ const envArg = process.argv.find((a) => a.startsWith("--env="));
 const envFlag = envArg ? ` ${envArg}` : "";
 
 async function main() {
-  // --- Step 1: fetch-results ---
+  // --- Step 1: fetch-results (athlete run results) ---
   console.log("=".repeat(60));
-  console.log("Step 1: Running fetch-results...");
+  console.log("Step 1: Running fetch-results (athlete results)...");
   console.log("=".repeat(60));
 
   try {
-    execSync(`npx tsx scripts/fetch-parkrun.ts${envFlag}`, {
+    execSync(`npx tsx scripts/fetch-results.ts${envFlag}`, {
       cwd: dirname(__dirname), // api package root
       stdio: "inherit",
     });
@@ -37,18 +38,18 @@ async function main() {
   console.log(`\nPausing ${(delay / 1000).toFixed(1)}s between scripts...\n`);
   await sleep(delay);
 
-  // --- Step 2: fetch-haga ---
+  // --- Step 2: fetch-parkrun (parkrun-specific: volunteers) ---
   console.log("=".repeat(60));
-  console.log("Step 2: Running fetch-haga...");
+  console.log("Step 2: Running fetch-parkrun (volunteers)...");
   console.log("=".repeat(60));
 
   try {
-    execSync(`npx tsx scripts/fetch-haga.ts${envFlag}`, {
+    execSync(`npx tsx scripts/fetch-parkrun.ts${envFlag}`, {
       cwd: dirname(__dirname), // api package root
       stdio: "inherit",
     });
   } catch (error) {
-    console.error("fetch-haga failed:", error);
+    console.error("fetch-parkrun failed:", error);
     process.exit(1);
   }
 

@@ -1,7 +1,7 @@
 /**
  * Shared utilities for Parkrun scraping scripts.
  *
- * Used by fetch-parkrun.ts, fetch-haga.ts, and fetch-all.ts.
+ * Used by fetch-results.ts, fetch-parkrun.ts, and fetch-all.ts.
  */
 import { chromium } from "playwright";
 import { readFileSync, existsSync } from "fs";
