@@ -15,6 +15,7 @@ import { BackSignButton } from "@/components/BackSignButton"
 import rock1Asset from "@/assets/misc/rock1.png"
 import graphIcon from "@/assets/misc/graph-icon.png"
 import { Icon } from "@/components/ui/Icon"
+import { ParkrunHeatmap } from "@/components/ParkrunHeatmap"
 
 interface MemberPageProps {
   results: RunResultItem[]
@@ -370,6 +371,8 @@ export function MemberPage(props: MemberPageProps) {
               )}
             </div>
           </FieldBlock>
+
+          <ParkrunHeatmap parkrunId={runnerId()} results={props.results} volunteers={props.volunteers} />
 
           <div class={styles.twoColumnGrid}>
             <DirtBlock title="Celebrations">

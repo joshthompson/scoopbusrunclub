@@ -24,7 +24,7 @@ import { AdminDropdown, AdminDropdownItem } from "@/components/admin/AdminDropdo
 import { Checkbox } from "@/components/ui/Checkbox";
 import { EventModal } from "./EventModal";
 import { AdminAvatar } from "@/components/admin/AdminAvatar";
-import { AdminTooltip } from "@/components/admin/AdminTooltip";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { AdminSelect } from "@/components/admin/AdminSelect";
 import { AdminInput } from "@/components/admin/AdminInput";
 import { Icon } from "@/components/ui/Icon";
@@ -312,9 +312,9 @@ export const EventsPage: Component = () => {
               <span title={race.attendees.map((a) => runnerDisplayName(a.runnerId)).join(", ")}>
                 <For each={race.attendees}>
                   {(att) =>
-                    <AdminTooltip content={runnerDisplayName(att.runnerId)}>
+                    <Tooltip content={runnerDisplayName(att.runnerId)}>
                       <AdminAvatar user={att.runnerId} size="small" title={runnerDisplayName(att.runnerId)} />
-                    </AdminTooltip>
+                    </Tooltip>
                   }
                 </For>
               </span>,

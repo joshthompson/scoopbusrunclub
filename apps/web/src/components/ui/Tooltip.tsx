@@ -2,7 +2,7 @@ import { css } from "@style/css";
 import { type JSX, createSignal, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 
-export function AdminTooltip(props: {
+export function Tooltip(props: {
   content: JSX.Element;
   children: JSX.Element;
 }) {
