@@ -17,7 +17,7 @@ import {
   type RaceAttendee,
 } from "@/utils/adminApi";
 import { runners, type RunnerName } from "@/data/runners";
-import { AdminTable } from "@/components/admin/AdminTable";
+import { Table as AdminTable } from "@/components/ui/Table";
 import { AdminToolbar } from "@/components/admin/AdminToolbar";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminDropdown, AdminDropdownItem } from "@/components/admin/AdminDropdown";

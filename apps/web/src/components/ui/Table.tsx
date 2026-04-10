@@ -1,15 +1,15 @@
 import { css, cva } from '@style/css';
 import { For, JSX, Show } from 'solid-js'
 
-export interface AdminTableColumn {
+export interface TableColumn {
   id?: string;
   title: string;
   sortable?: boolean;
   width?: string;
 } 
 
-export function AdminTable(props: {
-  columns: AdminTableColumn[];
+export function Table(props: {
+  columns: TableColumn[];
   data: JSX.Element[][];
   empty?: JSX.Element;
   sortKey?: string;
@@ -114,6 +114,6 @@ const styles = {
     marginLeft: "0.25rem",
     fontSize: "0.6rem",
     width: "0.6rem",
-    marginRight: '-0.85rem', // Width + margin to avoid column width shifting
+    marginRight: '-0.85rem',
   }),
 }

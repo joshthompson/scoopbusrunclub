@@ -1,4 +1,5 @@
 import { Component, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { StravaWidget } from '../components/StravaWidget';
 import { DirtBlock } from '../components/ui/DirtBlock';
 import { LatestResults } from '../components/LatestResults';
@@ -25,6 +26,11 @@ export const HomePage: Component<{ resultsLoading: boolean; runnersLoading: bool
           <Milestones runners={props.runners} results={props.results} />
         </Show>
         <RaceCalendar races={props.races} />
+        <DirtBlock title="Explore">
+          <A href="/map" class={css({ color: 'inherit', textDecoration: 'underline', fontWeight: 'bold' })}>
+            Scoop Bus Tourism Map
+          </A>
+        </DirtBlock>
         <DirtBlock title="Strava Activity"><StravaWidget /></DirtBlock>
         <DirtBlock title="About">
           <p>The Scoop Bus Run Club is a casual running club based in the Stockholm.</p>

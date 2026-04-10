@@ -11,6 +11,8 @@ import { HomePage } from './pages/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { MemberGraphPage } from './pages/MemberGraphPage';
 import { AdminPage, AdminScanPage, AdminUsersPage, AdminAccountPage, AdminLogsPage } from './pages/AdminPage';
+import { MapPage } from './pages/MapPage';
+import { ComparePage } from './pages/ComparePage';
 
 const App: Component = () => {
   const [runners] = createResource(fetchRunners)
@@ -83,6 +85,22 @@ const App: Component = () => {
           path="/member/:name/graph"
           component={() => (
             <MemberGraphPage results={results() ?? []} runners={runners() ?? []} celebrationData={celebrationData()} />
+          )}
+        />
+        <Route
+          path="/map"
+          component={() => (
+            <Show when={!results.loading} fallback={<div class={styles.loading}>Loading...</div>}>
+              <MapPage results={results() ?? []} volunteers={volunteers() ?? []} />
+            </Show>
+          )}
+        />
+        <Route
+          path="/compare/:name1/:name2"
+          component={() => (
+            <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
+              <ComparePage results={results() ?? []} runners={runners() ?? []} volunteers={volunteers() ?? []} />
+            </Show>
           )}
         />
         <Route path="/admin" component={AdminPage} />

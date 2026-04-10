@@ -13,7 +13,7 @@ import {
   type AdminUser,
 } from "@/utils/adminApi";
 import { AdminButton } from "@/components/admin/AdminButton";
-import { AdminTable } from "@/components/admin/AdminTable";
+import { Table as AdminTable } from "@/components/ui/Table";
 import { AdminModal } from "@/components/admin/AdminModal";
 import { AdminInput } from "@/components/admin/AdminInput";
 import { AdminToolbar } from "@/components/admin/AdminToolbar";

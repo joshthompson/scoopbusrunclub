@@ -374,6 +374,23 @@ export function MemberPage(props: MemberPageProps) {
 
           <ParkrunHeatmap parkrunId={runnerId()} results={props.results} volunteers={props.volunteers} />
 
+          {/* Compare with another runner */}
+          <DirtBlock title="Compare">
+            <div class={styles.compareGrid}>
+              <For each={Object.entries(runnerSignals).filter(([key]) => key !== runnerKey() && key !== "link")}>
+                {([key, [signal]]) => {
+                  const other = signal()
+                  return (
+                    <A href={`/compare/${runnerKey()}/${key.toLowerCase()}`} class={styles.compareLink}>
+                      <img src={other.frames.face[0]} class={styles.compareFace} alt={other.name} />
+                      <span class={styles.compareName}>{other.name}</span>
+                    </A>
+                  )
+                }}
+              </For>
+            </div>
+          </DirtBlock>
+
           <div class={styles.twoColumnGrid}>
             <DirtBlock title="Celebrations">
               <Show when={nonPbCelebrations().length > 0} fallback={<p>No celebrations yet.</p>}>
@@ -516,5 +533,32 @@ const styles = {
   rockButtonText: css({
     position: 'absolute',
     fontSize: '0.75rem',
+  }),
+  compareGrid: css({
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.75rem',
+    justifyContent: 'center',
+  }),
+  compareLink: css({
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.2rem',
+    textDecoration: 'none',
+    color: 'inherit',
+    transition: 'transform 0.15s ease',
+    _hover: {
+      transform: 'scale(1.1)',
+    },
+  }),
+  compareFace: css({
+    width: '40px',
+    height: '40px',
+    imageRendering: 'pixelated',
+  }),
+  compareName: css({
+    fontSize: '0.7rem',
+    opacity: 0.8,
   }),
 }
