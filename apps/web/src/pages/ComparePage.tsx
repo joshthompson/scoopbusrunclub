@@ -164,7 +164,9 @@ export function ComparePage(props: ComparePageProps) {
           {/* Runners side by side */}
           <div class={styles.versus}>
             <A href={`/member/${runner1Key()}`} class={styles.runnerCol}>
-              <CharacterImage runner={runner1Data()!} pose="sitting" />
+              <div style={{ transform: "scaleX(-1)" }}>
+                <CharacterImage runner={runner1Data()!} pose="sitting" />
+              </div>
               <span class={styles.runnerName}>{name1()}</span>
             </A>
             <span class={styles.vsLabel}>VS</span>

@@ -144,12 +144,20 @@ function updateRunnerSpeedsAndConnections(results: RunResultItem[], volunteers: 
 
   // For each runner, find others at the same event and pick the next-fastest
   for (const [key, current] of runnerLatest) {
+    // Skip runners with standing volunteer roles — they don't move, so they shouldn't follow anyone
+    const currentState = runners[key as RunnerName][0]().runnerState ?? 'run'
+    if (isStandingState(currentState)) continue
+
     const eventKey = `${current.result.event}:${current.result.eventNumber}`
 
     // Find all other runners at the same event
+    // Exclude runners with standing volunteer roles — they don't move, so connecting to them
+    // would leave the follower stuck in place
     const sameEvent: { key: string; timeSeconds: number; position: number }[] = []
     for (const [otherKey, other] of runnerLatest) {
       if (otherKey === key) continue
+      const otherState = runners[otherKey as RunnerName][0]().runnerState ?? 'run'
+      if (isStandingState(otherState)) continue
       const otherEventKey = `${other.result.event}:${other.result.eventNumber}`
       if (otherEventKey === eventKey) {
         sameEvent.push({ key: otherKey, timeSeconds: other.timeSeconds, position: other.result.position })

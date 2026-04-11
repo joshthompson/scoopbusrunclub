@@ -71,7 +71,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       face: [assets.joshFace],
       tailWalk: undefined,
       tailSit: undefined,
-      scanner: undefined,
+      scanner: [assets.joshScanner],
       photographer: undefined,
       runDirector: undefined,
       marshall: undefined,

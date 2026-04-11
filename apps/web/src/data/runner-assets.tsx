@@ -34,6 +34,7 @@ export { default as elineScanner } from '@/assets/runners/eline/scanner.png'
 export { default as joshRun } from '@/assets/runners/josh/run.png'
 export { default as joshSit } from '@/assets/runners/josh/sit.png'
 export { default as joshFace } from '@/assets/runners/josh/face.png'
+export { default as joshScanner } from '@/assets/runners/josh/scanner.png'
 
 export { default as keithRun } from '@/assets/runners/keith/run.png'
 export { default as keithSit } from '@/assets/runners/keith/sit.png'
