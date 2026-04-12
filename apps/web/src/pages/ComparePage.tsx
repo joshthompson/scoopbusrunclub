@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from "solid-js"
 import { css } from "@style/css"
-import { A, useParams } from "@solidjs/router"
+import { A, useParams, useNavigate } from "@solidjs/router"
 import { runners as runnerSignals, type RunnerName } from "@/data/runners"
 import { type RunResultItem, type Runner, type VolunteerItem } from "../utils/api"
 import { parseTimeToSeconds } from "@/utils/misc"
@@ -29,15 +29,26 @@ interface SharedEvent {
 
 export function ComparePage(props: ComparePageProps) {
   const params = useParams<{ names: string }>()
+  const navigate = useNavigate()
 
   // Parse the wildcard path into individual runner route names
   const runnerNames = createMemo(() =>
     (params.names ?? "").split("/").filter(Boolean)
   )
 
+  // Deduplicate: if names repeat, redirect to the unique set
+  const uniqueNames = createMemo(() => [...new Set(runnerNames())])
+  createMemo(() => {
+    const names = runnerNames()
+    const unique = uniqueNames()
+    if (names.length !== unique.length) {
+      navigate(`/compare/${unique.join("/")}`, { replace: true })
+    }
+  })
+
   // Resolve each name to a runner key, signal, data, and id
   const runnerKeys = createMemo(() =>
-    runnerNames().map((n) => getRunnerKeyFromRouteName(n) ?? "")
+    uniqueNames().map((n) => getRunnerKeyFromRouteName(n) ?? "")
   )
 
   const runnerDataList = createMemo(() =>
@@ -52,11 +63,11 @@ export function ComparePage(props: ComparePageProps) {
   )
 
   const names = createMemo(() =>
-    runnerDataList().map((d, i) => d?.name ?? runnerNames()[i])
+    runnerDataList().map((d, i) => d?.name ?? uniqueNames()[i])
   )
 
   const allExist = createMemo(() =>
-    runnerNames().length >= 2 && runnerDataList().every(Boolean)
+    uniqueNames().length >= 2 && runnerDataList().every(Boolean)
   )
 
   // Per-runner results
@@ -178,7 +189,7 @@ export function ComparePage(props: ComparePageProps) {
                     <span class={styles.andLabel}>&</span>
                   </Show>
                   <A href={`/member/${key}`} class={styles.runnerCol}>
-                    <div style={i() === 0 ? { transform: "scaleX(-1)" } : {}}>
+                    <div style={i() < runnerKeys().length / 2 ? { transform: "scaleX(-1)" } : {}}>
                       <CharacterImage runner={runnerDataList()[i()]!} pose="sitting" />
                     </div>
                     <span class={styles.runnerName}>{names()[i()]}</span>
