@@ -8,7 +8,7 @@ import {
 import { css } from "@style/css";
 import { runners, type RunnerName } from "@/data/runners";
 import type { Race, RaceAttendee } from "@/utils/adminApi";
-import { AdminModal } from "@/components/admin/AdminModal";
+import { Modal } from "@/components/ui/Modal";
 import { AdminInput } from "@/components/admin/AdminInput";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { AdminButton } from "@/components/admin/AdminButton";
@@ -173,7 +173,7 @@ export const EventModal: Component<EventModalProps> = (props) => {
   };
 
   return (
-    <AdminModal title={race && !props.isNew ? "Edit Event" : "New Event"} onClose={props.onClose} maxWidth="580px">
+    <Modal title={race && !props.isNew ? "Edit Event" : "New Event"} onClose={props.onClose} maxWidth="580px">
       <form onSubmit={handleSubmit} class={styles.form}>
         <div class={styles.row2}>
           <AdminInput
@@ -334,7 +334,7 @@ export const EventModal: Component<EventModalProps> = (props) => {
           </AdminButton>
         </div>
       </form>
-    </AdminModal>
+    </Modal>
   );
 };
 

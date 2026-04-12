@@ -2,7 +2,7 @@ import { JSX } from "solid-js";
 import { DirtBlock } from "@/components/ui/DirtBlock";
 import { css } from "@style/css/css";
 
-export function AdminModal(props: {
+export function Modal(props: {
   title: string;
   onClose?: () => void
   children: JSX.Element
@@ -37,7 +37,7 @@ const styles = {
     maxWidth: "380px",
   }),
   content: css({
-    maxHeight: "calc(100dvh - 170px)", // 170px for sign, margin, padding, etc.
+    maxHeight: "calc(100dvh - 170px)",
     overflowY: "auto",
   }),
 }

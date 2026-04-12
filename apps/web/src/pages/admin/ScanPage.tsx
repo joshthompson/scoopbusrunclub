@@ -14,7 +14,7 @@ import { fetchTodayRaces, updateRace } from "@/utils/adminApi"
 import { runners, type RunnerName } from "@/data/runners"
 import QrScanner from "qr-scanner"
 import { BarcodeDetector as BarcodeDetectorPolyfill } from "barcode-detector/pure"
-import { AdminModal } from "@/components/admin/AdminModal"
+import { Modal } from "@/components/ui/Modal"
 import { AdminButton } from "@/components/admin/AdminButton"
 
 
@@ -420,7 +420,7 @@ export const ScanPage: Component = () => {
       {/* Scan result confirmation modal */}
       <Show when={scanResult()}>
         {(result) => (
-          <AdminModal title="Runner Found!">
+          <Modal title="Runner Found!">
             <div class={styles.confirmContent}>
               <div class={styles.confirmText}>
                 Would you like to check in <strong>{result().runnerName}</strong> to:<br/>
@@ -431,7 +431,7 @@ export const ScanPage: Component = () => {
                 <AdminButton onClick={confirmCheckin}>OK</AdminButton>
               </div>
             </div>
-          </AdminModal>
+          </Modal>
         )}
       </Show>
     </div>

@@ -14,7 +14,7 @@ import {
 } from "@/utils/adminApi";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { Table as AdminTable } from "@/components/ui/Table";
-import { AdminModal } from "@/components/admin/AdminModal";
+import { Modal } from "@/components/ui/Modal";
 import { AdminInput } from "@/components/admin/AdminInput";
 import { AdminToolbar } from "@/components/admin/AdminToolbar";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -157,7 +157,7 @@ export const UsersPage: Component = () => {
 
         {/* Add User Modal */}
         <Show when={createModalOpen()}>
-          <AdminModal title="Add User" onClose={() => setCreateModalOpen(false)}>
+          <Modal title="Add User" onClose={() => setCreateModalOpen(false)}>
             <form onSubmit={handleCreate} class={styles.form}>
               <AdminInput
                 label="Username"
@@ -190,12 +190,12 @@ export const UsersPage: Component = () => {
                 </AdminButton>
               </div>
             </form>
-          </AdminModal>
+          </Modal>
         </Show>
 
         {/* Edit User Modal */}
         <Show when={editModalOpen()}>
-          <AdminModal title={`Edit User: ${editUser()?.username}`} onClose={() => setEditModalOpen(false)}>
+          <Modal title={`Edit User: ${editUser()?.username}`} onClose={() => setEditModalOpen(false)}>
             <form onSubmit={handleEdit} class={styles.form}>
               <AdminInput
                 label="Username"
@@ -227,7 +227,7 @@ export const UsersPage: Component = () => {
                 </AdminButton>
               </div>
             </form>
-          </AdminModal>
+          </Modal>
         </Show>
       </div>
     </Show>
