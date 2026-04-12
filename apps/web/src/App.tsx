@@ -96,7 +96,7 @@ const App: Component = () => {
           )}
         />
         <Route
-          path="/compare/:name1/:name2"
+          path="/compare/*names"
           component={() => (
             <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
               <ComparePage results={results() ?? []} runners={runners() ?? []} volunteers={volunteers() ?? []} />

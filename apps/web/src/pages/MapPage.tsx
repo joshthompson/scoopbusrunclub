@@ -1,4 +1,4 @@
-import { createMemo, For, Show } from "solid-js"
+import { createMemo, createSignal, For, Show } from "solid-js"
 import { css } from "@style/css"
 import { A } from "@solidjs/router"
 import { type RunResultItem, type VolunteerItem } from "../utils/api"
@@ -29,11 +29,9 @@ const COUNTRY_NAMES: Record<string, string> = {
 const MAP_COLOR_NON_PARKRUN    = "#1a1a1a" // non-parkrun countries (black)
 const MAP_COLOR_PARKRUN        = "#2d5a27" // parkrun countries not yet visited (dark green)
 const MAP_COLOR_VISITED        = "#6abf4b" // parkrun countries we've visited (light green)
-const MAP_COLOR_HIGHLIGHTED    = "#d93025" // highlighted country (red)
+const MAP_COLOR_HIGHLIGHTED    = "#f8b832" // highlighted country (yellow)
 const MAP_COLOR_OCEAN          = "#1a3a5c" // ocean background
-const MAP_COLOR_DOUBLE_COUNTRY = "#ffcc00" // double country (yellow)
-
-const HIGHLIGHTED_COUNTRY: string | null = null // For debug
+const MAP_COLOR_DOUBLE_COUNTRY = "#d93025" // double country (red)
 
 const PARKRUN_COUNTRIES = new Set(Object.keys(COUNTRY_PIXELS))
 
@@ -145,12 +143,37 @@ export function MapPage(props: MapPageProps) {
   const totalCountries = createMemo(() => mapData().length)
   const totalEvents = createMemo(() => mapData().reduce((sum, c) => sum + c.events.length, 0))
 
+  const countryDataLookup = createMemo(() => {
+    const map = new Map<string, CountryVisit>()
+    for (const cv of mapData()) map.set(cv.country, cv)
+    return map
+  })
+
+  const [hoveredCountry, setHoveredCountry] = createSignal<string | null>(null)
+  const [tooltipPos, setTooltipPos] = createSignal({ x: 0, y: 0 })
+
+  const handleMouseMove = (e: MouseEvent) => {
+    const svg = e.currentTarget as SVGSVGElement
+    const ctm = svg.getScreenCTM()
+    if (!ctm) return
+    const svgX = (e.clientX - ctm.e) / ctm.a
+    const svgY = (e.clientY - ctm.f) / ctm.d
+    const col = Math.floor(svgX / CELL)
+    const row = Math.floor(svgY / CELL)
+    const key = `${col},${row}`
+    setHoveredCountry(COUNTRY_LOOKUP.get(key) ?? null)
+    setTooltipPos({ x: e.clientX, y: e.clientY })
+  }
+
+  const handleMouseLeave = () => setHoveredCountry(null)
+
   const pixelRects = createMemo(() => {
     const visited = visitedCountries()
+    const highlighted = hoveredCountry()
     const rects: { x: number; y: number; fill: string; pos: string }[] = []
 
     const colorForCountry = (code: string | undefined): string => {
-      if (code === HIGHLIGHTED_COUNTRY) return MAP_COLOR_HIGHLIGHTED
+      if (code != null && code === highlighted) return MAP_COLOR_HIGHLIGHTED
       if (code != null && visited.has(code)) return MAP_COLOR_VISITED
       if (code != null && PARKRUN_COUNTRIES.has(code)) return MAP_COLOR_PARKRUN
       return MAP_COLOR_NON_PARKRUN
@@ -197,12 +220,43 @@ export function MapPage(props: MapPageProps) {
         </div>
 
         <div class={styles.mapContainer}>
-          <svg viewBox={`0 0 ${COLS * CELL} ${ROWS * CELL}`} class={styles.map}>
+          <svg
+            viewBox={`0 0 ${COLS * CELL} ${ROWS * CELL}`}
+            class={styles.map}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
             <rect width={COLS * CELL} height={ROWS * CELL} fill={MAP_COLOR_OCEAN} />
             <For each={pixelRects()}>
               {(px) => <rect x={px.x} y={px.y} width={CELL - 1} height={CELL - 1} fill={px.fill} rx="10" data-pos={px.pos} />}
             </For>
           </svg>
+          <Show when={hoveredCountry()}>
+            {(code) => {
+              const data = () => countryDataLookup().get(code())
+              return (
+                <div
+                  class={styles.tooltip}
+                  style={{
+                    left: `${tooltipPos().x + 14}px`,
+                    top: `${tooltipPos().y + 14}px`,
+                  }}
+                >
+                  <div class={styles.tooltipHeader}>
+                    {COUNTRY_FLAGS[code()] ?? "🏳️"} {COUNTRY_NAMES[code()] ?? code()}
+                  </div>
+                  <Show when={data()} fallback={<div class={styles.tooltipLine}>Not yet visited</div>}>
+                    {(d) => (
+                      <>
+                        <div class={styles.tooltipLine}>{d().totalVisits} total visit{d().totalVisits !== 1 ? "s" : ""}</div>
+                        <div class={styles.tooltipLine}>{d().events.length} event{d().events.length !== 1 ? "s" : ""}</div>
+                      </>
+                    )}
+                  </Show>
+                </div>
+              )
+            }}
+          </Show>
         </div>
       </FieldBlock>
 
@@ -278,6 +332,7 @@ const styles = {
     width: "100%",
     maxHeight: "350px",
     borderRadius: "4px",
+    cornerShape: 'notch',
     overflow: "hidden",
   }),
   map: css({
@@ -323,5 +378,28 @@ const styles = {
     color: "inherit",
     textDecoration: "underline",
     fontWeight: "bold",
+  }),
+  tooltip: css({
+    position: "fixed",
+    pointerEvents: "none",
+    zIndex: 1000,
+    background: "rgba(0, 0, 0, 0.85)",
+    color: "#fff",
+    borderRadius: "6px",
+    padding: "0.5rem 0.75rem",
+    fontSize: "0.85rem",
+    lineHeight: 1.4,
+    whiteSpace: "nowrap",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+    cornerShape: 'notch',
+    textAlign: "center",
+  }),
+  tooltipHeader: css({
+    fontWeight: "bold",
+    fontSize: "0.95rem",
+    marginBottom: "0.2rem",
+  }),
+  tooltipLine: css({
+    opacity: 0.85,
   }),
 }

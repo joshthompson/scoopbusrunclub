@@ -3,20 +3,15 @@ import { css } from "@style/css"
 import { A, useParams } from "@solidjs/router"
 import { runners as runnerSignals, type RunnerName } from "@/data/runners"
 import { type RunResultItem, type Runner, type VolunteerItem } from "../utils/api"
-import { formatName, parseTimeToSeconds } from "@/utils/misc"
-import { getRunnerKeyFromRouteName, getMemberRoute } from "@/utils/memberRoute"
+import { parseTimeToSeconds } from "@/utils/misc"
+import { getRunnerKeyFromRouteName } from "@/utils/memberRoute"
 import { CharacterImage } from "@/components/CharacterImage"
 import { FieldBlock } from "@/components/ui/FieldBlock"
 import { DirtBlock } from "@/components/ui/DirtBlock"
 import { BackSignButton } from "@/components/BackSignButton"
 import { NotFoundPage } from "./NotFoundPage"
+import { RunnerSummaryStat } from "./RunnerSummaryStat"
 import { Table } from "@/components/ui/Table"
-
-function secondsToMMSS(seconds: number) {
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`
-}
 
 interface ComparePageProps {
   results: RunResultItem[]
@@ -24,195 +19,192 @@ interface ComparePageProps {
   volunteers: VolunteerItem[]
 }
 
-interface HeadToHeadResult {
+interface SharedEvent {
   date: string
   event: string
   eventName: string
   eventNumber: number
-  time1: string
-  time2: string
-  winner: 1 | 2 | 0 // 0 = tie
+  times: string[] // one per runner
 }
 
 export function ComparePage(props: ComparePageProps) {
-  const params = useParams<{ name1: string; name2: string }>()
+  const params = useParams<{ names: string }>()
 
-  const runner1Key = createMemo(() => getRunnerKeyFromRouteName(params.name1) ?? "")
-  const runner2Key = createMemo(() => getRunnerKeyFromRouteName(params.name2) ?? "")
-  const runner1Signal = createMemo(() => runnerSignals[runner1Key() as RunnerName])
-  const runner2Signal = createMemo(() => runnerSignals[runner2Key() as RunnerName])
-  const runner1Data = createMemo(() => runner1Signal()?.[0]())
-  const runner2Data = createMemo(() => runner2Signal()?.[0]())
-  const runner1Id = createMemo(() => runner1Data()?.id ?? "")
-  const runner2Id = createMemo(() => runner2Data()?.id ?? "")
+  // Parse the wildcard path into individual runner route names
+  const runnerNames = createMemo(() =>
+    (params.names ?? "").split("/").filter(Boolean)
+  )
 
-  const runner1Results = createMemo(() => props.results.filter((r) => r.parkrunId === runner1Id()))
-  const runner2Results = createMemo(() => props.results.filter((r) => r.parkrunId === runner2Id()))
+  // Resolve each name to a runner key, signal, data, and id
+  const runnerKeys = createMemo(() =>
+    runnerNames().map((n) => getRunnerKeyFromRouteName(n) ?? "")
+  )
 
-  const runner1TotalRuns = createMemo(() => props.runners.find((r) => r.parkrunId === runner1Id())?.totalRuns ?? runner1Results().length)
-  const runner2TotalRuns = createMemo(() => props.runners.find((r) => r.parkrunId === runner2Id())?.totalRuns ?? runner2Results().length)
+  const runnerDataList = createMemo(() =>
+    runnerKeys().map((key) => {
+      const sig = runnerSignals[key as RunnerName]
+      return sig ? sig[0]() : undefined
+    })
+  )
 
-  const runner1Events = createMemo(() => new Set(runner1Results().map((r) => r.event)).size)
-  const runner2Events = createMemo(() => new Set(runner2Results().map((r) => r.event)).size)
+  const runnerIds = createMemo(() =>
+    runnerDataList().map((d) => d?.id ?? "")
+  )
 
-  const runner1Volunteered = createMemo(() => props.volunteers.filter((v) => v.parkrunId === runner1Id()).length)
-  const runner2Volunteered = createMemo(() => props.volunteers.filter((v) => v.parkrunId === runner2Id()).length)
+  const names = createMemo(() =>
+    runnerDataList().map((d, i) => d?.name ?? runnerNames()[i])
+  )
 
-  // PBs (fastest time)
-  const bestTime = (results: RunResultItem[]) => {
-    let best = Infinity
-    for (const r of results) {
-      const s = parseTimeToSeconds(r.time)
-      if (s < best) best = s
+  const allExist = createMemo(() =>
+    runnerNames().length >= 2 && runnerDataList().every(Boolean)
+  )
+
+  // Per-runner results
+  const perRunnerResults = createMemo(() =>
+    runnerIds().map((id) => props.results.filter((r) => r.parkrunId === id))
+  )
+
+  // Combined runs: sum of each runner's total
+  const combinedRuns = createMemo(() => {
+    const ids = runnerIds()
+    return ids.reduce((sum, id, i) => {
+      const fromRunner = props.runners.find((r) => r.parkrunId === id)?.totalRuns
+      return sum + (fromRunner ?? perRunnerResults()[i].length)
+    }, 0)
+  })
+
+  // Combined events: union of unique event slugs across all runners
+  const combinedEvents = createMemo(() => {
+    const events = new Set<string>()
+    for (const results of perRunnerResults()) {
+      for (const r of results) events.add(r.event)
     }
-    return best === Infinity ? null : best
-  }
-  const runner1PB = createMemo(() => bestTime(runner1Results()))
-  const runner2PB = createMemo(() => bestTime(runner2Results()))
+    return events.size
+  })
 
-  // Head-to-head: same event + same eventNumber on same date
-  const headToHead = createMemo<HeadToHeadResult[]>(() => {
-    const r2Map = new Map<string, RunResultItem>()
-    for (const r of runner2Results()) {
-      r2Map.set(`${r.date}:${r.event}:${r.eventNumber}`, r)
+  // Volunteered together: events where ALL runners volunteered on the same date
+  const volunteeredTogether = createMemo(() => {
+    const ids = runnerIds()
+    if (ids.length < 2) return 0
+    // Build a map: "date:event" -> set of runner ids who volunteered
+    const volMap = new Map<string, Set<string>>()
+    for (const v of props.volunteers) {
+      if (!ids.includes(v.parkrunId)) continue
+      const key = `${v.date}:${v.event}`
+      if (!volMap.has(key)) volMap.set(key, new Set())
+      volMap.get(key)!.add(v.parkrunId)
     }
+    let count = 0
+    for (const runners of volMap.values()) {
+      if (ids.every((id) => runners.has(id))) count++
+    }
+    return count
+  })
 
-    const results: HeadToHeadResult[] = []
-    for (const r1 of runner1Results()) {
-      const key = `${r1.date}:${r1.event}:${r1.eventNumber}`
-      const r2 = r2Map.get(key)
-      if (!r2) continue
+  // Events where ALL runners participated (same event + eventNumber + date)
+  const sharedEvents = createMemo<SharedEvent[]>(() => {
+    const allResults = perRunnerResults()
+    if (allResults.length < 2) return []
 
-      const s1 = parseTimeToSeconds(r1.time)
-      const s2 = parseTimeToSeconds(r2.time)
-      let winner: 1 | 2 | 0 = 0
-      if (Number.isFinite(s1) && Number.isFinite(s2)) {
-        if (s1 < s2) winner = 1
-        else if (s2 < s1) winner = 2
+    // Build maps per runner: eventKey -> RunResultItem
+    const maps = allResults.map((results) => {
+      const m = new Map<string, RunResultItem>()
+      for (const r of results) m.set(`${r.date}:${r.event}:${r.eventNumber}`, r)
+      return m
+    })
+
+    // Iterate over the first runner's results, check all others have it
+    const shared: SharedEvent[] = []
+    for (const [key, r1] of maps[0]) {
+      const matches = [r1]
+      let allMatch = true
+      for (let i = 1; i < maps.length; i++) {
+        const ri = maps[i].get(key)
+        if (!ri) { allMatch = false; break }
+        matches.push(ri)
       }
+      if (!allMatch) continue
 
-      results.push({
+      shared.push({
         date: r1.date,
         event: r1.event,
         eventName: r1.eventName,
         eventNumber: r1.eventNumber,
-        time1: r1.time,
-        time2: r2.time,
-        winner,
+        times: matches.map((m) => m.time),
       })
     }
-    return results.sort((a, b) => b.date.localeCompare(a.date))
+    return shared.sort((a, b) => b.date.localeCompare(a.date))
   })
 
-  const h2hWins1 = createMemo(() => headToHead().filter((r) => r.winner === 1).length)
-  const h2hWins2 = createMemo(() => headToHead().filter((r) => r.winner === 2).length)
-  const h2hTies = createMemo(() => headToHead().filter((r) => r.winner === 0).length)
-
-  // Closest finish
-  const closestFinish = createMemo(() => {
-    let closest: HeadToHeadResult | null = null
-    let closestDiff = Infinity
-    for (const r of headToHead()) {
-      const s1 = parseTimeToSeconds(r.time1)
-      const s2 = parseTimeToSeconds(r.time2)
-      if (!Number.isFinite(s1) || !Number.isFinite(s2)) continue
-      const diff = Math.abs(s1 - s2)
-      if (diff < closestDiff) {
-        closestDiff = diff
-        closest = r
-      }
-    }
-    return closest ? { ...closest, diff: closestDiff } : null
+  // Finishes together: all runners within 10s of each other at same event
+  const finishesTogether = createMemo(() => {
+    return sharedEvents().filter((ev) => {
+      const seconds = ev.times.map(parseTimeToSeconds).filter(Number.isFinite)
+      if (seconds.length < 2) return false
+      const max = Math.max(...seconds)
+      const min = Math.min(...seconds)
+      return max - min <= 10
+    }).length
   })
-
-  const name1 = createMemo(() => runner1Data()?.name ?? params.name1)
-  const name2 = createMemo(() => runner2Data()?.name ?? params.name2)
-
-  const bothExist = createMemo(() => !!runner1Data() && !!runner2Data())
-
-  function statWinner(v1: number | null, v2: number | null, lower = false): 0 | 1 | 2 {
-    if (v1 == null || v2 == null) return 0
-    if (v1 === v2) return 0
-    if (lower) return v1 < v2 ? 1 : 2
-    return v1 > v2 ? 1 : 2
-  }
 
   const raceTableColumns = createMemo(() => [
     { title: "Event" },
-    { title: name1(), width: "90px" },
-    { title: name2(), width: "90px" },
+    ...names().map((n) => ({ title: n, width: "90px" })),
   ])
 
   const raceTableData = createMemo(() =>
-    headToHead().map((race) => {
-      const formatted = new Date(`${race.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })
+    sharedEvents().map((ev) => {
+      const formatted = new Date(`${ev.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })
       return [
         <div class={styles.raceEvent}>
-          <span>{race.eventName} #{race.eventNumber}</span>
+          <span>{ev.eventName} #{ev.eventNumber}</span>
           <span class={styles.raceDate}>{formatted}</span>
         </div>,
-        <span class={css({ fontWeight: race.winner === 1 ? "bold" : "normal" })}>{race.time1}</span>,
-        <span class={css({ fontWeight: race.winner === 2 ? "bold" : "normal" })}>{race.time2}</span>,
+        ...ev.times.map((t) => <span>{t}</span>),
       ]
     })
   )
 
   return (
-    <Show when={bothExist()} fallback={<NotFoundPage />}>
+    <Show when={allExist()} fallback={<NotFoundPage />}>
       <div class={styles.container}>
-        <FieldBlock title="Head to Head" signType="purple">
+        <FieldBlock>
           {/* Runners side by side */}
-          <div class={styles.versus}>
-            <A href={`/member/${runner1Key()}`} class={styles.runnerCol}>
-              <div style={{ transform: "scaleX(-1)" }}>
-                <CharacterImage runner={runner1Data()!} pose="sitting" />
-              </div>
-              <span class={styles.runnerName}>{name1()}</span>
-            </A>
-            <span class={styles.vsLabel}>VS</span>
-            <A href={`/member/${runner2Key()}`} class={styles.runnerCol}>
-              <CharacterImage runner={runner2Data()!} pose="sitting" />
-              <span class={styles.runnerName}>{name2()}</span>
-            </A>
+          <div class={styles.runnersRow}>
+            <For each={runnerKeys()}>
+              {(key, i) => (
+                <>
+                  <Show when={i() > 0}>
+                    <span class={styles.andLabel}>&</span>
+                  </Show>
+                  <A href={`/member/${key}`} class={styles.runnerCol}>
+                    <div style={i() === 0 ? { transform: "scaleX(-1)" } : {}}>
+                      <CharacterImage runner={runnerDataList()[i()]!} pose="sitting" />
+                    </div>
+                    <span class={styles.runnerName}>{names()[i()]}</span>
+                  </A>
+                </>
+              )}
+            </For>
           </div>
 
-          {/* Comparison stats */}
-          <div class={styles.statsTable}>
-            <StatRow label="Total runs" v1={runner1TotalRuns()} v2={runner2TotalRuns()} />
-            <StatRow label="Events visited" v1={runner1Events()} v2={runner2Events()} />
-            <StatRow label="Volunteer times" v1={runner1Volunteered()} v2={runner2Volunteered()} />
-            <StatRow
-              label="PB"
-              v1={runner1PB() != null ? secondsToMMSS(runner1PB()!) : "—"}
-              v2={runner2PB() != null ? secondsToMMSS(runner2PB()!) : "—"}
-              winner={statWinner(runner1PB(), runner2PB(), true)}
-            />
-            <StatRow label="H2H Wins" v1={h2hWins1()} v2={h2hWins2()} />
+          {/* Stats */}
+          <div class={styles.statsGrid}>
+            <RunnerSummaryStat label="Combined runs">{combinedRuns()}</RunnerSummaryStat>
+            <RunnerSummaryStat label="Combined events">{combinedEvents()}</RunnerSummaryStat>
+            <RunnerSummaryStat label="Events together">{sharedEvents().length}</RunnerSummaryStat>
+            <RunnerSummaryStat label="Volunteered together">{volunteeredTogether()}</RunnerSummaryStat>
+            <RunnerSummaryStat label="Finishes within 10s">{finishesTogether()}</RunnerSummaryStat>
           </div>
-
-          <Show when={headToHead().length > 0}>
-            <div class={styles.h2hSummary}>
-              <strong>{headToHead().length}</strong> race{headToHead().length !== 1 ? "s" : ""} together
-              {h2hTies() > 0 && <> ({h2hTies()} tie{h2hTies() !== 1 ? "s" : ""})</>}
-            </div>
-          </Show>
-
-          <Show when={closestFinish()}>
-            {(cf) => (
-              <div class={styles.closestFinish}>
-                Closest finish: <strong>{cf().diff}s</strong> apart at {cf().eventName} #{cf().eventNumber}
-              </div>
-            )}
-          </Show>
         </FieldBlock>
 
         {/* Race-by-race breakdown */}
-        <Show when={headToHead().length > 0}>
-          <DirtBlock title="Race History">
+        <Show when={sharedEvents().length > 0}>
+          <DirtBlock title="Event History">
             <Table
               columns={raceTableColumns()}
               data={raceTableData()}
-              empty="No shared races."
+              empty="No shared events."
             />
           </DirtBlock>
         </Show>
@@ -220,28 +212,6 @@ export function ComparePage(props: ComparePageProps) {
         <BackSignButton />
       </div>
     </Show>
-  )
-}
-
-function StatRow(props: { label: string; v1: number | string; v2: number | string; winner?: 0 | 1 | 2 }) {
-  const w = () => {
-    if (props.winner != null) return props.winner
-    const n1 = typeof props.v1 === "number" ? props.v1 : NaN
-    const n2 = typeof props.v2 === "number" ? props.v2 : NaN
-    if (isNaN(n1) || isNaN(n2) || n1 === n2) return 0
-    return n1 > n2 ? 1 : 2
-  }
-
-  return (
-    <div class={styles.statRow}>
-      <span class={css({ fontWeight: w() === 1 ? "bold" : "normal" })}>
-        {String(props.v1)}
-      </span>
-      <span class={styles.statLabel}>{props.label}</span>
-      <span class={css({ fontWeight: w() === 2 ? "bold" : "normal" })}>
-        {String(props.v2)}
-      </span>
-    </div>
   )
 }
 
@@ -254,12 +224,13 @@ const styles = {
     flexDirection: "column",
     gap: "1.5rem",
   }),
-  versus: css({
+  runnersRow: css({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "1.5rem",
+    gap: "1rem",
     marginBottom: "1rem",
+    flexWrap: "wrap",
   }),
   runnerCol: css({
     display: "flex",
@@ -273,41 +244,18 @@ const styles = {
     fontSize: "1.2rem",
     fontWeight: "bold",
   }),
-  vsLabel: css({
-    fontSize: "2rem",
+  andLabel: css({
+    fontSize: "1.5rem",
     fontWeight: "bold",
-    opacity: 0.5,
+    opacity: 0.4,
     fontFamily: '"Jersey 10", sans-serif',
   }),
-  statsTable: css({
+  statsGrid: css({
     display: "flex",
-    flexDirection: "column",
+    flexWrap: "wrap",
     gap: "0.5rem",
-  }),
-  statRow: css({
-    display: "grid",
-    gridTemplateColumns: "1fr auto 1fr",
-    gap: "0.75rem",
     alignItems: "center",
-    textAlign: "center",
-    "& > :first-child": { textAlign: "right" },
-    "& > :last-child": { textAlign: "left" },
-  }),
-  statLabel: css({
-    fontSize: "0.8rem",
-    opacity: 0.7,
-    minWidth: "100px",
-  }),
-  h2hSummary: css({
-    textAlign: "center",
-    marginTop: "0.75rem",
-    fontSize: "0.9rem",
-  }),
-  closestFinish: css({
-    textAlign: "center",
-    fontSize: "0.85rem",
-    opacity: 0.85,
-    marginTop: "0.25rem",
+    width: "100%",
   }),
   raceEvent: css({
     display: "flex",
