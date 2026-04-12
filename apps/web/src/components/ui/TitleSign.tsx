@@ -1,4 +1,4 @@
-import { css, cva } from '@style/css'
+import { cva } from '@style/css'
 import woodenSign from '@/assets/misc/wooden-sign.png'
 import purpleSign from '@/assets/misc/purple-sign.png'
 

@@ -553,7 +553,7 @@ const styles = {
     },
   }),
   compareFace: css({
-    width: '40px',
+    width: 'auto',
     height: '40px',
     imageRendering: 'pixelated',
   }),

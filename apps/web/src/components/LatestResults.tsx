@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show, type JSX } from "solid-js"
 import { css } from "@style/css"
-import { A } from "@solidjs/router"
+import { A, useNavigate } from "@solidjs/router"
 import { type RunResultItem, type Runner, type RaceItem, type VolunteerItem } from "../utils/api"
 import { formatDate, formatName, ordinal } from "@/utils/misc"
 import { MILESTONE_SET } from "../utils/milestones"
@@ -362,13 +362,14 @@ const countryFlags: Record<string, string> = {
 }
 
 function ParkrunFlag(props: { parkrun: ParkrunEvent }) {
+  const navigate = useNavigate()
   const flag = createMemo(() => {
     const ev = getEvent(props.parkrun.eventId)
     if (ev?.country && ev.country !== 'SE' && countryFlags[ev.country]) return countryFlags[ev.country]
     return null
   })
   
-  return <Show when={flag()}>{(f) => <Emoji class={styles.flag} emoji={f()} noAnimation />}</Show>
+  return <Show when={flag()}>{(f) => <span class={styles.flag} onClick={() => navigate('/map')}><Emoji emoji={f()} noAnimation /></span>}</Show>
 }
 
 export function LatestResults(props: LatestResultsProps) {
@@ -536,6 +537,12 @@ const styles = {
     top: '-8px',
     left: '-8px',
     fontSize: '32px',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease',
+
+    _hover: {
+      transform: 'scale(1.2)',
+    }
   }),
   volunteers: css({
     listStyle: 'none',
