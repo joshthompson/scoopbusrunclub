@@ -7,6 +7,7 @@ import { getEvent, getEventName } from "@/utils/events"
 import { formatName, parseTimeToSeconds } from "@/utils/misc"
 import { getMemberRoute } from "@/utils/memberRoute"
 import { FieldBlock } from "../components/ui/FieldBlock"
+import { DirtBlock } from "../components/ui/DirtBlock"
 import { BackSignButton } from "@/components/BackSignButton"
 import { CharacterImage } from "@/components/CharacterImage"
 
@@ -15,6 +16,31 @@ import { CharacterImage } from "@/components/CharacterImage"
 // ---------------------------------------------------------------------------
 
 const FIRST_YEAR = 2012
+
+/** Country code → flag emoji + name */
+const COUNTRY_FLAGS: Record<string, { flag: string; name: string }> = {
+  AU: { flag: "🇦🇺", name: "Australia" },
+  AT: { flag: "🇦🇹", name: "Austria" },
+  CA: { flag: "🇨🇦", name: "Canada" },
+  DK: { flag: "🇩🇰", name: "Denmark" },
+  FI: { flag: "🇫🇮", name: "Finland" },
+  DE: { flag: "🇩🇪", name: "Germany" },
+  IE: { flag: "🇮🇪", name: "Ireland" },
+  IT: { flag: "🇮🇹", name: "Italy" },
+  JP: { flag: "🇯🇵", name: "Japan" },
+  LT: { flag: "🇱🇹", name: "Lithuania" },
+  MY: { flag: "🇲🇾", name: "Malaysia" },
+  NA: { flag: "🇳🇦", name: "Namibia" },
+  NL: { flag: "🇳🇱", name: "Netherlands" },
+  NZ: { flag: "🇳🇿", name: "New Zealand" },
+  NO: { flag: "🇳🇴", name: "Norway" },
+  PL: { flag: "🇵🇱", name: "Poland" },
+  SG: { flag: "🇸🇬", name: "Singapore" },
+  ZA: { flag: "🇿🇦", name: "South Africa" },
+  SE: { flag: "🇸🇪", name: "Sweden" },
+  UK: { flag: "🇬🇧", name: "United Kingdom" },
+  US: { flag: "🇺🇸", name: "United States" },
+}
 
 const parkrunIdToMeta = new Map<string, { name: string; key: string }>()
 for (const [key, [runner]] of Object.entries(runnerSignals)) {
@@ -90,6 +116,7 @@ interface WrappedStats {
     events: number
     newEvents: number
     volunteered: number
+    pbImprovement: number // seconds improved, 0 if no PB
   }[]
 
   // Top new events
@@ -100,6 +127,19 @@ interface WrappedStats {
 
   // Members who debuted this year (first-ever parkrun result)
   debutMembers: { name: string; key: string; date: string }[]
+
+  // PBs
+  totalPBs: number
+  biggestPBImprover: { name: string; secondsSaved: number } | null
+
+  // Biggest scoop bus trip (non-Haga event with most members)
+  biggestTrip: { date: string; event: string; eventName: string; eventNumber: number; count: number } | null
+
+  // Biggest Haga event
+  biggestHaga: { date: string; eventNumber: number; count: number } | null
+
+  // New countries ran in this year (not visited in any prior year)
+  newCountries: { code: string; flag: string; name: string; eventName: string }[]
 }
 
 function computeWrappedStats(
@@ -135,6 +175,11 @@ function computeWrappedStats(
       newEventsList: [],
       totalAchievements: 0,
       debutMembers: [],
+      totalPBs: 0,
+      biggestPBImprover: null,
+      biggestTrip: null,
+      biggestHaga: null,
+      newCountries: [],
     }
   }
 
@@ -322,21 +367,6 @@ function computeWrappedStats(
     }
   }
 
-  // Build member stats list
-  const memberStats: WrappedStats["memberStats"] = []
-  for (const id of activeMembers) {
-    const meta = parkrunIdToMeta.get(id)
-    memberStats.push({
-      parkrunId: id,
-      name: meta?.name ?? formatName(id),
-      runs: memberRunCounts.get(id) ?? 0,
-      events: memberEventSets.get(id)?.size ?? 0,
-      newEvents: memberNewEventCounts.get(id) ?? 0,
-      volunteered: memberVolCounts.get(id) ?? 0,
-    })
-  }
-  memberStats.sort((a, b) => b.runs - a.runs) // Sort by runs, just for ordering
-
   // Approximate total achievements = PBs + milestones (rough estimate from first-year runners etc.)
   // Keep it simple: count milestones as "interesting things"
   const totalAchievements = newEventsSet.size + closeFinishes + (volunteers.length > 0 ? 1 : 0)
@@ -366,6 +396,137 @@ function computeWrappedStats(
   }
   debutMembers.sort((a, b) => a.date.localeCompare(b.date))
 
+  // PBs — count runs that are a member's best 5K time at that point
+  // For each member, find their best time before this year, then track PBs within this year
+  const priorBestTime = new Map<string, number>() // parkrunId -> best seconds before this year
+  for (const r of allResultsPriorYears) {
+    if (r.date >= yearStr) continue
+    if (isJuniorEvent(r.event)) continue
+    const id = r.parkrunId
+    if (!parkrunIdToMeta.has(id)) continue
+    const secs = parseTimeToSeconds(r.time)
+    if (secs <= 0) continue
+    const existing = priorBestTime.get(id)
+    if (!existing || secs < existing) priorBestTime.set(id, secs)
+  }
+
+  let totalPBs = 0
+  const pbImprovements = new Map<string, number>() // parkrunId -> total seconds improved
+  // Sort this year's results by date so we can track running best
+  const sortedResults = [...results].filter((r) => !isJuniorEvent(r.event)).sort((a, b) => a.date.localeCompare(b.date))
+  const currentBest = new Map<string, number>() // running best per member within the year
+  for (const [id, secs] of priorBestTime) currentBest.set(id, secs)
+
+  for (const r of sortedResults) {
+    const id = r.parkrunId
+    if (!parkrunIdToMeta.has(id)) continue
+    const secs = parseTimeToSeconds(r.time)
+    if (secs <= 0) continue
+    const best = currentBest.get(id)
+    if (!best || secs < best) {
+      if (best) {
+        totalPBs++
+        const improvement = best - secs
+        pbImprovements.set(id, (pbImprovements.get(id) ?? 0) + improvement)
+      } else {
+        // First ever run — it's technically a PB but we only count improvements
+        totalPBs++
+      }
+      currentBest.set(id, secs)
+    }
+  }
+
+  let biggestPBImprover: WrappedStats["biggestPBImprover"] = null
+  for (const [id, saved] of pbImprovements) {
+    if (!biggestPBImprover || saved > biggestPBImprover.secondsSaved) {
+      biggestPBImprover = { name: parkrunIdToMeta.get(id)?.name ?? id, secondsSaved: saved }
+    }
+  }
+
+  // Build member stats list
+  const memberStats: WrappedStats["memberStats"] = []
+  for (const id of activeMembers) {
+    const meta = parkrunIdToMeta.get(id)
+    memberStats.push({
+      parkrunId: id,
+      name: meta?.name ?? formatName(id),
+      runs: memberRunCounts.get(id) ?? 0,
+      events: memberEventSets.get(id)?.size ?? 0,
+      newEvents: memberNewEventCounts.get(id) ?? 0,
+      volunteered: memberVolCounts.get(id) ?? 0,
+      pbImprovement: pbImprovements.get(id) ?? 0,
+    })
+  }
+  memberStats.sort((a, b) => b.runs - a.runs) // Sort by runs, just for ordering
+
+  // Biggest scoop bus trip — most members at a single non-Haga event instance
+  const eventInstanceMembers = new Map<string, { event: string; eventNumber: number; date: string; members: Set<string> }>()
+  for (const r of results) {
+    if (!parkrunIdToMeta.has(r.parkrunId)) continue
+    const key = `${r.date}:${r.event}:${r.eventNumber}`
+    if (!eventInstanceMembers.has(key)) {
+      eventInstanceMembers.set(key, { event: r.event, eventNumber: r.eventNumber, date: r.date, members: new Set() })
+    }
+    eventInstanceMembers.get(key)!.members.add(r.parkrunId)
+  }
+  for (const v of volunteers) {
+    if (!parkrunIdToMeta.has(v.parkrunId)) continue
+    const key = `${v.date}:${v.event}:${v.eventNumber}`
+    if (!eventInstanceMembers.has(key)) {
+      eventInstanceMembers.set(key, { event: v.event, eventNumber: v.eventNumber, date: v.date, members: new Set() })
+    }
+    eventInstanceMembers.get(key)!.members.add(v.parkrunId)
+  }
+
+  let biggestTrip: WrappedStats["biggestTrip"] = null
+  let biggestHaga: WrappedStats["biggestHaga"] = null
+  for (const inst of eventInstanceMembers.values()) {
+    const count = inst.members.size
+    if (inst.event === "haga") {
+      if (!biggestHaga || count > biggestHaga.count) {
+        biggestHaga = { date: inst.date, eventNumber: inst.eventNumber, count }
+      }
+    } else {
+      if (!biggestTrip || count > biggestTrip.count) {
+        biggestTrip = {
+          date: inst.date,
+          event: inst.event,
+          eventName: getEventName(inst.event),
+          eventNumber: inst.eventNumber,
+          count,
+        }
+      }
+    }
+  }
+
+  // New countries — countries visited this year that weren't visited in any prior year
+  const priorCountries = new Set<string>()
+  for (const r of allResultsPriorYears) {
+    if (r.date >= yearStr) continue
+    if (!parkrunIdToMeta.has(r.parkrunId)) continue
+    const ev = getEvent(r.event)
+    if (ev?.country) priorCountries.add(ev.country)
+  }
+
+  const newCountriesMap = new Map<string, string>() // country code -> first event name
+  for (const r of results) {
+    if (!parkrunIdToMeta.has(r.parkrunId)) continue
+    const ev = getEvent(r.event)
+    if (ev?.country && !priorCountries.has(ev.country) && !newCountriesMap.has(ev.country)) {
+      newCountriesMap.set(ev.country, ev.name)
+    }
+  }
+  const newCountries: WrappedStats["newCountries"] = []
+  for (const [code, eventName] of newCountriesMap) {
+    const info = COUNTRY_FLAGS[code]
+    newCountries.push({
+      code,
+      flag: info?.flag ?? "🏳️",
+      name: info?.name ?? code,
+      eventName,
+    })
+  }
+
   return {
     year,
     hasData: true,
@@ -387,6 +548,11 @@ function computeWrappedStats(
     newEventsList,
     totalAchievements,
     debutMembers,
+    totalPBs,
+    biggestPBImprover,
+    biggestTrip,
+    biggestHaga,
+    newCountries,
   }
 }
 
@@ -551,11 +717,11 @@ export function WrappedPage(props: WrappedPageProps) {
               </div>
             </WrappedCard>
 
-            {/* Active Saturdays */}
+            {/* Active events */}
             <WrappedCard emoji="📅" color="#7c3aed">
               <div>
                 <strong>{stats().activeMembers} members</strong> were active across{" "}
-                <strong>{stats().activeSaturdays} Saturdays</strong>
+                <strong>{stats().activeSaturdays} events</strong>
               </div>
             </WrappedCard>
 
@@ -563,13 +729,11 @@ export function WrappedPage(props: WrappedPageProps) {
             <Show when={stats().busiestSaturday}>
               {(() => {
                 const b = stats().busiestSaturday!
-                const d = new Date(`${b.date}T00:00:00`)
-                const isSaturday = d.getDay() === 6
                 const eventLabel = b.events.map((e) => `${e.name} #${e.eventNumber}`).join(", ")
                 return (
                   <WrappedCard emoji="🎉" color="#e11d48">
                     <div>
-                      The busiest {isSaturday ? "Saturday" : "event"} was <strong>{formatDateDisplay(b.date)}</strong> with{" "}
+                      The busiest dat was <strong>{formatDateDisplay(b.date)}</strong> with{" "}
                       <strong>{b.count} members</strong> at {eventLabel}
                     </div>
                   </WrappedCard>
@@ -608,12 +772,57 @@ export function WrappedPage(props: WrappedPageProps) {
                 <div>
                   <strong>{stats().closeFinishes} close finishes</strong> within 10 seconds of each other
                   <Show when={stats().mostCommonCloseFinishPair}>
-                    . {stats().mostCommonCloseFinishPair!.nameA} &{" "}
-                    {stats().mostCommonCloseFinishPair!.nameB} were the closest pair ({stats().mostCommonCloseFinishPair!.count} times)
+                    . <strong>{stats().mostCommonCloseFinishPair!.nameA}</strong> &{" "}
+                    <strong>{stats().mostCommonCloseFinishPair!.nameB}</strong> were the closest pair ({stats().mostCommonCloseFinishPair!.count} times)
                   </Show>
                 </div>
               </WrappedCard>
             </Show>
+
+            {/* PBs */}
+            <Show when={stats().totalPBs > 0}>
+              <WrappedCard emoji="⚡" color="#f59e0b">
+                <div>
+                  <strong>{stats().totalPBs} personal bests</strong> were set this year
+                  <Show when={stats().biggestPBImprover}>
+                    . <strong>{stats().biggestPBImprover!.name}</strong> knocked the most time off — <strong>{Math.floor(stats().biggestPBImprover!.secondsSaved / 60)}:{String(stats().biggestPBImprover!.secondsSaved % 60).padStart(2, "0")}</strong> faster!
+                  </Show>
+                </div>
+              </WrappedCard>
+            </Show>
+
+            {/* Biggest Haga */}
+            <Show when={stats().biggestHaga}>
+              <WrappedCard emoji="🏠" color="#6366f1">
+                <div>
+                  The biggest Haga turnout was <strong>Haga #{stats().biggestHaga!.eventNumber}</strong> on{" "}
+                  <strong>{formatDateDisplay(stats().biggestHaga!.date)}</strong> with{" "}
+                  <strong>{stats().biggestHaga!.count} members</strong>
+                </div>
+              </WrappedCard>
+            </Show>
+
+            {/* Biggest trip */}
+            <Show when={stats().biggestTrip}>
+              <WrappedCard emoji="🚌" color="#0ea5e9">
+                <div>
+                  The biggest Scoop Bus trip was to <strong>{stats().biggestTrip!.eventName} #{stats().biggestTrip!.eventNumber}</strong> on{" "}
+                  <strong>{formatDateDisplay(stats().biggestTrip!.date)}</strong> with{" "}
+                  <strong>{stats().biggestTrip!.count} members</strong>
+                </div>
+              </WrappedCard>
+            </Show>
+
+            {/* New countries */}
+            <For each={stats().newCountries}>
+              {(c) => (
+                <WrappedCard emoji={c.flag} color="#10b981">
+                  <div>
+                    First event in <strong>{c.name}</strong> — {c.eventName}
+                  </div>
+                </WrappedCard>
+              )}
+            </For>
           </div>
 
           {/* New events list */}
@@ -634,38 +843,40 @@ export function WrappedPage(props: WrappedPageProps) {
             </div>
           </Show>
 
-          {/* Member summaries */}
-          <Show when={stats().memberStats.length > 0}>
-            <div class={pageStyles.section}>
-              <h3 class={pageStyles.sectionTitle}>Member Highlights</h3>
-              <div class={pageStyles.memberGrid}>
-                <For each={stats().memberStats}>
-                  {(m) => {
-                    const route = getMemberRoute(m.parkrunId)
-                    const runnerSig = Object.entries(runnerSignals).find(([_, [sig]]) => sig().id === m.parkrunId)
-                    return (
-                      <div class={pageStyles.memberCard}>
-                        <Show when={runnerSig}>
-                          <CharacterImage runner={runnerSig![1][0]()} pose="sitting" />
-                        </Show>
-                        <Show when={route} fallback={<strong>{m.name}</strong>}>
-                          <A href={route!} class={pageStyles.memberLink}><strong>{m.name}</strong></A>
-                        </Show>
-                        <div class={pageStyles.memberStatsRow}>
-                          <Show when={m.runs > 0}><span>🏃 {m.runs} runs</span></Show>
-                          <Show when={m.events > 0}><span>📍 {m.events} events</span></Show>
-                          <Show when={m.newEvents > 0}><span>✨ {m.newEvents} new</span></Show>
-                          <Show when={m.volunteered > 0}><span>🦺 {m.volunteered} vol.</span></Show>
-                        </div>
-                      </div>
-                    )
-                  }}
-                </For>
-              </div>
-            </div>
-          </Show>
         </Show>
       </FieldBlock>
+
+      {/* Member summaries */}
+      <Show when={stats().hasData && stats().memberStats.length > 0}>
+        <DirtBlock title="Member Highlights">
+          <div class={pageStyles.memberGrid}>
+            <For each={stats().memberStats}>
+              {(m) => {
+                const route = getMemberRoute(m.parkrunId)
+                const runnerSig = Object.entries(runnerSignals).find(([_, [sig]]) => sig().id === m.parkrunId)
+                return (
+                  <div class={pageStyles.memberCard}>
+                    <Show when={runnerSig}>
+                      <CharacterImage runner={runnerSig![1][0]()} pose="sitting" />
+                    </Show>
+                    <Show when={route} fallback={<strong>{m.name}</strong>}>
+                      <A href={route!} class={pageStyles.memberLink}><strong>{m.name}</strong></A>
+                    </Show>
+                    <div class={pageStyles.memberStatsRow}>
+                      <Show when={m.runs > 0}><span>🏃 {m.runs} runs</span></Show>
+                      <Show when={m.events > 0}><span>📍 {m.events} events</span></Show>
+                      <Show when={m.newEvents > 0}><span>✨ {m.newEvents} new</span></Show>
+                      <Show when={m.volunteered > 0}><span>🦺 {m.volunteered} vol.</span></Show>
+                      <Show when={m.pbImprovement > 0}><span>⚡ PB −{Math.floor(m.pbImprovement / 60)}:{String(m.pbImprovement % 60).padStart(2, "0")}</span></Show>
+                    </div>
+                  </div>
+                )
+              }}
+            </For>
+          </div>
+        </DirtBlock>
+      </Show>
+
       <BackSignButton />
     </div>
   )
