@@ -8,12 +8,19 @@ import { Milestones } from '../components/Milestones';
 import { FieldBlock } from '../components/ui/FieldBlock';
 import { type RunResultItem, type Runner, type RaceItem, type VolunteerItem } from '../utils/api';
 import { type CelebrationData } from '../components/ResultCelebrations';
+import { isDecember, getWrappedBannerYear } from './WrappedPage';
 import { css } from "@style/css";
 
 
 export const HomePage: Component<{ resultsLoading: boolean; runnersLoading: boolean; results: RunResultItem[]; runners: Runner[]; races: RaceItem[]; volunteers: VolunteerItem[]; celebrationData?: CelebrationData }> = (props) => {
   return (
     <div class={styles.content}>
+      {/* December Wrapped banner */}
+      <Show when={isDecember()}>
+        <A href={`/wrapped/${getWrappedBannerYear()}`} class={styles.wrappedBanner}>
+          🎁 Scoop Bus Wrapped {getWrappedBannerYear()} is here! →
+        </A>
+      </Show>
       <main class={styles.main}>
         <FieldBlock title="Latest Results" signType="purple">
           <Show when={!props.resultsLoading && !props.runnersLoading} fallback={<div>Loading...</div>}>
@@ -27,9 +34,20 @@ export const HomePage: Component<{ resultsLoading: boolean; runnersLoading: bool
         </Show>
         <RaceCalendar races={props.races} />
         <DirtBlock title="Explore">
-          <A href="/map" class={css({ color: 'inherit', textDecoration: 'underline', fontWeight: 'bold' })}>
-            Scoop Bus Tourism Map
-          </A>
+          <div class={css({ display: 'flex', flexDirection: 'column', gap: '0.5rem' })}>
+            <A href="/map" class={css({ color: 'inherit', textDecoration: 'underline', fontWeight: 'bold' })}>
+              🗺️ Scoop Bus Tourism Map
+            </A>
+            <A href="/everyone" class={css({ color: 'inherit', textDecoration: 'underline', fontWeight: 'bold' })}>
+              🚶 Our Journey Together
+            </A>
+            <A href="/connections" class={css({ color: 'inherit', textDecoration: 'underline', fontWeight: 'bold' })}>
+              🕸️ The Connection Web
+            </A>
+            <A href={`/wrapped/${new Date().getFullYear() - (new Date().getMonth() === 11 ? 0 : 1)}`} class={css({ color: 'inherit', textDecoration: 'underline', fontWeight: 'bold' })}>
+              🎁 Scoop Bus Wrapped
+            </A>
+          </div>
         </DirtBlock>
         <DirtBlock title="Strava Activity"><StravaWidget /></DirtBlock>
         <DirtBlock title="About">
@@ -54,10 +72,30 @@ const styles = {
     maxWidth: '1200px',
     margin: '1rem auto',
     display: 'flex',
+    flexWrap: 'wrap',
     gap: '1rem',
     '@media (max-width: 768px)': {
       flexDirection: 'column',
       gap: '2.5rem',
+    },
+  }),
+  wrappedBanner: css({
+    width: '100%',
+    display: 'block',
+    textAlign: 'center',
+    background: 'linear-gradient(90deg, #e11d48, #d97706, #16a34a)',
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: '1.1rem',
+    padding: '0.75rem 1rem',
+    borderRadius: '8px',
+    cornerShape: 'notch',
+    textDecoration: 'none',
+    mb: '20px',
+    border: '4px solid black',
+    animation: 'pulse 2s ease-in-out infinite',
+    '&:hover': {
+      opacity: 0.9,
     },
   }),
   main: css({

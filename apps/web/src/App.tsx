@@ -3,7 +3,7 @@ import { Router, Route, type RouteSectionProps, useLocation } from '@solidjs/rou
 import { ScoopBusHeader, HEADER_HEIGHT } from './components/header/ScoopBusHeader';
 import './styles.css';
 import { css } from '@style/css';
-import { fetchRunners, fetchAllResults, fetchPublicRaces, fetchVolunteers } from './utils/api';
+import { fetchRunners, fetchAllResults, fetchPublicRaces, fetchVolunteers, getCached } from './utils/api';
 import { loadEvents } from './utils/events';
 import { getOrBuildCelebrationData } from './components/ResultCelebrations';
 import { MemberPage } from './pages/MemberPage';
@@ -13,8 +13,15 @@ import { MemberGraphPage } from './pages/MemberGraphPage';
 import { AdminPage, AdminScanPage, AdminUsersPage, AdminAccountPage, AdminLogsPage } from './pages/AdminPage';
 import { MapPage } from './pages/MapPage';
 import { ComparePage } from './pages/ComparePage';
+import { EveryonePage } from './pages/EveryonePage';
+import { ConnectionsPage } from './pages/ConnectionsPage';
+import { WrappedPage } from './pages/WrappedPage';
+import { SplashScreen, ALWAYS_SHOW_LOADER } from './components/SplashScreen';
 
 const App: Component = () => {
+  // Detect if cache is cold (no cached results) to show splash screen
+  const needsSplash = ALWAYS_SHOW_LOADER || !getCached<unknown>('results:all')
+
   const [runners] = createResource(fetchRunners)
   const [results] = createResource(fetchAllResults)
   const [races] = createResource(fetchPublicRaces)
@@ -57,7 +64,13 @@ const App: Component = () => {
     }
   })
 
+  const dataLoading = () => results.loading || runners.loading
+
   return (
+    <>
+    <Show when={needsSplash}>
+      <SplashScreen loading={dataLoading()} />
+    </Show>
     <Router root={RootLayout}>
         <Route
           path="/"
@@ -108,8 +121,33 @@ const App: Component = () => {
         <Route path="/admin/users" component={AdminUsersPage} />
         <Route path="/admin/logs" component={AdminLogsPage} />
         <Route path="/admin/account" component={AdminAccountPage} />
+        <Route
+          path="/everyone"
+          component={() => (
+            <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
+              <EveryonePage results={results() ?? []} runners={runners() ?? []} volunteers={volunteers() ?? []} celebrationData={celebrationData()} />
+            </Show>
+          )}
+        />
+        <Route
+          path="/connections"
+          component={() => (
+            <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
+              <ConnectionsPage results={results() ?? []} runners={runners() ?? []} volunteers={volunteers() ?? []} />
+            </Show>
+          )}
+        />
+        <Route
+          path="/wrapped/:year"
+          component={() => (
+            <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
+              <WrappedPage results={results() ?? []} runners={runners() ?? []} volunteers={volunteers() ?? []} />
+            </Show>
+          )}
+        />
         <Route path="*404" component={NotFoundPage} />
     </Router>
+    </>
   );
 };
 
