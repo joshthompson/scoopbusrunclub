@@ -6,6 +6,7 @@ import { runners as runnerSignals } from "@/data/runners"
 import { getEvent } from "@/utils/events"
 import { DirtBlock } from "../components/ui/DirtBlock"
 import { FieldBlock } from "../components/ui/FieldBlock"
+import { Masonry } from "../components/ui/Masonry"
 import { BackSignButton } from "@/components/BackSignButton"
 import { getMemberRoute } from "@/utils/memberRoute"
 import { COUNTRY_PIXELS, WORLD_PIXELS } from "@/data/map"
@@ -43,6 +44,15 @@ interface CountryVisit {
   totalVisits: number
 }
 
+/** Custom display names for specific events */
+const EVENT_NAME_OVERRIDES: Record<string, string> = {
+  "bushy": "Scoop Bushy Park",
+}
+
+function displayEventName(eventId: string, defaultName: string): string {
+  return EVENT_NAME_OVERRIDES[eventId] ?? defaultName
+}
+
 function buildMapData(results: RunResultItem[], volunteers: VolunteerItem[]) {
   // Track unique visits per event by (parkrunId, date) so that running + volunteering
   // on the same day at the same event only counts as one visit.
@@ -53,7 +63,7 @@ function buildMapData(results: RunResultItem[], volunteers: VolunteerItem[]) {
     const country = ev?.country ?? "??"
     if (country === "??") continue
     if (!eventStats.has(r.event)) {
-      eventStats.set(r.event, { name: r.eventName, country, runners: new Set(), visits: new Set() })
+      eventStats.set(r.event, { name: displayEventName(r.event, r.eventName), country, runners: new Set(), visits: new Set() })
     }
     const stat = eventStats.get(r.event)!
     stat.runners.add(r.parkrunId)
@@ -65,7 +75,7 @@ function buildMapData(results: RunResultItem[], volunteers: VolunteerItem[]) {
     const country = ev?.country ?? "??"
     if (country === "??") continue
     if (!eventStats.has(v.event)) {
-      eventStats.set(v.event, { name: v.eventName, country, runners: new Set(), visits: new Set() })
+      eventStats.set(v.event, { name: displayEventName(v.event, v.eventName), country, runners: new Set(), visits: new Set() })
     }
     const stat = eventStats.get(v.event)!
     stat.runners.add(v.parkrunId)
@@ -260,39 +270,41 @@ export function MapPage(props: MapPageProps) {
         </div>
       </FieldBlock>
 
-      <div class={styles.countryGrid}>
+      <Masonry minColumnWidth={300} gap={[24, 36]}>
         <For each={mapData()}>
           {(cv) => (
-            <DirtBlock title={`${COUNTRY_FLAGS[cv.country] ?? "🏳️"} ${COUNTRY_NAMES[cv.country] ?? cv.country}`}>
-              <div class={styles.countryCard}>
-                <div class={styles.countryEvents}>
-                  <For each={cv.events}>
-                    {(ev) => (
-                      <div class={styles.eventRow}>
-                        <strong>{ev.name}</strong>
-                        <span class={styles.eventCount}>{ev.count} visit{ev.count !== 1 ? "s" : ""}</span>
-                        <div class={styles.eventRunners}>
-                          <For each={[...ev.runners]}>
-                            {(parkrunId) => {
-                              const name = parkrunIdToName.get(parkrunId)
-                              const route = getMemberRoute(parkrunId)
-                              return (
-                                <Show when={name && route} fallback={<span>{name ?? parkrunId}</span>}>
-                                  <A href={route!} class={styles.link}>{name}</A>
-                                </Show>
-                              )
-                            }}
-                          </For>
+            <div data-id={cv.country}>
+              <DirtBlock title={`${COUNTRY_FLAGS[cv.country] ?? "🏳️"} ${COUNTRY_NAMES[cv.country] ?? cv.country}`}>
+                <div class={styles.countryCard}>
+                  <div class={styles.countryEvents}>
+                    <For each={cv.events}>
+                      {(ev) => (
+                        <div class={styles.eventRow}>
+                          <strong>{ev.name}</strong>
+                          <span class={styles.eventCount}>{ev.count} visit{ev.count !== 1 ? "s" : ""}</span>
+                          <div class={styles.eventRunners}>
+                            <For each={[...ev.runners]}>
+                              {(parkrunId) => {
+                                const name = parkrunIdToName.get(parkrunId)
+                                const route = getMemberRoute(parkrunId)
+                                return (
+                                  <Show when={name && route} fallback={<span>{name ?? parkrunId}</span>}>
+                                    <A href={route!} class={styles.link}>{name}</A>
+                                  </Show>
+                                )
+                              }}
+                            </For>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </For>
+                      )}
+                    </For>
+                  </div>
                 </div>
-              </div>
-            </DirtBlock>
+              </DirtBlock>
+            </div>
           )}
         </For>
-      </div>
+      </Masonry>
 
       <BackSignButton />
     </div>
@@ -342,12 +354,7 @@ const styles = {
     display: "block",
     imageRendering: "pixelated",
   }),
-  countryGrid: css({
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-    gap: "1.5rem",
-    alignItems: "start",
-  }),
+  // countryGrid style removed — now using Masonry component
   countryCard: css({
     display: "flex",
     flexDirection: "column",

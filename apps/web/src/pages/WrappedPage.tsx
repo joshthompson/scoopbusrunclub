@@ -665,7 +665,7 @@ export function WrappedPage(props: WrappedPageProps) {
               <div class={pageStyles.debutBlock}>
                 <div class={pageStyles.debutTitle}>🎉 Welcome to Scoop Bus!</div>
                 <div class={pageStyles.debutSubtitle}>
-                  {stats().debutMembers.length === 1 ? "This member" : "These members"} debuted in {year()}
+                  {stats().debutMembers.length === 1 ? "This member" : "These members"} made their parkrun debut in {year()}
                 </div>
                 <div class={pageStyles.debutGrid}>
                   <For each={stats().debutMembers}>
@@ -733,7 +733,7 @@ export function WrappedPage(props: WrappedPageProps) {
                 return (
                   <WrappedCard emoji="🎉" color="#e11d48">
                     <div>
-                      The busiest dat was <strong>{formatDateDisplay(b.date)}</strong> with{" "}
+                      The busiest day was <strong>{formatDateDisplay(b.date)}</strong> with{" "}
                       <strong>{b.count} members</strong> at {eventLabel}
                     </div>
                   </WrappedCard>
