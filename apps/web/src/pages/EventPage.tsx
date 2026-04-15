@@ -15,6 +15,7 @@ import { RoleTranslations } from "@/data/volunteer-roles"
 import { FieldBlock } from "@/components/ui/FieldBlock"
 import { Tooltip } from "@/components/ui/Tooltip"
 import extLinkAsset from "@/assets/misc/ext-link.png"
+import { COUNTRY_FLAGS } from "@/data/countries"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -23,13 +24,6 @@ import extLinkAsset from "@/assets/misc/ext-link.png"
 const PARKRUN_KM = 5
 const JUNIOR_PARKRUN_KM = 2
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  AU: "🇦🇺", AT: "🇦🇹", CA: "🇨🇦", DK: "🇩🇰", FI: "🇫🇮", DE: "🇩🇪",
-  IE: "🇮🇪", IT: "🇮🇹", JP: "🇯🇵", LT: "🇱🇹", MY: "🇲🇾", NL: "🇳🇱",
-  NZ: "🇳🇿", NO: "🇳🇴", PL: "🇵🇱", SG: "🇸🇬", ZA: "🇿🇦", SE: "🇸🇪",
-  UK: "🇬🇧", US: "🇺🇸",
-}
 
 const parkrunIdToRunner = new Map<string, { name: string; key: string }>()
 for (const [key, [runner]] of Object.entries(runnerSignals)) {
@@ -297,18 +291,6 @@ export function EventPage(props: EventPageProps) {
     return { min, max, span: max - min + 1 }
   })
 
-  // ---- Fun title for the event ----
-  const funTitle = createMemo(() => {
-    if (eventId() === "haga") return "🚌 Scoop Bus Home"
-    const count = totalVisits()
-    if (count >= 50) return "🏠 Local Favourite"
-    if (count >= 25) return "💎 Old Faithful"
-    if (count >= 10) return "❤️ A Club Favourite"
-    if (count >= 5) return "👋 Getting to Know You"
-    if (count >= 2) return "🔄 We've Been Here Before"
-    return "🆕 The New Discovery"
-  })
-
   // ---- All participants sorted by total appearances ----
   const allParticipants = createMemo(() => {
     const map = new Map<string, { parkrunId: string; name: string; runs: number; vols: number }>()
@@ -377,14 +359,13 @@ export function EventPage(props: EventPageProps) {
         {/* Header */}
         <FieldBlock class={styles.header} title={eventName()} signType="purple">
           <Show when={eventInfo()?.country && COUNTRY_FLAGS[eventInfo()!.country]}>
-            <span class={styles.headerFlag}>{COUNTRY_FLAGS[eventInfo()!.country]}</span>
+            <A href="/map" class={styles.headerFlag}>{COUNTRY_FLAGS[eventInfo()!.country]}</A>
           </Show>
           <Show when={eventInfo()?.url}>
             <a href={eventInfo()!.url} target="_blank" rel="noopener noreferrer" class={styles.headerExtLink}>
               <img src={extLinkAsset} alt="parkrun page" class={styles.headerExtLinkImg} />
             </a>
           </Show>
-          <div class={styles.funTitleBadge}>{funTitle()}</div>
 
           {/* Summary Stats */}
           <div class={styles.statsGrid}>
@@ -668,7 +649,7 @@ const styles = {
     margin: "1rem auto",
     display: "flex",
     flexDirection: "column",
-    gap: "1.5rem",
+    gap: "2rem",
     pb: "3rem",
   }),
   header: css({
@@ -681,6 +662,8 @@ const styles = {
     left: "12px",
     fontSize: "32px",
     lineHeight: 1,
+    textDecoration: "none",
+    cursor: "pointer",
   }),
   headerExtLink: css({
     position: "absolute",
@@ -695,18 +678,6 @@ const styles = {
     width: "100%",
     height: "100%",
     imageRendering: "pixelated",
-  }),
-  funTitleBadge: css({
-    display: "inline-block",
-    background: "rgba(255,255,255,0.1)",
-    borderRadius: "999px",
-    p: "0.25rem 1rem",
-    fontSize: "0.85rem",
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    mb: "0.25rem",
-    opacity: 0.7,
   }),
   title: css({
     fontSize: "2.5rem",
@@ -725,6 +696,7 @@ const styles = {
     display: "flex",
     flexWrap: "wrap",
     gap: "0.75rem",
+    mt: '10px',
     justifyContent: "center",
   }),
 
@@ -798,22 +770,18 @@ const styles = {
 
   // The Gang
   gangGrid: css({
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
+    display: "flex",
+    flexWrap: "wrap",
     gap: "0.75rem",
+    justifyContent: "center",
     textAlign: "center",
-    sm: {
-      gridTemplateColumns: "repeat(4, 1fr)",
-    },
-    md: {
-      gridTemplateColumns: "repeat(5, 1fr)",
-    },
   }),
   gangMember: css({
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     gap: "0.15rem",
+    width: "80px",
   }),
   gangFace: css({
     fontSize: "0",
@@ -826,7 +794,6 @@ const styles = {
     display: "flex",
     gap: "0.35rem",
     fontSize: "0.75rem",
-    opacity: 0.6,
   }),
 
   tinyFace: css({

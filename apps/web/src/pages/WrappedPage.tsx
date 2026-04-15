@@ -10,37 +10,13 @@ import { FieldBlock } from "../components/ui/FieldBlock"
 import { DirtBlock } from "../components/ui/DirtBlock"
 import { BackSignButton } from "@/components/BackSignButton"
 import { CharacterImage } from "@/components/CharacterImage"
+import { COUNTRY_FLAGS, COUNTRY_NAMES } from "@/data/countries"
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 const FIRST_YEAR = 2012
-
-/** Country code → flag emoji + name */
-const COUNTRY_FLAGS: Record<string, { flag: string; name: string }> = {
-  AU: { flag: "🇦🇺", name: "Australia" },
-  AT: { flag: "🇦🇹", name: "Austria" },
-  CA: { flag: "🇨🇦", name: "Canada" },
-  DK: { flag: "🇩🇰", name: "Denmark" },
-  FI: { flag: "🇫🇮", name: "Finland" },
-  DE: { flag: "🇩🇪", name: "Germany" },
-  IE: { flag: "🇮🇪", name: "Ireland" },
-  IT: { flag: "🇮🇹", name: "Italy" },
-  JP: { flag: "🇯🇵", name: "Japan" },
-  LT: { flag: "🇱🇹", name: "Lithuania" },
-  MY: { flag: "🇲🇾", name: "Malaysia" },
-  NA: { flag: "🇳🇦", name: "Namibia" },
-  NL: { flag: "🇳🇱", name: "Netherlands" },
-  NZ: { flag: "🇳🇿", name: "New Zealand" },
-  NO: { flag: "🇳🇴", name: "Norway" },
-  PL: { flag: "🇵🇱", name: "Poland" },
-  SG: { flag: "🇸🇬", name: "Singapore" },
-  ZA: { flag: "🇿🇦", name: "South Africa" },
-  SE: { flag: "🇸🇪", name: "Sweden" },
-  UK: { flag: "🇬🇧", name: "United Kingdom" },
-  US: { flag: "🇺🇸", name: "United States" },
-}
 
 const parkrunIdToMeta = new Map<string, { name: string; key: string }>()
 for (const [key, [runner]] of Object.entries(runnerSignals)) {
@@ -518,11 +494,10 @@ function computeWrappedStats(
   }
   const newCountries: WrappedStats["newCountries"] = []
   for (const [code, eventName] of newCountriesMap) {
-    const info = COUNTRY_FLAGS[code]
     newCountries.push({
       code,
-      flag: info?.flag ?? "🏳️",
-      name: info?.name ?? code,
+      flag: COUNTRY_FLAGS[code] ?? "🏳️",
+      name: COUNTRY_NAMES[code] ?? code,
       eventName,
     })
   }

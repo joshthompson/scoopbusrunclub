@@ -1,4 +1,5 @@
 import { cva } from '@style/css'
+import { createEffect, createSignal } from 'solid-js'
 import woodenSign from '@/assets/misc/wooden-sign.png'
 import purpleSign from '@/assets/misc/purple-sign.png'
 
@@ -10,13 +11,51 @@ export function TitleSign(props: {
 }) {
   const type = () => props.type ?? 'wooden'
   const signImage = () => type() === 'wooden' ? woodenSign : purpleSign
+
+  let innerRef!: HTMLDivElement
+  const [fontSize, setFontSize] = createSignal<string | undefined>(undefined)
+
+  createEffect(() => {
+    // Re-run when title or type changes
+    const _title = props.title
+    const _type = type()
+    setFontSize(undefined)
+
+    if (_type !== 'purple') return
+
+    // Wait for DOM to update
+    requestAnimationFrame(() => {
+      if (!innerRef) return
+      const containerWidth = 105
+      const containerHeight = 50
+      let size = 1.2 // starting em size (matches the CSS default)
+
+      // Temporarily apply the size so we can measure
+      while (size > 0.5) {
+        innerRef.style.fontSize = `${size}em`
+        if (innerRef.scrollWidth <= containerWidth && innerRef.scrollHeight <= containerHeight) {
+          break
+        }
+        size -= 0.05
+      }
+
+      setFontSize(`${size}em`)
+    })
+  })
+
   return (
     <div
       aria-role="heading"
       class={styles.sign({ type: type() })}
       style={{ 'background-image': `url(${signImage()})` }}
     >
-      <div class={styles.signInner({ type: type() })}>{props.title}</div>
+      <div
+        ref={innerRef}
+        class={styles.signInner({ type: type() })}
+        style={{ ...(fontSize() ? { 'font-size': fontSize() } : {}) }}
+      >
+        {props.title}
+      </div>
     </div>
   )
 }

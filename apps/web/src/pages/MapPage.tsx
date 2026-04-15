@@ -10,20 +10,7 @@ import { Masonry } from "../components/ui/Masonry"
 import { BackSignButton } from "@/components/BackSignButton"
 import { getMemberRoute } from "@/utils/memberRoute"
 import { COUNTRY_PIXELS, WORLD_PIXELS } from "@/data/map"
-
-const COUNTRY_FLAGS: Record<string, string> = {
-  AU: "🇦🇺", AT: "🇦🇹", CA: "🇨🇦", DK: "🇩🇰", FI: "🇫🇮",
-  DE: "🇩🇪", IE: "🇮🇪", IT: "🇮🇹", JP: "🇯🇵", LT: "🇱🇹",
-  MY: "🇲🇾", NA: "🇳🇦", NL: "🇳🇱", NZ: "🇳🇿", NO: "🇳🇴",
-  PL: "🇵🇱", SG: "🇸🇬", ZA: "🇿🇦", SE: "🇸🇪", UK: "🇬🇧", US: "🇺🇸",
-}
-
-const COUNTRY_NAMES: Record<string, string> = {
-  AU: "Australia", AT: "Austria", CA: "Canada", DK: "Denmark", FI: "Finland",
-  DE: "Germany", IE: "Ireland", IT: "Italy", JP: "Japan", LT: "Lithuania",
-  MY: "Malaysia", NA: "Namibia", NL: "Netherlands", NZ: "New Zealand", NO: "Norway",
-  PL: "Poland", SG: "Singapore", ZA: "South Africa", SE: "Sweden", UK: "United Kingdom", US: "United States",
-}
+import { COUNTRY_FLAGS, COUNTRY_NAMES } from "@/data/countries"
 
 // ─── Map colours & highlight ────────────────────────────────────────────────────
 
@@ -280,7 +267,7 @@ export function MapPage(props: MapPageProps) {
                     <For each={cv.events}>
                       {(ev) => (
                         <div class={styles.eventRow}>
-                          <strong>{ev.name}</strong>
+                          <A href={`/event/${ev.eventId}`} class={styles.link}><strong>{ev.name}</strong></A>
                           <span class={styles.eventCount}>{ev.count} visit{ev.count !== 1 ? "s" : ""}</span>
                           <div class={styles.eventRunners}>
                             <For each={[...ev.runners]}>

@@ -26,7 +26,9 @@ export function loadEvents(): Promise<void> {
  * Falls back to the raw eventId if events haven't loaded yet.
  */
 export function getEventName(eventId: string): string {
-  return eventMap()?.get(eventId)?.name ?? eventId
+  const name = eventMap()?.get(eventId)?.name ?? eventId
+  if (name === "Bushy Park") return "Scoop Bushy Park"
+  return name
 }
 
 /** Get the full EventItem for an eventId. */
