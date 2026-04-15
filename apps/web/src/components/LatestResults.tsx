@@ -280,7 +280,9 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
       {isXmas() && <Emoji emoji="🎄" flipped />}
       {isMilestone() && <Emoji emoji="🎉" flipped />}
       {isBusTrip() && <Emoji emoji="🚌" flipped />}{' '}
-      {displayName()}{' '}
+      <A href={`/event/${props.parkrun.eventId}`} class={styles.parkrunNameLink}>
+        {displayName()}
+      </A>{' '}
       #{props.parkrun.eventNumber}{' '}
       {isBusTrip() && <Emoji emoji="🚌" />}
       {isMilestone() && <Emoji emoji="🎉" />}
@@ -515,6 +517,11 @@ const styles = {
     fontSize: '1.5em',
     maxWidth: 'calc(100% - 40px)',
     m: '0 auto',
+  }),
+  parkrunNameLink: css({
+    color: 'inherit',
+    textDecoration: 'none',
+    _hover: { textDecoration: 'underline' },
   }),
   memberLink: css({
     color: 'inherit',

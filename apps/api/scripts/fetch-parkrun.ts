@@ -35,24 +35,7 @@ import {
   fetchPage,
   getAppDataValue,
 } from "./shared";
-
-// --- Configured parkrun events ---
-
-interface ParkrunEventConfig {
-  /** Lowercase event ID used in URLs and DB, e.g. "haga" */
-  eventId: string;
-  /** parkrun domain for this event */
-  baseUrl: string;
-}
-
-/**
- * All parkrun events we scrape volunteer data for.
- * To add a new event, just append to this array.
- */
-const PARKRUN_EVENTS: ParkrunEventConfig[] = [
-  { eventId: "haga", baseUrl: "https://www.parkrun.se/haga" },
-  { eventId: "judarskogen", baseUrl: "https://www.parkrun.se/judarskogen" },
-];
+import { PARKRUN_EVENTS } from "../../../libs/shared/parkrun-events";
 
 /** Build the appData key for an event's watermark, e.g. "latestHagaEventNumber" */
 function watermarkKey(eventId: string): string {

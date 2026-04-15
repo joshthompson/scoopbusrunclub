@@ -31,6 +31,7 @@ export type RunnerState =
   | 'scanner'
   | 'photographer'
   | 'run-director'
+  | 'marshal'
 
 export interface RunnerData {
   name: string
@@ -46,7 +47,7 @@ export interface RunnerData {
     scanner: string[] | undefined // And Timekeeper
     photographer: string[] | undefined
     runDirector: string[] | undefined
-    marshall: string[] | undefined
+    marshal: string[] | undefined
     volunteerGeneric: string[] | undefined // All other volunteer roles that don't have a specific sprite
   }
   runnerState?: RunnerState
@@ -74,7 +75,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: [assets.joshScanner],
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -95,7 +96,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: undefined,
       photographer: [assets.keithPhotographer],
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -116,7 +117,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: undefined,
       photographer: undefined,
       runDirector: [assets.claireRunDirector],
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -137,7 +138,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: undefined,
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -158,7 +159,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: undefined,
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -179,7 +180,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: undefined,
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -200,7 +201,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: [assets.elineScanner],
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -221,7 +222,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: [assets.rickScanner],
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: [assets.rickMarshal],
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -242,7 +243,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: undefined,
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -263,7 +264,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: undefined,
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 49,
@@ -284,7 +285,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: [assets.alisaScanner],
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,
@@ -305,7 +306,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: [assets.linkScanner],
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 20,
@@ -328,7 +329,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       scanner: undefined,
       photographer: undefined,
       runDirector: undefined,
-      marshall: undefined,
+      marshal: undefined,
       volunteerGeneric: undefined,
     },
     width: 21,

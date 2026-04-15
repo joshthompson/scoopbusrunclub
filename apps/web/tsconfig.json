@@ -7,7 +7,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@style/*": ["./styled-system/*"],
-      "@assets/*": ["./src/assets/*"]
+      "@assets/*": ["./src/assets/*"],
+      "@shared/*": ["../../libs/shared/*"]
     }
   },
   "include": ["src", "misc.d.ts"]

@@ -80,7 +80,7 @@ function AchievementItem(props: { celebration: GroupedCelebration }) {
           <Show when={showTime()}>
             <strong>{latest().time}</strong> -{' '}
           </Show>
-          Achieved at {latest().eventName} #{latest().eventNumber} on {formatDate(new Date(`${latest().date}T00:00:00`))}
+          Achieved at <A href={`/event/${latest().event}`} class={styles.link}>{latest().eventName}</A> #{latest().eventNumber} on {formatDate(new Date(`${latest().date}T00:00:00`))}
           <Show when={props.celebration.occurrences.length > 1 && !showMore()}>
             <div>
               <button class={styles.showMoreInline} type="button" onClick={() => setShowMore(true)}>
@@ -97,7 +97,7 @@ function AchievementItem(props: { celebration: GroupedCelebration }) {
                 <Show when={showTime()}>
                   <strong>{occurrence.time}</strong> -{' '}
                 </Show>
-                Achieved at {occurrence.eventName} #{occurrence.eventNumber} on {formatDate(new Date(`${occurrence.date}T00:00:00`))}
+                Achieved at <A href={`/event/${occurrence.event}`} class={styles.link}>{occurrence.eventName}</A> #{occurrence.eventNumber} on {formatDate(new Date(`${occurrence.date}T00:00:00`))}
               </div>
             )}
           </For>
