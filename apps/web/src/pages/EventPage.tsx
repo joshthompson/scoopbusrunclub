@@ -1,7 +1,8 @@
 import { css } from "@style/css"
-import { createMemo, For, Show } from "solid-js"
+import { createMemo, createSignal, For, onMount, Show } from "solid-js"
 import { A, useParams } from "@solidjs/router"
-import { type RunResultItem, type Runner, type VolunteerItem } from "../utils/api"
+import { type RunResultItem, type Runner, type VolunteerItem, type CourseData, fetchCourse } from "../utils/api"
+import { CourseSVG } from "@/components/CourseSVG"
 import { getEvent, getEventName } from "@/utils/events"
 import { formatDate, formatName } from "@/utils/misc"
 import { DirtBlock } from "../components/ui/DirtBlock"
@@ -56,6 +57,14 @@ export function EventPage(props: EventPageProps) {
   const eventId = () => params.name
   const eventInfo = createMemo(() => getEvent(eventId()))
   const eventName = createMemo(() => getEventName(eventId()))
+
+  // ---- Course map data ----
+  const [courseData, setCourseData] = createSignal<CourseData | null>(null)
+  onMount(() => {
+    fetchCourse(eventId()).then((data) => {
+      if (data) setCourseData(data)
+    }).catch(() => { /* silently ignore */ })
+  })
 
   const eventResults = createMemo(() =>
     props.results.filter((r) => r.event === eventId())
@@ -476,6 +485,14 @@ export function EventPage(props: EventPageProps) {
             </Show>
           </div>
         </DirtBlock>
+
+        <Show when={courseData()}>
+          {(course) => (
+            <DirtBlock title="Course Map">
+              <CourseSVG course={course()} />
+            </DirtBlock>
+          )}
+        </Show>
 
         {/* Fun Facts */}
         <DirtBlock title="Fun Facts">

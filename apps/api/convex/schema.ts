@@ -99,6 +99,16 @@ export default defineSchema({
     .index("by_username", ["username"])
     .index("by_action", ["action"]),
 
+  // --- Course map data ---
+
+  courses: defineTable({
+    eventId: v.string(),
+    coordinates: v.array(v.array(v.number())), // [[lon, lat, alt], ...]
+    points: v.array(v.object({ name: v.string(), coordinates: v.array(v.number()) })), // [{ name: "Start", coordinates: [lon, lat, alt] }, ...]
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_eventId", ["eventId"]),
+
   // --- App-level key/value store ---
 
   appData: defineTable({

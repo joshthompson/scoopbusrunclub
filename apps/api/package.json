@@ -6,6 +6,8 @@
   "scripts": {
     "fetch-parkrun": "tsx scripts/fetch-parkrun.ts",
     "fetch-results": "tsx scripts/fetch-results.ts",
+    "fetch-map": "tsx scripts/fetch-map.ts",
+    "fetch-all-maps": "tsx scripts/fetch-all-maps.ts",
     "fetch-all": "tsx scripts/fetch-all.ts",
     "test-parse": "tsx scripts/test-parse.ts"
   },
@@ -13,6 +15,7 @@
     "convex": "^1.21.0"
   },
   "devDependencies": {
+    "jszip": "^3.10.1",
     "playwright": "^1.49.0",
     "tsx": "^4.19.0"
   }

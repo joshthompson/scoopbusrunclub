@@ -257,6 +257,79 @@ http.route({
   }),
 });
 
+// --- POST /api/ingest-course ---
+// Receives parsed course map data (coordinates + named points) for a parkrun event.
+// Protected by a shared secret in the Authorization header.
+
+http.route({
+  path: "/api/ingest-course",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const authHeader = request.headers.get("Authorization");
+    const expectedSecret = process.env.INGEST_SECRET;
+
+    if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
+    const body = await request.json();
+    const { eventId, coordinates, points } = body;
+
+    if (!eventId || !Array.isArray(coordinates)) {
+      return jsonResponse(
+        { error: "Invalid payload: expected { eventId, coordinates, points }" },
+        400,
+      );
+    }
+
+    await ctx.runMutation(internal.courses.storeCourse, {
+      eventId,
+      coordinates,
+      points: points ?? [],
+    });
+
+    return jsonResponse({ status: "ok", eventId });
+  }),
+});
+
+// --- GET /api/courses ---
+// Returns the list of event IDs that have course map data.
+
+http.route({
+  path: "/api/courses",
+  method: "GET",
+  handler: httpAction(async (ctx) => {
+    const courseEventIds = await ctx.runQuery(
+      internal.courses.getAllCourseEventIds,
+    );
+    return jsonResponse(courseEventIds);
+  }),
+});
+
+// --- GET /api/course?eventId=... ---
+// Returns the full course data for a given event.
+
+http.route({
+  path: "/api/course",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const eventId = url.searchParams.get("eventId");
+
+    if (!eventId) {
+      return jsonResponse({ error: "Missing 'eventId' query parameter" }, 400);
+    }
+
+    const course = await ctx.runQuery(internal.courses.getCourse, { eventId });
+
+    if (!course) {
+      return jsonResponse({ error: "Course not found" }, 404);
+    }
+
+    return jsonResponse(course);
+  }),
+});
+
 // --- GET /api/app-data?key=... ---
 // Protected by INGEST_SECRET. Returns the value for a given key from the appData table.
 
@@ -541,6 +614,9 @@ for (const path of [
   "/api/races",
   "/api/ingest",
   "/api/ingest-volunteers",
+  "/api/ingest-course",
+  "/api/courses",
+  "/api/course",
   "/api/app-data",
   "/api/admin/login",
   "/api/admin/logout",

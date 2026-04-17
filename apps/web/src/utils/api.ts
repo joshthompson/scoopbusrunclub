@@ -2,6 +2,7 @@ const CONVEX_URL = import.meta.env.VITE_CONVEX_URL as string || "";
 
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 const CACHE_TTL_SHORT_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 
 /** Fixed MM-DD dates where caching should be skipped (add more as needed) */
 const NO_CACHE_DATES: string[] = [
@@ -112,6 +113,22 @@ export function getCached<T>(key: string): T | null {
   }
 }
 
+/** Read cache with a fixed TTL (ignores special-date logic). */
+export function getCachedWithTTL<T>(key: string, ttlMs: number): T | null {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + key);
+    if (!raw) return null;
+    const entry: CacheEntry<T> = JSON.parse(raw);
+    if (entry.version !== CACHE_VERSION || Date.now() - entry.timestamp > ttlMs) {
+      localStorage.removeItem(CACHE_PREFIX + key);
+      return null;
+    }
+    return entry.data;
+  } catch {
+    return null;
+  }
+}
+
 export function setCache<T>(key: string, data: T): void {
   try {
     const entry: CacheEntry<T> = { data, timestamp: Date.now(), version: CACHE_VERSION };
@@ -201,10 +218,15 @@ export interface RaceItem {
 }
 
 export async function fetchPublicRaces(): Promise<RaceItem[]> {
+  const cacheKey = "races";
+  const cached = getCached<RaceItem[]>(cacheKey);
+  if (cached) return cached;
+
   const url = `${CONVEX_URL}/api/races`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`API error: ${response.status}`);
   const data: RaceItem[] = await response.json();
+  setCache(cacheKey, data);
   return data;
 }
 
@@ -247,6 +269,31 @@ export async function fetchVolunteers(): Promise<VolunteerItem[]> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`API error: ${response.status}`);
   const data: VolunteerItem[] = await response.json();
+  setCache(cacheKey, data);
+  return data;
+}
+
+export interface CoursePoint {
+  name: string;
+  coordinates: number[];
+}
+
+export interface CourseData {
+  eventId: string;
+  coordinates: number[][]; // [[lon, lat, alt], ...]
+  points: CoursePoint[]; // [{ name: "Start", coordinates: [lon, lat, alt] }, ...]
+}
+
+export async function fetchCourse(eventId: string): Promise<CourseData | null> {
+  const cacheKey = `course:${eventId}`;
+  const cached = getCachedWithTTL<CourseData>(cacheKey, CACHE_TTL_WEEK_MS);
+  if (cached) return cached;
+
+  const url = `${CONVEX_URL}/api/course?eventId=${encodeURIComponent(eventId)}`;
+  const response = await fetch(url);
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const data: CourseData = await response.json();
   setCache(cacheKey, data);
   return data;
 }

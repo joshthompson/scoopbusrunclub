@@ -17,7 +17,9 @@
     "test-crons": "pnpm --filter @scoopbus/api run test-parse",
     "fetch-parkrun": "pnpm --filter @scoopbus/api run fetch-parkrun",
     "fetch-results": "pnpm --filter @scoopbus/api run fetch-results",
-    "fetch-all": "pnpm --filter @scoopbus/api run fetch-all"
+    "fetch-all": "pnpm --filter @scoopbus/api run fetch-all",
+    "fetch-map": "pnpm --filter @scoopbus/api run fetch-map",
+    "fetch-all-maps": "pnpm --filter @scoopbus/api run fetch-all-maps"
   },
   "license": "MIT",
   "devDependencies": {

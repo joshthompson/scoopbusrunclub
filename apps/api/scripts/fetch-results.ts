@@ -37,6 +37,7 @@ import {
   launchBrowser,
   fetchPage,
 } from "./shared";
+import { scrapeCourseMap } from "../lib/map-scraper";
 
 // --- Env file loading ---
 
@@ -154,11 +155,80 @@ async function main() {
     }
   }
 
-  await browser.close();
+  // --- Fetch course maps for events that don't have one yet ---
 
-  // Attach deduplicated events to payload
   payload.events = Array.from(allEvents.values());
   console.log(`\nCollected ${payload.events.length} unique event(s).`);
+
+  if (!isDryRun && payload.events.length > 0) {
+    try {
+      const coursesRes = await fetch(`${CONVEX_SITE_URL}/api/courses`, {
+        headers: { Authorization: `Bearer ${INGEST_SECRET}` },
+      });
+      const existingCourseEventIds: string[] = await coursesRes.json();
+      const existingCourseSet = new Set(existingCourseEventIds);
+
+      const eventsNeedingCourse = payload.events.filter(
+        (e) => !existingCourseSet.has(e.eventId),
+      );
+
+      if (eventsNeedingCourse.length > 0) {
+        console.log(
+          `\nFound ${eventsNeedingCourse.length} event(s) without course data. Fetching maps...`,
+        );
+
+        for (const event of eventsNeedingCourse) {
+          try {
+            const result = await scrapeCourseMap(context, event.url);
+            if (result) {
+              const courseRes = await fetch(
+                `${CONVEX_SITE_URL}/api/ingest-course`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${INGEST_SECRET}`,
+                  },
+                  body: JSON.stringify({
+                    eventId: event.eventId,
+                    coordinates: result.courseData.coordinates,
+                    points: result.courseData.points,
+                  }),
+                },
+              );
+              if (courseRes.ok) {
+                console.log(
+                  `  ✓ Course data stored for ${event.eventId}`,
+                );
+              } else {
+                console.warn(
+                  `  ⚠ Failed to store course for ${event.eventId}: ${courseRes.status}`,
+                );
+              }
+            }
+          } catch (error) {
+            console.error(
+              `  ✗ Failed to fetch course map for ${event.eventId}:`,
+              error,
+            );
+          }
+
+          // Delay between course fetches
+          if (event !== eventsNeedingCourse[eventsNeedingCourse.length - 1]) {
+            const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS);
+            console.log(
+              `  Waiting ${(delay / 1000).toFixed(1)}s before next fetch...`,
+            );
+            await sleep(delay);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error checking/fetching course data:", error);
+    }
+  }
+
+  await browser.close();
 
   if (payload.athletes.length === 0) {
     console.log("No athlete data fetched, skipping ingest.");
