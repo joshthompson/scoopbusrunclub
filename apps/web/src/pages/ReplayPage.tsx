@@ -20,6 +20,10 @@ import { FieldBlock } from "@/components/ui/FieldBlock"
 import { BackSignButton } from "@/components/BackSignButton"
 import { NotFoundPage } from "./NotFoundPage"
 import { runners as runnerSignals } from "@/data/runners"
+import tree1Asset from "@/assets/misc/tree1.png"
+import tree2Asset from "@/assets/misc/tree2.png"
+import shrub1Asset from "@/assets/misc/shrub1.png"
+import shrub2Asset from "@/assets/misc/shrub2.png"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,7 +39,7 @@ const PADDING = 30
 const HEAD_SIZE = 30 // desired head size in screen pixels
 
 /** Project lon/lat coordinates into SVG space (same algo as CourseSVG). */
-function projectCoordinates(coords: number[][], padding: number) {
+function projectCoordinates(coords: number[][], extraCoords: number[][], padding: number) {
   const empty = {
     path: [] as Point2D[],
     project: (_c: number[]) => ({ x: 0, y: 0 }),
@@ -44,11 +48,14 @@ function projectCoordinates(coords: number[][], padding: number) {
   }
   if (coords.length === 0) return empty
 
+  // Include both path coords and extra points (labelled markers) in bounding box
+  const allCoords = [...coords, ...extraCoords]
+
   let minLon = Infinity,
     maxLon = -Infinity
   let minLat = Infinity,
     maxLat = -Infinity
-  for (const c of coords) {
+  for (const c of allCoords) {
     if (c[0] < minLon) minLon = c[0]
     if (c[0] > maxLon) maxLon = c[0]
     if (c[1] < minLat) minLat = c[1]
@@ -130,6 +137,123 @@ const POINT_EMOJI: Record<string, string> = {
   "2km": "2",
   "3km": "3",
   "4km": "4",
+}
+
+const END_POINTS = ["finish", "mål", "start/mål", "start/finish"]
+
+// ---------------------------------------------------------------------------
+// Per-course overrides
+// ---------------------------------------------------------------------------
+
+interface CourseOverride {
+  laps?: number
+  reverse?: boolean
+}
+
+const COURSE_OVERRIDES: Record<string, CourseOverride> = {
+  haga: { laps: 2 },
+  somerdalepavilion: { laps: 2, reverse: true },
+}
+
+const TREE_ASSETS = [
+  { src: tree1Asset, isShrub: false },
+  { src: tree2Asset, isShrub: false },
+  { src: shrub1Asset, isShrub: true },
+  { src: shrub2Asset, isShrub: true },
+]
+const TREE_COUNT = 25
+
+/** Simple seeded PRNG so trees are deterministic per course. */
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed)
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
+    return ((t ^ t >>> 14) >>> 0) / 4294967296
+  }
+}
+
+interface TreePlacement {
+  x: number
+  y: number
+  asset: string
+  height: number // SVG units
+}
+
+/**
+ * Place trees randomly within the viewBox, rejecting any that are
+ * too close to the path polyline.
+ */
+function placeTrees(
+  pathPts: Point2D[],
+  width: number,
+  height: number,
+  minTreeH: number,
+  maxTreeH: number,
+  minShrubH: number,
+  maxShrubH: number,
+  clearance: number,
+  seed: number,
+): TreePlacement[] {
+  const rng = mulberry32(seed)
+  const trees: TreePlacement[] = []
+  let attempts = 0
+  const maxAttempts = TREE_COUNT * 20
+
+  while (trees.length < TREE_COUNT && attempts < maxAttempts) {
+    attempts++
+    const x = rng() * width
+    const y = rng() * height
+    const pick = TREE_ASSETS[Math.floor(rng() * TREE_ASSETS.length)]
+    const h = pick.isShrub
+      ? minShrubH + rng() * (maxShrubH - minShrubH)
+      : minTreeH + rng() * (maxTreeH - minTreeH)
+
+    // Check distance to every segment of the path
+    let tooClose = false
+    for (let i = 1; i < pathPts.length; i++) {
+      if (distToSegment(x, y, pathPts[i - 1], pathPts[i]) < clearance) {
+        tooClose = true
+        break
+      }
+    }
+    if (tooClose) continue
+
+    // Also don't overlap other trees
+    let overlaps = false
+    for (const t of trees) {
+      const dx = t.x - x
+      const dy = t.y - y
+      if (Math.sqrt(dx * dx + dy * dy) < clearance * 0.6) {
+        overlaps = true
+        break
+      }
+    }
+    if (overlaps) continue
+
+    trees.push({
+      x,
+      y,
+      asset: pick.src,
+      height: h,
+    })
+  }
+
+  // Sort by y so trees further "back" render first (painter's order)
+  return trees.sort((a, b) => a.y - b.y)
+}
+
+/** Squared distance from point (px,py) to line segment (a,b). */
+function distToSegment(px: number, py: number, a: Point2D, b: Point2D): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lenSq = dx * dx + dy * dy
+  if (lenSq === 0) return Math.sqrt((px - a.x) ** 2 + (py - a.y) ** 2)
+  let t = ((px - a.x) * dx + (py - a.y) * dy) / lenSq
+  t = Math.max(0, Math.min(1, t))
+  const closestX = a.x + t * dx
+  const closestY = a.y + t * dy
+  return Math.sqrt((px - closestX) ** 2 + (py - closestY) ** 2)
 }
 
 /** Build a lookup: parkrunId → face image URL (only for our club members). */
@@ -241,11 +365,39 @@ export function ReplayPage(props: ReplayPageProps) {
     return runners[runners.length - 1].finishSeconds
   })
 
+  // ---- Course overrides ----
+  const courseOverride = createMemo(() => COURSE_OVERRIDES[eventId()] ?? {})
+
   // ---- Projected path ----
   const projected = createMemo(() => {
     const cd = courseData()
     if (!cd) return null
-    return projectCoordinates(cd.coordinates, PADDING)
+    const extraCoords = cd.points.map((pt) => pt.coordinates)
+
+    // Apply reverse override
+    let coords = cd.coordinates
+    if (courseOverride().reverse) {
+      coords = [...coords].reverse()
+    }
+
+    // Project using single-lap coords (for bounding box)
+    const proj = projectCoordinates(coords, extraCoords, PADDING)
+
+    // Apply laps: repeat the projected path for multi-lap courses
+    const laps = courseOverride().laps ?? 1
+    if (laps > 1) {
+      const singlePath = proj.path
+      const multiPath: Point2D[] = []
+      for (let lap = 0; lap < laps; lap++) {
+        // Alternate direction for out-and-back style laps
+        const lapPts = lap % 2 === 0 ? singlePath : [...singlePath].reverse()
+        // Skip first point of subsequent laps to avoid duplicate at junction
+        multiPath.push(...(lap === 0 ? lapPts : lapPts.slice(1)))
+      }
+      return { ...proj, path: multiPath }
+    }
+
+    return proj
   })
   const cumDist = createMemo(() => {
     const p = projected()
@@ -255,7 +407,9 @@ export function ReplayPage(props: ReplayPageProps) {
   const viewBox = createMemo(() => {
     const p = projected()
     if (!p) return "0 0 100 100"
-    return `0 0 ${p.width} ${p.height}`
+    // Expand by headSvgSize so heads + scatter area aren't clipped
+    const margin = headSvgSize() * 2
+    return `${-margin} ${-margin} ${p.width + margin * 2} ${p.height + margin * 2}`
   })
   const pathD = createMemo(() => {
     const p = projected()
@@ -273,6 +427,16 @@ export function ReplayPage(props: ReplayPageProps) {
       label: pt.name,
       ...p.project(pt.coordinates),
     }))
+  })
+
+  /** Projected end/finish point (if one exists on the course). */
+  const endPoint = createMemo<Point2D | null>(() => {
+    const cd = courseData()
+    const p = projected()
+    if (!cd || !p) return null
+    const ep = cd.points.find((pt) => END_POINTS.includes(pt.name.toLowerCase()))
+    if (!ep) return null
+    return p.project(ep.coordinates)
   })
 
   // ---- SVG ref + scale factor so heads render at fixed pixel size ----
@@ -370,10 +534,28 @@ export function ReplayPage(props: ReplayPageProps) {
     const p = projected()
     if (!p || cd.length === 0) return []
 
-    return replayRunners().map((runner) => {
+    const ep = endPoint()
+    const hs = headSvgSize()
+
+    return replayRunners().map((runner, idx) => {
       const fraction = Math.min(1, t / runner.finishSeconds)
-      const pos = pointAtFraction(p.path, cd, fraction)
       const finished = t >= runner.finishSeconds
+
+      let pos: Point2D
+      if (finished && ep) {
+        // Scatter finished runners around the end point so they don't stack
+        const finishedBefore = replayRunners().slice(0, idx).filter((r) => t >= r.finishSeconds).length
+        const angle = (finishedBefore * 2.39996) // golden angle in radians for even spread
+        const ring = Math.floor(finishedBefore / 6)
+        const radius = hs * 0.8 * (ring + 1)
+        pos = {
+          x: ep.x + Math.cos(angle) * radius,
+          y: ep.y + Math.sin(angle) * radius,
+        }
+      } else {
+        pos = pointAtFraction(p.path, cd, fraction)
+      }
+
       const prevX = prevXMap.get(runner.parkrunId) ?? pos.x
       const movingRight = pos.x > prevX + 0.01
       const movingLeft = pos.x < prevX - 0.01
@@ -390,6 +572,21 @@ export function ReplayPage(props: ReplayPageProps) {
   const finishedCount = createMemo(
     () => runnerPositions().filter((r) => r.finished).length,
   )
+
+  // ---- Tree placements (computed once when course loads) ----
+  const trees = createMemo(() => {
+    const p = projected()
+    if (!p || p.path.length === 0) return []
+    const hs = headSvgSize()
+    const minH = hs * 1.5  // ~40-45px trees
+    const maxH = hs * 2.2  // ~55-66px trees
+    const minShrubH = hs * (8 / HEAD_SIZE)  // ~8px shrubs
+    const maxShrubH = hs * (16 / HEAD_SIZE) // ~16px shrubs
+    const clearance = hs * 1.5 // keep trees away from path
+    // Use a seed derived from coordinate count for determinism
+    const seed = p.path.length * 7919 + Math.round(p.width * 31)
+    return placeTrees(p.path, p.width, p.height, minH, maxH, minShrubH, maxShrubH, clearance, seed)
+  })
 
   // ---- Title ----
   const title = createMemo(
@@ -411,6 +608,20 @@ export function ReplayPage(props: ReplayPageProps) {
                 class={styles.svg}
                 preserveAspectRatio="xMidYMid meet"
               >
+                {/* Decorative trees (behind the path) */}
+                <For each={trees()}>
+                  {(tree) => (
+                    <image
+                      href={tree.asset}
+                      x={tree.x - tree.height * 0.35}
+                      y={tree.y - tree.height}
+                      height={tree.height}
+                      preserveAspectRatio="xMidYMax meet"
+                      style={{ opacity: "0.85", "pointer-events": "none" }}
+                    />
+                  )}
+                </For>
+
                 {/* Route path background */}
                 <path
                   d={pathD()}
@@ -535,7 +746,7 @@ export function ReplayPage(props: ReplayPageProps) {
                 </p>
               </div>
               <div class={styles.disclaimer}>
-                The replay is based on finish times and map data which often doesn't reflect laps and correct start/end locations.
+                The replay is based on finish times and map data which often doesn't reflect things like laps, direction or correct start/end locations.
               </div>
             </div>
           </FieldBlock>

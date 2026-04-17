@@ -470,7 +470,7 @@ export function LatestResults(props: LatestResultsProps) {
                         </For>
                       </ul>
                     </Show>
-                    <Show when={parkrun.results.length >= 2}>
+                    <Show when={parkrun.results.length >= 1}>
                       <A href={`/replay/${parkrun.eventId}/${parkrun.eventNumber}`} class={styles.replayLink}>
                         ▶ Watch Replay
                       </A>
