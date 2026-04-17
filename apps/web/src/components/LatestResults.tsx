@@ -470,6 +470,11 @@ export function LatestResults(props: LatestResultsProps) {
                         </For>
                       </ul>
                     </Show>
+                    <Show when={parkrun.results.length >= 2}>
+                      <A href={`/replay/${parkrun.eventId}/${parkrun.eventNumber}`} class={styles.replayLink}>
+                        ▶ Watch Replay
+                      </A>
+                    </Show>
                   </div>
                 </DirtBlock>
                 )
@@ -564,5 +569,17 @@ const styles = {
     width: '236px',
     maxWidth: '100%',
     margin: '0 auto',
+  }),
+  replayLink: css({
+    display: 'inline-block',
+    fontFamily: '"Jersey 10", sans-serif',
+    fontSize: '14px',
+    color: '#5a3a1a',
+    background: '#ddef64',
+    padding: '2px 12px',
+    borderRadius: '3px',
+    textDecoration: 'none',
+    margin: '4px auto 0',
+    _hover: { background: '#c8dc50' },
   }),
 }

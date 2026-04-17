@@ -17,6 +17,7 @@ import { EveryonePage } from './pages/EveryonePage';
 import { ConnectionsPage } from './pages/ConnectionsPage';
 import { WrappedPage } from './pages/WrappedPage';
 import { EventPage } from './pages/EventPage';
+import { ReplayPage } from './pages/ReplayPage';
 import { SplashScreen, ALWAYS_SHOW_LOADER } from './components/SplashScreen';
 
 const App: Component = () => {
@@ -151,6 +152,14 @@ const App: Component = () => {
           component={() => (
             <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
               <EventPage results={results() ?? []} runners={runners() ?? []} volunteers={volunteers() ?? []} />
+            </Show>
+          )}
+        />
+        <Route
+          path="/replay/:eventName/:eventNumber"
+          component={() => (
+            <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
+              <ReplayPage results={results() ?? []} />
             </Show>
           )}
         />
