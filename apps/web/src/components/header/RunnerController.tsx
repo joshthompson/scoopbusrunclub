@@ -6,7 +6,7 @@ import { createCameraFlashController } from "./CameraFlashController"
 
 export const RUNNER_LABEL_RENDER_DISTANCE = 50
 
-const STANDING_STATES: RunnerState[] = ['scanner', 'photographer', 'run-director']
+const STANDING_STATES: RunnerState[] = ['scanner', 'photographer', 'run-director', 'marshal']
 
 export function isStandingState(state: RunnerState): boolean {
   return STANDING_STATES.includes(state)
@@ -140,6 +140,8 @@ export function createRunnerController(
       if (state !== $.activeState()) {
         $.setActiveState(state)
 
+        console.log(state)
+
         if (isStandingState(state)) {
           // Position for standing: fixed y of 150, non-overlapping x
           const otherStanding = $scene.getControllersByType<RunnerController>('runner')
@@ -157,15 +159,17 @@ export function createRunnerController(
 
       // --- Standing states (scanner, photographer, etc.) ---
       if (isStandingState(state)) {
-        if (state === 'scanner' && runner().frames.scanner) {
-          $.setFrames(runner().frames.scanner!)
-        }
-        if (state === 'photographer' && runner().frames.photographer) {
-          $.setFrames(runner().frames.photographer!)
-        }
-        if (state === 'run-director' && runner().frames.runDirector) {
-          $.setFrames(runner().frames.runDirector!)
-        }
+        let frames: string[] | undefined
+        if (state === 'scanner') frames = runner().frames.scanner
+        else if (state === 'photographer') frames = runner().frames.photographer
+        else if (state === 'run-director') frames = runner().frames.runDirector
+        else if (state === 'marshal') frames = runner().frames.marshal
+
+        // Fall back to volunteerGeneric, then sit frame if no specific sprite
+        if (!frames) frames = runner().frames.volunteerGeneric
+        if (!frames) frames = runner().frames.sit
+
+        if (frames) $.setFrames(runner().frames.run.map(() => frames![0]))
         // No movement, no scooping — just render in place
         return
       }

@@ -38,6 +38,7 @@ function determineRunnerState(latestVol: VolunteerItem | undefined, latestSaturd
     if (latestVol.roles.includes('Sistagångare')) return 'tail-walker'
     if (latestVol.roles.includes('Fotograf')) return 'photographer'
     if (latestVol.roles.includes('Loppansvarig')) return 'run-director'
+    if (latestVol.roles.includes('Funktionär')) return 'marshal'
   }
   return 'run'
 }

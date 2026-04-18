@@ -29,6 +29,7 @@ export { default as claireRunDirector } from '@/assets/runners/claire/run-direct
 export { default as elineRun } from '@/assets/runners/eline/run.png'
 export { default as elineSit } from '@/assets/runners/eline/sit.png'
 export { default as elineFace } from '@/assets/runners/eline/face.png'
+export { default as elineRunDirector } from '@/assets/runners/eline/run-director.png'
 export { default as elineScanner } from '@/assets/runners/eline/scanner.png'
 
 export { default as joshRun } from '@/assets/runners/josh/run.png'
