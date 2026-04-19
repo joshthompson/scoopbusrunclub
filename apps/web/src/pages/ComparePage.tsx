@@ -216,6 +216,7 @@ export function ComparePage(props: ComparePageProps) {
   const raceTableColumns = createMemo(() => [
     { title: "Event" },
     ...names().map((n) => ({ title: n, width: "90px" })),
+    { title: "", width: "40px" },
   ])
 
   const raceTableData = createMemo(() =>
@@ -227,6 +228,9 @@ export function ComparePage(props: ComparePageProps) {
           <span class={styles.raceDate}>{formatted}</span>
         </div>,
         ...ev.entries.map((e) => <span class={e === "Volunteer" ? styles.volunteerLabel : undefined}>{e}</span>),
+        <A href={`/replay/${ev.event}/${ev.eventNumber}`} class={styles.replayBtn} title="Replay">
+          ▶
+        </A>,
       ]
     })
   )
@@ -498,5 +502,19 @@ const styles = {
     _hover: {
       background: "rgba(0,0,0,0.35)",
     },
+  }),
+  replayBtn: css({
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "28px",
+    height: "28px",
+    borderRadius: "4px",
+    background: "rgba(0,0,0,0.15)",
+    color: "inherit",
+    textDecoration: "none",
+    fontSize: "0.85rem",
+    cursor: "pointer",
+    _hover: { background: "rgba(0,0,0,0.3)" },
   }),
 }

@@ -6,6 +6,7 @@ import { CourseSVG } from "@/components/CourseSVG"
 import { getEvent, getEventName } from "@/utils/events"
 import { formatDate, formatName } from "@/utils/misc"
 import { DirtBlock } from "../components/ui/DirtBlock"
+import { Table } from "@/components/ui/Table"
 import { RunnerSummaryStat } from "./RunnerSummaryStat"
 import { BackSignButton } from "@/components/BackSignButton"
 import { NotFoundPage } from "./NotFoundPage"
@@ -595,56 +596,42 @@ export function EventPage(props: EventPageProps) {
         {/* Visit History */}
         <Show when={timeline().length > 0}>
           <DirtBlock title="Visit History">
-            <div class={styles.timeline}>
-              <For each={timeline()}>
-                {(entry) => (
-                  <div class={styles.timelineEntry}>
-                    <div class={styles.timelineHeader}>
-                      <strong>#{entry.eventNumber}</strong>
-                      <span class={styles.timelineDate}>{formatDate(new Date(`${entry.date}T00:00:00`))}</span>
-                      <span class={styles.timelineBadge}>
-                        {entry.runners.length + entry.vols.length} {entry.runners.length + entry.vols.length === 1 ? "member" : "members"}
+            <Table
+              columns={[
+                { title: "#", width: "50px" },
+                { title: "Date" },
+                { title: "Members" },
+                { title: "", width: "40px" },
+              ]}
+              data={timeline().map((entry) => [
+                <strong>#{entry.eventNumber}</strong>,
+                <span>{formatDate(new Date(`${entry.date}T00:00:00`))}</span>,
+                <div class={styles.membersCell}>
+                  <For each={entry.runners}>
+                    {(r) => (
+                      <span class={styles.memberChip}>
+                        {runnerFace(r.parkrunId)}
+                        {runnerLink(r.parkrunId, r.runnerName)}
+                        <span class={styles.memberChipMeta}>{r.time}</span>
                       </span>
-                    </div>
-                    <div class={styles.timelineParticipants}>
-                      <Show when={entry.runners.length > 0}>
-                        <div class={styles.timelineGroup}>
-                          <span class={styles.timelineLabel}>🏃</span>
-                          <For each={entry.runners}>
-                            {(r) => (
-                              <span class={styles.timelineChip}>
-                                {runnerFace(r.parkrunId)}
-                                {runnerLink(r.parkrunId, r.runnerName)}
-                                <span class={styles.timelineChipMeta}>
-                                  {r.time}
-                                  {r.position > 0 && <> (Pos: {r.position})</>}
-                                </span>
-                              </span>
-                            )}
-                          </For>
-                        </div>
-                      </Show>
-                      <Show when={entry.vols.length > 0}>
-                        <div class={styles.timelineGroup}>
-                          <span class={styles.timelineLabel}>🙌</span>
-                          <For each={entry.vols}>
-                            {(v) => (
-                              <span class={styles.timelineChip}>
-                                {runnerFace(v.parkrunId)}
-                                {runnerLink(v.parkrunId, v.volunteerName)}
-                                <span class={styles.timelineChipMeta}>
-                                  {v.roles.map(translateRole).join(", ")}
-                                </span>
-                              </span>
-                            )}
-                          </For>
-                        </div>
-                      </Show>
-                    </div>
-                  </div>
-                )}
-              </For>
-            </div>
+                    )}
+                  </For>
+                  <For each={entry.vols}>
+                    {(v) => (
+                      <span class={styles.memberChip}>
+                        {runnerFace(v.parkrunId)}
+                        {runnerLink(v.parkrunId, v.volunteerName)}
+                        <span class={styles.memberChipMeta}>{v.roles.map(translateRole).join(", ")}</span>
+                      </span>
+                    )}
+                  </For>
+                </div>,
+                <A href={`/replay/${eventId()}/${entry.eventNumber}`} class={styles.replayBtn} title="Replay">
+                  ▶
+                </A>,
+              ])}
+              empty="No visits recorded."
+            />
           </DirtBlock>
         </Show>
 
@@ -820,60 +807,38 @@ const styles = {
     verticalAlign: "middle",
   }),
 
-  // Timeline
-  timeline: css({
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    textAlign: "left",
-  }),
-  timelineEntry: css({
-    borderLeft: "3px solid rgba(255,255,255,0.15)",
-    pl: "0.75rem",
-  }),
-  timelineHeader: css({
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    mb: "0.25rem",
-  }),
-  timelineDate: css({
-    fontSize: "0.85rem",
-    opacity: 0.6,
-  }),
-  timelineBadge: css({
-    fontSize: "0.75rem",
-    background: "rgba(255,255,255,0.1)",
-    borderRadius: "999px",
-    p: "0.1rem 0.5rem",
-    opacity: 0.6,
-  }),
-  timelineParticipants: css({
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.35rem",
-  }),
-  timelineGroup: css({
+  // Visit History table
+  membersCell: css({
     display: "flex",
     flexWrap: "wrap",
-    alignItems: "center",
     gap: "0.35rem",
   }),
-  timelineLabel: css({
-    fontSize: "1rem",
-    mr: "0.1rem",
-  }),
-  timelineChip: css({
+  memberChip: css({
     display: "inline-flex",
     alignItems: "center",
     gap: "0.25rem",
     background: "rgba(255,255,255,0.08)",
     borderRadius: "6px",
     p: "0.15rem 0.5rem",
-    fontSize: "0.9rem",
+    fontSize: "0.85rem",
   }),
-  timelineChipMeta: css({
+  memberChipMeta: css({
     fontSize: "0.75rem",
     opacity: 0.6,
+  }),
+  replayBtn: css({
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "24px",
+    height: "24px",
+    borderRadius: "4px",
+    background: "rgba(0,0,0,0.15)",
+    color: "inherit",
+    textDecoration: "none",
+    fontSize: "0.75rem",
+    cursor: "pointer",
+    marginLeft: "auto",
+    _hover: { background: "rgba(0,0,0,0.3)" },
   }),
 }

@@ -8,22 +8,29 @@ import {
   onMount,
   Show,
 } from "solid-js"
-import { useParams } from "@solidjs/router"
+import { A, useParams } from "@solidjs/router"
 import {
   type RunResultItem,
+  type VolunteerItem,
   type CourseData,
   fetchCourse,
 } from "@/utils/api"
 import { getEventName } from "@/utils/events"
-import { parseTimeToSeconds } from "@/utils/misc"
+import { formatDate, formatName, parseTimeToSeconds } from "@/utils/misc"
 import { FieldBlock } from "@/components/ui/FieldBlock"
+import { DirtBlock } from "@/components/ui/DirtBlock"
+import { Table } from "@/components/ui/Table"
 import { BackSignButton } from "@/components/BackSignButton"
 import { NotFoundPage } from "./NotFoundPage"
 import { runners as runnerSignals } from "@/data/runners"
+import { getMemberRoute } from "@/utils/memberRoute"
+import { VOLUNTEER_EVENT_IDS } from "@shared/parkrun-events"
+import { RoleTranslations } from "@/data/volunteer-roles"
 import tree1Asset from "@/assets/misc/tree1.png"
 import tree2Asset from "@/assets/misc/tree2.png"
 import shrub1Asset from "@/assets/misc/shrub1.png"
 import shrub2Asset from "@/assets/misc/shrub2.png"
+import { COURSE_OVERRIDES } from "@/data/courses"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -130,6 +137,7 @@ const POINT_EMOJI: Record<string, string> = {
   start: "🟢",
   finish: "🏁",
   mål: "🏁",
+  "start / finish": "🟢 🏁",
   "turnaround point": "🔄",
   "turning point": "🔄",
   "u-turn": "🔄",
@@ -139,21 +147,7 @@ const POINT_EMOJI: Record<string, string> = {
   "4km": "4",
 }
 
-const END_POINTS = ["finish", "mål", "start/mål", "start/finish"]
-
-// ---------------------------------------------------------------------------
-// Per-course overrides
-// ---------------------------------------------------------------------------
-
-interface CourseOverride {
-  laps?: number
-  reverse?: boolean
-}
-
-const COURSE_OVERRIDES: Record<string, CourseOverride> = {
-  haga: { laps: 2 },
-  somerdalepavilion: { laps: 2, reverse: true },
-}
+const END_POINTS = ["finish", "mål", "start/mål", "start/finish", "start / finish"]
 
 const TREE_ASSETS = [
   { src: tree1Asset, isShrub: false },
@@ -311,8 +305,14 @@ const SPEED_OPTIONS = [1, 2, 5, 10, 25, 50, 100] as const
 // Component
 // ---------------------------------------------------------------------------
 
+function translateRole(role: string): string {
+  const translations = RoleTranslations as Record<string, string>
+  return translations[role] ?? role
+}
+
 interface ReplayPageProps {
   results: RunResultItem[]
+  volunteers: VolunteerItem[]
 }
 
 export function ReplayPage(props: ReplayPageProps) {
@@ -358,6 +358,57 @@ export function ReplayPage(props: ReplayPageProps) {
 
   const hasData = createMemo(() => replayRunners().length > 0 && courseData() !== null)
 
+  // ---- Event date ----
+  const eventDate = createMemo(() => {
+    const r = props.results.find(
+      (r) => r.event === eventId() && r.eventNumber === eventNumber(),
+    )
+    return r?.date ?? null
+  })
+
+  // ---- Volunteers for this event number ----
+  const hasVolunteerData = createMemo(() => VOLUNTEER_EVENT_IDS.has(eventId()))
+  const eventVolunteers = createMemo(() => {
+    if (!hasVolunteerData()) return []
+    return props.volunteers.filter(
+      (v) => v.event === eventId() && v.eventNumber === eventNumber(),
+    )
+  })
+
+  // ---- Finish table data ----
+  const finishTableColumns = createMemo(() => [
+    { title: "#", width: "40px" },
+    { title: "Name" },
+    { title: "Time", width: "80px" },
+  ])
+
+  const finishTableData = createMemo(() => {
+    const runners = replayRunners()
+    const volRows = eventVolunteers().map((v) => {
+      const memberRoute = getMemberRoute(v.parkrunId)
+      const name = memberRoute
+        ? <A href={`/member/${memberRoute}`} class={styles.link}>{parkrunIdToFace.get(v.parkrunId)?.name ?? formatName(v.volunteerName)}</A>
+        : <span>{formatName(v.volunteerName)}</span>
+      return [
+        <span class={styles.volunteerLabel}>🙌</span>,
+        name,
+        <span class={styles.volunteerLabel}>{v.roles.map(translateRole).join(", ")}</span>,
+      ] as import("solid-js").JSX.Element[]
+    })
+    const runRows = runners.map((r) => {
+      const memberRoute = getMemberRoute(r.parkrunId)
+      const name = memberRoute
+        ? <A href={`/member/${memberRoute}`} class={styles.link}>{r.name}</A>
+        : <span>{r.name}</span>
+      return [
+        <span>{r.position}</span>,
+        name,
+        <span>{formatSecs(r.finishSeconds)}</span>,
+      ] as import("solid-js").JSX.Element[]
+    })
+    return [...runRows, ...volRows]
+  })
+
   /** The slowest finisher's time (total animation duration in seconds). */
   const maxFinishTime = createMemo(() => {
     const runners = replayRunners()
@@ -382,6 +433,27 @@ export function ReplayPage(props: ReplayPageProps) {
 
     // Project using single-lap coords (for bounding box)
     const proj = projectCoordinates(coords, extraCoords, PADDING)
+
+    // Apply sections override: each section [fromIdx, toIdx] defines a
+    // sub-path through the projected coordinates. If fromIdx < toIdx,
+    // the runner moves forward; if fromIdx > toIdx, the runner moves
+    // backward. Between sections the runner teleports to the new start.
+    const sections = courseOverride().sections
+    if (sections && sections.length > 0) {
+      const multiPath: Point2D[] = []
+      for (const [fromIdx, toIdx] of sections) {
+        let sectionPts: Point2D[]
+        if (fromIdx <= toIdx) {
+          sectionPts = proj.path.slice(fromIdx, toIdx + 1)
+        } else {
+          // Reverse: take coords from toIdx..fromIdx then reverse
+          sectionPts = proj.path.slice(toIdx, fromIdx + 1).reverse()
+        }
+        // Skip first point of subsequent sections to avoid duplicate at junction
+        multiPath.push(...(multiPath.length === 0 ? sectionPts : sectionPts))
+      }
+      return { ...proj, path: multiPath }
+    }
 
     // Apply laps: repeat the projected path for multi-lap courses
     const laps = courseOverride().laps ?? 1
@@ -435,8 +507,10 @@ export function ReplayPage(props: ReplayPageProps) {
     const p = projected()
     if (!cd || !p) return null
     const ep = cd.points.find((pt) => END_POINTS.includes(pt.name.toLowerCase()))
-    if (!ep) return null
-    return p.project(ep.coordinates)
+    if (ep) return p.project(ep.coordinates)
+    // Fallback to the final coordinate of the projected path
+    if (p.path.length > 0) return p.path[p.path.length - 1]
+    return null
   })
 
   // ---- SVG ref + scale factor so heads render at fixed pixel size ----
@@ -600,6 +674,11 @@ export function ReplayPage(props: ReplayPageProps) {
       <Show when={!courseLoading()} fallback={<p class={styles.loading}>Loading course…</p>}>
         <Show when={hasData()} fallback={<NotFoundPage />}>
           <FieldBlock title={title()}>
+            <Show when={eventDate()}>
+              {(date) => (
+                <p class={styles.eventDate}>{formatDate(new Date(`${date()}T00:00:00`))}</p>
+              )}
+            </Show>
             <div class={styles.replayContainer}>
               {/* ---- SVG Course + Runners ---- */}
               <svg
@@ -745,11 +824,27 @@ export function ReplayPage(props: ReplayPageProps) {
                   {finishedCount()} / {replayRunners().length} finished
                 </p>
               </div>
-              <div class={styles.disclaimer}>
-                The replay is based on finish times and map data which often doesn't reflect things like laps, direction or correct start/end locations.
-              </div>
+              <Show when={!COURSE_OVERRIDES[eventId()]}>
+                <div class={styles.disclaimer}>
+                  The replay is based on finish times and map data which often doesn't reflect things like laps, direction or correct start/end locations.
+                </div>
+              </Show>
             </div>
           </FieldBlock>
+
+          {/* Finish table */}
+          <DirtBlock title="Results">
+            <Table
+              columns={finishTableColumns()}
+              data={finishTableData()}
+              empty="No results."
+            />
+          </DirtBlock>
+
+          {/* Link to event details page */}
+          <A href={`/event/${eventId()}`} class={styles.eventLink}>
+            View {eventName()} Details →
+          </A>
         </Show>
       </Show>
       <BackSignButton />
@@ -894,5 +989,31 @@ const styles = {
     m: "0.5rem auto 0",
     background: '#000',
     color: '#fff',
+  }),
+  eventDate: css({
+    textAlign: "center",
+    fontSize: "1.1rem",
+    margin: "0 0 0.5rem",
+    opacity: 0.8,
+  }),
+  link: css({
+    color: "inherit",
+    textDecoration: "underline",
+    fontWeight: "bold",
+  }),
+  volunteerLabel: css({
+    fontSize: "0.85rem",
+    opacity: 0.7,
+    fontStyle: "italic",
+  }),
+  eventLink: css({
+    display: "block",
+    textAlign: "center",
+    color: "inherit",
+    fontSize: "1.1rem",
+    fontWeight: "bold",
+    textDecoration: "underline",
+    padding: "0.5rem",
+    _hover: { opacity: 0.8 },
   }),
 }

@@ -159,7 +159,7 @@ const App: Component = () => {
           path="/replay/:eventName/:eventNumber"
           component={() => (
             <Show when={!results.loading && !runners.loading} fallback={<div class={styles.loading}>Loading...</div>}>
-              <ReplayPage results={results() ?? []} />
+              <ReplayPage results={results() ?? []} volunteers={volunteers() ?? []} />
             </Show>
           )}
         />
