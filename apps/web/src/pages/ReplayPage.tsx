@@ -387,7 +387,7 @@ export function ReplayPage(props: ReplayPageProps) {
     const volRows = eventVolunteers().map((v) => {
       const memberRoute = getMemberRoute(v.parkrunId)
       const name = memberRoute
-        ? <A href={`/member/${memberRoute}`} class={styles.link}>{parkrunIdToFace.get(v.parkrunId)?.name ?? formatName(v.volunteerName)}</A>
+        ? <A href={memberRoute} class={styles.link}>{parkrunIdToFace.get(v.parkrunId)?.name ?? formatName(v.volunteerName)}</A>
         : <span>{formatName(v.volunteerName)}</span>
       return [
         <span class={styles.volunteerLabel}>🙌</span>,
@@ -398,7 +398,7 @@ export function ReplayPage(props: ReplayPageProps) {
     const runRows = runners.map((r) => {
       const memberRoute = getMemberRoute(r.parkrunId)
       const name = memberRoute
-        ? <A href={`/member/${memberRoute}`} class={styles.link}>{r.name}</A>
+        ? <A href={memberRoute} class={styles.link}>{r.name}</A>
         : <span>{r.name}</span>
       return [
         <span>{r.position}</span>,
