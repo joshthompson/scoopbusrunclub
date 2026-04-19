@@ -43,4 +43,11 @@ export const COURSE_OVERRIDES: Record<string, CourseOverride> = {
     ],
   },
   judarskogen: {}, // Course data good - no overrides needed
+  orebro: {
+    sections: [
+      [42, 27], // Start to loop point
+      [0, 26], // Loop
+      [27, 41], // Loop point to finish
+    ],
+  }
 }
