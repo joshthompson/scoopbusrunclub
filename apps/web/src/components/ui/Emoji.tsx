@@ -121,7 +121,7 @@ const styles = {
             position: "absolute",
             height: '6px',
             borderRadius: '50%',
-            background: 'black',
+            background: 'var(--color-black)',
             transform: 'scale(1, 0.5)',
             translate: '0 0.3em',
             animation: "floatShadow 2s ease-in-out infinite",

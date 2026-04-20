@@ -13,7 +13,7 @@ const styles = {
     inset: 0,
     width: '100%',
     height: '100%',
-    background: '#00000088',
+    background: 'var(--overlay-black-50)',
   }),
   modal: css({
     position: 'absolute',

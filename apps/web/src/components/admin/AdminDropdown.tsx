@@ -95,7 +95,7 @@ const styles = {
     position: "absolute",
     transform: "translateX(-100%)",
     zIndex: 10000,
-    background: "#222",
+    background: "var(--grey-800)",
     cornerShape: "notch",
     borderRadius: "4px",
     display: "flex",
@@ -106,7 +106,7 @@ const styles = {
   item: css({
     background: "none",
     border: "none",
-    color: "#fff",
+    color: "var(--color-white)",
     fontSize: "0.8rem",
     padding: "0.5rem 0.75rem",
     borderRadius: "inherit",
@@ -114,7 +114,7 @@ const styles = {
     cursor: "pointer",
     textAlign: "left",
     _hover: {
-      background: "rgba(255,255,255,0.1)",
+      background: "var(--overlay-white-10)",
     },
   }),
 }

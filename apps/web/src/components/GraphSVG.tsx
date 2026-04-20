@@ -5,7 +5,7 @@ import { type RunResultItem, type Runner } from "@/utils/api"
 import { parseTimeToSeconds } from "@/utils/misc"
 import { getRunnerKeyFromRouteName } from "@/utils/memberRoute"
 import { RunnerName, runners as runnerSignals } from '@/data/runners'
-import { buildCelebrationData, getCelebrationTags, type CelebrationData, getOrBuildCelebrationData } from "@/components/ResultCelebrations"
+import { getCelebrationTags, type CelebrationData, getOrBuildCelebrationData } from "@/components/ResultCelebrations"
 
 /** Category of celebration for filtering */
 export type GraphMarkerCategory = "pb" | "coursePb" | "other"
@@ -393,10 +393,10 @@ export function GraphSVG(props: GraphProps) {
     const base = {
       lineWidth: 3,
       pointSize: 8,
-      outerLineColor: "#4A3215",
-      innerLineColor: "#AD855A",
-      outerPointColor: "#4A3215",
-      innerPointColor: "#AD855A",
+      outerLineColor: "var(--dirt-darker-brown)",
+      innerLineColor: "var(--dirt-dark-brown)",
+      outerPointColor: "var(--dirt-darker-brown)",
+      innerPointColor: "var(--dirt-dark-brown)",
     }
     if (rpp < 10) return {
       ...base,
@@ -418,7 +418,7 @@ export function GraphSVG(props: GraphProps) {
       lineWidth: 1,
       pointSize: 1,
       outerLineColor: "transparent",
-      innerLineColor: "#4A3215",
+      innerLineColor: "var(--dirt-darker-brown)",
 
     }
   })
@@ -535,8 +535,8 @@ export function GraphSVG(props: GraphProps) {
                       y={p.y - pointSize() / 2}
                       width={pointSize()}
                       height={pointSize()}
-                      fill={isPb() ? "#FFD700" : lineSizeProps().innerPointColor}
-                      stroke={isPb() ? "#4A3215" : lineSizeProps().outerPointColor}
+                      fill={isPb() ? "var(--gold-pure)" : lineSizeProps().innerPointColor}
+                      stroke={isPb() ? "var(--dirt-darker-brown)" : lineSizeProps().outerPointColor}
                       stroke-width={isPb() ? "2" : "1"}
                     />
                   </g>
@@ -671,8 +671,8 @@ const styles = {
   }),
   tooltip: css({
     position: "fixed",
-    background: "#000",
-    color: "#fff",
+    background: "var(--color-black)",
+    color: "var(--color-white)",
     fontSize: "0.75rem",
     fontWeight: "normal",
     lineHeight: "1.3",
@@ -694,7 +694,7 @@ const styles = {
     opacity: 0.85,
   }),
   tooltipDivider: css({
-    borderTop: "1px solid rgba(255,255,255,0.2)",
+    borderTop: "1px solid var(--overlay-white-20)",
     mt: "0.25rem",
     mb: "0.25rem",
   }),
@@ -723,7 +723,7 @@ const styles = {
     gap: "0.3rem",
     fontSize: "1.25rem",
     fontWeight: "bold",
-    color: "#4A3215",
+    color: "var(--dirt-darker-brown)",
     cursor: "pointer",
     userSelect: "none",
     fontFamily: '"Jersey 10", sans-serif',
@@ -738,7 +738,7 @@ const styles = {
     border: '2px solid var(--dirt-darker-brown)',
     appearance: "none",
     background: "var(--dirt-brown)",
-    color: "#fff",
+    color: "var(--color-white)",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",

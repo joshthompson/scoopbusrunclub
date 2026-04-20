@@ -87,7 +87,7 @@ const styles = {
     base: {
       textAlign: "left",
       padding: "0.5rem 0.75rem",
-      borderBottom: "2px solid rgba(0,0,0,0.2)",
+      borderBottom: "2px solid var(--overlay-black-20)",
       fontWeight: "bold",
       textTransform: "uppercase",
       fontSize: "0.75rem",
@@ -97,17 +97,17 @@ const styles = {
       sortable: {
         true: {
           cursor: "pointer",
-          _hover: { background: "rgba(0,0,0,0.05)" },
+          _hover: { background: "var(--overlay-black-5)" },
         },
       },
     },
   }),
   row: css({
-    _hover: { background: "rgba(0,0,0,0.05)" },
+    _hover: { background: "var(--overlay-black-5)" },
   }),
   cell: css({
     padding: "0.5rem 0.75rem",
-    borderBottom: "1px solid rgba(0,0,0,0.1)",
+    borderBottom: "1px solid var(--overlay-black-10)",
     verticalAlign: "middle",
   }),
   sortIndicator: css({

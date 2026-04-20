@@ -322,7 +322,7 @@ export function MemberPage(props: MemberPageProps) {
       items.unshift({
         name: "Be a good boy",
         emoji: "🐶",
-        color: "#f0c040",
+        color: "var(--gold-warm)",
         description: "Achieved everyday!",
         occurrences: [],
       })

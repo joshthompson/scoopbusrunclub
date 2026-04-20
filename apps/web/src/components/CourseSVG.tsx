@@ -188,7 +188,7 @@ const styles = {
   }),
   label: css({
     fontSize: "13px",
-    fill: "#fff",
+    fill: "var(--color-white)",
     fontWeight: "bold",
     pointerEvents: "none",
     textShadow: "0 1px 3px rgba(0,0,0,0.6)",

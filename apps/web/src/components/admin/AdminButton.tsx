@@ -25,35 +25,35 @@ const styles = {
   button: cva({
     base: {
       padding: "0.5rem 1.25rem",
-      border: "3px double #000",
-      background: "rgba(0,0,0,0.15)",
-      color: "#FFF",
+      border: "3px double var(--color-black)",
+      background: "var(--overlay-black-15)",
+      color: "var(--color-white)",
       cursor: "pointer",
       fontWeight: "bold",
       fontSize: "0.8rem",
       textTransform: "uppercase",
       borderRadius: "4px",
       cornerShape: "notch",
-      _hover: { background: "rgba(0,0,0,0.25)" },
+      _hover: { background: "var(--overlay-black-25)" },
       _disabled: { opacity: 0.5, cursor: "default", pointerEvents: "none" },
     },
     variants: {
       variant: {
         primary: {
-          background: "rgba(0,0,0,0.15)",
-          border: "3px double #000",
-          _hover: { background: "rgba(0,0,0,0.25)" },
+          background: "var(--overlay-black-15)",
+          border: "3px double var(--color-black)",
+          _hover: { background: "var(--overlay-black-25)" },
         },
         secondary: {
-          background: "rgba(0,0,0,0.07)",
+          background: "var(--overlay-black-7)",
           border: "none",
-          _hover: { background: "rgba(0,0,0,0.2)" },
+          _hover: { background: "var(--overlay-black-20)" },
         },
         danger: {
-          background: "rgba(255, 100, 100, 0.15)",
+          background: "var(--red-danger-light)",
           borderColor: "var(--error-red)",
           color: "var(--error-red)",
-          _hover: { background: "rgba(255, 100, 100, 0.25)" },
+          _hover: { background: "var(--red-danger-light-hover)" },
         },
       },
       size: {

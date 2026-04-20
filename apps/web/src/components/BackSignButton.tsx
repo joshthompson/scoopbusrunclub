@@ -30,11 +30,11 @@ const styles = {
     transform: 'translateX(-50%)',
     width: 'max-content',
     p: '2px 10px',
-    background: '#ddef64',
+    background: 'var(--lime-yellow)',
     fontFamily: '"Jersey 10", sans-serif',
     fontSize: '20px',
     textTransform: 'uppercase',
     lineHeight: '20px',
-    color: 'black',
+    color: 'var(--color-black)',
   }),
 }

@@ -541,7 +541,7 @@ const styles = {
     p: '4px',
 
     _hover: { 
-      background: '#00000018',
+      background: 'var(--overlay-black-10)',
     }
   }),
   flag: css({
@@ -562,7 +562,7 @@ const styles = {
   }),
   seperator: css({
     border: 'none',
-    borderTop: '1px solid #00000020',
+    borderTop: '1px solid var(--overlay-black-12)',
     margin: '0'
   }),
   parkrunImage: css({
@@ -574,11 +574,11 @@ const styles = {
     display: 'inline-block',
     fontSize: '0.8rem',
     color: 'inherit',
-    background: 'rgba(0,0,0,0.15)',
+    background: 'var(--overlay-black-15)',
     padding: '2px 10px',
     borderRadius: '4px',
     textDecoration: 'none',
     margin: '4px auto 0',
-    _hover: { background: 'rgba(0,0,0,0.3)' },
+    _hover: { background: 'var(--overlay-black-30)' },
   }),
 }

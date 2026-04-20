@@ -118,9 +118,9 @@ export function createRunnerController(
             }}
             class={css({
               position: 'absolute',
-              background: 'black',
+              background: 'var(--color-black)',
               left: '50%',
-              color: 'white',
+              color: 'var(--color-white)',
               fontFamily: '"Jersey 10", sans-serif',
               fontSize: '12px',
               p: '0px 8px',

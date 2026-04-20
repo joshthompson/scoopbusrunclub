@@ -6,10 +6,10 @@ import { DirtBlock } from "./ui/DirtBlock"
 import { Tooltip } from "./ui/Tooltip"
 
 const ACTIVITY_COLORS: Record<WeekActivity, string> = {
-  none: "rgba(255,255,255,0.08)",
-  ran: "#5cb85c",
-  volunteered: "#9b59b6",
-  both: "#f0c040",
+  none: "var(--heatmap-none)",
+  ran: "var(--heatmap-ran)",
+  volunteered: "var(--heatmap-volunteered)",
+  both: "var(--heatmap-both)",
 }
 
 const ACTIVITY_LABELS: Record<WeekActivity, string> = {

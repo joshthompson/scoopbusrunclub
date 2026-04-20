@@ -242,7 +242,7 @@ const styles = {
     textAlign: "left",
   }),
   error: css({
-    color: "#ff6b6b",
+    color: "var(--red-soft)",
     fontSize: "0.875rem",
     margin: 0,
     textAlign: "center",

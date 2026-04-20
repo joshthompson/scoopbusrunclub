@@ -254,7 +254,7 @@ function computeGroupCelebrations(results: RunResultItem[], runners: Runner[], v
         emoji: "🛣️",
         label: `${m.toLocaleString()} km`,
         description: `The club has collectively run ${m.toLocaleString()} km!`,
-        color: "#16a34a",
+        color: "var(--green-600)",
       })
     }
   }
@@ -267,7 +267,7 @@ function computeGroupCelebrations(results: RunResultItem[], runners: Runner[], v
         emoji: "🏃",
         label: `${m.toLocaleString()} tracked runs`,
         description: `The club has ${m.toLocaleString()} tracked parkruns in total!`,
-        color: "#2563eb",
+        color: "var(--blue-600)",
       })
     }
   }
@@ -280,7 +280,7 @@ function computeGroupCelebrations(results: RunResultItem[], runners: Runner[], v
         emoji: "🌍",
         label: `${m} countries`,
         description: `The club has visited parkruns in ${m} different countries!`,
-        color: "#d97706",
+        color: "var(--amber-600)",
       })
     }
   }
@@ -293,7 +293,7 @@ function computeGroupCelebrations(results: RunResultItem[], runners: Runner[], v
         emoji: "📍",
         label: `${m} different events`,
         description: `The club has visited ${m} different parkrun events!`,
-        color: "#7c3aed",
+        color: "var(--purple-violet)",
       })
     }
   }
@@ -306,7 +306,7 @@ function computeGroupCelebrations(results: RunResultItem[], runners: Runner[], v
         emoji: "🦺",
         label: `${m} volunteer sessions`,
         description: `The club has collectively volunteered ${m} times!`,
-        color: "#059669",
+        color: "var(--green-emerald-dark)",
       })
     }
   }
@@ -319,7 +319,7 @@ function computeGroupCelebrations(results: RunResultItem[], runners: Runner[], v
         emoji: "🤝",
         label: `${m} close finishes`,
         description: `Club members have finished within 10 seconds of each other ${m} times!`,
-        color: "#e67e22",
+        color: "var(--orange)",
       })
     }
   }
@@ -568,7 +568,7 @@ const styles = {
   journeyBarTrack: css({
     position: "relative",
     height: "32px",
-    background: "rgba(0,0,0,0.2)",
+    background: "var(--overlay-black-20)",
     borderRadius: "4px",
     cornerShape: "notch",
     overflow: "hidden",
@@ -576,7 +576,7 @@ const styles = {
   }),
   journeyBarFill: css({
     height: "100%",
-    background: "#6abf4b",
+    background: "var(--green-brand)",
     borderRadius: "2px",
     transition: "width 1s ease",
   }),
@@ -585,7 +585,7 @@ const styles = {
     top: 0,
     bottom: 0,
     width: "2px",
-    background: "rgba(0,0,0,0.4)",
+    background: "var(--overlay-black-40)",
     transform: "translateX(-1px)",
     zIndex: 1,
   }),
@@ -629,7 +629,7 @@ const styles = {
     gap: "0.15rem",
     padding: "0.5rem 0.25rem",
     borderRadius: "6px",
-    background: "rgba(0,0,0,0.08)",
+    background: "var(--overlay-black-8)",
   }),
   countryUnvisited: css({
     filter: "saturate(0)",
@@ -677,13 +677,13 @@ const styles = {
   contributionBarTrack: css({
     flex: 1,
     height: "14px",
-    background: "rgba(0,0,0,0.15)",
+    background: "var(--overlay-black-15)",
     borderRadius: "4px",
     overflow: "hidden",
   }),
   contributionBarFill: css({
     height: "100%",
-    background: "#6abf4b",
+    background: "var(--green-brand)",
     borderRadius: "2px",
     minWidth: "2px",
     transition: "width 0.6s ease",
@@ -701,7 +701,7 @@ const styles = {
     textAlign: "center",
   }),
   celebrationCard: css({
-    background: "rgba(0,0,0,0.1)",
+    background: "var(--overlay-black-10)",
     borderRadius: "6px",
     padding: "0.75rem",
   }),

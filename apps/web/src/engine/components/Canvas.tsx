@@ -116,6 +116,6 @@ const styles = {
   canvas: css({
     position: 'relative',
     overflow: 'hidden',
-    background: 'white',
+    background: 'var(--color-white)',
   }),
 }
