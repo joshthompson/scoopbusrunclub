@@ -370,7 +370,7 @@ const styles = {
     gap: "4px",
   }),
   emptyText: css({
-    color: "rgba(255,255,255,0.7)",
+    color: "var(--overlay-white-70)",
     textAlign: "center",
     padding: "2rem",
   }),

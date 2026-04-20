@@ -25,7 +25,7 @@ const styles = {
   overlay: css({
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.6)",
+    background: "var(--overlay-black-60)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

@@ -217,7 +217,7 @@ const styles = {
     },
   }),
   emptyText: css({
-    color: "rgba(255,255,255,0.7)",
+    color: "var(--overlay-white-70)",
     textAlign: "center",
     padding: "2rem",
   }),
@@ -250,7 +250,7 @@ const styles = {
       textTransform: "uppercase",
       letterSpacing: "0.03em",
       whiteSpace: "nowrap",
-      color: "white",
+      color: "var(--color-white)",
     },
     variants: {
       variant: {
@@ -258,7 +258,7 @@ const styles = {
         edit: { background: "rgba(33, 150, 243, 1)" },
         delete: { background: "rgba(244, 67, 54, 1)" },
         scan: { background: "rgba(255, 193, 7, 1)" },
-        default: { background: "rgba(255, 255, 255, 0.15)", color: "rgba(255, 255, 255, 0.8)" },
+        default: { background: "var(--overlay-white-15)", color: "var(--overlay-white-80)" },
       },
     },
     defaultVariants: {

@@ -92,7 +92,7 @@ const styles = {
     },
   }),
   nav: css({
-    background: "black",
+    background: "var(--color-black)",
     position: "sticky",
     top: 0,
     zIndex: 100,
@@ -123,7 +123,7 @@ const styles = {
     gap: "0.75rem",
   }),
   navLink: css({
-    color: "#fff",
+    color: "var(--color-white)",
     textDecoration: "none",
     padding: "0.375rem 0.75rem",
     borderRadius: "4px",
@@ -132,33 +132,33 @@ const styles = {
     textTransform: "uppercase",
     letterSpacing: "0.05em",
     _hover: {
-      background: "rgba(255,255,255,0.1)",
+      background: "var(--overlay-white-10)",
     },
   }),
   navLinkActive: css({
-    background: "rgba(255,255,255,0.15)",
+    background: "var(--overlay-white-15)",
   }),
   usernameLink: css({
-    color: "rgba(255,255,255,0.7)",
+    color: "var(--overlay-white-70)",
     fontSize: "0.8rem",
     textDecoration: "none",
     _hover: {
-      color: "#fff",
+      color: "var(--color-white)",
       textDecoration: "underline",
     },
   }),
   toolbarOutlineBtn: css({
     padding: "0.375rem 0.75rem",
-    border: "2px solid rgba(255,255,255,0.3)",
+    border: "2px solid var(--overlay-white-30)",
     background: "transparent",
-    color: "#fff",
+    color: "var(--color-white)",
     cursor: "pointer",
     fontWeight: "bold",
     fontSize: "0.75rem",
     textTransform: "uppercase",
     borderRadius: "4px",
     _hover: {
-      background: "rgba(255,255,255,0.1)",
+      background: "var(--overlay-white-10)",
     },
   }),
   main: cva({

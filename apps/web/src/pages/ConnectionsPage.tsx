@@ -501,7 +501,7 @@ const pageStyles = {
     transition: "opacity 0.2s ease",
   }),
   hoverCard: css({
-    background: "rgba(0,0,0,0.15)",
+    background: "var(--overlay-black-15)",
     borderRadius: "6px",
     padding: "0.75rem",
     marginTop: "0.5rem",
@@ -529,7 +529,7 @@ const pageStyles = {
     textAlign: "center",
     margin: "0.75rem 0 0.25rem",
     padding: "0.5rem",
-    background: "rgba(0,0,0,0.1)",
+    background: "var(--overlay-black-10)",
     borderRadius: "6px",
   }),
   formulaLabel: css({

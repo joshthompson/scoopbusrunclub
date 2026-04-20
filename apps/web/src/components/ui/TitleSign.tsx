@@ -105,12 +105,12 @@ const styles = {
         wooden: {
           cornerShape: 'notch',
           borderRadius: '4px',
-          border: '2px solid rgba(0, 0, 0, 0.2)',
+          border: '2px solid var(--overlay-black-20)',
           padding: '0.1rem 0.75rem',
-          background: '#bd9359',
+          background: 'var(--dirt-sign)',
         },
         purple: {
-          color: '#f8b832',
+          color: 'var(--gold)',
           textAlign: 'center',
           width: '105px',
           height: '50px',

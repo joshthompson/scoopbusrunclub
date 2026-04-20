@@ -20,7 +20,7 @@ export function Checkbox(props: JSX.HTMLAttributes<HTMLInputElement> & CheckboxP
 
 const styles = {
   toggleLabel: css({
-    color: "#fff",
+    color: "var(--color-white)",
     fontSize: "0.875rem",
     display: "flex",
     alignItems: "center",
@@ -37,7 +37,7 @@ const styles = {
       border: '2px solid var(--outer-color)',
       appearance: "none",
       background: "var(--inner-color)",
-      color: "#fff",
+      color: "var(--color-white)",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",

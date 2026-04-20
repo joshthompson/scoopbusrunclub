@@ -547,7 +547,7 @@ function formatDateDisplay(dateStr: string): string {
 
 function WrappedCard(props: { emoji: string; children: any; color?: string }) {
   return (
-    <div class={cardStyles.card} style={{ "border-left": `4px solid ${props.color ?? "#6abf4b"}` }}>
+    <div class={cardStyles.card} style={{ "border-left": `4px solid ${props.color ?? "var(--green-brand)"}` }}>
       <span class={cardStyles.emoji}>{props.emoji}</span>
       <div class={cardStyles.content}>{props.children}</div>
     </div>
@@ -556,7 +556,7 @@ function WrappedCard(props: { emoji: string; children: any; color?: string }) {
 
 const cardStyles = {
   card: css({
-    background: "rgba(0,0,0,0.12)",
+    background: "var(--overlay-black-12)",
     borderRadius: "8px",
     padding: "1rem 1.2rem",
     display: "flex",
@@ -667,7 +667,7 @@ export function WrappedPage(props: WrappedPageProps) {
             </Show>
 
             {/* Total runs */}
-            <WrappedCard emoji="🏃" color="#2563eb">
+            <WrappedCard emoji="🏃" color="var(--blue-600)">
               <div>
                 In {year()}, Scoop Bus completed{" "}
                 <strong>{stats().totalRuns.toLocaleString()} parkruns</strong>
@@ -678,14 +678,14 @@ export function WrappedPage(props: WrappedPageProps) {
             </WrappedCard>
 
             {/* Distance */}
-            <WrappedCard emoji="🛣️" color="#16a34a">
+            <WrappedCard emoji="🛣️" color="var(--green-600)">
               <div>
                 That's <strong>{stats().totalDistanceKm.toLocaleString()} km</strong> run together
               </div>
             </WrappedCard>
 
             {/* Events and countries */}
-            <WrappedCard emoji="🌍" color="#d97706">
+            <WrappedCard emoji="🌍" color="var(--amber-600)">
               <div>
                 Across <strong>{stats().uniqueEvents} different events</strong> in{" "}
                 <strong>{stats().uniqueCountries} {stats().uniqueCountries === 1 ? "country" : "countries"}</strong>
@@ -693,7 +693,7 @@ export function WrappedPage(props: WrappedPageProps) {
             </WrappedCard>
 
             {/* Active events */}
-            <WrappedCard emoji="📅" color="#7c3aed">
+            <WrappedCard emoji="📅" color="var(--purple-violet)">
               <div>
                 <strong>{stats().activeMembers} members</strong> were active across{" "}
                 <strong>{stats().activeSaturdays} events</strong>
@@ -706,7 +706,7 @@ export function WrappedPage(props: WrappedPageProps) {
                 const b = stats().busiestSaturday!
                 const eventLabel = b.events.map((e) => `${e.name} #${e.eventNumber}`).join(", ")
                 return (
-                  <WrappedCard emoji="🎉" color="#e11d48">
+                  <WrappedCard emoji="🎉" color="var(--pink-rose)">
                     <div>
                       The busiest day was <strong>{formatDateDisplay(b.date)}</strong> with{" "}
                       <strong>{b.count} members</strong> at {eventLabel}
@@ -718,7 +718,7 @@ export function WrappedPage(props: WrappedPageProps) {
 
             {/* Volunteering */}
             <Show when={stats().volunteerSessions > 0}>
-              <WrappedCard emoji="🦺" color="#059669">
+              <WrappedCard emoji="🦺" color="var(--green-emerald-dark)">
                 <div>
                   The club volunteered <strong>{stats().volunteerSessions} times</strong>
                   <Show when={stats().mostVolunteeredMember}>
@@ -731,7 +731,7 @@ export function WrappedPage(props: WrappedPageProps) {
 
             {/* New events discovered */}
             <Show when={stats().newEventsDiscovered > 0}>
-              <WrappedCard emoji="📍" color="#0891b2">
+              <WrappedCard emoji="📍" color="var(--blue-cyan)">
                 <div>
                   <strong>{stats().newEventsDiscovered} new events</strong> were discovered this year
                   <Show when={stats().mostExploredMember}>
@@ -743,7 +743,7 @@ export function WrappedPage(props: WrappedPageProps) {
 
             {/* Close finishes */}
             <Show when={stats().closeFinishes > 0}>
-              <WrappedCard emoji="🤝" color="#e67e22">
+              <WrappedCard emoji="🤝" color="var(--orange)">
                 <div>
                   <strong>{stats().closeFinishes} close finishes</strong> within 10 seconds of each other
                   <Show when={stats().mostCommonCloseFinishPair}>
@@ -756,7 +756,7 @@ export function WrappedPage(props: WrappedPageProps) {
 
             {/* PBs */}
             <Show when={stats().totalPBs > 0}>
-              <WrappedCard emoji="⚡" color="#f59e0b">
+              <WrappedCard emoji="⚡" color="var(--amber-500)">
                 <div>
                   <strong>{stats().totalPBs} personal bests</strong> were set this year
                   <Show when={stats().biggestPBImprover}>
@@ -768,7 +768,7 @@ export function WrappedPage(props: WrappedPageProps) {
 
             {/* Biggest Haga */}
             <Show when={stats().biggestHaga}>
-              <WrappedCard emoji="🏠" color="#6366f1">
+              <WrappedCard emoji="🏠" color="var(--blue-indigo-500)">
                 <div>
                   The biggest Haga turnout was <strong>Haga #{stats().biggestHaga!.eventNumber}</strong> on{" "}
                   <strong>{formatDateDisplay(stats().biggestHaga!.date)}</strong> with{" "}
@@ -779,7 +779,7 @@ export function WrappedPage(props: WrappedPageProps) {
 
             {/* Biggest trip */}
             <Show when={stats().biggestTrip}>
-              <WrappedCard emoji="🚌" color="#0ea5e9">
+              <WrappedCard emoji="🚌" color="var(--blue-sky)">
                 <div>
                   The biggest Scoop Bus trip was to <strong>{stats().biggestTrip!.eventName} #{stats().biggestTrip!.eventNumber}</strong> on{" "}
                   <strong>{formatDateDisplay(stats().biggestTrip!.date)}</strong> with{" "}
@@ -791,7 +791,7 @@ export function WrappedPage(props: WrappedPageProps) {
             {/* New countries */}
             <For each={stats().newCountries}>
               {(c) => (
-                <WrappedCard emoji={c.flag} color="#10b981">
+                <WrappedCard emoji={c.flag} color="var(--green-emerald)">
                   <div>
                     First event in <strong>{c.name}</strong> — {c.eventName}
                   </div>
@@ -878,20 +878,20 @@ const pageStyles = {
   }),
   yearLink: css({
     padding: "0.25rem 0.6rem",
-    background: "rgba(0,0,0,0.15)",
+    background: "var(--overlay-black-15)",
     borderRadius: "4px",
     color: "inherit",
     textDecoration: "none",
     fontSize: "0.85rem",
     "&:hover": {
-      background: "rgba(0,0,0,0.25)",
+      background: "var(--overlay-black-25)",
     },
   }),
   yearActive: css({
     padding: "0.25rem 0.6rem",
-    background: "#6abf4b",
+    background: "var(--green-brand)",
     borderRadius: "4px",
-    color: "white",
+    color: "var(--color-white)",
     textDecoration: "none",
     fontSize: "0.85rem",
     fontWeight: "bold",
@@ -926,7 +926,7 @@ const pageStyles = {
     gap: "0.5rem",
     alignItems: "center",
     padding: "0.2rem 0.5rem",
-    background: "rgba(0,0,0,0.08)",
+    background: "var(--overlay-black-8)",
     borderRadius: "4px",
     fontSize: "0.9rem",
   }),
@@ -949,7 +949,7 @@ const pageStyles = {
     gap: "0.75rem",
   }),
   memberCard: css({
-    background: "rgba(0,0,0,0.1)",
+    background: "var(--overlay-black-10)",
     borderRadius: "8px",
     padding: "0.75rem",
     textAlign: "center",

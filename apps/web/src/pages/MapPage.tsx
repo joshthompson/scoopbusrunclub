@@ -14,12 +14,12 @@ import { COUNTRY_FLAGS, COUNTRY_NAMES } from "@/data/countries"
 
 // ─── Map colours & highlight ────────────────────────────────────────────────────
 
-const MAP_COLOR_NON_PARKRUN    = "#1a1a1a" // non-parkrun countries (black)
-const MAP_COLOR_PARKRUN        = "#2d5a27" // parkrun countries not yet visited (dark green)
-const MAP_COLOR_VISITED        = "#6abf4b" // parkrun countries we've visited (light green)
-const MAP_COLOR_HIGHLIGHTED    = "#f8b832" // highlighted country (yellow)
-const MAP_COLOR_OCEAN          = "#1a3a5c" // ocean background
-const MAP_COLOR_DOUBLE_COUNTRY = "#d93025" // double country (red)
+const MAP_COLOR_NON_PARKRUN    = "var(--map-land)" // non-parkrun countries (black)
+const MAP_COLOR_PARKRUN        = "var(--map-parkrun-country)" // parkrun countries not yet visited (dark green)
+const MAP_COLOR_VISITED        = "var(--map-visited)" // parkrun countries we've visited (light green)
+const MAP_COLOR_HIGHLIGHTED    = "var(--map-highlighted)" // highlighted country (yellow)
+const MAP_COLOR_OCEAN          = "var(--map-ocean)" // ocean background
+const MAP_COLOR_DOUBLE_COUNTRY = "var(--map-double-country)" // double country (red)
 
 const PARKRUN_COUNTRIES = new Set(Object.keys(COUNTRY_PIXELS))
 
@@ -377,14 +377,14 @@ const styles = {
     position: "fixed",
     pointerEvents: "none",
     zIndex: 1000,
-    background: "rgba(0, 0, 0, 0.85)",
-    color: "#fff",
+    background: "var(--overlay-black-85)",
+    color: "var(--color-white)",
     borderRadius: "6px",
     padding: "0.5rem 0.75rem",
     fontSize: "0.85rem",
     lineHeight: 1.4,
     whiteSpace: "nowrap",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+    boxShadow: "0 2px 8px var(--overlay-black-40)",
     cornerShape: 'notch',
     textAlign: "center",
   }),

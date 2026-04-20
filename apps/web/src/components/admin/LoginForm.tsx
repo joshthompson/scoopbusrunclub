@@ -98,19 +98,19 @@ const styles = {
     gap: "0.25rem",
     fontSize: "0.875rem",
     fontWeight: "bold",
-    color: "#fff",
+    color: "var(--color-white)",
     textTransform: "uppercase",
   }),
   input: css({
     padding: "0.5rem 0.75rem",
-    border: "2px solid rgba(255,255,255,0.3)",
+    border: "2px solid var(--overlay-white-30)",
     borderRadius: "4px",
-    background: "rgba(0,0,0,0.3)",
-    color: "#fff",
+    background: "var(--overlay-black-30)",
+    color: "var(--color-white)",
     fontSize: "1rem",
     outline: "none",
     _focus: {
-      borderColor: "rgba(255,255,255,0.6)",
+      borderColor: "var(--overlay-white-60)",
     },
   }),
   error: css({
@@ -121,9 +121,9 @@ const styles = {
   }),
   button: css({
     padding: "0.625rem 1.5rem",
-    border: "3px double #fff",
-    background: "rgba(255,255,255,0.1)",
-    color: "#fff",
+    border: "3px double var(--color-white)",
+    background: "var(--overlay-white-10)",
+    color: "var(--color-white)",
     cursor: "pointer",
     fontWeight: "bold",
     fontSize: "1rem",
@@ -131,7 +131,7 @@ const styles = {
     borderRadius: "4px",
     marginTop: "0.5rem",
     _hover: {
-      background: "rgba(255,255,255,0.2)",
+      background: "var(--overlay-white-20)",
     },
     _disabled: {
       opacity: 0.5,

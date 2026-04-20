@@ -55,8 +55,8 @@ const styles = {
   tooltip: css({
     position: "fixed",
     transform: "translate(-50%, calc(-100% - 6px))",
-    background: "black",
-    color: "white",
+    background: "var(--color-black)",
+    color: "var(--color-white)",
     padding: "4px 8px",
     borderRadius: "4px",
     cornerShape: "notch",

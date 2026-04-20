@@ -215,15 +215,15 @@ const styles = {
   }),
   barTrack: css({
     height: "32px",
-    background: "rgba(0,0,0,0.2)",
+    background: "var(--overlay-black-20)",
     borderRadius: "4px",
     cornerShape: "notch",
     overflow: "hidden",
-    border: "4px solid black",
+    border: "4px solid var(--color-black)",
   }),
   barFill: css({
     height: "100%",
-    background: "#6abf4b",
+    background: "var(--green-brand)",
     borderRadius: "2px",
     transition: "width 0.15s linear",
   }),

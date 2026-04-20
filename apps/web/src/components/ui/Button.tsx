@@ -29,7 +29,7 @@ const styles = {
     cornerShape: 'notch',
     borderRadius: '4px',
     _hover: {
-      background: 'rgba(255, 255, 255, 0.1)',
+      background: 'var(--overlay-white-10)',
     },
   }),
 }
