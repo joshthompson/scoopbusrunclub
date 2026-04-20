@@ -2,7 +2,7 @@ import { css } from "@style/css"
 import { createMemo, createSignal, For, onMount, Show } from "solid-js"
 import { A, useParams } from "@solidjs/router"
 import { type RunResultItem, type Runner, type VolunteerItem, type CourseData, fetchCourse } from "../utils/api"
-import { CourseSVG } from "@/components/CourseSVG"
+import { CourseMap } from "@/components/CourseMap"
 import { getEvent, getEventName } from "@/utils/events"
 import { formatDate, formatName } from "@/utils/misc"
 import { DirtBlock } from "../components/ui/DirtBlock"
@@ -18,6 +18,7 @@ import { FieldBlock } from "@/components/ui/FieldBlock"
 import { Tooltip } from "@/components/ui/Tooltip"
 import extLinkAsset from "@/assets/misc/ext-link.png"
 import { COUNTRY_FLAGS } from "@/data/countries"
+import { CourseSVG } from "@/components/CourseSVG"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -490,7 +491,8 @@ export function EventPage(props: EventPageProps) {
         <Show when={courseData()}>
           {(course) => (
             <DirtBlock title="Course Map">
-              <CourseSVG course={course()} />
+              {/* <CourseSVG course={course()} /> */}
+              <CourseMap course={course()} />
             </DirtBlock>
           )}
         </Show>
