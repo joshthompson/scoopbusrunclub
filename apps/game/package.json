@@ -1,0 +1,22 @@
+{
+  "name": "@scoopbus/game",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "fetch-level": "tsx scripts/fetch-level.ts"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^7.52.2",
+    "@babylonjs/loaders": "^7.54.3",
+    "@babylonjs/materials": "^7.52.2",
+    "earcut": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/earcut": "^3.0.0",
+    "tsx": "^4.19.0"
+  }
+}

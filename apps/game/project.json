@@ -1,0 +1,33 @@
+{
+  "name": "game",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/game/src",
+  "targets": {
+    "dev": {
+      "command": "vite",
+      "options": {
+        "cwd": "apps/game"
+      }
+    },
+    "build": {
+      "command": "vite build",
+      "options": {
+        "cwd": "apps/game"
+      },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "serve": {
+      "command": "vite preview",
+      "options": {
+        "cwd": "apps/game"
+      }
+    },
+    "fetch-level": {
+      "command": "tsx scripts/fetch-level.ts",
+      "options": {
+        "cwd": "apps/game"
+      }
+    }
+  }
+}
