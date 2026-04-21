@@ -8,6 +8,9 @@ import { joinRoom, type Room } from 'trystero';
 
 // ---------- Shared types ----------
 
+/** Maximum number of players in a room */
+export const MAX_PLAYERS = 4;
+
 /** Minimal bus state broadcast each frame */
 export interface BusState {
   x: number;
@@ -24,6 +27,18 @@ export interface BusState {
   raceState: 'countdown' | 'racing' | 'finished';
   /** Race timer (seconds) */
   raceTime: number;
+  /** Player index (1-based): 1=host, 2-4=joiners in order */
+  playerIndex: number;
+  /** Whether exhaust boost is currently active */
+  boosting: boolean;
+}
+
+/** Broadcast when a player scoops a runner (so all clients can sync) */
+export interface ScoopEvent {
+  /** Runner index (0-based into the shared runner list) */
+  runnerIndex: number;
+  /** Player index that scooped it */
+  playerIndex: number;
 }
 
 /** Lobby chat / coordination messages */
@@ -31,6 +46,8 @@ export interface LobbyMessage {
   type: 'ready' | 'start' | 'playerInfo';
   name?: string;
   courseId?: string;
+  /** Assigned player index (1-based), sent by host to joiners */
+  playerIndex?: number;
 }
 
 export type OnRemoteState = (state: BusState, peerId: string) => void;
@@ -47,7 +64,9 @@ export class Multiplayer {
   private room: Room | null = null;
   private sendState: ((state: BusState) => void) | null = null;
   private sendLobby: ((msg: LobbyMessage) => void) | null = null;
+  private sendScoop: ((evt: ScoopEvent) => void) | null = null;
   private _onRemoteState: OnRemoteState | null = null;
+  private _onScoopEvent: ((evt: ScoopEvent, peerId: string) => void) | null = null;
   private _onPeerJoin: OnPeerJoin | null = null;
   private _onPeerLeave: OnPeerLeave | null = null;
   private _onLobbyMessage: OnLobbyMessage | null = null;
@@ -57,6 +76,10 @@ export class Multiplayer {
   private _isHost = false;
   private _peerId = '';
   private _remotePeerIds: string[] = [];
+  /** Map peerId → player index (1-based). Host is always 1. */
+  private _peerPlayerIndex = new Map<string, number>();
+  /** This client's player index (1 for host, assigned by host for joiners) */
+  private _localPlayerIndex = 1;
 
   get roomCode() { return this._roomCode; }
   get isHost() { return this._isHost; }
@@ -64,6 +87,9 @@ export class Multiplayer {
   get remotePeerIds() { return this._remotePeerIds; }
   get peerCount() { return this._remotePeerIds.length; }
   get connected() { return this._remotePeerIds.length > 0; }
+  get localPlayerIndex() { return this._localPlayerIndex; }
+  /** Get the player index for a remote peer */
+  getPlayerIndex(peerId: string): number { return this._peerPlayerIndex.get(peerId) ?? 0; }
 
   // ---------- Event setters ----------
 
@@ -71,6 +97,7 @@ export class Multiplayer {
   set onPeerJoin(fn: OnPeerJoin | null) { this._onPeerJoin = fn; }
   set onPeerLeave(fn: OnPeerLeave | null) { this._onPeerLeave = fn; }
   set onLobbyMessage(fn: OnLobbyMessage | null) { this._onLobbyMessage = fn; }
+  set onScoopEvent(fn: ((evt: ScoopEvent, peerId: string) => void) | null) { this._onScoopEvent = fn; }
 
   // ---------- Connect ----------
 
@@ -82,33 +109,68 @@ export class Multiplayer {
   connect(roomCode: string, isHost: boolean) {
     this._roomCode = roomCode;
     this._isHost = isHost;
+    this._localPlayerIndex = isHost ? 1 : 0; // joiners get assigned by host
+    this._peerPlayerIndex.clear();
 
     this.room = joinRoom({ appId: APP_ID }, roomCode);
 
     // Wire up actions
     const [sendState, onState] = this.room.makeAction('busState');
     const [sendLobby, onLobby] = this.room.makeAction('lobby');
+    const [sendScoop, onScoop] = this.room.makeAction('scoop');
 
     this.sendState = (state: BusState) => sendState(state as any);
     this.sendLobby = (msg: LobbyMessage) => sendLobby(msg as any);
+    this.sendScoop = (evt: ScoopEvent) => sendScoop(evt as any);
 
     onState((data, peerId: string) => {
-      this._onRemoteState?.(data as unknown as BusState, peerId);
+      const state = data as unknown as BusState;
+      // Learn peer's player index from their broadcast if not already known
+      if (state.playerIndex && !this._peerPlayerIndex.has(peerId)) {
+        this._peerPlayerIndex.set(peerId, state.playerIndex);
+      }
+      this._onRemoteState?.(state, peerId);
     });
 
     onLobby((data, peerId: string) => {
-      this._onLobbyMessage?.(data as unknown as LobbyMessage, peerId);
+      const msg = data as unknown as LobbyMessage;
+      // If host sends us our player index, store it
+      if (!this._isHost && msg.type === 'playerInfo' && msg.playerIndex) {
+        this._localPlayerIndex = msg.playerIndex;
+        // Also record the host's index
+        this._peerPlayerIndex.set(peerId, 1);
+      }
+      // If we're host and joiner sends playerInfo, record their known index from BusState
+      this._onLobbyMessage?.(msg, peerId);
+    });
+
+    onScoop((data, peerId: string) => {
+      this._onScoopEvent?.(data as unknown as ScoopEvent, peerId);
     });
 
     this.room.onPeerJoin((peerId: string) => {
       if (!this._remotePeerIds.includes(peerId)) {
         this._remotePeerIds.push(peerId);
       }
+      // Host assigns player indices: host=1, joiners get 2,3,4 in order
+      if (this._isHost) {
+        const nextIdx = this._remotePeerIds.indexOf(peerId) + 2; // +2 because host is 1
+        this._peerPlayerIndex.set(peerId, nextIdx);
+        // Tell the joiner their assigned index
+        setTimeout(() => {
+          this.sendLobby?.({
+            type: 'playerInfo',
+            playerIndex: nextIdx,
+            courseId: undefined,
+          } as any);
+        }, 100);
+      }
       this._onPeerJoin?.(peerId);
     });
 
     this.room.onPeerLeave((peerId: string) => {
       this._remotePeerIds = this._remotePeerIds.filter(id => id !== peerId);
+      this._peerPlayerIndex.delete(peerId);
       this._onPeerLeave?.(peerId);
     });
   }
@@ -128,6 +190,11 @@ export class Multiplayer {
     this.sendLobby?.(msg);
   }
 
+  /** Broadcast a scoop event to all peers (immediately, not rate-limited). */
+  broadcastScoop(evt: ScoopEvent) {
+    this.sendScoop?.(evt);
+  }
+
   // ---------- Disconnect ----------
 
   disconnect() {
@@ -137,7 +204,10 @@ export class Multiplayer {
     }
     this.sendState = null;
     this.sendLobby = null;
+    this.sendScoop = null;
     this._remotePeerIds = [];
+    this._peerPlayerIndex.clear();
+    this._localPlayerIndex = 1;
     this._roomCode = '';
   }
 }

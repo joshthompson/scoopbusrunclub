@@ -1,6 +1,10 @@
-import { createSignal, Show } from 'solid-js';
-import { mp, generateRoomCode } from './multiplayer';
+import { createSignal, Show, For } from 'solid-js';
+import { mp, generateRoomCode, MAX_PLAYERS } from './multiplayer';
 import logoSrc from './assets/logo.png';
+
+/** Player colour CSS values (1-indexed) */
+const PLAYER_CSS_COLORS = ['#f0c820', '#d94030', '#3470d8', '#9940cc'];
+const PLAYER_NAMES = ['Yellow', 'Red', 'Blue', 'Purple'];
 
 interface LobbyScreenProps {
   mode: 'host' | 'join';
@@ -20,6 +24,8 @@ export function LobbyScreen(props: LobbyScreenProps) {
   const [connected, setConnected] = createSignal(false);
   const [joining, setJoining] = createSignal(false);
   const [inputCode, setInputCode] = createSignal('');
+  const [peerCount, setPeerCount] = createSignal(0);
+  const [localIdx, setLocalIdx] = createSignal(props.mode === 'host' ? 1 : 0);
 
   // Auto-connect for host
   if (props.mode === 'host') {
@@ -35,7 +41,9 @@ export function LobbyScreen(props: LobbyScreenProps) {
 
     mp.onPeerJoin = (_peerId) => {
       setConnected(true);
-      setStatus('Opponent connected!');
+      setPeerCount(mp.peerCount);
+      const playerCount = mp.peerCount + 1;
+      setStatus(`${playerCount}/${MAX_PLAYERS} players connected`);
 
       // If host, send course info
       if (isHost) {
@@ -47,9 +55,13 @@ export function LobbyScreen(props: LobbyScreenProps) {
     };
 
     mp.onPeerLeave = (_peerId) => {
+      setPeerCount(mp.peerCount);
       if (mp.peerCount === 0) {
         setConnected(false);
         setStatus(isHost ? 'Opponent disconnected. Waiting...' : 'Disconnected. Try again.');
+      } else {
+        const playerCount = mp.peerCount + 1;
+        setStatus(`${playerCount}/${MAX_PLAYERS} players connected`);
       }
     };
 
@@ -57,6 +69,10 @@ export function LobbyScreen(props: LobbyScreenProps) {
       if (msg.type === 'start') {
         // Other player started the race
         props.onStart();
+      }
+      // Update local player index when host assigns it
+      if (msg.type === 'playerInfo' && msg.playerIndex) {
+        setLocalIdx(msg.playerIndex);
       }
     };
   }
@@ -119,8 +135,23 @@ export function LobbyScreen(props: LobbyScreenProps) {
 
         <Show when={connected()}>
           <div class="lobby-players">
-            <div class="player-badge you">🚌 You</div>
-            <div class="player-badge opponent">🚌 Opponent</div>
+            {/* Local player badge */}
+            <div class="player-badge you" style={{ 'border-color': PLAYER_CSS_COLORS[(localIdx() || 1) - 1] }}>
+              🚌 You (P{localIdx() || '?'} {PLAYER_NAMES[(localIdx() || 1) - 1]})
+            </div>
+            {/* Remote player badges */}
+            <For each={mp.remotePeerIds}>{(peerId, i) => {
+              const idx = mp.getPlayerIndex(peerId) || (i() + 2);
+              return (
+                <div class="player-badge opponent" style={{ 'border-color': PLAYER_CSS_COLORS[idx - 1] }}>
+                  🚌 P{idx} {PLAYER_NAMES[idx - 1]}
+                </div>
+              );
+            }}</For>
+            {/* Empty slots */}
+            <For each={Array.from({ length: MAX_PLAYERS - 1 - peerCount() })}>{() => (
+              <div class="player-badge empty">🚌 Waiting...</div>
+            )}</For>
           </div>
         </Show>
 

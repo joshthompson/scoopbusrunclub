@@ -15,5 +15,7 @@ export interface LevelData {
   course: LevelCourse;
   altitude: number[];
   water: LevelWaterFeature[];
+  /** GPS positions [lat, lon] where course marshals stand */
+  marshals?: [number, number][];
   hide?: boolean;
 }

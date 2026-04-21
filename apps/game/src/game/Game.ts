@@ -28,12 +28,14 @@ import { COURSE_OVERRIDES, buildCourseIndices } from '@shared/course-overrides';
 import levels from '../levels';
 import type { LevelData } from '../levels';
 import type { BusState } from '../multiplayer';
+import { MAX_PLAYERS } from '../multiplayer';
 import { createParkrunSign } from './objects/ParkrunSign';
 import { createWaterMesh, createWaterRibbon } from './objects/Water';
 import { createKmSign } from './objects/KmSign';
-import { createBusModel, BusModelResult } from './objects/BusModel';
+import { createBusModel, BusModelResult, tintBusModel, PLAYER_COLORS } from './objects/BusModel';
 import { createCopperTent } from './objects/CopperTent';
 import { createHagaGate } from './objects/HagaGate';
+import { createMarshalModel, poseCheering, MarshalModelResult } from './objects/MarshalModel';
 import { createSky } from './objects/Sky';
 import { createPathGroundMaterial } from './PathShader';
 import {
@@ -90,6 +92,16 @@ interface Runner {
   ridingOffsetZ: number;
   /** Escape direction when bus is close: 0 = not escaping, -1/1 = left/right */
   escapeDir: number;
+  /** Player index that scooped this runner (0 = nobody, localPlayerIndex = local bus) */
+  ownerPlayerIndex: number;
+  /** Original t-shirt colour for reconstructing rider models */
+  tshirtColor: Color3;
+}
+
+interface Marshal {
+  model: MarshalModelResult;
+  /** Animation phase accumulator */
+  animPhase: number;
 }
 
 // ---------- Constants ----------
@@ -113,7 +125,7 @@ const SCOOP_UP_FACTOR = 0.85; // upward launch = |busSpeed| × this factor
 const SCOOP_MIN_UP = 10; // m/s — minimum upward launch (scoop still provides lift)
 const SCOOP_FORWARD_FACTOR = 0.5; // forward launch = busSpeed × this factor (preserves direction)
 const SCOOP_ANIM_DURATION = 0.35; // seconds for scoop flick animation
-const SCOOP_BOOST_DURATION = 1; // seconds of speed boost after scooping a runner
+const SCOOP_BOOST_DURATION = 2; // seconds of speed boost after scooping a runner
 const SCOOP_BOOST_MULTIPLIER = 2; // max-speed multiplier during boost
 const RUNNER_SIT_DURATION = 5; // seconds sitting on ground before standing up
 const GRAVITY = 20; // m/s² for launched runners
@@ -188,6 +200,12 @@ export class Game {
   // Runners
   private runners: Runner[] = [];
 
+  // Marshals (course marshals standing at fixed GPS points)
+  private marshals: Marshal[] = [];
+
+  /** Scoop events queued this frame to broadcast to peers */
+  private pendingScoopEvents: { runnerIndex: number; playerIndex: number }[] = [];
+
   // Water zones (local XZ polygons + Y level) — set before buildGround
   private waterZones: { points: [number, number][]; y: number }[] = [];
 
@@ -198,13 +216,21 @@ export class Game {
   // Isolated so it's easy to swap for a physics engine later.
   private solidObstacles: { x: number; z: number; radius: number }[] = [];
 
-  // ---------- Remote player (multiplayer) ----------
-  private remoteBusMesh: TransformNode | null = null;
-  private remoteState: BusState | null = null;
-  /** Smoothed remote position/rotation for interpolation */
-  private remoteSmoothPos = new Vector3(0, 0, 0);
-  private remoteSmoothYaw = 0;
-  private remoteSmoothPitch = 0;
+  // ---------- Remote players (multiplayer, up to MAX_PLAYERS-1 opponents) ----------
+  private remotePlayers = new Map<string, {
+    mesh: TransformNode;
+    state: BusState | null;
+    smoothPos: Vector3;
+    smoothYaw: number;
+    smoothPitch: number;
+    playerIndex: number;
+    exhaustFlames: ParticleSystem | null;
+    riderModels: RunnerModelResult[];
+    riderAnchors: Mesh[];
+  }>();
+
+  /** This client's player index (1=host/yellow, 2=red, 3=blue, 4=purple) */
+  private localPlayerIndex = 1;
 
   // Gate/checkpoint system (100 m sections)
   private gatePositions: { x: number; z: number; y: number; pathDist: number; yaw: number }[] = [];
@@ -250,33 +276,58 @@ export class Game {
 
   // ---------- Remote bus (multiplayer) ----------
 
-  /** Build a second bus mesh for the remote player (different colour). */
-  async buildRemoteBus() {
+  /** Set this client's player index (called before init). */
+  setLocalPlayerIndex(idx: number) {
+    this.localPlayerIndex = idx;
+  }
+
+  /** Build a remote bus mesh for a specific peer with the given player index. */
+  async buildRemoteBusForPeer(peerId: string, playerIndex: number) {
     if (!this.scene) return;
+    // Don't rebuild if already exists
+    if (this.remotePlayers.has(peerId)) return;
+
     const result = await createBusModel(this.scene);
-    this.remoteBusMesh = result.root;
-    // Tint remote bus a different colour (red body) so players can tell apart
-    this.remoteBusMesh.getChildMeshes().forEach((m) => {
-      if (m.material && 'diffuseColor' in m.material) {
-        const mat = m.material as StandardMaterial;
-        if (mat.name === 'busYellow' || mat.name === 'busDarkYellow') {
-          const tinted = mat.clone(mat.name + '_remote');
-          tinted.diffuseColor = mat.name === 'busYellow'
-            ? new Color3(0.85, 0.25, 0.2)   // red body
-            : new Color3(0.7, 0.18, 0.12);  // dark red roof
-          m.material = tinted;
-        }
-      }
-    });
+    const palette = PLAYER_COLORS[playerIndex - 1] ?? PLAYER_COLORS[1];
+    tintBusModel(result.root, palette, `p${playerIndex}`);
+
+    // Create exhaust flames for this remote bus (starts stopped)
+    const flames = this.createExhaustFlamesForBus(result.root);
+
     // Start hidden until we receive first state
-    this.remoteBusMesh.setEnabled(false);
+    result.root.setEnabled(false);
+
+    this.remotePlayers.set(peerId, {
+      mesh: result.root,
+      state: null,
+      smoothPos: new Vector3(0, 0, 0),
+      smoothYaw: 0,
+      smoothPitch: 0,
+      playerIndex,
+      exhaustFlames: flames,
+      riderModels: [],
+      riderAnchors: [],
+    });
+  }
+
+  /** Remove a remote bus (peer left). */
+  removeRemoteBus(peerId: string) {
+    const remote = this.remotePlayers.get(peerId);
+    if (remote) {
+      remote.exhaustFlames?.dispose();
+      for (const anchor of remote.riderAnchors) anchor.dispose();
+      remote.mesh.dispose();
+      this.remotePlayers.delete(peerId);
+    }
   }
 
   /** Feed incoming remote bus state from the network layer. */
-  updateRemoteState(state: BusState) {
-    this.remoteState = state;
-    if (this.remoteBusMesh && !this.remoteBusMesh.isEnabled()) {
-      this.remoteBusMesh.setEnabled(true);
+  updateRemoteState(state: BusState, peerId: string) {
+    const remote = this.remotePlayers.get(peerId);
+    if (!remote) return;
+    remote.state = state;
+    if (!remote.mesh.isEnabled()) {
+      remote.mesh.setEnabled(true);
     }
   }
 
@@ -290,9 +341,11 @@ export class Game {
       pitch: this.busPitch,
       speed: this.busSpeed,
       dist: this.distanceTravelled,
-      scooped: this.runners.filter(r => r.state === 'riding').length,
+      scooped: this.runners.filter(r => r.state === 'riding' && r.ownerPlayerIndex === this.localPlayerIndex).length,
       raceState: this.raceState,
       raceTime: this.raceTimer,
+      playerIndex: this.localPlayerIndex,
+      boosting: this.boostTimer > 0,
     };
   }
 
@@ -412,14 +465,21 @@ export class Game {
       this.solidObstacles.push({ x: signX, z: signZ, radius: 1.5 });
 
       if (!opts.skipBus) {
-        // Bus starts behind the start line
-        this.busPos.x = sx - forwardX * BUS_START_OFFSET;
-        this.busPos.z = sz - forwardZ * BUS_START_OFFSET;
+        // Bus starts behind the start line, fanned outward by player index
+        const lateralSpacing = 4; // metres between each player's lane
+        const totalPlayers = MAX_PLAYERS;
+        // Centre the fan: player indices 1..N get offsets centred around 0
+        const laneOffset = (this.localPlayerIndex - 1) - (totalPlayers - 1) / 2;
+        this.busPos.x = sx - forwardX * BUS_START_OFFSET + rightX * laneOffset * lateralSpacing;
+        this.busPos.z = sz - forwardZ * BUS_START_OFFSET + rightZ * laneOffset * lateralSpacing;
         const startH = this.getGroundY(this.busPos.x, this.busPos.z);
         this.busPos.y = startH;
         this.busYaw = yaw;
       }
     }
+
+    // --- Marshals ---
+    this.spawnMarshals(level);
 
     // --- Event-specific landmarks ---
     this.placeEventLandmarks(eventId);
@@ -1187,6 +1247,11 @@ export class Game {
     const result = await createBusModel(this.scene);
     this.busMesh = result.root;
     this.scoopPivot = result.scoopPivot;
+
+    // Tint local bus to match player colour
+    const palette = PLAYER_COLORS[this.localPlayerIndex - 1] ?? PLAYER_COLORS[0];
+    tintBusModel(this.busMesh, palette, 'local');
+
     // Store rest position for scoop animation offsets
     (this.scoopPivot as any).__restY = this.scoopPivot.position.y;
     (this.scoopPivot as any).__restZ = this.scoopPivot.position.z;
@@ -1251,10 +1316,157 @@ export class Game {
     return ps;
   }
 
+  /**
+   * Create exhaust flames for a remote bus (identical config, different parent).
+   */
+  private createExhaustFlamesForBus(busRoot: TransformNode): ParticleSystem {
+    const ps = new ParticleSystem('exhaustFlames_remote', 300, this.scene);
+
+    const flameTex = new DynamicTexture('flameTex_r', 64, this.scene, false);
+    const ctx = flameTex.getContext() as unknown as CanvasRenderingContext2D;
+    const cx = 32, cy = 32, r = 30;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.4, 'rgba(255,180,50,0.8)');
+    grad.addColorStop(1, 'rgba(255,80,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+    flameTex.update();
+    ps.particleTexture = flameTex;
+
+    const emitter = MeshBuilder.CreateBox('exhaustEmitter_r', { size: 0.01 }, this.scene);
+    emitter.isVisible = false;
+    emitter.position = new Vector3(0.5, 0.65, -3.8);
+    emitter.parent = busRoot;
+    ps.emitter = emitter;
+
+    ps.direction1 = new Vector3(-0.3, 0.5, -2);
+    ps.direction2 = new Vector3(0.3, 1.0, -3);
+    ps.minEmitBox = new Vector3(-0.15, -0.05, 0);
+    ps.maxEmitBox = new Vector3(0.15, 0.05, 0);
+
+    ps.color1 = new Color4(1, 0.6, 0.1, 1);
+    ps.color2 = new Color4(1, 0.2, 0.0, 1);
+    ps.colorDead = new Color4(0.2, 0.2, 0.2, 0);
+
+    ps.minSize = 0.3;
+    ps.maxSize = 0.9;
+    ps.minLifeTime = 0.15;
+    ps.maxLifeTime = 0.45;
+    ps.emitRate = 300;
+    ps.blendMode = ParticleSystem.BLENDMODE_ONEONE;
+    ps.minEmitPower = 3;
+    ps.maxEmitPower = 6;
+    ps.updateSpeed = 0.02;
+    ps.gravity = new Vector3(0, 2, 0);
+
+    ps.stop();
+    return ps;
+  }
+
+  /**
+   * Launch a runner onto the local bus (called when this player scoops).
+   */
+  private launchRunnerOntoLocalBus(runner: Runner) {
+    runner.state = 'launched';
+
+    const speed = this.busSpeed;
+    const absSpeed = Math.abs(speed);
+    const fwdX = Math.sin(this.busYaw);
+    const fwdZ = Math.cos(this.busYaw);
+    runner.velX = fwdX * speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
+    runner.velY = Math.max(SCOOP_MIN_UP, absSpeed * SCOOP_UP_FACTOR) + Math.random() * 3;
+    runner.velZ = fwdZ * speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
+
+    if (MODE === 'SCOOP_THEN_RIDE') {
+      this.assignRoofSeat(runner);
+    }
+
+    this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+    this.boostTimer += SCOOP_BOOST_DURATION;
+    if (this.exhaustFlames && !this.exhaustFlames.isStarted()) {
+      this.exhaustFlames.start();
+    }
+  }
+
+  /**
+   * Handle a scoop event from a remote player.
+   * Hides the runner from the path and spawns a rider model on the remote bus.
+   */
+  handleRemoteScoop(runnerIndex: number, scooperPlayerIndex: number) {
+    const runner = this.runners[runnerIndex];
+    if (!runner || runner.ownerPlayerIndex !== 0) return; // already claimed
+
+    runner.ownerPlayerIndex = scooperPlayerIndex;
+    runner.state = 'riding'; // skip the launch arc, just put them on the remote bus
+    runner.mesh.setEnabled(false); // hide from scene (they're on the remote bus now)
+
+    // Find the remote player that owns this runner
+    for (const [_peerId, remote] of this.remotePlayers) {
+      if (remote.playerIndex === scooperPlayerIndex) {
+        // Create a rider model on this remote bus using the runner's saved tshirt color
+        const riderModel = createRunnerModel(this.scene, 100 + runnerIndex, runner.tshirtColor);
+        poseSitting(riderModel);
+
+        const anchor = MeshBuilder.CreateBox(
+          `remoteRider_${runnerIndex}`,
+          { width: 0.01, height: 0.01, depth: 0.01 },
+          this.scene,
+        );
+        anchor.isVisible = false;
+        riderModel.root.parent = anchor;
+        riderModel.root.position = Vector3.Zero();
+
+        remote.riderModels.push(riderModel);
+        remote.riderAnchors.push(anchor);
+
+        // Re-pack all rider positions on this remote bus roof
+        this.packRemoteRiders(remote);
+        break;
+      }
+    }
+  }
+
+  /** Get the pending scoop events and clear the queue. */
+  flushScoopEvents(): { runnerIndex: number; playerIndex: number }[] {
+    const events = this.pendingScoopEvents;
+    this.pendingScoopEvents = [];
+    return events;
+  }
+
+  /**
+   * Pack rider models evenly across a remote bus's roof.
+   */
+  private packRemoteRiders(remote: { riderAnchors: Mesh[]; smoothPos: Vector3; smoothYaw: number }) {
+    const count = remote.riderAnchors.length;
+    if (count === 0) return;
+
+    const roofW = 2.0;
+    const roofL = 6.0;
+    const cols = Math.min(count, 3);
+    const rows = Math.ceil(count / cols);
+    const spacingX = cols > 1 ? roofW / (cols - 1) : 0;
+    const spacingZ = rows > 1 ? roofL / (rows - 1) : 0;
+
+    for (let i = 0; i < count; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const ox = cols > 1 ? -roofW / 2 + col * spacingX : 0;
+      const oz = rows > 1 ? -roofL / 2 + row * spacingZ : 0;
+
+      // Store offset on the anchor for use during render
+      (remote.riderAnchors[i] as any).__roofOffsetX = ox;
+      (remote.riderAnchors[i] as any).__roofOffsetZ = oz;
+    }
+  }
+
   // ---------- Runners ----------
 
   private spawnRunners() {
     if (this.pathPositions.length < 3) return;
+
+    // Use a seeded RNG so all clients produce identical runners
+    const rand = mulberry32(12345);
 
     for (let i = 0; i < RUNNER_COUNT; i++) {
       // Spread runners along the path
@@ -1267,13 +1479,13 @@ export class Game {
       const [px, pz] = this.pathPositions[targetIdx];
 
       // Persistent lateral offset so runners spread across the path width
-      const lateralOffset = (Math.random() - 0.5) * 2 * PATH_HALF_WIDTH * 0.85;
+      const lateralOffset = (rand() - 0.5) * 2 * PATH_HALF_WIDTH * 0.85;
 
-      // Random bright t-shirt colour
+      // Random bright t-shirt colour (seeded)
       const tshirtColor = new Color3(
-        0.3 + Math.random() * 0.7,
-        0.3 + Math.random() * 0.7,
-        0.3 + Math.random() * 0.7,
+        0.3 + rand() * 0.7,
+        0.3 + rand() * 0.7,
+        0.3 + rand() * 0.7,
       );
 
       const model = createRunnerModel(this.scene, i, tshirtColor);
@@ -1293,7 +1505,7 @@ export class Game {
       model.root.position = Vector3.Zero();
 
       const speed =
-        RUNNER_MIN_SPEED + Math.random() * (RUNNER_MAX_SPEED - RUNNER_MIN_SPEED);
+        RUNNER_MIN_SPEED + rand() * (RUNNER_MAX_SPEED - RUNNER_MIN_SPEED);
 
       this.runners.push({
         mesh: anchor,
@@ -1303,17 +1515,106 @@ export class Game {
         state: 'running',
         velX: 0, velY: 0, velZ: 0,
         fadeTimer: 0,
-        animPhase: Math.random() * Math.PI * 2, // random start phase so they don't sync
+        animPhase: rand() * Math.PI * 2, // seeded start phase so they don't sync
         lateralOffset,
         ridingOffsetX: 0,
         ridingOffsetZ: 0,
         escapeDir: 0,
+        ownerPlayerIndex: 0,
+        tshirtColor,
       });
+    }
+  }
+
+  // ---------- Marshals ----------
+
+  /**
+   * Spawn course marshals at GPS positions defined in the level data.
+   * Each marshal stands to the side of the path, facing oncoming runners
+   * but angled ~30° toward the track so they look like they're pointing
+   * runners in the right direction.
+   */
+  private spawnMarshals(level: LevelData) {
+    if (!level.marshals || level.marshals.length === 0) return;
+
+    const MARSHAL_PATH_OFFSET = PATH_HALF_WIDTH + 1.5; // stand just outside the path edge
+    const INWARD_ANGLE = (30 * Math.PI) / 180; // 30° turned toward the track
+
+    for (let i = 0; i < level.marshals.length; i++) {
+      const [lat, lon] = level.marshals[i];
+      const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
+      const lx = rawX * this.scaleFactor;
+      const lz = rawZ * this.scaleFactor;
+
+      // Find the nearest path segment
+      let bestDist = Infinity;
+      let bestIdx = 0;
+      for (let j = 0; j < this.pathPositions.length - 1; j++) {
+        const [px, pz] = this.pathPositions[j];
+        const dx = px - lx;
+        const dz = pz - lz;
+        const dist = dx * dx + dz * dz;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = j;
+        }
+      }
+
+      const [px, pz] = this.pathPositions[bestIdx];
+      const [nx, nz] = this.pathPositions[bestIdx + 1];
+
+      // Direction runners travel along this segment
+      const segDx = nx - px;
+      const segDz = nz - pz;
+      const segLen = Math.sqrt(segDx * segDx + segDz * segDz) || 1;
+
+      // Perpendicular to the path (pointing left of travel direction)
+      const perpX = -segDz / segLen;
+      const perpZ = segDx / segLen;
+
+      // Determine which side of the path the GPS point is on
+      const toMarshalX = lx - px;
+      const toMarshalZ = lz - pz;
+      const side = perpX * toMarshalX + perpZ * toMarshalZ > 0 ? 1 : -1;
+
+      // Project the marshal's GPS position onto the path segment to get
+      // the closest point along the path, then offset to the side
+      const along = (toMarshalX * segDx + toMarshalZ * segDz) / (segLen * segLen);
+      const clampedAlong = Math.max(0, Math.min(1, along));
+      const baseX = px + segDx * clampedAlong + perpX * side * MARSHAL_PATH_OFFSET;
+      const baseZ = pz + segDz * clampedAlong + perpZ * side * MARSHAL_PATH_OFFSET;
+      const y = this.getGroundY(baseX, baseZ);
+
+      const model = createMarshalModel(this.scene, i);
+      model.root.position = new Vector3(baseX, y, baseZ);
+
+      // Face oncoming runners (opposite to travel direction), then rotate
+      // 30° inward toward the track so they look like they're pointing the way
+      const runnerTravelYaw = Math.atan2(segDx, segDz);
+      const facingOncoming = runnerTravelYaw + Math.PI; // 180° flip
+      model.root.rotation.y = facingOncoming + side * INWARD_ANGLE;
+
+      this.marshals.push({
+        model,
+        animPhase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  private updateMarshals(dt: number) {
+    for (const marshal of this.marshals) {
+      marshal.animPhase += dt;
+      poseCheering(marshal.model, marshal.animPhase);
     }
   }
 
   private updateRunners(dt: number) {
     for (const runner of this.runners) {
+      // Skip runners owned by a remote player (they render on the remote bus)
+      if (runner.ownerPlayerIndex !== 0 && runner.ownerPlayerIndex !== this.localPlayerIndex) {
+        continue;
+      }
+
       const pos = runner.mesh.position;
 
       switch (runner.state) {
@@ -1385,34 +1686,18 @@ export class Game {
           runner.animPhase += dt * runner.speed * 3; // faster runner = faster swing
           poseRunning(runner.model, runner.animPhase);
 
-          // Check if scooped by bus
+          // Check if scooped by local bus (skip if already owned by another player)
           const bx = this.busPos.x - pos.x;
           const bz = this.busPos.z - pos.z;
-          if (Math.sqrt(bx * bx + bz * bz) < SCOOP_DISTANCE && Math.abs(this.busSpeed) > 0.5) {
-            runner.state = 'launched';
+          if (runner.ownerPlayerIndex === 0 && Math.sqrt(bx * bx + bz * bz) < SCOOP_DISTANCE && Math.abs(this.busSpeed) > 0.5) {
+            runner.ownerPlayerIndex = this.localPlayerIndex;
+            this.launchRunnerOntoLocalBus(runner);
 
-            // Launch velocity: scale with bus speed & direction
-            const speed = this.busSpeed; // signed: +forward, –reverse
-            const absSpeed = Math.abs(speed);
-            const fwdX = Math.sin(this.busYaw);
-            const fwdZ = Math.cos(this.busYaw);
-            runner.velX = fwdX * speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
-            runner.velY = Math.max(SCOOP_MIN_UP, absSpeed * SCOOP_UP_FACTOR) + Math.random() * 3;
-            runner.velZ = fwdZ * speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
-
-            // In RIDE mode, pre-assign the seat so the runner arcs toward it
-            if (MODE === 'SCOOP_THEN_RIDE') {
-              this.assignRoofSeat(runner);
-            }
-
-            // Trigger scoop animation
-            this.scoopAnimTimer = SCOOP_ANIM_DURATION;
-
-            // Trigger speed boost + exhaust flames
-            this.boostTimer = SCOOP_BOOST_DURATION;
-            if (this.exhaustFlames && !this.exhaustFlames.isStarted()) {
-              this.exhaustFlames.start();
-            }
+            // Broadcast scoop event to other players
+            this.pendingScoopEvents.push({
+              runnerIndex: this.runners.indexOf(runner),
+              playerIndex: this.localPlayerIndex,
+            });
 
             this.callbacks.onScoopRunner();
           }
@@ -1531,8 +1816,8 @@ export class Game {
    * The bus roof is ~2.4 wide × ~7.0 long (bodyW × bodyL).
    */
   private assignRoofSeat(newRider: Runner) {
-    // Collect all currently riding runners (including the new one we're about to set)
-    const riders = this.runners.filter((r) => r.state === 'riding');
+    // Collect all currently riding runners that belong to the local bus
+    const riders = this.runners.filter((r) => r.state === 'riding' && r.ownerPlayerIndex === this.localPlayerIndex);
     const seatIndex = riders.length; // new rider gets the next seat
     const totalRiders = seatIndex + 1;
 
@@ -1675,6 +1960,37 @@ export class Game {
         this.busPos.z += nz * overlap;
         // Kill speed on impact
         this.busSpeed *= -0.15; // small bounce-back
+      }
+    }
+
+    // --- Bus-to-bus collisions (solid bodies cannot overlap) ---
+    this.resolveBusCollisions();
+  }
+
+  /**
+   * Resolve collisions between the local bus and all remote buses.
+   * Both are treated as circles with BUS_COLLISION_RADIUS.
+   * On overlap the local bus is pushed out and bounced back.
+   */
+  private resolveBusCollisions() {
+    const br = Game.BUS_COLLISION_RADIUS;
+    const minDist = br + br; // both buses have the same radius
+    for (const [_peerId, remote] of this.remotePlayers) {
+      if (!remote.state) continue;
+      const rx = remote.smoothPos.x;
+      const rz = remote.smoothPos.z;
+      const dx = this.busPos.x - rx;
+      const dz = this.busPos.z - rz;
+      const distSq = dx * dx + dz * dz;
+      if (distSq < minDist * minDist && distSq > 0) {
+        const dist = Math.sqrt(distSq);
+        const overlap = minDist - dist;
+        const nx = dx / dist;
+        const nz = dz / dist;
+        // Push local bus out fully (remote bus position is authoritative)
+        this.busPos.x += nx * overlap;
+        this.busPos.z += nz * overlap;
+        this.busSpeed *= -0.15; // bounce-back
       }
     }
   }
@@ -1849,27 +2165,50 @@ export class Game {
 
   // ---------- Remote bus interpolation ----------
 
-  private updateRemoteBusMesh(dt: number) {
-    if (!this.remoteBusMesh || !this.remoteState) return;
+  private updateRemoteBusMeshes(dt: number) {
+    for (const [_peerId, remote] of this.remotePlayers) {
+      if (!remote.state) continue;
+      const mesh = remote.mesh;
+      const s = remote.state;
+      const lerp = Math.min(1, 10 * dt);
 
-    const s = this.remoteState;
-    const lerp = Math.min(1, 10 * dt); // smooth towards target
+      remote.smoothPos.x += (s.x - remote.smoothPos.x) * lerp;
+      remote.smoothPos.y += (s.y - remote.smoothPos.y) * lerp;
+      remote.smoothPos.z += (s.z - remote.smoothPos.z) * lerp;
 
-    this.remoteSmoothPos.x += (s.x - this.remoteSmoothPos.x) * lerp;
-    this.remoteSmoothPos.y += (s.y - this.remoteSmoothPos.y) * lerp;
-    this.remoteSmoothPos.z += (s.z - this.remoteSmoothPos.z) * lerp;
+      // Angle interpolation (handle wrap-around)
+      let yawDiff = s.yaw - remote.smoothYaw;
+      while (yawDiff > Math.PI) yawDiff -= 2 * Math.PI;
+      while (yawDiff < -Math.PI) yawDiff += 2 * Math.PI;
+      remote.smoothYaw += yawDiff * lerp;
 
-    // Angle interpolation (handle wrap-around)
-    let yawDiff = s.yaw - this.remoteSmoothYaw;
-    while (yawDiff > Math.PI) yawDiff -= 2 * Math.PI;
-    while (yawDiff < -Math.PI) yawDiff += 2 * Math.PI;
-    this.remoteSmoothYaw += yawDiff * lerp;
+      remote.smoothPitch += (s.pitch - remote.smoothPitch) * lerp;
 
-    this.remoteSmoothPitch += (s.pitch - this.remoteSmoothPitch) * lerp;
+      mesh.position.copyFrom(remote.smoothPos);
+      mesh.rotation.y = remote.smoothYaw;
+      mesh.rotation.x = -remote.smoothPitch;
 
-    this.remoteBusMesh.position.copyFrom(this.remoteSmoothPos);
-    this.remoteBusMesh.rotation.y = this.remoteSmoothYaw;
-    this.remoteBusMesh.rotation.x = -this.remoteSmoothPitch;
+      // --- Sync boost / exhaust flames on remote bus ---
+      if (remote.exhaustFlames) {
+        if (s.boosting && !remote.exhaustFlames.isStarted()) {
+          remote.exhaustFlames.start();
+        } else if (!s.boosting && remote.exhaustFlames.isStarted()) {
+          remote.exhaustFlames.stop();
+        }
+      }
+
+      // --- Position rider models on remote bus roof ---
+      const sinY = Math.sin(remote.smoothYaw);
+      const cosY = Math.cos(remote.smoothYaw);
+      for (const anchor of remote.riderAnchors) {
+        const ox = (anchor as any).__roofOffsetX ?? 0;
+        const oz = (anchor as any).__roofOffsetZ ?? 0;
+        anchor.position.x = remote.smoothPos.x + cosY * ox + sinY * oz;
+        anchor.position.z = remote.smoothPos.z - sinY * ox + cosY * oz;
+        anchor.position.y = remote.smoothPos.y + BUS_ROOF_Y;
+        anchor.rotation.y = remote.smoothYaw;
+      }
+    }
   }
 
   // ---------- Update ----------
@@ -1897,6 +2236,7 @@ export class Game {
       // During countdown: update camera/minimap/runners but skip bus input
       this.updateDirectionArrow(dt);
       this.updateRunners(dt);
+      this.updateMarshals(dt);
 
       // Ensure bus mesh is positioned (so it's visible during countdown)
       if (this.busMesh) {
@@ -1926,6 +2266,7 @@ export class Game {
     if (this.raceState === 'finished') {
       this.updateChaseCam(dt);
       this.updateRunners(dt);
+      this.updateMarshals(dt);
       if (this.minimap) {
         this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw);
       }
@@ -2116,8 +2457,11 @@ export class Game {
     // Update runners
     this.updateRunners(dt);
 
-    // --- Update remote bus mesh (multiplayer interpolation) ---
-    this.updateRemoteBusMesh(dt);
+    // Update marshals
+    this.updateMarshals(dt);
+
+    // --- Update remote bus meshes (multiplayer interpolation) ---
+    this.updateRemoteBusMeshes(dt);
 
     // Minimap
     if (this.minimap) {

@@ -1,16 +1,24 @@
 /* @refresh reload */
 import { render } from 'solid-js/web';
-import { createSignal, onMount, Show } from 'solid-js';
+import { createSignal, onMount, Show, For } from 'solid-js';
 import earcut from 'earcut';
 import { Game } from './game/Game';
 import levels from './levels';
 import { TitleScreen } from './TitleScreen';
 import { LobbyScreen } from './LobbyScreen';
-import { mp } from './multiplayer';
-import type { BusState } from './multiplayer';
+import { mp, MAX_PLAYERS } from './multiplayer';
+import type { BusState, ScoopEvent } from './multiplayer';
 
 // Babylon.js needs earcut on window for CreatePolygon
 (window as any).earcut = earcut;
+
+/** Player colour names & CSS colours (1-indexed) */
+const PLAYER_COLOR_INFO = [
+  { name: 'Yellow', css: '#f0c820' },
+  { name: 'Red', css: '#d94030' },
+  { name: 'Blue', css: '#3470d8' },
+  { name: 'Purple', css: '#9940cc' },
+];
 
 const LAST_COURSE_KEY = 'scoopbus_last_course';
 
@@ -40,7 +48,7 @@ function App() {
 
   // Multiplayer state
   const [gameMode, setGameMode] = createSignal<GameMode>('single');
-  const [remoteState, setRemoteState] = createSignal<BusState | null>(null);
+  const [remoteStates, setRemoteStates] = createSignal<Map<string, BusState>>(new Map());
 
   let canvasRef!: HTMLCanvasElement;
   let minimapRef!: HTMLCanvasElement;
@@ -117,7 +125,7 @@ function App() {
     setRaceTime(0);
     setCourseProgress({ covered: 0, total: 5 });
     setFinishTime(0);
-    setRemoteState(null);
+    setRemoteStates(new Map());
 
     // Validate
     if (!levels[eventId]) {
@@ -143,24 +151,68 @@ function App() {
     }, minimapRef);
 
     activeGame = game;
-    await game.init(eventId);
 
     // --- Multiplayer setup ---
     const isMultiplayer = gameMode() !== 'single';
     if (isMultiplayer && mp.roomCode) {
-      // Build opponent bus
-      await game.buildRemoteBus();
+      // Set local player index (host=1, joiners get assigned by host)
+      game.setLocalPlayerIndex(mp.localPlayerIndex);
+    }
 
-      // Listen for remote state updates
-      mp.onRemoteState = (state: BusState) => {
-        setRemoteState(state);
-        game.updateRemoteState(state);
+    await game.init(eventId);
+
+    if (isMultiplayer && mp.roomCode) {
+      // Build a remote bus for each currently-connected peer
+      for (const peerId of mp.remotePeerIds) {
+        const idx = mp.getPlayerIndex(peerId) || 2;
+        await game.buildRemoteBusForPeer(peerId, idx);
+      }
+
+      // Handle new peers joining mid-game
+      mp.onPeerJoin = async (peerId: string) => {
+        const idx = mp.getPlayerIndex(peerId) || (mp.remotePeerIds.indexOf(peerId) + 2);
+        await game.buildRemoteBusForPeer(peerId, idx);
       };
 
-      // Start sending local state at ~15 Hz
+      // Handle peers leaving
+      mp.onPeerLeave = (peerId: string) => {
+        game.removeRemoteBus(peerId);
+        setRemoteStates((prev) => {
+          const next = new Map(prev);
+          next.delete(peerId);
+          return next;
+        });
+      };
+
+      // Listen for remote state updates
+      mp.onRemoteState = (state: BusState, peerId: string) => {
+        setRemoteStates((prev) => {
+          const next = new Map(prev);
+          next.set(peerId, state);
+          return next;
+        });
+        game.updateRemoteState(state, peerId);
+        // Lazily build bus if not yet created (e.g. late joiner)
+        if (!game['remotePlayers'].has(peerId)) {
+          const idx = state.playerIndex || (mp.getPlayerIndex(peerId) || 2);
+          game.buildRemoteBusForPeer(peerId, idx);
+        }
+      };
+
+      // Listen for remote scoop events
+      mp.onScoopEvent = (evt: ScoopEvent, _peerId: string) => {
+        game.handleRemoteScoop(evt.runnerIndex, evt.playerIndex);
+      };
+
+      // Start sending local state at ~15 Hz + flush scoop events
       mpSendInterval = setInterval(() => {
         if (activeGame) {
           mp.broadcastState(activeGame.getLocalBusState());
+          // Flush and broadcast any scoop events from this frame
+          const scoops = activeGame.flushScoopEvents();
+          for (const evt of scoops) {
+            mp.broadcastScoop(evt);
+          }
         }
       }, 66);
     }
@@ -180,7 +232,7 @@ function App() {
     }
     mp.disconnect();
     setGameMode('single');
-    setRemoteState(null);
+    setRemoteStates(new Map());
 
     if (activeGame) {
       activeGame.dispose();
@@ -225,16 +277,23 @@ function App() {
           <p>⏱️ {fmtTime(raceTime())}</p>
         </div>
 
-        {/* Top-right multiplayer opponent HUD */}
-        <Show when={gameMode() !== 'single' && remoteState()}>
+        {/* Top-right multiplayer HUD (all opponents) */}
+        <Show when={gameMode() !== 'single' && remoteStates().size > 0}>
           <div id="mp-hud">
-            <p>🚌 Opponent</p>
-            <p>Speed: {(Math.abs(remoteState()!.speed) * 3.6).toFixed(0)} km/h</p>
-            <p>Scooped: {remoteState()!.scooped}</p>
-            <p>⏱️ {fmtTime(remoteState()!.raceTime)}</p>
-            <Show when={remoteState()!.raceState === 'finished'}>
-              <p style={{ color: '#ffc107' }}>🏁 FINISHED</p>
-            </Show>
+            <For each={[...remoteStates().entries()]}>{([_peerId, rs]) => {
+              const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
+              return (
+                <div class="mp-player-block" style={{ 'border-left': `3px solid ${info.css}` }}>
+                  <p style={{ color: info.css }}>🚌 P{rs.playerIndex || '?'} {info.name}</p>
+                  <p>Speed: {(Math.abs(rs.speed) * 3.6).toFixed(0)} km/h</p>
+                  <p>Scooped: {rs.scooped}</p>
+                  <p>⏱️ {fmtTime(rs.raceTime)}</p>
+                  <Show when={rs.raceState === 'finished'}>
+                    <p style={{ color: '#ffc107' }}>🏁 FINISHED</p>
+                  </Show>
+                </div>
+              );
+            }}</For>
           </div>
         </Show>
 
@@ -259,21 +318,28 @@ function App() {
               <h1>🏁 Finished!</h1>
               <p class="finish-time">Finished in {fmtTime(finishTime())}</p>
               <p class="finish-scooped">Runners scooped: {scored()}</p>
-              <Show when={gameMode() !== 'single' && remoteState()}>
-                <p class="finish-scooped" style={{ 'margin-top': '8px' }}>
-                  {remoteState()!.raceState === 'finished'
-                    ? `Opponent: ${fmtTime(remoteState()!.raceTime)}`
-                    : 'Opponent still racing...'}
-                </p>
-                <Show when={remoteState()!.raceState === 'finished'}>
-                  <p class="finish-time" style={{
-                    color: finishTime() <= remoteState()!.raceTime ? '#4caf50' : '#e53935',
-                    'font-size': 'clamp(18px, 3vw, 28px)',
-                    'margin-top': '4px',
-                  }}>
-                    {finishTime() <= remoteState()!.raceTime ? '🏆 You Win!' : '💀 You Lose'}
-                  </p>
-                </Show>
+              <Show when={gameMode() !== 'single' && remoteStates().size > 0}>
+                <For each={[...remoteStates().entries()]}>{([_peerId, rs]) => {
+                  const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
+                  return (
+                    <div>
+                      <p class="finish-scooped" style={{ 'margin-top': '8px', color: info.css }}>
+                        {rs.raceState === 'finished'
+                          ? `P${rs.playerIndex} ${info.name}: ${fmtTime(rs.raceTime)}`
+                          : `P${rs.playerIndex} ${info.name}: still racing...`}
+                      </p>
+                      <Show when={rs.raceState === 'finished'}>
+                        <p class="finish-time" style={{
+                          color: finishTime() <= rs.raceTime ? '#4caf50' : '#e53935',
+                          'font-size': 'clamp(14px, 2vw, 20px)',
+                          'margin-top': '2px',
+                        }}>
+                          {finishTime() <= rs.raceTime ? '🏆 Beat them!' : '💀 They beat you'}
+                        </p>
+                      </Show>
+                    </div>
+                  );
+                }}</For>
               </Show>
               <div class="finish-buttons">
                 <button class="course-btn" onClick={handleReplay}>Replay</button>

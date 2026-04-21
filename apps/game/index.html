@@ -105,6 +105,7 @@
         border-radius: 12px;
         padding: 14px 20px;
         min-width: 320px;
+        max-width: 95vw;
       }
       .course-name {
         font-family: 'Arial Black', 'Impact', sans-serif;
@@ -144,10 +145,12 @@
         text-align: center;
         background: rgba(20,20,40,0.94);
         border-radius: 20px;
-        padding: clamp(24px, 5vw, 48px) clamp(32px, 8vw, 80px);
+        padding: clamp(16px, 4vw, 48px) clamp(16px, 4vw, 80px);
         box-shadow: 0 8px 40px rgba(0,0,0,0.5);
         border: 2px solid rgba(255,193,7,0.4);
-        min-width: 300px;
+        min-width: 0;
+        max-width: 95vw;
+        width: clamp(280px, 80vw, 500px);
       }
       .lobby-logo {
         max-width: clamp(80px, 20vw, 160px);
@@ -227,24 +230,32 @@
       }
       .lobby-players {
         display: flex;
-        gap: 16px;
+        gap: 8px;
         justify-content: center;
+        flex-wrap: wrap;
         margin: 12px 0 16px;
       }
       .player-badge {
         font-family: 'Arial Black', sans-serif;
-        font-size: 16px;
-        padding: 8px 16px;
+        font-size: clamp(12px, 2.5vw, 16px);
+        padding: 6px 10px;
         border-radius: 8px;
         color: #fff;
+        white-space: nowrap;
       }
       .player-badge.you {
         background: linear-gradient(180deg, #ffc107, #e8850c);
         border: 2px solid #000;
       }
       .player-badge.opponent {
-        background: linear-gradient(180deg, #e53935, #b71c1c);
+        background: rgba(255,255,255,0.12);
         border: 2px solid #000;
+      }
+      .player-badge.empty {
+        background: rgba(255,255,255,0.06);
+        border: 2px dashed rgba(255,255,255,0.2);
+        color: #666;
+        font-size: clamp(11px, 2vw, 14px);
       }
       .lobby-buttons {
         display: flex;
@@ -287,17 +298,25 @@
         right: 16px;
         color: #fff;
         font-family: monospace;
-        font-size: 16px;
+        font-size: clamp(12px, 2vw, 16px);
         text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         pointer-events: none;
         z-index: 10;
         text-align: right;
-        background: rgba(229,57,53,0.3);
+        background: rgba(0,0,0,0.4);
         padding: 8px 12px;
         border-radius: 8px;
-        border: 1px solid rgba(229,57,53,0.5);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-width: 40vw;
       }
-      #mp-hud p { margin: 0 0 2px; }
+      #mp-hud p { margin: 0 0 1px; }
+      .mp-player-block {
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: rgba(255,255,255,0.05);
+      }
       #joystick {
         position: absolute;
         display: none;

@@ -407,6 +407,42 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   return { root, scoopPivot, frontWheelLeft, frontWheelRight };
 }
 
+// ── Player color palettes ──
+
+export interface BusColorPalette {
+  body: Color3;
+  roof: Color3;
+}
+
+/** Fixed colour palettes for players 1–4 */
+export const PLAYER_COLORS: BusColorPalette[] = [
+  { body: new Color3(0.95, 0.78, 0.15), roof: new Color3(0.82, 0.65, 0.10) },  // P1 yellow (default)
+  { body: new Color3(0.85, 0.25, 0.20), roof: new Color3(0.70, 0.18, 0.12) },  // P2 red
+  { body: new Color3(0.20, 0.45, 0.85), roof: new Color3(0.14, 0.32, 0.70) },  // P3 blue
+  { body: new Color3(0.60, 0.25, 0.80), roof: new Color3(0.45, 0.16, 0.65) },  // P4 purple
+];
+
+/**
+ * Re-tint a bus model's body + roof to the given palette.
+ * Clones the materials so multiple buses can have different colours.
+ */
+export function tintBusModel(root: TransformNode, palette: BusColorPalette, suffix: string) {
+  root.getChildMeshes().forEach((m) => {
+    if (m.material && 'diffuseColor' in m.material) {
+      const mat = m.material as StandardMaterial;
+      if (mat.name === 'busYellow' || mat.name.startsWith('busYellow_')) {
+        const tinted = mat.clone(mat.name + '_' + suffix);
+        tinted.diffuseColor = palette.body.clone();
+        m.material = tinted;
+      } else if (mat.name === 'busDarkYellow' || mat.name.startsWith('busDarkYellow_')) {
+        const tinted = mat.clone(mat.name + '_' + suffix);
+        tinted.diffuseColor = palette.roof.clone();
+        m.material = tinted;
+      }
+    }
+  });
+}
+
 // ── Helper ──
 
 function makeMat(name: string, color: Color3, scene: Scene): StandardMaterial {
