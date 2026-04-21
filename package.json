@@ -19,7 +19,9 @@
     "fetch-results": "pnpm --filter @scoopbus/api run fetch-results",
     "fetch-all": "pnpm --filter @scoopbus/api run fetch-all",
     "fetch-map": "pnpm --filter @scoopbus/api run fetch-map",
-    "fetch-all-maps": "pnpm --filter @scoopbus/api run fetch-all-maps"
+    "fetch-all-maps": "pnpm --filter @scoopbus/api run fetch-all-maps",
+    "game:dev": "nx run game:dev",
+    "game:build": "nx run game:build"
   },
   "license": "MIT",
   "devDependencies": {

@@ -33,6 +33,13 @@ jobs:
         env:
           VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
 
+      - run: pnpm nx run game:build
+        env:
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
+
+      - name: Copy game dist into web dist
+        run: cp -r apps/game/dist apps/web/dist/game
+
       - name: Copy index.html to 404.html
         run: cp apps/web/dist/index.html apps/web/dist/404.html
 
