@@ -2,8 +2,10 @@ import { For } from 'solid-js';
 import levels from './levels';
 import logoSrc from './assets/logo.png';
 
+type GameMode = 'single' | 'host' | 'join';
+
 interface TitleScreenProps {
-  onSelectCourse: (eventId: string) => void;
+  onSelectMode: (mode: GameMode, eventId: string) => void;
 }
 
 export function TitleScreen(props: TitleScreenProps) {
@@ -18,12 +20,29 @@ export function TitleScreen(props: TitleScreenProps) {
             {(id) => {
               const level = levels[id];
               return (
-                <button
-                  class="course-btn"
-                  onClick={() => props.onSelectCourse(id)}
-                >
-                  {level.name}
-                </button>
+                <div class="course-row">
+                  <span class="course-name">{level.name}</span>
+                  <div class="mode-buttons">
+                    <button
+                      class="course-btn mode-btn"
+                      onClick={() => props.onSelectMode('single', id)}
+                    >
+                      Single Player
+                    </button>
+                    <button
+                      class="course-btn mode-btn host-btn"
+                      onClick={() => props.onSelectMode('host', id)}
+                    >
+                      Host Game
+                    </button>
+                    <button
+                      class="course-btn mode-btn join-btn"
+                      onClick={() => props.onSelectMode('join', id)}
+                    >
+                      Join Game
+                    </button>
+                  </div>
+                </div>
               );
             }}
           </For>

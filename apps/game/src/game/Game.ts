@@ -27,6 +27,7 @@ import { Minimap } from './Minimap';
 import { COURSE_OVERRIDES, buildCourseIndices } from '@shared/course-overrides';
 import levels from '../levels';
 import type { LevelData } from '../levels';
+import type { BusState } from '../multiplayer';
 import { createParkrunSign } from './objects/ParkrunSign';
 import { createWaterMesh, createWaterRibbon } from './objects/Water';
 import { createKmSign } from './objects/KmSign';
@@ -197,6 +198,14 @@ export class Game {
   // Isolated so it's easy to swap for a physics engine later.
   private solidObstacles: { x: number; z: number; radius: number }[] = [];
 
+  // ---------- Remote player (multiplayer) ----------
+  private remoteBusMesh: TransformNode | null = null;
+  private remoteState: BusState | null = null;
+  /** Smoothed remote position/rotation for interpolation */
+  private remoteSmoothPos = new Vector3(0, 0, 0);
+  private remoteSmoothYaw = 0;
+  private remoteSmoothPitch = 0;
+
   // Gate/checkpoint system (100 m sections)
   private gatePositions: { x: number; z: number; y: number; pathDist: number; yaw: number }[] = [];
   private currentGateIdx = 0;
@@ -237,6 +246,54 @@ export class Game {
     this.engine?.stopRenderLoop();
     this.scene?.dispose();
     this.engine?.dispose();
+  }
+
+  // ---------- Remote bus (multiplayer) ----------
+
+  /** Build a second bus mesh for the remote player (different colour). */
+  async buildRemoteBus() {
+    if (!this.scene) return;
+    const result = await createBusModel(this.scene);
+    this.remoteBusMesh = result.root;
+    // Tint remote bus a different colour (red body) so players can tell apart
+    this.remoteBusMesh.getChildMeshes().forEach((m) => {
+      if (m.material && 'diffuseColor' in m.material) {
+        const mat = m.material as StandardMaterial;
+        if (mat.name === 'busYellow' || mat.name === 'busDarkYellow') {
+          const tinted = mat.clone(mat.name + '_remote');
+          tinted.diffuseColor = mat.name === 'busYellow'
+            ? new Color3(0.85, 0.25, 0.2)   // red body
+            : new Color3(0.7, 0.18, 0.12);  // dark red roof
+          m.material = tinted;
+        }
+      }
+    });
+    // Start hidden until we receive first state
+    this.remoteBusMesh.setEnabled(false);
+  }
+
+  /** Feed incoming remote bus state from the network layer. */
+  updateRemoteState(state: BusState) {
+    this.remoteState = state;
+    if (this.remoteBusMesh && !this.remoteBusMesh.isEnabled()) {
+      this.remoteBusMesh.setEnabled(true);
+    }
+  }
+
+  /** Get local bus state to broadcast. */
+  getLocalBusState(): BusState {
+    return {
+      x: this.busPos.x,
+      y: this.busPos.y,
+      z: this.busPos.z,
+      yaw: this.busYaw,
+      pitch: this.busPitch,
+      speed: this.busSpeed,
+      dist: this.distanceTravelled,
+      scooped: this.runners.filter(r => r.state === 'riding').length,
+      raceState: this.raceState,
+      raceTime: this.raceTimer,
+    };
   }
 
   // ---------- Demo mode (title screen background) ----------
@@ -1790,6 +1847,31 @@ export class Game {
     this.camera.setTarget(lookTarget);
   }
 
+  // ---------- Remote bus interpolation ----------
+
+  private updateRemoteBusMesh(dt: number) {
+    if (!this.remoteBusMesh || !this.remoteState) return;
+
+    const s = this.remoteState;
+    const lerp = Math.min(1, 10 * dt); // smooth towards target
+
+    this.remoteSmoothPos.x += (s.x - this.remoteSmoothPos.x) * lerp;
+    this.remoteSmoothPos.y += (s.y - this.remoteSmoothPos.y) * lerp;
+    this.remoteSmoothPos.z += (s.z - this.remoteSmoothPos.z) * lerp;
+
+    // Angle interpolation (handle wrap-around)
+    let yawDiff = s.yaw - this.remoteSmoothYaw;
+    while (yawDiff > Math.PI) yawDiff -= 2 * Math.PI;
+    while (yawDiff < -Math.PI) yawDiff += 2 * Math.PI;
+    this.remoteSmoothYaw += yawDiff * lerp;
+
+    this.remoteSmoothPitch += (s.pitch - this.remoteSmoothPitch) * lerp;
+
+    this.remoteBusMesh.position.copyFrom(this.remoteSmoothPos);
+    this.remoteBusMesh.rotation.y = this.remoteSmoothYaw;
+    this.remoteBusMesh.rotation.x = -this.remoteSmoothPitch;
+  }
+
   // ---------- Update ----------
 
   private update(dt: number) {
@@ -2036,6 +2118,9 @@ export class Game {
 
     // Update runners
     this.updateRunners(dt);
+
+    // --- Update remote bus mesh (multiplayer interpolation) ---
+    this.updateRemoteBusMesh(dt);
 
     // Minimap
     if (this.minimap) {
