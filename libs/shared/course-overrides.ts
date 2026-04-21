@@ -33,7 +33,7 @@ export const COURSE_OVERRIDES: Record<string, CourseOverride> = {
       [0, 18], // Start
       [18, 768], // Lap 1
       [18, 768], // Lap 2
-      [769, 800], // Final stretch to the finish
+      [769, 797], // Final stretch to the finish
     ],
   },
   uppsala: {

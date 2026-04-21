@@ -22,6 +22,12 @@
       "options": {
         "cwd": "apps/game"
       }
+    },
+    "fetch-level": {
+      "command": "tsx scripts/fetch-level.ts",
+      "options": {
+        "cwd": "apps/game"
+      }
     }
   }
 }

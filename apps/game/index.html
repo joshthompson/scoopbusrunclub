@@ -10,6 +10,7 @@
       #app { width: 100%; height: 100%; }
       #gameCanvas { width: 100% !important; height: 100% !important; outline: none; }
       #hud {
+        display: none;
         position: absolute;
         top: 16px;
         left: 16px;
@@ -43,10 +44,193 @@
         font-size: 24px;
         z-index: 100;
       }
+      /* ---------- Title screen ---------- */
+      #title-screen {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        pointer-events: auto;
+      }
+      .title-content {
+        text-align: center;
+        pointer-events: auto;
+      }
+      .title-logo {
+        max-width: clamp(120px, 30vw, 280px);
+        height: auto;
+        margin-bottom: 16px;
+        filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+      }
+      .course-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        align-items: center;
+      }
+      .course-btn {
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-size: clamp(18px, 3vw, 28px);
+        padding: 14px 48px;
+        border: none;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #ffc107 0%, #e8850c 100%);
+        color: #fff;
+        /* text-shadow: 1px 1px 2px rgba(0,0,0,0.4); */
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        min-width: 220px;
+        letter-spacing: 0.03em;
+        border: 4px solid black;
+        corner-shape: notch;
+      }
+      .course-btn:hover {
+        transform: scale(1.07);
+        box-shadow: 0 6px 20px rgba(255,193,7,0.5);
+      }
+      .course-btn:active {
+        transform: scale(0.97);
+      }
+      #joystick {
+        position: absolute;
+        display: none;
+        z-index: 20;
+        pointer-events: none;
+      }
+      #joystick-outer {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 3px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.08);
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform: translate(-50%, -50%);
+      }
+      #joystick-inner {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.5);
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform: translate(-50%, -50%);
+      }
+
+      /* ---------- Course progress (bottom-right) ---------- */
+      #course-progress {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        color: #fff;
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-size: clamp(18px, 3.5vw, 32px);
+        text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+        background: rgba(0,0,0,0.45);
+        padding: 8px 18px;
+        border-radius: 12px;
+        pointer-events: none;
+        z-index: 10;
+        letter-spacing: 0.04em;
+      }
+
+      /* ---------- Countdown overlay ---------- */
+      #countdown-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 60;
+      }
+      .countdown-num {
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-size: clamp(80px, 20vw, 200px);
+        color: #fff;
+        text-shadow: 0 4px 24px rgba(0,0,0,0.6), 0 0 60px rgba(255,193,7,0.5);
+        animation: countdown-pop 0.6s ease-out;
+      }
+      .countdown-go {
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-size: clamp(80px, 20vw, 200px);
+        color: #fff;
+        text-shadow: 0 4px 24px rgba(0,0,0,0.6), 0 0 60px rgba(76,255,76,0.5);
+        animation: countdown-pop 0.5s ease-out;
+      }
+      @keyframes countdown-pop {
+        0% { transform: scale(2.5); opacity: 0; }
+        40% { opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      /* ---------- Race timer in HUD ---------- */
+      #hud p { margin-bottom: 4px; }
+
+      /* ---------- Finish overlay ---------- */
+      #finish-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.55);
+        z-index: 70;
+        animation: finish-fade-in 0.5s ease-out;
+      }
+      @keyframes finish-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .finish-card {
+        text-align: center;
+        background: rgba(20,20,40,0.92);
+        border-radius: 20px;
+        padding: clamp(24px, 5vw, 48px) clamp(32px, 8vw, 80px);
+        box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+        border: 2px solid rgba(255,193,7,0.4);
+      }
+      .finish-card h1 {
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-size: clamp(32px, 6vw, 56px);
+        color: #ffc107;
+        margin: 0 0 12px;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      }
+      .finish-time {
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-size: clamp(24px, 5vw, 44px);
+        color: #fff;
+        margin: 0 0 8px;
+      }
+      .finish-scooped {
+        font-family: monospace;
+        font-size: clamp(14px, 2.5vw, 20px);
+        color: #ccc;
+        margin: 0 0 24px;
+      }
+      .finish-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        align-items: center;
+      }
+      .finish-exit-btn {
+        background: linear-gradient(180deg, #aaa 0%, #666 100%) !important;
+      }
     </style>
   </head>
   <body>
     <div id="app"></div>
+    <div id="joystick">
+      <div id="joystick-outer"></div>
+      <div id="joystick-inner"></div>
+    </div>
     <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>

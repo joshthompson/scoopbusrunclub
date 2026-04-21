@@ -246,6 +246,60 @@ export function poseSitting(
   model.rightArm.rotation.z = 0.15;
 }
 
+/**
+ * Animated sitting pose: legs stay put, but one arm occasionally
+ * raises up and waves. `phase` should advance with real time so
+ * different runners with different phase offsets wave at different moments.
+ */
+export function poseSittingAnimated(
+  model: RunnerModelResult,
+  phase: number,
+): void {
+  // Legs: same as static sitting
+  model.leftLeg.rotation.x = -Math.PI / 2;
+  model.leftLeg.rotation.z = -0.1;
+  model.rightLeg.rotation.x = -Math.PI / 2;
+  model.rightLeg.rotation.z = 0.1;
+
+  // Alternate which arm waves each cycle
+  const cycleDuration = 10; // full cycle in seconds
+  const waveDuration = 2.5; // seconds of actual waving per cycle
+  const cycle = ((phase % cycleDuration) + cycleDuration) % cycleDuration;
+  const cycleIndex = Math.floor(((phase < 0 ? phase + 1e6 : phase)) / cycleDuration);
+  const useLeft = cycleIndex % 2 === 0;
+
+  const wavingArm = useLeft ? model.leftArm : model.rightArm;
+  const restingArm = useLeft ? model.rightArm : model.leftArm;
+  const sideSign = useLeft ? -1 : 1; // flip z direction for left vs right arm
+
+  // Resting arm defaults
+  restingArm.rotation.x = 0.2;
+  restingArm.rotation.z = sideSign * -0.15;
+
+  if (cycle < waveDuration) {
+    const t = cycle;
+    const rampUp = 0.4;
+    const rampDown = 0.4;
+    let raise: number;
+    if (t < rampUp) {
+      raise = t / rampUp; // ease arm up
+    } else if (t > waveDuration - rampDown) {
+      raise = (waveDuration - t) / rampDown; // ease arm down
+    } else {
+      raise = 1; // fully raised
+    }
+
+    // Raised arm: rotation.x → -2.8 (arm up), oscillate z for wave
+    const waveOsc = Math.sin(phase * 8) * 0.25;
+    wavingArm.rotation.x = 0.2 * (1 - raise) + (-2.8) * raise;
+    wavingArm.rotation.z = sideSign * (0.15 * (1 - raise) + (0.5 + waveOsc) * raise);
+  } else {
+    // Resting
+    wavingArm.rotation.x = 0.2;
+    wavingArm.rotation.z = sideSign * 0.15;
+  }
+}
+
 /** Neutral standing pose. */
 export function poseStanding(
   model: RunnerModelResult,

@@ -25,7 +25,7 @@ export function createParkrunSign(
 ): Mesh {
   const root = new Mesh('parkrunSign', scene);
   root.position = new Vector3(x, y, z);
-  root.rotation.y = -yaw + Math.PI / 2; // perpendicular to the path
+  root.rotation.y = yaw + Math.PI; // sign faces along path direction — parallel to start line
 
   // --- Dimensions ---
   const scale = 2.0;   // overall size multiplier

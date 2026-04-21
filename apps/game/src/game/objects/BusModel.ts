@@ -5,9 +5,12 @@ import {
   StandardMaterial,
   DynamicTexture,
   Color3,
-  Mesh,
   TransformNode,
+  SceneLoader,
 } from '@babylonjs/core';
+import '@babylonjs/loaders/glTF';
+
+import scoopModelUrl from '../../assets/models/scoop.glb?url';
 
 export interface BusModelResult {
   root: TransformNode;
@@ -26,7 +29,7 @@ export interface BusModelResult {
  * The bus faces +Z. Height base is at y=0.
  * Total size ≈ 2.6 wide × 3.2 tall × 8.5 long.
  */
-export function createBusModel(scene: Scene): BusModelResult {
+export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   const root = new TransformNode('bus', scene);
 
   // ═══════════════════════════════════════
@@ -39,7 +42,6 @@ export function createBusModel(scene: Scene): BusModelResult {
   const windowBlue = makeMat('busWindow', new Color3(0.15, 0.25, 0.45), scene);
   windowBlue.alpha = 0.85;
   const scoopBlue = makeMat('busScoop', new Color3(0.12, 0.42, 0.72), scene);
-  const scoopDarkBlue = makeMat('busScoopDark', new Color3(0.08, 0.28, 0.55), scene);
   const red = makeMat('busRed', new Color3(0.85, 0.15, 0.1), scene);
   const chrome = makeMat('busChrome', new Color3(0.7, 0.7, 0.72), scene);
   chrome.specularColor = new Color3(1, 1, 1);
@@ -269,65 +271,67 @@ export function createBusModel(scene: Scene): BusModelResult {
   }
 
   // ═══════════════════════════════════════
-  // SCOOP / PLOW (front, blue, 3-blade style)
-  // Group under a pivot node so it can be animated (flick up on scoop)
+  // SCOOP / PLOW — loaded from GLB model
   // ═══════════════════════════════════════
-  const scoopW = bodyW + 0.8;  // wider than bus
-  const scoopH = 0.9;
-  const scoopD = 0.6;
-  const scoopZ = bodyL / 2 + hoodL + 0.3;
+  const scoopTargetW = bodyW + 0.8;   // slightly wider than bus so visible from behind
 
-  // Pivot at the base of the scoop attachment point
+  // Pivot at bus front, ground level — animation rotates/translates from here
   const scoopPivot = new TransformNode('scoopPivot', scene);
-  scoopPivot.position = new Vector3(0, floorY - 0.55, scoopZ - 0.3);
+  scoopPivot.position = new Vector3(0, floorY - 0.55, bodyL / 2 + hoodL + 0.8);
   scoopPivot.parent = root;
 
-  // Main scoop plate (angled)
-  const scoopPlate = MeshBuilder.CreateBox('scoopPlate', {
-    width: scoopW,
-    height: scoopH,
-    depth: 0.12,
-  }, scene);
-  scoopPlate.material = scoopBlue;
-  scoopPlate.rotation.x = -0.35; // tilt forward
-  scoopPlate.position = new Vector3(0, floorY - 0.1 - scoopPivot.position.y, scoopZ - scoopPivot.position.z);
-  scoopPlate.parent = scoopPivot;
+  // Load GLB model
+  const result = await SceneLoader.ImportMeshAsync('', '', scoopModelUrl, scene);
+  const scoopRoot = new TransformNode('scoopGlbRoot', scene);
+  scoopRoot.parent = scoopPivot;
 
-  // Scoop blade ridges (3 horizontal ridges to look like the pixel art)
-  for (let i = 0; i < 3; i++) {
-    const ridge = MeshBuilder.CreateBox(`scoopRidge_${i}`, {
-      width: scoopW - 0.15,
-      height: 0.08,
-      depth: 0.16,
-    }, scene);
-    ridge.material = scoopDarkBlue;
-    ridge.rotation.x = -0.35;
-    const ridgeY = floorY - 0.35 + i * 0.28;
-    ridge.position = new Vector3(0, ridgeY - scoopPivot.position.y, scoopZ + 0.03 - scoopPivot.position.z);
-    ridge.parent = scoopPivot;
+  // Measure the raw bounding extent to compute the scale factor
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+  for (const mesh of result.meshes) {
+    if (mesh.isAnInstance || !mesh.getBoundingInfo) continue;
+    mesh.refreshBoundingInfo(true);
+    const bounds = mesh.getBoundingInfo().boundingBox;
+    const worldMin = bounds.minimumWorld;
+    const worldMax = bounds.maximumWorld;
+    if (worldMin.x < minX) minX = worldMin.x;
+    if (worldMax.x > maxX) maxX = worldMax.x;
+    if (worldMin.y < minY) minY = worldMin.y;
+    if (worldMax.y > maxY) maxY = worldMax.y;
+    if (worldMin.z < minZ) minZ = worldMin.z;
+    if (worldMax.z > maxZ) maxZ = worldMax.z;
   }
+  const rawWidth = maxX - minX || 1;
+  const scaleFactor = scoopTargetW / rawWidth;
 
-  // Scoop bottom lip (curved floor piece)
-  const lip = MeshBuilder.CreateBox('scoopLip', {
-    width: scoopW,
-    height: 0.08,
-    depth: scoopD,
-  }, scene);
-  lip.material = scoopBlue;
-  lip.position = new Vector3(0, floorY - 0.55 - scoopPivot.position.y, scoopZ - 0.15 - scoopPivot.position.z);
-  lip.parent = scoopPivot;
-
-  // Scoop side wings
-  for (const side of [-1, 1]) {
-    const wing = MeshBuilder.CreateBox(`scoopWing_${side}`, {
-      width: 0.1,
-      height: scoopH,
-      depth: scoopD + 0.1,
-    }, scene);
-    wing.material = scoopBlue;
-    wing.position = new Vector3(side * scoopW / 2, floorY - 0.1 - scoopPivot.position.y, scoopZ - 0.15 - scoopPivot.position.z);
-    wing.parent = scoopPivot;
+  // Parent all loaded meshes under the scoop root and apply uniform scale
+  for (const mesh of result.meshes) {
+    if (!mesh.parent || mesh.parent === scene) {
+      mesh.parent = scoopRoot;
+    }
+    // Apply blue scoop material to all sub-meshes
+    if (mesh.material) {
+      mesh.material = scoopBlue;
+    }
   }
+  // Also reparent transform nodes (skeletons, empties)
+  for (const tn of result.transformNodes) {
+    if (!tn.parent || tn.parent === scene) {
+      tn.parent = scoopRoot;
+    }
+  }
+  scoopRoot.scaling.setAll(scaleFactor);
+
+  // Position model so pivot is at the top-back of the scoop
+  const centerX = (minX + maxX) / 2;
+  const scoopScaledH = (maxY - minY) * scaleFactor;
+  scoopRoot.position.x = -centerX * scaleFactor;       // centre left-right
+  scoopRoot.position.y = -maxY * scaleFactor;           // top of scoop at pivot Y
+  scoopRoot.position.z = -minZ * scaleFactor;           // back edge at pivot Z, scoop extends forward
+
+  // Move pivot up so scoop bottom sits near ground level
+  scoopPivot.position.y = scoopScaledH;
 
   // ═══════════════════════════════════════
   // "SBRC" text on front (above grille)
