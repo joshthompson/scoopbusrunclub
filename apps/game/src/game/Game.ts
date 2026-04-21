@@ -96,9 +96,9 @@ interface Runner {
 
 const PATH_HALF_WIDTH = 5; // 10 m wide path
 const COURSE_TARGET_LENGTH = 5000; // 5 km
-const BUS_MAX_SPEED = 12 * 2.5; // m/s (~43 km/h)
+const BUS_MAX_SPEED = 12 * 2; // m/s (~43 km/h)
 const BUS_ACCELERATION = 12; // m/s²
-const BUS_BRAKE = 20; // m/s²
+const BUS_BRAKE = 8; // m/s²
 const BUS_FRICTION = 10; // m/s² passive deceleration
 const COUNTDOWN_DURATION = 3.0; // seconds for 3-2-1 countdown
 const BUS_TURN_SPEED = 1.08; // rad/s (reduced 40% from 1.8)
@@ -113,7 +113,7 @@ const SCOOP_UP_FACTOR = 0.85; // upward launch = |busSpeed| × this factor
 const SCOOP_MIN_UP = 10; // m/s — minimum upward launch (scoop still provides lift)
 const SCOOP_FORWARD_FACTOR = 0.5; // forward launch = busSpeed × this factor (preserves direction)
 const SCOOP_ANIM_DURATION = 0.35; // seconds for scoop flick animation
-const SCOOP_BOOST_DURATION = 2; // seconds of speed boost after scooping a runner
+const SCOOP_BOOST_DURATION = 1; // seconds of speed boost after scooping a runner
 const SCOOP_BOOST_MULTIPLIER = 2; // max-speed multiplier during boost
 const RUNNER_SIT_DURATION = 5; // seconds sitting on ground before standing up
 const GRAVITY = 20; // m/s² for launched runners
@@ -1964,14 +1964,11 @@ export class Game {
     if (this.touchActive) turnInput += this.touchDeltaX;
     turnInput = Math.max(-1, Math.min(1, turnInput));
 
-    // Flip steering when reversing so left/right feel natural
-    const effectiveTurn = this.busSpeed < -0.5 ? -turnInput : turnInput;
-
-    if (effectiveTurn !== 0 && Math.abs(this.busSpeed) > 0.5) {
-      this.busYaw += effectiveTurn * BUS_TURN_SPEED * dt;
-    } else if (effectiveTurn !== 0 && accelInput !== 0 && Math.abs(this.busSpeed) <= 0.5) {
+    if (turnInput !== 0 && Math.abs(this.busSpeed) > 0.5) {
+      this.busYaw += turnInput * BUS_TURN_SPEED * dt;
+    } else if (turnInput !== 0 && accelInput !== 0 && Math.abs(this.busSpeed) <= 0.5) {
       // Slow rotation at standstill when player is pressing forward/reverse + turn
-      this.busYaw += effectiveTurn * BUS_TURN_SPEED_STANDSTILL * dt;
+      this.busYaw += turnInput * BUS_TURN_SPEED_STANDSTILL * dt;
     }
 
     // --- Steer front wheels visually ---
