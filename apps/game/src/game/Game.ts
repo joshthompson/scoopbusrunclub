@@ -23,7 +23,7 @@ import {
 import '@babylonjs/loaders/glTF';
 import arrowModelUrl from '../assets/models/arrow.glb?url';
 import { gpsToLocal, gpsPointToLocal } from '../api';
-import { Minimap } from './Minimap';
+import { Minimap, MinimapPlayer } from './Minimap';
 import { COURSE_OVERRIDES, buildCourseIndices } from '@shared/course-overrides';
 import levels from '../levels';
 import type { LevelData } from '../levels';
@@ -108,7 +108,7 @@ interface Marshal {
 
 const PATH_HALF_WIDTH = 5; // 10 m wide path
 const COURSE_TARGET_LENGTH = 5000; // 5 km
-const BUS_MAX_SPEED = 12 * 2; // m/s (~43 km/h)
+const BUS_MAX_SPEED = 12 * 3; // m/s (~43 km/h)
 const BUS_ACCELERATION = 12; // m/s²
 const BUS_BRAKE = 8; // m/s²
 const BUS_FRICTION = 10; // m/s² passive deceleration
@@ -138,6 +138,13 @@ const GATE_RADIUS = 15; // metres — how close bus must be to trigger gate
 const TREE_COUNT = 1200; // total trees to place
 const TREE_SPREAD = 200; // metres from path — much closer for dense feel
 const TREE_MIN_DIST_FROM_PATH = 8; // metres — keep trees off the track
+const AUTO_DRIVE_SPEED = 10; // m/s — cruise speed after finishing (~36 km/h)
+const DRIFT_GRIP = 6; // higher = less drift; velocity angle converges toward heading
+const DRIFT_HIGH_SPEED_GRIP_FACTOR = 0.45; // grip reduction at max speed (0–1)
+const ELASTIC_SPRING_K = 12; // spring stiffness for elastic snap-back
+const ELASTIC_DAMPING = 4; // damping on elastic oscillation
+const ELASTIC_MAX_TILT = 0.55; // max tilt in radians (~31°)
+const ELASTIC_SPEED_PENALTY = 0.4; // multiply speed by this on elastic hit
 
 // ---------- Seeded PRNG (mulberry32) ----------
 
@@ -173,9 +180,11 @@ export class Game {
   private busSpeed = 0; // m/s (forward speed)
   private busYaw = 0; // radians
   private busPitch = 0; // radians – slope tilt (positive = looking up)
+  private busVelAngle = 0; // radians – actual velocity direction (lags behind busYaw for drift)
   private busPos = new Vector3(0, 0, 0); // bus base position (ground level)
   private busVelY = 0; // vertical velocity (m/s) — >0 when airborne going up
   private busAirborne = false; // true while bus is above ground
+  private elasticPenaltyActive = false; // true while bus overlaps an elastic object (prevents re-applying penalty)
   private prevSlopePitch = 0; // previous frame's terrain pitch for detecting crests
   private cameraYawOffset = 0; // smoothed yaw offset for reverse camera (0 = forward, π = reverse)
   private busMesh: TransformNode | null = null;
@@ -214,7 +223,16 @@ export class Game {
 
   // Solid obstacles — circle colliders {x, z, radius}
   // Isolated so it's easy to swap for a physics engine later.
-  private solidObstacles: { x: number; z: number; radius: number }[] = [];
+  private solidObstacles: { x: number; z: number; radius: number; elasticIndex?: number }[] = [];
+
+  // Elastic objects — anything that tilts on collision and springs back (trees, signs, marshals)
+  private elasticObjects: {
+    root: TransformNode;
+    tiltX: number;
+    tiltZ: number;
+    tiltVelX: number;
+    tiltVelZ: number;
+  }[] = [];
 
   // ---------- Remote players (multiplayer, up to MAX_PLAYERS-1 opponents) ----------
   private remotePlayers = new Map<string, {
@@ -325,9 +343,16 @@ export class Game {
   updateRemoteState(state: BusState, peerId: string) {
     const remote = this.remotePlayers.get(peerId);
     if (!remote) return;
+    const isFirstState = remote.state === null;
     remote.state = state;
     if (!remote.mesh.isEnabled()) {
       remote.mesh.setEnabled(true);
+    }
+    // Snap position on first state so the bus doesn't lerp from (0,0,0)
+    if (isFirstState) {
+      remote.smoothPos.set(state.x, state.y, state.z);
+      remote.smoothYaw = state.yaw;
+      remote.smoothPitch = state.pitch;
     }
   }
 
@@ -461,8 +486,15 @@ export class Game {
       const signZ = sz + forwardZ * 3 + rightZ * (PATH_HALF_WIDTH + 1.5);
       const signH = this.getGroundY(signX, signZ);
       const displayName = eventId.charAt(0).toUpperCase() + eventId.slice(1);
-      createParkrunSign(this.scene, signX, signZ, yaw, displayName, signH);
-      this.solidObstacles.push({ x: signX, z: signZ, radius: 1.5 });
+      const parkrunSignRoot = createParkrunSign(this.scene, signX, signZ, yaw, displayName, signH);
+      // Wrap in elastic pivot at base for tilt physics
+      const parkrunPivot = new TransformNode('parkrunSignPivot', this.scene);
+      parkrunPivot.position.set(signX, signH, signZ);
+      parkrunSignRoot.parent = parkrunPivot;
+      parkrunSignRoot.position.set(0, 0, 0);
+      const parkrunElasticIdx = this.elasticObjects.length;
+      this.elasticObjects.push({ root: parkrunPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
+      this.solidObstacles.push({ x: signX, z: signZ, radius: 1.5, elasticIndex: parkrunElasticIdx });
 
       if (!opts.skipBus) {
         // Bus starts behind the start line, fanned outward by player index
@@ -475,6 +507,7 @@ export class Game {
         const startH = this.getGroundY(this.busPos.x, this.busPos.z);
         this.busPos.y = startH;
         this.busYaw = yaw;
+        this.busVelAngle = yaw;
       }
     }
 
@@ -668,6 +701,10 @@ export class Game {
       const variant = rand();
       const scale = 0.7 + rand() * 0.8; // 0.7 – 1.5
 
+      // Create a pivot at the tree base for tilt animation
+      const treeRoot = new TransformNode(`tree_root_${placed}`, this.scene);
+      treeRoot.position.set(x, groundY, z);
+
       if (variant < 0.5) {
         // -- Conifer (cylinder trunk + cone top) --
         const trunk = MeshBuilder.CreateCylinder(
@@ -675,16 +712,18 @@ export class Game {
           { height: 2.5 * scale, diameterTop: 0.25 * scale, diameterBottom: 0.35 * scale, tessellation: 6 },
           this.scene,
         );
-        trunk.position.set(x, groundY + 1.25 * scale, z);
+        trunk.position.set(0, 1.25 * scale, 0);
         trunk.material = trunkMat;
+        trunk.parent = treeRoot;
 
         const crown = MeshBuilder.CreateCylinder(
           `tree_c_${placed}`,
           { height: 4 * scale, diameterTop: 0, diameterBottom: 2.8 * scale, tessellation: 6 },
           this.scene,
         );
-        crown.position.set(x, groundY + 3.5 * scale, z);
+        crown.position.set(0, 3.5 * scale, 0);
         crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
+        crown.parent = treeRoot;
       } else {
         // -- Broad-leaf (cylinder trunk + sphere top) --
         const trunk = MeshBuilder.CreateCylinder(
@@ -692,20 +731,32 @@ export class Game {
           { height: 2 * scale, diameterTop: 0.3 * scale, diameterBottom: 0.4 * scale, tessellation: 6 },
           this.scene,
         );
-        trunk.position.set(x, groundY + 1 * scale, z);
+        trunk.position.set(0, 1 * scale, 0);
         trunk.material = trunkMat;
+        trunk.parent = treeRoot;
 
         const crown = MeshBuilder.CreateSphere(
           `tree_c_${placed}`,
           { diameter: 3 * scale, segments: 6 },
           this.scene,
         );
-        crown.position.set(x, groundY + 3.2 * scale, z);
+        crown.position.set(0, 3.2 * scale, 0);
         crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
+        crown.parent = treeRoot;
       }
 
+      // Register tree as elastic object for tilt physics
+      const elasticIndex = this.elasticObjects.length;
+      this.elasticObjects.push({
+        root: treeRoot,
+        tiltX: 0,
+        tiltZ: 0,
+        tiltVelX: 0,
+        tiltVelZ: 0,
+      });
+
       // Register tree as solid obstacle (trunk radius ≈ 0.4 * scale)
-      this.solidObstacles.push({ x, z, radius: 0.5 * scale });
+      this.solidObstacles.push({ x, z, radius: 0.5 * scale, elasticIndex });
 
       placed++;
     }
@@ -982,9 +1033,15 @@ export class Game {
       const signZ = cz + rightZ * signOffset * side;
       const signY = this.getGroundY(signX, signZ);
 
-      createKmSign(this.scene, km, signX, signZ, signY, yaw);
-      // Km sign obstacle
-      this.solidObstacles.push({ x: signX, z: signZ, radius: 0.5 });
+      const kmSignRoot = createKmSign(this.scene, km, signX, signZ, signY, yaw);
+      // Wrap in elastic pivot at base for tilt physics
+      const kmPivot = new TransformNode(`kmSignPivot_${km}`, this.scene);
+      kmPivot.position.set(signX, signY, signZ);
+      kmSignRoot.parent = kmPivot;
+      kmSignRoot.position.set(0, 0, 0);
+      const kmElasticIdx = this.elasticObjects.length;
+      this.elasticObjects.push({ root: kmPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
+      this.solidObstacles.push({ x: signX, z: signZ, radius: 0.5, elasticIndex: kmElasticIdx });
     }
   }
 
@@ -1586,13 +1643,22 @@ export class Game {
       const y = this.getGroundY(baseX, baseZ);
 
       const model = createMarshalModel(this.scene, i);
-      model.root.position = new Vector3(baseX, y, baseZ);
+      model.root.position = new Vector3(0, 0, 0);
+
+      // Wrap in elastic pivot at base for tilt physics
+      const marshalPivot = new TransformNode(`marshalPivot_${i}`, this.scene);
+      marshalPivot.position.set(baseX, y, baseZ);
+      model.root.parent = marshalPivot;
 
       // Face oncoming runners (opposite to travel direction), then rotate
       // 30° inward toward the track so they look like they're pointing the way
       const runnerTravelYaw = Math.atan2(segDx, segDz);
       const facingOncoming = runnerTravelYaw + Math.PI; // 180° flip
       model.root.rotation.y = facingOncoming + side * INWARD_ANGLE;
+
+      const marshalElasticIdx = this.elasticObjects.length;
+      this.elasticObjects.push({ root: marshalPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
+      this.solidObstacles.push({ x: baseX, z: baseZ, radius: 0.6, elasticIndex: marshalElasticIdx });
 
       this.marshals.push({
         model,
@@ -1945,6 +2011,8 @@ export class Game {
    */
   private resolveCollisions() {
     const br = Game.BUS_COLLISION_RADIUS;
+    let touchingElastic = false;
+
     for (const obs of this.solidObstacles) {
       const dx = this.busPos.x - obs.x;
       const dz = this.busPos.z - obs.z;
@@ -1952,15 +2020,36 @@ export class Game {
       const minDist = br + obs.radius;
       if (distSq < minDist * minDist && distSq > 0) {
         const dist = Math.sqrt(distSq);
-        const overlap = minDist - dist;
-        // Push bus out along the collision normal
         const nx = dx / dist;
         const nz = dz / dist;
-        this.busPos.x += nx * overlap;
-        this.busPos.z += nz * overlap;
-        // Kill speed on impact
-        this.busSpeed *= -0.15; // small bounce-back
+
+        if (obs.elasticIndex != null) {
+          touchingElastic = true;
+          // Elastic collision: tilt the object and slow down, but DON'T block the bus
+          const elastic = this.elasticObjects[obs.elasticIndex];
+          if (elastic) {
+            const pushStrength = Math.abs(this.busSpeed) * 0.15;
+            elastic.tiltVelX += -nx * pushStrength;
+            elastic.tiltVelZ += -nz * pushStrength;
+          }
+          // Apply speed penalty only once per collision (not every frame)
+          if (!this.elasticPenaltyActive) {
+            this.busSpeed *= ELASTIC_SPEED_PENALTY;
+            this.elasticPenaltyActive = true;
+          }
+        } else {
+          // Non-elastic solid obstacle: push bus out and bounce
+          const overlap = minDist - dist;
+          this.busPos.x += nx * overlap;
+          this.busPos.z += nz * overlap;
+          this.busSpeed *= -0.15;
+        }
       }
+    }
+
+    // Clear penalty flag once bus is no longer touching any elastic object
+    if (!touchingElastic) {
+      this.elasticPenaltyActive = false;
     }
 
     // --- Bus-to-bus collisions (solid bodies cannot overlap) ---
@@ -1992,6 +2081,42 @@ export class Game {
         this.busPos.z += nz * overlap;
         this.busSpeed *= -0.15; // bounce-back
       }
+    }
+  }
+
+  // ---------- Elastic object tilt physics (spring) ----------
+
+  private updateElasticObjects(dt: number) {
+    for (const obj of this.elasticObjects) {
+      // Spring force pulls tilt back to zero
+      const forceX = -ELASTIC_SPRING_K * obj.tiltX - ELASTIC_DAMPING * obj.tiltVelX;
+      const forceZ = -ELASTIC_SPRING_K * obj.tiltZ - ELASTIC_DAMPING * obj.tiltVelZ;
+      obj.tiltVelX += forceX * dt;
+      obj.tiltVelZ += forceZ * dt;
+      obj.tiltX += obj.tiltVelX * dt;
+      obj.tiltZ += obj.tiltVelZ * dt;
+
+      // Clamp tilt magnitude
+      const mag = Math.sqrt(obj.tiltX * obj.tiltX + obj.tiltZ * obj.tiltZ);
+      if (mag > ELASTIC_MAX_TILT) {
+        const s = ELASTIC_MAX_TILT / mag;
+        obj.tiltX *= s;
+        obj.tiltZ *= s;
+      }
+
+      // Snap to zero when very small to avoid perpetual micro-oscillation
+      if (Math.abs(obj.tiltX) < 0.001 && Math.abs(obj.tiltVelX) < 0.001) {
+        obj.tiltX = 0;
+        obj.tiltVelX = 0;
+      }
+      if (Math.abs(obj.tiltZ) < 0.001 && Math.abs(obj.tiltVelZ) < 0.001) {
+        obj.tiltZ = 0;
+        obj.tiltVelZ = 0;
+      }
+
+      // Apply rotation to the root (rotation around base)
+      obj.root.rotation.x = obj.tiltZ; // tilt in Z maps to rotation around X
+      obj.root.rotation.z = -obj.tiltX; // tilt in X maps to rotation around Z
     }
   }
 
@@ -2163,6 +2288,45 @@ export class Game {
     this.camera.setTarget(lookTarget);
   }
 
+  // ---------- Minimap player list builder ----------
+
+  /** Convert Color3 (0-1 floats) to a CSS hex string. */
+  private static color3ToHex(c: { r: number; g: number; b: number }): string {
+    const r = Math.round(c.r * 255).toString(16).padStart(2, '0');
+    const g = Math.round(c.g * 255).toString(16).padStart(2, '0');
+    const b = Math.round(c.b * 255).toString(16).padStart(2, '0');
+    return `#${r}${g}${b}`;
+  }
+
+  private buildMinimapPlayers(): MinimapPlayer[] {
+    const players: MinimapPlayer[] = [];
+
+    // Remote players first (drawn underneath)
+    for (const [_peerId, remote] of this.remotePlayers) {
+      if (!remote.state) continue;
+      const palette = PLAYER_COLORS[remote.playerIndex - 1] ?? PLAYER_COLORS[1];
+      players.push({
+        x: remote.smoothPos.x,
+        z: remote.smoothPos.z,
+        yaw: remote.smoothYaw,
+        color: Game.color3ToHex(palette.body),
+        isLocal: false,
+      });
+    }
+
+    // Local player (drawn on top)
+    const localPalette = PLAYER_COLORS[this.localPlayerIndex - 1] ?? PLAYER_COLORS[0];
+    players.push({
+      x: this.busPos.x,
+      z: this.busPos.z,
+      yaw: this.busYaw,
+      color: Game.color3ToHex(localPalette.body),
+      isLocal: true,
+    });
+
+    return players;
+  }
+
   // ---------- Remote bus interpolation ----------
 
   private updateRemoteBusMeshes(dt: number) {
@@ -2257,18 +2421,42 @@ export class Game {
       this.updateCountdownCamera(dt);
 
       if (this.minimap) {
-        this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw);
+        this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers());
       }
       return;
     }
 
-    // --- Finished phase: freeze bus, keep rendering ---
+    // --- Finished phase: auto-drive bus forward so it doesn't block others ---
     if (this.raceState === 'finished') {
+      // Decelerate toward a gentle cruise speed, then maintain it
+      if (this.busSpeed > AUTO_DRIVE_SPEED) {
+        this.busSpeed = Math.max(AUTO_DRIVE_SPEED, this.busSpeed - BUS_FRICTION * dt);
+      } else {
+        this.busSpeed += (AUTO_DRIVE_SPEED - this.busSpeed) * Math.min(1, 3 * dt);
+      }
+
+      // Keep moving straight ahead
+      const fwd = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
+      this.busPos.x += fwd.x * this.busSpeed * dt;
+      this.busPos.z += fwd.z * this.busSpeed * dt;
+
+      // Follow terrain
+      const finGroundY = this.getGroundY(this.busPos.x, this.busPos.z);
+      this.busPos.y = finGroundY;
+
+      // Update bus mesh
+      if (this.busMesh) {
+        this.busMesh.position.copyFrom(this.busPos);
+        this.busMesh.rotation.y = this.busYaw;
+      }
+
       this.updateChaseCam(dt);
       this.updateRunners(dt);
       this.updateMarshals(dt);
+      this.updateElasticObjects(dt);
+      this.updateRemoteBusMeshes(dt);
       if (this.minimap) {
-        this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw);
+        this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers());
       }
       return;
     }
@@ -2351,8 +2539,18 @@ export class Game {
       }
     }
 
-    // --- Move bus ---
-    const forward = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
+    // --- Move bus (with drift) ---
+    // Velocity direction lags behind heading to create drift when turning
+    const absSpeed = Math.abs(this.busSpeed);
+    const speedRatio = absSpeed / BUS_MAX_SPEED;
+    const grip = DRIFT_GRIP * (1 - speedRatio * DRIFT_HIGH_SPEED_GRIP_FACTOR);
+    let velAngleDiff = this.busYaw - this.busVelAngle;
+    // Normalise to [-PI, PI]
+    while (velAngleDiff > Math.PI) velAngleDiff -= 2 * Math.PI;
+    while (velAngleDiff < -Math.PI) velAngleDiff += 2 * Math.PI;
+    this.busVelAngle += velAngleDiff * Math.min(1, grip * dt);
+
+    const forward = new Vector3(Math.sin(this.busVelAngle), 0, Math.cos(this.busVelAngle));
     this.busPos.x += forward.x * this.busSpeed * dt;
     this.busPos.z += forward.z * this.busSpeed * dt;
 
@@ -2363,14 +2561,15 @@ export class Game {
     const groundY = this.getGroundY(this.busPos.x, this.busPos.z);
 
     // Compute slope pitch from terrain height a short distance ahead vs behind
+    const headingDir = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
     const slopeProbe = 2.0; // metres to sample ahead/behind
     const hAhead = this.getGroundY(
-      this.busPos.x + forward.x * slopeProbe,
-      this.busPos.z + forward.z * slopeProbe,
+      this.busPos.x + headingDir.x * slopeProbe,
+      this.busPos.z + headingDir.z * slopeProbe,
     );
     const hBehind = this.getGroundY(
-      this.busPos.x - forward.x * slopeProbe,
-      this.busPos.z - forward.z * slopeProbe,
+      this.busPos.x - headingDir.x * slopeProbe,
+      this.busPos.z - headingDir.z * slopeProbe,
     );
     const targetPitch = Math.atan2(hAhead - hBehind, slopeProbe * 2);
 
@@ -2460,12 +2659,15 @@ export class Game {
     // Update marshals
     this.updateMarshals(dt);
 
+    // Update elastic object tilt physics
+    this.updateElasticObjects(dt);
+
     // --- Update remote bus meshes (multiplayer interpolation) ---
     this.updateRemoteBusMeshes(dt);
 
     // Minimap
     if (this.minimap) {
-      this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw);
+      this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers());
     }
   }
 }

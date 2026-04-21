@@ -29,8 +29,16 @@ const COL_BG = '#1e5e15';
 const COL_PATH = '#c4a44a';
 const COL_PATH_OUTLINE = '#6b5a10';
 const COL_WATER = '#1a5faa';
-const COL_PLAYER = '#ff3030';
 const COL_BORDER = '#ffffffcc';
+
+/** Info for one player marker on the minimap. */
+export interface MinimapPlayer {
+  x: number;
+  z: number;
+  yaw: number;
+  color: string; // CSS colour for the arrow fill
+  isLocal: boolean;
+}
 
 export class Minimap {
   private ctx: CanvasRenderingContext2D;
@@ -89,7 +97,7 @@ export class Minimap {
 
   /* ---- draw (called once per frame) ---- */
 
-  draw(busX: number, busZ: number, busYaw: number) {
+  draw(busX: number, busZ: number, busYaw: number, players: MinimapPlayer[] = []) {
     const S = this.cssSize;
     const R = S / 2;
     const ctx = this.ctx;
@@ -138,20 +146,12 @@ export class Minimap {
       this.strokePath(ctx, project, 3.5, COL_PATH);
     }
 
-    // --- player arrow (always at centre, pointing up) ---
-    const aLen = 10;
-    const aHalf = 5;
-    ctx.fillStyle = COL_PLAYER;
-    ctx.beginPath();
-    ctx.moveTo(R, R - aLen);                    // tip (up)
-    ctx.lineTo(R - aHalf, R + aLen * 0.4);      // bottom-left
-    ctx.lineTo(R, R + aLen * 0.1);               // notch
-    ctx.lineTo(R + aHalf, R + aLen * 0.4);      // bottom-right
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    // --- player arrows: remote players first, then local on top ---
+    const remotes = players.filter(p => !p.isLocal);
+    const locals = players.filter(p => p.isLocal);
+    for (const p of [...remotes, ...locals]) {
+      this.drawPlayerArrow(ctx, project, p, busYaw);
+    }
 
     ctx.restore();
 
@@ -161,6 +161,45 @@ export class Minimap {
     ctx.strokeStyle = COL_BORDER;
     ctx.lineWidth = BORDER_W;
     ctx.stroke();
+  }
+
+  /* ---- draw a single player arrow ---- */
+
+  private drawPlayerArrow(
+    ctx: CanvasRenderingContext2D,
+    project: (wx: number, wz: number) => [number, number],
+    player: MinimapPlayer,
+    cameraYaw: number,
+  ) {
+    const S = this.cssSize;
+    const R = S / 2;
+    const [cx, cy] = project(player.x, player.z);
+
+    // Arrow dimensions
+    const aLen = 10;
+    const aHalf = 5;
+
+    // Rotation: the arrow needs to point in the player's yaw direction
+    // relative to the camera yaw (since the whole map is rotated)
+    const relYaw = player.yaw - cameraYaw;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(relYaw);
+
+    ctx.fillStyle = player.color;
+    ctx.beginPath();
+    ctx.moveTo(0, -aLen);                    // tip (up)
+    ctx.lineTo(-aHalf, aLen * 0.4);          // bottom-left
+    ctx.lineTo(0, aLen * 0.1);               // notch
+    ctx.lineTo(aHalf, aLen * 0.4);           // bottom-right
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   /* ---- path stroke with adaptive gap detection ---- */
