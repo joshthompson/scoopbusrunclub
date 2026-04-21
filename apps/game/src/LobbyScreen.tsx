@@ -124,6 +124,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
               value={inputCode()}
               onInput={(e) => setInputCode(e.currentTarget.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+              ref={(el) => setTimeout(() => el.focus(), 0)}
             />
             <button class="course-btn" onClick={handleJoin}>
               Connect

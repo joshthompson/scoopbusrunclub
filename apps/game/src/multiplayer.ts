@@ -2,7 +2,7 @@
  * Multiplayer networking layer using Trystero (WebRTC P2P).
  *
  * Two players connect via a shared room code. One hosts, one joins.
- * During gameplay each player broadcasts their bus state ~15 times/sec.
+ * During gameplay each player broadcasts their player state ~15 times/sec.
  */
 import { joinRoom, type Room } from 'trystero';
 
@@ -11,8 +11,8 @@ import { joinRoom, type Room } from 'trystero';
 /** Maximum number of players in a room */
 export const MAX_PLAYERS = 4;
 
-/** Minimal bus state broadcast each frame */
-export interface BusState {
+/** Minimal player state broadcast each frame */
+export interface PlayerState {
   x: number;
   y: number;
   z: number;
@@ -31,7 +31,16 @@ export interface BusState {
   playerIndex: number;
   /** Whether exhaust boost is currently active */
   boosting: boolean;
+  /** Gate index for position tracking */
+  gateIdx: number;
+  /** Player role for gameplay interactions */
+  role: 'bus' | 'runner';
+  /** Whether the scoop plow animation is active */
+  scooping: boolean;
 }
+
+/** @deprecated Use PlayerState */
+export type BusState = PlayerState;
 
 /** Broadcast when a player scoops a runner (so all clients can sync) */
 export interface ScoopEvent {
@@ -39,6 +48,12 @@ export interface ScoopEvent {
   runnerIndex: number;
   /** Player index that scooped it */
   playerIndex: number;
+  /** Scooped player index (for player-vs-player scoop), if applicable */
+  victimPlayerIndex?: number;
+  /** Scooper yaw at scoop time (for deterministic victim launch) */
+  scooperYaw?: number;
+  /** Scooper speed at scoop time (for deterministic victim launch) */
+  scooperSpeed?: number;
 }
 
 /** Lobby chat / coordination messages */
@@ -50,7 +65,7 @@ export interface LobbyMessage {
   playerIndex?: number;
 }
 
-export type OnRemoteState = (state: BusState, peerId: string) => void;
+export type OnRemoteState = (state: PlayerState, peerId: string) => void;
 export type OnPeerJoin = (peerId: string) => void;
 export type OnPeerLeave = (peerId: string) => void;
 export type OnLobbyMessage = (msg: LobbyMessage, peerId: string) => void;
@@ -62,7 +77,7 @@ const SEND_INTERVAL_MS = 66; // ~15 Hz
 
 export class Multiplayer {
   private room: Room | null = null;
-  private sendState: ((state: BusState) => void) | null = null;
+  private sendState: ((state: PlayerState) => void) | null = null;
   private sendLobby: ((msg: LobbyMessage) => void) | null = null;
   private sendScoop: ((evt: ScoopEvent) => void) | null = null;
   private _onRemoteState: OnRemoteState | null = null;
@@ -115,16 +130,16 @@ export class Multiplayer {
     this.room = joinRoom({ appId: APP_ID }, roomCode);
 
     // Wire up actions
-    const [sendState, onState] = this.room.makeAction('busState');
+    const [sendState, onState] = this.room.makeAction('playerState');
     const [sendLobby, onLobby] = this.room.makeAction('lobby');
     const [sendScoop, onScoop] = this.room.makeAction('scoop');
 
-    this.sendState = (state: BusState) => sendState(state as any);
+    this.sendState = (state: PlayerState) => sendState(state as any);
     this.sendLobby = (msg: LobbyMessage) => sendLobby(msg as any);
     this.sendScoop = (evt: ScoopEvent) => sendScoop(evt as any);
 
     onState((data, peerId: string) => {
-      const state = data as unknown as BusState;
+      const state = data as unknown as PlayerState;
       // Learn peer's player index from their broadcast if not already known
       if (state.playerIndex && !this._peerPlayerIndex.has(peerId)) {
         this._peerPlayerIndex.set(peerId, state.playerIndex);
@@ -140,7 +155,7 @@ export class Multiplayer {
         // Also record the host's index
         this._peerPlayerIndex.set(peerId, 1);
       }
-      // If we're host and joiner sends playerInfo, record their known index from BusState
+      // If we're host and joiner sends playerInfo, record their known index from PlayerState
       this._onLobbyMessage?.(msg, peerId);
     });
 
@@ -177,8 +192,8 @@ export class Multiplayer {
 
   // ---------- Send ----------
 
-  /** Broadcast local bus state. Call every frame; internally rate-limited. */
-  broadcastState(state: BusState) {
+  /** Broadcast local player state. Call every frame; internally rate-limited. */
+  broadcastState(state: PlayerState) {
     const now = performance.now();
     if (now - this.lastSendTime < SEND_INTERVAL_MS) return;
     this.lastSendTime = now;

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
-    "fetch-level": "tsx scripts/fetch-level.ts"
+    "fetch-level": "tsx scripts/fetch-level.ts",
+    "apply-gpx-altitude": "tsx scripts/apply-gpx-altitude.ts"
   },
   "dependencies": {
     "@babylonjs/core": "^7.52.2",

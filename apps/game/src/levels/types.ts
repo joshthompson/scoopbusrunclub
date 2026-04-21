@@ -17,5 +17,13 @@ export interface LevelData {
   water: LevelWaterFeature[];
   /** GPS positions [lat, lon] where course marshals stand */
   marshals?: [number, number][];
+  /** Roads as line segments [lat, lon] */
+  roads?: [number, number][][];
+  /** Buildings as polygons of [lat, lon] points */
+  buildings?: {
+    type: 'grey' | 'red';
+    height?: number;
+    points: [number, number][];
+  }[];
   hide?: boolean;
 }

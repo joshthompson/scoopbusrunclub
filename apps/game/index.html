@@ -150,6 +150,8 @@
         border: 2px solid rgba(255,193,7,0.4);
         min-width: 0;
         max-width: 95vw;
+        max-height: 90dvh;
+        overflow-y: auto;
         width: clamp(280px, 80vw, 500px);
       }
       .lobby-logo {
@@ -199,6 +201,7 @@
       }
       .join-form {
         display: flex;
+        flex-direction: column;
         gap: 10px;
         justify-content: center;
         align-items: center;
@@ -209,7 +212,8 @@
         font-size: clamp(28px, 5vw, 40px);
         text-align: center;
         letter-spacing: 0.2em;
-        width: 180px;
+        width: min(180px, 100%);
+        max-width: 100%;
         padding: 8px 12px;
         border: 3px solid #ffc107;
         border-radius: 8px;
@@ -445,6 +449,49 @@
       }
       .finish-exit-btn {
         background: linear-gradient(180deg, #aaa 0%, #666 100%) !important;
+      }
+
+      /* ---------- Pause overlay ---------- */
+      #pause-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.5);
+        z-index: 80;
+        animation: pause-fade-in 0.15s ease-out;
+      }
+      @keyframes pause-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .pause-card {
+        text-align: center;
+        background: rgba(20,20,40,0.92);
+        border-radius: 20px;
+        padding: clamp(24px, 5vw, 48px) clamp(32px, 8vw, 80px);
+        box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+        border: 2px solid rgba(255,255,255,0.2);
+      }
+      .pause-card h1 {
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-size: clamp(32px, 6vw, 56px);
+        color: #fff;
+        margin: 0 0 16px;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      }
+      .pause-note {
+        font-family: monospace;
+        font-size: clamp(12px, 2vw, 16px);
+        color: #f0c820;
+        margin: 0 0 20px;
+      }
+      .pause-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        align-items: center;
       }
     </style>
   </head>

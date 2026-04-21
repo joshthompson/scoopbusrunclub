@@ -1,13 +1,13 @@
 /* @refresh reload */
 import { render } from 'solid-js/web';
-import { createSignal, onMount, Show, For } from 'solid-js';
+import { createSignal, onMount, onCleanup, Show, For } from 'solid-js';
 import earcut from 'earcut';
 import { Game } from './game/Game';
 import levels from './levels';
 import { TitleScreen } from './TitleScreen';
 import { LobbyScreen } from './LobbyScreen';
 import { mp, MAX_PLAYERS } from './multiplayer';
-import type { BusState, ScoopEvent } from './multiplayer';
+import type { PlayerState, ScoopEvent } from './multiplayer';
 
 // Babylon.js needs earcut on window for CreatePolygon
 (window as any).earcut = earcut;
@@ -20,9 +20,8 @@ const PLAYER_COLOR_INFO = [
   { name: 'Purple', css: '#9940cc' },
 ];
 
-const LAST_COURSE_KEY = 'scoopbus_last_course';
-
-type GameMode = 'single' | 'host' | 'join';
+type GameMode = 'single' | 'single-runner' | 'host' | 'join';
+type PlayerRole = 'bus' | 'runner';
 type Screen = 'title' | 'lobby' | 'loading' | 'playing';
 
 /** Format seconds as M:SS */
@@ -30,6 +29,19 @@ function fmtTime(s: number): string {
   const mins = Math.floor(s / 60);
   const secs = Math.floor(s % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/** Format position as ordinal: 1st, 2nd, 3rd, 4th... */
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function getRandomCourseId(): string {
+  const courseIds = Object.keys(levels).filter((id) => !levels[id]?.hide);
+  if (courseIds.length === 0) return 'haga';
+  return courseIds[Math.floor(Math.random() * courseIds.length)];
 }
 
 function App() {
@@ -45,10 +57,18 @@ function App() {
   const [raceTime, setRaceTime] = createSignal(0);
   const [courseProgress, setCourseProgress] = createSignal({ covered: 0, total: 5 });
   const [finishTime, setFinishTime] = createSignal(0);
+  const [racePosition, setRacePosition] = createSignal({ position: 1, total: 1 });
+  const [keepDriving, setKeepDriving] = createSignal(false);
+
+  // Pause menu
+  const [paused, setPaused] = createSignal(false);
 
   // Multiplayer state
   const [gameMode, setGameMode] = createSignal<GameMode>('single');
-  const [remoteStates, setRemoteStates] = createSignal<Map<string, BusState>>(new Map());
+  const [playerRole, setPlayerRole] = createSignal<PlayerRole>('bus');
+  const [remoteStates, setRemoteStates] = createSignal<Map<string, PlayerState>>(new Map());
+
+  const isMultiplayerMode = () => gameMode() === 'host' || gameMode() === 'join';
 
   let canvasRef!: HTMLCanvasElement;
   let minimapRef!: HTMLCanvasElement;
@@ -57,14 +77,34 @@ function App() {
   let currentEventId = '';
   let mpSendInterval: ReturnType<typeof setInterval> | null = null;
 
-  // Determine demo course: last loaded or haga
-  function getDemoCourseId(): string {
-    const last = localStorage.getItem(LAST_COURSE_KEY);
-    if (last && levels[last]) return last;
-    return 'haga';
+  // --- Pause / resume toggle ---
+  function togglePause() {
+    if (screen() !== 'playing') return;
+    if (raceState() === 'finished' && !keepDriving()) return; // finish screen shown
+    const next = !paused();
+    setPaused(next);
+    const isSingle = !isMultiplayerMode();
+    if (activeGame) {
+      // Only freeze simulation in single-player
+      activeGame.setPaused(isSingle && next);
+    }
+  }
+
+  function handleResume() {
+    setPaused(false);
+    if (activeGame) activeGame.setPaused(false);
   }
 
   onMount(async () => {
+    // Global key listener for pause
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
+        togglePause();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    onCleanup(() => window.removeEventListener('keydown', onKey));
+
     // Start background demo animation
     demoGame = new Game(canvasRef, {
       onScoopRunner: () => {},
@@ -72,16 +112,18 @@ function App() {
       onDistanceChange: () => {},
       onAltitudeChange: () => {},
     });
-    await demoGame.initDemo(getDemoCourseId());
+    await demoGame.initDemo(getRandomCourseId());
   });
 
   function handleSelectMode(mode: GameMode, eventId: string) {
     currentEventId = eventId;
     setGameMode(mode);
 
-    if (mode === 'single') {
+    if (mode === 'single' || mode === 'single-runner') {
+      setPlayerRole(mode === 'single-runner' ? 'runner' : 'bus');
       startGame(eventId);
     } else {
+      setPlayerRole(mode === 'host' ? 'bus' : 'runner');
       // Go to lobby
       setScreen('lobby');
     }
@@ -98,8 +140,6 @@ function App() {
   }
 
   async function startGame(eventId: string) {
-    // Remember this course for next visit's demo background
-    localStorage.setItem(LAST_COURSE_KEY, eventId);
     currentEventId = eventId;
 
     setScreen('loading');
@@ -125,6 +165,8 @@ function App() {
     setRaceTime(0);
     setCourseProgress({ covered: 0, total: 5 });
     setFinishTime(0);
+    setKeepDriving(false);
+    setRacePosition({ position: 1, total: 1 });
     setRemoteStates(new Map());
 
     // Validate
@@ -137,6 +179,11 @@ function App() {
       return;
     }
 
+    const resolvedRole: PlayerRole = isMultiplayerMode()
+      ? (mp.localPlayerIndex === 1 ? 'bus' : 'runner')
+      : playerRole();
+    setPlayerRole(resolvedRole);
+
     const game = new Game(canvasRef, {
       onScoopRunner: () => setScored((s) => s + 1),
       onSpeedChange: (s: number) => setSpeed(s),
@@ -148,12 +195,15 @@ function App() {
       onRaceTimer: (seconds: number) => setRaceTime(seconds),
       onCourseProgress: (covered: number, total: number) => setCourseProgress({ covered, total }),
       onFinish: (time: number) => setFinishTime(time),
-    }, minimapRef);
+      onPositionChange: (pos: number, total: number) => setRacePosition({ position: pos, total }),
+    }, minimapRef, {
+      localPlayerRole: resolvedRole,
+    });
 
     activeGame = game;
 
     // --- Multiplayer setup ---
-    const isMultiplayer = gameMode() !== 'single';
+    const isMultiplayer = isMultiplayerMode();
     if (isMultiplayer && mp.roomCode) {
       // Set local player index (host=1, joiners get assigned by host)
       game.setLocalPlayerIndex(mp.localPlayerIndex);
@@ -185,7 +235,7 @@ function App() {
       };
 
       // Listen for remote state updates
-      mp.onRemoteState = (state: BusState, peerId: string) => {
+      mp.onRemoteState = (state: PlayerState, peerId: string) => {
         setRemoteStates((prev) => {
           const next = new Map(prev);
           next.set(peerId, state);
@@ -201,13 +251,19 @@ function App() {
 
       // Listen for remote scoop events
       mp.onScoopEvent = (evt: ScoopEvent, _peerId: string) => {
-        game.handleRemoteScoop(evt.runnerIndex, evt.playerIndex);
+        game.handleRemoteScoop(
+          evt.runnerIndex,
+          evt.playerIndex,
+          evt.victimPlayerIndex,
+          evt.scooperYaw,
+          evt.scooperSpeed,
+        );
       };
 
       // Start sending local state at ~15 Hz + flush scoop events
       mpSendInterval = setInterval(() => {
         if (activeGame) {
-          mp.broadcastState(activeGame.getLocalBusState());
+          mp.broadcastState(activeGame.getLocalPlayerState());
           // Flush and broadcast any scoop events from this frame
           const scoops = activeGame.flushScoopEvents();
           for (const evt of scoops) {
@@ -220,11 +276,18 @@ function App() {
     setScreen('playing');
   }
 
+  function handleKeepDriving() {
+    if (activeGame) activeGame.setKeepDriving();
+    setKeepDriving(true);
+  }
+
   function handleReplay() {
+    setPaused(false);
     startGame(currentEventId);
   }
 
   function handleExitToMenu() {
+    setPaused(false);
     // Clean up multiplayer
     if (mpSendInterval) {
       clearInterval(mpSendInterval);
@@ -232,6 +295,7 @@ function App() {
     }
     mp.disconnect();
     setGameMode('single');
+    setPlayerRole('bus');
     setRemoteStates(new Map());
 
     if (activeGame) {
@@ -246,7 +310,7 @@ function App() {
       onDistanceChange: () => {},
       onAltitudeChange: () => {},
     });
-    demoGame.initDemo(getDemoCourseId());
+    demoGame.initDemo(getRandomCourseId());
   }
 
   return (
@@ -272,24 +336,34 @@ function App() {
       <Show when={screen() === 'playing'}>
         {/* Top-left HUD */}
         <div id="hud">
-          <p>🚌 Scooped: {scored()}</p>
+          <Show when={playerRole() === 'bus'}>
+            <p>🚌 Scooped: {scored()}</p>
+          </Show>
+          <Show when={playerRole() === 'runner'}>
+            <p>🏃 Runner mode</p>
+          </Show>
           <p>🏃 Speed: {speed().toFixed(1)} km/h</p>
           <p>⏱️ {fmtTime(raceTime())}</p>
+          <Show when={isMultiplayerMode() && raceState() === 'racing'}>
+            <p style={{ color: '#ffc107', 'font-weight': 'bold', 'font-size': 'clamp(16px, 2.5vw, 24px)' }}>
+              {ordinal(racePosition().position)}
+            </p>
+          </Show>
         </div>
 
-        {/* Top-right multiplayer HUD (all opponents) */}
-        <Show when={gameMode() !== 'single' && remoteStates().size > 0}>
+        {/* Top-right multiplayer HUD — show each opponent's status only when finished */}
+        <Show when={isMultiplayerMode() && remoteStates().size > 0 && raceState() === 'finished' && !keepDriving()}>
           <div id="mp-hud">
             <For each={[...remoteStates().entries()]}>{([_peerId, rs]) => {
               const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
               return (
                 <div class="mp-player-block" style={{ 'border-left': `3px solid ${info.css}` }}>
                   <p style={{ color: info.css }}>🚌 P{rs.playerIndex || '?'} {info.name}</p>
-                  <p>Speed: {(Math.abs(rs.speed) * 3.6).toFixed(0)} km/h</p>
-                  <p>Scooped: {rs.scooped}</p>
-                  <p>⏱️ {fmtTime(rs.raceTime)}</p>
                   <Show when={rs.raceState === 'finished'}>
-                    <p style={{ color: '#ffc107' }}>🏁 FINISHED</p>
+                    <p style={{ color: '#ffc107' }}>🏁 {fmtTime(rs.raceTime)}</p>
+                  </Show>
+                  <Show when={rs.raceState !== 'finished'}>
+                    <p>Still racing...</p>
                   </Show>
                 </div>
               );
@@ -312,37 +386,65 @@ function App() {
         </Show>
 
         {/* Finish screen */}
-        <Show when={raceState() === 'finished'}>
+        <Show when={raceState() === 'finished' && !keepDriving()}>
           <div id="finish-overlay">
             <div class="finish-card">
               <h1>🏁 Finished!</h1>
               <p class="finish-time">Finished in {fmtTime(finishTime())}</p>
-              <p class="finish-scooped">Runners scooped: {scored()}</p>
-              <Show when={gameMode() !== 'single' && remoteStates().size > 0}>
-                <For each={[...remoteStates().entries()]}>{([_peerId, rs]) => {
-                  const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
+              <Show when={playerRole() === 'bus'}>
+                <p class="finish-scooped">Runners scooped: {scored()}</p>
+              </Show>
+              <Show when={isMultiplayerMode() && remoteStates().size > 0}>
+                {(() => {
+                  // Build ranked leaderboard
+                  const states = remoteStates();
+                  const players: { name: string; css: string; time: number; finished: boolean; index: number }[] = [];
+                  // Add local player
+                  const localIdx = (activeGame as any)?.localPlayerIndex ?? 1;
+                  const localInfo = PLAYER_COLOR_INFO[localIdx - 1] ?? PLAYER_COLOR_INFO[0];
+                  players.push({ name: `P${localIdx} ${localInfo.name} (You)`, css: localInfo.css, time: finishTime(), finished: true, index: localIdx });
+                  // Add remote players
+                  for (const [, rs] of states) {
+                    const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
+                    players.push({ name: `P${rs.playerIndex} ${info.name}`, css: info.css, time: rs.raceTime, finished: rs.raceState === 'finished', index: rs.playerIndex });
+                  }
+                  // Sort: finished first (by time), then unfinished
+                  players.sort((a, b) => {
+                    if (a.finished && !b.finished) return -1;
+                    if (!a.finished && b.finished) return 1;
+                    if (a.finished && b.finished) return a.time - b.time;
+                    return 0;
+                  });
                   return (
-                    <div>
-                      <p class="finish-scooped" style={{ 'margin-top': '8px', color: info.css }}>
-                        {rs.raceState === 'finished'
-                          ? `P${rs.playerIndex} ${info.name}: ${fmtTime(rs.raceTime)}`
-                          : `P${rs.playerIndex} ${info.name}: still racing...`}
-                      </p>
-                      <Show when={rs.raceState === 'finished'}>
-                        <p class="finish-time" style={{
-                          color: finishTime() <= rs.raceTime ? '#4caf50' : '#e53935',
-                          'font-size': 'clamp(14px, 2vw, 20px)',
-                          'margin-top': '2px',
-                        }}>
-                          {finishTime() <= rs.raceTime ? '🏆 Beat them!' : '💀 They beat you'}
+                    <div style={{ 'margin-top': '12px' }}>
+                      <For each={players}>{(p, i) => (
+                        <p style={{ color: p.css, margin: '4px 0', 'font-size': 'clamp(14px, 2vw, 20px)' }}>
+                          {ordinal(i() + 1)} — {p.name}{p.finished ? ` — ${fmtTime(p.time)}` : ' — still racing...'}
                         </p>
-                      </Show>
+                      )}</For>
                     </div>
                   );
-                }}</For>
+                })()}
               </Show>
               <div class="finish-buttons">
+                <button class="course-btn" onClick={handleKeepDriving}>Keep Driving</button>
                 <button class="course-btn" onClick={handleReplay}>Replay</button>
+                <button class="course-btn finish-exit-btn" onClick={handleExitToMenu}>Exit to Menu</button>
+              </div>
+            </div>
+          </div>
+        </Show>
+
+        {/* Pause menu overlay */}
+        <Show when={paused() && (raceState() !== 'finished' || keepDriving())}>
+          <div id="pause-overlay">
+            <div class="pause-card">
+              <h1>Paused</h1>
+              <Show when={isMultiplayerMode()}>
+                <p class="pause-note">Game continues in multiplayer</p>
+              </Show>
+              <div class="pause-buttons">
+                <button class="course-btn" onClick={handleResume}>Resume</button>
                 <button class="course-btn finish-exit-btn" onClick={handleExitToMenu}>Exit to Menu</button>
               </div>
             </div>

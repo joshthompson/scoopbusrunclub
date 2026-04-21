@@ -10,153 +10,133 @@ import {
   MeshBuilder,
   StandardMaterial,
   Mesh,
-  KeyboardEventTypes,
-  Texture,
   VertexBuffer,
   VertexData,
   TransformNode,
   GroundMesh,
   ParticleSystem,
-  DynamicTexture,
   SceneLoader,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import arrowModelUrl from '../assets/models/arrow.glb?url';
 import { gpsToLocal, gpsPointToLocal } from '../api';
-import { Minimap, MinimapPlayer } from './Minimap';
+import { Minimap } from './Minimap';
 import { COURSE_OVERRIDES, buildCourseIndices } from '@shared/course-overrides';
 import levels from '../levels';
 import type { LevelData } from '../levels';
-import type { BusState } from '../multiplayer';
+import type { PlayerState } from '../multiplayer';
 import { MAX_PLAYERS } from '../multiplayer';
-import { createParkrunSign } from './objects/ParkrunSign';
-import { createWaterMesh, createWaterRibbon } from './objects/Water';
-import { createKmSign } from './objects/KmSign';
-import { createBusModel, BusModelResult, tintBusModel, PLAYER_COLORS } from './objects/BusModel';
-import { createCopperTent } from './objects/CopperTent';
-import { createHagaGate } from './objects/HagaGate';
-import { createMarshalModel, poseCheering, MarshalModelResult } from './objects/MarshalModel';
+import { createBusModel, tintBusModel, PLAYER_COLORS } from './objects/BusModel';
 import { createSky } from './objects/Sky';
 import { createPathGroundMaterial } from './PathShader';
+import { createRunnerModel, poseStanding } from './objects/RunnerModel';
+import type { RunnerModelResult } from './objects/RunnerModel';
 import {
-  createRunnerModel,
-  RunnerModelResult,
-  poseRunning,
-  poseFlailing,
-  poseSitting,
-  poseSittingAnimated,
-  poseStanding,
-} from './objects/RunnerModel';
-
-// ---------- Types ----------
-
-type GameMode = 'SCOOP_THEN_RUN' | 'SCOOP_THEN_RIDE';
-const MODE: GameMode = 'SCOOP_THEN_RIDE';
-
-type RaceState = 'countdown' | 'racing' | 'finished';
-
-interface GameCallbacks {
-  onScoopRunner: () => void;
-  onSpeedChange: (kmh: number) => void;
-  onDistanceChange: (metres: number) => void;
-  onAltitudeChange: (metres: number) => void;
-  onGatePass?: (gateIndex: number, totalGates: number) => void;
-  onCountdown?: (text: string) => void;
-  onRaceStateChange?: (state: RaceState) => void;
-  onRaceTimer?: (seconds: number) => void;
-  onCourseProgress?: (coveredKm: number, totalKm: number) => void;
-  onFinish?: (timeSeconds: number) => void;
-}
-
-interface Runner {
-  mesh: Mesh;
-  model: RunnerModelResult;
-  /** Index along path positions the runner is heading toward */
-  targetIdx: number;
-  /** Speed in m/s */
-  speed: number;
-  /** Runner state machine */
-  state: 'running' | 'launched' | 'landed' | 'sitting' | 'riding';
-  /** Velocity for launch physics */
-  velX: number;
-  velY: number;
-  velZ: number;
-  /** Timer for post-landing sit-down */
-  fadeTimer: number;
-  /** Animation phase accumulator */
-  animPhase: number;
-  /** Persistent lateral offset from path centre (-1 to 1, scaled by path width) */
-  lateralOffset: number;
-  /** Offset on bus roof when riding (local X/Z relative to bus centre) */
-  ridingOffsetX: number;
-  ridingOffsetZ: number;
-  /** Escape direction when bus is close: 0 = not escaping, -1/1 = left/right */
-  escapeDir: number;
-  /** Player index that scooped this runner (0 = nobody, localPlayerIndex = local bus) */
-  ownerPlayerIndex: number;
-  /** Original t-shirt colour for reconstructing rider models */
-  tshirtColor: Color3;
-}
-
-interface Marshal {
-  model: MarshalModelResult;
-  /** Animation phase accumulator */
-  animPhase: number;
-}
-
-// ---------- Constants ----------
-
-const PATH_HALF_WIDTH = 5; // 10 m wide path
-const COURSE_TARGET_LENGTH = 5000; // 5 km
-const BUS_MAX_SPEED = 12 * 3; // m/s (~43 km/h)
-const BUS_ACCELERATION = 12; // m/s²
-const BUS_BRAKE = 8; // m/s²
-const BUS_FRICTION = 10; // m/s² passive deceleration
-const COUNTDOWN_DURATION = 3.0; // seconds for 3-2-1 countdown
-const BUS_TURN_SPEED = 1.08; // rad/s (reduced 40% from 1.8)
-const BUS_TURN_SPEED_STANDSTILL = 0.4; // rad/s — slow turn when nearly stopped
-const RUNNER_COUNT = 30;
-const RUNNER_MIN_SPEED = 2.5; // m/s (~9 km/h)
-const RUNNER_MAX_SPEED = 4.5 * 2; // m/s (~16.2 km/h)
-const SCOOP_DISTANCE = 3.5; // metres — how close bus needs to be
-const RUNNER_ESCAPE_DISTANCE = 60; // metres — runners start dodging when bus is this close
-const RUNNER_ESCAPE_SPEED = 2.5; // m/s lateral dodge 
-const SCOOP_UP_FACTOR = 0.85; // upward launch = |busSpeed| × this factor
-const SCOOP_MIN_UP = 10; // m/s — minimum upward launch (scoop still provides lift)
-const SCOOP_FORWARD_FACTOR = 0.5; // forward launch = busSpeed × this factor (preserves direction)
-const SCOOP_ANIM_DURATION = 0.35; // seconds for scoop flick animation
-const SCOOP_BOOST_DURATION = 2; // seconds of speed boost after scooping a runner
-const SCOOP_BOOST_MULTIPLIER = 2; // max-speed multiplier during boost
-const RUNNER_SIT_DURATION = 5; // seconds sitting on ground before standing up
-const GRAVITY = 20; // m/s² for launched runners
-const BUS_GRAVITY = 4; // m/s² for bus when airborne
-const BUS_JUMP_PITCH_THRESHOLD = 0.04; // minimum pitch drop (rad) per frame to trigger jump
-const BUS_START_OFFSET = 15; // metres behind the start line
-const BUS_ROOF_Y = 2.85; // seated hip height on bus roof (roof surface 3.4 minus 0.55 hip offset)
-const GATE_SPACING = 100; // metres between each gate/checkpoint
-const GATE_RADIUS = 15; // metres — how close bus must be to trigger gate
-const TREE_COUNT = 1200; // total trees to place
-const TREE_SPREAD = 200; // metres from path — much closer for dense feel
-const TREE_MIN_DIST_FROM_PATH = 8; // metres — keep trees off the track
-const AUTO_DRIVE_SPEED = 10; // m/s — cruise speed after finishing (~36 km/h)
-const DRIFT_GRIP = 6; // higher = less drift; velocity angle converges toward heading
-const DRIFT_HIGH_SPEED_GRIP_FACTOR = 0.45; // grip reduction at max speed (0–1)
-const ELASTIC_SPRING_K = 12; // spring stiffness for elastic snap-back
-const ELASTIC_DAMPING = 4; // damping on elastic oscillation
-const ELASTIC_MAX_TILT = 0.55; // max tilt in radians (~31°)
-const ELASTIC_SPEED_PENALTY = 0.4; // multiply speed by this on elastic hit
-
-// ---------- Seeded PRNG (mulberry32) ----------
-
-function mulberry32(seed: number) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+  ALTITUDE_EXAGGERATION,
+  BUS_ACCELERATION,
+  BUS_BRAKE,
+  BUS_COLLISION_RADIUS,
+  BUS_DOWNHILL_ACCEL_BOOST,
+  BUS_DOWNHILL_SLOPE_THRESHOLD,
+  BUS_FRICTION,
+  BUS_GRAVITY,
+  BUS_JUMP_PITCH_THRESHOLD,
+  BUS_MAX_SPEED,
+  BUS_ROOF_Y,
+  BUS_START_OFFSET,
+  BUS_TURN_SPEED,
+  BUS_TURN_SPEED_STANDSTILL,
+  COUNTDOWN_DURATION,
+  COURSE_TARGET_LENGTH,
+  DRIFT_GRIP,
+  DRIFT_HIGH_SPEED_GRIP_FACTOR,
+  ELASTIC_SPEED_PENALTY,
+  GRAVITY,
+  MODE,
+  PATH_HALF_WIDTH,
+  PATH_MASK_RESOLUTION,
+  RUNNER_COLLISION_RADIUS,
+  RUNNER_DOWNHILL_SLOPE_THRESHOLD,
+  RUNNER_DOWNHILL_SPEED_BOOST,
+  RUNNER_PLAYER_ACCELERATION,
+  RUNNER_PLAYER_DECELERATION,
+  RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
+  RUNNER_PLAYER_MAX_JUMPS,
+  RUNNER_PLAYER_SPEED,
+  RUNNER_PLAYER_TURN_SPEED,
+  RUNNER_JUMP_HEIGHT,
+  RUNNER_SIT_DURATION,
+  SCOOP_ANIM_DURATION,
+  SCOOP_BOOST_DURATION,
+  SCOOP_BOOST_MULTIPLIER,
+  SCOOP_DISTANCE,
+  SCOOP_FORWARD_FACTOR,
+  SCOOP_MIN_UP,
+  SCOOP_UP_FACTOR,
+  START_CIRCLE_RADIUS,
+  WATER_BOB_AMPLITUDE,
+  WATER_BOB_SPEED,
+  WATER_DRIFT_GRIP,
+  WATER_SINK,
+} from './constants';
+import {
+  type BuildingCollider,
+  type BuildingFootprint,
+  type ElasticObject,
+  type GameCallbacks,
+  type InitSceneOptions,
+  type Marshal,
+  type RaceState,
+  type RemotePlayersMap,
+  type Runner,
+  type SolidObstacle,
+  type WaterZone,
+} from './types';
+import { buildMinimapPlayers } from './systems/minimap';
+import {
+  updateChaseCameraSystem,
+  updateCountdownCameraSystem,
+  updateDemoCameraSystem,
+  updateRunnerCameraSystem,
+} from './systems/camera';
+import { updateRemotePlayersSystem } from './systems/remotePlayers';
+import {
+  computeTerrainHeight,
+  computeWaterZones,
+  buildWaterMeshes,
+  computeRoadPolylines,
+  computeBuildingFootprintData,
+  isInWaterZone,
+  getWaterSurfaceYAt,
+  getWaterDepressionAt,
+} from './systems/terrain';
+import { buildBuildingMeshes, resolvePositionAgainstBuildings } from './systems/buildings';
+import {
+  createExhaustFlames,
+  createExhaustFlamesForBus,
+  createWaterWake,
+  setWaterWakeActive,
+  updateWakeIntensity,
+} from './systems/busEffects';
+import {
+  spawnRunners as spawnRunnersSystem,
+  updateRunnersSystem,
+  buildLocalRunner as buildLocalRunnerFn,
+  updateLocalRunnerVisual as updateLocalRunnerVisualFn,
+  packRemoteRiders,
+} from './systems/runners';
+import {
+  buildTrees,
+  placeKmSigns,
+  buildGates as buildGatesSystem,
+  checkGatePass,
+  spawnMarshals as spawnMarshalsSystem,
+  updateMarshals,
+  placeEventLandmarks as placeEventLandmarksSystem,
+  buildStartLineObjects,
+  updateElasticObjects,
+  type GatePosition,
+} from './systems/environment';
 
 // ---------- Game class ----------
 
@@ -186,6 +166,7 @@ export class Game {
   private busAirborne = false; // true while bus is above ground
   private elasticPenaltyActive = false; // true while bus overlaps an elastic object (prevents re-applying penalty)
   private prevSlopePitch = 0; // previous frame's terrain pitch for detecting crests
+  private waterBobPhase = 0; // accumulator for water surface bobbing
   private cameraYawOffset = 0; // smoothed yaw offset for reverse camera (0 = forward, π = reverse)
   private busMesh: TransformNode | null = null;
   private scoopPivot: TransformNode | null = null;
@@ -194,6 +175,8 @@ export class Game {
   private scoopAnimTimer = 0; // >0 while scoop is animating
   private boostTimer = 0; // >0 while scoop speed-boost is active
   private exhaustFlames: ParticleSystem | null = null; // flame particles from exhaust
+  private waterWake: ParticleSystem[] = []; // wake/ripple spray when driving through water
+  private waterWakeActive = false; // whether wake is currently emitting
   private distanceTravelled = 0;
 
   // Input
@@ -213,71 +196,150 @@ export class Game {
   private marshals: Marshal[] = [];
 
   /** Scoop events queued this frame to broadcast to peers */
-  private pendingScoopEvents: { runnerIndex: number; playerIndex: number }[] = [];
+  private pendingScoopEvents: {
+    runnerIndex: number;
+    playerIndex: number;
+    victimPlayerIndex?: number;
+    scooperYaw?: number;
+    scooperSpeed?: number;
+  }[] = [];
+  private playerScoopCooldownUntil = new Map<number, number>();
 
   // Water zones (local XZ polygons + Y level) — set before buildGround
-  private waterZones: { points: [number, number][]; y: number }[] = [];
+  private waterZones: WaterZone[] = [];
+  private roadPolylines: [number, number][][] = [];
+  private buildingFootprints: BuildingFootprint[] = [];
+  private buildingColliders: BuildingCollider[] = [];
 
   // Ground mesh — stored for accurate height queries via getHeightAtCoordinates
   private groundMesh: GroundMesh | null = null;
 
+  // Start circle — cleared zone behind start line (no trees, rendered as path)
+  private startCircleCenter: { x: number; z: number } | null = null;
+
   // Solid obstacles — circle colliders {x, z, radius}
   // Isolated so it's easy to swap for a physics engine later.
-  private solidObstacles: { x: number; z: number; radius: number; elasticIndex?: number }[] = [];
+  private solidObstacles: SolidObstacle[] = [];
 
   // Elastic objects — anything that tilts on collision and springs back (trees, signs, marshals)
-  private elasticObjects: {
-    root: TransformNode;
-    tiltX: number;
-    tiltZ: number;
-    tiltVelX: number;
-    tiltVelZ: number;
-  }[] = [];
+  private elasticObjects: ElasticObject[] = [];
 
   // ---------- Remote players (multiplayer, up to MAX_PLAYERS-1 opponents) ----------
-  private remotePlayers = new Map<string, {
-    mesh: TransformNode;
-    state: BusState | null;
-    smoothPos: Vector3;
-    smoothYaw: number;
-    smoothPitch: number;
-    playerIndex: number;
-    exhaustFlames: ParticleSystem | null;
-    riderModels: RunnerModelResult[];
-    riderAnchors: Mesh[];
-  }>();
+  private remotePlayers: RemotePlayersMap = new Map();
 
   /** This client's player index (1=host/yellow, 2=red, 3=blue, 4=purple) */
   private localPlayerIndex = 1;
 
   // Gate/checkpoint system (100 m sections)
-  private gatePositions: { x: number; z: number; y: number; pathDist: number; yaw: number }[] = [];
+  private gatePositions: GatePosition[] = [];
   private currentGateIdx = 0;
 
   // Race state
   private raceState: RaceState = 'countdown';
   private countdownTimer = 0; // seconds remaining in countdown phase
   private raceTimer = 0; // seconds elapsed while racing
+  private finishedTimer = 0; // seconds since race ended (for coast+stop)
+  private keepDrivingMode = false; // true when player chooses "Keep Driving"
 
   // 3D direction arrow (HUD compass)
   private directionArrowRoot: TransformNode | null = null;
   /** Node that receives the Y rotation (pivot sits at model centre) */
   private directionArrowRotNode: TransformNode | null = null;
+  /** Smoothed relative angle applied to the arrow (avoids snapping on gate change) */
+  private arrowDisplayAngle = 0;
 
   // Minimap
   private minimap: Minimap | null = null;
+
+  // Pause state
+  private paused = false;
 
   // Demo mode (title screen background)
   private demoMode = false;
   private demoCamProgress = 0; // 0→1 along the path
   private resizeHandler: (() => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement, callbacks: GameCallbacks, minimapCanvas?: HTMLCanvasElement) {
+  // Local player role
+  private localPlayerRole: 'bus' | 'runner' = 'bus';
+  private localRunnerModel: RunnerModelResult | null = null;
+  private localRunnerAnimPhase = 0;
+  private runnerJumpSideVel = 0;
+  private runnerJumpsUsed = 0;
+  private jumpHeldLastFrame = false;
+  private localRunnerScoopState: 'free' | 'launched' | 'sitting' = 'free';
+  private localRunnerScoopVelX = 0;
+  private localRunnerScoopVelY = 0;
+  private localRunnerScoopVelZ = 0;
+  private localRunnerScoopSitTimer = 0;
+
+  constructor(
+    canvas: HTMLCanvasElement,
+    callbacks: GameCallbacks,
+    minimapCanvas?: HTMLCanvasElement,
+    options?: { localPlayerRole?: 'bus' | 'runner' },
+  ) {
     this.canvas = canvas;
     this.callbacks = callbacks;
+    this.localPlayerRole = options?.localPlayerRole ?? 'bus';
     if (minimapCanvas) {
       this.minimap = new Minimap(minimapCanvas);
     }
+  }
+
+  // ---------- Pause / Resume ----------
+
+  setPaused(p: boolean) { this.paused = p; }
+  isPaused() { return this.paused; }
+
+  // ---------- Keep Driving (post-finish free roam) ----------
+
+  /** Allow the player to resume driving after finishing the race. */
+  setKeepDriving() {
+    this.keepDrivingMode = true;
+  }
+
+  // ---------- Race position ----------
+
+  /**
+   * Compute the local player's race position (1st, 2nd, ...) based on
+   * gate progress and distance travelled, relative to remote players.
+   * Returns { position, total } where total includes the local player.
+   */
+  getRacePosition(): { position: number; total: number } {
+    const remotes = this.remotePlayers;
+    const localDist = this.distanceTravelled;
+    const localGate = this.currentGateIdx;
+    const localFinished = this.raceState === 'finished';
+
+    let ahead = 0; // count of players ahead of local
+    let total = 1; // start counting local player
+
+    for (const [, rp] of remotes) {
+      if (!rp.state) continue;
+      total++;
+      const rs = rp.state;
+      const remoteFinished = rs.raceState === 'finished';
+      const remoteGate = rs.gateIdx ?? 0;
+
+      // Finished players are ahead of non-finished players
+      if (remoteFinished && !localFinished) {
+        ahead++;
+      } else if (!remoteFinished && localFinished) {
+        // local is ahead
+      } else if (remoteFinished && localFinished) {
+        // Both finished — earlier finish time wins
+        if (rs.raceTime < this.raceTimer) ahead++;
+      } else {
+        // Both racing — compare gate progress, then distance
+        if (remoteGate > localGate) {
+          ahead++;
+        } else if (remoteGate === localGate && rs.dist > localDist) {
+          ahead++;
+        }
+      }
+    }
+
+    return { position: ahead + 1, total };
   }
 
   // ---------- Dispose ----------
@@ -299,7 +361,7 @@ export class Game {
     this.localPlayerIndex = idx;
   }
 
-  /** Build a remote bus mesh for a specific peer with the given player index. */
+  /** Build a remote player visuals (bus + runner) for a specific peer with the given player index. */
   async buildRemoteBusForPeer(peerId: string, playerIndex: number) {
     if (!this.scene) return;
     // Don't rebuild if already exists
@@ -308,15 +370,25 @@ export class Game {
     const result = await createBusModel(this.scene);
     const palette = PLAYER_COLORS[playerIndex - 1] ?? PLAYER_COLORS[1];
     tintBusModel(result.root, palette, `p${playerIndex}`);
+    const runnerModel = createRunnerModel(this.scene, 200000 + playerIndex, palette.body);
 
     // Create exhaust flames for this remote bus (starts stopped)
-    const flames = this.createExhaustFlamesForBus(result.root);
+    const flames = createExhaustFlamesForBus(this.scene, result.root);
 
     // Start hidden until we receive first state
     result.root.setEnabled(false);
+    runnerModel.root.setEnabled(false);
+    poseStanding(runnerModel);
+
+    // Store scoop pivot rest position for animation
+    const scoopPivot = result.scoopPivot;
+    (scoopPivot as any).__restY = scoopPivot.position.y;
+    (scoopPivot as any).__restZ = scoopPivot.position.z;
 
     this.remotePlayers.set(peerId, {
       mesh: result.root,
+      scoopPivot,
+      scoopAnimTimer: 0,
       state: null,
       smoothPos: new Vector3(0, 0, 0),
       smoothYaw: 0,
@@ -325,6 +397,8 @@ export class Game {
       exhaustFlames: flames,
       riderModels: [],
       riderAnchors: [],
+      runnerModel,
+      runnerAnimPhase: 0,
     });
   }
 
@@ -334,20 +408,19 @@ export class Game {
     if (remote) {
       remote.exhaustFlames?.dispose();
       for (const anchor of remote.riderAnchors) anchor.dispose();
+      for (const rider of remote.riderModels) rider.root.dispose();
+      remote.runnerModel?.root.dispose();
       remote.mesh.dispose();
       this.remotePlayers.delete(peerId);
     }
   }
 
   /** Feed incoming remote bus state from the network layer. */
-  updateRemoteState(state: BusState, peerId: string) {
+  updateRemoteState(state: PlayerState, peerId: string) {
     const remote = this.remotePlayers.get(peerId);
     if (!remote) return;
     const isFirstState = remote.state === null;
     remote.state = state;
-    if (!remote.mesh.isEnabled()) {
-      remote.mesh.setEnabled(true);
-    }
     // Snap position on first state so the bus doesn't lerp from (0,0,0)
     if (isFirstState) {
       remote.smoothPos.set(state.x, state.y, state.z);
@@ -356,8 +429,8 @@ export class Game {
     }
   }
 
-  /** Get local bus state to broadcast. */
-  getLocalBusState(): BusState {
+  /** Get local player state to broadcast. */
+  getLocalPlayerState(): PlayerState {
     return {
       x: this.busPos.x,
       y: this.busPos.y,
@@ -371,7 +444,187 @@ export class Game {
       raceTime: this.raceTimer,
       playerIndex: this.localPlayerIndex,
       boosting: this.boostTimer > 0,
+      gateIdx: this.currentGateIdx,
+      role: this.localPlayerRole,
+      scooping: this.scoopAnimTimer > 0,
     };
+  }
+
+  /** @deprecated Use getLocalPlayerState */
+  getLocalBusState(): PlayerState {
+    return this.getLocalPlayerState();
+  }
+
+  private getRoleForPlayerIndex(playerIndex: number, state?: PlayerState): 'bus' | 'runner' {
+    return state?.role ?? (playerIndex === 1 ? 'bus' : 'runner');
+  }
+
+  private getPlayerPoseByIndex(playerIndex: number): { x: number; y: number; z: number; yaw: number; speed: number } | null {
+    if (playerIndex === this.localPlayerIndex) {
+      return {
+        x: this.busPos.x,
+        y: this.busPos.y,
+        z: this.busPos.z,
+        yaw: this.busYaw,
+        speed: this.busSpeed,
+      };
+    }
+    for (const [_peerId, remote] of this.remotePlayers) {
+      if (remote.playerIndex === playerIndex && remote.state) {
+        return {
+          x: remote.state.x,
+          y: remote.state.y,
+          z: remote.state.z,
+          yaw: remote.state.yaw,
+          speed: remote.state.speed,
+        };
+      }
+    }
+    return null;
+  }
+
+  private beginLocalRunnerScoop(_scooperPlayerIndex: number, scooperPose: { yaw: number; speed: number }) {
+    this.localRunnerScoopState = 'launched';
+    this.busAirborne = false;
+    this.runnerJumpsUsed = 0;
+    this.runnerJumpSideVel = 0;
+    this.jumpHeldLastFrame = false;
+
+    const speed = scooperPose.speed;
+    const absSpeed = Math.abs(speed);
+    const fwdX = Math.sin(scooperPose.yaw);
+    const fwdZ = Math.cos(scooperPose.yaw);
+    this.localRunnerScoopVelX = fwdX * speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
+    this.localRunnerScoopVelY = Math.max(SCOOP_MIN_UP, absSpeed * SCOOP_UP_FACTOR) + Math.random() * 3;
+    this.localRunnerScoopVelZ = fwdZ * speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
+    this.localRunnerAnimPhase = 0;
+    this.localRunnerScoopSitTimer = 0;
+  }
+
+  private tryScoopRemoteRunnerPlayersByLocalBus() {
+    if (this.localPlayerRole !== 'bus') return;
+    if (Math.abs(this.busSpeed) <= 0.5) return;
+    const nowSec = performance.now() / 1000;
+
+    for (const [_peerId, remote] of this.remotePlayers) {
+      if (!remote.state) continue;
+      if (this.getRoleForPlayerIndex(remote.playerIndex, remote.state) !== 'runner') continue;
+      if (this.playerScoopCooldownUntil.get(remote.playerIndex) && nowSec < (this.playerScoopCooldownUntil.get(remote.playerIndex) ?? 0)) continue;
+
+      const dx = remote.state.x - this.busPos.x;
+      const dz = remote.state.z - this.busPos.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > SCOOP_DISTANCE * SCOOP_DISTANCE) continue;
+
+      this.playerScoopCooldownUntil.set(remote.playerIndex, nowSec + 2.5);
+      this.pendingScoopEvents.push({
+        runnerIndex: -1,
+        playerIndex: this.localPlayerIndex,
+        victimPlayerIndex: remote.playerIndex,
+        scooperYaw: this.busYaw,
+        scooperSpeed: this.busSpeed,
+      });
+    }
+  }
+
+  private updateLocalRunnerScooped(dt: number) {
+    if (this.localRunnerScoopState === 'launched') {
+      this.localRunnerScoopVelY -= GRAVITY * dt;
+      this.busPos.x += this.localRunnerScoopVelX * dt;
+      this.busPos.y += this.localRunnerScoopVelY * dt;
+      this.busPos.z += this.localRunnerScoopVelZ * dt;
+      this.busSpeed = Math.sqrt(
+        this.localRunnerScoopVelX * this.localRunnerScoopVelX
+        + this.localRunnerScoopVelZ * this.localRunnerScoopVelZ,
+      );
+
+      // Check collision with elastic objects (bouncing)
+      for (const obs of this.solidObstacles) {
+        const dx = obs.x - this.busPos.x;
+        const dz = obs.z - this.busPos.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        const minDist = obs.radius + 0.5; // runner collision radius
+        if (dist < minDist) {
+          const nx = dx / dist;
+          const nz = dz / dist;
+          if (obs.elasticIndex != null) {
+            // Elastic collision: bounce player back and tilt the object
+            const elastic = this.elasticObjects[obs.elasticIndex];
+            if (elastic) {
+              const pushStrength = Math.abs(this.busSpeed) * 0.15;
+              elastic.tiltVelX += -nx * pushStrength;
+              elastic.tiltVelZ += -nz * pushStrength;
+            }
+            // Bounce player away
+            const bounceStrength = 15;
+            this.localRunnerScoopVelX = nx * bounceStrength;
+            this.localRunnerScoopVelZ = nz * bounceStrength;
+            this.busPos.x += nx * (minDist - dist);
+            this.busPos.z += nz * (minDist - dist);
+          }
+        }
+      }
+
+      if (this.resolvePositionAgainstBuildingsLocal(this.busPos, RUNNER_COLLISION_RADIUS)) {
+        const bounceStrength = 12;
+        const horizontalSpeed = Math.sqrt(
+          this.localRunnerScoopVelX * this.localRunnerScoopVelX
+          + this.localRunnerScoopVelZ * this.localRunnerScoopVelZ,
+        );
+        if (horizontalSpeed > 0.001) {
+          this.localRunnerScoopVelX *= -bounceStrength / horizontalSpeed;
+          this.localRunnerScoopVelZ *= -bounceStrength / horizontalSpeed;
+        } else {
+          this.localRunnerScoopVelX = 0;
+          this.localRunnerScoopVelZ = 0;
+        }
+      }
+
+      // Check collision with other players (inter-player elasticity)
+      for (const [_peerId, remote] of this.remotePlayers) {
+        if (!remote.state) continue;
+        const dx = remote.smoothPos.x - this.busPos.x;
+        const dz = remote.smoothPos.z - this.busPos.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        const minDist = BUS_COLLISION_RADIUS + 0.5; // approximate runner size
+        if (dist < minDist && dist > 0.001) {
+          const nx = dx / dist;
+          const nz = dz / dist;
+          // Bounce player away elastically
+          const bounceStrength = 12;
+          this.localRunnerScoopVelX = nx * bounceStrength;
+          this.localRunnerScoopVelZ = nz * bounceStrength;
+          this.busPos.x += nx * (minDist - dist);
+          this.busPos.z += nz * (minDist - dist);
+        }
+      }
+
+      const groundY = this.getGroundY(this.busPos.x, this.busPos.z);
+      if (this.busPos.y <= groundY && this.localRunnerScoopVelY < 0) {
+        this.busPos.y = groundY;
+        this.localRunnerScoopVelX = 0;
+        this.localRunnerScoopVelY = 0;
+        this.localRunnerScoopVelZ = 0;
+        this.busSpeed = 0;
+        this.localRunnerScoopState = 'sitting';
+        this.localRunnerScoopSitTimer = RUNNER_SIT_DURATION;
+      }
+      if (Math.abs(this.localRunnerScoopVelX) > 0.001 || Math.abs(this.localRunnerScoopVelZ) > 0.001) {
+        this.busYaw = Math.atan2(this.localRunnerScoopVelX, this.localRunnerScoopVelZ);
+      }
+      this.distanceTravelled += Math.max(0, this.busSpeed) * dt;
+      return;
+    }
+
+    if (this.localRunnerScoopState === 'sitting') {
+      this.busSpeed = 0;
+      this.busPos.y = this.getGroundY(this.busPos.x, this.busPos.z);
+      this.localRunnerScoopSitTimer -= dt;
+      if (this.localRunnerScoopSitTimer <= 0) {
+        this.localRunnerScoopState = 'free';
+        this.localRunnerScoopSitTimer = 0;
+      }
+    }
   }
 
   // ---------- Demo mode (title screen background) ----------
@@ -389,7 +642,7 @@ export class Game {
 
   private async initScene(
     eventId: string,
-    opts: { skipBus: boolean; skipRunners: boolean; skipInput: boolean },
+    opts: InitSceneOptions,
   ) {
     // Load pre-fetched level data (no runtime API calls)
     const level: LevelData | undefined = levels[eventId];
@@ -412,11 +665,13 @@ export class Game {
 
     // Water features come pre-fetched from the level file
     const waterFeatures = level.water;
+    const roadFeatures = level.roads ?? [];
+    const buildingFeatures = level.buildings ?? [];
 
     const { positions, heights, totalDistance } = gpsToLocal(orderedCoords, elevations);
 
     this.scaleFactor = totalDistance > 0 ? COURSE_TARGET_LENGTH / totalDistance : 1;
-    this.elevationScale = this.scaleFactor * 1; // 1:1 with horizontal scale (real proportions)
+    this.elevationScale = this.scaleFactor * ALTITUDE_EXAGGERATION;
     this.originCoord = course.coordinates[0];
     this.pathPositions = positions.map(([x, z]) => [
       x * this.scaleFactor,
@@ -454,10 +709,15 @@ export class Game {
     sun.intensity = 0.8;
 
     // Build world — water zones must be computed before ground so terrain dips
-    this.computeWaterZones(waterFeatures, course.coordinates[0]);
+    this.waterZones = computeWaterZones(waterFeatures, course.coordinates[0], this.scaleFactor, (x, z) => this.getTerrainHeight(x, z));
+    this.roadPolylines = computeRoadPolylines(roadFeatures, course.coordinates[0], this.scaleFactor);
+    this.buildingFootprints = computeBuildingFootprintData(buildingFeatures, course.coordinates[0], this.scaleFactor);
     this.buildGround();
-    this.buildWaterMeshes();
-    this.buildTrees();
+    buildWaterMeshes(this.scene, this.waterZones);
+    this.buildingColliders = buildBuildingMeshes(this.scene, this.buildingFootprints, (x, z) => this.getGroundY(x, z));
+    const treeResult = buildTrees(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z), this.waterZones, this.startCircleCenter);
+    this.elasticObjects.push(...treeResult.elasticObjects);
+    this.solidObstacles.push(...treeResult.solidObstacles);
 
     // Procedural sky + clouds
     createSky(this.scene);
@@ -465,11 +725,20 @@ export class Game {
     if (!opts.skipBus) {
       await this.buildBus();
     }
-    if (!opts.skipRunners) {
-      this.spawnRunners();
+    if (!this.demoMode && this.localPlayerRole === 'runner') {
+      this.localRunnerModel = buildLocalRunnerFn(this.scene, this.localPlayerIndex, this.busPos, this.busYaw);
+      if (this.busMesh) {
+        this.busMesh.setEnabled(false);
+      }
     }
-    this.placeKmSigns();
-    this.buildGates();
+    if (!opts.skipRunners) {
+      this.runners = spawnRunnersSystem(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z));
+    }
+    const kmResult = placeKmSigns(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z));
+    this.elasticObjects.push(...kmResult.elasticObjects);
+    this.solidObstacles.push(...kmResult.solidObstacles);
+    this.gatePositions = buildGatesSystem(this.pathPositions, this.pathCumDist, (x, z) => this.getGroundY(x, z));
+    this.currentGateIdx = 0;
 
     // Place sign & position bus behind start line
     if (this.pathPositions.length > 1) {
@@ -477,50 +746,46 @@ export class Game {
       const [nx, nz] = this.pathPositions[1];
       const yaw = Math.atan2(nx - sx, nz - sz);
 
-      // Parkrun sign — to the right of the path, just after the start
+      // Start line objects (parkrun sign + marshal)
+      const startLineResult = buildStartLineObjects(this.scene, this.pathPositions, eventId, (x, z) => this.getGroundY(x, z));
+      this.elasticObjects.push(...startLineResult.elasticObjects);
+      this.solidObstacles.push(...startLineResult.solidObstacles);
+      this.marshals.push(...startLineResult.marshals);
+
+      // Player starts behind the start line, fanned outward by player index
       const forwardX = Math.sin(yaw);
       const forwardZ = Math.cos(yaw);
-      const rightX = Math.cos(yaw);   // perpendicular right
+      const rightX = Math.cos(yaw);
       const rightZ = -Math.sin(yaw);
-      const signX = sx + forwardX * 3 + rightX * (PATH_HALF_WIDTH + 1.5);
-      const signZ = sz + forwardZ * 3 + rightZ * (PATH_HALF_WIDTH + 1.5);
-      const signH = this.getGroundY(signX, signZ);
-      const displayName = eventId.charAt(0).toUpperCase() + eventId.slice(1);
-      const parkrunSignRoot = createParkrunSign(this.scene, signX, signZ, yaw, displayName, signH);
-      // Wrap in elastic pivot at base for tilt physics
-      const parkrunPivot = new TransformNode('parkrunSignPivot', this.scene);
-      parkrunPivot.position.set(signX, signH, signZ);
-      parkrunSignRoot.parent = parkrunPivot;
-      parkrunSignRoot.position.set(0, 0, 0);
-      const parkrunElasticIdx = this.elasticObjects.length;
-      this.elasticObjects.push({ root: parkrunPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
-      this.solidObstacles.push({ x: signX, z: signZ, radius: 1.5, elasticIndex: parkrunElasticIdx });
-
-      if (!opts.skipBus) {
-        // Bus starts behind the start line, fanned outward by player index
-        const lateralSpacing = 4; // metres between each player's lane
-        const totalPlayers = MAX_PLAYERS;
-        // Centre the fan: player indices 1..N get offsets centred around 0
-        const laneOffset = (this.localPlayerIndex - 1) - (totalPlayers - 1) / 2;
-        this.busPos.x = sx - forwardX * BUS_START_OFFSET + rightX * laneOffset * lateralSpacing;
-        this.busPos.z = sz - forwardZ * BUS_START_OFFSET + rightZ * laneOffset * lateralSpacing;
-        const startH = this.getGroundY(this.busPos.x, this.busPos.z);
-        this.busPos.y = startH;
-        this.busYaw = yaw;
-        this.busVelAngle = yaw;
-      }
+      const lateralSpacing = 4; // metres between each player's lane
+      const totalPlayers = MAX_PLAYERS;
+      // Centre the fan: player indices 1..N get offsets centred around 0
+      const laneOffset = (this.localPlayerIndex - 1) - (totalPlayers - 1) / 2;
+      this.busPos.x = sx - forwardX * BUS_START_OFFSET + rightX * laneOffset * lateralSpacing;
+      this.busPos.z = sz - forwardZ * BUS_START_OFFSET + rightZ * laneOffset * lateralSpacing;
+      const startH = this.getGroundY(this.busPos.x, this.busPos.z);
+      this.busPos.y = startH;
+      this.busYaw = yaw;
+      this.busVelAngle = yaw;
     }
 
     // --- Marshals ---
-    this.spawnMarshals(level);
+    const marshalResult = spawnMarshalsSystem(this.scene, level, this.pathPositions, this.originCoord, this.scaleFactor, (x, z) => this.getGroundY(x, z));
+    this.marshals.push(...marshalResult.marshals);
+    this.elasticObjects.push(...marshalResult.elasticObjects);
+    this.solidObstacles.push(...marshalResult.solidObstacles);
 
     // --- Event-specific landmarks ---
-    this.placeEventLandmarks(eventId);
+    const landmarkResult = placeEventLandmarksSystem(this.scene, eventId, this.originCoord, this.scaleFactor, (x, z) => this.getGroundY(x, z));
+    this.solidObstacles.push(...landmarkResult.solidObstacles);
+    this.buildingFootprints.push(...landmarkResult.buildingFootprints);
 
-    // Give minimap the path data + water zones
+    // Give minimap the map feature data
     if (this.minimap) {
       this.minimap.setPath(this.pathPositions);
       this.minimap.setWaterZones(this.waterZones);
+      this.minimap.setRoads(this.roadPolylines);
+      this.minimap.setBuildings(this.buildingFootprints);
     }
 
     if (!opts.skipBus) {
@@ -536,6 +801,8 @@ export class Game {
       this.raceState = 'countdown';
       this.countdownTimer = COUNTDOWN_DURATION;
       this.raceTimer = 0;
+      this.finishedTimer = 0;
+      this.keepDrivingMode = false;
       this.callbacks.onCountdown?.('3');
       this.callbacks.onRaceStateChange?.('countdown');
 
@@ -549,7 +816,7 @@ export class Game {
         Math.max(groundY, this.busPos.y) + camHeight,
         this.busPos.z + frontDir.z * camDist,
       );
-      this.camera.setTarget(new Vector3(this.busPos.x, this.busPos.y + 2.5, this.busPos.z));
+      this.camera.setTarget(new Vector3(this.busPos.x, this.busPos.y + (this.localPlayerRole === 'runner' ? 1.4 : 2.5), this.busPos.z));
     }
 
     // Position demo camera at start of path
@@ -599,13 +866,28 @@ export class Game {
         }
       : undefined;
 
+    // Start circle: a cleared dirt area behind the start line where buses spawn
+    let startCircleInfo: { x: number; z: number; radius: number } | undefined;
+    if (this.pathPositions.length > 1) {
+      const [sx, sz] = this.pathPositions[0];
+      const [nx, nz] = this.pathPositions[1];
+      const yaw = Math.atan2(nx - sx, nz - sz);
+      const cx = sx - Math.sin(yaw) * BUS_START_OFFSET;
+      const cz = sz - Math.cos(yaw) * BUS_START_OFFSET;
+      startCircleInfo = { x: cx, z: cz, radius: START_CIRCLE_RADIUS };
+      this.startCircleCenter = { x: cx, z: cz };
+    }
+
     ground.material = createPathGroundMaterial(this.scene, {
       pathPositions: this.pathPositions,
+      roads: this.roadPolylines,
       groundSize: 6000,
       pathHalfWidth: PATH_HALF_WIDTH,
+      roadHalfWidth: PATH_HALF_WIDTH * 1.4,
       edgeSoftness: 1.5,
-      maskResolution: 4096,
+      maskResolution: PATH_MASK_RESOLUTION,
       startLine: startLineInfo,
+      startCircle: startCircleInfo,
     });
 
     // Apply terrain heights to ground vertices so the ground undulates
@@ -617,7 +899,7 @@ export class Game {
         let h = this.getTerrainHeight(x, z) - 0.08;
 
         // Depress terrain inside / near water zones
-        const waterInfo = this.getWaterDepression(x, z);
+        const waterInfo = getWaterDepressionAt(x, z, this.waterZones, (wx, wz) => this.getTerrainHeight(wx, wz));
         if (waterInfo !== null) {
           h = waterInfo;
         }
@@ -650,457 +932,28 @@ export class Game {
     if (this.groundMesh) {
       return this.groundMesh.getHeightAtCoordinates(x, z);
     }
-    return this.getTerrainHeight(x, z);
+    return computeTerrainHeight(x, z, this.pathPositions, this.pathHeights);
   }
 
-  // ---------- Trees ----------
-
-  /**
-   * Scatter trees across the landscape using a seeded RNG.
-   * Trees avoid the path and come in two variants (trunk + foliage).
-   */
-  private buildTrees() {
-    if (this.pathPositions.length < 2) return;
-
-    const rand = mulberry32(42); // fixed seed → deterministic layout
-
-    // Shared materials
-    const trunkMat = new StandardMaterial('trunkMat', this.scene);
-    trunkMat.diffuseColor = new Color3(0.4, 0.26, 0.13);
-    trunkMat.specularColor = Color3.Black();
-
-    const foliageMats = [
-      this.makeColor('foliage0', new Color3(0.18, 0.52, 0.15)),
-      this.makeColor('foliage1', new Color3(0.22, 0.58, 0.18)),
-      this.makeColor('foliage2', new Color3(0.15, 0.45, 0.12)),
-    ];
-
-    let placed = 0;
-    let attempts = 0;
-
-    while (placed < TREE_COUNT && attempts < TREE_COUNT * 5) {
-      attempts++;
-
-      // Pick a random point along the path, then offset perpendicular to it
-      const pathIdx = Math.floor(rand() * this.pathPositions.length);
-      const [cx, cz] = this.pathPositions[pathIdx];
-
-      // Random distance from path: between TREE_MIN_DIST and TREE_SPREAD
-      const dist = TREE_MIN_DIST_FROM_PATH + rand() * (TREE_SPREAD - TREE_MIN_DIST_FROM_PATH);
-      const angle = rand() * Math.PI * 2;
-      const x = cx + Math.cos(angle) * dist;
-      const z = cz + Math.sin(angle) * dist;
-
-      // Reject if too close to any path segment (catches corners / overlaps)
-      if (this.distToPath(x, z) < TREE_MIN_DIST_FROM_PATH) continue;
-
-      // Reject if inside a water zone
-      if (this.isInWater(x, z)) continue;
-
-      const groundY = this.getGroundY(x, z);
-      const variant = rand();
-      const scale = 0.7 + rand() * 0.8; // 0.7 – 1.5
-
-      // Create a pivot at the tree base for tilt animation
-      const treeRoot = new TransformNode(`tree_root_${placed}`, this.scene);
-      treeRoot.position.set(x, groundY, z);
-
-      if (variant < 0.5) {
-        // -- Conifer (cylinder trunk + cone top) --
-        const trunk = MeshBuilder.CreateCylinder(
-          `tree_t_${placed}`,
-          { height: 2.5 * scale, diameterTop: 0.25 * scale, diameterBottom: 0.35 * scale, tessellation: 6 },
-          this.scene,
-        );
-        trunk.position.set(0, 1.25 * scale, 0);
-        trunk.material = trunkMat;
-        trunk.parent = treeRoot;
-
-        const crown = MeshBuilder.CreateCylinder(
-          `tree_c_${placed}`,
-          { height: 4 * scale, diameterTop: 0, diameterBottom: 2.8 * scale, tessellation: 6 },
-          this.scene,
-        );
-        crown.position.set(0, 3.5 * scale, 0);
-        crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
-        crown.parent = treeRoot;
-      } else {
-        // -- Broad-leaf (cylinder trunk + sphere top) --
-        const trunk = MeshBuilder.CreateCylinder(
-          `tree_t_${placed}`,
-          { height: 2 * scale, diameterTop: 0.3 * scale, diameterBottom: 0.4 * scale, tessellation: 6 },
-          this.scene,
-        );
-        trunk.position.set(0, 1 * scale, 0);
-        trunk.material = trunkMat;
-        trunk.parent = treeRoot;
-
-        const crown = MeshBuilder.CreateSphere(
-          `tree_c_${placed}`,
-          { diameter: 3 * scale, segments: 6 },
-          this.scene,
-        );
-        crown.position.set(0, 3.2 * scale, 0);
-        crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
-        crown.parent = treeRoot;
-      }
-
-      // Register tree as elastic object for tilt physics
-      const elasticIndex = this.elasticObjects.length;
-      this.elasticObjects.push({
-        root: treeRoot,
-        tiltX: 0,
-        tiltZ: 0,
-        tiltVelX: 0,
-        tiltVelZ: 0,
-      });
-
-      // Register tree as solid obstacle (trunk radius ≈ 0.4 * scale)
-      this.solidObstacles.push({ x, z, radius: 0.5 * scale, elasticIndex });
-
-      placed++;
-    }
-  }
-
-  /** Shortest distance from point (x,z) to the path polyline. */
-  private distToPath(x: number, z: number): number {
-    let minDist = Infinity;
-    for (let i = 0; i < this.pathPositions.length - 1; i++) {
-      const [ax, az] = this.pathPositions[i];
-      const [bx, bz] = this.pathPositions[i + 1];
-      const dx = bx - ax;
-      const dz = bz - az;
-      const lenSq = dx * dx + dz * dz;
-      let t = lenSq > 0 ? ((x - ax) * dx + (z - az) * dz) / lenSq : 0;
-      t = Math.max(0, Math.min(1, t));
-      const px = ax + t * dx;
-      const pz = az + t * dz;
-      const dist = Math.sqrt((x - px) ** 2 + (z - pz) ** 2);
-      if (dist < minDist) minDist = dist;
-    }
-    return minDist;
-  }
-
-  private makeColor(name: string, color: Color3): StandardMaterial {
-    const mat = new StandardMaterial(name, this.scene);
-    mat.diffuseColor = color;
-    mat.specularColor = Color3.Black();
-    return mat;
-  }
-
-  // ---------- Terrain height lookup ----------
-
-  /**
-   * Catmull-Rom interpolation helper. Returns value at t in [0,1] given
-   * four control-point values p0..p3.
-   */
-  private static catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): number {
-    const t2 = t * t;
-    const t3 = t2 * t;
-    return (
-      0.5 *
-      (2 * p1 +
-        (-p0 + p2) * t +
-        (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-        (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
-    );
-  }
-
-  /**
-   * Get smoothly interpolated terrain height at a world (x, z) position.
-   * Projects onto the nearest path segment, then applies Catmull-Rom spline
-   * interpolation through path heights for a smooth curved surface.
-   */
+  // Thin wrappers for extracted terrain/water helpers
   private getTerrainHeight(x: number, z: number): number {
-    const n = this.pathPositions.length;
-    if (n === 0) return 0;
-    if (n === 1) return this.pathHeights[0] ?? 0;
-
-    let bestDist = Infinity;
-    let bestSeg = 0;
-    let bestT = 0;
-
-    for (let i = 0; i < n - 1; i++) {
-      const [ax, az] = this.pathPositions[i];
-      const [bx, bz] = this.pathPositions[i + 1];
-      const dx = bx - ax;
-      const dz = bz - az;
-      const lenSq = dx * dx + dz * dz;
-
-      let t = lenSq > 0 ? ((x - ax) * dx + (z - az) * dz) / lenSq : 0;
-      t = Math.max(0, Math.min(1, t));
-
-      const px = ax + t * dx;
-      const pz = az + t * dz;
-      const dist = (x - px) ** 2 + (z - pz) ** 2;
-
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestSeg = i;
-        bestT = t;
-      }
-    }
-
-    // Catmull-Rom spline through the four surrounding path heights
-    const i0 = Math.max(0, bestSeg - 1);
-    const i1 = bestSeg;
-    const i2 = Math.min(n - 1, bestSeg + 1);
-    const i3 = Math.min(n - 1, bestSeg + 2);
-
-    return Game.catmullRom(
-      this.pathHeights[i0],
-      this.pathHeights[i1],
-      this.pathHeights[i2],
-      this.pathHeights[i3],
-      bestT,
-    );
+    return computeTerrainHeight(x, z, this.pathPositions, this.pathHeights);
   }
 
-  // ---------- Water ----------
-
-  /**
-   * Pre-compute water zone polygons in local coordinates and store them
-   * so buildGround can depress the terrain beneath them.
-   */
-  private computeWaterZones(
-    waterFeatures: LevelData['water'],
-    originCoord: number[],
-  ) {
-    this.waterZones = [];
-    console.log(`[water] Processing ${waterFeatures.length} water features`);
-    for (const wf of waterFeatures) {
-      const localPts: [number, number][] = wf.coords.map(([lon, lat]) => {
-        const [lx, lz] = gpsPointToLocal(lon, lat, originCoord);
-        return [lx * this.scaleFactor, lz * this.scaleFactor];
-      });
-
-      // Find minimum terrain height at the water boundary → water sits there
-      let minH = Infinity;
-      for (const [wx, wz] of localPts) {
-        const h = this.getTerrainHeight(wx, wz);
-        if (h < minH) minH = h;
-      }
-      if (!isFinite(minH)) minH = 0;
-
-      this.waterZones.push({ points: localPts, y: minH + 0.1 });
-    }
-    console.log(`[water] ${this.waterZones.length} water zones stored`);
-  }
-
-  /**
-   * Render the pre-computed water zones as blue meshes.
-   */
-  private buildWaterMeshes() {
-    for (let i = 0; i < this.waterZones.length; i++) {
-      const wz = this.waterZones[i];
-      if (wz.points.length >= 3) {
-        createWaterMesh(this.scene, `water_${i}`, wz.points, wz.y);
-      } else if (wz.points.length >= 2) {
-        createWaterRibbon(this.scene, `water_${i}`, wz.points, 20, wz.y);
-      }
-    }
-  }
-
-  /**
-   * Check if a world (x, z) point is inside or near a water zone.
-   * Returns the depressed Y value if so, or null if not in water.
-   * Points inside get pushed below water level; points within a bank
-   * distance get a smooth transition.
-   */
-  private getWaterDepression(x: number, z: number): number | null {
-    const BANK_WIDTH = 15; // metres — transition zone around water edges
-
-    for (const wz of this.waterZones) {
-      // Quick bounding box check
-      let mnX = Infinity, mxX = -Infinity, mnZ = Infinity, mxZ = -Infinity;
-      for (const [px, pz] of wz.points) {
-        if (px < mnX) mnX = px; if (px > mxX) mxX = px;
-        if (pz < mnZ) mnZ = pz; if (pz > mxZ) mxZ = pz;
-      }
-      if (x < mnX - BANK_WIDTH || x > mxX + BANK_WIDTH ||
-          z < mnZ - BANK_WIDTH || z > mxZ + BANK_WIDTH) continue;
-
-      const inside = this.pointInPolygon(x, z, wz.points);
-      const waterFloor = wz.y - 1.5; // lake/river bed is 1.5m below water surface
-
-      if (inside) {
-        return waterFloor;
-      }
-
-      // Check if we're within BANK_WIDTH of the polygon edge
-      const distToEdge = this.distToPolygonEdge(x, z, wz.points);
-      if (distToEdge < BANK_WIDTH) {
-        const terrainH = this.getTerrainHeight(x, z) - 0.08;
-        const t = distToEdge / BANK_WIDTH; // 0 at edge → 1 at bank limit
-        // Smooth interpolation: near edge → dips toward water floor
-        return terrainH * t + waterFloor * (1 - t);
-      }
-    }
-    return null;
-  }
-
-  /** Quick check: is (x,z) inside any water zone polygon? */
   private isInWater(x: number, z: number): boolean {
-    for (const wz of this.waterZones) {
-      if (this.pointInPolygon(x, z, wz.points)) return true;
-    }
-    return false;
+    return isInWaterZone(x, z, this.waterZones);
   }
 
-  /** Ray-casting point-in-polygon test. */
-  private pointInPolygon(x: number, z: number, poly: [number, number][]): boolean {
-    let inside = false;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const [xi, zi] = poly[i];
-      const [xj, zj] = poly[j];
-      if ((zi > z) !== (zj > z) &&
-          x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) {
-        inside = !inside;
-      }
-    }
-    return inside;
+  private getWaterSurfaceY(x: number, z: number): number | null {
+    return getWaterSurfaceYAt(x, z, this.waterZones);
   }
 
-  /** Shortest distance from (x,z) to any edge of a polygon. */
-  private distToPolygonEdge(x: number, z: number, poly: [number, number][]): number {
-    let minDist = Infinity;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const [ax, az] = poly[j];
-      const [bx, bz] = poly[i];
-      const dx = bx - ax;
-      const dz = bz - az;
-      const lenSq = dx * dx + dz * dz;
-      let t = lenSq > 0 ? ((x - ax) * dx + (z - az) * dz) / lenSq : 0;
-      t = Math.max(0, Math.min(1, t));
-      const d = Math.sqrt((x - (ax + t * dx)) ** 2 + (z - (az + t * dz)) ** 2);
-      if (d < minDist) minDist = d;
-    }
-    return minDist;
+  private resolvePositionAgainstBuildingsLocal(pos: Vector3, radius: number): boolean {
+    return resolvePositionAgainstBuildings(pos, radius, this.buildingColliders);
   }
 
-  // ---------- Km signs ----------
 
-  /**
-   * Place yellow km marker signs at 1 km, 2 km, 3 km, 4 km along the path.
-   * Signs alternate sides: odd km on the right, even km on the left.
-   */
-  private placeKmSigns() {
-    if (this.pathPositions.length < 2) return;
 
-    // Walk the path and compute cumulative distance
-    const cumDist: number[] = [0];
-    for (let i = 1; i < this.pathPositions.length; i++) {
-      const dx = this.pathPositions[i][0] - this.pathPositions[i - 1][0];
-      const dz = this.pathPositions[i][1] - this.pathPositions[i - 1][1];
-      cumDist.push(cumDist[i - 1] + Math.sqrt(dx * dx + dz * dz));
-    }
-
-    const signOffset = PATH_HALF_WIDTH + 1.5; // distance from path centre
-
-    for (let km = 1; km <= 4; km++) {
-      const targetDist = km * 1000; // metres along the scaled path
-      if (targetDist >= cumDist[cumDist.length - 1]) break;
-
-      // Find the segment containing this distance
-      let segIdx = 0;
-      for (let i = 1; i < cumDist.length; i++) {
-        if (cumDist[i] >= targetDist) {
-          segIdx = i - 1;
-          break;
-        }
-      }
-
-      // Interpolate position along segment
-      const segLen = cumDist[segIdx + 1] - cumDist[segIdx];
-      const t = segLen > 0 ? (targetDist - cumDist[segIdx]) / segLen : 0;
-      const [ax, az] = this.pathPositions[segIdx];
-      const [bx, bz] = this.pathPositions[segIdx + 1];
-      const cx = ax + t * (bx - ax);
-      const cz = az + t * (bz - az);
-
-      // Path heading at this point
-      const dx = bx - ax;
-      const dz = bz - az;
-      const yaw = Math.atan2(dx, dz);
-
-      // Perpendicular direction (right side of path when facing forward)
-      const rightX = Math.cos(yaw);
-      const rightZ = -Math.sin(yaw);
-
-      // Alternate sides: odd km → right, even km → left
-      const side = km % 2 === 1 ? 1 : -1;
-      const signX = cx + rightX * signOffset * side;
-      const signZ = cz + rightZ * signOffset * side;
-      const signY = this.getGroundY(signX, signZ);
-
-      const kmSignRoot = createKmSign(this.scene, km, signX, signZ, signY, yaw);
-      // Wrap in elastic pivot at base for tilt physics
-      const kmPivot = new TransformNode(`kmSignPivot_${km}`, this.scene);
-      kmPivot.position.set(signX, signY, signZ);
-      kmSignRoot.parent = kmPivot;
-      kmSignRoot.position.set(0, 0, 0);
-      const kmElasticIdx = this.elasticObjects.length;
-      this.elasticObjects.push({ root: kmPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
-      this.solidObstacles.push({ x: signX, z: signZ, radius: 0.5, elasticIndex: kmElasticIdx });
-    }
-  }
-
-  // ---------- 100 m Gate / Checkpoint system ----------
-
-  /**
-   * Generate checkpoint gates every GATE_SPACING metres along the path.
-   * Each gate stores its world position, height, cumulative distance, and
-   * the path heading (yaw) at that point.
-   */
-  private buildGates() {
-    if (this.pathPositions.length < 2) return;
-    this.gatePositions = [];
-    this.currentGateIdx = 0;
-
-    const totalDist = this.pathCumDist[this.pathCumDist.length - 1];
-
-    for (let dist = GATE_SPACING; dist < totalDist; dist += GATE_SPACING) {
-      // Find the segment containing this distance
-      let segIdx = 0;
-      for (let i = 1; i < this.pathCumDist.length; i++) {
-        if (this.pathCumDist[i] >= dist) {
-          segIdx = i - 1;
-          break;
-        }
-      }
-
-      const segLen = this.pathCumDist[segIdx + 1] - this.pathCumDist[segIdx];
-      const t = segLen > 0 ? (dist - this.pathCumDist[segIdx]) / segLen : 0;
-      const [ax, az] = this.pathPositions[segIdx];
-      const [bx, bz] = this.pathPositions[segIdx + 1];
-      const x = ax + t * (bx - ax);
-      const z = az + t * (bz - az);
-      const y = this.getGroundY(x, z);
-
-      // Path heading at this point
-      const yaw = Math.atan2(bx - ax, bz - az);
-
-      this.gatePositions.push({ x, z, y, pathDist: dist, yaw });
-    }
-  }
-
-  /**
-   * Check if the bus has passed through the current gate.
-   * Gates must be completed in order — this prevents skipping sections.
-   */
-  private checkGates() {
-    if (this.currentGateIdx >= this.gatePositions.length) return;
-
-    const gate = this.gatePositions[this.currentGateIdx];
-    const dx = this.busPos.x - gate.x;
-    const dz = this.busPos.z - gate.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
-
-    if (dist < GATE_RADIUS) {
-      this.currentGateIdx++;
-      this.callbacks.onGatePass?.(this.currentGateIdx, this.gatePositions.length);
-    }
-  }
 
   // ---------- 3D Direction Arrow (HUD compass) ----------
 
@@ -1234,68 +1087,22 @@ export class Game {
 
     // Arrow rotation = relative angle (gate direction minus camera direction)
     // Applied to rotNode — root only handles positioning
-    const relAngle = worldAngle - camYaw;
-    this.directionArrowRotNode.rotation.y = relAngle;
+    const targetAngle = worldAngle - camYaw;
+
+    // Smoothly interpolate toward target angle via shortest arc
+    let delta = targetAngle - this.arrowDisplayAngle;
+    // Wrap delta into [-PI, PI] so the arrow takes the short way round
+    delta = ((delta + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    const smoothSpeed = 6; // radians/sec blend rate
+    this.arrowDisplayAngle += delta * Math.min(1, smoothSpeed * dt);
+
+    this.directionArrowRotNode.rotation.y = this.arrowDisplayAngle;
 
     // Gentle bobbing animation (on the position node)
     const bob = Math.sin(performance.now() * 0.003) * 0.12;
     this.directionArrowRoot.position.y = 2.8 + bob;
   }
 
-  // ---------- Event-specific landmarks ----------
-
-  /**
-   * Place real-world landmarks that exist near specific parkrun courses.
-   * GPS coordinates are converted to local game space.
-   */
-  private placeEventLandmarks(eventId: string) {
-    if (eventId === 'haga') {
-      // The Copper Tent (Koppartältet) — iconic blue & gold tent building in Haga Park
-      const [x1, z1] = gpsPointToLocal(18.030139, 59.364515, this.originCoord);
-      const [x2, z2] = gpsPointToLocal(18.030857, 59.364715, this.originCoord);
-      const lx1 = x1 * this.scaleFactor;
-      const lz1 = z1 * this.scaleFactor;
-      const lx2 = x2 * this.scaleFactor;
-      const lz2 = z2 * this.scaleFactor;
-      const tentY = this.getGroundY((lx1 + lx2) / 2, (lz1 + lz2) / 2);
-      createCopperTent(this.scene, lx1, lz1, lx2, lz2, tentY);
-      // Copper tent obstacle — large circular footprint around centre
-      const tentCx = (lx1 + lx2) / 2;
-      const tentCz = (lz1 + lz2) / 2;
-      const tentLength = Math.sqrt((lx2 - lx1) ** 2 + (lz2 - lz1) ** 2);
-      this.solidObstacles.push({ x: tentCx, z: tentCz, radius: tentLength * 0.45 });
-
-      // The Royal Gate — ornate entrance gate in Haga Park
-      const [gx1, gz1] = gpsPointToLocal(18.037956, 59.355194, this.originCoord);
-      const [gx2, gz2] = gpsPointToLocal(18.038218, 59.355216, this.originCoord);
-      const glx1 = gx1 * this.scaleFactor;
-      const glz1 = gz1 * this.scaleFactor;
-      const glx2 = gx2 * this.scaleFactor;
-      const glz2 = gz2 * this.scaleFactor;
-      const gateY = this.getGroundY((glx1 + glx2) / 2, (glz1 + glz2) / 2);
-      createHagaGate(this.scene, glx1, glz1, glx2, glz2, gateY);
-      // Gate pillar obstacles — two gatehouses on either side of the path
-      const gateCx = (glx1 + glx2) / 2;
-      const gateCz = (glz1 + glz2) / 2;
-      const gateSpan = Math.sqrt((glx2 - glx1) ** 2 + (glz2 - glz1) ** 2);
-      const gateScale = (gateSpan / 12) * 1.44 * 0.8;
-      const gateYaw = Math.atan2(glx2 - glx1, glz2 - glz1) + Math.PI / 2;
-      const gateHalfGap = 5.0 * gateScale * 2.25 / 2 + 3.5 * gateScale / 2;
-      const pillarRadius = Math.max(3.5, 3.0) * gateScale * 0.6;
-      // Left pillar
-      this.solidObstacles.push({
-        x: gateCx + Math.sin(gateYaw + Math.PI / 2) * gateHalfGap,
-        z: gateCz + Math.cos(gateYaw + Math.PI / 2) * gateHalfGap,
-        radius: pillarRadius,
-      });
-      // Right pillar
-      this.solidObstacles.push({
-        x: gateCx - Math.sin(gateYaw + Math.PI / 2) * gateHalfGap,
-        z: gateCz - Math.cos(gateYaw + Math.PI / 2) * gateHalfGap,
-        radius: pillarRadius,
-      });
-    }
-  }
 
   /**
    * Create the 3D bus model and store a reference to it.
@@ -1316,610 +1123,84 @@ export class Game {
     this.frontWheelRight = result.frontWheelRight;
 
     // --- Exhaust flame particle system (initially stopped) ---
-    this.exhaustFlames = this.createExhaustFlames();
+    this.exhaustFlames = createExhaustFlames(this.scene, this.busMesh!);
+
+    // --- Water wake particle systems (initially stopped) ---
+    this.waterWake = createWaterWake(this.scene, this.busMesh!);
   }
 
-  /**
-   * Create a flame particle system attached to the back of the bus.
-   * Starts stopped — call start() when a runner is scooped.
-   */
-  private createExhaustFlames(): ParticleSystem {
-    const ps = new ParticleSystem('exhaustFlames', 300, this.scene);
 
-    // Generate a small radial-gradient circle texture for the flame particles
-    const flameTex = new DynamicTexture('flameTex', 64, this.scene, false);
-    const ctx = flameTex.getContext() as unknown as CanvasRenderingContext2D;
-    const cx = 32, cy = 32, r = 30;
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    grad.addColorStop(0, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.4, 'rgba(255,180,50,0.8)');
-    grad.addColorStop(1, 'rgba(255,80,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 64);
-    flameTex.update();
-    ps.particleTexture = flameTex;
 
-    // Emitter at the rear-underside of the bus (exhaust pipe area)
-    const emitter = MeshBuilder.CreateBox('exhaustEmitter', { size: 0.01 }, this.scene);
-    emitter.isVisible = false;
-    // Bus body: bodyL=7, back at z=-3.5, floorY=0.9
-    emitter.position = new Vector3(0.5, 0.65, -3.8);
-    emitter.parent = this.busMesh!;
-    ps.emitter = emitter;
 
-    // Emit backward and slightly up
-    ps.direction1 = new Vector3(-0.3, 0.5, -2);
-    ps.direction2 = new Vector3(0.3, 1.0, -3);
-    ps.minEmitBox = new Vector3(-0.15, -0.05, 0);
-    ps.maxEmitBox = new Vector3(0.15, 0.05, 0);
 
-    // Flame appearance
-    ps.color1 = new Color4(1, 0.6, 0.1, 1);     // orange-yellow
-    ps.color2 = new Color4(1, 0.2, 0.0, 1);     // red-orange
-    ps.colorDead = new Color4(0.2, 0.2, 0.2, 0); // transparent smoke
 
-    ps.minSize = 0.3;
-    ps.maxSize = 0.9;
-    ps.minLifeTime = 0.15;
-    ps.maxLifeTime = 0.45;
-    ps.emitRate = 300;
-    ps.blendMode = ParticleSystem.BLENDMODE_ONEONE;
-    ps.minEmitPower = 3;
-    ps.maxEmitPower = 6;
-    ps.updateSpeed = 0.02;
-    ps.gravity = new Vector3(0, 2, 0); // flames rise
-
-    ps.stop(); // dormant until scoop
-    return ps;
-  }
-
-  /**
-   * Create exhaust flames for a remote bus (identical config, different parent).
-   */
-  private createExhaustFlamesForBus(busRoot: TransformNode): ParticleSystem {
-    const ps = new ParticleSystem('exhaustFlames_remote', 300, this.scene);
-
-    const flameTex = new DynamicTexture('flameTex_r', 64, this.scene, false);
-    const ctx = flameTex.getContext() as unknown as CanvasRenderingContext2D;
-    const cx = 32, cy = 32, r = 30;
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    grad.addColorStop(0, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.4, 'rgba(255,180,50,0.8)');
-    grad.addColorStop(1, 'rgba(255,80,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 64);
-    flameTex.update();
-    ps.particleTexture = flameTex;
-
-    const emitter = MeshBuilder.CreateBox('exhaustEmitter_r', { size: 0.01 }, this.scene);
-    emitter.isVisible = false;
-    emitter.position = new Vector3(0.5, 0.65, -3.8);
-    emitter.parent = busRoot;
-    ps.emitter = emitter;
-
-    ps.direction1 = new Vector3(-0.3, 0.5, -2);
-    ps.direction2 = new Vector3(0.3, 1.0, -3);
-    ps.minEmitBox = new Vector3(-0.15, -0.05, 0);
-    ps.maxEmitBox = new Vector3(0.15, 0.05, 0);
-
-    ps.color1 = new Color4(1, 0.6, 0.1, 1);
-    ps.color2 = new Color4(1, 0.2, 0.0, 1);
-    ps.colorDead = new Color4(0.2, 0.2, 0.2, 0);
-
-    ps.minSize = 0.3;
-    ps.maxSize = 0.9;
-    ps.minLifeTime = 0.15;
-    ps.maxLifeTime = 0.45;
-    ps.emitRate = 300;
-    ps.blendMode = ParticleSystem.BLENDMODE_ONEONE;
-    ps.minEmitPower = 3;
-    ps.maxEmitPower = 6;
-    ps.updateSpeed = 0.02;
-    ps.gravity = new Vector3(0, 2, 0);
-
-    ps.stop();
-    return ps;
-  }
-
-  /**
-   * Launch a runner onto the local bus (called when this player scoops).
-   */
-  private launchRunnerOntoLocalBus(runner: Runner) {
-    runner.state = 'launched';
-
-    const speed = this.busSpeed;
-    const absSpeed = Math.abs(speed);
-    const fwdX = Math.sin(this.busYaw);
-    const fwdZ = Math.cos(this.busYaw);
-    runner.velX = fwdX * speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
-    runner.velY = Math.max(SCOOP_MIN_UP, absSpeed * SCOOP_UP_FACTOR) + Math.random() * 3;
-    runner.velZ = fwdZ * speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
-
-    if (MODE === 'SCOOP_THEN_RIDE') {
-      this.assignRoofSeat(runner);
-    }
-
-    this.scoopAnimTimer = SCOOP_ANIM_DURATION;
-    this.boostTimer += SCOOP_BOOST_DURATION;
-    if (this.exhaustFlames && !this.exhaustFlames.isStarted()) {
-      this.exhaustFlames.start();
-    }
-  }
 
   /**
    * Handle a scoop event from a remote player.
-   * Hides the runner from the path and spawns a rider model on the remote bus.
+   * Hides the runner from the path and spawns a rider model on the scooper bus.
    */
-  handleRemoteScoop(runnerIndex: number, scooperPlayerIndex: number) {
+  handleRemoteScoop(
+    runnerIndex: number,
+    scooperPlayerIndex: number,
+    victimPlayerIndex?: number,
+    scooperYaw?: number,
+    scooperSpeed?: number,
+  ) {
+    if (victimPlayerIndex && victimPlayerIndex > 0) {
+      if (
+        victimPlayerIndex === this.localPlayerIndex
+        && this.localPlayerRole === 'runner'
+        && this.localRunnerScoopState === 'free'
+      ) {
+        const scooperPose = this.getPlayerPoseByIndex(scooperPlayerIndex);
+        this.beginLocalRunnerScoop(scooperPlayerIndex, {
+          yaw: scooperYaw ?? scooperPose?.yaw ?? this.busYaw,
+          speed: scooperSpeed ?? scooperPose?.speed ?? 0,
+        });
+      }
+      return;
+    }
+
     const runner = this.runners[runnerIndex];
     if (!runner || runner.ownerPlayerIndex !== 0) return; // already claimed
 
     runner.ownerPlayerIndex = scooperPlayerIndex;
-    runner.state = 'riding'; // skip the launch arc, just put them on the remote bus
-    runner.mesh.setEnabled(false); // hide from scene (they're on the remote bus now)
-
-    // Find the remote player that owns this runner
-    for (const [_peerId, remote] of this.remotePlayers) {
-      if (remote.playerIndex === scooperPlayerIndex) {
-        // Create a rider model on this remote bus using the runner's saved tshirt color
-        const riderModel = createRunnerModel(this.scene, 100 + runnerIndex, runner.tshirtColor);
-        poseSitting(riderModel);
-
-        const anchor = MeshBuilder.CreateBox(
-          `remoteRider_${runnerIndex}`,
-          { width: 0.01, height: 0.01, depth: 0.01 },
-          this.scene,
-        );
-        anchor.isVisible = false;
-        riderModel.root.parent = anchor;
-        riderModel.root.position = Vector3.Zero();
-
-        remote.riderModels.push(riderModel);
-        remote.riderAnchors.push(anchor);
-
-        // Re-pack all rider positions on this remote bus roof
-        this.packRemoteRiders(remote);
-        break;
-      }
-    }
+    runner.state = 'launched'; // let them go through launch arc so they flail
+    // Don't hide yet — stay visible while airborne, will hide when transitioning to riding
+    runner.velX = scooperSpeed ? Math.sin(scooperYaw ?? 0) * scooperSpeed * SCOOP_FORWARD_FACTOR : 0;
+    runner.velZ = scooperSpeed ? Math.cos(scooperYaw ?? 0) * scooperSpeed * SCOOP_FORWARD_FACTOR : 0;
+    runner.velY = scooperSpeed ? scooperSpeed * SCOOP_UP_FACTOR : SCOOP_UP_FACTOR;
   }
 
   /** Get the pending scoop events and clear the queue. */
-  flushScoopEvents(): { runnerIndex: number; playerIndex: number }[] {
+  flushScoopEvents(): {
+    runnerIndex: number;
+    playerIndex: number;
+    victimPlayerIndex?: number;
+    scooperYaw?: number;
+    scooperSpeed?: number;
+  }[] {
     const events = this.pendingScoopEvents;
     this.pendingScoopEvents = [];
     return events;
   }
 
-  /**
-   * Pack rider models evenly across a remote bus's roof.
-   */
-  private packRemoteRiders(remote: { riderAnchors: Mesh[]; smoothPos: Vector3; smoothYaw: number }) {
-    const count = remote.riderAnchors.length;
-    if (count === 0) return;
 
-    const roofW = 2.0;
-    const roofL = 6.0;
-    const cols = Math.min(count, 3);
-    const rows = Math.ceil(count / cols);
-    const spacingX = cols > 1 ? roofW / (cols - 1) : 0;
-    const spacingZ = rows > 1 ? roofL / (rows - 1) : 0;
 
-    for (let i = 0; i < count; i++) {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const ox = cols > 1 ? -roofW / 2 + col * spacingX : 0;
-      const oz = rows > 1 ? -roofL / 2 + row * spacingZ : 0;
 
-      // Store offset on the anchor for use during render
-      (remote.riderAnchors[i] as any).__roofOffsetX = ox;
-      (remote.riderAnchors[i] as any).__roofOffsetZ = oz;
-    }
-  }
 
-  // ---------- Runners ----------
 
-  private spawnRunners() {
-    if (this.pathPositions.length < 3) return;
 
-    // Use a seeded RNG so all clients produce identical runners
-    const rand = mulberry32(12345);
 
-    for (let i = 0; i < RUNNER_COUNT; i++) {
-      // Spread runners along the path
-      const pathFraction = (i + 1) / (RUNNER_COUNT + 1);
-      const targetIdx = Math.min(
-        Math.floor(pathFraction * this.pathPositions.length),
-        this.pathPositions.length - 1,
-      );
-
-      const [px, pz] = this.pathPositions[targetIdx];
-
-      // Persistent lateral offset so runners spread across the path width
-      const lateralOffset = (rand() - 0.5) * 2 * PATH_HALF_WIDTH * 0.85;
-
-      // Random bright t-shirt colour (seeded)
-      const tshirtColor = new Color3(
-        0.3 + rand() * 0.7,
-        0.3 + rand() * 0.7,
-        0.3 + rand() * 0.7,
-      );
-
-      const model = createRunnerModel(this.scene, i, tshirtColor);
-      const runnerGroundY = this.getGroundY(px + lateralOffset, pz);
-      model.root.position = new Vector3(px + lateralOffset, runnerGroundY, pz);
-
-      // We still need a "mesh" reference for position/rotation/visibility.
-      // Use a small invisible box as the positional anchor — the model root is parented to it.
-      const anchor = MeshBuilder.CreateBox(
-        `runnerAnchor_${i}`,
-        { width: 0.01, height: 0.01, depth: 0.01 },
-        this.scene,
-      );
-      anchor.isVisible = false;
-      anchor.position = model.root.position.clone();
-      model.root.parent = anchor;
-      model.root.position = Vector3.Zero();
-
-      const speed =
-        RUNNER_MIN_SPEED + rand() * (RUNNER_MAX_SPEED - RUNNER_MIN_SPEED);
-
-      this.runners.push({
-        mesh: anchor,
-        model,
-        targetIdx,
-        speed,
-        state: 'running',
-        velX: 0, velY: 0, velZ: 0,
-        fadeTimer: 0,
-        animPhase: rand() * Math.PI * 2, // seeded start phase so they don't sync
-        lateralOffset,
-        ridingOffsetX: 0,
-        ridingOffsetZ: 0,
-        escapeDir: 0,
-        ownerPlayerIndex: 0,
-        tshirtColor,
-      });
-    }
-  }
-
-  // ---------- Marshals ----------
-
-  /**
-   * Spawn course marshals at GPS positions defined in the level data.
-   * Each marshal stands to the side of the path, facing oncoming runners
-   * but angled ~30° toward the track so they look like they're pointing
-   * runners in the right direction.
-   */
-  private spawnMarshals(level: LevelData) {
-    if (!level.marshals || level.marshals.length === 0) return;
-
-    const MARSHAL_PATH_OFFSET = PATH_HALF_WIDTH + 1.5; // stand just outside the path edge
-    const INWARD_ANGLE = (30 * Math.PI) / 180; // 30° turned toward the track
-
-    for (let i = 0; i < level.marshals.length; i++) {
-      const [lat, lon] = level.marshals[i];
-      const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
-      const lx = rawX * this.scaleFactor;
-      const lz = rawZ * this.scaleFactor;
-
-      // Find the nearest path segment
-      let bestDist = Infinity;
-      let bestIdx = 0;
-      for (let j = 0; j < this.pathPositions.length - 1; j++) {
-        const [px, pz] = this.pathPositions[j];
-        const dx = px - lx;
-        const dz = pz - lz;
-        const dist = dx * dx + dz * dz;
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestIdx = j;
-        }
-      }
-
-      const [px, pz] = this.pathPositions[bestIdx];
-      const [nx, nz] = this.pathPositions[bestIdx + 1];
-
-      // Direction runners travel along this segment
-      const segDx = nx - px;
-      const segDz = nz - pz;
-      const segLen = Math.sqrt(segDx * segDx + segDz * segDz) || 1;
-
-      // Perpendicular to the path (pointing left of travel direction)
-      const perpX = -segDz / segLen;
-      const perpZ = segDx / segLen;
-
-      // Determine which side of the path the GPS point is on
-      const toMarshalX = lx - px;
-      const toMarshalZ = lz - pz;
-      const side = perpX * toMarshalX + perpZ * toMarshalZ > 0 ? 1 : -1;
-
-      // Project the marshal's GPS position onto the path segment to get
-      // the closest point along the path, then offset to the side
-      const along = (toMarshalX * segDx + toMarshalZ * segDz) / (segLen * segLen);
-      const clampedAlong = Math.max(0, Math.min(1, along));
-      const baseX = px + segDx * clampedAlong + perpX * side * MARSHAL_PATH_OFFSET;
-      const baseZ = pz + segDz * clampedAlong + perpZ * side * MARSHAL_PATH_OFFSET;
-      const y = this.getGroundY(baseX, baseZ);
-
-      const model = createMarshalModel(this.scene, i);
-      model.root.position = new Vector3(0, 0, 0);
-
-      // Wrap in elastic pivot at base for tilt physics
-      const marshalPivot = new TransformNode(`marshalPivot_${i}`, this.scene);
-      marshalPivot.position.set(baseX, y, baseZ);
-      model.root.parent = marshalPivot;
-
-      // Face oncoming runners (opposite to travel direction), then rotate
-      // 30° inward toward the track so they look like they're pointing the way
-      const runnerTravelYaw = Math.atan2(segDx, segDz);
-      const facingOncoming = runnerTravelYaw + Math.PI; // 180° flip
-      model.root.rotation.y = facingOncoming + side * INWARD_ANGLE;
-
-      const marshalElasticIdx = this.elasticObjects.length;
-      this.elasticObjects.push({ root: marshalPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
-      this.solidObstacles.push({ x: baseX, z: baseZ, radius: 0.6, elasticIndex: marshalElasticIdx });
-
-      this.marshals.push({
-        model,
-        animPhase: Math.random() * Math.PI * 2,
-      });
-    }
-  }
-
-  private updateMarshals(dt: number) {
-    for (const marshal of this.marshals) {
-      marshal.animPhase += dt;
-      poseCheering(marshal.model, marshal.animPhase);
-    }
-  }
-
-  private updateRunners(dt: number) {
-    for (const runner of this.runners) {
-      // Skip runners owned by a remote player (they render on the remote bus)
-      if (runner.ownerPlayerIndex !== 0 && runner.ownerPlayerIndex !== this.localPlayerIndex) {
-        continue;
-      }
-
-      const pos = runner.mesh.position;
-
-      switch (runner.state) {
-        case 'running': {
-          // Move toward next path point
-          const target = this.pathPositions[runner.targetIdx];
-          if (!target) break;
-
-          // Compute a perpendicular offset from the path segment so runners
-          // don't all run on the exact centre line
-          const nextIdx = (runner.targetIdx + 1) % this.pathPositions.length;
-          const next = this.pathPositions[nextIdx];
-          const segDx = next[0] - target[0];
-          const segDz = next[1] - target[1];
-          const segLen = Math.sqrt(segDx * segDx + segDz * segDz) || 1;
-          // perpendicular (rotate 90°)
-          const perpX = -segDz / segLen;
-          const perpZ = segDx / segLen;
-
-          // --- Escape behaviour: dodge sideways when bus is close ---
-          const busDx = this.busPos.x - pos.x;
-          const busDz = this.busPos.z - pos.z;
-          const busDist = Math.sqrt(busDx * busDx + busDz * busDz);
-
-          if (busDist < RUNNER_ESCAPE_DISTANCE && Math.abs(this.busSpeed) > 0.5) {
-            // Pick an escape direction once (away from bus, perpendicular to path)
-            if (runner.escapeDir === 0) {
-              const busPerp = perpX * busDx + perpZ * busDz;
-              runner.escapeDir = busPerp > 0 ? -1 : 1;
-            }
-            // Shift lateral offset toward the escape side
-            const escapeTarget = runner.escapeDir * PATH_HALF_WIDTH * 1.8;
-            if (runner.lateralOffset < escapeTarget) {
-              runner.lateralOffset = Math.min(runner.lateralOffset + RUNNER_ESCAPE_SPEED * dt, escapeTarget);
-            } else {
-              runner.lateralOffset = Math.max(runner.lateralOffset - RUNNER_ESCAPE_SPEED * dt, escapeTarget);
-            }
-          } else {
-            runner.escapeDir = 0;
-          }
-
-          const dx = target[0] + perpX * runner.lateralOffset - pos.x;
-          const dz = target[1] + perpZ * runner.lateralOffset - pos.z;
-          const dist = Math.sqrt(dx * dx + dz * dz);
-
-          if (dist < 1) {
-            runner.targetIdx += 1;
-            // When a runner reaches the end, loop back to the start
-            if (runner.targetIdx >= this.pathPositions.length) {
-              runner.targetIdx = 0;
-              const [sx, sz] = this.pathPositions[0];
-              pos.x = sx + runner.lateralOffset;
-              pos.z = sz;
-              pos.y = this.getGroundY(pos.x, pos.z);
-            }
-          } else {
-            const move = runner.speed * dt;
-            pos.x += (dx / dist) * move;
-            pos.z += (dz / dist) * move;
-
-            // Face movement direction
-            runner.mesh.rotation.y = Math.atan2(dx, dz);
-          }
-
-          // Follow terrain
-          pos.y = this.getGroundY(pos.x, pos.z);
-
-          // Animate running limbs
-          runner.animPhase += dt * runner.speed * 3; // faster runner = faster swing
-          poseRunning(runner.model, runner.animPhase);
-
-          // Check if scooped by local bus (skip if already owned by another player)
-          const bx = this.busPos.x - pos.x;
-          const bz = this.busPos.z - pos.z;
-          if (runner.ownerPlayerIndex === 0 && Math.sqrt(bx * bx + bz * bz) < SCOOP_DISTANCE && Math.abs(this.busSpeed) > 0.5) {
-            runner.ownerPlayerIndex = this.localPlayerIndex;
-            this.launchRunnerOntoLocalBus(runner);
-
-            // Broadcast scoop event to other players
-            this.pendingScoopEvents.push({
-              runnerIndex: this.runners.indexOf(runner),
-              playerIndex: this.localPlayerIndex,
-            });
-
-            this.callbacks.onScoopRunner();
-          }
-          break;
-        }
-
-        case 'launched': {
-          // Projectile physics (vertical)
-          runner.velY -= GRAVITY * dt;
-          pos.y += runner.velY * dt;
-
-          if (MODE === 'SCOOP_THEN_RIDE') {
-            // Steer horizontally toward the pre-assigned seat on the moving bus
-            const sinY = Math.sin(this.busYaw);
-            const cosY = Math.cos(this.busYaw);
-            const seatWorldX = this.busPos.x + cosY * runner.ridingOffsetX + sinY * runner.ridingOffsetZ;
-            const seatWorldZ = this.busPos.z - sinY * runner.ridingOffsetX + cosY * runner.ridingOffsetZ;
-
-            // Blend toward seat position (fast homing so they arrive before landing)
-            const homingStrength = 6; // higher = snappier homing
-            const toSeatX = seatWorldX - pos.x;
-            const toSeatZ = seatWorldZ - pos.z;
-            pos.x += toSeatX * Math.min(1, homingStrength * dt);
-            pos.z += toSeatZ * Math.min(1, homingStrength * dt);
-
-            // Spin + flail while airborne
-            runner.mesh.rotation.x += 8 * dt;
-            runner.mesh.rotation.z += 5 * dt;
-            runner.animPhase += dt * 12;
-            poseFlailing(runner.model, runner.animPhase);
-
-            // Land when reaching roof height
-            const roofWorldY = this.busPos.y + BUS_ROOF_Y;
-            if (pos.y <= roofWorldY && runner.velY < 0) {
-              runner.state = 'riding';
-              runner.mesh.rotation.x = 0;
-              runner.mesh.rotation.z = 0;
-              poseSitting(runner.model);
-            }
-          } else {
-            // SCOOP_THEN_RUN: free projectile
-            pos.x += runner.velX * dt;
-            pos.z += runner.velZ * dt;
-
-            runner.mesh.rotation.x += 8 * dt;
-            runner.mesh.rotation.z += 5 * dt;
-            runner.animPhase += dt * 12;
-            poseFlailing(runner.model, runner.animPhase);
-
-            const groundY = this.getGroundY(pos.x, pos.z);
-            if (pos.y <= groundY && runner.velY < 0) {
-              pos.y = groundY;
-              runner.state = 'sitting';
-              runner.fadeTimer = RUNNER_SIT_DURATION;
-              runner.mesh.rotation.x = 0;
-              runner.mesh.rotation.z = 0;
-              poseSitting(runner.model);
-            }
-          }
-          break;
-        }
-
-        case 'riding': {
-          // Stick to bus roof — transform local offset back to world space
-          const sinY = Math.sin(this.busYaw);
-          const cosY = Math.cos(this.busYaw);
-          pos.x = this.busPos.x + cosY * runner.ridingOffsetX + sinY * runner.ridingOffsetZ;
-          pos.z = this.busPos.z - sinY * runner.ridingOffsetX + cosY * runner.ridingOffsetZ;
-          pos.y = this.busPos.y + BUS_ROOF_Y;
-          // Face the same direction as the bus
-          runner.mesh.rotation.y = this.busYaw;
-          // Animated sitting — occasionally wave
-          runner.animPhase += dt;
-          poseSittingAnimated(runner.model, runner.animPhase);
-          break;
-        }
-
-        case 'sitting': {
-          // Sit on the ground for a while, then stand up and resume running
-          pos.y = this.getGroundY(pos.x, pos.z);
-          runner.fadeTimer -= dt;
-
-          // Animated sitting — occasionally wave
-          runner.animPhase += dt;
-          poseSittingAnimated(runner.model, runner.animPhase);
-
-          if (runner.fadeTimer <= 0) {
-            // Stand back up
-            poseStanding(runner.model);
-            runner.state = 'running';
-            // Find nearest path point ahead to resume running toward
-            let bestDist = Infinity;
-            let bestIdx = runner.targetIdx;
-            for (let i = 0; i < this.pathPositions.length; i++) {
-              const [px, pz] = this.pathPositions[i];
-              const d = (pos.x - px) ** 2 + (pos.z - pz) ** 2;
-              if (d < bestDist) {
-                bestDist = d;
-                bestIdx = i;
-              }
-            }
-            // Aim for the next point after the closest, wrapping around
-            runner.targetIdx = (bestIdx + 1) % this.pathPositions.length;
-          }
-          break;
-        }
-      }
-    }
-  }
-
-  // ---------- Roof seat assignment ----------
-
-  /**
-   * Assign a packed seat position on the bus roof.
-   * As more runners board, everyone squeezes closer together to fit.
-   * The bus roof is ~2.4 wide × ~7.0 long (bodyW × bodyL).
-   */
-  private assignRoofSeat(newRider: Runner) {
-    // Collect all currently riding runners that belong to the local bus
-    const riders = this.runners.filter((r) => r.state === 'riding' && r.ownerPlayerIndex === this.localPlayerIndex);
-    const seatIndex = riders.length; // new rider gets the next seat
-    const totalRiders = seatIndex + 1;
-
-    // Roof dimensions (bus-local)
-    const roofW = 2.0;  // usable roof width (slightly less than bodyW 2.4)
-    const roofL = 6.0;  // usable roof length (slightly less than bodyL 7.0)
-
-    // Decide how many columns and rows we need
-    // Start with 2 columns side by side, add rows as needed
-    const cols = Math.min(totalRiders, 3); // max 3 across
-    const rows = Math.ceil(totalRiders / cols);
-
-    // Spacing shrinks as more riders board
-    const spacingX = cols > 1 ? roofW / (cols - 1) : 0;
-    const spacingZ = rows > 1 ? roofL / (rows - 1) : 0;
-
-    // Reassign ALL current riders so they pack evenly
-    const allRiders = [...riders, newRider];
-    for (let i = 0; i < allRiders.length; i++) {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      allRiders[i].ridingOffsetX = cols > 1 ? -roofW / 2 + col * spacingX : 0;
-      allRiders[i].ridingOffsetZ = rows > 1 ? -roofL / 2 + row * spacingZ : 0;
-    }
-  }
 
   // ---------- Input ----------
 
   private setupInput() {
-    this.scene.onKeyboardObservable.add((info) => {
-      const key = info.event.key.toLowerCase();
-      if (info.type === KeyboardEventTypes.KEYDOWN) {
-        this.keys[key] = true;
-      } else if (info.type === KeyboardEventTypes.KEYUP) {
-        this.keys[key] = false;
-      }
+    window.addEventListener('keydown', (e) => {
+      this.keys[e.key.toLowerCase()] = true;
+    });
+    window.addEventListener('keyup', (e) => {
+      this.keys[e.key.toLowerCase()] = false;
     });
 
     // --- Touch controls (virtual joystick) ---
@@ -2002,16 +1283,15 @@ export class Game {
 
   // ---------- Collision resolution (swap-friendly: replace this for physics engine) ----------
 
-  private static readonly BUS_COLLISION_RADIUS = 2.0; // metres — approximate bus half-width
-
   /**
    * Test the bus position against every solid obstacle (circle vs circle).
    * On overlap, push the bus out and kill its speed.
    * ~30 lines of isolated code — easy to replace with a physics engine later.
    */
   private resolveCollisions() {
-    const br = Game.BUS_COLLISION_RADIUS;
+    const br = this.localPlayerRole === 'runner' ? RUNNER_COLLISION_RADIUS : BUS_COLLISION_RADIUS;
     let touchingElastic = false;
+    let hitBuilding = false;
 
     for (const obs of this.solidObstacles) {
       const dx = this.busPos.x - obs.x;
@@ -2047,13 +1327,24 @@ export class Game {
       }
     }
 
+    if (this.resolvePositionAgainstBuildingsLocal(this.busPos, br)) {
+      hitBuilding = true;
+    }
+
     // Clear penalty flag once bus is no longer touching any elastic object
     if (!touchingElastic) {
       this.elasticPenaltyActive = false;
     }
 
+    if (hitBuilding) {
+      this.busSpeed *= -0.15;
+    }
+
     // --- Bus-to-bus collisions (solid bodies cannot overlap) ---
     this.resolveBusCollisions();
+
+    // --- Remote player collisions with elastic objects ---
+    this.resolveRemotePlayerElasticCollisions();
   }
 
   /**
@@ -2062,10 +1353,12 @@ export class Game {
    * On overlap the local bus is pushed out and bounced back.
    */
   private resolveBusCollisions() {
-    const br = Game.BUS_COLLISION_RADIUS;
+    if (this.localPlayerRole === 'runner') return;
+    const br = BUS_COLLISION_RADIUS;
     const minDist = br + br; // both buses have the same radius
     for (const [_peerId, remote] of this.remotePlayers) {
       if (!remote.state) continue;
+      if (this.getRoleForPlayerIndex(remote.playerIndex, remote.state) !== 'bus') continue;
       const rx = remote.smoothPos.x;
       const rz = remote.smoothPos.z;
       const dx = this.busPos.x - rx;
@@ -2084,116 +1377,58 @@ export class Game {
     }
   }
 
-  // ---------- Elastic object tilt physics (spring) ----------
+  /**
+   * Check remote player collisions against elastic objects.
+   * When a remote player hits an elastic object, tilt it locally.
+   */
+  private resolveRemotePlayerElasticCollisions() {
+    for (const [_peerId, remote] of this.remotePlayers) {
+      if (!remote.state) continue;
 
-  private updateElasticObjects(dt: number) {
-    for (const obj of this.elasticObjects) {
-      // Spring force pulls tilt back to zero
-      const forceX = -ELASTIC_SPRING_K * obj.tiltX - ELASTIC_DAMPING * obj.tiltVelX;
-      const forceZ = -ELASTIC_SPRING_K * obj.tiltZ - ELASTIC_DAMPING * obj.tiltVelZ;
-      obj.tiltVelX += forceX * dt;
-      obj.tiltVelZ += forceZ * dt;
-      obj.tiltX += obj.tiltVelX * dt;
-      obj.tiltZ += obj.tiltVelZ * dt;
+      // Determine collision radius based on role
+      const remoteRole = this.getRoleForPlayerIndex(remote.playerIndex, remote.state);
+      const collisionRadius = remoteRole === 'runner' ? RUNNER_COLLISION_RADIUS : BUS_COLLISION_RADIUS;
 
-      // Clamp tilt magnitude
-      const mag = Math.sqrt(obj.tiltX * obj.tiltX + obj.tiltZ * obj.tiltZ);
-      if (mag > ELASTIC_MAX_TILT) {
-        const s = ELASTIC_MAX_TILT / mag;
-        obj.tiltX *= s;
-        obj.tiltZ *= s;
+      // Check against all elastic obstacles
+      for (const obs of this.solidObstacles) {
+        if (obs.elasticIndex == null) continue; // only check elastic objects
+
+        const dx = remote.smoothPos.x - obs.x;
+        const dz = remote.smoothPos.z - obs.z;
+        const distSq = dx * dx + dz * dz;
+        const minDist = collisionRadius + obs.radius;
+        if (distSq < minDist * minDist && distSq > 0) {
+          const dist = Math.sqrt(distSq);
+          const nx = dx / dist;
+          const nz = dz / dist;
+
+          // Tilt the elastic object
+          const elastic = this.elasticObjects[obs.elasticIndex];
+          if (elastic) {
+            // Use remote player's speed to determine push strength
+            const remoteSpeed = remote.state.speed ?? 0;
+            const pushStrength = Math.abs(remoteSpeed) * 0.15;
+            elastic.tiltVelX += -nx * pushStrength;
+            elastic.tiltVelZ += -nz * pushStrength;
+          }
+        }
       }
-
-      // Snap to zero when very small to avoid perpetual micro-oscillation
-      if (Math.abs(obj.tiltX) < 0.001 && Math.abs(obj.tiltVelX) < 0.001) {
-        obj.tiltX = 0;
-        obj.tiltVelX = 0;
-      }
-      if (Math.abs(obj.tiltZ) < 0.001 && Math.abs(obj.tiltVelZ) < 0.001) {
-        obj.tiltZ = 0;
-        obj.tiltVelZ = 0;
-      }
-
-      // Apply rotation to the root (rotation around base)
-      obj.root.rotation.x = obj.tiltZ; // tilt in Z maps to rotation around X
-      obj.root.rotation.z = -obj.tiltX; // tilt in X maps to rotation around Z
     }
   }
+
 
   // ---------- Demo camera (title screen flyover) ----------
 
   private updateDemoCamera(dt: number) {
-    if (this.pathPositions.length < 2) return;
-
-    // Advance progress along the path in a loop — slow, cinematic speed
-    const DEMO_SPEED = 40; // metres per second along the path
-    this.demoCamProgress += (DEMO_SPEED * dt) / this.pathTotalDistance;
-    if (this.demoCamProgress > 1) this.demoCamProgress -= 1;
-
-    const totalDist = this.pathCumDist[this.pathCumDist.length - 1];
-    const targetDist = this.demoCamProgress * totalDist;
-
-    // Helper: interpolate a position along the path at a given cumulative distance
-    const samplePath = (dist: number): { x: number; z: number; y: number } => {
-      // Wrap distance into [0, totalDist)
-      const d = ((dist % totalDist) + totalDist) % totalDist;
-      let idx = 0;
-      for (let i = 1; i < this.pathCumDist.length; i++) {
-        if (this.pathCumDist[i] >= d) { idx = i - 1; break; }
-      }
-      const segLen = this.pathCumDist[idx + 1] - this.pathCumDist[idx];
-      const t = segLen > 0 ? (d - this.pathCumDist[idx]) / segLen : 0;
-      const [ax, az] = this.pathPositions[idx];
-      const [bx, bz] = this.pathPositions[idx + 1] ?? this.pathPositions[idx];
-      const hA = this.pathHeights[idx] ?? 0;
-      const hB = this.pathHeights[idx + 1] ?? hA;
-      return {
-        x: ax + (bx - ax) * t,
-        z: az + (bz - az) * t,
-        y: hA + (hB - hA) * t,
-      };
-    };
-
-    // Current position on path
-    const pos = samplePath(targetDist);
-
-    // Compute yaw from a point a fixed distance ahead (avoids per-segment jumps)
-    const YAW_LOOK_DIST = 30; // metres ahead for direction
-    const ahead = samplePath(targetDist + YAW_LOOK_DIST);
-    const dx = ahead.x - pos.x;
-    const dz = ahead.z - pos.z;
-    const yaw = Math.atan2(dx, dz);
-
-    // Camera floats to the side and above the path
-    const sideX = Math.cos(yaw);
-    const sideZ = -Math.sin(yaw);
-
-    const camHeight = 25;
-    const camSide = 20;
-    const camX = pos.x + sideX * camSide;
-    const camZ = pos.z + sideZ * camSide;
-    const camY = pos.y + camHeight;
-
-    // Smooth follow (exponential lerp, frame-rate independent)
-    const smooth = 1 - Math.exp(-2.5 * dt);
-    this.camera.position.x += (camX - this.camera.position.x) * smooth;
-    this.camera.position.y += (camY - this.camera.position.y) * smooth;
-    this.camera.position.z += (camZ - this.camera.position.z) * smooth;
-
-    // Look-ahead target: sample a point further ahead for a smooth gaze
-    const LOOK_AHEAD_DIST = 80; // metres ahead on the path
-    const look = samplePath(targetDist + LOOK_AHEAD_DIST);
-    const lookTarget = new Vector3(look.x, look.y + 2, look.z);
-
-    // Smooth the look target to avoid any residual snapping
-    const prevTarget = this.camera.getTarget();
-    const lookSmooth = 1 - Math.exp(-3 * dt);
-    const smoothedTarget = new Vector3(
-      prevTarget.x + (lookTarget.x - prevTarget.x) * lookSmooth,
-      prevTarget.y + (lookTarget.y - prevTarget.y) * lookSmooth,
-      prevTarget.z + (lookTarget.z - prevTarget.z) * lookSmooth,
-    );
-    this.camera.setTarget(smoothedTarget);
+    this.demoCamProgress = updateDemoCameraSystem({
+      dt,
+      camera: this.camera,
+      pathPositions: this.pathPositions,
+      pathHeights: this.pathHeights,
+      pathCumDist: this.pathCumDist,
+      pathTotalDistance: this.pathTotalDistance,
+      demoCamProgress: this.demoCamProgress,
+    });
   }
 
   // ---------- Countdown Cinematic Camera ----------
@@ -2204,180 +1439,77 @@ export class Game {
    * Uses smooth easing for a cinematic feel.
    */
   private updateCountdownCamera(dt: number) {
-    // t goes from 0 (start, camera in front) to 1 (end, camera behind)
-    const t = Math.max(0, Math.min(1, 1 - this.countdownTimer / COUNTDOWN_DURATION));
-    // Smooth ease-in-out: slow start, fast middle, slow end
-    const ease = t < 0.5
-      ? 2 * t * t
-      : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
-    const camDist = 18;
-    // Start a bit higher for drama, ease down to normal chase cam height
-    const camHeightStart = 10;
-    const camHeightEnd = 8;
-    const camHeight = camHeightStart + (camHeightEnd - camHeightStart) * ease;
-
-    // Orbit angle: 0 = in front of bus, π = behind bus (normal chase position)
-    // The bus faces busYaw, so "in front" = busYaw direction and
-    // "behind" = busYaw + π direction.
-    const orbitAngle = this.busYaw + ease * Math.PI;
-    const orbitDir = new Vector3(Math.sin(orbitAngle), 0, Math.cos(orbitAngle));
-
-    // Camera distance starts a bit closer and eases to normal
-    const distStart = 14;
-    const distEnd = camDist;
-    const dist = distStart + (distEnd - distStart) * ease;
-
-    const camX = this.busPos.x + orbitDir.x * dist;
-    const camZ = this.busPos.z + orbitDir.z * dist;
-    const groundY = this.getGroundY(this.busPos.x, this.busPos.z);
-    const camGroundY = this.getGroundY(camX, camZ);
-    const camY = Math.max(groundY, camGroundY) + camHeight;
-
-    const desiredCamPos = new Vector3(camX, camY, camZ);
-
-    // Smooth follow so it doesn't jitter
-    const camSmooth = Math.min(1, 6 * dt);
-    this.camera.position.x += (desiredCamPos.x - this.camera.position.x) * camSmooth;
-    this.camera.position.y += (desiredCamPos.y - this.camera.position.y) * camSmooth;
-    this.camera.position.z += (desiredCamPos.z - this.camera.position.z) * camSmooth;
-
-    // Always look at the bus centre
-    const lookTarget = new Vector3(
-      this.busPos.x,
-      this.busPos.y + 2.5,
-      this.busPos.z,
-    );
-    this.camera.setTarget(lookTarget);
+    updateCountdownCameraSystem({
+      dt,
+      camera: this.camera,
+      busYaw: this.busYaw,
+      busPos: this.busPos,
+      countdownTimer: this.countdownTimer,
+      countdownDuration: COUNTDOWN_DURATION,
+      getGroundY: (x, z) => this.getGroundY(x, z),
+    });
   }
 
   // ---------- Chase Camera ----------
 
   private updateChaseCam(dt: number) {
-    const camDist = 18;    // distance behind bus
-    const camHeight = 8;   // height above bus
-    const lookAhead = 8;   // look-ahead target offset from bus
+    if (this.localPlayerRole === 'runner') {
+      updateRunnerCameraSystem({
+        dt,
+        camera: this.camera,
+        runnerYaw: this.busYaw,
+        runnerPos: this.busPos,
+        getGroundY: (x, z) => this.getGroundY(x, z),
+      });
+      return;
+    }
 
-    // Smoothly swing camera around when reversing
-    const targetYawOffset = this.busSpeed < -1 ? Math.PI : 0;
-    const camSwingSpeed = 3; // rad/s for the swing
-    const yawDiff = targetYawOffset - this.cameraYawOffset;
-    this.cameraYawOffset += Math.sign(yawDiff) * Math.min(Math.abs(yawDiff), camSwingSpeed * dt);
-
-    // Camera direction = bus yaw + reverse offset
-    const camYaw = this.busYaw + this.cameraYawOffset;
-    const camForward = new Vector3(Math.sin(camYaw), 0, Math.cos(camYaw));
-
-    const camX = this.busPos.x - camForward.x * camDist;
-    const camZ = this.busPos.z - camForward.z * camDist;
-    const groundY = this.getGroundY(this.busPos.x, this.busPos.z);
-    const camGroundY = this.getGroundY(camX, camZ);
-    const camY = Math.max(groundY, camGroundY) + camHeight;
-
-    const desiredCamPos = new Vector3(camX, camY, camZ);
-    const camSmooth = Math.min(1, 5 * dt);
-    this.camera.position.x += (desiredCamPos.x - this.camera.position.x) * camSmooth;
-    this.camera.position.y += (desiredCamPos.y - this.camera.position.y) * camSmooth;
-    this.camera.position.z += (desiredCamPos.z - this.camera.position.z) * camSmooth;
-
-    const lookTarget = new Vector3(
-      this.busPos.x + camForward.x * lookAhead,
-      this.busPos.y + 2.5,
-      this.busPos.z + camForward.z * lookAhead,
-    );
-    this.camera.setTarget(lookTarget);
+    this.cameraYawOffset = updateChaseCameraSystem({
+      dt,
+      camera: this.camera,
+      busYaw: this.busYaw,
+      busSpeed: this.busSpeed,
+      busPos: this.busPos,
+      cameraYawOffset: this.cameraYawOffset,
+      getGroundY: (x, z) => this.getGroundY(x, z),
+    });
   }
 
   // ---------- Minimap player list builder ----------
 
-  /** Convert Color3 (0-1 floats) to a CSS hex string. */
-  private static color3ToHex(c: { r: number; g: number; b: number }): string {
-    const r = Math.round(c.r * 255).toString(16).padStart(2, '0');
-    const g = Math.round(c.g * 255).toString(16).padStart(2, '0');
-    const b = Math.round(c.b * 255).toString(16).padStart(2, '0');
-    return `#${r}${g}${b}`;
+  private buildMinimapPlayers() {
+    return buildMinimapPlayers({
+      remotePlayers: this.remotePlayers,
+      localPlayerIndex: this.localPlayerIndex,
+      busPos: this.busPos,
+      busYaw: this.busYaw,
+    });
   }
 
-  private buildMinimapPlayers(): MinimapPlayer[] {
-    const players: MinimapPlayer[] = [];
-
-    // Remote players first (drawn underneath)
-    for (const [_peerId, remote] of this.remotePlayers) {
-      if (!remote.state) continue;
-      const palette = PLAYER_COLORS[remote.playerIndex - 1] ?? PLAYER_COLORS[1];
-      players.push({
-        x: remote.smoothPos.x,
-        z: remote.smoothPos.z,
-        yaw: remote.smoothYaw,
-        color: Game.color3ToHex(palette.body),
-        isLocal: false,
-      });
+  private getMinimapLookaheadAnchor(): { x: number; z: number } {
+    const gate = this.gatePositions[this.currentGateIdx];
+    if (gate) {
+      return { x: gate.x, z: gate.z };
     }
-
-    // Local player (drawn on top)
-    const localPalette = PLAYER_COLORS[this.localPlayerIndex - 1] ?? PLAYER_COLORS[0];
-    players.push({
-      x: this.busPos.x,
-      z: this.busPos.z,
-      yaw: this.busYaw,
-      color: Game.color3ToHex(localPalette.body),
-      isLocal: true,
-    });
-
-    return players;
+    return { x: this.busPos.x, z: this.busPos.z };
   }
 
   // ---------- Remote bus interpolation ----------
 
   private updateRemoteBusMeshes(dt: number) {
-    for (const [_peerId, remote] of this.remotePlayers) {
-      if (!remote.state) continue;
-      const mesh = remote.mesh;
-      const s = remote.state;
-      const lerp = Math.min(1, 10 * dt);
-
-      remote.smoothPos.x += (s.x - remote.smoothPos.x) * lerp;
-      remote.smoothPos.y += (s.y - remote.smoothPos.y) * lerp;
-      remote.smoothPos.z += (s.z - remote.smoothPos.z) * lerp;
-
-      // Angle interpolation (handle wrap-around)
-      let yawDiff = s.yaw - remote.smoothYaw;
-      while (yawDiff > Math.PI) yawDiff -= 2 * Math.PI;
-      while (yawDiff < -Math.PI) yawDiff += 2 * Math.PI;
-      remote.smoothYaw += yawDiff * lerp;
-
-      remote.smoothPitch += (s.pitch - remote.smoothPitch) * lerp;
-
-      mesh.position.copyFrom(remote.smoothPos);
-      mesh.rotation.y = remote.smoothYaw;
-      mesh.rotation.x = -remote.smoothPitch;
-
-      // --- Sync boost / exhaust flames on remote bus ---
-      if (remote.exhaustFlames) {
-        if (s.boosting && !remote.exhaustFlames.isStarted()) {
-          remote.exhaustFlames.start();
-        } else if (!s.boosting && remote.exhaustFlames.isStarted()) {
-          remote.exhaustFlames.stop();
-        }
-      }
-
-      // --- Position rider models on remote bus roof ---
-      const sinY = Math.sin(remote.smoothYaw);
-      const cosY = Math.cos(remote.smoothYaw);
-      for (const anchor of remote.riderAnchors) {
-        const ox = (anchor as any).__roofOffsetX ?? 0;
-        const oz = (anchor as any).__roofOffsetZ ?? 0;
-        anchor.position.x = remote.smoothPos.x + cosY * ox + sinY * oz;
-        anchor.position.z = remote.smoothPos.z - sinY * ox + cosY * oz;
-        anchor.position.y = remote.smoothPos.y + BUS_ROOF_Y;
-        anchor.rotation.y = remote.smoothYaw;
-      }
-    }
+    updateRemotePlayersSystem({
+      remotePlayers: this.remotePlayers,
+      dt,
+      busRoofY: BUS_ROOF_Y,
+    });
   }
 
   // ---------- Update ----------
 
   private update(dt: number) {
+    // If paused, keep rendering the scene but skip all simulation
+    if (this.paused) return;
+
     // --- Countdown phase ---
     if (this.raceState === 'countdown') {
       const prevSec = Math.ceil(this.countdownTimer);
@@ -2399,13 +1531,41 @@ export class Game {
 
       // During countdown: update camera/minimap/runners but skip bus input
       this.updateDirectionArrow(dt);
-      this.updateRunners(dt);
-      this.updateMarshals(dt);
+      const runnerResult = updateRunnersSystem({
+        scene: this.scene,
+        runners: this.runners,
+        pathPositions: this.pathPositions,
+        getGroundY: (x, z) => this.getGroundY(x, z),
+        busPos: this.busPos,
+        busYaw: this.busYaw,
+        busSpeed: this.busSpeed,
+        localPlayerRole: this.localPlayerRole,
+        localPlayerIndex: this.localPlayerIndex,
+        solidObstacles: this.solidObstacles,
+        elasticObjects: this.elasticObjects,
+        remotePlayers: this.remotePlayers,
+        buildingColliders: this.buildingColliders,
+      }, dt);
+      this.pendingScoopEvents.push(...runnerResult.scoopEvents);
+      if (runnerResult.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+      if (runnerResult.boostTimerAdd > 0) this.boostTimer += runnerResult.boostTimerAdd;
+      if (runnerResult.startExhaust && this.exhaustFlames && !this.exhaustFlames.isStarted()) {
+        this.exhaustFlames.start();
+      }
+      for (let _i = 0; _i < runnerResult.scoopCount; _i++) {
+        this.callbacks.onScoopRunner();
+      }
+      updateMarshals(this.marshals, dt);
+      this.updateRemoteBusMeshes(dt);
 
       // Ensure bus mesh is positioned (so it's visible during countdown)
       if (this.busMesh) {
         this.busMesh.position.copyFrom(this.busPos);
         this.busMesh.rotation.y = this.busYaw;
+        this.busMesh.setEnabled(this.localPlayerRole === 'bus');
+      }
+      if (this.localPlayerRole === 'runner') {
+        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed, busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       }
 
       // Callbacks for static HUD values
@@ -2421,44 +1581,99 @@ export class Game {
       this.updateCountdownCamera(dt);
 
       if (this.minimap) {
-        this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers());
+        this.minimap.draw(
+          this.busPos.x,
+          this.busPos.z,
+          this.busYaw,
+          this.buildMinimapPlayers(),
+          this.getMinimapLookaheadAnchor(),
+        );
       }
       return;
     }
 
-    // --- Finished phase: auto-drive bus forward so it doesn't block others ---
+    // --- Finished phase: coast for ~2s then stop (unless keepDrivingMode) ---
     if (this.raceState === 'finished') {
-      // Decelerate toward a gentle cruise speed, then maintain it
-      if (this.busSpeed > AUTO_DRIVE_SPEED) {
-        this.busSpeed = Math.max(AUTO_DRIVE_SPEED, this.busSpeed - BUS_FRICTION * dt);
+      this.finishedTimer += dt;
+
+      if (this.keepDrivingMode) {
+        // Re-enter normal driving (fall through to racing physics below)
       } else {
-        this.busSpeed += (AUTO_DRIVE_SPEED - this.busSpeed) * Math.min(1, 3 * dt);
+        // Coast: decelerate to 0 over ~2 seconds
+        const COAST_DECEL = 8; // m/s² — brings ~16 m/s to 0 in 2s
+        if (this.busSpeed > 0) {
+          this.busSpeed = Math.max(0, this.busSpeed - COAST_DECEL * dt);
+        } else if (this.busSpeed < 0) {
+          this.busSpeed = Math.min(0, this.busSpeed + COAST_DECEL * dt);
+        }
+
+        // Keep moving straight ahead (while speed > 0)
+        if (Math.abs(this.busSpeed) > 0.01) {
+          const fwd = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
+          this.busPos.x += fwd.x * this.busSpeed * dt;
+          this.busPos.z += fwd.z * this.busSpeed * dt;
+        }
+
+        // Follow terrain (float on water if applicable)
+        let finGroundY = this.getGroundY(this.busPos.x, this.busPos.z);
+        const finWaterY = this.getWaterSurfaceY(this.busPos.x, this.busPos.z);
+        if (finWaterY !== null) {
+          this.waterBobPhase += WATER_BOB_SPEED * dt;
+          finGroundY = finWaterY + Math.sin(this.waterBobPhase) * WATER_BOB_AMPLITUDE - WATER_SINK;
+        }
+        this.waterWakeActive = setWaterWakeActive(this.waterWake, this.waterWakeActive, finWaterY !== null && Math.abs(this.busSpeed) > 0.5);
+        updateWakeIntensity(this.waterWake, this.waterWakeActive, this.busSpeed);
+        this.busPos.y = finGroundY;
+
+        // Update bus mesh
+        if (this.busMesh) {
+          this.busMesh.position.copyFrom(this.busPos);
+          this.busMesh.rotation.y = this.busYaw;
+          this.busMesh.setEnabled(this.localPlayerRole === 'bus');
+        }
+        if (this.localPlayerRole === 'runner') {
+          this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed, busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+        }
+
+        this.updateChaseCam(dt);
+        const runnerResult2 = updateRunnersSystem({
+          scene: this.scene,
+          runners: this.runners,
+          pathPositions: this.pathPositions,
+          getGroundY: (x, z) => this.getGroundY(x, z),
+          busPos: this.busPos,
+          busYaw: this.busYaw,
+          busSpeed: this.busSpeed,
+          localPlayerRole: this.localPlayerRole,
+          localPlayerIndex: this.localPlayerIndex,
+          solidObstacles: this.solidObstacles,
+          elasticObjects: this.elasticObjects,
+          remotePlayers: this.remotePlayers,
+          buildingColliders: this.buildingColliders,
+        }, dt);
+        this.pendingScoopEvents.push(...runnerResult2.scoopEvents);
+        if (runnerResult2.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+        if (runnerResult2.boostTimerAdd > 0) this.boostTimer += runnerResult2.boostTimerAdd;
+        if (runnerResult2.startExhaust && this.exhaustFlames && !this.exhaustFlames.isStarted()) {
+          this.exhaustFlames.start();
+        }
+        for (let _i = 0; _i < runnerResult2.scoopCount; _i++) {
+          this.callbacks.onScoopRunner();
+        }
+        updateMarshals(this.marshals, dt);
+        updateElasticObjects(this.elasticObjects, dt);
+        this.updateRemoteBusMeshes(dt);
+        if (this.minimap) {
+          this.minimap.draw(
+            this.busPos.x,
+            this.busPos.z,
+            this.busYaw,
+            this.buildMinimapPlayers(),
+            this.getMinimapLookaheadAnchor(),
+          );
+        }
+        return;
       }
-
-      // Keep moving straight ahead
-      const fwd = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
-      this.busPos.x += fwd.x * this.busSpeed * dt;
-      this.busPos.z += fwd.z * this.busSpeed * dt;
-
-      // Follow terrain
-      const finGroundY = this.getGroundY(this.busPos.x, this.busPos.z);
-      this.busPos.y = finGroundY;
-
-      // Update bus mesh
-      if (this.busMesh) {
-        this.busMesh.position.copyFrom(this.busPos);
-        this.busMesh.rotation.y = this.busYaw;
-      }
-
-      this.updateChaseCam(dt);
-      this.updateRunners(dt);
-      this.updateMarshals(dt);
-      this.updateElasticObjects(dt);
-      this.updateRemoteBusMeshes(dt);
-      if (this.minimap) {
-        this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers());
-      }
-      return;
     }
 
     // --- Racing phase: track time ---
@@ -2493,143 +1708,271 @@ export class Game {
     if (this.touchActive) turnInput += this.touchDeltaX;
     turnInput = Math.max(-1, Math.min(1, turnInput));
 
-    if (turnInput !== 0 && Math.abs(this.busSpeed) > 0.5) {
-      this.busYaw += turnInput * BUS_TURN_SPEED * dt;
-    } else if (turnInput !== 0 && accelInput !== 0 && Math.abs(this.busSpeed) <= 0.5) {
-      // Slow rotation at standstill when player is pressing forward/reverse + turn
-      this.busYaw += turnInput * BUS_TURN_SPEED_STANDSTILL * dt;
-    }
+    let groundY = this.getGroundY(this.busPos.x, this.busPos.z);
 
-    // --- Steer front wheels visually ---
-    const maxWheelSteer = 0.45; // radians (~25°)
-    const targetWheelY = turnInput * maxWheelSteer;
-    // Smooth the wheel rotation so it doesn't snap
-    const steerSmooth = Math.min(1, 10 * dt);
-    if (this.frontWheelLeft) {
-      this.frontWheelLeft.rotation.y += (targetWheelY - this.frontWheelLeft.rotation.y) * steerSmooth;
-    }
-    if (this.frontWheelRight) {
-      this.frontWheelRight.rotation.y += (targetWheelY - this.frontWheelRight.rotation.y) * steerSmooth;
-    }
+    if (this.localPlayerRole === 'runner') {
+      if (this.localRunnerScoopState !== 'free') {
+        this.updateLocalRunnerScooped(dt);
+        groundY = this.getGroundY(this.busPos.x, this.busPos.z);
+        this.waterWakeActive = setWaterWakeActive(this.waterWake, this.waterWakeActive, false);
+        updateWakeIntensity(this.waterWake, this.waterWakeActive, this.busSpeed);
 
-    // --- Apply acceleration ---
-    if (accelInput > 0) {
-      this.busSpeed += BUS_ACCELERATION * dt;
-    } else if (accelInput < 0) {
-      this.busSpeed -= BUS_BRAKE * dt;
-    } else {
-      // Friction
-      if (this.busSpeed > 0) {
-        this.busSpeed = Math.max(0, this.busSpeed - BUS_FRICTION * dt);
-      } else if (this.busSpeed < 0) {
-        this.busSpeed = Math.min(0, this.busSpeed + BUS_FRICTION * dt);
+        this.busPitch = 0;
+
+        if (this.busMesh) {
+          this.busMesh.setEnabled(false);
+        }
+        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed, busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+      } else {
+      // Human-like direct control: no drift, runner jump with optional side leap.
+      if (turnInput !== 0) {
+        this.busYaw += turnInput * RUNNER_PLAYER_TURN_SPEED * dt;
       }
-    }
 
-    // Clamp speed (boosted max while scoop-boost is active)
-    const effectiveMaxSpeed = this.boostTimer > 0 ? BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER : BUS_MAX_SPEED;
-    this.busSpeed = Math.max(-effectiveMaxSpeed * 0.3, Math.min(effectiveMaxSpeed, this.busSpeed));
+      // Calculate player runner slope for downhill speed boost
+      const playerRunnerHeading = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
+      const currentRunnerHeight = this.getGroundY(this.busPos.x, this.busPos.z);
+      const aheadRunnerHeight = this.getGroundY(
+        this.busPos.x + playerRunnerHeading.x * 2,
+        this.busPos.z + playerRunnerHeading.z * 2,
+      );
+      const playerRunnerSlope = Math.atan2(aheadRunnerHeight - currentRunnerHeight, 2);
+      const playerSpeedMultiplier = playerRunnerSlope < RUNNER_DOWNHILL_SLOPE_THRESHOLD ? RUNNER_DOWNHILL_SPEED_BOOST : 1;
 
-    // Tick boost timer and stop exhaust flames when expired
-    if (this.boostTimer > 0) {
-      this.boostTimer -= dt;
-      if (this.boostTimer <= 0) {
-        this.boostTimer = 0;
-        this.exhaustFlames?.stop();
-      }
-    }
+      const targetSpeed = accelInput * RUNNER_PLAYER_SPEED * playerSpeedMultiplier;
+      const accelRate = accelInput !== 0 ? RUNNER_PLAYER_ACCELERATION : RUNNER_PLAYER_DECELERATION;
+      const blend = Math.min(1, accelRate * dt);
+      this.busSpeed += (targetSpeed - this.busSpeed) * blend;
+      
+      const maxReverse = RUNNER_PLAYER_SPEED * 0.45;
+      this.busSpeed = Math.max(-maxReverse, Math.min(RUNNER_PLAYER_SPEED * playerSpeedMultiplier, this.busSpeed));
 
-    // --- Move bus (with drift) ---
-    // Velocity direction lags behind heading to create drift when turning
-    const absSpeed = Math.abs(this.busSpeed);
-    const speedRatio = absSpeed / BUS_MAX_SPEED;
-    const grip = DRIFT_GRIP * (1 - speedRatio * DRIFT_HIGH_SPEED_GRIP_FACTOR);
-    let velAngleDiff = this.busYaw - this.busVelAngle;
-    // Normalise to [-PI, PI]
-    while (velAngleDiff > Math.PI) velAngleDiff -= 2 * Math.PI;
-    while (velAngleDiff < -Math.PI) velAngleDiff += 2 * Math.PI;
-    this.busVelAngle += velAngleDiff * Math.min(1, grip * dt);
-
-    const forward = new Vector3(Math.sin(this.busVelAngle), 0, Math.cos(this.busVelAngle));
-    this.busPos.x += forward.x * this.busSpeed * dt;
-    this.busPos.z += forward.z * this.busSpeed * dt;
-
-    // --- Solid-object collisions (push-back) ---
-    this.resolveCollisions();
-
-    // Follow terrain height / airborne physics
-    const groundY = this.getGroundY(this.busPos.x, this.busPos.z);
-
-    // Compute slope pitch from terrain height a short distance ahead vs behind
-    const headingDir = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
-    const slopeProbe = 2.0; // metres to sample ahead/behind
-    const hAhead = this.getGroundY(
-      this.busPos.x + headingDir.x * slopeProbe,
-      this.busPos.z + headingDir.z * slopeProbe,
-    );
-    const hBehind = this.getGroundY(
-      this.busPos.x - headingDir.x * slopeProbe,
-      this.busPos.z - headingDir.z * slopeProbe,
-    );
-    const targetPitch = Math.atan2(hAhead - hBehind, slopeProbe * 2);
-
-    if (this.busAirborne) {
-      // Apply gravity
-      this.busVelY -= BUS_GRAVITY * dt;
-      this.busPos.y += this.busVelY * dt;
-
-      // Check landing
-      if (this.busPos.y <= groundY) {
-        this.busPos.y = groundY;
-        this.busVelY = 0;
-        this.busAirborne = false;
-      }
-    } else {
-      // On the ground — detect crest (slope was uphill, now levelling/downhill)
-      const pitchDrop = this.prevSlopePitch - targetPitch;
-      const absSpeed = Math.abs(this.busSpeed);
-      if (pitchDrop > BUS_JUMP_PITCH_THRESHOLD && absSpeed > 4 && this.prevSlopePitch > 0.03) {
-        // Launch! Vertical velocity based on forward speed and how steep the slope was
-        this.busVelY = Math.sin(this.prevSlopePitch) * absSpeed * 0.7;
-        this.busVelY = Math.max(this.busVelY, 1.5); // minimum pop
-        this.busVelY = Math.min(this.busVelY, 8);   // cap so it doesn't fly to space
+      const jumpHeld = this.isKey(' ') || this.isKey('space') || this.isKey('spacebar');
+      const jumpPressed = jumpHeld && !this.jumpHeldLastFrame;
+      this.jumpHeldLastFrame = jumpHeld;
+      if (jumpPressed && this.runnerJumpsUsed < RUNNER_PLAYER_MAX_JUMPS) {
         this.busAirborne = true;
-      } else {
-        this.busPos.y = groundY; // stay on ground
+        this.runnerJumpsUsed += 1;
+        this.busVelY = Math.sqrt(2 * GRAVITY * RUNNER_JUMP_HEIGHT);
+        const leftHeld = this.isKey('a') || this.isKey('arrowleft');
+        const rightHeld = this.isKey('d') || this.isKey('arrowright');
+        if (leftHeld !== rightHeld) {
+          this.runnerJumpSideVel = leftHeld ? -RUNNER_PLAYER_JUMP_SIDE_VELOCITY : RUNNER_PLAYER_JUMP_SIDE_VELOCITY;
+        } else {
+          this.runnerJumpSideVel = 0;
+        }
       }
-    }
 
-    this.prevSlopePitch = targetPitch;
+      const forward = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
+      const right = new Vector3(Math.cos(this.busYaw), 0, -Math.sin(this.busYaw));
+      this.busPos.x += (forward.x * this.busSpeed + right.x * this.runnerJumpSideVel) * dt;
+      this.busPos.z += (forward.z * this.busSpeed + right.z * this.runnerJumpSideVel) * dt;
 
-    // Smooth the pitch so it doesn't jitter
-    this.busPitch += (targetPitch - this.busPitch) * Math.min(1, 6 * dt);
-
-    this.distanceTravelled += Math.abs(this.busSpeed) * dt;
-
-    // --- Update bus mesh transform ---
-    if (this.busMesh) {
-      this.busMesh.position.copyFrom(this.busPos);
-      this.busMesh.rotation.y = this.busYaw;
-      this.busMesh.rotation.x = -this.busPitch; // negative to tilt forward when going uphill
-    }
-
-    // --- Animate scoop plow (flick up + forward then back) ---
-    if (this.scoopPivot) {
-      if (this.scoopAnimTimer > 0) {
-        this.scoopAnimTimer -= dt;
-        // Ease: quick up, slow down. Peak at halfway through.
-        const t = 1 - this.scoopAnimTimer / SCOOP_ANIM_DURATION; // 0→1
-        const ease = Math.sin(t * Math.PI); // 0→1→0
-        // Rotate up/back
-        this.scoopPivot.rotation.x = ease * -1.2;
-        // Translate slightly forward and up for a scooping motion
-        this.scoopPivot.position.y = (this.scoopPivot as any).__restY + ease * 0.5;
-        this.scoopPivot.position.z = (this.scoopPivot as any).__restZ + ease * 0.35;
+      if (Math.abs(this.runnerJumpSideVel) > 0.01) {
+        const sideDamp = Math.exp(-8 * dt);
+        this.runnerJumpSideVel *= sideDamp;
       } else {
-        this.scoopPivot.rotation.x = 0;
-        this.scoopPivot.position.y = (this.scoopPivot as any).__restY ?? this.scoopPivot.position.y;
-        this.scoopPivot.position.z = (this.scoopPivot as any).__restZ ?? this.scoopPivot.position.z;
+        this.runnerJumpSideVel = 0;
       }
+
+      this.resolveCollisions();
+      groundY = this.getGroundY(this.busPos.x, this.busPos.z);
+      this.waterWakeActive = setWaterWakeActive(this.waterWake, this.waterWakeActive, false);
+      updateWakeIntensity(this.waterWake, this.waterWakeActive, this.busSpeed);
+
+      if (this.busAirborne) {
+        this.busVelY -= GRAVITY * dt;
+        this.busPos.y += this.busVelY * dt;
+        if (this.busPos.y <= groundY) {
+          this.busPos.y = groundY;
+          this.busVelY = 0;
+          this.busAirborne = false;
+          this.runnerJumpSideVel = 0;
+          this.runnerJumpsUsed = 0;
+        }
+      } else {
+        this.busPos.y = groundY;
+        this.runnerJumpsUsed = 0;
+      }
+
+      this.busPitch = 0;
+      this.distanceTravelled += Math.max(0, this.busSpeed) * dt;
+
+      if (this.busMesh) {
+        this.busMesh.setEnabled(false);
+      }
+      this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed, busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+      }
+    } else {
+      // --- Space = manual scoop animation (bus mode) ---
+      const scoopKeyHeld = this.isKey(' ') || this.isKey('space') || this.isKey('spacebar');
+      if (scoopKeyHeld && this.scoopAnimTimer <= 0) {
+        this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+      }
+
+      if (turnInput !== 0 && Math.abs(this.busSpeed) > 0.5) {
+        this.busYaw += turnInput * BUS_TURN_SPEED * dt;
+      } else if (turnInput !== 0 && accelInput !== 0 && Math.abs(this.busSpeed) <= 0.5) {
+        // Slow rotation at standstill when player is pressing forward/reverse + turn
+        this.busYaw += turnInput * BUS_TURN_SPEED_STANDSTILL * dt;
+      }
+
+      // --- Steer front wheels visually ---
+      const maxWheelSteer = 0.9; // radians (~52°)
+      const targetWheelY = turnInput * maxWheelSteer;
+      // Smooth the wheel rotation so it doesn't snap
+      const steerSmooth = Math.min(1, 10 * dt);
+      if (this.frontWheelLeft) {
+        this.frontWheelLeft.rotation.y += (targetWheelY - this.frontWheelLeft.rotation.y) * steerSmooth;
+      }
+      if (this.frontWheelRight) {
+        this.frontWheelRight.rotation.y += (targetWheelY - this.frontWheelRight.rotation.y) * steerSmooth;
+      }
+
+      // --- Apply acceleration ---
+      if (accelInput > 0) {
+        this.busSpeed += BUS_ACCELERATION * dt;
+      } else if (accelInput < 0) {
+        this.busSpeed -= BUS_BRAKE * dt;
+      } else {
+        // Friction
+        if (this.busSpeed > 0) {
+          this.busSpeed = Math.max(0, this.busSpeed - BUS_FRICTION * dt);
+        } else if (this.busSpeed < 0) {
+          this.busSpeed = Math.min(0, this.busSpeed + BUS_FRICTION * dt);
+        }
+      }
+
+      // Clamp speed (boosted max while scoop-boost is active)
+      const effectiveMaxSpeed = this.boostTimer > 0 ? BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER : BUS_MAX_SPEED;
+      this.busSpeed = Math.max(-effectiveMaxSpeed * 0.3, Math.min(effectiveMaxSpeed, this.busSpeed));
+
+      // Tick boost timer and stop exhaust flames when expired
+      if (this.boostTimer > 0) {
+        this.boostTimer -= dt;
+        if (this.boostTimer <= 0) {
+          this.boostTimer = 0;
+          this.exhaustFlames?.stop();
+        }
+      }
+
+      // --- Move bus (with drift) ---
+      // Velocity direction lags behind heading to create drift when turning
+      const absSpeed = Math.abs(this.busSpeed);
+      const speedRatio = absSpeed / BUS_MAX_SPEED;
+      const busInWater = this.isInWater(this.busPos.x, this.busPos.z);
+      const baseGrip = busInWater ? WATER_DRIFT_GRIP : DRIFT_GRIP;
+      const grip = baseGrip * (1 - speedRatio * DRIFT_HIGH_SPEED_GRIP_FACTOR);
+      let velAngleDiff = this.busYaw - this.busVelAngle;
+      // Normalise to [-PI, PI]
+      while (velAngleDiff > Math.PI) velAngleDiff -= 2 * Math.PI;
+      while (velAngleDiff < -Math.PI) velAngleDiff += 2 * Math.PI;
+      this.busVelAngle += velAngleDiff * Math.min(1, grip * dt);
+
+      const forward = new Vector3(Math.sin(this.busVelAngle), 0, Math.cos(this.busVelAngle));
+      this.busPos.x += forward.x * this.busSpeed * dt;
+      this.busPos.z += forward.z * this.busSpeed * dt;
+
+      // --- Solid-object collisions (push-back) ---
+      this.resolveCollisions();
+
+      // Follow terrain height / airborne physics
+      groundY = this.getGroundY(this.busPos.x, this.busPos.z);
+
+      // If over water, float on the surface with a gentle bob instead of driving on the lake bed
+      const waterSurfY = this.getWaterSurfaceY(this.busPos.x, this.busPos.z);
+      if (waterSurfY !== null) {
+        this.waterBobPhase += WATER_BOB_SPEED * dt;
+        const bob = Math.sin(this.waterBobPhase) * WATER_BOB_AMPLITUDE;
+        groundY = waterSurfY + bob - WATER_SINK;
+      }
+      this.waterWakeActive = setWaterWakeActive(this.waterWake, this.waterWakeActive, waterSurfY !== null && !this.busAirborne);
+      updateWakeIntensity(this.waterWake, this.waterWakeActive, this.busSpeed);
+
+      // Compute slope pitch from terrain height a short distance ahead vs behind
+      const headingDir = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
+      const slopeProbe = 2.0; // metres to sample ahead/behind
+      let hAhead = this.getGroundY(
+        this.busPos.x + headingDir.x * slopeProbe,
+        this.busPos.z + headingDir.z * slopeProbe,
+      );
+      let hBehind = this.getGroundY(
+        this.busPos.x - headingDir.x * slopeProbe,
+        this.busPos.z - headingDir.z * slopeProbe,
+      );
+      // Flatten pitch probes when on water so bus stays level
+      if (waterSurfY !== null) {
+        hAhead = groundY;
+        hBehind = groundY;
+      }
+      const targetPitch = Math.atan2(hAhead - hBehind, slopeProbe * 2);
+
+      // Apply downhill acceleration boost when going downhill
+      if (targetPitch < BUS_DOWNHILL_SLOPE_THRESHOLD && this.busSpeed > 0) {
+        this.busSpeed += BUS_DOWNHILL_ACCEL_BOOST * dt;
+      }
+
+      if (this.busAirborne) {
+        // Apply gravity
+        this.busVelY -= BUS_GRAVITY * dt;
+        this.busPos.y += this.busVelY * dt;
+
+        // Check landing
+        if (this.busPos.y <= groundY) {
+          this.busPos.y = groundY;
+          this.busVelY = 0;
+          this.busAirborne = false;
+        }
+      } else {
+        // On the ground — detect crest (slope was uphill, now levelling/downhill)
+        const pitchDrop = this.prevSlopePitch - targetPitch;
+        const absSpeed = Math.abs(this.busSpeed);
+        if (pitchDrop > BUS_JUMP_PITCH_THRESHOLD && absSpeed > 4 && this.prevSlopePitch > 0.03) {
+          // Launch! Vertical velocity based on forward speed and how steep the slope was
+          this.busVelY = Math.sin(this.prevSlopePitch) * absSpeed * 0.7;
+          this.busVelY = Math.max(this.busVelY, 1.5); // minimum pop
+          this.busVelY = Math.min(this.busVelY, 8);   // cap so it doesn't fly to space
+          this.busAirborne = true;
+        } else {
+          this.busPos.y = groundY; // stay on ground
+        }
+      }
+
+      this.prevSlopePitch = targetPitch;
+
+      // Smooth the pitch so it doesn't jitter
+      this.busPitch += (targetPitch - this.busPitch) * Math.min(1, 6 * dt);
+
+      this.distanceTravelled += Math.abs(this.busSpeed) * dt;
+
+      // --- Update bus mesh transform ---
+      if (this.busMesh) {
+        this.busMesh.setEnabled(true);
+        this.busMesh.position.copyFrom(this.busPos);
+        this.busMesh.rotation.y = this.busYaw;
+        this.busMesh.rotation.x = -this.busPitch; // negative to tilt forward when going uphill
+      }
+
+      // --- Animate scoop plow (flick up + forward then back) ---
+      if (this.scoopPivot) {
+        if (this.scoopAnimTimer > 0) {
+          this.scoopAnimTimer -= dt;
+          // Ease: quick up, slow down. Peak at halfway through.
+          const t = 1 - this.scoopAnimTimer / SCOOP_ANIM_DURATION; // 0→1
+          const ease = Math.sin(t * Math.PI); // 0→1→0
+          // Rotate up/back
+          this.scoopPivot.rotation.x = ease * -1.2;
+          // Translate slightly forward and up for a scooping motion
+          this.scoopPivot.position.y = (this.scoopPivot as any).__restY + ease * 0.5;
+          this.scoopPivot.position.z = (this.scoopPivot as any).__restZ + ease * 0.35;
+        } else {
+          this.scoopPivot.rotation.x = 0;
+          this.scoopPivot.position.y = (this.scoopPivot as any).__restY ?? this.scoopPivot.position.y;
+          this.scoopPivot.position.z = (this.scoopPivot as any).__restZ ?? this.scoopPivot.position.z;
+        }
+      }
+
+      this.tryScoopRemoteRunnerPlayersByLocalBus();
     }
 
     // --- Third-person chase camera ---
@@ -2641,7 +1984,17 @@ export class Game {
     this.callbacks.onAltitudeChange(groundY);
 
     // Gate checkpoint tracking
-    this.checkGates();
+    const newGateIdx = checkGatePass(this.gatePositions, this.currentGateIdx, this.busPos.x, this.busPos.z);
+    if (newGateIdx > this.currentGateIdx) {
+      this.currentGateIdx = newGateIdx;
+      this.callbacks.onGatePass?.(this.currentGateIdx, this.gatePositions.length);
+    }
+
+    // Broadcast race position
+    if (this.callbacks.onPositionChange) {
+      const pos = this.getRacePosition();
+      this.callbacks.onPositionChange(pos.position, pos.total);
+    }
 
     // Check for finish (all gates cleared)
     if (this.currentGateIdx >= this.gatePositions.length && this.raceState === 'racing') {
@@ -2654,20 +2007,49 @@ export class Game {
     this.updateDirectionArrow(dt);
 
     // Update runners
-    this.updateRunners(dt);
+    const runnerResult3 = updateRunnersSystem({
+      scene: this.scene,
+      runners: this.runners,
+      pathPositions: this.pathPositions,
+      getGroundY: (x, z) => this.getGroundY(x, z),
+      busPos: this.busPos,
+      busYaw: this.busYaw,
+      busSpeed: this.busSpeed,
+      localPlayerRole: this.localPlayerRole,
+      localPlayerIndex: this.localPlayerIndex,
+      solidObstacles: this.solidObstacles,
+      elasticObjects: this.elasticObjects,
+      remotePlayers: this.remotePlayers,
+      buildingColliders: this.buildingColliders,
+    }, dt);
+    this.pendingScoopEvents.push(...runnerResult3.scoopEvents);
+    if (runnerResult3.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+    if (runnerResult3.boostTimerAdd > 0) this.boostTimer += runnerResult3.boostTimerAdd;
+    if (runnerResult3.startExhaust && this.exhaustFlames && !this.exhaustFlames.isStarted()) {
+      this.exhaustFlames.start();
+    }
+    for (let _i = 0; _i < runnerResult3.scoopCount; _i++) {
+      this.callbacks.onScoopRunner();
+    }
 
     // Update marshals
-    this.updateMarshals(dt);
+    updateMarshals(this.marshals, dt);
 
     // Update elastic object tilt physics
-    this.updateElasticObjects(dt);
+    updateElasticObjects(this.elasticObjects, dt);
 
     // --- Update remote bus meshes (multiplayer interpolation) ---
     this.updateRemoteBusMeshes(dt);
 
     // Minimap
     if (this.minimap) {
-      this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers());
+      this.minimap.draw(
+        this.busPos.x,
+        this.busPos.z,
+        this.busYaw,
+        this.buildMinimapPlayers(),
+        this.getMinimapLookaheadAnchor(),
+      );
     }
   }
 }

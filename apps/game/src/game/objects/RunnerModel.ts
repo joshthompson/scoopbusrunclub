@@ -230,6 +230,31 @@ export function poseFlailing(
   model.rightLeg.rotation.z = -Math.sin(phase * 2.1 + 1.3) * 0.3;
 }
 
+/** Jump pose: arms raised, legs slightly tucked, no frantic flailing. */
+export function poseJump(
+  model: RunnerModelResult,
+  lift = 1,
+  lateralLean = 0,
+): void {
+  const heightT = Math.max(0, Math.min(1, lift));
+  const lean = Math.max(-1, Math.min(1, lateralLean));
+
+  const armRaiseX = -0.45 + heightT * -1.75;
+  const armSpreadZ = 0.08 + heightT * 0.2;
+  const legLiftX = 0.1 + heightT * 0.55;
+  const legSplayZ = 0.03 + heightT * 0.12;
+
+  model.leftArm.rotation.x = armRaiseX;
+  model.rightArm.rotation.x = armRaiseX;
+  model.leftArm.rotation.z = -armSpreadZ + lean * 0.2;
+  model.rightArm.rotation.z = armSpreadZ + lean * 0.2;
+
+  model.leftLeg.rotation.x = legLiftX;
+  model.rightLeg.rotation.x = legLiftX;
+  model.leftLeg.rotation.z = -legSplayZ - lean * 0.12;
+  model.rightLeg.rotation.z = legSplayZ - lean * 0.12;
+}
+
 /** Sitting pose: legs forward and flat, arms resting at sides. */
 export function poseSitting(
   model: RunnerModelResult,
