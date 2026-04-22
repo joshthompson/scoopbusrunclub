@@ -1,57 +1,26 @@
-import { For } from 'solid-js';
-import levels from './levels';
 import logoSrc from './assets/logo.png';
 
-type GameMode = 'single' | 'single-runner' | 'host' | 'join';
+type GameMode = 'single' | 'host' | 'join';
 
 interface TitleScreenProps {
-  onSelectMode: (mode: GameMode, eventId: string) => void;
+  onSelectMode: (mode: GameMode) => void;
 }
 
 export function TitleScreen(props: TitleScreenProps) {
-  const courseIds = Object.keys(levels).filter((id) => !levels[id].hide);
-
   return (
     <div id="title-screen">
       <div class="title-content">
         <img src={logoSrc} alt="Scoop Bus" class="title-logo" />
         <div class="course-buttons">
-          <For each={courseIds}>
-            {(id) => {
-              const level = levels[id];
-              return (
-                <div class="course-row">
-                  <span class="course-name">{level.name}</span>
-                  <div class="mode-buttons">
-                    <button
-                      class="course-btn mode-btn"
-                      onClick={() => props.onSelectMode('single', id)}
-                    >
-                      Single player
-                    </button>
-                    <button
-                      class="course-btn mode-btn"
-                      onClick={() => props.onSelectMode('single-runner', id)}
-                    >
-                      Single player - runner
-                    </button>
-                    <button
-                      class="course-btn mode-btn host-btn"
-                      onClick={() => props.onSelectMode('host', id)}
-                    >
-                      Host Game
-                    </button>
-                    <button
-                      class="course-btn mode-btn join-btn"
-                      onClick={() => props.onSelectMode('join', id)}
-                    >
-                      Join Game
-                    </button>
-                  </div>
-                </div>
-              );
-            }}
-          </For>
+          <button class="course-btn" onClick={() => props.onSelectMode('single')}>
+            Single Player
+          </button>
+          <button class="course-btn host-btn" onClick={() => props.onSelectMode('host')}>
+            Host Game
+          </button>
+          <button class="course-btn join-btn" onClick={() => props.onSelectMode('join')}>
+            Join Game
+          </button>
         </div>
       </div>
     </div>

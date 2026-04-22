@@ -1,5 +1,6 @@
 import { createSignal, Show, For } from 'solid-js';
 import { mp, generateRoomCode, MAX_PLAYERS } from './multiplayer';
+import levels from './levels';
 import logoSrc from './assets/logo.png';
 
 /** Player colour CSS values (1-indexed) */
@@ -8,9 +9,9 @@ const PLAYER_NAMES = ['Yellow', 'Red', 'Blue', 'Purple'];
 
 interface LobbyScreenProps {
   mode: 'host' | 'join';
-  courseId: string;
-  courseName: string;
-  onStart: () => void;
+  /** Course ID — required for host, received from host for join */
+  courseId?: string;
+  onStart: (courseId: string) => void;
   onCancel: () => void;
 }
 
@@ -26,9 +27,16 @@ export function LobbyScreen(props: LobbyScreenProps) {
   const [inputCode, setInputCode] = createSignal('');
   const [peerCount, setPeerCount] = createSignal(0);
   const [localIdx, setLocalIdx] = createSignal(props.mode === 'host' ? 1 : 0);
+  const [hostCourseId, setHostCourseId] = createSignal(props.courseId ?? '');
+
+  const courseName = () => {
+    const cid = hostCourseId();
+    return cid ? (levels[cid]?.name ?? cid) : '';
+  };
 
   // Auto-connect for host
   if (props.mode === 'host') {
+    mp.courseId = props.courseId ?? '';
     connectToRoom(roomCode());
   }
 
@@ -44,14 +52,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
       setPeerCount(mp.peerCount);
       const playerCount = mp.peerCount + 1;
       setStatus(`${playerCount}/${MAX_PLAYERS} players connected`);
-
-      // If host, send course info
-      if (isHost) {
-        mp.broadcastLobby({
-          type: 'playerInfo',
-          courseId: props.courseId,
-        });
-      }
     };
 
     mp.onPeerLeave = (_peerId) => {
@@ -67,12 +67,17 @@ export function LobbyScreen(props: LobbyScreenProps) {
 
     mp.onLobbyMessage = (msg, _peerId) => {
       if (msg.type === 'start') {
-        // Other player started the race
-        props.onStart();
+        const cid = hostCourseId() || msg.courseId || '';
+        props.onStart(cid);
       }
-      // Update local player index when host assigns it
-      if (msg.type === 'playerInfo' && msg.playerIndex) {
-        setLocalIdx(msg.playerIndex);
+      if (msg.type === 'playerInfo') {
+        if (msg.playerIndex) {
+          setLocalIdx(msg.playerIndex);
+        }
+        // Joiner receives courseId from host
+        if (msg.courseId) {
+          setHostCourseId(msg.courseId);
+        }
       }
     };
   }
@@ -85,9 +90,9 @@ export function LobbyScreen(props: LobbyScreenProps) {
   }
 
   function handleStart() {
-    // Tell remote player to start too
-    mp.broadcastLobby({ type: 'start', courseId: props.courseId });
-    props.onStart();
+    const cid = hostCourseId();
+    mp.broadcastLobby({ type: 'start', courseId: cid });
+    props.onStart(cid);
   }
 
   function handleCancel() {
@@ -104,7 +109,9 @@ export function LobbyScreen(props: LobbyScreenProps) {
           {props.mode === 'host' ? 'Host Game' : 'Join Game'}
         </h2>
 
-        <p class="lobby-course">{props.courseName}</p>
+        <Show when={courseName()}>
+          <p class="lobby-course">{courseName()}</p>
+        </Show>
 
         <Show when={props.mode === 'host'}>
           <div class="room-code-display">

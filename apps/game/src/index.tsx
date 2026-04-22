@@ -5,6 +5,8 @@ import earcut from 'earcut';
 import { Game } from './game/Game';
 import levels from './levels';
 import { TitleScreen } from './TitleScreen';
+import { LevelSelectScreen } from './LevelSelectScreen';
+import { CharacterSelectScreen } from './CharacterSelectScreen';
 import { LobbyScreen } from './LobbyScreen';
 import { mp, MAX_PLAYERS } from './multiplayer';
 import type { PlayerState, ScoopEvent } from './multiplayer';
@@ -20,9 +22,9 @@ const PLAYER_COLOR_INFO = [
   { name: 'Purple', css: '#9940cc' },
 ];
 
-type GameMode = 'single' | 'single-runner' | 'host' | 'join';
+type GameMode = 'single' | 'host' | 'join';
 type PlayerRole = 'bus' | 'runner';
-type Screen = 'title' | 'lobby' | 'loading' | 'playing';
+type Screen = 'title' | 'level-select' | 'character-select' | 'lobby' | 'loading' | 'playing';
 
 /** Format seconds as M:SS */
 function fmtTime(s: number): string {
@@ -115,23 +117,36 @@ function App() {
     await demoGame.initDemo(getRandomCourseId());
   });
 
-  function handleSelectMode(mode: GameMode, eventId: string) {
-    currentEventId = eventId;
+  function handleSelectMode(mode: GameMode) {
     setGameMode(mode);
 
-    if (mode === 'single' || mode === 'single-runner') {
-      setPlayerRole(mode === 'single-runner' ? 'runner' : 'bus');
-      startGame(eventId);
+    if (mode === 'join') {
+      // Go straight to lobby for code entry
+      setScreen('lobby');
     } else {
-      setPlayerRole(mode === 'host' ? 'bus' : 'runner');
-      // Go to lobby
+      // Single player and host both pick a level first
+      setScreen('level-select');
+    }
+  }
+
+  function handleLevelSelect(levelId: string) {
+    currentEventId = levelId;
+    if (gameMode() === 'single') {
+      setScreen('character-select');
+    } else {
+      // Host → go to lobby
       setScreen('lobby');
     }
   }
 
-  function handleLobbyStart() {
-    // Lobby says "go" — start the actual game
+  function handleCharacterSelect(role: PlayerRole) {
+    setPlayerRole(role);
     startGame(currentEventId);
+  }
+
+  function handleLobbyStart(courseId: string) {
+    currentEventId = courseId;
+    startGame(courseId);
   }
 
   function handleLobbyCancel() {
@@ -324,11 +339,23 @@ function App() {
       <Show when={screen() === 'title'}>
         <TitleScreen onSelectMode={handleSelectMode} />
       </Show>
+      <Show when={screen() === 'level-select'}>
+        <LevelSelectScreen
+          onSelect={handleLevelSelect}
+          onBack={() => setScreen('title')}
+        />
+      </Show>
+      <Show when={screen() === 'character-select'}>
+        <CharacterSelectScreen
+          courseName={levels[currentEventId]?.name ?? currentEventId}
+          onSelect={handleCharacterSelect}
+          onBack={() => setScreen('level-select')}
+        />
+      </Show>
       <Show when={screen() === 'lobby'}>
         <LobbyScreen
           mode={gameMode() as 'host' | 'join'}
-          courseId={currentEventId}
-          courseName={levels[currentEventId]?.name ?? currentEventId}
+          courseId={gameMode() === 'host' ? currentEventId : undefined}
           onStart={handleLobbyStart}
           onCancel={handleLobbyCancel}
         />

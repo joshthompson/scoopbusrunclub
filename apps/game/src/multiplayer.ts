@@ -95,6 +95,8 @@ export class Multiplayer {
   private _peerPlayerIndex = new Map<string, number>();
   /** This client's player index (1 for host, assigned by host for joiners) */
   private _localPlayerIndex = 1;
+  /** Course ID for the room (set by host, received by joiner) */
+  private _courseId = '';
 
   get roomCode() { return this._roomCode; }
   get isHost() { return this._isHost; }
@@ -105,6 +107,9 @@ export class Multiplayer {
   get localPlayerIndex() { return this._localPlayerIndex; }
   /** Get the player index for a remote peer */
   getPlayerIndex(peerId: string): number { return this._peerPlayerIndex.get(peerId) ?? 0; }
+  /** Course ID for the room */
+  get courseId() { return this._courseId; }
+  set courseId(id: string) { this._courseId = id; }
 
   // ---------- Event setters ----------
 
@@ -149,9 +154,14 @@ export class Multiplayer {
 
     onLobby((data, peerId: string) => {
       const msg = data as unknown as LobbyMessage;
-      // If host sends us our player index, store it
-      if (!this._isHost && msg.type === 'playerInfo' && msg.playerIndex) {
-        this._localPlayerIndex = msg.playerIndex;
+      // If host sends us our player index and/or courseId, store them
+      if (!this._isHost && msg.type === 'playerInfo') {
+        if (msg.playerIndex) {
+          this._localPlayerIndex = msg.playerIndex;
+        }
+        if (msg.courseId) {
+          this._courseId = msg.courseId;
+        }
         // Also record the host's index
         this._peerPlayerIndex.set(peerId, 1);
       }
@@ -171,13 +181,13 @@ export class Multiplayer {
       if (this._isHost) {
         const nextIdx = this._remotePeerIds.indexOf(peerId) + 2; // +2 because host is 1
         this._peerPlayerIndex.set(peerId, nextIdx);
-        // Tell the joiner their assigned index
+        // Tell the joiner their assigned index and course
         setTimeout(() => {
           this.sendLobby?.({
             type: 'playerInfo',
             playerIndex: nextIdx,
-            courseId: undefined,
-          } as any);
+            courseId: this._courseId || undefined,
+          });
         }, 100);
       }
       this._onPeerJoin?.(peerId);
@@ -224,6 +234,7 @@ export class Multiplayer {
     this._peerPlayerIndex.clear();
     this._localPlayerIndex = 1;
     this._roomCode = '';
+    this._courseId = '';
   }
 }
 
