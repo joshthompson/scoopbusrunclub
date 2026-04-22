@@ -15,7 +15,7 @@
  * Valid --type values: all (default), course, altitude, water, buildings
  */
 
-import { writeFileSync, readFileSync, readdirSync, existsSync } from 'fs';
+import { writeFileSync, readFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -25,7 +25,7 @@ const CONVEX_URL = 'https://charming-yak-976.eu-west-1.convex.site';
 
 // ── Arg parsing ──────────────────────────────────────────────────────
 
-const VALID_TYPES = ['all', 'course', 'altitude', 'water', 'buildings'] as const;
+const VALID_TYPES = ['all', 'course', 'altitude', 'water', 'buildings', 'paths'] as const;
 type FetchType = (typeof VALID_TYPES)[number];
 
 const args = process.argv.slice(2);
@@ -44,7 +44,7 @@ const fetchType: FetchType = typeArg
   : 'all';
 
 if (!eventId) {
-  console.error('Usage: pnpm game:level <eventId> [--name "Display Name"] [--type=water|altitude|course|buildings|all]');
+  console.error('Usage: pnpm game:level <eventId> [--name "Display Name"] [--type=water|altitude|course|buildings|paths|all]');
   process.exit(1);
 }
 
@@ -297,6 +297,177 @@ out skel qt;
   return results;
 }
 
+// ── Fetch path features from Overpass ─────────────────────────────────
+
+type PathType = 'footway' | 'cycleway' | 'path' | 'track' | 'steps' | 'bridleway';
+
+interface PathPolyline {
+  type: PathType;
+  points: [number, number][]; // [lat, lon]
+}
+
+/**
+ * Return distance in metres from a point [lon, lat] to the nearest point on
+ * any segment of the course (point-to-segment, not just point-to-vertex).
+ */
+function pointToPathDist(
+  pLon: number,
+  pLat: number,
+  courseCoords: number[][],
+): number {
+  let best = Infinity;
+  for (const c of courseCoords) {
+    const d = haversineMetres(pLon, pLat, c[0], c[1]);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+/**
+ * Simplify a polyline by removing points that are closer than `minDist` metres
+ * to the previously kept point.  Always keeps the first and last point.
+ */
+function simplifyByMinDist(
+  points: [number, number][],
+  minDist: number,
+): [number, number][] {
+  if (points.length <= 2) return points;
+  const result: [number, number][] = [points[0]];
+  let [lastLat, lastLon] = points[0];
+  for (let i = 1; i < points.length - 1; i++) {
+    const [lat, lon] = points[i];
+    const d = haversineMetres(lastLon, lastLat, lon, lat);
+    if (d >= minDist) {
+      result.push(points[i]);
+      lastLat = lat;
+      lastLon = lon;
+    }
+  }
+  result.push(points[points.length - 1]);
+  return result;
+}
+
+async function fetchPathFeatures(
+  coords: number[][],
+  paddingMetres = 400,
+): Promise<PathPolyline[]> {
+  if (coords.length === 0) return [];
+
+  let minLat = Infinity, maxLat = -Infinity;
+  let minLon = Infinity, maxLon = -Infinity;
+  for (const c of coords) {
+    if (c[1] < minLat) minLat = c[1];
+    if (c[1] > maxLat) maxLat = c[1];
+    if (c[0] < minLon) minLon = c[0];
+    if (c[0] > maxLon) maxLon = c[0];
+  }
+
+  const latPad = paddingMetres / 111_000;
+  const lonPad =
+    paddingMetres / (111_000 * Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
+  minLat -= latPad;
+  maxLat += latPad;
+  minLon -= lonPad;
+  maxLon += lonPad;
+
+  const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
+
+  const PATH_TYPES: PathType[] = ['footway', 'cycleway', 'path', 'track', 'steps', 'bridleway'];
+
+  const query = `
+[out:json][timeout:25];
+(
+${PATH_TYPES.map((t) => `  way["highway"="${t}"](${bbox});`).join('\n')}
+);
+out body;
+>;
+out skel qt;
+`;
+
+  console.log(`Fetching paths (bbox: ${bbox}) …`);
+  const results: PathPolyline[] = [];
+
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'scoopbus-game/1.0',
+      },
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const nodes = new Map<number, [number, number]>();
+
+      for (const el of json.elements) {
+        if (el.type === 'node') {
+          nodes.set(el.id, [el.lon, el.lat]);
+        }
+      }
+
+      for (const el of json.elements) {
+        if (el.type === 'way' && el.nodes && el.nodes.length >= 2) {
+          const pts: [number, number][] = []; // [lat, lon]
+          for (const nid of el.nodes) {
+            const pt = nodes.get(nid);
+            if (pt) pts.push([pt[1], pt[0]]); // [lat, lon]
+          }
+          if (pts.length < 2) continue;
+
+          const highway = el.tags?.highway as PathType;
+          if (PATH_TYPES.includes(highway)) {
+            results.push({ type: highway, points: pts });
+          }
+        }
+      }
+      console.log(
+        `  Overpass returned ${json.elements.length} elements → ${results.length} paths`,
+      );
+    } else {
+      console.warn(`  ⚠ Overpass responded with ${res.status}`);
+    }
+  } catch (err) {
+    console.warn('  ⚠ Overpass fetch failed:', err);
+  }
+
+  return results;
+}
+
+/** Filter path features: drop points >maxDist from course, simplify to minSpacing. */
+function filterAndSimplifyPaths(
+  paths: PathPolyline[],
+  courseCoords: number[][],
+  maxDist: number,
+  minSpacing: number,
+): PathPolyline[] {
+  const before = paths.length;
+  const result: PathPolyline[] = [];
+
+  for (const p of paths) {
+    // Keep only points within maxDist of the course
+    const nearby = p.points.filter(([lat, lon]) =>
+      pointToPathDist(lon, lat, courseCoords) <= maxDist,
+    );
+    if (nearby.length < 2) continue;
+
+    // Simplify by enforcing minSpacing between consecutive kept points
+    const simplified = simplifyByMinDist(nearby, minSpacing);
+    if (simplified.length < 2) continue;
+
+    result.push({ type: p.type, points: simplified });
+  }
+
+  const totalPtsBefore = paths.reduce((s, p) => s + p.points.length, 0);
+  const totalPtsAfter = result.reduce((s, p) => s + p.points.length, 0);
+  console.log(
+    `  Filtered paths: ${before} → ${result.length} (within ${maxDist}m), ` +
+    `points: ${totalPtsBefore} → ${totalPtsAfter} (${minSpacing}m spacing)`,
+  );
+  return result;
+}
+
 // ── Fetch building features from Overpass ────────────────────────────
 
 interface BuildingPolygon {
@@ -407,7 +578,12 @@ out skel qt;
   return results;
 }
 
-// ── Write level file ─────────────────────────────────────────────────
+// ── Write level files ────────────────────────────────────────────────
+
+/** Write a JSON file, creating parent dirs as needed. */
+function writeJson(filePath: string, data: unknown) {
+  writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+}
 
 function writeLevelFile(
   id: string,
@@ -416,6 +592,7 @@ function writeLevelFile(
   altitude: number[],
   water: WaterPolygon[],
   buildings: BuildingPolygon[],
+  paths: PathPolyline[],
   extras?: { marshals?: [number, number][]; roads?: [number, number][][]; hide?: boolean },
 ) {
   // Strip Convex internal fields, keep only what we need
@@ -424,71 +601,175 @@ function writeLevelFile(
     coordinates: course.coordinates,
     points: course.points,
   };
-  const data: Record<string, unknown> = { id, name, course: cleanCourse, altitude, water };
+
+  // Create level sub-directory
+  const levelDir = resolve(LEVELS_DIR, id);
+  mkdirSync(levelDir, { recursive: true });
+
+  // Write each data type as a separate JSON file
+  writeJson(resolve(levelDir, 'course.json'), cleanCourse);
+  writeJson(resolve(levelDir, 'altitude.json'), altitude);
+  writeJson(resolve(levelDir, 'water.json'), water);
 
   if (buildings.length > 0) {
-    data.buildings = buildings;
+    writeJson(resolve(levelDir, 'buildings.json'), buildings);
+  }
+  if (paths.length > 0) {
+    writeJson(resolve(levelDir, 'paths.json'), paths);
+  }
+  if (extras?.marshals && extras.marshals.length > 0) {
+    writeJson(resolve(levelDir, 'marshals.json'), extras.marshals);
+  }
+  if (extras?.roads && extras.roads.length > 0) {
+    writeJson(resolve(levelDir, 'roads.json'), extras.roads);
   }
 
-  // Preserve manually-added fields
-  if (extras?.marshals && extras.marshals.length > 0) data.marshals = extras.marshals;
-  if (extras?.roads && extras.roads.length > 0) data.roads = extras.roads;
-  if (extras?.hide !== undefined) data.hide = extras.hide;
-
-  const json = JSON.stringify(data, null, 2);
-
-  const filePath = resolve(LEVELS_DIR, `${id}.map.ts`);
-  const content = [
+  // Generate the level's index.ts that imports JSON files and exports LevelData
+  const imports: string[] = [
     `// Auto-generated by scripts/fetch-level.ts — do not edit manually`,
-    `import type { LevelData } from './types';`,
+    `import type { LevelData } from '../types';`,
+    `import course from './course.json';`,
+    `import altitude from './altitude.json';`,
+    `import water from './water.json';`,
+  ];
+  const fields: string[] = [
+    `  id: '${id}',`,
+    `  name: '${name}',`,
+    `  course: course as LevelData['course'],`,
+    `  altitude,`,
+    `  water: water as LevelData['water'],`,
+  ];
+
+  if (buildings.length > 0) {
+    imports.push(`import buildings from './buildings.json';`);
+    fields.push(`  buildings: buildings as LevelData['buildings'],`);
+  }
+  if (paths.length > 0) {
+    imports.push(`import paths from './paths.json';`);
+    fields.push(`  paths: paths as LevelData['paths'],`);
+  }
+  if (extras?.marshals && extras.marshals.length > 0) {
+    imports.push(`import marshals from './marshals.json';`);
+    fields.push(`  marshals: marshals as LevelData['marshals'],`);
+  }
+  if (extras?.roads && extras.roads.length > 0) {
+    imports.push(`import roads from './roads.json';`);
+    fields.push(`  roads: roads as LevelData['roads'],`);
+  }
+  if (extras?.hide !== undefined) {
+    fields.push(`  hide: ${extras.hide},`);
+  }
+
+  const indexContent = [
+    ...imports,
     ``,
-    `const level: LevelData = ${json};`,
+    `const level: LevelData = {`,
+    ...fields,
+    `};`,
     ``,
     `export default level;`,
     ``,
   ].join('\n');
 
-  writeFileSync(filePath, content, 'utf-8');
-  console.log(`\n✅ Wrote ${filePath}`);
+  writeFileSync(resolve(levelDir, 'index.ts'), indexContent, 'utf-8');
+  console.log(`\n✅ Wrote level files to ${levelDir}/`);
 }
 
 // ── Regenerate barrel index ──────────────────────────────────────────
 
-function regenerateIndex() {
-  const files = readdirSync(LEVELS_DIR)
-    .filter((f) => f.endsWith('.map.ts'))
+function regenerateIndex(levelNames: Record<string, string>) {
+  // Discover all level sub-folders (those containing an index.ts)
+  const entries = readdirSync(LEVELS_DIR, { withFileTypes: true });
+  const subfolderIds = entries
+    .filter((e) => e.isDirectory() && existsSync(resolve(LEVELS_DIR, e.name, 'index.ts')))
+    .map((e) => e.name)
     .sort();
 
-  const ids = files.map((f) => f.replace('.map.ts', ''));
+  // Also discover legacy .map.ts files (not yet migrated)
+  const legacyIds = entries
+    .filter((e) => e.isFile() && e.name.endsWith('.map.ts'))
+    .map((e) => e.name.replace('.map.ts', ''))
+    .filter((id) => !subfolderIds.includes(id))
+    .sort();
+
+  const allIds = [...subfolderIds, ...legacyIds].sort();
 
   const lines: string[] = [
     `/**`,
-    ` * Auto-generated barrel file — re-generated by scripts/fetch-level.ts`,
-    ` * Do not edit manually.`,
+    ` * Level registry — provides metadata eagerly & full data lazily.`,
+    ` *`,
+    ` * Auto-generated by scripts/fetch-level.ts`,
     ` */`,
     `import type { LevelData } from './types';`,
     ``,
+    `// ── Level metadata (always available, no heavy data) ─────────────────`,
+    ``,
+    `export interface LevelMeta {`,
+    `  id: string;`,
+    `  name: string;`,
+    `  hide?: boolean;`,
+    `}`,
+    ``,
+    `const levelMeta: LevelMeta[] = [`,
   ];
 
-  for (const id of ids) {
-    lines.push(`import ${id} from './${id}.map';`);
+  for (const id of allIds) {
+    const name = levelNames[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+    lines.push(`  { id: '${id}', name: '${name}' },`);
   }
 
+  lines.push(`];`);
+  lines.push(``);
+  lines.push(`export const levels: Record<string, LevelMeta> = Object.fromEntries(`);
+  lines.push(`  levelMeta.map((m) => [m.id, m]),`);
+  lines.push(`);`);
+  lines.push(``);
+  lines.push(`// ── Lazy loader — resolves the full LevelData on demand ──────────────`);
+  lines.push(``);
+  lines.push(`const loaders: Record<string, () => Promise<{ default: LevelData }>> = {`);
+
+  if (subfolderIds.length > 0) {
+    for (const id of subfolderIds) {
+      lines.push(`  ${id}: () => import('./${id}/index'),`);
+    }
+  }
+  if (legacyIds.length > 0) {
+    lines.push(`  // Legacy .map.ts files (not yet migrated to sub-folders)`);
+    for (const id of legacyIds) {
+      lines.push(`  ${id}: () => import('./${id}.map'),`);
+    }
+  }
+
+  lines.push(`};`);
+  lines.push(``);
+  lines.push(`const cache = new Map<string, LevelData>();`);
+  lines.push(``);
+  lines.push(`export async function loadLevel(id: string): Promise<LevelData> {`);
+  lines.push(`  const cached = cache.get(id);`);
+  lines.push(`  if (cached) return cached;`);
+  lines.push(``);
+  lines.push(`  const loader = loaders[id];`);
+  lines.push(`  if (!loader) {`);
+  lines.push(`    const available = Object.keys(loaders).join(', ');`);
+  lines.push(`    throw new Error(`);
+  lines.push(`      \`Unknown level "\${id}". Available levels: \${available || '(none — run pnpm game:level <id>)'}\`,`);
+  lines.push(`    );`);
+  lines.push(`  }`);
+  lines.push(``);
+  lines.push(`  const mod = await loader();`);
+  lines.push(`  cache.set(id, mod.default);`);
+  lines.push(`  return mod.default;`);
+  lines.push(`}`);
   lines.push(``);
   lines.push(`export type { LevelData } from './types';`);
   lines.push(``);
-  lines.push(`const levels: Record<string, LevelData> = {`);
-  for (const id of ids) {
-    lines.push(`  ${id},`);
-  }
-  lines.push(`};`);
-  lines.push(``);
+  lines.push(`// Default export for backward-compat: the metadata record`);
   lines.push(`export default levels;`);
   lines.push(``);
 
   const indexPath = resolve(LEVELS_DIR, 'index.ts');
   writeFileSync(indexPath, lines.join('\n'), 'utf-8');
-  console.log(`✅ Regenerated ${indexPath} (${ids.length} level${ids.length === 1 ? '' : 's'})`);
+  console.log(`✅ Regenerated ${indexPath} (${allIds.length} level${allIds.length === 1 ? '' : 's'}: ${subfolderIds.length} migrated, ${legacyIds.length} legacy)`);
 }
 
 // ── Read existing level ──────────────────────────────────────────────
@@ -499,13 +780,17 @@ interface ExistingLevel {
   water: WaterPolygon[];
   name: string;
   buildings?: BuildingPolygon[];
+  paths?: PathPolyline[];
   marshals?: [number, number][];
   roads?: [number, number][][];
   hide?: boolean;
 }
 
 async function readExistingLevel(id: string): Promise<ExistingLevel | null> {
-  const filePath = resolve(LEVELS_DIR, `${id}.map.ts`);
+  // Try sub-folder format first, then legacy .map.ts
+  const subfolderIndex = resolve(LEVELS_DIR, id, 'index.ts');
+  const legacyFile = resolve(LEVELS_DIR, `${id}.map.ts`);
+  const filePath = existsSync(subfolderIndex) ? subfolderIndex : legacyFile;
   if (!existsSync(filePath)) return null;
 
   try {
@@ -519,6 +804,7 @@ async function readExistingLevel(id: string): Promise<ExistingLevel | null> {
       water: data.water,
       name: data.name,
       buildings: data.buildings,
+      paths: data.paths,
       marshals: data.marshals,
       roads: data.roads,
       hide: data.hide,
@@ -543,14 +829,17 @@ async function main() {
     process.exit(1);
   }
 
-  const MAX_FEATURE_DIST = 200; // metres — only keep features within this distance of the path
-  const MAX_BUILDINGS = 50;   // cap the number of buildings to the N closest to the path
+  const MAX_FEATURE_DIST = 200; // metres — only keep features within this distance of the course
+  const MAX_PATH_DIST = 300;    // metres — only keep path points within this distance of the course
+  const MIN_PATH_SPACING = 20;  // metres — minimum distance between consecutive path points
+  const MAX_BUILDINGS = 50;     // cap the number of buildings to the N closest to the path
 
   // Determine what to fetch
   const needCourse = fetchType === 'all' || fetchType === 'course';
   const needAltitude = fetchType === 'all' || fetchType === 'altitude';
   const needWater = fetchType === 'all' || fetchType === 'water';
   const needBuildings = fetchType === 'all' || fetchType === 'buildings';
+  const needPaths = fetchType === 'all' || fetchType === 'paths';
 
   // Course is always needed for altitude/water/buildings coords, but we can reuse existing
   let course: CourseData;
@@ -561,7 +850,7 @@ async function main() {
   }
 
   // Fetch only what's requested, reuse existing for the rest
-  const [altitude, rawWater, rawBuildings] = await Promise.all([
+  const [altitude, rawWater, rawBuildings, rawPaths] = await Promise.all([
     needAltitude
       ? fetchElevations(course.coordinates)
       : Promise.resolve(existing!.altitude),
@@ -571,6 +860,9 @@ async function main() {
     needBuildings
       ? fetchBuildingFeatures(course.coordinates, 600)
       : Promise.resolve(existing?.buildings ?? []),
+    needPaths
+      ? fetchPathFeatures(course.coordinates, 400)
+      : Promise.resolve(existing?.paths ?? []),
   ]);
 
   // Filter water & buildings to within MAX_FEATURE_DIST of the path
@@ -580,15 +872,44 @@ async function main() {
   const buildings = needBuildings
     ? filterBuildingsByDistance(rawBuildings, course.coordinates, MAX_FEATURE_DIST, MAX_BUILDINGS)
     : rawBuildings;
+  const paths = needPaths
+    ? filterAndSimplifyPaths(rawPaths, course.coordinates, MAX_PATH_DIST, MIN_PATH_SPACING)
+    : rawPaths;
 
   const name = displayName || existing?.name || eventId.charAt(0).toUpperCase() + eventId.slice(1);
 
-  writeLevelFile(eventId, name, course, altitude, water, buildings, {
+  writeLevelFile(eventId, name, course, altitude, water, buildings, paths, {
     marshals: existing?.marshals,
     roads: existing?.roads,
     hide: existing?.hide,
   });
-  regenerateIndex();
+  if (!isPartial) {
+    // Collect names from all existing levels for the index
+    const allNames: Record<string, string> = { [eventId]: name };
+    const entries = readdirSync(LEVELS_DIR, { withFileTypes: true });
+
+    // Check sub-folders
+    for (const e of entries) {
+      if (e.isDirectory() && e.name !== eventId && existsSync(resolve(LEVELS_DIR, e.name, 'index.ts'))) {
+        try {
+          const mod = await import(resolve(LEVELS_DIR, e.name, 'index.ts'));
+          if (mod.default?.name) allNames[e.name] = mod.default.name;
+        } catch { /* skip */ }
+      }
+    }
+    // Check legacy .map.ts files
+    for (const e of entries) {
+      if (e.isFile() && e.name.endsWith('.map.ts') && !allNames[e.name.replace('.map.ts', '')]) {
+        const lid = e.name.replace('.map.ts', '');
+        try {
+          const mod = await import(resolve(LEVELS_DIR, e.name));
+          if (mod.default?.name) allNames[lid] = mod.default.name;
+        } catch { /* skip */ }
+      }
+    }
+
+    regenerateIndex(allNames);
+  }
 
   console.log(`\nDone! You can now use event="${eventId}" in the game.\n`);
 }

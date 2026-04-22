@@ -22,7 +22,7 @@ import arrowModelUrl from '../assets/models/arrow.glb?url';
 import { gpsToLocal, gpsPointToLocal } from '../api';
 import { Minimap } from './Minimap';
 import { COURSE_OVERRIDES, buildCourseIndices } from '@shared/course-overrides';
-import levels from '../levels';
+import { loadLevel } from '../levels';
 import type { LevelData } from '../levels';
 import type { PlayerState } from '../multiplayer';
 import { MAX_PLAYERS } from '../multiplayer';
@@ -219,6 +219,7 @@ export class Game {
   // Water zones (local XZ polygons + Y level) — set before buildGround
   private waterZones: WaterZone[] = [];
   private roadPolylines: [number, number][][] = [];
+  private trailPolylines: [number, number][][] = [];
   private buildingFootprints: BuildingFootprint[] = [];
   private buildingColliders: BuildingCollider[] = [];
 
@@ -665,14 +666,8 @@ export class Game {
     eventId: string,
     opts: InitSceneOptions,
   ) {
-    // Load pre-fetched level data (no runtime API calls)
-    const level: LevelData | undefined = levels[eventId];
-    if (!level) {
-      const available = Object.keys(levels).join(', ');
-      throw new Error(
-        `Unknown level "${eventId}". Available levels: ${available || '(none — run pnpm game:level <id>)'}`,
-      );
-    }
+    // Lazy-load full level data (JSON chunks loaded on demand)
+    const level: LevelData = await loadLevel(eventId);
 
     const course = level.course;
 
@@ -688,6 +683,7 @@ export class Game {
     const waterFeatures = level.water;
     const roadFeatures = level.roads ?? [];
     const buildingFeatures = level.buildings ?? [];
+    const pathFeatures = level.paths ?? [];
 
     const { positions, heights, totalDistance } = gpsToLocal(orderedCoords, elevations);
 
@@ -732,6 +728,12 @@ export class Game {
     // Build world — water zones must be computed before ground so terrain dips
     this.waterZones = computeWaterZones(waterFeatures, course.coordinates[0], this.scaleFactor, (x, z) => this.getTerrainHeight(x, z));
     this.roadPolylines = computeRoadPolylines(roadFeatures, course.coordinates[0], this.scaleFactor);
+    this.trailPolylines = pathFeatures.map((p) =>
+      p.points.map(([lat, lon]): [number, number] => {
+        const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
+        return [rawX * this.scaleFactor, rawZ * this.scaleFactor];
+      }),
+    ).filter((t) => t.length >= 2);
     this.buildingFootprints = computeBuildingFootprintData(buildingFeatures, course.coordinates[0], this.scaleFactor);
     this.buildGround();
     buildWaterMeshes(this.scene, this.waterZones);
@@ -806,6 +808,7 @@ export class Game {
       this.minimap.setPath(this.pathPositions);
       this.minimap.setWaterZones(this.waterZones);
       this.minimap.setRoads(this.roadPolylines);
+      this.minimap.setTrails(this.trailPolylines);
       this.minimap.setBuildings(this.buildingFootprints);
     }
 
@@ -902,6 +905,7 @@ export class Game {
     ground.material = createPathGroundMaterial(this.scene, {
       pathPositions: this.pathPositions,
       roads: this.roadPolylines,
+      trails: this.trailPolylines,
       groundSize: 6000,
       pathHalfWidth: PATH_HALF_WIDTH,
       roadHalfWidth: PATH_HALF_WIDTH * 1.4,
@@ -1533,9 +1537,10 @@ export class Game {
     // If paused, keep rendering the scene but skip all simulation
     if (this.paused) return;
 
-    // --- Engine vibration (applied every frame so idle rumble is always present) ---
+    // --- Engine vibration (scales with speed, max amplitude at full base speed) ---
     this.engineVibePhase += dt * ENGINE_VIBE_FREQUENCY * Math.PI * 2;
-    const engineVibeOffset = Math.sin(this.engineVibePhase) * ENGINE_VIBE_AMPLITUDE;
+    const speedFraction = Math.min(Math.abs(this.busSpeed) / BUS_MAX_SPEED, 1);
+    const engineVibeOffset = Math.sin(this.engineVibePhase) * ENGINE_VIBE_AMPLITUDE * speedFraction;
 
     // --- Countdown phase ---
     if (this.raceState === 'countdown') {

@@ -68,6 +68,34 @@ function sideOfOther(
   return (rightX * dx + rightZ * dz) >= 0 ? 1 : -1;
 }
 
+/**
+ * Check whether two runners are roughly facing each other.
+ * Each runner's forward vector must point within ~70° toward the other.
+ * Returns true only when both runners are facing one another.
+ */
+const FACING_DOT_THRESHOLD = 0.35; // cos(~70°)
+function areFacing(
+  ax: number, az: number, aYaw: number,
+  bx: number, bz: number, bYaw: number,
+): boolean {
+  const dx = bx - ax;
+  const dz = bz - az;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  if (dist < 0.001) return false;
+  const nx = dx / dist;
+  const nz = dz / dist;
+  // A's forward direction (yaw convention: sin=x, cos=z)
+  const aFwdX = Math.sin(aYaw);
+  const aFwdZ = Math.cos(aYaw);
+  // B's forward direction
+  const bFwdX = Math.sin(bYaw);
+  const bFwdZ = Math.cos(bYaw);
+  // A must face toward B, B must face toward A (negated direction)
+  const aDot = aFwdX * nx + aFwdZ * nz;
+  const bDot = -(bFwdX * nx + bFwdZ * nz);
+  return aDot > FACING_DOT_THRESHOLD && bDot > FACING_DOT_THRESHOLD;
+}
+
 // ── Public API ──
 
 export interface PlayerRunnerState {
@@ -147,6 +175,9 @@ export function updateRunnerInteractions(
       );
       if (closing < INTERACTION_CLOSING_SPEED) continue;
 
+      // Only wave if runners are actually facing each other
+      if (!areFacing(player.x, player.z, player.yaw, rPos.x, rPos.z, rYaw)) continue;
+
       // Determine interaction type
       let type: RunnerInteraction;
       let duration: number;
@@ -206,6 +237,9 @@ export function updateRunnerInteractions(
 
       const closing = closingSpeed(aPos.x, aPos.z, aVx, aVz, bPos.x, bPos.z, bVx, bVz);
       if (closing < INTERACTION_CLOSING_SPEED) continue;
+
+      // Only wave if runners are actually facing each other
+      if (!areFacing(aPos.x, aPos.z, aYaw, bPos.x, bPos.z, bYaw)) continue;
 
       let type: RunnerInteraction;
       let duration: number;

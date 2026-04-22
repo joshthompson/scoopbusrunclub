@@ -374,7 +374,7 @@ export function poseWaving(
 
   // Waving arm: raise up and oscillate
   const raiseX = -2.6 * envelope;                                   // arm up over head
-  const waveOsc = Math.sin(runPhase * 6) * 0.3 * envelope;          // quick wave oscillation
+  const waveOsc = Math.sin(runPhase * 2.5) * 0.3 * envelope;        // gentle wave oscillation
   const splayZ = (side >= 0 ? 1 : -1) * (0.4 + waveOsc) * envelope;
 
   wavingArm.rotation.x = raiseX + (1 - envelope) * (side >= 0 ? -armSwing : armSwing);

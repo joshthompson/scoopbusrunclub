@@ -73,5 +73,5 @@ export const RUNNER_DOWNHILL_SLOPE_THRESHOLD = -0.02;
 export const BUS_COLLISION_RADIUS = 2.0;
 
 // Engine vibration (body oscillates on the wheels)
-export const ENGINE_VIBE_FREQUENCY = 2;   // Hz — fast idle-engine rumble
+export const ENGINE_VIBE_FREQUENCY = 3;   // Hz — fast idle-engine rumble
 export const ENGINE_VIBE_AMPLITUDE = 0.03; // metres — subtle vertical shake

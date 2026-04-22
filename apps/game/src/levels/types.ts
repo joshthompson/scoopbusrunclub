@@ -25,5 +25,10 @@ export interface LevelData {
     height?: number;
     points: [number, number][];
   }[];
+  /** Paths/trails as polylines of [lat, lon] points */
+  paths?: {
+    type: 'footway' | 'cycleway' | 'path' | 'track' | 'steps' | 'bridleway';
+    points: [number, number][];
+  }[];
   hide?: boolean;
 }

@@ -1,6 +1,5 @@
 import type { RemotePlayersMap } from '../types';
 import { poseRunning, poseStanding } from '../objects/RunnerModel';
-import { ENGINE_VIBE_AMPLITUDE, ENGINE_VIBE_FREQUENCY } from '../constants';
 
 const SCOOP_ANIM_DURATION = 0.35;
 

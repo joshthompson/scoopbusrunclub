@@ -34,6 +34,7 @@ const COL_PATH_OUTLINE = '#6b5a10';
 const COL_WATER = '#1a5faa';
 const COL_ROAD = '#7e7e84';
 const COL_ROAD_OUTLINE = '#4f4f53';
+const COL_TRAIL = '#1a4e12';
 const COL_BUILDING_GREY = '#8f8f96';
 const COL_BUILDING_RED = '#a94a46';
 const COL_BUILDING_BLUE = '#3f7fc7';
@@ -57,6 +58,7 @@ export class Minimap {
   private pathTotalDist = 0;
   private waterZones: { points: [number, number][] }[] = [];
   private roads: [number, number][][] = [];
+  private trails: [number, number][][] = [];
   private buildings: { type: 'grey' | 'red' | 'blue'; points: [number, number][] }[] = [];
 
   private gapThresholdSq = Infinity; // adaptive gap detection
@@ -98,6 +100,10 @@ export class Minimap {
 
   setRoads(roads: [number, number][][]) {
     this.roads = roads;
+  }
+
+  setTrails(trails: [number, number][][]) {
+    this.trails = trails;
   }
 
   setBuildings(buildings: { type: 'grey' | 'red' | 'blue'; points: [number, number][] }[]) {
@@ -202,6 +208,12 @@ export class Minimap {
       }
       ctx.closePath();
       ctx.fill();
+    }
+
+    // --- trails (under roads and main path) ---
+    for (const trail of this.trails) {
+      if (trail.length < 2) continue;
+      this.strokePolyline(ctx, project, trail, 1.8, COL_TRAIL);
     }
 
     // --- roads (outline + core, slightly thicker than path) ---

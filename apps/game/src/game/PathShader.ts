@@ -26,6 +26,8 @@ export interface PathShaderOptions {
   pathPositions: [number, number][];
   /** World-space road polylines [ [x,z], ... ][] */
   roads?: [number, number][][];
+  /** World-space trail/path polylines [ [x,z], ... ][] — rendered as narrow dirt */
+  trails?: [number, number][][];
   /** Ground plane size in world units (square). Default 6000 */
   groundSize?: number;
   /** Path half-width in world units. Default 5 */
@@ -78,6 +80,7 @@ export function createPathGroundMaterial(
   const {
     pathPositions,
     roads = [],
+    trails = [],
     groundSize = 6000,
     pathHalfWidth = 5,
     roadHalfWidth = pathHalfWidth * 1.4,
@@ -94,6 +97,7 @@ export function createPathGroundMaterial(
     scene,
     pathPositions,
     roads,
+    trails,
     groundSize,
     pathHalfWidth,
     roadHalfWidth,
@@ -172,6 +176,7 @@ function bakeMaskTexture(
   scene: Scene,
   pathPositions: [number, number][],
   roads: [number, number][][],
+  trails: [number, number][][],
   groundSize: number,
   pathHalfWidth: number,
   roadHalfWidth: number,
@@ -285,6 +290,21 @@ function bakeMaskTexture(
   const coreWorldWidth = pathHalfWidth * 2;
   const corePixelWidth = (coreWorldWidth / groundSize) * size;
   drawPathStroke(corePixelWidth, 'rgb(255, 255, 0)');   // G=1.0 → full dirt
+
+  // -- Trails: narrower dirt paths drawn with 'lighten' compositing so they
+  //    only INCREASE the G channel. Where the main path already has high G,
+  //    the trail's lower values are ignored → no visible seam/border. --
+  const trailHalfWidth = pathHalfWidth * 0.4;
+  const trailOuterWorld = (trailHalfWidth + edgeSoftness * 0.4) * 2;
+  const trailOuterPx = (trailOuterWorld / groundSize) * size;
+  const trailCorePx = ((trailHalfWidth * 2) / groundSize) * size;
+
+  ctx.globalCompositeOperation = 'lighten';
+  for (const trail of trails) {
+    drawRoadStroke(trail, trailOuterPx, 'rgb(255, 60, 0)');   // G≈0.24 soft edge
+    drawRoadStroke(trail, trailCorePx, 'rgb(255, 110, 0)');   // G≈0.43 core
+  }
+  ctx.globalCompositeOperation = 'source-over';
 
   // -- Roads in B channel (terrain shader, not mesh objects) --
   const roadOuterWorldWidth = roadHalfWidth * 2 + edgeSoftness * 1.2;
