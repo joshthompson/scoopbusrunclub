@@ -339,6 +339,83 @@ export function poseStanding(
   model.rightLeg.rotation.z = 0;
 }
 
+/**
+ * Running + one arm raised waving.
+ * `side` = 1  → wave with right arm (partner is to the right)
+ * `side` = -1 → wave with left arm (partner is to the left)
+ * `t` is 0→1 normalised progress through the wave (ramps up then oscillates).
+ */
+export function poseWaving(
+  model: RunnerModelResult,
+  runPhase: number,
+  t: number,
+  side: number,
+): void {
+  // Legs keep running normally
+  const legSwing = Math.sin(runPhase) * 0.7;
+  model.leftLeg.rotation.x = -legSwing;
+  model.leftLeg.rotation.z = 0;
+  model.rightLeg.rotation.x = legSwing;
+  model.rightLeg.rotation.z = 0;
+
+  // Ramp envelope: ease-in for first 20%, full for middle 60%, ease-out last 20%
+  let envelope: number;
+  if (t < 0.2) envelope = t / 0.2;
+  else if (t > 0.8) envelope = (1 - t) / 0.2;
+  else envelope = 1;
+
+  const wavingArm = side >= 0 ? model.rightArm : model.leftArm;
+  const freeArm = side >= 0 ? model.leftArm : model.rightArm;
+
+  // Free arm runs normally (opposite of legs)
+  const armSwing = Math.sin(runPhase) * 0.7;
+  freeArm.rotation.x = side >= 0 ? armSwing : -armSwing;
+  freeArm.rotation.z = 0;
+
+  // Waving arm: raise up and oscillate
+  const raiseX = -2.6 * envelope;                                   // arm up over head
+  const waveOsc = Math.sin(runPhase * 6) * 0.3 * envelope;          // quick wave oscillation
+  const splayZ = (side >= 0 ? 1 : -1) * (0.4 + waveOsc) * envelope;
+
+  wavingArm.rotation.x = raiseX + (1 - envelope) * (side >= 0 ? -armSwing : armSwing);
+  wavingArm.rotation.z = splayZ;
+}
+
+/**
+ * High-five pose: one arm punches forward to meet the other runner's hand.
+ * `side` = 1  → right arm forward, -1 → left arm forward.
+ * `t` is 0→1 normalised progress (thrust out, hold, retract).
+ */
+export function poseHighFive(
+  model: RunnerModelResult,
+  t: number,
+  side: number,
+): void {
+  // Legs brake to a brief stop
+  const legBend = 0.15;
+  model.leftLeg.rotation.x = legBend;
+  model.leftLeg.rotation.z = 0;
+  model.rightLeg.rotation.x = legBend;
+  model.rightLeg.rotation.z = 0;
+
+  // Envelope: quick thrust (0→0.3), hold (0.3→0.7), retract (0.7→1)
+  let envelope: number;
+  if (t < 0.3) envelope = t / 0.3;
+  else if (t > 0.7) envelope = (1 - t) / 0.3;
+  else envelope = 1;
+
+  const activeArm = side >= 0 ? model.rightArm : model.leftArm;
+  const passiveArm = side >= 0 ? model.leftArm : model.rightArm;
+
+  // Active arm: thrust forward-up (rotation.x = -1.5 rad ≈ arm out in front)
+  activeArm.rotation.x = -1.5 * envelope;
+  activeArm.rotation.z = (side >= 0 ? 1 : -1) * 0.3 * envelope;
+
+  // Passive arm stays relaxed at side
+  passiveArm.rotation.x = 0.1;
+  passiveArm.rotation.z = 0;
+}
+
 // ── Helper ──
 
 function makeMat(name: string, color: Color3, scene: Scene): StandardMaterial {

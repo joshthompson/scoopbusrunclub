@@ -16,6 +16,7 @@ import {
   poseStanding,
   poseJump,
 } from '../objects/RunnerModel';
+import { applyRunnerInteractionPose } from './runnerInteractions';
 import { PLAYER_COLORS } from '../objects/BusModel';
 import type { Runner, RemotePlayersMap, ElasticObject, SolidObstacle, BuildingCollider } from '../types';
 import { resolvePositionAgainstBuildings } from './buildings';
@@ -106,6 +107,9 @@ export function spawnRunners(
       escapeDir: 0,
       ownerPlayerIndex: 0,
       tshirtColor,
+      interaction: 'none',
+      interactionTimer: 0,
+      interactionSide: 1,
     });
   }
 
@@ -128,6 +132,8 @@ export interface RunnerUpdateContext {
   elasticObjects: ElasticObject[];
   remotePlayers: RemotePlayersMap;
   buildingColliders: BuildingCollider[];
+  /** Current engine vibration Y offset (applied to roof riders). */
+  engineVibeOffset: number;
 }
 
 export interface ScoopEvent {
@@ -229,7 +235,10 @@ export function updateRunnersSystem(
 
         pos.y = ctx.getGroundY(pos.x, pos.z);
         runner.animPhase += dt * runner.speed * 3;
-        poseRunning(runner.model, runner.animPhase);
+        // Use interaction pose (wave / high-five) when active, otherwise run
+        if (!applyRunnerInteractionPose(runner)) {
+          poseRunning(runner.model, runner.animPhase);
+        }
 
         // Check if scooped by local bus
         const bx = ctx.busPos.x - pos.x;
@@ -379,7 +388,7 @@ export function updateRunnersSystem(
         const cosY = Math.cos(ctx.busYaw);
         pos.x = ctx.busPos.x + cosY * runner.ridingOffsetX + sinY * runner.ridingOffsetZ;
         pos.z = ctx.busPos.z - sinY * runner.ridingOffsetX + cosY * runner.ridingOffsetZ;
-        pos.y = ctx.busPos.y + BUS_ROOF_Y;
+        pos.y = ctx.busPos.y + BUS_ROOF_Y + ctx.engineVibeOffset;
         runner.mesh.rotation.y = ctx.busYaw;
         runner.animPhase += dt;
         poseSittingAnimated(runner.model, runner.animPhase);
@@ -426,6 +435,8 @@ function launchRunnerOntoLocalBus(
   result: RunnerUpdateResult,
 ) {
   runner.state = 'launched';
+  runner.interaction = 'none';
+  runner.interactionTimer = 0;
 
   const speed = busSpeed;
   const absSpeed = Math.abs(speed);

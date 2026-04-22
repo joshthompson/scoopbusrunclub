@@ -1,5 +1,6 @@
 import type { RemotePlayersMap } from '../types';
 import { poseRunning, poseStanding } from '../objects/RunnerModel';
+import { ENGINE_VIBE_AMPLITUDE, ENGINE_VIBE_FREQUENCY } from '../constants';
 
 const SCOOP_ANIM_DURATION = 0.35;
 
@@ -7,10 +8,12 @@ export interface UpdateRemotePlayersParams {
   remotePlayers: RemotePlayersMap;
   dt: number;
   busRoofY: number;
+  /** Current engine vibration Y offset for body shell. */
+  engineVibeOffset: number;
 }
 
 export function updateRemotePlayersSystem(params: UpdateRemotePlayersParams): void {
-  const { remotePlayers, dt, busRoofY } = params;
+  const { remotePlayers, dt, busRoofY, engineVibeOffset } = params;
 
   for (const [_peerId, remote] of remotePlayers) {
     if (!remote.state) continue;
@@ -35,6 +38,11 @@ export function updateRemotePlayersSystem(params: UpdateRemotePlayersParams): vo
     mesh.rotation.y = remote.smoothYaw;
     mesh.rotation.x = -remote.smoothPitch;
     mesh.setEnabled(!isRunner);
+
+    // Engine vibration on remote bus body shell
+    if (!isRunner) {
+      remote.bodyShell.position.y = engineVibeOffset;
+    }
 
     if (remote.runnerModel) {
       remote.runnerModel.root.setEnabled(isRunner);
@@ -85,7 +93,7 @@ export function updateRemotePlayersSystem(params: UpdateRemotePlayersParams): vo
       const roofOffsetZ = (anchor as MeshWithRoofOffset).__roofOffsetZ ?? 0;
       anchor.position.x = remote.smoothPos.x + cosY * roofOffsetX + sinY * roofOffsetZ;
       anchor.position.z = remote.smoothPos.z - sinY * roofOffsetX + cosY * roofOffsetZ;
-      anchor.position.y = remote.smoothPos.y + busRoofY;
+      anchor.position.y = remote.smoothPos.y + busRoofY + engineVibeOffset;
       anchor.rotation.y = remote.smoothYaw;
     }
   }

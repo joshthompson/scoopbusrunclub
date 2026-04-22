@@ -54,6 +54,14 @@ export const WATER_DRIFT_GRIP = 2.5;
 export const WATER_BOB_AMPLITUDE = 0.12;
 export const WATER_BOB_SPEED = 2.5;
 export const WATER_SINK = 1.0;
+// ---------- Runner social interactions ----------
+export const WAVE_TRIGGER_DISTANCE = 12;       // metres – start waving when this close
+export const HIGH_FIVE_TRIGGER_DISTANCE = 1.8;  // metres – switch to high-five
+export const WAVE_DURATION = 2.0;               // seconds the wave animation plays
+export const HIGH_FIVE_DURATION = 0.6;          // seconds the high-five freeze plays
+export const INTERACTION_COOLDOWN = 4.0;         // seconds before same pair can interact again
+export const INTERACTION_CLOSING_SPEED = 0.5;    // must be closing at ≥ this m/s
+
 export const ELASTIC_SPRING_K = 12;
 export const ELASTIC_DAMPING = 4;
 export const ELASTIC_MAX_TILT = 0.55;
@@ -63,3 +71,7 @@ export const BUS_DOWNHILL_SLOPE_THRESHOLD = -0.01;
 export const RUNNER_DOWNHILL_SPEED_BOOST = 1.5;
 export const RUNNER_DOWNHILL_SLOPE_THRESHOLD = -0.02;
 export const BUS_COLLISION_RADIUS = 2.0;
+
+// Engine vibration (body oscillates on the wheels)
+export const ENGINE_VIBE_FREQUENCY = 2;   // Hz — fast idle-engine rumble
+export const ENGINE_VIBE_AMPLITUDE = 0.03; // metres — subtle vertical shake

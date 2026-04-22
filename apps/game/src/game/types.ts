@@ -21,6 +21,8 @@ export interface GameCallbacks {
   onPositionChange?: (position: number, total: number) => void;
 }
 
+export type RunnerInteraction = 'none' | 'waving' | 'highfive';
+
 export interface Runner {
   mesh: Mesh;
   model: RunnerModelResult;
@@ -39,6 +41,12 @@ export interface Runner {
   ownerPlayerIndex: number;
   tshirtColor: Color3;
   riderModelCreated?: boolean; // tracks if rider model has been created (for SCOOP_THEN_RIDE)
+  /** Current social interaction state (wave / high-five) */
+  interaction: RunnerInteraction;
+  /** Countdown timer for the current interaction animation */
+  interactionTimer: number;
+  /** Which side the interaction partner is on (-1 = left, 1 = right) */
+  interactionSide: number;
 }
 
 export interface Marshal {
@@ -48,6 +56,7 @@ export interface Marshal {
 
 export interface RemotePlayer {
   mesh: TransformNode;
+  bodyShell: TransformNode;
   scoopPivot: TransformNode;
   scoopAnimTimer: number;
   state: PlayerState | null;

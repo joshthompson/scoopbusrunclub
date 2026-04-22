@@ -6,12 +6,13 @@
  *   pnpm game:level <eventId> [--name "Display Name"] [--type=<type>]
  *
  * Examples:
- *   pnpm game:level haga                  # fetch everything
- *   pnpm game:level haga --type=water      # re-fetch only water
- *   pnpm game:level haga --type=altitude   # re-fetch only altitude
- *   pnpm game:level haga --type=course     # re-fetch only course
+ *   pnpm game:level haga                      # fetch everything
+ *   pnpm game:level haga --type=water          # re-fetch only water
+ *   pnpm game:level haga --type=altitude       # re-fetch only altitude
+ *   pnpm game:level haga --type=course         # re-fetch only course
+ *   pnpm game:level haga --type=buildings      # re-fetch only buildings
  *
- * Valid --type values: all (default), course, altitude, water
+ * Valid --type values: all (default), course, altitude, water, buildings
  */
 
 import { writeFileSync, readFileSync, readdirSync, existsSync } from 'fs';
@@ -24,7 +25,7 @@ const CONVEX_URL = 'https://charming-yak-976.eu-west-1.convex.site';
 
 // ── Arg parsing ──────────────────────────────────────────────────────
 
-const VALID_TYPES = ['all', 'course', 'altitude', 'water'] as const;
+const VALID_TYPES = ['all', 'course', 'altitude', 'water', 'buildings'] as const;
 type FetchType = (typeof VALID_TYPES)[number];
 
 const args = process.argv.slice(2);
@@ -43,13 +44,98 @@ const fetchType: FetchType = typeArg
   : 'all';
 
 if (!eventId) {
-  console.error('Usage: pnpm game:level <eventId> [--name "Display Name"] [--type=water|altitude|course|all]');
+  console.error('Usage: pnpm game:level <eventId> [--name "Display Name"] [--type=water|altitude|course|buildings|all]');
   process.exit(1);
 }
 
 if (!VALID_TYPES.includes(fetchType)) {
   console.error(`Invalid --type="${fetchType}". Valid values: ${VALID_TYPES.join(', ')}`);
   process.exit(1);
+}
+
+// ── Geo helpers ──────────────────────────────────────────────────────
+
+/** Haversine distance in metres between two [lon, lat] points. */
+function haversineMetres(
+  lon1: number, lat1: number,
+  lon2: number, lat2: number,
+): number {
+  const R = 6_371_000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Return the minimum distance (metres) from any vertex of the polygon to the
+ * nearest course coordinate. `polygonCoords` are [lon, lat], `courseCoords`
+ * are [[lon, lat, …], …].
+ */
+function minDistanceToPath(
+  polygonCoords: [number, number][],
+  courseCoords: number[][],
+): number {
+  let best = Infinity;
+  for (const [pLon, pLat] of polygonCoords) {
+    for (const c of courseCoords) {
+      const d = haversineMetres(pLon, pLat, c[0], c[1]);
+      if (d < best) {
+        best = d;
+        if (best < 1) return best; // short-circuit
+      }
+    }
+  }
+  return best;
+}
+
+/** Filter water features to those within `maxDist` metres of the path. */
+function filterWaterByDistance(
+  features: WaterPolygon[],
+  courseCoords: number[][],
+  maxDist: number,
+): WaterPolygon[] {
+  const before = features.length;
+  const filtered = features.filter(
+    (f) => minDistanceToPath(f.coords, courseCoords) <= maxDist,
+  );
+  if (filtered.length < before) {
+    console.log(`  Filtered water: ${before} → ${filtered.length} (within ${maxDist}m of path)`);
+  }
+  return filtered;
+}
+
+/** Filter building features to those within `maxDist` metres of the path. */
+function filterBuildingsByDistance(
+  buildings: BuildingPolygon[],
+  courseCoords: number[][],
+  maxDist: number,
+  maxCount: number = Infinity,
+): BuildingPolygon[] {
+  const before = buildings.length;
+
+  // Compute distance for each building and filter by maxDist
+  const withDist = buildings
+    .map((b) => {
+      const coords: [number, number][] = b.points.map(([lat, lon]) => [lon, lat]);
+      return { building: b, dist: minDistanceToPath(coords, courseCoords) };
+    })
+    .filter((bd) => bd.dist <= maxDist);
+
+  // Sort by distance (closest first) and take the top N
+  withDist.sort((a, b) => a.dist - b.dist);
+  const capped = withDist.slice(0, maxCount).map((bd) => bd.building);
+
+  if (capped.length < before) {
+    console.log(
+      `  Filtered buildings: ${before} → ${withDist.length} (within ${maxDist}m)` +
+        (withDist.length > maxCount ? ` → ${capped.length} (closest ${maxCount})` : ''),
+    );
+  }
+  return capped;
 }
 
 // ── Fetch course from Convex ─────────────────────────────────────────
@@ -211,6 +297,116 @@ out skel qt;
   return results;
 }
 
+// ── Fetch building features from Overpass ────────────────────────────
+
+interface BuildingPolygon {
+  type: 'grey' | 'red';
+  height?: number;
+  points: [number, number][]; // [lat, lon]
+}
+
+async function fetchBuildingFeatures(
+  coords: number[][],
+  paddingMetres = 600,
+): Promise<BuildingPolygon[]> {
+  if (coords.length === 0) return [];
+
+  let minLat = Infinity, maxLat = -Infinity;
+  let minLon = Infinity, maxLon = -Infinity;
+  for (const c of coords) {
+    if (c[1] < minLat) minLat = c[1];
+    if (c[1] > maxLat) maxLat = c[1];
+    if (c[0] < minLon) minLon = c[0];
+    if (c[0] > maxLon) maxLon = c[0];
+  }
+
+  const latPad = paddingMetres / 111_000;
+  const lonPad =
+    paddingMetres / (111_000 * Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
+  minLat -= latPad;
+  maxLat += latPad;
+  minLon -= lonPad;
+  maxLon += lonPad;
+
+  const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
+
+  const query = `
+[out:json][timeout:25];
+(
+  way["building"](${bbox});
+);
+out body;
+>;
+out skel qt;
+`;
+
+  console.log(`Fetching buildings (bbox: ${bbox}) …`);
+  const results: BuildingPolygon[] = [];
+
+  const RESIDENTIAL_TAGS = new Set([
+    'residential', 'house', 'apartments', 'detached',
+    'semidetached_house', 'terrace', 'dormitory',
+  ]);
+
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'scoopbus-game/1.0',
+      },
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const nodes = new Map<number, [number, number]>();
+
+      for (const el of json.elements) {
+        if (el.type === 'node') {
+          nodes.set(el.id, [el.lon, el.lat]);
+        }
+      }
+
+      for (const el of json.elements) {
+        if (el.type === 'way' && el.nodes && el.nodes.length >= 3) {
+          const ring: [number, number][] = []; // [lat, lon] to match LevelData
+          for (const nid of el.nodes) {
+            const pt = nodes.get(nid);
+            if (pt) ring.push([pt[1], pt[0]]); // [lat, lon]
+          }
+          if (ring.length < 3) continue;
+
+          const buildingTag = el.tags?.building ?? 'yes';
+          const type: 'grey' | 'red' = RESIDENTIAL_TAGS.has(buildingTag) ? 'red' : 'grey';
+
+          const bldg: BuildingPolygon = { type, points: ring };
+
+          // Extract height from tags if available
+          if (el.tags?.height) {
+            const h = parseFloat(el.tags.height);
+            if (!isNaN(h) && h > 0) bldg.height = Math.round(h);
+          } else if (el.tags?.['building:levels']) {
+            const levels = parseFloat(el.tags['building:levels']);
+            if (!isNaN(levels) && levels > 0) bldg.height = Math.round(levels * 3);
+          }
+
+          results.push(bldg);
+        }
+      }
+      console.log(
+        `  Overpass returned ${json.elements.length} elements → ${results.length} buildings`,
+      );
+    } else {
+      console.warn(`  ⚠ Overpass responded with ${res.status}`);
+    }
+  } catch (err) {
+    console.warn('  ⚠ Overpass fetch failed:', err);
+  }
+
+  return results;
+}
+
 // ── Write level file ─────────────────────────────────────────────────
 
 function writeLevelFile(
@@ -219,6 +415,8 @@ function writeLevelFile(
   course: CourseData,
   altitude: number[],
   water: WaterPolygon[],
+  buildings: BuildingPolygon[],
+  extras?: { marshals?: [number, number][]; roads?: [number, number][][]; hide?: boolean },
 ) {
   // Strip Convex internal fields, keep only what we need
   const cleanCourse = {
@@ -226,7 +424,17 @@ function writeLevelFile(
     coordinates: course.coordinates,
     points: course.points,
   };
-  const data = { id, name, course: cleanCourse, altitude, water };
+  const data: Record<string, unknown> = { id, name, course: cleanCourse, altitude, water };
+
+  if (buildings.length > 0) {
+    data.buildings = buildings;
+  }
+
+  // Preserve manually-added fields
+  if (extras?.marshals && extras.marshals.length > 0) data.marshals = extras.marshals;
+  if (extras?.roads && extras.roads.length > 0) data.roads = extras.roads;
+  if (extras?.hide !== undefined) data.hide = extras.hide;
+
   const json = JSON.stringify(data, null, 2);
 
   const filePath = resolve(LEVELS_DIR, `${id}.map.ts`);
@@ -285,23 +493,38 @@ function regenerateIndex() {
 
 // ── Read existing level ──────────────────────────────────────────────
 
-function readExistingLevel(id: string): { course: CourseData; altitude: number[]; water: WaterPolygon[]; name: string } | null {
+interface ExistingLevel {
+  course: CourseData;
+  altitude: number[];
+  water: WaterPolygon[];
+  name: string;
+  buildings?: BuildingPolygon[];
+  marshals?: [number, number][];
+  roads?: [number, number][][];
+  hide?: boolean;
+}
+
+async function readExistingLevel(id: string): Promise<ExistingLevel | null> {
   const filePath = resolve(LEVELS_DIR, `${id}.map.ts`);
   if (!existsSync(filePath)) return null;
 
   try {
-    const src = readFileSync(filePath, 'utf-8');
-    // Extract the JSON object from: const level: LevelData = { ... };
-    const match = src.match(/const level: LevelData = (\{[\s\S]*\});/);
-    if (!match) return null;
-    const data = JSON.parse(match[1]);
+    // Dynamically import the TS module (works because we run under tsx)
+    const mod = await import(filePath);
+    const data = mod.default;
+    if (!data) return null;
     return {
       course: data.course,
       altitude: data.altitude,
       water: data.water,
       name: data.name,
+      buildings: data.buildings,
+      marshals: data.marshals,
+      roads: data.roads,
+      hide: data.hide,
     };
-  } catch {
+  } catch (err) {
+    console.warn(`  ⚠ Could not import existing level "${id}":`, err);
     return null;
   }
 }
@@ -313,19 +536,23 @@ async function main() {
   console.log(`\n🎮 Fetching ${isPartial ? fetchType : 'all data'} for "${eventId}" …\n`);
 
   // For partial updates, load the existing level file first
-  const existing = isPartial ? readExistingLevel(eventId) : null;
+  const existing = isPartial ? await readExistingLevel(eventId) : null;
   if (isPartial && !existing) {
     console.error(`❌ Cannot do partial update: no existing level file for "${eventId}".`);
     console.error(`   Run without --type first to fetch everything.`);
     process.exit(1);
   }
 
+  const MAX_FEATURE_DIST = 200; // metres — only keep features within this distance of the path
+  const MAX_BUILDINGS = 50;   // cap the number of buildings to the N closest to the path
+
   // Determine what to fetch
   const needCourse = fetchType === 'all' || fetchType === 'course';
   const needAltitude = fetchType === 'all' || fetchType === 'altitude';
   const needWater = fetchType === 'all' || fetchType === 'water';
+  const needBuildings = fetchType === 'all' || fetchType === 'buildings';
 
-  // Course is always needed for altitude/water coords, but we can reuse existing
+  // Course is always needed for altitude/water/buildings coords, but we can reuse existing
   let course: CourseData;
   if (needCourse) {
     course = await fetchCourse(eventId);
@@ -334,18 +561,33 @@ async function main() {
   }
 
   // Fetch only what's requested, reuse existing for the rest
-  const [altitude, water] = await Promise.all([
+  const [altitude, rawWater, rawBuildings] = await Promise.all([
     needAltitude
       ? fetchElevations(course.coordinates)
       : Promise.resolve(existing!.altitude),
     needWater
       ? fetchWaterFeatures(course.coordinates, 600)
       : Promise.resolve(existing!.water),
+    needBuildings
+      ? fetchBuildingFeatures(course.coordinates, 600)
+      : Promise.resolve(existing?.buildings ?? []),
   ]);
+
+  // Filter water & buildings to within MAX_FEATURE_DIST of the path
+  const water = needWater
+    ? filterWaterByDistance(rawWater, course.coordinates, MAX_FEATURE_DIST)
+    : rawWater;
+  const buildings = needBuildings
+    ? filterBuildingsByDistance(rawBuildings, course.coordinates, MAX_FEATURE_DIST, MAX_BUILDINGS)
+    : rawBuildings;
 
   const name = displayName || existing?.name || eventId.charAt(0).toUpperCase() + eventId.slice(1);
 
-  writeLevelFile(eventId, name, course, altitude, water);
+  writeLevelFile(eventId, name, course, altitude, water, buildings, {
+    marshals: existing?.marshals,
+    roads: existing?.roads,
+    hide: existing?.hide,
+  });
   regenerateIndex();
 
   console.log(`\nDone! You can now use event="${eventId}" in the game.\n`);

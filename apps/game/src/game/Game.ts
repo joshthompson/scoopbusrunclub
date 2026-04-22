@@ -51,6 +51,8 @@ import {
   DRIFT_GRIP,
   DRIFT_HIGH_SPEED_GRIP_FACTOR,
   ELASTIC_SPEED_PENALTY,
+  ENGINE_VIBE_AMPLITUDE,
+  ENGINE_VIBE_FREQUENCY,
   GRAVITY,
   MODE,
   PATH_HALF_WIDTH,
@@ -78,6 +80,8 @@ import {
   WATER_BOB_SPEED,
   WATER_DRIFT_GRIP,
   WATER_SINK,
+  WAVE_DURATION,
+  HIGH_FIVE_DURATION,
 } from './constants';
 import {
   type BuildingCollider,
@@ -126,6 +130,11 @@ import {
   packRemoteRiders,
 } from './systems/runners';
 import {
+  updateRunnerInteractions,
+  type PlayerRunnerState,
+} from './systems/runnerInteractions';
+import { poseWaving, poseHighFive } from './objects/RunnerModel';
+import {
   buildTrees,
   placeKmSigns,
   buildGates as buildGatesSystem,
@@ -167,8 +176,10 @@ export class Game {
   private elasticPenaltyActive = false; // true while bus overlaps an elastic object (prevents re-applying penalty)
   private prevSlopePitch = 0; // previous frame's terrain pitch for detecting crests
   private waterBobPhase = 0; // accumulator for water surface bobbing
+  private engineVibePhase = 0; // accumulator for engine vibration
   private cameraYawOffset = 0; // smoothed yaw offset for reverse camera (0 = forward, π = reverse)
   private busMesh: TransformNode | null = null;
+  private busBodyShell: TransformNode | null = null;
   private scoopPivot: TransformNode | null = null;
   private frontWheelLeft: TransformNode | null = null;
   private frontWheelRight: TransformNode | null = null;
@@ -271,6 +282,15 @@ export class Game {
   private localRunnerScoopVelY = 0;
   private localRunnerScoopVelZ = 0;
   private localRunnerScoopSitTimer = 0;
+
+  // Player runner interaction state (wave / high-five)
+  private playerInteraction: PlayerRunnerState = {
+    x: 0, z: 0, yaw: 0, speed: 0,
+    canInteract: false,
+    interaction: 'none',
+    interactionTimer: 0,
+    interactionSide: 1,
+  };
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -387,6 +407,7 @@ export class Game {
 
     this.remotePlayers.set(peerId, {
       mesh: result.root,
+      bodyShell: result.bodyShell,
       scoopPivot,
       scoopAnimTimer: 0,
       state: null,
@@ -1110,6 +1131,7 @@ export class Game {
   private async buildBus() {
     const result = await createBusModel(this.scene);
     this.busMesh = result.root;
+    this.busBodyShell = result.bodyShell;
     this.scoopPivot = result.scoopPivot;
 
     // Tint local bus to match player colour
@@ -1496,11 +1518,12 @@ export class Game {
 
   // ---------- Remote bus interpolation ----------
 
-  private updateRemoteBusMeshes(dt: number) {
+  private updateRemoteBusMeshes(dt: number, engineVibeOffset: number) {
     updateRemotePlayersSystem({
       remotePlayers: this.remotePlayers,
       dt,
       busRoofY: BUS_ROOF_Y,
+      engineVibeOffset,
     });
   }
 
@@ -1509,6 +1532,10 @@ export class Game {
   private update(dt: number) {
     // If paused, keep rendering the scene but skip all simulation
     if (this.paused) return;
+
+    // --- Engine vibration (applied every frame so idle rumble is always present) ---
+    this.engineVibePhase += dt * ENGINE_VIBE_FREQUENCY * Math.PI * 2;
+    const engineVibeOffset = Math.sin(this.engineVibePhase) * ENGINE_VIBE_AMPLITUDE;
 
     // --- Countdown phase ---
     if (this.raceState === 'countdown') {
@@ -1545,6 +1572,7 @@ export class Game {
         elasticObjects: this.elasticObjects,
         remotePlayers: this.remotePlayers,
         buildingColliders: this.buildingColliders,
+        engineVibeOffset,
       }, dt);
       this.pendingScoopEvents.push(...runnerResult.scoopEvents);
       if (runnerResult.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
@@ -1555,14 +1583,19 @@ export class Game {
       for (let _i = 0; _i < runnerResult.scoopCount; _i++) {
         this.callbacks.onScoopRunner();
       }
+      // NPC wave / high-five during countdown
+      updateRunnerInteractions(this.runners, null, dt);
       updateMarshals(this.marshals, dt);
-      this.updateRemoteBusMeshes(dt);
+      this.updateRemoteBusMeshes(dt, engineVibeOffset);
 
       // Ensure bus mesh is positioned (so it's visible during countdown)
       if (this.busMesh) {
         this.busMesh.position.copyFrom(this.busPos);
         this.busMesh.rotation.y = this.busYaw;
         this.busMesh.setEnabled(this.localPlayerRole === 'bus');
+      }
+      if (this.busBodyShell) {
+        this.busBodyShell.position.y = engineVibeOffset;
       }
       if (this.localPlayerRole === 'runner') {
         this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed, busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
@@ -1650,6 +1683,7 @@ export class Game {
           elasticObjects: this.elasticObjects,
           remotePlayers: this.remotePlayers,
           buildingColliders: this.buildingColliders,
+          engineVibeOffset,
         }, dt);
         this.pendingScoopEvents.push(...runnerResult2.scoopEvents);
         if (runnerResult2.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
@@ -1660,9 +1694,11 @@ export class Game {
         for (let _i = 0; _i < runnerResult2.scoopCount; _i++) {
           this.callbacks.onScoopRunner();
         }
+        // NPC wave / high-five during finished state
+        updateRunnerInteractions(this.runners, null, dt);
         updateMarshals(this.marshals, dt);
         updateElasticObjects(this.elasticObjects, dt);
-        this.updateRemoteBusMeshes(dt);
+        this.updateRemoteBusMeshes(dt, engineVibeOffset);
         if (this.minimap) {
           this.minimap.draw(
             this.busPos.x,
@@ -1953,6 +1989,11 @@ export class Game {
         this.busMesh.rotation.x = -this.busPitch; // negative to tilt forward when going uphill
       }
 
+      // Apply engine vibration to body shell (everything except wheels)
+      if (this.busBodyShell) {
+        this.busBodyShell.position.y = engineVibeOffset;
+      }
+
       // --- Animate scoop plow (flick up + forward then back) ---
       if (this.scoopPivot) {
         if (this.scoopAnimTimer > 0) {
@@ -2021,6 +2062,7 @@ export class Game {
       elasticObjects: this.elasticObjects,
       remotePlayers: this.remotePlayers,
       buildingColliders: this.buildingColliders,
+      engineVibeOffset,
     }, dt);
     this.pendingScoopEvents.push(...runnerResult3.scoopEvents);
     if (runnerResult3.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
@@ -2032,6 +2074,39 @@ export class Game {
       this.callbacks.onScoopRunner();
     }
 
+    // Update runner social interactions (wave / high-five)
+    {
+      const isRunner = this.localPlayerRole === 'runner';
+      const canInteract = isRunner
+        && this.localRunnerScoopState === 'free'
+        && !this.busAirborne
+        && Math.abs(this.busSpeed) > 0.3;
+
+      this.playerInteraction.x = this.busPos.x;
+      this.playerInteraction.z = this.busPos.z;
+      this.playerInteraction.yaw = this.busYaw;
+      this.playerInteraction.speed = this.busSpeed;
+      this.playerInteraction.canInteract = canInteract;
+
+      updateRunnerInteractions(
+        this.runners,
+        isRunner ? this.playerInteraction : null,
+        dt,
+      );
+
+      // Apply interaction pose to the local player runner (override after normal pose)
+      if (isRunner && this.localRunnerModel && this.playerInteraction.interaction !== 'none') {
+        const pi = this.playerInteraction;
+        const totalDur = pi.interaction === 'highfive' ? HIGH_FIVE_DURATION : WAVE_DURATION;
+        const t = 1 - pi.interactionTimer / totalDur;
+        if (pi.interaction === 'waving') {
+          poseWaving(this.localRunnerModel, this.localRunnerAnimPhase, t, pi.interactionSide);
+        } else {
+          poseHighFive(this.localRunnerModel, t, pi.interactionSide);
+        }
+      }
+    }
+
     // Update marshals
     updateMarshals(this.marshals, dt);
 
@@ -2039,7 +2114,7 @@ export class Game {
     updateElasticObjects(this.elasticObjects, dt);
 
     // --- Update remote bus meshes (multiplayer interpolation) ---
-    this.updateRemoteBusMeshes(dt);
+    this.updateRemoteBusMeshes(dt, engineVibeOffset);
 
     // Minimap
     if (this.minimap) {

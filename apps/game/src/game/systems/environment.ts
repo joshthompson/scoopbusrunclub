@@ -57,11 +57,17 @@ export function buildTrees(
   trunkMat.diffuseColor = new Color3(0.4, 0.26, 0.13);
   trunkMat.specularColor = Color3.Black();
 
-  const foliageMats = [
-    makeColor(scene, 'foliage0', new Color3(0.18, 0.52, 0.15)),
-    makeColor(scene, 'foliage1', new Color3(0.22, 0.58, 0.18)),
-    makeColor(scene, 'foliage2', new Color3(0.15, 0.45, 0.12)),
-  ];
+  // Generate a spectrum of foliage shades so every tree looks slightly different
+  const FOLIAGE_SHADE_COUNT = 12;
+  const foliageMats: StandardMaterial[] = [];
+  for (let i = 0; i < FOLIAGE_SHADE_COUNT; i++) {
+    const t = i / (FOLIAGE_SHADE_COUNT - 1); // 0 → 1
+    // Hue shifts from yellow-green (t=0) through mid-green to blue-green (t=1)
+    const r = 0.10 + 0.18 * (1 - t);          // 0.28 → 0.10
+    const g = 0.38 + 0.24 * Math.sin(t * Math.PI); // peaks mid-range
+    const b = 0.08 + 0.14 * t;                // 0.08 → 0.22
+    foliageMats.push(makeColor(scene, `foliage${i}`, new Color3(r, g, b)));
+  }
 
   let placed = 0;
   let attempts = 0;

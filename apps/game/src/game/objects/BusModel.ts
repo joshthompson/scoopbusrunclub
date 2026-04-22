@@ -14,6 +14,8 @@ import scoopModelUrl from '../../assets/models/scoop.glb?url';
 
 export interface BusModelResult {
   root: TransformNode;
+  /** Everything except wheels — animate position.y for engine vibration. */
+  bodyShell: TransformNode;
   scoopPivot: TransformNode;
   frontWheelLeft: TransformNode;
   frontWheelRight: TransformNode;
@@ -31,6 +33,10 @@ export interface BusModelResult {
  */
 export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   const root = new TransformNode('bus', scene);
+
+  // Shell node for everything above the wheels — animated for engine vibration
+  const bodyShell = new TransformNode('busBodyShell', scene);
+  bodyShell.parent = root;
 
   // ═══════════════════════════════════════
   // Materials
@@ -63,7 +69,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   const body = MeshBuilder.CreateBox('busBody', { width: bodyW, height: bodyH, depth: bodyL }, scene);
   body.material = yellow;
   body.position = new Vector3(0, floorY + bodyH / 2, 0);
-  body.parent = root;
+  body.parent = bodyShell;
 
   // ═══════════════════════════════════════
   // Hood / engine section (slightly lower, in front)
@@ -72,13 +78,13 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   const hood = MeshBuilder.CreateBox('busHood', { width: bodyW, height: hoodH, depth: hoodL }, scene);
   hood.material = yellow;
   hood.position = new Vector3(0, floorY + hoodH / 2, bodyL / 2 + hoodL / 2);
-  hood.parent = root;
+  hood.parent = bodyShell;
 
   // Grille on front of hood
   const grille = MeshBuilder.CreateBox('busGrille', { width: bodyW * 0.7, height: hoodH * 0.5, depth: 0.06 }, scene);
   grille.material = darkGrey;
   grille.position = new Vector3(0, floorY + hoodH * 0.35, bodyL / 2 + hoodL + 0.02);
-  grille.parent = root;
+  grille.parent = bodyShell;
 
   // ═══════════════════════════════════════
   // Roof
@@ -86,7 +92,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   const roof = MeshBuilder.CreateBox('busRoof', { width: bodyW + 0.1, height: roofH, depth: bodyL + 0.1 }, scene);
   roof.material = darkYellow;
   roof.position = new Vector3(0, floorY + bodyH + roofH / 2, 0);
-  roof.parent = root;
+  roof.parent = bodyShell;
 
   // ═══════════════════════════════════════
   // Undercarriage
@@ -95,7 +101,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   const under = MeshBuilder.CreateBox('busUnder', { width: bodyW - 0.2, height: underH, depth: bodyL + hoodL }, scene);
   under.material = black;
   under.position = new Vector3(0, floorY - underH / 2, hoodL / 2);
-  under.parent = root;
+  under.parent = bodyShell;
 
   // ═══════════════════════════════════════
   // Bumpers (front + back chrome bars)
@@ -104,12 +110,12 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   const frontBumper = MeshBuilder.CreateBox('busFBumper', { width: bodyW + 0.15, height: bumperH, depth: 0.15 }, scene);
   frontBumper.material = chrome;
   frontBumper.position = new Vector3(0, floorY - 0.1, bodyL / 2 + hoodL + 0.05);
-  frontBumper.parent = root;
+  frontBumper.parent = bodyShell;
 
   const rearBumper = MeshBuilder.CreateBox('busRBumper', { width: bodyW + 0.15, height: bumperH, depth: 0.15 }, scene);
   rearBumper.material = chrome;
   rearBumper.position = new Vector3(0, floorY - 0.1, -bodyL / 2 - 0.05);
-  rearBumper.parent = root;
+  rearBumper.parent = bodyShell;
 
   // ═══════════════════════════════════════
   // Wheels (4 wheels — 2 front, 2 rear)
@@ -190,7 +196,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
       }, scene);
       win.material = windowBlue;
       win.position = new Vector3(side * (bodyW / 2 + 0.02), winY, wz);
-      win.parent = root;
+      win.parent = bodyShell;
     }
   }
 
@@ -202,7 +208,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   }, scene);
   windshield.material = windowBlue;
   windshield.position = new Vector3(0, floorY + bodyH * 0.65, bodyL / 2 + 0.02);
-  windshield.parent = root;
+  windshield.parent = bodyShell;
 
   // Rear window
   const rearWin = MeshBuilder.CreateBox('rearWin', {
@@ -212,7 +218,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   }, scene);
   rearWin.material = windowBlue;
   rearWin.position = new Vector3(0, floorY + bodyH * 0.65, -bodyL / 2 - 0.02);
-  rearWin.parent = root;
+  rearWin.parent = bodyShell;
 
   // ═══════════════════════════════════════
   // Headlights (front, on hood)
@@ -226,7 +232,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
     hl.material = white;
     hl.rotation.x = Math.PI / 2;
     hl.position = new Vector3(side * bodyW * 0.35, floorY + hoodH * 0.6, bodyL / 2 + hoodL + 0.03);
-    hl.parent = root;
+    hl.parent = bodyShell;
   }
 
   // ═══════════════════════════════════════
@@ -240,7 +246,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
     }, scene);
     tl.material = red;
     tl.position = new Vector3(side * bodyW * 0.38, floorY + 0.3, -bodyL / 2 - 0.02);
-    tl.parent = root;
+    tl.parent = bodyShell;
   }
 
   // ═══════════════════════════════════════
@@ -253,7 +259,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   }, scene);
   stopSign.material = red;
   stopSign.position = new Vector3(-bodyW / 2 - 0.25, floorY + bodyH * 0.75, bodyL / 2 - 0.5);
-  stopSign.parent = root;
+  stopSign.parent = bodyShell;
 
   // ═══════════════════════════════════════
   // Yellow stripes / trim along sides
@@ -267,7 +273,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
     }, scene);
     strip.material = black;
     strip.position = new Vector3(side * (bodyW / 2 + 0.02), winY - winH / 2 - 0.08, 0);
-    strip.parent = root;
+    strip.parent = bodyShell;
   }
 
   // ═══════════════════════════════════════
@@ -278,7 +284,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   // Pivot at bus front, ground level — animation rotates/translates from here
   const scoopPivot = new TransformNode('scoopPivot', scene);
   scoopPivot.position = new Vector3(0, floorY - 0.55, bodyL / 2 + hoodL + 0.8);
-  scoopPivot.parent = root;
+  scoopPivot.parent = bodyShell;
 
   // Load GLB model
   const result = await SceneLoader.ImportMeshAsync('', '', scoopModelUrl, scene);
@@ -361,7 +367,7 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   frontLabelMat.specularColor = Color3.Black();
   frontLabel.material = frontLabelMat;
   frontLabel.position = new Vector3(0, floorY + hoodH + 0.35, bodyL / 2 + 0.03);
-  frontLabel.parent = root;
+  frontLabel.parent = bodyShell;
 
   // ═══════════════════════════════════════
   // "Scoop Bus Run Club" text on sides
@@ -401,10 +407,10 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
       sideLabel.rotation.y = -Math.PI / 2; // face left
     }
     sideLabel.position = new Vector3(side * (bodyW / 2 + 0.04), floorY + bodyH * 0.42, -0.2);
-    sideLabel.parent = root;
+    sideLabel.parent = bodyShell;
   }
 
-  return { root, scoopPivot, frontWheelLeft, frontWheelRight };
+  return { root, bodyShell, scoopPivot, frontWheelLeft, frontWheelRight };
 }
 
 // ── Player color palettes ──
