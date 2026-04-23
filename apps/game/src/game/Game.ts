@@ -59,6 +59,7 @@ import {
   MODE,
   PATH_HALF_WIDTH,
   PATH_MASK_RESOLUTION,
+  TREE_COUNT,
   RUNNER_COLLISION_RADIUS,
   RUNNER_DOWNHILL_SLOPE_THRESHOLD,
   RUNNER_DOWNHILL_SPEED_BOOST,
@@ -321,6 +322,9 @@ export class Game {
   private demoMode = false;
   private demoCamProgress = 0; // 0→1 along the path
   private resizeHandler: (() => void) | null = null;
+  private mobileLikeDevice = false;
+  private effectivePathMaskResolution = PATH_MASK_RESOLUTION;
+  private effectiveTreeCount = TREE_COUNT;
 
   // Local player role
   private localPlayerRole: 'bus' | 'runner' = 'bus';
@@ -894,6 +898,33 @@ export class Game {
     await this.initScene(eventId, { skipBus: false, skipRunners: false, skipInput: false });
   }
 
+  private detectMobileLikeDevice(): boolean {
+    const ua = navigator.userAgent.toLowerCase();
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    const touchPoints = navigator.maxTouchPoints > 0;
+    return /iphone|ipad|ipod|android|mobile|mobi/.test(ua) || coarsePointer || touchPoints;
+  }
+
+  private configurePerformanceProfile() {
+    this.mobileLikeDevice = this.detectMobileLikeDevice();
+
+    if (this.mobileLikeDevice) {
+      const dpr = window.devicePixelRatio || 1;
+      const targetMaxDpr = 1.5;
+      const targetDpr = Math.min(dpr, targetMaxDpr);
+      this.engine.setHardwareScalingLevel(dpr / targetDpr);
+      this.effectivePathMaskResolution = Math.min(PATH_MASK_RESOLUTION, 2048);
+      this.effectiveTreeCount = this.demoMode
+        ? Math.max(80, Math.floor(TREE_COUNT * 0.08))
+        : Math.max(260, Math.floor(TREE_COUNT * 0.35));
+      return;
+    }
+
+    this.engine.setHardwareScalingLevel(1);
+    this.effectivePathMaskResolution = PATH_MASK_RESOLUTION;
+    this.effectiveTreeCount = TREE_COUNT;
+  }
+
   private async initScene(
     eventId: string,
     opts: InitSceneOptions,
@@ -944,6 +975,7 @@ export class Game {
 
     // Engine + scene
     this.engine = new Engine(this.canvas, true, { stencil: true });
+    this.configurePerformanceProfile();
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.68, 0.88, 1.0, 1); // bright sky blue fallback
 
@@ -978,7 +1010,16 @@ export class Game {
     this.buildingLodEntries = buildingResult.lodEntries;
     this.updateBuildingLodForPlayer();
     if (level.trees !== false) {
-      const treeResult = buildTrees(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z), this.waterZones, this.startCircleCenter, this.roadPolylines, this.trailPolylines);
+      const treeResult = buildTrees(
+        this.scene,
+        this.pathPositions,
+        (x, z) => this.getGroundY(x, z),
+        this.waterZones,
+        this.startCircleCenter,
+        this.roadPolylines,
+        this.trailPolylines,
+        this.effectiveTreeCount,
+      );
       this.elasticObjects.push(...treeResult.elasticObjects);
       this.solidObstacles.push(...treeResult.solidObstacles);
     }
@@ -1201,7 +1242,7 @@ export class Game {
       pathHalfWidth: PATH_HALF_WIDTH,
       roadHalfWidth: PATH_HALF_WIDTH * 1.4,
       edgeSoftness: 1.5,
-      maskResolution: PATH_MASK_RESOLUTION,
+      maskResolution: this.effectivePathMaskResolution,
       startLine: startLineInfo,
       startCircle: startCircleInfo,
       pathTextureUrl: this.pathTextureUrl,

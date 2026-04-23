@@ -49,6 +49,7 @@ export function buildTrees(
   startCircleCenter: { x: number; z: number } | null,
   roads: [number, number][][] = [],
   trails: [number, number][][] = [],
+  treeCount = TREE_COUNT,
 ): PhysicsObjectResult {
   const result: PhysicsObjectResult = { elasticObjects: [], solidObstacles: [] };
   if (pathPositions.length < 2) return result;
@@ -74,7 +75,7 @@ export function buildTrees(
   let placed = 0;
   let attempts = 0;
 
-  while (placed < TREE_COUNT && attempts < TREE_COUNT * 5) {
+  while (placed < treeCount && attempts < treeCount * 5) {
     attempts++;
 
     const pathIdx = Math.floor(rand() * pathPositions.length);
