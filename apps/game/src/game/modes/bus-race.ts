@@ -10,6 +10,7 @@ export const busRaceMode: GameModeConfig = {
   type: 'bus-race',
   label: 'Bus Race',
   description: 'All players are buses — race to the finish!',
+  items: false,
   minPlayers: 2,
   maxPlayers: 4,
   usesLevelSelect: true,

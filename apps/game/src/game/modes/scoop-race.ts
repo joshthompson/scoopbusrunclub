@@ -11,6 +11,7 @@ export const scoopRaceMode: GameModeConfig = {
   type: 'scoop-race',
   label: 'Scoop Race',
   description: 'One bus, rest are runners — classic scoop!',
+  items: false,
   minPlayers: 2,
   maxPlayers: 4,
   usesLevelSelect: true,

@@ -3,6 +3,7 @@ import type { LevelData } from '../levels';
 import type { PlayerState } from '../multiplayer';
 import type { MarshalModelResult } from './objects/MarshalModel';
 import type { RunnerModelResult } from './objects/RunnerModel';
+import type { PowerUpId } from './systems/powerups';
 
 export type GameMode = 'SCOOP_THEN_RUN' | 'SCOOP_THEN_RIDE';
 export type RaceState = 'countdown' | 'racing' | 'finished';
@@ -19,6 +20,7 @@ export interface GameCallbacks {
   onCourseProgress?: (coveredKm: number, totalKm: number) => void;
   onFinish?: (timeSeconds: number) => void;
   onPositionChange?: (position: number, total: number) => void;
+  onPowerUpDisplayChange?: (powerUp: PowerUpId | null, rolling: boolean) => void;
 }
 
 export type RunnerInteraction = 'none' | 'waving' | 'highfive';

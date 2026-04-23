@@ -22,6 +22,32 @@
         z-index: 10;
       }
       #hud p { margin-bottom: 4px; }
+      #powerup-hud {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        width: min(220px, 30vw);
+        height: min(220px, 30vw);
+        pointer-events: auto;
+        cursor: pointer;
+        z-index: 12;
+        background: rgba(0,0,0,0.4);
+        border-radius: 14px;
+        border: 2px solid rgba(255,255,255,0.35);
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+      }
+      #powerup-hud img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      #powerup-hud.rolling {
+        border-color: rgba(255,193,7,0.85);
+      }
       #minimap {
         position: absolute;
         bottom: 20px;

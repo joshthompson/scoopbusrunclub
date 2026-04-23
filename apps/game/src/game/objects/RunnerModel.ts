@@ -25,6 +25,8 @@ export interface RunnerModelResult {
   rightArm: TransformNode;
   leftLeg: TransformNode;
   rightLeg: TransformNode;
+  leftShoe: Mesh;
+  rightShoe: Mesh;
 }
 
 /**
@@ -52,6 +54,7 @@ export function createRunnerModel(
   const shirtMat = makeMat(`rShirt_${id}`, tshirtColor, scene);
   const skinMat = makeMat(`rSkin_${id}`, skin, scene);
   const shortsMat = makeMat(`rShorts_${id}`, new Color3(0.08, 0.08, 0.08), scene);
+  const shoeMat = makeMat(`rShoe_${id}`, new Color3(1, 1, 1), scene);
   const hairMat = makeMat(`rHair_${id}`, new Color3(
     0.15 + Math.random() * 0.25,
     0.1 + Math.random() * 0.15,
@@ -187,12 +190,35 @@ export function createRunnerModel(
   rightLegLower.position.y = -legH * 3 / 4;
   rightLegLower.parent = rightLegPivot;
 
+  // Shoes (hidden by default; enabled by shoe power-up)
+  const shoeH = 0.08;
+  const shoeD = 0.28;
+  const shoeW = legW * 1.05;
+
+  const leftShoe = MeshBuilder.CreateBox(`rLShoe_${id}`, {
+    width: shoeW, height: shoeH, depth: shoeD,
+  }, scene);
+  leftShoe.material = shoeMat;
+  leftShoe.position.set(0, -legH - shoeH * 0.5, shoeD * 0.2);
+  leftShoe.parent = leftLegPivot;
+  leftShoe.setEnabled(false);
+
+  const rightShoe = MeshBuilder.CreateBox(`rRShoe_${id}`, {
+    width: shoeW, height: shoeH, depth: shoeD,
+  }, scene);
+  rightShoe.material = shoeMat;
+  rightShoe.position.set(0, -legH - shoeH * 0.5, shoeD * 0.2);
+  rightShoe.parent = rightLegPivot;
+  rightShoe.setEnabled(false);
+
   return {
     root,
     leftArm: leftArmPivot,
     rightArm: rightArmPivot,
     leftLeg: leftLegPivot,
     rightLeg: rightLegPivot,
+    leftShoe,
+    rightShoe,
   };
 }
 

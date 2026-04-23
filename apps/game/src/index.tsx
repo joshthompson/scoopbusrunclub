@@ -13,6 +13,13 @@ import { mp, MAX_PLAYERS } from './multiplayer';
 import type { PlayerState, ScoopEvent } from './multiplayer';
 import { getGameModeConfig, GAME_TYPE_LABELS } from './game/modes';
 import type { GameType, TeamColor } from './game/modes';
+import type { ItemCollectEvent } from './multiplayer';
+import type { PowerUpId } from './game/systems/powerups';
+import powerUpFika from './assets/power-ups/fika.png';
+import powerUpFire from './assets/power-ups/fire.png';
+import powerUpIce from './assets/power-ups/ice.png';
+import powerUpMallet from './assets/power-ups/mallet.png';
+import powerUpShoe from './assets/power-ups/shoe.png';
 
 // Babylon.js needs earcut on window for CreatePolygon
 (window as any).earcut = earcut;
@@ -28,6 +35,14 @@ const PLAYER_COLOR_INFO = [
 type GameMode = 'single' | 'host' | 'join';
 type PlayerRole = 'bus' | 'runner';
 type Screen = 'title' | 'level-select' | 'character-select' | 'game-type-select' | 'lobby' | 'loading' | 'playing';
+
+const POWER_UP_IMAGE_BY_ID: Record<PowerUpId, string> = {
+  fika: powerUpFika,
+  fire: powerUpFire,
+  ice: powerUpIce,
+  mallet: powerUpMallet,
+  shoe: powerUpShoe,
+};
 
 /** Format seconds as M:SS */
 function fmtTime(s: number): string {
@@ -64,6 +79,8 @@ function App() {
   const [finishTime, setFinishTime] = createSignal(0);
   const [racePosition, setRacePosition] = createSignal({ position: 1, total: 1 });
   const [keepDriving, setKeepDriving] = createSignal(false);
+  const [powerUpDisplay, setPowerUpDisplay] = createSignal<PowerUpId | null>(null);
+  const [powerUpRolling, setPowerUpRolling] = createSignal(false);
 
   // Pause menu
   const [paused, setPaused] = createSignal(false);
@@ -217,6 +234,8 @@ function App() {
     setKeepDriving(false);
     setRacePosition({ position: 1, total: 1 });
     setRemoteStates(new Map());
+    setPowerUpDisplay(null);
+    setPowerUpRolling(false);
 
     // Validate
     if (!levels[eventId]) {
@@ -249,9 +268,14 @@ function App() {
       onCourseProgress: (covered: number, total: number) => setCourseProgress({ covered, total }),
       onFinish: (time: number) => setFinishTime(time),
       onPositionChange: (pos: number, total: number) => setRacePosition({ position: pos, total }),
+      onPowerUpDisplayChange: (powerUp, rolling) => {
+        setPowerUpDisplay(powerUp);
+        setPowerUpRolling(rolling);
+      },
     }, minimapRef, {
       localPlayerRole: resolvedRole,
       gameType: gameType(),
+      items: getGameModeConfig(gameType()).items,
     });
 
     activeGame = game;
@@ -314,6 +338,11 @@ function App() {
         );
       };
 
+      // Listen for remote item collection events
+      mp.onItemEvent = (evt: ItemCollectEvent, _peerId: string) => {
+        game.handleRemoteItemCollect(evt);
+      };
+
       // Start sending local state at ~15 Hz + flush scoop events
       mpSendInterval = setInterval(() => {
         if (activeGame) {
@@ -322,6 +351,10 @@ function App() {
           const scoops = activeGame.flushScoopEvents();
           for (const evt of scoops) {
             mp.broadcastScoop(evt);
+          }
+          const itemEvents = activeGame.flushItemCollectEvents();
+          for (const evt of itemEvents) {
+            mp.broadcastItemCollect(evt);
           }
         }
       }, 66);
@@ -338,6 +371,10 @@ function App() {
   function handleReplay() {
     setPaused(false);
     startGame(currentEventId);
+  }
+
+  function handleUsePowerUp() {
+    activeGame?.useHeldPowerUp();
   }
 
   function handleExitToMenu() {
@@ -415,7 +452,21 @@ function App() {
       </Show>
       <Show when={screen() === 'playing'}>
         {/* Top-left HUD */}
-        <div id="hud">
+        <Show when={powerUpDisplay()}>
+          <div
+            id="powerup-hud"
+            classList={{ rolling: powerUpRolling() }}
+            onClick={handleUsePowerUp}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              handleUsePowerUp();
+            }}
+          >
+            <img src={POWER_UP_IMAGE_BY_ID[powerUpDisplay()!]} alt="Power-up" />
+          </div>
+        </Show>
+
+        <div id="hud" style={powerUpDisplay() ? { top: 'calc(min(220px, 30vw) + 24px)' } : undefined}>
           <Show when={isMultiplayerMode()}>
             <p style={{ 'font-size': 'clamp(10px, 1.5vw, 14px)', opacity: 0.7 }}>
               {GAME_TYPE_LABELS[gameType()]}

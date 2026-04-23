@@ -1,9 +1,8 @@
 /**
  * /test/{level} — Interactive SVG map viewer for level data.
  *
- * Renders: main path, other paths, building outlines, fences, water, roads.
+ * Renders: main path, other paths, building outlines, fences, water.
  * Supports drag-to-pan and scroll-to-zoom.
- * Sidebar with per-layer visibility + numbering toggles.
  */
 import { loadLevel, levels } from './levels';
 import type { LevelData } from './levels/types';
@@ -46,31 +45,20 @@ const COLORS = {
   track: '#a09060',
   steps: '#d08888',
   bridleway: '#90a040',
-  road: '#aaaaaa',
   buildingGrey: '#8899aa',
   buildingRed: '#c06050',
-  buildingKristineberg: '#6a4a2a',
   water: '#4488cc',
   river: '#3377bb',
   fence: '#806040',
   background: '#2a3a2a',
 };
 
-// ── Layer definitions for sidebar ───────────────────────────────────────
-
-interface LayerDef {
-  key: string;
-  label: string;
-  color: string;
-  count?: number;
-}
-
 // ── Main ────────────────────────────────────────────────────────────────
 
 async function main() {
   const infoEl = document.getElementById('info')!;
   const appEl = document.getElementById('app')!;
-  const sidebarEl = document.getElementById('sidebar')!;
+  const legendEl = document.getElementById('legend')!;
 
   // Parse level id from search param: ?event=haga
   const params = new URLSearchParams(window.location.search);
@@ -115,11 +103,6 @@ async function main() {
     points: w.coords.map(([lon, lat]) => gpsToLocal(lon, lat, origin)),
   }));
 
-  // Roads: each road is [lat, lon][] → [x, z][]
-  const roads = (level.roads ?? []).map((r) =>
-    r.map(([lat, lon]) => gpsToLocal(lon, lat, origin)),
-  );
-
   // Custom fences: [lat, lon] → [x, z]
   const fences = (level.customFences ?? []).map((f) => ({
     points: f.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)),
@@ -133,7 +116,6 @@ async function main() {
     ...buildings.flatMap((b) => b.points),
     ...waterFeatures.flatMap((w) => w.points),
     ...fences.flatMap((f) => f.points),
-    ...roads.flat(),
   ];
 
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -151,8 +133,12 @@ async function main() {
 
   // ── Build SVG ───────────────────────────────────────────────────────
 
+  // Note: SVG Y axis goes down, but our Z axis also goes "up" (north).
+  // We flip Z so north is at the top: svgY = -(z - minZ) mapped to [0, height].
+  // We use transform="scale(1,-1)" on a group and flip the viewBox.
+
   const svg = svgEl('svg', { viewBox: `${minX} ${-maxZ} ${width} ${height}` });
-  const g = svgEl('g');
+  const g = svgEl('g'); // main group — everything drawn here so viewBox panning works
   svg.appendChild(g);
 
   // Helper to convert [x, z] to SVG point string (z is flipped)
@@ -162,58 +148,8 @@ async function main() {
   const pathD = (pts: [number, number][]) =>
     pts.map(([x, z], i) => `${i === 0 ? 'M' : 'L'}${x},${-z}`).join(' ');
 
-  // Label font sizing
-  const labelFontSize = Math.max(width, height) * 0.006;
-  const labelStrokeWidth = Math.max(width, height) * 0.001;
-
-  function makeLabel(cx: number, cz: number, text: string, fillColor: string, strokeColor: string): SVGTextElement {
-    const label = svgEl('text', {
-      x: cx,
-      y: -cz,
-      'text-anchor': 'middle',
-      'dominant-baseline': 'central',
-      'font-size': labelFontSize,
-      'font-family': 'sans-serif',
-      'font-weight': 'bold',
-      fill: fillColor,
-      stroke: strokeColor,
-      'stroke-width': labelStrokeWidth,
-      'paint-order': 'stroke',
-    });
-    label.textContent = text;
-    return label;
-  }
-
-  // Track all label elements for zoom rescaling
-  const allLabels: SVGTextElement[] = [];
-
-  // ── SVG groups per layer (draw order: water → roads → buildings → paths → fences → course) ──
-
-  const gWater = svgEl('g');
-  const gWaterLabels = svgEl('g');
-  const gRoads = svgEl('g');
-  const gRoadLabels = svgEl('g');
-  const gBuildings = svgEl('g');
-  const gBuildingLabels = svgEl('g');
-  const gPaths = svgEl('g');
-  const gPathLabels = svgEl('g');
-  const gFences = svgEl('g');
-  const gFenceLabels = svgEl('g');
-  const gCourse = svgEl('g');
-
-  g.appendChild(gWater);
-  g.appendChild(gWaterLabels);
-  g.appendChild(gRoads);
-  g.appendChild(gRoadLabels);
-  g.appendChild(gBuildings);
-  g.appendChild(gBuildingLabels);
-  g.appendChild(gPaths);
-  g.appendChild(gPathLabels);
-  g.appendChild(gFences);
-  g.appendChild(gFenceLabels);
-  g.appendChild(gCourse);
-
   // --- Water ---
+  const waterLabels: SVGTextElement[] = [];
   for (let i = 0; i < waterFeatures.length; i++) {
     const w = waterFeatures[i];
     if (w.points.length < 3) continue;
@@ -225,42 +161,35 @@ async function main() {
       'stroke-width': 0.5,
       'stroke-opacity': 0.8,
     });
-    gWater.appendChild(poly);
+    g.appendChild(poly);
 
+    // Label water body with its array index
     const cx = w.points.reduce((s, p) => s + p[0], 0) / w.points.length;
     const cz = w.points.reduce((s, p) => s + p[1], 0) / w.points.length;
-    const label = makeLabel(cx, cz, String(i), '#88ccff', '#003366');
-    gWaterLabels.appendChild(label);
-    allLabels.push(label);
-  }
-
-  // --- Roads ---
-  for (let i = 0; i < roads.length; i++) {
-    const road = roads[i];
-    if (road.length < 2) continue;
-    const roadPath = svgEl('path', {
-      d: pathD(road),
-      fill: 'none',
-      stroke: COLORS.road,
-      'stroke-width': 3,
-      'stroke-opacity': 0.7,
-      'stroke-linecap': 'round',
-      'stroke-linejoin': 'round',
+    const label = svgEl('text', {
+      x: cx,
+      y: -cz,
+      'text-anchor': 'middle',
+      'dominant-baseline': 'central',
+      'font-size': Math.max(width, height) * 0.006,
+      'font-family': 'sans-serif',
+      'font-weight': 'bold',
+      fill: '#88ccff',
+      stroke: '#003366',
+      'stroke-width': Math.max(width, height) * 0.001,
+      'paint-order': 'stroke',
     });
-    gRoads.appendChild(roadPath);
-
-    // Label at midpoint
-    const mid = road[Math.floor(road.length / 2)];
-    const label = makeLabel(mid[0], mid[1], String(i), '#ddd', '#333');
-    gRoadLabels.appendChild(label);
-    allLabels.push(label);
+    label.textContent = String(i);
+    g.appendChild(label);
+    waterLabels.push(label);
   }
 
   // --- Buildings ---
+  const buildingLabels: SVGTextElement[] = [];
   for (let i = 0; i < buildings.length; i++) {
     const b = buildings[i];
     if (b.points.length < 3) continue;
-    const fill = b.type === 'red' ? COLORS.buildingRed : b.type === 'kristineberg' ? COLORS.buildingKristineberg : COLORS.buildingGrey;
+    const fill = b.type === 'red' ? COLORS.buildingRed : COLORS.buildingGrey;
     const poly = svgEl('polygon', {
       points: polyPoints(b.points),
       fill,
@@ -269,20 +198,34 @@ async function main() {
       'stroke-width': 0.3,
       'stroke-opacity': 1,
     });
-    gBuildings.appendChild(poly);
+    g.appendChild(poly);
 
+    // Label building with its array index
     const cx = b.points.reduce((s, p) => s + p[0], 0) / b.points.length;
     const cz = b.points.reduce((s, p) => s + p[1], 0) / b.points.length;
-    const label = makeLabel(cx, cz, String(i), '#fff', '#000');
-    gBuildingLabels.appendChild(label);
-    allLabels.push(label);
+    const label = svgEl('text', {
+      x: cx,
+      y: -cz,
+      'text-anchor': 'middle',
+      'dominant-baseline': 'central',
+      'font-size': Math.max(width, height) * 0.006,
+      'font-family': 'sans-serif',
+      'font-weight': 'bold',
+      fill: '#fff',
+      stroke: '#000',
+      'stroke-width': Math.max(width, height) * 0.001,
+      'paint-order': 'stroke',
+    });
+    label.textContent = String(i);
+    g.appendChild(label);
+    buildingLabels.push(label);
   }
 
   // --- Other paths ---
-  for (let i = 0; i < otherPaths.length; i++) {
-    const p = otherPaths[i];
+  for (const p of otherPaths) {
     if (p.points.length < 2) continue;
-    const color = COLORS[p.type as keyof typeof COLORS] ?? COLORS.path;
+    const color =
+      COLORS[p.type as keyof typeof COLORS] ?? COLORS.path;
     const path = svgEl('path', {
       d: pathD(p.points),
       fill: 'none',
@@ -292,19 +235,13 @@ async function main() {
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
     });
-    gPaths.appendChild(path);
-
-    // Label at midpoint
-    const mid = p.points[Math.floor(p.points.length / 2)];
-    const label = makeLabel(mid[0], mid[1], String(i), '#e0d0a0', '#3a3020');
-    gPathLabels.appendChild(label);
-    allLabels.push(label);
+    g.appendChild(path);
   }
 
   // --- Fences ---
-  for (let i = 0; i < fences.length; i++) {
-    const f = fences[i];
+  for (const f of fences) {
     if (f.points.length < 2) continue;
+    // Close the polygon
     const closedD = pathD(f.points) + ' Z';
     const fencePath = svgEl('path', {
       d: closedD,
@@ -315,8 +252,9 @@ async function main() {
       'stroke-opacity': 0.9,
       'stroke-linecap': 'round',
     });
-    gFences.appendChild(fencePath);
+    g.appendChild(fencePath);
 
+    // Fence posts as small circles at each vertex
     for (const [x, z] of f.points) {
       const circle = svgEl('circle', {
         cx: x,
@@ -325,18 +263,13 @@ async function main() {
         fill: COLORS.fence,
         'fill-opacity': 0.9,
       });
-      gFences.appendChild(circle);
+      g.appendChild(circle);
     }
-
-    // Label at midpoint
-    const mid = f.points[Math.floor(f.points.length / 2)];
-    const label = makeLabel(mid[0], mid[1], String(i), '#c0a060', '#302010');
-    gFenceLabels.appendChild(label);
-    allLabels.push(label);
   }
 
-  // --- Main course path ---
+  // --- Main path ---
   if (mainPath.length >= 2) {
+    // Thick outline
     const outline = svgEl('path', {
       d: pathD(mainPath),
       fill: 'none',
@@ -346,7 +279,7 @@ async function main() {
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
     });
-    gCourse.appendChild(outline);
+    g.appendChild(outline);
 
     const mainPathEl = svgEl('path', {
       d: pathD(mainPath),
@@ -357,7 +290,7 @@ async function main() {
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
     });
-    gCourse.appendChild(mainPathEl);
+    g.appendChild(mainPathEl);
 
     // Start marker
     const [sx, sz] = mainPath[0];
@@ -365,7 +298,7 @@ async function main() {
       cx: sx, cy: -sz, r: 3,
       fill: '#40d040', stroke: '#fff', 'stroke-width': 1,
     });
-    gCourse.appendChild(startMarker);
+    g.appendChild(startMarker);
 
     // End marker (if not a loop)
     const [ex, ez] = mainPath[mainPath.length - 1];
@@ -375,96 +308,29 @@ async function main() {
         cx: ex, cy: -ez, r: 3,
         fill: '#d04040', stroke: '#fff', 'stroke-width': 1,
       });
-      gCourse.appendChild(endMarker);
+      g.appendChild(endMarker);
     }
   }
 
   appEl.appendChild(svg);
 
-  // ── Sidebar ─────────────────────────────────────────────────────────
+  // ── Legend ───────────────────────────────────────────────────────────
 
-  const layers: (LayerDef & { geoGroup: SVGGElement; labelGroup: SVGGElement })[] = [
-    { key: 'course',    label: 'Course',     color: COLORS.mainPath,            count: 1,                       geoGroup: gCourse,    labelGroup: gCourse },
-    { key: 'paths',     label: 'Paths',      color: COLORS.path,               count: otherPaths.length,        geoGroup: gPaths,     labelGroup: gPathLabels },
-    { key: 'roads',     label: 'Roads',      color: COLORS.road,               count: roads.length,             geoGroup: gRoads,     labelGroup: gRoadLabels },
-    { key: 'buildings', label: 'Buildings',   color: COLORS.buildingGrey,       count: buildings.length,         geoGroup: gBuildings, labelGroup: gBuildingLabels },
-    { key: 'water',     label: 'Water',      color: COLORS.water,              count: waterFeatures.length,     geoGroup: gWater,     labelGroup: gWaterLabels },
-    { key: 'fences',    label: 'Fences',     color: COLORS.fence,              count: fences.length,            geoGroup: gFences,    labelGroup: gFenceLabels },
+  const legendItems: [string, string][] = [
+    ['Main path', COLORS.mainPath],
+    ['Footway', COLORS.footway],
+    ['Cycleway', COLORS.cycleway],
+    ['Building (grey)', COLORS.buildingGrey],
+    ['Building (red)', COLORS.buildingRed],
+    ['Water', COLORS.water],
+    ['Fence', COLORS.fence],
   ];
-
-  // Title
-  const title = document.createElement('h3');
-  title.textContent = 'Layers';
-  sidebarEl.appendChild(title);
-
-  // Master numbering toggle
-  let numbersVisible = true;
-  const numberSection = document.createElement('div');
-  numberSection.className = 'sidebar-section';
-  const numberRow = document.createElement('div');
-  numberRow.className = 'sidebar-row';
-  const numberCb = document.createElement('input');
-  numberCb.type = 'checkbox';
-  numberCb.checked = true;
-  numberCb.id = 'toggle-numbers';
-  const numberLabel = document.createElement('label');
-  numberLabel.htmlFor = 'toggle-numbers';
-  numberLabel.textContent = 'Show numbers';
-  numberRow.appendChild(numberCb);
-  numberRow.appendChild(numberLabel);
-  numberSection.appendChild(numberRow);
-  sidebarEl.appendChild(numberSection);
-
-  const divider = document.createElement('hr');
-  divider.className = 'sidebar-divider';
-  sidebarEl.appendChild(divider);
-
-  // Per-layer toggles
-  const layerSection = document.createElement('div');
-  layerSection.className = 'sidebar-section';
-  const layerTitle = document.createElement('div');
-  layerTitle.className = 'sidebar-section-title';
-  layerTitle.textContent = 'Visibility';
-  layerSection.appendChild(layerTitle);
-
-  for (const layer of layers) {
-    const row = document.createElement('div');
-    row.className = 'sidebar-row';
-
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = true;
-    cb.id = `toggle-${layer.key}`;
-
-    const swatch = document.createElement('div');
-    swatch.className = 'sidebar-swatch';
-    swatch.style.background = layer.color;
-
-    const lbl = document.createElement('label');
-    lbl.htmlFor = `toggle-${layer.key}`;
-    lbl.textContent = `${layer.label} (${layer.count})`;
-
-    row.appendChild(cb);
-    row.appendChild(swatch);
-    row.appendChild(lbl);
-    layerSection.appendChild(row);
-
-    cb.addEventListener('change', () => {
-      layer.geoGroup.style.display = cb.checked ? '' : 'none';
-      layer.labelGroup.style.display = (cb.checked && numbersVisible) ? '' : 'none';
-    });
+  for (const [label, color] of legendItems) {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-swatch" style="background:${color}"></div>${label}`;
+    legendEl.appendChild(item);
   }
-  sidebarEl.appendChild(layerSection);
-
-  // Wire up numbering toggle
-  numberCb.addEventListener('change', () => {
-    numbersVisible = numberCb.checked;
-    for (const layer of layers) {
-      const layerCb = document.getElementById(`toggle-${layer.key}`) as HTMLInputElement;
-      const visible = layerCb.checked && numbersVisible;
-      layer.labelGroup.style.display = visible ? '' : 'none';
-    }
-  });
 
   // Course info
   const courseLen = mainPath.reduce((sum, [x, z], i) => {
@@ -472,7 +338,7 @@ async function main() {
     const [px, pz] = mainPath[i - 1];
     return sum + Math.hypot(x - px, z - pz);
   }, 0);
-  infoEl.innerHTML = `<strong>${level.name}</strong> — ${Math.round(courseLen)}m · ${buildings.length} buildings · ${otherPaths.length} paths · ${roads.length} roads · ${waterFeatures.length} water · ${fences.length} fences`;
+  infoEl.innerHTML = `<strong>${level.name}</strong> — ${Math.round(courseLen)}m · ${buildings.length} buildings · ${otherPaths.length} paths · ${waterFeatures.length} water · ${fences.length} fences`;
 
   // ── Pan & Zoom ──────────────────────────────────────────────────────
 
@@ -481,42 +347,22 @@ async function main() {
   let dragStartX = 0, dragStartY = 0;
   let dragVbX = 0, dragVbY = 0;
 
+  const baseSize = Math.max(width, height);
   function updateViewBox() {
     svg.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
-    // Scale labels inversely with zoom so they stay a constant visual size
+    // Scale building labels inversely with zoom so they stay a constant visual size
     const currentSize = Math.max(vbW, vbH);
     const fontSize = currentSize * 0.006;
     const strokeWidth = currentSize * 0.001;
-    for (const lbl of allLabels) {
+    for (const lbl of buildingLabels) {
       lbl.setAttribute('font-size', String(fontSize));
       lbl.setAttribute('stroke-width', String(strokeWidth));
     }
-    updateScaleBar();
-  }
-
-  // ── Scale bar ─────────────────────────────────────────────────────────
-
-  const scaleLineEl = document.getElementById('scale-line')!;
-  const scaleLabelEl = document.getElementById('scale-label')!;
-  const NICE_STEPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
-
-  function updateScaleBar() {
-    const rect = svg.getBoundingClientRect();
-    if (rect.width === 0) return;
-    // metres per CSS pixel
-    const metresPerPx = vbW / rect.width;
-    // target the bar to be ~100px wide
-    const targetMetres = metresPerPx * 100;
-    // pick the nicest round number
-    let niceMetres = NICE_STEPS[NICE_STEPS.length - 1];
-    for (const s of NICE_STEPS) {
-      if (s >= targetMetres * 0.5) { niceMetres = s; break; }
+    for (const lbl of waterLabels) {
+      lbl.setAttribute('font-size', String(fontSize));
+      lbl.setAttribute('stroke-width', String(strokeWidth));
     }
-    const barPx = niceMetres / metresPerPx;
-    scaleLineEl.style.width = `${Math.round(barPx)}px`;
-    scaleLabelEl.textContent = niceMetres >= 1000 ? `${niceMetres / 1000} km` : `${niceMetres} m`;
   }
-  updateScaleBar();
 
   svg.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
@@ -531,6 +377,7 @@ async function main() {
   window.addEventListener('mousemove', (e) => {
     if (!dragging) return;
     const rect = svg.getBoundingClientRect();
+    // Convert pixel delta to SVG units
     const scaleX = vbW / rect.width;
     const scaleY = vbH / rect.height;
     vbX = dragVbX - (e.clientX - dragStartX) * scaleX;
@@ -546,6 +393,7 @@ async function main() {
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
     const rect = svg.getBoundingClientRect();
+    // Mouse position in SVG coords
     const mx = vbX + ((e.clientX - rect.left) / rect.width) * vbW;
     const my = vbY + ((e.clientY - rect.top) / rect.height) * vbH;
 
@@ -553,6 +401,7 @@ async function main() {
     const newW = vbW * zoomFactor;
     const newH = vbH * zoomFactor;
 
+    // Keep mouse position fixed in SVG space
     vbX = mx - ((mx - vbX) / vbW) * newW;
     vbY = my - ((my - vbY) / vbH) * newH;
     vbW = newW;

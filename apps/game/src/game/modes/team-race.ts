@@ -34,6 +34,7 @@ export const teamRaceMode: GameModeConfig = {
   type: 'team-race',
   label: 'Team Race',
   description: 'Two teams with a bus each — best average runner time wins',
+  items: false,
   minPlayers: 4,
   maxPlayers: 8,
   usesLevelSelect: true,

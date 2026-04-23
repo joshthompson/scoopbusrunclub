@@ -55,6 +55,8 @@ export interface GameModeConfig {
   type: GameType;
   label: string;
   description: string;
+  /** Whether collectible items are enabled in this mode */
+  items: boolean;
   /** Minimum players needed (including host) */
   minPlayers: number;
   /** Maximum players allowed */

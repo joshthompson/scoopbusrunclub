@@ -24,12 +24,13 @@ import { Minimap } from './Minimap';
 import { COURSE_OVERRIDES, buildCourseIndices } from '@shared/course-overrides';
 import { loadLevel } from '../levels';
 import type { LevelData } from '../levels';
-import type { PlayerState } from '../multiplayer';
+import type { ItemCollectEvent, PlayerState } from '../multiplayer';
 import { MAX_PLAYERS } from '../multiplayer';
 import type { GameType } from './modes/types';
 import { createBusModel, tintBusModel, PLAYER_COLORS } from './objects/BusModel';
 import { createSky } from './objects/Sky';
 import { createPathGroundMaterial } from './PathShader';
+import type { IcePatchOverlay, PathGroundMaterial } from './PathShader';
 import { createRunnerModel, poseStanding } from './objects/RunnerModel';
 import type { RunnerModelResult } from './objects/RunnerModel';
 import {
@@ -83,6 +84,18 @@ import {
   WATER_SINK,
   WAVE_DURATION,
   HIGH_FIVE_DURATION,
+  POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER,
+  POWER_UP_FIKA_DURATION_SECONDS,
+  POWER_UP_FIKA_SCALE_MULTIPLIER,
+  POWER_UP_FIKA_SCALE_TRANSITION_SPEED,
+  POWER_UP_FIKA_SPEED_MULTIPLIER,
+  POWER_UP_ICE_BASE_ALPHA,
+  POWER_UP_ICE_DURATION_SECONDS,
+  POWER_UP_ICE_FADE_SECONDS,
+  POWER_UP_ICE_GROW_SECONDS,
+  POWER_UP_ICE_RADIUS_METRES,
+  POWER_UP_SHOE_DURATION_SECONDS,
+  POWER_UP_SHOE_SPEED_MULTIPLIER,
 } from './constants';
 import {
   type BuildingCollider,
@@ -159,6 +172,7 @@ import {
   DEFAULT_FENCE_DISTANCE,
   type FenceCollider,
 } from './objects/Fence';
+import { PowerUpSystem, type PowerUpId } from './systems/powerups';
 
 // ---------- Game class ----------
 
@@ -228,6 +242,20 @@ export class Game {
     scooperSpeed?: number;
   }[] = [];
   private playerScoopCooldownUntil = new Map<number, number>();
+  private itemsEnabled = false;
+  private powerUpSystem: PowerUpSystem | null = null;
+  private enterHeldLastFrame = false;
+  private runnerFikaTimer = 0;
+  private runnerShoeTimer = 0;
+  private shoeFlames: ParticleSystem[] = [];
+  private shoeFlameEmitters: TransformNode[] = [];
+  private icePatches: {
+    ownerPlayerIndex: number;
+    x: number;
+    z: number;
+    age: number;
+  }[] = [];
+  private setIcePatchesOnGround: ((patches: IcePatchOverlay[]) => void) | null = null;
 
   // Water zones (local XZ polygons + Y level) — set before buildGround
   private waterZones: WaterZone[] = [];
@@ -322,12 +350,13 @@ export class Game {
     canvas: HTMLCanvasElement,
     callbacks: GameCallbacks,
     minimapCanvas?: HTMLCanvasElement,
-    options?: { localPlayerRole?: 'bus' | 'runner'; gameType?: GameType },
+    options?: { localPlayerRole?: 'bus' | 'runner'; gameType?: GameType; items?: boolean },
   ) {
     this.canvas = canvas;
     this.callbacks = callbacks;
     this.localPlayerRole = options?.localPlayerRole ?? 'bus';
     this.gameType = options?.gameType ?? 'single-bus';
+    this.itemsEnabled = options?.items ?? false;
     if (minimapCanvas) {
       this.minimap = new Minimap(minimapCanvas);
     }
@@ -396,6 +425,14 @@ export class Game {
       window.removeEventListener('resize', this.resizeHandler);
       this.resizeHandler = null;
     }
+    this.powerUpSystem?.dispose();
+    this.powerUpSystem = null;
+    for (const ps of this.shoeFlames) ps.dispose();
+    this.shoeFlames = [];
+    for (const emitter of this.shoeFlameEmitters) emitter.dispose();
+    this.shoeFlameEmitters = [];
+    this.icePatches = [];
+    this.setIcePatchesOnGround = null;
     this.engine?.stopRenderLoop();
     this.scene?.dispose();
     this.engine?.dispose();
@@ -512,12 +549,143 @@ export class Game {
       role: this.localPlayerRole,
       scooping: this.scoopAnimTimer > 0,
       gameType: this.gameType,
+      powerUp: this.powerUpSystem?.getHeldPowerUp() ?? undefined,
     };
   }
 
   /** @deprecated Use getLocalPlayerState */
   getLocalBusState(): PlayerState {
     return this.getLocalPlayerState();
+  }
+
+  useHeldPowerUp() {
+    if (this.localPlayerRole !== 'runner') return;
+    const powerUp = this.powerUpSystem?.consumeHeldPowerUp();
+    if (!powerUp) return;
+    this.activateRunnerPowerUp(powerUp);
+  }
+
+  private activateRunnerPowerUp(powerUp: PowerUpId) {
+    if (powerUp === 'fika') {
+      this.runnerFikaTimer = POWER_UP_FIKA_DURATION_SECONDS;
+      return;
+    }
+    if (powerUp === 'shoe') {
+      this.runnerShoeTimer = POWER_UP_SHOE_DURATION_SECONDS;
+      this.ensureRunnerShoeFlames();
+      return;
+    }
+    if (powerUp === 'ice') {
+      this.icePatches.push({
+        ownerPlayerIndex: this.localPlayerIndex,
+        x: this.busPos.x,
+        z: this.busPos.z,
+        age: 0,
+      });
+      return;
+    }
+  }
+
+  private ensureRunnerShoeFlames() {
+    if (!this.scene || !this.localRunnerModel || this.shoeFlames.length > 0) return;
+    const offsets: [number, number, number][] = [
+      [-0.12, 0.03, 0.08],
+      [0.12, 0.03, 0.08],
+    ];
+    for (let i = 0; i < offsets.length; i++) {
+      const emitter = new TransformNode(`shoeFlameEmitter_${i}`, this.scene);
+      emitter.parent = this.localRunnerModel.root;
+      emitter.position.set(offsets[i][0], offsets[i][1], offsets[i][2]);
+      this.shoeFlameEmitters.push(emitter);
+
+      const ps = new ParticleSystem(`shoeFlames_${i}`, 120, this.scene);
+      ps.emitter = emitter;
+      ps.minEmitBox.set(0, 0, 0);
+      ps.maxEmitBox.set(0, 0, 0);
+      ps.minSize = 0.05;
+      ps.maxSize = 0.18;
+      ps.minLifeTime = 0.08;
+      ps.maxLifeTime = 0.22;
+      ps.emitRate = 180;
+      ps.color1 = new Color3(1, 0.7, 0.2).toColor4(0.9);
+      ps.color2 = new Color3(1, 0.25, 0.0).toColor4(0.9);
+      ps.colorDead = new Color3(0.4, 0.1, 0.05).toColor4(0);
+      ps.direction1 = new Vector3(-0.1, 0.15, -0.8);
+      ps.direction2 = new Vector3(0.1, 0.35, -1.1);
+      ps.minEmitPower = 0.8;
+      ps.maxEmitPower = 1.6;
+      ps.updateSpeed = 1 / 60;
+      ps.start();
+      this.shoeFlames.push(ps);
+    }
+  }
+
+  private setRunnerShoeFlamesActive(active: boolean) {
+    for (const ps of this.shoeFlames) {
+      if (active) {
+        if (!ps.isStarted()) ps.start();
+      } else if (ps.isStarted()) {
+        ps.stop();
+      }
+    }
+  }
+
+  private updateRunnerPowerUpEffects(dt: number) {
+    if (this.runnerFikaTimer > 0) {
+      this.runnerFikaTimer = Math.max(0, this.runnerFikaTimer - dt);
+    }
+    if (this.runnerShoeTimer > 0) {
+      this.runnerShoeTimer = Math.max(0, this.runnerShoeTimer - dt);
+    }
+
+    if (this.localRunnerModel) {
+      const targetScale = this.runnerFikaTimer > 0 ? POWER_UP_FIKA_SCALE_MULTIPLIER : 1;
+      const currentScale = this.localRunnerModel.root.scaling.x;
+      const blend = Math.min(1, POWER_UP_FIKA_SCALE_TRANSITION_SPEED * dt);
+      const nextScale = currentScale + (targetScale - currentScale) * blend;
+      this.localRunnerModel.root.scaling.setAll(nextScale);
+      const shoeActive = this.runnerShoeTimer > 0;
+      this.localRunnerModel.leftShoe.setEnabled(shoeActive);
+      this.localRunnerModel.rightShoe.setEnabled(shoeActive);
+    }
+
+    this.setRunnerShoeFlamesActive(this.runnerShoeTimer > 0 && this.localPlayerRole === 'runner');
+
+    for (let i = this.icePatches.length - 1; i >= 0; i--) {
+      const patch = this.icePatches[i];
+      patch.age += dt;
+      if (patch.age >= POWER_UP_ICE_DURATION_SECONDS) {
+        this.icePatches.splice(i, 1);
+      }
+    }
+
+    if (this.setIcePatchesOnGround) {
+      const overlays: IcePatchOverlay[] = [];
+      for (const patch of this.icePatches) {
+        const growT = Math.min(1, patch.age / POWER_UP_ICE_GROW_SECONDS);
+        const easedGrow = 1 - Math.pow(1 - growT, 3);
+        const radius = Math.max(0.01, POWER_UP_ICE_RADIUS_METRES * easedGrow);
+
+        const fadeStart = POWER_UP_ICE_DURATION_SECONDS - POWER_UP_ICE_FADE_SECONDS;
+        const alpha = patch.age > fadeStart
+          ? POWER_UP_ICE_BASE_ALPHA * Math.max(0, 1 - (patch.age - fadeStart) / POWER_UP_ICE_FADE_SECONDS)
+          : POWER_UP_ICE_BASE_ALPHA;
+
+        overlays.push({ x: patch.x, z: patch.z, radius, alpha });
+      }
+      this.setIcePatchesOnGround(overlays);
+    }
+  }
+
+  private isControlLockedByIcePatch(x: number, z: number): boolean {
+    const radiusSq = POWER_UP_ICE_RADIUS_METRES * POWER_UP_ICE_RADIUS_METRES;
+    for (const patch of this.icePatches) {
+      if (patch.ownerPlayerIndex === this.localPlayerIndex) continue;
+      const dx = x - patch.x;
+      const dz = z - patch.z;
+      if (dx * dx + dz * dz <= radiusSq) return true;
+    }
+    return false;
   }
 
   private getRoleForPlayerIndex(playerIndex: number, state?: PlayerState): 'bus' | 'runner' {
@@ -841,6 +1009,15 @@ export class Game {
     }
     this.gatePositions = buildGatesSystem(this.pathPositions, this.pathCumDist, (x, z) => this.getGroundY(x, z));
     this.currentGateIdx = 0;
+    this.powerUpSystem = new PowerUpSystem({
+      scene: this.scene,
+      enabled: this.itemsEnabled,
+      localPlayerIndex: this.localPlayerIndex,
+      onPowerUpDisplayChange: (powerUp, rolling) => this.callbacks.onPowerUpDisplayChange?.(powerUp, rolling),
+      pathPositions: this.pathPositions,
+      pathCumDist: this.pathCumDist,
+      getGroundY: (x, z) => this.getGroundY(x, z),
+    });
 
     // Place sign & position bus behind start line
     if (this.pathPositions.length > 1) {
@@ -1016,7 +1193,7 @@ export class Game {
       this.startCircleCenter = { x: cx, z: cz };
     }
 
-    ground.material = createPathGroundMaterial(this.scene, {
+    const groundMat = createPathGroundMaterial(this.scene, {
       pathPositions: this.pathPositions,
       roads: this.roadPolylines,
       trails: this.trailPolylines,
@@ -1029,6 +1206,9 @@ export class Game {
       startCircle: startCircleInfo,
       pathTextureUrl: this.pathTextureUrl,
     });
+    ground.material = groundMat;
+    this.setIcePatchesOnGround = (groundMat as PathGroundMaterial).__setIcePatches ?? null;
+    this.setIcePatchesOnGround?.([]);
 
     // Apply terrain heights to ground vertices so the ground undulates
     const positions = ground.getVerticesData(VertexBuffer.PositionKind);
@@ -1090,6 +1270,14 @@ export class Game {
 
   private resolvePositionAgainstBuildingsLocal(pos: Vector3, radius: number): boolean {
     return resolvePositionAgainstBuildings(pos, radius, this.buildingColliders);
+  }
+
+  handleRemoteItemCollect(evt: ItemCollectEvent) {
+    this.powerUpSystem?.applyCollectEvent(evt);
+  }
+
+  flushItemCollectEvents(): ItemCollectEvent[] {
+    return this.powerUpSystem?.flushCollectEvents() ?? [];
   }
 
 
@@ -1718,6 +1906,14 @@ export class Game {
     this.engineVibePhase += dt * ENGINE_VIBE_FREQUENCY * Math.PI * 2;
     const speedFraction = Math.min(Math.abs(this.busSpeed) / BUS_MAX_SPEED, 1);
     const engineVibeOffset = Math.sin(this.engineVibePhase) * ENGINE_VIBE_AMPLITUDE * speedFraction;
+    this.powerUpSystem?.update(Date.now());
+    this.updateRunnerPowerUpEffects(dt);
+
+    const enterHeld = this.isKey('enter');
+    if (enterHeld && !this.enterHeldLastFrame) {
+      this.useHeldPowerUp();
+    }
+    this.enterHeldLastFrame = enterHeld;
 
     // --- Countdown phase ---
     if (this.raceState === 'countdown') {
@@ -1780,7 +1976,7 @@ export class Game {
         this.busBodyShell.position.y = engineVibeOffset;
       }
       if (this.localPlayerRole === 'runner') {
-        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed, busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       }
 
       // Callbacks for static HUD values
@@ -1848,7 +2044,7 @@ export class Game {
           this.busMesh.setEnabled(this.localPlayerRole === 'bus');
         }
         if (this.localPlayerRole === 'runner') {
-          this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed, busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+          this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
         }
 
         this.updateChaseCam(dt);
@@ -1927,6 +2123,9 @@ export class Game {
     // Blend touch steering
     if (this.touchActive) turnInput += this.touchDeltaX;
     turnInput = Math.max(-1, Math.min(1, turnInput));
+    if (this.isControlLockedByIcePatch(this.busPos.x, this.busPos.z)) {
+      turnInput = 0;
+    }
 
     let groundY = this.getGroundY(this.busPos.x, this.busPos.z);
 
@@ -1942,7 +2141,7 @@ export class Game {
         if (this.busMesh) {
           this.busMesh.setEnabled(false);
         }
-        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed, busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       } else {
       // Human-like direct control: no drift, runner jump with optional side leap.
       if (turnInput !== 0) {
@@ -1959,13 +2158,21 @@ export class Game {
       const playerRunnerSlope = Math.atan2(aheadRunnerHeight - currentRunnerHeight, 2);
       const playerSpeedMultiplier = playerRunnerSlope < RUNNER_DOWNHILL_SLOPE_THRESHOLD ? RUNNER_DOWNHILL_SPEED_BOOST : 1;
 
-      const targetSpeed = accelInput * RUNNER_PLAYER_SPEED * playerSpeedMultiplier;
+      const fikaSpeedBoost = this.runnerFikaTimer > 0 ? POWER_UP_FIKA_SPEED_MULTIPLIER : 1;
+      const shoeSpeedBoost = this.runnerShoeTimer > 0 ? POWER_UP_SHOE_SPEED_MULTIPLIER : 1;
+      const totalRunnerSpeedBoost = fikaSpeedBoost * shoeSpeedBoost;
+
+      if (this.runnerShoeTimer > 0) {
+        accelInput = Math.max(1, accelInput);
+      }
+
+      const targetSpeed = accelInput * RUNNER_PLAYER_SPEED * playerSpeedMultiplier * totalRunnerSpeedBoost;
       const accelRate = accelInput !== 0 ? RUNNER_PLAYER_ACCELERATION : RUNNER_PLAYER_DECELERATION;
       const blend = Math.min(1, accelRate * dt);
       this.busSpeed += (targetSpeed - this.busSpeed) * blend;
       
-      const maxReverse = RUNNER_PLAYER_SPEED * 0.45;
-      this.busSpeed = Math.max(-maxReverse, Math.min(RUNNER_PLAYER_SPEED * playerSpeedMultiplier, this.busSpeed));
+      const maxReverse = this.runnerShoeTimer > 0 ? 0 : RUNNER_PLAYER_SPEED * 0.45;
+      this.busSpeed = Math.max(-maxReverse, Math.min(RUNNER_PLAYER_SPEED * playerSpeedMultiplier * totalRunnerSpeedBoost, this.busSpeed));
 
       const jumpHeld = this.isKey(' ') || this.isKey('space') || this.isKey('spacebar');
       const jumpPressed = jumpHeld && !this.jumpHeldLastFrame;
@@ -2021,7 +2228,7 @@ export class Game {
       if (this.busMesh) {
         this.busMesh.setEnabled(false);
       }
-      this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed, busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+      this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       }
     } else {
       // --- Space = manual scoop animation (bus mode) ---
@@ -2220,6 +2427,12 @@ export class Game {
       const pos = this.getRacePosition();
       this.callbacks.onPositionChange(pos.position, pos.total);
     }
+
+    this.powerUpSystem?.tryCollect(
+      this.busPos.x,
+      this.busPos.z,
+      this.localPlayerRole === 'runner' ? RUNNER_COLLISION_RADIUS : BUS_COLLISION_RADIUS,
+    );
 
     // Check for finish (all gates cleared)
     if (this.currentGateIdx >= this.gatePositions.length && this.raceState === 'racing') {

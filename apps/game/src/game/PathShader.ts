@@ -60,6 +60,17 @@ export interface PathShaderOptions {
   pathTextureUrl?: string;
 }
 
+export interface IcePatchOverlay {
+  x: number;
+  z: number;
+  radius: number;
+  alpha: number;
+}
+
+export type PathGroundMaterial = MixMaterial & {
+  __setIcePatches?: (patches: IcePatchOverlay[]) => void;
+};
+
 // ---------- Public API ----------
 
 /**
@@ -78,7 +89,7 @@ export interface PathShaderOptions {
 export function createPathGroundMaterial(
   scene: Scene,
   opts: PathShaderOptions,
-): MixMaterial {
+): PathGroundMaterial {
   const {
     pathPositions,
     roads = [],
@@ -96,7 +107,7 @@ export function createPathGroundMaterial(
   } = opts;
 
   // --- 1. Bake path mask onto a DynamicTexture ---
-  const { maskTex, lineMaskTex } = bakeMaskTexture(
+  const { maskTex, lineMaskTex, setIcePatches } = bakeMaskTexture(
     scene,
     pathPositions,
     roads,
@@ -154,11 +165,19 @@ export function createPathGroundMaterial(
   wCtx.fillRect(0, 0, 4, 4);
   whiteDyn.update();
   mat.diffuseTexture5 = whiteDyn;
-  mat.diffuseTexture6 = grassTex;
+  // diffuseTexture6 is controlled by mixTexture2.g → ice overlay
+  const iceDyn = new DynamicTexture('iceTex', 4, scene, false);
+  const iCtx = iceDyn.getContext() as unknown as CanvasRenderingContext2D;
+  iCtx.fillStyle = '#85d2ff';
+  iCtx.fillRect(0, 0, 4, 4);
+  iceDyn.update();
+  mat.diffuseTexture6 = iceDyn;
   mat.diffuseTexture7 = grassTex;
   mat.diffuseTexture8 = grassTex;
 
-  return mat;
+  (mat as PathGroundMaterial).__setIcePatches = setIcePatches;
+
+  return mat as PathGroundMaterial;
 }
 
 // ---------- Mask baking ----------
@@ -189,7 +208,11 @@ function bakeMaskTexture(
   resolution: number,
   startLine?: PathShaderOptions['startLine'],
   startCircle?: PathShaderOptions['startCircle'],
-): { maskTex: DynamicTexture; lineMaskTex: DynamicTexture } {
+): {
+  maskTex: DynamicTexture;
+  lineMaskTex: DynamicTexture;
+  setIcePatches: (patches: IcePatchOverlay[]) => void;
+} {
   const supportedResolution = Math.min(
     resolution,
     scene.getEngine().getCaps().maxTextureSize || resolution,
@@ -433,7 +456,31 @@ function bakeMaskTexture(
     lineCtx.fill();
   }
 
+  const staticLineCanvas = document.createElement('canvas');
+  staticLineCanvas.width = size;
+  staticLineCanvas.height = size;
+  const staticLineCtx = staticLineCanvas.getContext('2d') as CanvasRenderingContext2D;
+  staticLineCtx.drawImage((lineCtx as any).canvas, 0, 0);
+
+  const setIcePatches = (patches: IcePatchOverlay[]) => {
+    lineCtx.clearRect(0, 0, size, size);
+    lineCtx.drawImage(staticLineCanvas, 0, 0);
+
+    for (const patch of patches) {
+      if (patch.alpha <= 0 || patch.radius <= 0) continue;
+      const [px, py] = toPixel(patch.x, patch.z);
+      const pixelRadius = (patch.radius / groundSize) * size;
+      const g = Math.max(0, Math.min(255, Math.round(patch.alpha * 255)));
+      lineCtx.fillStyle = `rgb(0, ${g}, 0)`;
+      lineCtx.beginPath();
+      lineCtx.arc(px, py, pixelRadius, 0, Math.PI * 2);
+      lineCtx.fill();
+    }
+
+    lineMaskTex.update();
+  };
+
   tex.update();
   lineMaskTex.update();
-  return { maskTex: tex, lineMaskTex };
+  return { maskTex: tex, lineMaskTex, setIcePatches };
 }

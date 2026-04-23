@@ -44,6 +44,8 @@ export interface PlayerState {
   team?: TeamColor;
   /** Arena: whether this runner is stuck */
   stuck?: boolean;
+  /** Currently held power-up id, if any */
+  powerUp?: string;
 }
 
 /** @deprecated Use PlayerState */
@@ -61,6 +63,18 @@ export interface ScoopEvent {
   scooperYaw?: number;
   /** Scooper speed at scoop time (for deterministic victim launch) */
   scooperSpeed?: number;
+}
+
+/** Broadcast when a collectible item is picked up (for synced despawn/respawn). */
+export interface ItemCollectEvent {
+  /** Item id in the shared deterministic item list */
+  itemId: number;
+  /** Player index that collected it */
+  playerIndex: number;
+  /** Unix ms timestamp when it was collected */
+  collectedAtMs: number;
+  /** Unix ms timestamp when the item should respawn */
+  respawnAtMs: number;
 }
 
 /** Lobby chat / coordination messages */
@@ -95,8 +109,10 @@ export class Multiplayer {
   private sendState: ((state: PlayerState) => void) | null = null;
   private sendLobby: ((msg: LobbyMessage, targetPeers?: string | string[]) => void) | null = null;
   private sendScoop: ((evt: ScoopEvent) => void) | null = null;
+  private sendItem: ((evt: ItemCollectEvent) => void) | null = null;
   private _onRemoteState: OnRemoteState | null = null;
   private _onScoopEvent: ((evt: ScoopEvent, peerId: string) => void) | null = null;
+  private _onItemEvent: ((evt: ItemCollectEvent, peerId: string) => void) | null = null;
   private _onPeerJoin: OnPeerJoin | null = null;
   private _onPeerLeave: OnPeerLeave | null = null;
   private _onLobbyMessage: OnLobbyMessage | null = null;
@@ -148,6 +164,7 @@ export class Multiplayer {
   set onPeerLeave(fn: OnPeerLeave | null) { this._onPeerLeave = fn; }
   set onLobbyMessage(fn: OnLobbyMessage | null) { this._onLobbyMessage = fn; }
   set onScoopEvent(fn: ((evt: ScoopEvent, peerId: string) => void) | null) { this._onScoopEvent = fn; }
+  set onItemEvent(fn: ((evt: ItemCollectEvent, peerId: string) => void) | null) { this._onItemEvent = fn; }
 
   // ---------- Connect ----------
 
@@ -168,10 +185,12 @@ export class Multiplayer {
     const [sendState, onState] = this.room.makeAction('playerState');
     const [sendLobby, onLobby] = this.room.makeAction('lobby');
     const [sendScoop, onScoop] = this.room.makeAction('scoop');
+    const [sendItem, onItem] = this.room.makeAction('itemCollect');
 
     this.sendState = (state: PlayerState) => sendState(state as any);
     this.sendLobby = (msg: LobbyMessage, targetPeers?: string | string[]) => sendLobby(msg as any, targetPeers);
     this.sendScoop = (evt: ScoopEvent) => sendScoop(evt as any);
+    this.sendItem = (evt: ItemCollectEvent) => sendItem(evt as any);
 
     onState((data, peerId: string) => {
       const state = data as unknown as PlayerState;
@@ -239,6 +258,10 @@ export class Multiplayer {
 
     onScoop((data, peerId: string) => {
       this._onScoopEvent?.(data as unknown as ScoopEvent, peerId);
+    });
+
+    onItem((data, peerId: string) => {
+      this._onItemEvent?.(data as unknown as ItemCollectEvent, peerId);
     });
 
     this.room.onPeerJoin((peerId: string) => {
@@ -310,6 +333,11 @@ export class Multiplayer {
     this.sendScoop?.(evt);
   }
 
+  /** Broadcast an item collection event (immediately, not rate-limited). */
+  broadcastItemCollect(evt: ItemCollectEvent) {
+    this.sendItem?.(evt);
+  }
+
   // ---------- Disconnect ----------
 
   disconnect() {
@@ -320,6 +348,7 @@ export class Multiplayer {
     this.sendState = null;
     this.sendLobby = null;
     this.sendScoop = null;
+    this.sendItem = null;
     this._remotePeerIds = [];
     this._peerPlayerIndex.clear();
     this._localPlayerIndex = 1;

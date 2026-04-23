@@ -124,6 +124,7 @@ export const arenaMode: GameModeConfig = {
   type: 'arena',
   label: 'Arena',
   description: 'Stuck in the mud! Bus tries to freeze all runners',
+  items: false,
   minPlayers: 3,
   maxPlayers: 8,
   usesLevelSelect: false, // uses special arena map
