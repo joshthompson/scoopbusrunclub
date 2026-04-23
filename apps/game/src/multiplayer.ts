@@ -63,6 +63,8 @@ export interface LobbyMessage {
   courseId?: string;
   /** Assigned player index (1-based), sent by host to joiners */
   playerIndex?: number;
+  /** Map of peerId → playerIndex, broadcast by host so all joiners know every player's index */
+  peerIndices?: Record<string, number>;
 }
 
 export type OnRemoteState = (state: PlayerState, peerId: string) => void;
@@ -78,7 +80,7 @@ const SEND_INTERVAL_MS = 66; // ~15 Hz
 export class Multiplayer {
   private room: Room | null = null;
   private sendState: ((state: PlayerState) => void) | null = null;
-  private sendLobby: ((msg: LobbyMessage) => void) | null = null;
+  private sendLobby: ((msg: LobbyMessage, targetPeers?: string | string[]) => void) | null = null;
   private sendScoop: ((evt: ScoopEvent) => void) | null = null;
   private _onRemoteState: OnRemoteState | null = null;
   private _onScoopEvent: ((evt: ScoopEvent, peerId: string) => void) | null = null;
@@ -140,7 +142,7 @@ export class Multiplayer {
     const [sendScoop, onScoop] = this.room.makeAction('scoop');
 
     this.sendState = (state: PlayerState) => sendState(state as any);
-    this.sendLobby = (msg: LobbyMessage) => sendLobby(msg as any);
+    this.sendLobby = (msg: LobbyMessage, targetPeers?: string | string[]) => sendLobby(msg as any, targetPeers);
     this.sendScoop = (evt: ScoopEvent) => sendScoop(evt as any);
 
     onState((data, peerId: string) => {
@@ -154,16 +156,28 @@ export class Multiplayer {
 
     onLobby((data, peerId: string) => {
       const msg = data as unknown as LobbyMessage;
-      // If host sends us our player index and/or courseId, store them
+      // If host sends us our player index and/or courseId, store them.
+      // Only accept playerInfo from the peer we know is the host (or the
+      // first peer we see, which in the join flow is always the host).
       if (!this._isHost && msg.type === 'playerInfo') {
-        if (msg.playerIndex) {
-          this._localPlayerIndex = msg.playerIndex;
+        const knownHostIdx = this._peerPlayerIndex.get(peerId);
+        const senderIsHost = knownHostIdx === 1 || knownHostIdx === undefined;
+        if (senderIsHost) {
+          if (msg.playerIndex) {
+            this._localPlayerIndex = msg.playerIndex;
+          }
+          if (msg.courseId) {
+            this._courseId = msg.courseId;
+          }
+          // Record the host's index
+          this._peerPlayerIndex.set(peerId, 1);
         }
-        if (msg.courseId) {
-          this._courseId = msg.courseId;
+        // Store all peer indices broadcast by the host
+        if (msg.peerIndices) {
+          for (const [pid, idx] of Object.entries(msg.peerIndices)) {
+            this._peerPlayerIndex.set(pid, idx);
+          }
         }
-        // Also record the host's index
-        this._peerPlayerIndex.set(peerId, 1);
       }
       // If we're host and joiner sends playerInfo, record their known index from PlayerState
       this._onLobbyMessage?.(msg, peerId);
@@ -181,12 +195,24 @@ export class Multiplayer {
       if (this._isHost) {
         const nextIdx = this._remotePeerIds.indexOf(peerId) + 2; // +2 because host is 1
         this._peerPlayerIndex.set(peerId, nextIdx);
-        // Tell the joiner their assigned index and course
+        // Build the full map of all peer→index assignments
+        const peerIndices: Record<string, number> = {};
+        for (const [pid, idx] of this._peerPlayerIndex) {
+          peerIndices[pid] = idx;
+        }
+        // Tell the new joiner their own index + all peer indices
         setTimeout(() => {
           this.sendLobby?.({
             type: 'playerInfo',
             playerIndex: nextIdx,
             courseId: this._courseId || undefined,
+            peerIndices,
+          }, peerId);
+          // Also broadcast updated indices to ALL existing peers
+          // so they learn about the new joiner's index
+          this.sendLobby?.({
+            type: 'playerInfo',
+            peerIndices,
           });
         }, 100);
       }
@@ -213,6 +239,11 @@ export class Multiplayer {
   /** Send a lobby coordination message to all peers. */
   broadcastLobby(msg: LobbyMessage) {
     this.sendLobby?.(msg);
+  }
+
+  /** Send a lobby message to a specific peer only. */
+  sendLobbyTo(msg: LobbyMessage, peerId: string) {
+    this.sendLobby?.(msg, peerId);
   }
 
   /** Broadcast a scoop event to all peers (immediately, not rate-limited). */

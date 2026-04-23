@@ -7,6 +7,11 @@ import logoSrc from './assets/logo.png';
 const PLAYER_CSS_COLORS = ['#f0c820', '#d94030', '#3470d8', '#9940cc'];
 const PLAYER_NAMES = ['Yellow', 'Red', 'Blue', 'Purple'];
 
+/** Role emoji for a given player index: 1 = bus, 2+ = runner */
+function roleEmoji(playerIndex: number): string {
+  return playerIndex === 1 ? '🚌' : '🏃';
+}
+
 interface LobbyScreenProps {
   mode: 'host' | 'join';
   /** Course ID — required for host, received from host for join */
@@ -65,13 +70,17 @@ export function LobbyScreen(props: LobbyScreenProps) {
       }
     };
 
-    mp.onLobbyMessage = (msg, _peerId) => {
+    mp.onLobbyMessage = (msg, peerId) => {
       if (msg.type === 'start') {
         const cid = hostCourseId() || msg.courseId || '';
         props.onStart(cid);
       }
       if (msg.type === 'playerInfo') {
-        if (msg.playerIndex) {
+        // Only accept our own player index assignment from the host
+        // (The host is always playerIndex 1 — verify sender is host)
+        const senderIsHost = mp.getPlayerIndex(peerId) === 1
+          || (!isHost && msg.playerIndex !== undefined);
+        if (senderIsHost && msg.playerIndex) {
           setLocalIdx(msg.playerIndex);
         }
         // Joiner receives courseId from host
@@ -79,6 +88,8 @@ export function LobbyScreen(props: LobbyScreenProps) {
           setHostCourseId(msg.courseId);
         }
       }
+      // Force re-render of peer list when peer info updates
+      setPeerCount(mp.peerCount);
     };
   }
 
@@ -143,23 +154,46 @@ export function LobbyScreen(props: LobbyScreenProps) {
 
         <Show when={connected()}>
           <div class="lobby-players">
-            {/* Local player badge */}
-            <div class="player-badge you" style={{ 'border-color': PLAYER_CSS_COLORS[(localIdx() || 1) - 1] }}>
-              🚌 You (P{localIdx() || '?'} {PLAYER_NAMES[(localIdx() || 1) - 1]})
-            </div>
-            {/* Remote player badges */}
-            <For each={mp.remotePeerIds}>{(peerId, i) => {
-              const idx = mp.getPlayerIndex(peerId) || (i() + 2);
+            {/* All players in consistent playerIndex order */}
+            <For each={(() => {
+              // Re-read peerCount signal to trigger re-render on join/leave
+              peerCount();
+              const myIdx = localIdx() || 1;
+              // Build entries: local + all remote peers
+              const entries: { idx: number; isLocal: boolean }[] = [
+                { idx: myIdx, isLocal: true },
+              ];
+              for (const peerId of mp.remotePeerIds) {
+                const pIdx = mp.getPlayerIndex(peerId);
+                if (pIdx) entries.push({ idx: pIdx, isLocal: false });
+              }
+              // Sort by playerIndex so everyone sees the same order
+              entries.sort((a, b) => a.idx - b.idx);
+              // Pad with empty slots up to MAX_PLAYERS
+              while (entries.length < MAX_PLAYERS) {
+                entries.push({ idx: 0, isLocal: false });
+              }
+              return entries;
+            })()}>{(entry) => {
+              const idx = entry.idx;
+              if (idx === 0) {
+                return <div class="player-badge empty">⏳ Waiting...</div>;
+              }
+              const color = PLAYER_CSS_COLORS[(idx - 1) % PLAYER_CSS_COLORS.length];
+              const name = PLAYER_NAMES[(idx - 1) % PLAYER_NAMES.length];
+              if (entry.isLocal) {
+                return (
+                  <div class="player-badge you" style={{ background: color }}>
+                    {roleEmoji(idx)} P{idx} {name} (You)
+                  </div>
+                );
+              }
               return (
-                <div class="player-badge opponent" style={{ 'border-color': PLAYER_CSS_COLORS[idx - 1] }}>
-                  🚌 P{idx} {PLAYER_NAMES[idx - 1]}
+                <div class="player-badge opponent" style={{ 'border-color': color }}>
+                  {roleEmoji(idx)} P{idx} {name}
                 </div>
               );
             }}</For>
-            {/* Empty slots */}
-            <For each={Array.from({ length: MAX_PLAYERS - 1 - peerCount() })}>{() => (
-              <div class="player-badge empty">🚌 Waiting...</div>
-            )}</For>
           </div>
         </Show>
 

@@ -442,6 +442,22 @@ export class Game {
     const remote = this.remotePlayers.get(peerId);
     if (!remote) return;
     const isFirstState = remote.state === null;
+
+    // If the peer's actual playerIndex differs from what we built with, re-tint
+    if (state.playerIndex && state.playerIndex !== remote.playerIndex) {
+      const newPalette = PLAYER_COLORS[state.playerIndex - 1] ?? PLAYER_COLORS[1];
+      tintBusModel(remote.mesh, newPalette, `p${state.playerIndex}`);
+      // Re-tint the runner model's shirt
+      if (remote.runnerModel) {
+        for (const m of remote.runnerModel.root.getChildMeshes()) {
+          if (m.material && m.material.name.startsWith('rShirt_')) {
+            (m.material as StandardMaterial).diffuseColor = newPalette.body.clone();
+          }
+        }
+      }
+      remote.playerIndex = state.playerIndex;
+    }
+
     remote.state = state;
     // Snap position on first state so the bus doesn't lerp from (0,0,0)
     if (isFirstState) {

@@ -73,7 +73,7 @@ function sideOfOther(
  * Each runner's forward vector must point within ~70° toward the other.
  * Returns true only when both runners are facing one another.
  */
-const FACING_DOT_THRESHOLD = 0.35; // cos(~70°)
+const FACING_DOT_THRESHOLD = 0.57; // cos(55°) → 110° forward arc
 function areFacing(
   ax: number, az: number, aYaw: number,
   bx: number, bz: number, bYaw: number,
