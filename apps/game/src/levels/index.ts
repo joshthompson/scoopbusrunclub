@@ -19,6 +19,7 @@ const levelMeta: LevelMeta[] = [
   { id: 'haga', name: 'Haga' },
   { id: 'huddinge', name: 'Huddinge' },
   { id: 'judarskogen', name: 'Judarskogen' },
+  { id: 'kristineberg', name: 'Kristineberg' },
   { id: 'lillsjon', name: 'Lillsjön', hide: true },
   { id: 'uppsala', name: 'Uppsala', hide: true },
 ];
@@ -34,6 +35,7 @@ const loaders: Record<string, () => Promise<{ default: LevelData }>> = {
   haga: () => import('./haga/index'),
   huddinge: () => import('./huddinge/index'),
   judarskogen: () => import('./judarskogen/index'),
+  kristineberg: () => import('./kristineberg/index'),
   lillsjon: () => import('./lillsjon/index'),
   uppsala: () => import('./uppsala/index'),
 };

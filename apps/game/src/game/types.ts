@@ -82,7 +82,7 @@ export interface InitSceneOptions {
 export type SpawnMarshalsFn = (level: LevelData) => void;
 
 export type BuildingFootprint = {
-  type: 'grey' | 'red' | 'blue';
+  type: 'grey' | 'red' | 'blue' | 'kristineberg';
   height?: number;
   points: [number, number][];
 };

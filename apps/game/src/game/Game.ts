@@ -26,6 +26,7 @@ import { loadLevel } from '../levels';
 import type { LevelData } from '../levels';
 import type { PlayerState } from '../multiplayer';
 import { MAX_PLAYERS } from '../multiplayer';
+import type { GameType } from './modes/types';
 import { createBusModel, tintBusModel, PLAYER_COLORS } from './objects/BusModel';
 import { createSky } from './objects/Sky';
 import { createPathGroundMaterial } from './PathShader';
@@ -114,7 +115,12 @@ import {
   getWaterSurfaceYAt,
   getWaterDepressionAt,
 } from './systems/terrain';
-import { buildBuildingMeshes, resolvePositionAgainstBuildings } from './systems/buildings';
+import {
+  buildBuildingMeshes,
+  resolvePositionAgainstBuildings,
+  updateBuildingLod,
+  type BuildingLodEntry,
+} from './systems/buildings';
 import {
   createExhaustFlames,
   createExhaustFlamesForBus,
@@ -146,6 +152,13 @@ import {
   updateElasticObjects,
   type GatePosition,
 } from './systems/environment';
+import {
+  buildFenceMesh,
+  generateFencePolygon,
+  resolvePositionAgainstFence,
+  DEFAULT_FENCE_DISTANCE,
+  type FenceCollider,
+} from './objects/Fence';
 
 // ---------- Game class ----------
 
@@ -222,6 +235,7 @@ export class Game {
   private trailPolylines: [number, number][][] = [];
   private buildingFootprints: BuildingFootprint[] = [];
   private buildingColliders: BuildingCollider[] = [];
+  private buildingLodEntries: BuildingLodEntry[] = [];
 
   // Ground mesh — stored for accurate height queries via getHeightAtCoordinates
   private groundMesh: GroundMesh | null = null;
@@ -235,6 +249,15 @@ export class Game {
 
   // Elastic objects — anything that tilts on collision and springs back (trees, signs, marshals)
   private elasticObjects: ElasticObject[] = [];
+
+  // Fence boundary collider — generated around path, blocks all entities
+  private fenceCollider: FenceCollider = { segments: [] };
+
+  // Custom path texture URL (e.g. track.png for arena levels)
+  private pathTextureUrl: string | undefined;
+
+  // Current level data (set once in initScene)
+  private level: LevelData | null = null;
 
   // ---------- Remote players (multiplayer, up to MAX_PLAYERS-1 opponents) ----------
   private remotePlayers: RemotePlayersMap = new Map();
@@ -273,6 +296,8 @@ export class Game {
 
   // Local player role
   private localPlayerRole: 'bus' | 'runner' = 'bus';
+  /** Game type / mode for this session */
+  private gameType: GameType = 'single-bus';
   private localRunnerModel: RunnerModelResult | null = null;
   private localRunnerAnimPhase = 0;
   private runnerJumpSideVel = 0;
@@ -297,11 +322,12 @@ export class Game {
     canvas: HTMLCanvasElement,
     callbacks: GameCallbacks,
     minimapCanvas?: HTMLCanvasElement,
-    options?: { localPlayerRole?: 'bus' | 'runner' },
+    options?: { localPlayerRole?: 'bus' | 'runner'; gameType?: GameType },
   ) {
     this.canvas = canvas;
     this.callbacks = callbacks;
     this.localPlayerRole = options?.localPlayerRole ?? 'bus';
+    this.gameType = options?.gameType ?? 'single-bus';
     if (minimapCanvas) {
       this.minimap = new Minimap(minimapCanvas);
     }
@@ -485,6 +511,7 @@ export class Game {
       gateIdx: this.currentGateIdx,
       role: this.localPlayerRole,
       scooping: this.scoopAnimTimer > 0,
+      gameType: this.gameType,
     };
   }
 
@@ -494,7 +521,13 @@ export class Game {
   }
 
   private getRoleForPlayerIndex(playerIndex: number, state?: PlayerState): 'bus' | 'runner' {
-    return state?.role ?? (playerIndex === 1 ? 'bus' : 'runner');
+    // If we have state from the remote player, trust it
+    if (state?.role) return state.role;
+    // For bus-race, everyone is a bus
+    if (this.gameType === 'bus-race') return 'bus';
+    // For scoop-race / arena / team-race, only the designated driver(s) are buses
+    // Default: P1 = bus, everyone else = runner
+    return playerIndex === 1 ? 'bus' : 'runner';
   }
 
   private getPlayerPoseByIndex(playerIndex: number): { x: number; y: number; z: number; yaw: number; speed: number } | null {
@@ -618,6 +651,21 @@ export class Game {
         }
       }
 
+      // Fence collision for launched runner
+      if (resolvePositionAgainstFence(this.busPos, RUNNER_COLLISION_RADIUS, this.fenceCollider)) {
+        const bounceStrength = 12;
+        this.localRunnerScoopVelX *= -1;
+        this.localRunnerScoopVelZ *= -1;
+        const speed = Math.sqrt(
+          this.localRunnerScoopVelX * this.localRunnerScoopVelX
+          + this.localRunnerScoopVelZ * this.localRunnerScoopVelZ,
+        );
+        if (speed > 0.001) {
+          this.localRunnerScoopVelX = (this.localRunnerScoopVelX / speed) * bounceStrength;
+          this.localRunnerScoopVelZ = (this.localRunnerScoopVelZ / speed) * bounceStrength;
+        }
+      }
+
       // Check collision with other players (inter-player elasticity)
       for (const [_peerId, remote] of this.remotePlayers) {
         if (!remote.state) continue;
@@ -684,6 +732,7 @@ export class Game {
   ) {
     // Lazy-load full level data (JSON chunks loaded on demand)
     const level: LevelData = await loadLevel(eventId);
+    this.level = level;
 
     const course = level.course;
 
@@ -701,9 +750,12 @@ export class Game {
     const buildingFeatures = level.buildings ?? [];
     const pathFeatures = level.paths ?? [];
 
+    this.pathTextureUrl = level.pathTexture;
+
     const { positions, heights, totalDistance } = gpsToLocal(orderedCoords, elevations);
 
-    this.scaleFactor = totalDistance > 0 ? COURSE_TARGET_LENGTH / totalDistance : 1;
+    const courseTargetLength = level.targetLength ?? COURSE_TARGET_LENGTH;
+    this.scaleFactor = totalDistance > 0 ? courseTargetLength / totalDistance : 1;
     this.elevationScale = this.scaleFactor * ALTITUDE_EXAGGERATION;
     this.originCoord = course.coordinates[0];
     this.pathPositions = positions.map(([x, z]) => [
@@ -711,7 +763,7 @@ export class Game {
       z * this.scaleFactor,
     ]);
     this.pathHeights = heights.map((h) => h * this.elevationScale);
-    this.pathTotalDistance = COURSE_TARGET_LENGTH;
+    this.pathTotalDistance = courseTargetLength;
 
     // Pre-compute cumulative distances along path for spline parameterisation
     this.pathCumDist = [0];
@@ -753,10 +805,15 @@ export class Game {
     this.buildingFootprints = computeBuildingFootprintData(buildingFeatures, course.coordinates[0], this.scaleFactor);
     this.buildGround();
     buildWaterMeshes(this.scene, this.waterZones);
-    this.buildingColliders = buildBuildingMeshes(this.scene, this.buildingFootprints, (x, z) => this.getGroundY(x, z));
-    const treeResult = buildTrees(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z), this.waterZones, this.startCircleCenter);
-    this.elasticObjects.push(...treeResult.elasticObjects);
-    this.solidObstacles.push(...treeResult.solidObstacles);
+    const buildingResult = buildBuildingMeshes(this.scene, this.buildingFootprints, (x, z) => this.getGroundY(x, z));
+    this.buildingColliders = buildingResult.colliders;
+    this.buildingLodEntries = buildingResult.lodEntries;
+    this.updateBuildingLodForPlayer();
+    if (level.trees !== false) {
+      const treeResult = buildTrees(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z), this.waterZones, this.startCircleCenter, this.roadPolylines, this.trailPolylines);
+      this.elasticObjects.push(...treeResult.elasticObjects);
+      this.solidObstacles.push(...treeResult.solidObstacles);
+    }
 
     // Procedural sky + clouds
     createSky(this.scene);
@@ -773,9 +830,15 @@ export class Game {
     if (!opts.skipRunners) {
       this.runners = spawnRunnersSystem(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z));
     }
-    const kmResult = placeKmSigns(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z));
-    this.elasticObjects.push(...kmResult.elasticObjects);
-    this.solidObstacles.push(...kmResult.solidObstacles);
+    if (level.kmSigns !== false) {
+      const kmResult = placeKmSigns(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z));
+      const kmElasticOffset = this.elasticObjects.length;
+      this.elasticObjects.push(...kmResult.elasticObjects);
+      for (const obs of kmResult.solidObstacles) {
+        if (obs.elasticIndex != null) obs.elasticIndex += kmElasticOffset;
+      }
+      this.solidObstacles.push(...kmResult.solidObstacles);
+    }
     this.gatePositions = buildGatesSystem(this.pathPositions, this.pathCumDist, (x, z) => this.getGroundY(x, z));
     this.currentGateIdx = 0;
 
@@ -786,10 +849,16 @@ export class Game {
       const yaw = Math.atan2(nx - sx, nz - sz);
 
       // Start line objects (parkrun sign + marshal)
-      const startLineResult = buildStartLineObjects(this.scene, this.pathPositions, eventId, (x, z) => this.getGroundY(x, z));
-      this.elasticObjects.push(...startLineResult.elasticObjects);
-      this.solidObstacles.push(...startLineResult.solidObstacles);
-      this.marshals.push(...startLineResult.marshals);
+      if (level.parkrunSign !== false) {
+        const startLineResult = buildStartLineObjects(this.scene, this.pathPositions, eventId, (x, z) => this.getGroundY(x, z));
+        const slElasticOffset = this.elasticObjects.length;
+        this.elasticObjects.push(...startLineResult.elasticObjects);
+        for (const obs of startLineResult.solidObstacles) {
+          if (obs.elasticIndex != null) obs.elasticIndex += slElasticOffset;
+        }
+        this.solidObstacles.push(...startLineResult.solidObstacles);
+        this.marshals.push(...startLineResult.marshals);
+      }
 
       // Player starts behind the start line, fanned outward by player index
       const forwardX = Math.sin(yaw);
@@ -809,15 +878,41 @@ export class Game {
     }
 
     // --- Marshals ---
-    const marshalResult = spawnMarshalsSystem(this.scene, level, this.pathPositions, this.originCoord, this.scaleFactor, (x, z) => this.getGroundY(x, z));
-    this.marshals.push(...marshalResult.marshals);
-    this.elasticObjects.push(...marshalResult.elasticObjects);
-    this.solidObstacles.push(...marshalResult.solidObstacles);
+    if (level.showMarshals !== false) {
+      const marshalResult = spawnMarshalsSystem(this.scene, level, this.pathPositions, this.originCoord, this.scaleFactor, (x, z) => this.getGroundY(x, z));
+      this.marshals.push(...marshalResult.marshals);
+      const marshalElasticOffset = this.elasticObjects.length;
+      this.elasticObjects.push(...marshalResult.elasticObjects);
+      for (const obs of marshalResult.solidObstacles) {
+        if (obs.elasticIndex != null) obs.elasticIndex += marshalElasticOffset;
+      }
+      this.solidObstacles.push(...marshalResult.solidObstacles);
+    }
 
     // --- Event-specific landmarks ---
     const landmarkResult = placeEventLandmarksSystem(this.scene, eventId, this.originCoord, this.scaleFactor, (x, z) => this.getGroundY(x, z));
     this.solidObstacles.push(...landmarkResult.solidObstacles);
     this.buildingFootprints.push(...landmarkResult.buildingFootprints);
+
+    // --- Fence boundary ---
+    if (level.fences !== false) {
+      const fenceDistance = level.fenceDistance ?? DEFAULT_FENCE_DISTANCE;
+      const boundaryPoly = generateFencePolygon(this.pathPositions, fenceDistance);
+      if (boundaryPoly.length >= 3) {
+        this.fenceCollider = buildFenceMesh(this.scene, boundaryPoly, (x, z) => this.getGroundY(x, z));
+      }
+    }
+    // Custom fences from level data (e.g. palace grounds, arena perimeter)
+    if (level.customFences) {
+      for (const fence of level.customFences) {
+        const localPoly: [number, number][] = fence.points.map(([lat, lon]) => {
+          const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
+          return [rawX * this.scaleFactor, rawZ * this.scaleFactor] as [number, number];
+        });
+        const customCollider = buildFenceMesh(this.scene, localPoly, (x, z) => this.getGroundY(x, z));
+        this.fenceCollider.segments.push(...customCollider.segments);
+      }
+    }
 
     // Give minimap the map feature data
     if (this.minimap) {
@@ -826,6 +921,9 @@ export class Game {
       this.minimap.setRoads(this.roadPolylines);
       this.minimap.setTrails(this.trailPolylines);
       this.minimap.setBuildings(this.buildingFootprints);
+      if (this.level?.minimapZoom) {
+        this.minimap.setZoom(this.level.minimapZoom);
+      }
     }
 
     if (!opts.skipBus) {
@@ -908,7 +1006,7 @@ export class Game {
 
     // Start circle: a cleared dirt area behind the start line where buses spawn
     let startCircleInfo: { x: number; z: number; radius: number } | undefined;
-    if (this.pathPositions.length > 1) {
+    if (this.level?.startCircle !== false && this.pathPositions.length > 1) {
       const [sx, sz] = this.pathPositions[0];
       const [nx, nz] = this.pathPositions[1];
       const yaw = Math.atan2(nx - sx, nz - sz);
@@ -929,6 +1027,7 @@ export class Game {
       maskResolution: PATH_MASK_RESOLUTION,
       startLine: startLineInfo,
       startCircle: startCircleInfo,
+      pathTextureUrl: this.pathTextureUrl,
     });
 
     // Apply terrain heights to ground vertices so the ground undulates
@@ -1333,7 +1432,10 @@ export class Game {
   private resolveCollisions() {
     const br = this.localPlayerRole === 'runner' ? RUNNER_COLLISION_RADIUS : BUS_COLLISION_RADIUS;
     let touchingElastic = false;
-    let hitBuilding = false;
+
+    // Save position before collision resolution for wall-sliding
+    const preCollX = this.busPos.x;
+    const preCollZ = this.busPos.z;
 
     for (const obs of this.solidObstacles) {
       const dx = this.busPos.x - obs.x;
@@ -1360,26 +1462,78 @@ export class Game {
             this.elasticPenaltyActive = true;
           }
         } else {
-          // Non-elastic solid obstacle: push bus out and bounce
+          // Non-elastic solid obstacle: push position out (velocity handled below)
           const overlap = minDist - dist;
           this.busPos.x += nx * overlap;
           this.busPos.z += nz * overlap;
-          this.busSpeed *= -0.15;
         }
       }
     }
 
-    if (this.resolvePositionAgainstBuildingsLocal(this.busPos, br)) {
-      hitBuilding = true;
-    }
+    this.resolvePositionAgainstBuildingsLocal(this.busPos, br);
+
+    // Fence boundary collision
+    resolvePositionAgainstFence(this.busPos, br, this.fenceCollider);
 
     // Clear penalty flag once bus is no longer touching any elastic object
     if (!touchingElastic) {
       this.elasticPenaltyActive = false;
     }
 
-    if (hitBuilding) {
-      this.busSpeed *= -0.15;
+    // --- Wall-sliding velocity response ---
+    // Instead of killing speed on collision, project velocity onto the
+    // wall surface so glancing hits slide along.  Head-on hits still stop.
+    const pushX = this.busPos.x - preCollX;
+    const pushZ = this.busPos.z - preCollZ;
+    const pushDistSq = pushX * pushX + pushZ * pushZ;
+
+    if (pushDistSq > 1e-6) {
+      const pushDist = Math.sqrt(pushDistSq);
+      // Collision normal (direction we were pushed)
+      const nx = pushX / pushDist;
+      const nz = pushZ / pushDist;
+
+      if (this.localPlayerRole === 'runner') {
+        // Runner velocity = forward * busSpeed + right * jumpSideVel
+        const fwdX = Math.sin(this.busYaw);
+        const fwdZ = Math.cos(this.busYaw);
+        const rightX = Math.cos(this.busYaw);
+        const rightZ = -Math.sin(this.busYaw);
+
+        let velX = fwdX * this.busSpeed + rightX * this.runnerJumpSideVel;
+        let velZ = fwdZ * this.busSpeed + rightZ * this.runnerJumpSideVel;
+
+        const normalDot = velX * nx + velZ * nz;
+        if (normalDot < 0) {
+          // Remove component going into the wall
+          velX -= normalDot * nx;
+          velZ -= normalDot * nz;
+          // Decompose back into forward / right axes with slight friction
+          this.busSpeed = (velX * fwdX + velZ * fwdZ) * 0.92;
+          this.runnerJumpSideVel = (velX * rightX + velZ * rightZ) * 0.92;
+        }
+      } else {
+        // Bus velocity = forward(busVelAngle) * busSpeed
+        let velX = Math.sin(this.busVelAngle) * this.busSpeed;
+        let velZ = Math.cos(this.busVelAngle) * this.busSpeed;
+
+        const normalDot = velX * nx + velZ * nz;
+        if (normalDot < 0) {
+          // Remove component going into the wall
+          velX -= normalDot * nx;
+          velZ -= normalDot * nz;
+
+          const slideSpeedSq = velX * velX + velZ * velZ;
+          if (slideSpeedSq > 0.01) {
+            const slideSpeed = Math.sqrt(slideSpeedSq);
+            this.busVelAngle = Math.atan2(velX, velZ);
+            this.busSpeed = slideSpeed * 0.92; // slight wall friction
+          } else {
+            // Nearly head-on — stop
+            this.busSpeed = 0;
+          }
+        }
+      }
     }
 
     // --- Bus-to-bus collisions (solid bodies cannot overlap) ---
@@ -1544,7 +1698,14 @@ export class Game {
       dt,
       busRoofY: BUS_ROOF_Y,
       engineVibeOffset,
+      observerX: this.busPos.x,
+      observerZ: this.busPos.z,
     });
+  }
+
+  private updateBuildingLodForPlayer() {
+    if (this.buildingLodEntries.length === 0) return;
+    updateBuildingLod(this.buildingLodEntries, this.busPos.x, this.busPos.z);
   }
 
   // ---------- Update ----------
@@ -1643,6 +1804,7 @@ export class Game {
           this.getMinimapLookaheadAnchor(),
         );
       }
+      this.updateBuildingLodForPlayer();
       return;
     }
 
@@ -1720,6 +1882,7 @@ export class Game {
         updateMarshals(this.marshals, dt);
         updateElasticObjects(this.elasticObjects, dt);
         this.updateRemoteBusMeshes(dt, engineVibeOffset);
+        this.updateBuildingLodForPlayer();
         if (this.minimap) {
           this.minimap.draw(
             this.busPos.x,
@@ -2136,6 +2299,7 @@ export class Game {
 
     // --- Update remote bus meshes (multiplayer interpolation) ---
     this.updateRemoteBusMeshes(dt, engineVibeOffset);
+    this.updateBuildingLodForPlayer();
 
     // Minimap
     if (this.minimap) {

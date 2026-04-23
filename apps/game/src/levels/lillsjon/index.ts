@@ -3,13 +3,15 @@ import type { LevelData } from '../types';
 import course from './course.json';
 import altitude from './altitude.json';
 import water from './water.json';
+import roads from './roads.json';
 
 const level: LevelData = {
   id: 'lillsjon',
-  name: 'Lillsjön',
+  name: 'Lillsjon',
   course: course as LevelData['course'],
   altitude,
   water: water as LevelData['water'],
+  roads: roads as LevelData['roads'],
   hide: true,
 };
 

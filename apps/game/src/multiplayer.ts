@@ -1,10 +1,11 @@
 /**
  * Multiplayer networking layer using Trystero (WebRTC P2P).
  *
- * Two players connect via a shared room code. One hosts, one joins.
+ * Players connect via a shared room code. One hosts, others join.
  * During gameplay each player broadcasts their player state ~15 times/sec.
  */
 import { joinRoom, type Room } from 'trystero';
+import type { GameType, TeamColor } from './game/modes/types';
 
 // ---------- Shared types ----------
 
@@ -37,6 +38,12 @@ export interface PlayerState {
   role: 'bus' | 'runner';
   /** Whether the scoop plow animation is active */
   scooping: boolean;
+  /** Game type for the current session */
+  gameType?: GameType;
+  /** Team assignment (for team-race mode) */
+  team?: TeamColor;
+  /** Arena: whether this runner is stuck */
+  stuck?: boolean;
 }
 
 /** @deprecated Use PlayerState */
@@ -65,6 +72,12 @@ export interface LobbyMessage {
   playerIndex?: number;
   /** Map of peerId → playerIndex, broadcast by host so all joiners know every player's index */
   peerIndices?: Record<string, number>;
+  /** Game type for the session (set by host, sent to joiners) */
+  gameType?: GameType;
+  /** Driver index — which player is the bus (for scoop-race, arena) */
+  driverIndex?: number;
+  /** Team assignments for team-race (playerIndex → { team, role }) */
+  teamAssignments?: Record<number, { team: TeamColor; role: 'bus' | 'runner' }>;
 }
 
 export type OnRemoteState = (state: PlayerState, peerId: string) => void;
@@ -99,6 +112,12 @@ export class Multiplayer {
   private _localPlayerIndex = 1;
   /** Course ID for the room (set by host, received by joiner) */
   private _courseId = '';
+  /** Game type for the room */
+  private _gameType: GameType = 'scoop-race';
+  /** Driver index — which player is the bus driver */
+  private _driverIndex = 1;
+  /** Team assignments for team-race mode */
+  private _teamAssignments = new Map<number, { team: TeamColor; role: 'bus' | 'runner' }>();
 
   get roomCode() { return this._roomCode; }
   get isHost() { return this._isHost; }
@@ -112,6 +131,15 @@ export class Multiplayer {
   /** Course ID for the room */
   get courseId() { return this._courseId; }
   set courseId(id: string) { this._courseId = id; }
+  /** Game type for the room */
+  get gameType() { return this._gameType; }
+  set gameType(gt: GameType) { this._gameType = gt; }
+  /** Driver index */
+  get driverIndex() { return this._driverIndex; }
+  set driverIndex(idx: number) { this._driverIndex = idx; }
+  /** Team assignments */
+  get teamAssignments() { return this._teamAssignments; }
+  set teamAssignments(ta: Map<number, { team: TeamColor; role: 'bus' | 'runner' }>) { this._teamAssignments = ta; }
 
   // ---------- Event setters ----------
 
@@ -156,6 +184,21 @@ export class Multiplayer {
 
     onLobby((data, peerId: string) => {
       const msg = data as unknown as LobbyMessage;
+      // Apply driverIndex from the start message so clients always have the
+      // latest driver assignment regardless of playerInfo timing.
+      if (!this._isHost && msg.type === 'start') {
+        if (msg.driverIndex !== undefined) {
+          this._driverIndex = msg.driverIndex;
+        }
+        if (msg.gameType) {
+          this._gameType = msg.gameType;
+        }
+        if (msg.teamAssignments) {
+          this._teamAssignments = new Map(Object.entries(msg.teamAssignments).map(
+            ([k, v]) => [Number(k), v]
+          ));
+        }
+      }
       // If host sends us our player index and/or courseId, store them.
       // Only accept playerInfo from the peer we know is the host (or the
       // first peer we see, which in the join flow is always the host).
@@ -168,6 +211,17 @@ export class Multiplayer {
           }
           if (msg.courseId) {
             this._courseId = msg.courseId;
+          }
+          if (msg.gameType) {
+            this._gameType = msg.gameType;
+          }
+          if (msg.driverIndex !== undefined) {
+            this._driverIndex = msg.driverIndex;
+          }
+          if (msg.teamAssignments) {
+            this._teamAssignments = new Map(Object.entries(msg.teamAssignments).map(
+              ([k, v]) => [Number(k), v]
+            ));
           }
           // Record the host's index
           this._peerPlayerIndex.set(peerId, 1);
@@ -200,13 +254,18 @@ export class Multiplayer {
         for (const [pid, idx] of this._peerPlayerIndex) {
           peerIndices[pid] = idx;
         }
-        // Tell the new joiner their own index + all peer indices
+        // Tell the new joiner their own index + all peer indices + game config
+        const teamAssignmentsObj: Record<number, { team: TeamColor; role: 'bus' | 'runner' }> = {};
+        for (const [k, v] of this._teamAssignments) teamAssignmentsObj[k] = v;
         setTimeout(() => {
           this.sendLobby?.({
             type: 'playerInfo',
             playerIndex: nextIdx,
             courseId: this._courseId || undefined,
             peerIndices,
+            gameType: this._gameType,
+            driverIndex: this._driverIndex,
+            teamAssignments: Object.keys(teamAssignmentsObj).length > 0 ? teamAssignmentsObj : undefined,
           }, peerId);
           // Also broadcast updated indices to ALL existing peers
           // so they learn about the new joiner's index
@@ -266,6 +325,9 @@ export class Multiplayer {
     this._localPlayerIndex = 1;
     this._roomCode = '';
     this._courseId = '';
+    this._gameType = 'scoop-race';
+    this._driverIndex = 1;
+    this._teamAssignments = new Map();
   }
 }
 

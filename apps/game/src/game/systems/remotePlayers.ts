@@ -1,5 +1,6 @@
 import type { RemotePlayersMap } from '../types';
 import { poseRunning, poseStanding } from '../objects/RunnerModel';
+import { RUNNER_ANIMATION_CULL_DISTANCE } from '../constants';
 
 const SCOOP_ANIM_DURATION = 0.35;
 
@@ -9,10 +10,13 @@ export interface UpdateRemotePlayersParams {
   busRoofY: number;
   /** Current engine vibration Y offset for body shell. */
   engineVibeOffset: number;
+  observerX: number;
+  observerZ: number;
 }
 
 export function updateRemotePlayersSystem(params: UpdateRemotePlayersParams): void {
-  const { remotePlayers, dt, busRoofY, engineVibeOffset } = params;
+  const { remotePlayers, dt, busRoofY, engineVibeOffset, observerX, observerZ } = params;
+  const animationCullDistanceSq = RUNNER_ANIMATION_CULL_DISTANCE * RUNNER_ANIMATION_CULL_DISTANCE;
 
   for (const [_peerId, remote] of remotePlayers) {
     if (!remote.state) continue;
@@ -50,7 +54,10 @@ export function updateRemotePlayersSystem(params: UpdateRemotePlayersParams): vo
         remote.runnerModel.root.rotation.x = 0;
         remote.runnerModel.root.rotation.z = 0;
         remote.runnerModel.root.rotation.y = remote.smoothYaw;
-        if (Math.abs(s.speed) > 0.15) {
+        const dx = remote.smoothPos.x - observerX;
+        const dz = remote.smoothPos.z - observerZ;
+        const animateRunner = dx * dx + dz * dz <= animationCullDistanceSq;
+        if (animateRunner && Math.abs(s.speed) > 0.15) {
           remote.runnerAnimPhase += dt * Math.abs(s.speed) * 3.2;
           poseRunning(remote.runnerModel, remote.runnerAnimPhase);
         } else {

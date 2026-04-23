@@ -37,6 +37,7 @@ import {
   RUNNER_MAX_SPEED,
   RUNNER_MIN_SPEED,
   RUNNER_PLAYER_ANIM_SPEED_FACTOR,
+  RUNNER_ANIMATION_CULL_DISTANCE,
   RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
   RUNNER_SIT_DURATION,
   SCOOP_ANIM_DURATION,
@@ -164,6 +165,8 @@ export function updateRunnersSystem(
     startExhaust: false,
   };
 
+  const animationCullDistanceSq = RUNNER_ANIMATION_CULL_DISTANCE * RUNNER_ANIMATION_CULL_DISTANCE;
+
   for (const runner of ctx.runners) {
     // Skip runners owned by a remote player
     if (runner.ownerPlayerIndex !== 0 && runner.ownerPlayerIndex !== ctx.localPlayerIndex) {
@@ -171,6 +174,9 @@ export function updateRunnersSystem(
     }
 
     const pos = runner.mesh.position;
+    const distToLocalX = pos.x - ctx.busPos.x;
+    const distToLocalZ = pos.z - ctx.busPos.z;
+    const animateRunner = distToLocalX * distToLocalX + distToLocalZ * distToLocalZ <= animationCullDistanceSq;
 
     switch (runner.state) {
       case 'running': {
@@ -234,10 +240,14 @@ export function updateRunnersSystem(
         }
 
         pos.y = ctx.getGroundY(pos.x, pos.z);
-        runner.animPhase += dt * runner.speed * 3;
-        // Use interaction pose (wave / high-five) when active, otherwise run
-        if (!applyRunnerInteractionPose(runner)) {
-          poseRunning(runner.model, runner.animPhase);
+        if (animateRunner) {
+          runner.animPhase += dt * runner.speed * 3;
+          // Use interaction pose (wave / high-five) when active, otherwise run
+          if (!applyRunnerInteractionPose(runner)) {
+            poseRunning(runner.model, runner.animPhase);
+          }
+        } else {
+          poseStanding(runner.model);
         }
 
         // Check if scooped by local bus
@@ -292,8 +302,10 @@ export function updateRunnersSystem(
 
           runner.mesh.rotation.x += 8 * dt;
           runner.mesh.rotation.z += 5 * dt;
-          runner.animPhase += dt * 12;
-          poseFlailing(runner.model, runner.animPhase);
+          if (animateRunner) {
+            runner.animPhase += dt * 12;
+            poseFlailing(runner.model, runner.animPhase);
+          }
 
           // Elastic object collisions
           for (const obs of ctx.solidObstacles) {
@@ -367,8 +379,10 @@ export function updateRunnersSystem(
 
           runner.mesh.rotation.x += 8 * dt;
           runner.mesh.rotation.z += 5 * dt;
-          runner.animPhase += dt * 12;
-          poseFlailing(runner.model, runner.animPhase);
+          if (animateRunner) {
+            runner.animPhase += dt * 12;
+            poseFlailing(runner.model, runner.animPhase);
+          }
 
           const groundY = ctx.getGroundY(pos.x, pos.z);
           if (pos.y <= groundY && runner.velY < 0) {
@@ -390,16 +404,20 @@ export function updateRunnersSystem(
         pos.z = ctx.busPos.z - sinY * runner.ridingOffsetX + cosY * runner.ridingOffsetZ;
         pos.y = ctx.busPos.y + BUS_ROOF_Y + ctx.engineVibeOffset;
         runner.mesh.rotation.y = ctx.busYaw;
-        runner.animPhase += dt;
-        poseSittingAnimated(runner.model, runner.animPhase);
+        if (animateRunner) {
+          runner.animPhase += dt;
+          poseSittingAnimated(runner.model, runner.animPhase);
+        }
         break;
       }
 
       case 'sitting': {
         pos.y = ctx.getGroundY(pos.x, pos.z);
         runner.fadeTimer -= dt;
-        runner.animPhase += dt;
-        poseSittingAnimated(runner.model, runner.animPhase);
+        if (animateRunner) {
+          runner.animPhase += dt;
+          poseSittingAnimated(runner.model, runner.animPhase);
+        }
 
         if (runner.fadeTimer <= 0) {
           poseStanding(runner.model);

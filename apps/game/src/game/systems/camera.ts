@@ -1,4 +1,5 @@
 import { FreeCamera, Vector3 } from '@babylonjs/core';
+import { DEMO_CAMERA_SPEED } from '../constants';
 
 export interface DemoCameraParams {
   dt: number;
@@ -22,8 +23,7 @@ export function updateDemoCameraSystem(params: DemoCameraParams): number {
 
   if (pathPositions.length < 2) return params.demoCamProgress;
 
-  const DEMO_SPEED = 40;
-  let demoCamProgress = params.demoCamProgress + (DEMO_SPEED * dt) / pathTotalDistance;
+  let demoCamProgress = params.demoCamProgress + (DEMO_CAMERA_SPEED * dt) / pathTotalDistance;
   if (demoCamProgress > 1) demoCamProgress -= 1;
 
   const totalDist = pathCumDist[pathCumDist.length - 1];

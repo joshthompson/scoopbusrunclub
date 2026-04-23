@@ -9,7 +9,23 @@ import {
   VertexData,
 } from '@babylonjs/core';
 import earcut from 'earcut';
+import { createStadiumStand } from '../objects/StadiumStand';
 import type { BuildingFootprint, BuildingCollider } from '../types';
+import { BUILDING_LOD_SWAP_DISTANCE } from '../constants';
+
+export interface BuildingLodEntry {
+  detailedRoot: TransformNode;
+  lowDetailRoot: TransformNode;
+  x: number;
+  z: number;
+  swapDistanceSq: number;
+  lowDetailActive: boolean;
+}
+
+export interface BuildBuildingMeshesResult {
+  colliders: BuildingCollider[];
+  lodEntries: BuildingLodEntry[];
+}
 
 // ---------- Building mesh construction ----------
 
@@ -21,9 +37,10 @@ export function buildBuildingMeshes(
   scene: Scene,
   footprints: BuildingFootprint[],
   getGroundY: (x: number, z: number) => number,
-): BuildingCollider[] {
+): BuildBuildingMeshesResult {
   const colliders: BuildingCollider[] = [];
-  if (footprints.length === 0) return colliders;
+  const lodEntries: BuildingLodEntry[] = [];
+  if (footprints.length === 0) return { colliders, lodEntries };
 
   const DEFAULT_BUILDING_HEIGHT = 10;
   const MIN_BUILDING_HEIGHT = 4.25;
@@ -132,6 +149,36 @@ export function buildBuildingMeshes(
     const root = new TransformNode(`buildingRoot_${i}`, scene);
     root.position.set(centerX, groundY, centerZ);
     root.rotation.y = yaw;
+
+    const lowDetailRoot = new TransformNode(`buildingLowDetailRoot_${i}`, scene);
+    lowDetailRoot.position.set(centerX, groundY, centerZ);
+    lowDetailRoot.rotation.y = yaw;
+
+    const lowDetailBlock = MeshBuilder.CreateBox(
+      `buildingLowDetail_${i}`,
+      { width, depth, height: totalHeight },
+      scene,
+    );
+    lowDetailBlock.position.y = totalHeight * 0.5;
+    lowDetailBlock.material = wallMat;
+    lowDetailBlock.parent = lowDetailRoot;
+    lowDetailRoot.setEnabled(false);
+
+    lodEntries.push({
+      detailedRoot: root,
+      lowDetailRoot,
+      x: centerX,
+      z: centerZ,
+      swapDistanceSq: BUILDING_LOD_SWAP_DISTANCE * BUILDING_LOD_SWAP_DISTANCE,
+      lowDetailActive: false,
+    });
+
+    // --- Custom model for 'kristineberg' stadium stand ---
+    if (building.type === 'kristineberg') {
+      createStadiumStand(scene, root, width, depth, groundY);
+      colliders.push({ x: centerX, z: centerZ, yaw, halfWidth, halfDepth });
+      continue;
+    }
 
     // Compute local polygon points (in root's coordinate frame)
     const cosYaw = Math.cos(yaw);
@@ -244,7 +291,24 @@ export function buildBuildingMeshes(
     });
   }
 
-  return colliders;
+  return { colliders, lodEntries };
+}
+
+export function updateBuildingLod(
+  lodEntries: BuildingLodEntry[],
+  observerX: number,
+  observerZ: number,
+): void {
+  for (const entry of lodEntries) {
+    const dx = entry.x - observerX;
+    const dz = entry.z - observerZ;
+    const useLowDetail = dx * dx + dz * dz > entry.swapDistanceSq;
+    if (useLowDetail === entry.lowDetailActive) continue;
+
+    entry.lowDetailActive = useLowDetail;
+    entry.detailedRoot.setEnabled(!useLowDetail);
+    entry.lowDetailRoot.setEnabled(useLowDetail);
+  }
 }
 
 // ---------- Roof ----------
@@ -521,7 +585,7 @@ function addBuildingFacadeFeaturesPolygon(
   wallSegments: { cx: number; cz: number; span: number; yaw: number; nx: number; nz: number }[],
   foundationHeight: number,
   wallHeight: number,
-  buildingType: 'grey' | 'red' | 'blue',
+  buildingType: 'grey' | 'red' | 'blue' | 'kristineberg',
   trimMat: StandardMaterial,
   windowMat: StandardMaterial,
   doorMat: StandardMaterial,
@@ -664,7 +728,7 @@ export function addBuildingFacadeFeatures(
   depth: number,
   foundationHeight: number,
   wallHeight: number,
-  buildingType: 'grey' | 'red' | 'blue',
+  buildingType: 'grey' | 'red' | 'blue' | 'kristineberg',
   trimMat: StandardMaterial,
   windowMat: StandardMaterial,
   doorMat: StandardMaterial,

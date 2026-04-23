@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Level Map Viewer</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; font-family: system-ui, sans-serif; }
+      #sidebar {
+        position: fixed; top: 0; left: 0; width: 160px; height: 100%;
+        background: rgba(0,0,0,0.85); color: #ccc; padding: 10px 8px;
+        z-index: 20; overflow-y: auto; font-size: 11px;
+        border-right: 1px solid rgba(255,255,255,0.1);
+      }
+      #sidebar h3 { color: #fff; font-size: 12px; margin: 0 0 8px; }
+      .sidebar-section { margin-bottom: 10px; }
+      .sidebar-section-title { color: #999; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+      .sidebar-row { display: flex; align-items: center; gap: 5px; padding: 2px 0; cursor: pointer; user-select: none; }
+      .sidebar-row:hover { background: rgba(255,255,255,0.05); }
+      .sidebar-swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }
+      .sidebar-row label { cursor: pointer; flex: 1; }
+      .sidebar-row input[type="checkbox"] { cursor: pointer; flex-shrink: 0; }
+      .sidebar-divider { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 8px 0; }
+      #app { position: absolute; top: 0; left: 160px; width: calc(100% - 160px); height: 100%; }
+      svg { display: block; width: 100%; height: 100%; cursor: grab; }
+      svg.dragging { cursor: grabbing; }
+      #info {
+        position: fixed; top: 12px; left: 172px;
+        background: rgba(0,0,0,0.7); color: #ccc; padding: 8px 14px;
+        border-radius: 6px; font-size: 13px; pointer-events: none;
+        z-index: 10;
+      }
+      #info strong { color: #fff; }
+      #scale-bar {
+        position: fixed; bottom: 16px; right: 16px;
+        background: rgba(0,0,0,0.7); color: #ccc; padding: 6px 12px;
+        border-radius: 6px; font-size: 11px; pointer-events: none;
+        z-index: 10; display: flex; align-items: center; gap: 8px;
+      }
+      #scale-bar .bar { height: 4px; background: #fff; border-radius: 1px; }
+      #scale-bar .bar-ticks { position: relative; }
+      #scale-bar .bar-ticks::before,
+      #scale-bar .bar-ticks::after {
+        content: ''; position: absolute; top: -2px; width: 1px; height: 8px; background: #fff;
+      }
+      #scale-bar .bar-ticks::before { left: 0; }
+      #scale-bar .bar-ticks::after { right: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="sidebar"></div>
+    <div id="info">Loading…</div>
+    <div id="scale-bar"><div class="bar bar-ticks" id="scale-line"></div><span id="scale-label"></span></div>
+    <div id="app"></div>
+    <script type="module" src="/src/test-map.ts"></script>
+  </body>
+</html>

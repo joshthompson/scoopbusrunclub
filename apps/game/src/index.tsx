@@ -7,9 +7,12 @@ import levels from './levels';
 import { TitleScreen } from './TitleScreen';
 import { LevelSelectScreen } from './LevelSelectScreen';
 import { CharacterSelectScreen } from './CharacterSelectScreen';
+import { GameTypeSelectScreen } from './GameTypeSelectScreen';
 import { LobbyScreen } from './LobbyScreen';
 import { mp, MAX_PLAYERS } from './multiplayer';
 import type { PlayerState, ScoopEvent } from './multiplayer';
+import { getGameModeConfig, GAME_TYPE_LABELS } from './game/modes';
+import type { GameType, TeamColor } from './game/modes';
 
 // Babylon.js needs earcut on window for CreatePolygon
 (window as any).earcut = earcut;
@@ -24,7 +27,7 @@ const PLAYER_COLOR_INFO = [
 
 type GameMode = 'single' | 'host' | 'join';
 type PlayerRole = 'bus' | 'runner';
-type Screen = 'title' | 'level-select' | 'character-select' | 'lobby' | 'loading' | 'playing';
+type Screen = 'title' | 'level-select' | 'character-select' | 'game-type-select' | 'lobby' | 'loading' | 'playing';
 
 /** Format seconds as M:SS */
 function fmtTime(s: number): string {
@@ -68,6 +71,7 @@ function App() {
   // Multiplayer state
   const [gameMode, setGameMode] = createSignal<GameMode>('single');
   const [playerRole, setPlayerRole] = createSignal<PlayerRole>('bus');
+  const [gameType, setGameType] = createSignal<GameType>('single-bus');
   const [remoteStates, setRemoteStates] = createSignal<Map<string, PlayerState>>(new Map());
 
   const isMultiplayerMode = () => gameMode() === 'host' || gameMode() === 'join';
@@ -123,9 +127,24 @@ function App() {
     if (mode === 'join') {
       // Go straight to lobby for code entry
       setScreen('lobby');
+    } else if (mode === 'host') {
+      // Host picks game type first
+      setScreen('game-type-select');
     } else {
-      // Single player and host both pick a level first
+      // Single player picks a level first
       setScreen('level-select');
+    }
+  }
+
+  function handleGameTypeSelect(gt: GameType) {
+    setGameType(gt);
+    const config = getGameModeConfig(gt);
+    if (config.usesLevelSelect) {
+      // Pick a course, then go to lobby
+      setScreen('level-select');
+    } else {
+      // Arena etc — go straight to lobby (no level select)
+      setScreen('lobby');
     }
   }
 
@@ -141,12 +160,27 @@ function App() {
 
   function handleCharacterSelect(role: PlayerRole) {
     setPlayerRole(role);
+    setGameType(role === 'bus' ? 'single-bus' : 'single-runner');
     startGame(currentEventId);
   }
 
   function handleLobbyStart(courseId: string) {
-    currentEventId = courseId;
-    startGame(courseId);
+    // For modes without level select (e.g. arena), fall back to the mode's default level
+    let cid = courseId;
+    if (!cid) {
+      // For joiners, mp.gameType was just updated from the start message, so use it directly
+      // instead of gameType() signal which may not have updated yet (Solid is reactive).
+      // For host, gameType() signal is already set from game-type-select screen.
+      const gt = gameMode() === 'join' ? (mp.gameType ?? 'scoop-race') : gameType();
+      const config = getGameModeConfig(gt);
+      cid = config.defaultLevelId ?? 'haga';
+    }
+    currentEventId = cid;
+    // When joining, adopt the host's game type from the multiplayer layer
+    if (gameMode() === 'join' && mp.gameType) {
+      setGameType(mp.gameType);
+    }
+    startGame(cid);
   }
 
   function handleLobbyCancel() {
@@ -195,7 +229,11 @@ function App() {
     }
 
     const resolvedRole: PlayerRole = isMultiplayerMode()
-      ? (mp.localPlayerIndex === 1 ? 'bus' : 'runner')
+      ? getGameModeConfig(gameType()).getRoleForPlayer(
+          mp.localPlayerIndex,
+          mp.peerCount + 1,
+          mp.driverIndex,
+        )
       : playerRole();
     setPlayerRole(resolvedRole);
 
@@ -213,6 +251,7 @@ function App() {
       onPositionChange: (pos: number, total: number) => setRacePosition({ position: pos, total }),
     }, minimapRef, {
       localPlayerRole: resolvedRole,
+      gameType: gameType(),
     });
 
     activeGame = game;
@@ -311,6 +350,7 @@ function App() {
     mp.disconnect();
     setGameMode('single');
     setPlayerRole('bus');
+    setGameType('single-bus');
     setRemoteStates(new Map());
 
     if (activeGame) {
@@ -342,7 +382,13 @@ function App() {
       <Show when={screen() === 'level-select'}>
         <LevelSelectScreen
           onSelect={handleLevelSelect}
-          onBack={() => setScreen('title')}
+          onBack={() => {
+            if (gameMode() === 'host') {
+              setScreen('game-type-select');
+            } else {
+              setScreen('title');
+            }
+          }}
         />
       </Show>
       <Show when={screen() === 'character-select'}>
@@ -352,10 +398,17 @@ function App() {
           onBack={() => setScreen('level-select')}
         />
       </Show>
+      <Show when={screen() === 'game-type-select'}>
+        <GameTypeSelectScreen
+          onSelect={handleGameTypeSelect}
+          onBack={() => setScreen('title')}
+        />
+      </Show>
       <Show when={screen() === 'lobby'}>
         <LobbyScreen
           mode={gameMode() as 'host' | 'join'}
           courseId={gameMode() === 'host' ? currentEventId : undefined}
+          gameType={gameMode() === 'host' ? gameType() : undefined}
           onStart={handleLobbyStart}
           onCancel={handleLobbyCancel}
         />
@@ -363,6 +416,11 @@ function App() {
       <Show when={screen() === 'playing'}>
         {/* Top-left HUD */}
         <div id="hud">
+          <Show when={isMultiplayerMode()}>
+            <p style={{ 'font-size': 'clamp(10px, 1.5vw, 14px)', opacity: 0.7 }}>
+              {GAME_TYPE_LABELS[gameType()]}
+            </p>
+          </Show>
           <Show when={playerRole() === 'bus'}>
             <p>🚌 Scooped: {scored()}</p>
           </Show>

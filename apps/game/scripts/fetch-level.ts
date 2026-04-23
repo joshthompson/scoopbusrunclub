@@ -25,7 +25,7 @@ const CONVEX_URL = 'https://charming-yak-976.eu-west-1.convex.site';
 
 // ── Arg parsing ──────────────────────────────────────────────────────
 
-const VALID_TYPES = ['all', 'course', 'altitude', 'water', 'buildings', 'paths'] as const;
+const VALID_TYPES = ['all', 'course', 'altitude', 'water', 'buildings', 'paths', 'roads'] as const;
 type FetchType = (typeof VALID_TYPES)[number];
 
 const args = process.argv.slice(2);
@@ -44,7 +44,7 @@ const fetchType: FetchType = typeArg
   : 'all';
 
 if (!eventId) {
-  console.error('Usage: pnpm game:level <eventId> [--name "Display Name"] [--type=water|altitude|course|buildings|paths|all]');
+  console.error('Usage: pnpm game:level <eventId> [--name "Display Name"] [--type=water|altitude|course|buildings|paths|roads|all]');
   process.exit(1);
 }
 
@@ -468,6 +468,153 @@ function filterAndSimplifyPaths(
   return result;
 }
 
+// ── Fetch road features from Overpass ─────────────────────────────────
+
+const ROAD_TYPES = [
+  'motorway', 'trunk', 'primary', 'secondary', 'tertiary',
+  'unclassified', 'residential', 'service',
+  'living_street', 'pedestrian',
+] as const;
+
+type RoadPolyline = [number, number][]; // [lat, lon]
+
+async function fetchRoadFeatures(
+  coords: number[][],
+  paddingMetres = 400,
+): Promise<RoadPolyline[]> {
+  if (coords.length === 0) return [];
+
+  let minLat = Infinity, maxLat = -Infinity;
+  let minLon = Infinity, maxLon = -Infinity;
+  for (const c of coords) {
+    if (c[1] < minLat) minLat = c[1];
+    if (c[1] > maxLat) maxLat = c[1];
+    if (c[0] < minLon) minLon = c[0];
+    if (c[0] > maxLon) maxLon = c[0];
+  }
+
+  const latPad = paddingMetres / 111_000;
+  const lonPad =
+    paddingMetres / (111_000 * Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
+  minLat -= latPad;
+  maxLat += latPad;
+  minLon -= lonPad;
+  maxLon += lonPad;
+
+  const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
+
+  // Use a regex to match all road types at once instead of separate lines
+  const typeRegex = ROAD_TYPES.join('|');
+
+  const query = `
+[out:json][timeout:60];
+(
+  way["highway"~"^(${typeRegex})$"](${bbox});
+);
+out body;
+>;
+out skel qt;
+`;
+
+  console.log(`Fetching roads (bbox: ${bbox}) …`);
+  const results: RoadPolyline[] = [];
+
+  const OVERPASS_ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+  ];
+
+  try {
+    let res: Response | null = null;
+    for (const endpoint of OVERPASS_ENDPOINTS) {
+      try {
+        res = await fetch(endpoint, {
+          method: 'POST',
+          body: `data=${encodeURIComponent(query)}`,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'scoopbus-game/1.0',
+          },
+        });
+        if (res.ok) break;
+        console.warn(`  ⚠ ${endpoint} responded with ${res.status}, trying next …`);
+      } catch (err) {
+        console.warn(`  ⚠ ${endpoint} failed:`, err);
+      }
+    }
+    if (!res || !res.ok) {
+      console.warn(`  ⚠ All Overpass endpoints failed`);
+      return results;
+    }
+
+    const json = await res.json();
+    const nodes = new Map<number, [number, number]>();
+
+    for (const el of json.elements) {
+      if (el.type === 'node') {
+        nodes.set(el.id, [el.lon, el.lat]);
+      }
+    }
+
+    for (const el of json.elements) {
+      if (el.type === 'way' && el.nodes && el.nodes.length >= 2) {
+        const pts: [number, number][] = []; // [lat, lon]
+        for (const nid of el.nodes) {
+          const pt = nodes.get(nid);
+          if (pt) pts.push([pt[1], pt[0]]); // [lat, lon]
+        }
+        if (pts.length < 2) continue;
+
+        const highway = el.tags?.highway;
+        if (ROAD_TYPES.includes(highway)) {
+          results.push(pts);
+        }
+      }
+    }
+    console.log(
+      `  Overpass returned ${json.elements.length} elements → ${results.length} roads`,
+    );
+  } catch (err) {
+    console.warn('  ⚠ Overpass fetch failed:', err);
+  }
+
+  return results;
+}
+
+/** Filter road features: drop points >maxDist from course, simplify to minSpacing. */
+function filterAndSimplifyRoads(
+  roads: RoadPolyline[],
+  courseCoords: number[][],
+  maxDist: number,
+  minSpacing: number,
+): RoadPolyline[] {
+  const before = roads.length;
+  const result: RoadPolyline[] = [];
+
+  for (const road of roads) {
+    // Keep only points within maxDist of the course
+    const nearby = road.filter(([lat, lon]) =>
+      pointToPathDist(lon, lat, courseCoords) <= maxDist,
+    );
+    if (nearby.length < 2) continue;
+
+    // Simplify by enforcing minSpacing between consecutive kept points
+    const simplified = simplifyByMinDist(nearby, minSpacing);
+    if (simplified.length < 2) continue;
+
+    result.push(simplified);
+  }
+
+  const totalPtsBefore = roads.reduce((s, r) => s + r.length, 0);
+  const totalPtsAfter = result.reduce((s, r) => s + r.length, 0);
+  console.log(
+    `  Filtered roads: ${before} → ${result.length} (within ${maxDist}m), ` +
+    `points: ${totalPtsBefore} → ${totalPtsAfter} (${minSpacing}m spacing)`,
+  );
+  return result;
+}
+
 // ── Fetch building features from Overpass ────────────────────────────
 
 interface BuildingPolygon {
@@ -787,14 +934,54 @@ interface ExistingLevel {
 }
 
 async function readExistingLevel(id: string): Promise<ExistingLevel | null> {
-  // Try sub-folder format first, then legacy .map.ts
-  const subfolderIndex = resolve(LEVELS_DIR, id, 'index.ts');
+  const levelDir = resolve(LEVELS_DIR, id);
+  const subfolderIndex = resolve(levelDir, 'index.ts');
   const legacyFile = resolve(LEVELS_DIR, `${id}.map.ts`);
+
+  // Try reading individual JSON files first (avoids tsx issues with asset imports)
+  if (existsSync(subfolderIndex)) {
+    const courseFile = resolve(levelDir, 'course.json');
+    const altFile = resolve(levelDir, 'altitude.json');
+    const waterFile = resolve(levelDir, 'water.json');
+
+    if (existsSync(courseFile) && existsSync(altFile) && existsSync(waterFile)) {
+      try {
+        const course = JSON.parse(readFileSync(courseFile, 'utf-8'));
+        const altitude = JSON.parse(readFileSync(altFile, 'utf-8'));
+        const water = JSON.parse(readFileSync(waterFile, 'utf-8'));
+
+        // Read optional JSON files
+        const buildingsFile = resolve(levelDir, 'buildings.json');
+        const pathsFile = resolve(levelDir, 'paths.json');
+        const marshalsFile = resolve(levelDir, 'marshals.json');
+        const roadsFile = resolve(levelDir, 'roads.json');
+
+        const buildings = existsSync(buildingsFile) ? JSON.parse(readFileSync(buildingsFile, 'utf-8')) : undefined;
+        const paths = existsSync(pathsFile) ? JSON.parse(readFileSync(pathsFile, 'utf-8')) : undefined;
+        const marshals = existsSync(marshalsFile) ? JSON.parse(readFileSync(marshalsFile, 'utf-8')) : undefined;
+        const roads = existsSync(roadsFile) ? JSON.parse(readFileSync(roadsFile, 'utf-8')) : undefined;
+
+        // Extract name from index.ts via simple regex
+        const indexSrc = readFileSync(subfolderIndex, 'utf-8');
+        const nameMatch = indexSrc.match(/name:\s*['"]([^'"]+)['"]/);
+        const name = nameMatch?.[1] ?? id.charAt(0).toUpperCase() + id.slice(1);
+
+        // Extract hide from index.ts
+        const hideMatch = indexSrc.match(/hide:\s*(true|false)/);
+        const hide = hideMatch ? hideMatch[1] === 'true' : undefined;
+
+        return { course, altitude, water, name, buildings, paths, marshals, roads, hide };
+      } catch (err) {
+        console.warn(`  ⚠ Could not read JSON files for "${id}":`, err);
+      }
+    }
+  }
+
+  // Fallback: dynamic import (legacy .map.ts files)
   const filePath = existsSync(subfolderIndex) ? subfolderIndex : legacyFile;
   if (!existsSync(filePath)) return null;
 
   try {
-    // Dynamically import the TS module (works because we run under tsx)
     const mod = await import(filePath);
     const data = mod.default;
     if (!data) return null;
@@ -840,6 +1027,7 @@ async function main() {
   const needWater = fetchType === 'all' || fetchType === 'water';
   const needBuildings = fetchType === 'all' || fetchType === 'buildings';
   const needPaths = fetchType === 'all' || fetchType === 'paths';
+  const needRoads = fetchType === 'all' || fetchType === 'roads';
 
   // Course is always needed for altitude/water/buildings coords, but we can reuse existing
   let course: CourseData;
@@ -850,7 +1038,7 @@ async function main() {
   }
 
   // Fetch only what's requested, reuse existing for the rest
-  const [altitude, rawWater, rawBuildings, rawPaths] = await Promise.all([
+  const [altitude, rawWater, rawBuildings, rawPaths, rawRoads] = await Promise.all([
     needAltitude
       ? fetchElevations(course.coordinates)
       : Promise.resolve(existing!.altitude),
@@ -863,6 +1051,9 @@ async function main() {
     needPaths
       ? fetchPathFeatures(course.coordinates, 400)
       : Promise.resolve(existing?.paths ?? []),
+    needRoads
+      ? fetchRoadFeatures(course.coordinates, 400)
+      : Promise.resolve(existing?.roads ?? []),
   ]);
 
   // Filter water & buildings to within MAX_FEATURE_DIST of the path
@@ -875,12 +1066,15 @@ async function main() {
   const paths = needPaths
     ? filterAndSimplifyPaths(rawPaths, course.coordinates, MAX_PATH_DIST, MIN_PATH_SPACING)
     : rawPaths;
+  const roads = needRoads
+    ? filterAndSimplifyRoads(rawRoads, course.coordinates, MAX_PATH_DIST, MIN_PATH_SPACING)
+    : rawRoads;
 
   const name = displayName || existing?.name || eventId.charAt(0).toUpperCase() + eventId.slice(1);
 
   writeLevelFile(eventId, name, course, altitude, water, buildings, paths, {
     marshals: existing?.marshals,
-    roads: existing?.roads,
+    roads,
     hide: existing?.hide,
   });
   if (!isPartial) {

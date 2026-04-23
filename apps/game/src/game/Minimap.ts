@@ -22,7 +22,7 @@
 const MAX_VW = 0.3; // 30 vw
 const PREFERRED_PX = 220; // desktop cap
 const PAD = 8; // px inside the circle kept clear
-const VIEW_RADIUS = 500; // world-metres visible around the player
+const DEFAULT_VIEW_RADIUS = 500; // world-metres visible around the player
 const LOOKAHEAD_SEGMENT_METRES = 300; // how far ahead to render guidance on minimap
 const LOOKAHEAD_BACKTRACK_METRES = 150; // extra distance behind anchor to include
 const LOOKAHEAD_SAMPLE_STEP = 12; // metres between sampled points along lookahead segment
@@ -32,8 +32,7 @@ const COL_BG = '#1e5e15';
 const COL_PATH = '#c4a44a';
 const COL_PATH_OUTLINE = '#6b5a10';
 const COL_WATER = '#1a5faa';
-const COL_ROAD = '#7e7e84';
-const COL_ROAD_OUTLINE = '#4f4f53';
+const COL_ROAD = '#5a5a60';
 const COL_TRAIL = '#1a4e12';
 const COL_BUILDING_GREY = '#8f8f96';
 const COL_BUILDING_RED = '#a94a46';
@@ -41,6 +40,7 @@ const COL_BUILDING_BLUE = '#3f7fc7';
 const COL_BORDER = '#ffffffcc';
 const COL_LOOKAHEAD = '#ffffff';
 const COL_LOOKAHEAD_OUTLINE = '#0f3c0a';
+
 
 /** Info for one player marker on the minimap. */
 export interface MinimapPlayer {
@@ -59,15 +59,22 @@ export class Minimap {
   private waterZones: { points: [number, number][] }[] = [];
   private roads: [number, number][][] = [];
   private trails: [number, number][][] = [];
-  private buildings: { type: 'grey' | 'red' | 'blue'; points: [number, number][] }[] = [];
+  private buildings: { type: 'grey' | 'red' | 'blue' | 'kristineberg'; points: [number, number][] }[] = [];
+
 
   private gapThresholdSq = Infinity; // adaptive gap detection
   private cssSize = PREFERRED_PX;
+
+  private viewRadius = DEFAULT_VIEW_RADIUS;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
     this.applyCssSize();
     window.addEventListener('resize', () => this.applyCssSize());
+  }
+
+  setZoom(multiplier: number) {
+    this.viewRadius = DEFAULT_VIEW_RADIUS / Math.max(0.1, multiplier);
   }
 
   /* ---- public data setters ---- */
@@ -106,9 +113,11 @@ export class Minimap {
     this.trails = trails;
   }
 
-  setBuildings(buildings: { type: 'grey' | 'red' | 'blue'; points: [number, number][] }[]) {
+  setBuildings(buildings: { type: 'grey' | 'red' | 'blue' | 'kristineberg'; points: [number, number][] }[]) {
     this.buildings = buildings;
   }
+
+
 
   /* ---- sizing ---- */
 
@@ -154,7 +163,7 @@ export class Minimap {
     const ctx = this.ctx;
     const sinY = Math.sin(busYaw);
     const cosY = Math.cos(busYaw);
-    const scale = (R - PAD) / VIEW_RADIUS;
+    const scale = (R - PAD) / this.viewRadius;
 
     /** World position → canvas pixel, rotated so bus forward = up. */
     const project = (wx: number, wz: number): [number, number] => {
@@ -191,7 +200,9 @@ export class Minimap {
         ? COL_BUILDING_RED
         : building.type === 'blue'
           ? COL_BUILDING_BLUE
-          : COL_BUILDING_GREY;
+          : building.type === 'kristineberg'
+            ? COL_BUILDING_BLUE
+            : COL_BUILDING_GREY;
       ctx.fill();
     }
 
@@ -219,8 +230,7 @@ export class Minimap {
     // --- roads (outline + core, slightly thicker than path) ---
     for (const road of this.roads) {
       if (road.length < 2) continue;
-      this.strokePolyline(ctx, project, road, 8, COL_ROAD_OUTLINE);
-      this.strokePolyline(ctx, project, road, 5, COL_ROAD);
+      this.strokePolyline(ctx, project, road, 3, COL_ROAD);
     }
 
     // --- path (outline + core for bordered-road look) ---

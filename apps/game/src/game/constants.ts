@@ -26,6 +26,7 @@ export const RUNNER_JUMP_HEIGHT = 3;
 export const RUNNER_PLAYER_MAX_JUMPS = 2;
 export const RUNNER_PLAYER_JUMP_SIDE_VELOCITY = 5.5;
 export const RUNNER_COLLISION_RADIUS = 0.75;
+export const RUNNER_ANIMATION_CULL_DISTANCE = 500;
 export const SCOOP_DISTANCE = 3.5;
 export const RUNNER_ESCAPE_DISTANCE = 60;
 export const RUNNER_ESCAPE_SPEED = 2.5;
@@ -48,6 +49,7 @@ export const TREE_COUNT = 1200;
 export const TREE_SPREAD = 200;
 export const TREE_MIN_DIST_FROM_PATH = 8;
 export const AUTO_DRIVE_SPEED = 10;
+export const DEMO_CAMERA_SPEED = 10; // metres/s — title screen flyover speed
 export const DRIFT_GRIP = 6;
 export const DRIFT_HIGH_SPEED_GRIP_FACTOR = 0.45;
 export const WATER_DRIFT_GRIP = 2.5;
@@ -71,6 +73,7 @@ export const BUS_DOWNHILL_SLOPE_THRESHOLD = -0.01;
 export const RUNNER_DOWNHILL_SPEED_BOOST = 1.5;
 export const RUNNER_DOWNHILL_SLOPE_THRESHOLD = -0.02;
 export const BUS_COLLISION_RADIUS = 2.0;
+export const BUILDING_LOD_SWAP_DISTANCE = 500;
 
 // Engine vibration (body oscillates on the wheels)
 export const ENGINE_VIBE_FREQUENCY = 3;   // Hz — fast idle-engine rumble

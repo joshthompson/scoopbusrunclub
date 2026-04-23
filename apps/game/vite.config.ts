@@ -4,12 +4,21 @@ import path from 'path';
 
 export default defineConfig({
   base: '/game/',
-  plugins: [solidPlugin()],
+  plugins: [
+    solidPlugin(),
+
+  ],
   server: {
     port: 3010,
   },
   build: {
     target: 'esnext',
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        test: path.resolve(__dirname, 'test.html'),
+      },
+    },
   },
   resolve: {
     alias: {

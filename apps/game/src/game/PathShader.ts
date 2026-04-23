@@ -56,6 +56,8 @@ export interface PathShaderOptions {
     z: number;
     radius: number;     // world-space radius
   };
+  /** If provided, use this URL as the path texture instead of the default dirt */
+  pathTextureUrl?: string;
 }
 
 // ---------- Public API ----------
@@ -90,6 +92,7 @@ export function createPathGroundMaterial(
     dirtTiling = 300,
     startLine,
     startCircle,
+    pathTextureUrl,
   } = opts;
 
   // --- 1. Bake path mask onto a DynamicTexture ---
@@ -113,7 +116,7 @@ export function createPathGroundMaterial(
   grassTex.vScale = grassTiling;
   grassTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
 
-  const dirtTex = new Texture(dirtUrl, scene);
+  const dirtTex = new Texture(pathTextureUrl ?? dirtUrl, scene);
   dirtTex.uScale = dirtTiling;
   dirtTex.vScale = dirtTiling;
   dirtTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
@@ -122,7 +125,7 @@ export function createPathGroundMaterial(
   const mat = new MixMaterial('pathGroundMat', scene);
   mat.specularColor = Color3.Black();
 
-  // The mix-map: R=1 (full grass brightness), G=path mask (blend toward dirt), B=road mask
+  // The mix-map: R=1 (full grass brightness), G=road mask, B=path mask (blend toward dirt)
   mat.mixTexture1 = maskTex;
   // Secondary mix-map: R=start-line mask
   mat.mixTexture2 = lineMaskTex;
@@ -130,16 +133,16 @@ export function createPathGroundMaterial(
   // diffuseTexture1 is controlled by R channel → grass everywhere
   mat.diffuseTexture1 = grassTex;
 
-  // diffuseTexture2 is controlled by G channel → dirt on path
-  mat.diffuseTexture2 = dirtTex;
-
-  // diffuseTexture3 is controlled by B channel → roads
+  // diffuseTexture2 is controlled by G channel → roads (rendered under paths)
   const roadDyn = new DynamicTexture('roadTex', 4, scene, false);
   const rCtx = roadDyn.getContext() as unknown as CanvasRenderingContext2D;
   rCtx.fillStyle = '#606066';
   rCtx.fillRect(0, 0, 4, 4);
   roadDyn.update();
-  mat.diffuseTexture3 = roadDyn;
+  mat.diffuseTexture2 = roadDyn;
+
+  // diffuseTexture3 is controlled by B channel → dirt on path (rendered on top)
+  mat.diffuseTexture3 = dirtTex;
 
   // diffuseTexture4 must also be set to avoid shader errors (use grass)
   mat.diffuseTexture4 = grassTex;
@@ -166,11 +169,13 @@ export function createPathGroundMaterial(
  * MixMaterial blend logic:
  *   diffuse1 *= R
  *   result = mix(diffuse1, diffuse2, G)
+ *   result = mix(result, diffuse3, B)
  *
  * So we paint:
  *   R = 1.0 everywhere (grass at full brightness)
- *   G = 0.0 off-path (stay on grass), 1.0 on-path (show dirt)
- *   B = road mask, A = 1
+ *   G = road mask (0 = no road, 1 = full road) — blended first (under)
+ *   B = path mask (0 = no path, 1 = full dirt) — blended last (on top)
+ *   A = 1
  */
 function bakeMaskTexture(
   scene: Scene,
@@ -272,27 +277,45 @@ function bakeMaskTexture(
     ctx.stroke();
   };
 
+  // -- Roads in G channel (blended first → renders under paths) --
+  // Use 'lighten' compositing so overlapping road edges never reduce each
+  // other's G value → no visible grass seam at intersections.
+  const roadOuterWorldWidth = roadHalfWidth * 2 + edgeSoftness * 1.2;
+  const roadOuterPixelWidth = (roadOuterWorldWidth / groundSize) * size;
+  const roadMidWorldWidth = roadHalfWidth * 2 + edgeSoftness * 0.4;
+  const roadMidPixelWidth = (roadMidWorldWidth / groundSize) * size;
+  const roadCoreWorldWidth = roadHalfWidth * 2;
+  const roadCorePixelWidth = (roadCoreWorldWidth / groundSize) * size;
+
+  ctx.globalCompositeOperation = 'lighten';
+  for (const road of roads) {
+    drawRoadStroke(road, roadOuterPixelWidth, 'rgb(255, 140, 0)');
+    drawRoadStroke(road, roadMidPixelWidth, 'rgb(255, 210, 0)');
+    drawRoadStroke(road, roadCorePixelWidth, 'rgb(255, 255, 0)');
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
   // Draw path in layers: wide soft edge → medium → solid core
-  // We're adding G channel (green) on top of the red background.
-  // R must stay 255 so we use colours like rgb(255, G, 0).
+  // Course path uses B channel (blended last → renders on top of roads).
+  // Painting with source-over zeroes G where paths exist, hiding roads beneath.
 
   // -- Soft outer edge: slight dirt blend --
   const totalWorldWidth = (pathHalfWidth + edgeSoftness) * 2;
   const outerPixelWidth = (totalWorldWidth / groundSize) * size;
-  drawPathStroke(outerPixelWidth, 'rgb(255, 115, 0)');  // G≈0.45
+  drawPathStroke(outerPixelWidth, 'rgb(255, 0, 115)');  // B≈0.45
 
   // -- Medium transition --
   const midWorldWidth = (pathHalfWidth + edgeSoftness * 0.4) * 2;
   const midPixelWidth = (midWorldWidth / groundSize) * size;
-  drawPathStroke(midPixelWidth, 'rgb(255, 179, 0)');    // G≈0.70
+  drawPathStroke(midPixelWidth, 'rgb(255, 0, 179)');    // B≈0.70
 
   // -- Solid core (full path width) --
   const coreWorldWidth = pathHalfWidth * 2;
   const corePixelWidth = (coreWorldWidth / groundSize) * size;
-  drawPathStroke(corePixelWidth, 'rgb(255, 255, 0)');   // G=1.0 → full dirt
+  drawPathStroke(corePixelWidth, 'rgb(255, 0, 255)');   // B=1.0 → full dirt
 
   // -- Trails: narrower dirt paths drawn with 'lighten' compositing so they
-  //    only INCREASE the G channel. Where the main path already has high G,
+  //    only INCREASE the B channel. Where the main path already has high B,
   //    the trail's lower values are ignored → no visible seam/border. --
   const trailHalfWidth = pathHalfWidth * 0.4;
   const trailOuterWorld = (trailHalfWidth + edgeSoftness * 0.4) * 2;
@@ -301,24 +324,10 @@ function bakeMaskTexture(
 
   ctx.globalCompositeOperation = 'lighten';
   for (const trail of trails) {
-    drawRoadStroke(trail, trailOuterPx, 'rgb(255, 60, 0)');   // G≈0.24 soft edge
-    drawRoadStroke(trail, trailCorePx, 'rgb(255, 110, 0)');   // G≈0.43 core
+    drawRoadStroke(trail, trailOuterPx, 'rgb(255, 0, 60)');   // B≈0.24 soft edge
+    drawRoadStroke(trail, trailCorePx, 'rgb(255, 0, 110)');   // B≈0.43 core
   }
   ctx.globalCompositeOperation = 'source-over';
-
-  // -- Roads in B channel (terrain shader, not mesh objects) --
-  const roadOuterWorldWidth = roadHalfWidth * 2 + edgeSoftness * 1.2;
-  const roadOuterPixelWidth = (roadOuterWorldWidth / groundSize) * size;
-  const roadMidWorldWidth = roadHalfWidth * 2 + edgeSoftness * 0.4;
-  const roadMidPixelWidth = (roadMidWorldWidth / groundSize) * size;
-  const roadCoreWorldWidth = roadHalfWidth * 2;
-  const roadCorePixelWidth = (roadCoreWorldWidth / groundSize) * size;
-
-  for (const road of roads) {
-    drawRoadStroke(road, roadOuterPixelWidth, 'rgb(255, 0, 140)');
-    drawRoadStroke(road, roadMidPixelWidth, 'rgb(255, 0, 210)');
-    drawRoadStroke(road, roadCorePixelWidth, 'rgb(255, 0, 255)');
-  }
 
   // Seam connector: bridge the spawn circle to the first path point using
   // strokes that start from the circle edge, not the centre. That keeps the
@@ -348,17 +357,17 @@ function bakeMaskTexture(
       );
 
       ctx.globalCompositeOperation = 'lighten';
-      drawSegmentStroke(outerStart, connectorTo, outerPixelWidth, 'rgb(255, 115, 0)');
-      drawSegmentStroke(midStart, connectorTo, midPixelWidth, 'rgb(255, 179, 0)');
-      drawSegmentStroke(coreStart, connectorTo, corePixelWidth, 'rgb(255, 255, 0)');
+      drawSegmentStroke(outerStart, connectorTo, outerPixelWidth, 'rgb(255, 0, 115)');
+      drawSegmentStroke(midStart, connectorTo, midPixelWidth, 'rgb(255, 0, 179)');
+      drawSegmentStroke(coreStart, connectorTo, corePixelWidth, 'rgb(255, 0, 255)');
       ctx.globalCompositeOperation = 'source-over';
     }
   }
 
-  // --- Start circle (G channel = dirt) ---
+  // --- Start circle (B channel = dirt) ---
   // Renders a circular dirt area behind the start line where buses spawn.
   // Use 'lighten' compositing so the circle's soft edges don't overwrite
-  // higher G values already painted by the path (which would cause a
+  // higher B values already painted by the path (which would cause a
   // visible grass-coloured seam at the overlap).
   if (startCircle) {
     const [cx, cy] = toPixel(startCircle.x, startCircle.z);
@@ -370,20 +379,20 @@ function bakeMaskTexture(
     const outerRadius = pixelRadius + (edgeSoftness / groundSize) * size;
     ctx.beginPath();
     ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgb(255, 115, 0)'; // G≈0.45
+    ctx.fillStyle = 'rgb(255, 0, 115)'; // B≈0.45
     ctx.fill();
 
     // Medium transition
     const midRadius = pixelRadius + (edgeSoftness * 0.4 / groundSize) * size;
     ctx.beginPath();
     ctx.arc(cx, cy, midRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgb(255, 179, 0)'; // G≈0.70
+    ctx.fillStyle = 'rgb(255, 0, 179)'; // B≈0.70
     ctx.fill();
 
     // Solid core
     ctx.beginPath();
     ctx.arc(cx, cy, pixelRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgb(255, 255, 0)'; // G=1.0 → full dirt
+    ctx.fillStyle = 'rgb(255, 0, 255)'; // B=1.0 → full dirt
     ctx.fill();
 
     ctx.globalCompositeOperation = 'source-over';

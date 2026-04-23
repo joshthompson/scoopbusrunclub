@@ -38,7 +38,7 @@ export interface PhysicsObjectResult {
 
 /**
  * Scatter trees across the landscape using a seeded RNG.
- * Trees avoid the path and come in two variants (trunk + foliage).
+ * Trees avoid the path, roads, and trails and come in two variants (trunk + foliage).
  * Returns the elastic objects and solid obstacles created.
  */
 export function buildTrees(
@@ -47,6 +47,8 @@ export function buildTrees(
   getGroundY: (x: number, z: number) => number,
   waterZones: WaterZone[],
   startCircleCenter: { x: number; z: number } | null,
+  roads: [number, number][][] = [],
+  trails: [number, number][][] = [],
 ): PhysicsObjectResult {
   const result: PhysicsObjectResult = { elasticObjects: [], solidObstacles: [] };
   if (pathPositions.length < 2) return result;
@@ -84,6 +86,16 @@ export function buildTrees(
     const z = cz + Math.sin(angle) * dist;
 
     if (distToPath(x, z, pathPositions) < TREE_MIN_DIST_FROM_PATH) continue;
+    // Also avoid roads and trails
+    let onRoadOrTrail = false;
+    for (const road of roads) {
+      if (distToPath(x, z, road) < TREE_MIN_DIST_FROM_PATH) { onRoadOrTrail = true; break; }
+    }
+    if (onRoadOrTrail) continue;
+    for (const trail of trails) {
+      if (distToPath(x, z, trail) < TREE_MIN_DIST_FROM_PATH) { onRoadOrTrail = true; break; }
+    }
+    if (onRoadOrTrail) continue;
     if (isInWaterZone(x, z, waterZones)) continue;
 
     if (startCircleCenter) {

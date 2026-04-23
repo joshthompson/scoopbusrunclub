@@ -5,6 +5,7 @@ import altitude from './altitude.json';
 import water from './water.json';
 import buildings from './buildings.json';
 import paths from './paths.json';
+import roads from './roads.json';
 
 const level: LevelData = {
   id: 'huddinge',
@@ -14,6 +15,7 @@ const level: LevelData = {
   water: water as LevelData['water'],
   buildings: buildings as LevelData['buildings'],
   paths: paths as LevelData['paths'],
+  roads: roads as LevelData['roads'],
 };
 
 export default level;

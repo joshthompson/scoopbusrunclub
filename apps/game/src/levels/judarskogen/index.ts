@@ -7,6 +7,15 @@ import buildings from './buildings.json';
 import paths from './paths.json';
 import roads from './roads.json';
 
+// Shift roads 50 m west and 15 m north (at ~59.35°N latitude)
+const LAT_PER_METRE = 1 / 111_000;
+const LON_PER_METRE = 1 / (111_000 * Math.cos(59.35 * Math.PI / 180));
+const dLat = 10 * LAT_PER_METRE;   // 15 m north
+const dLon = -40 * LON_PER_METRE;  // 50 m west
+const shiftedRoads = (roads as LevelData['roads'])!.map((road) =>
+  road.map(([lat, lon]) => [lat + dLat, lon + dLon] as [number, number]),
+);
+
 const level: LevelData = {
   id: 'judarskogen',
   name: 'Judarskogen',
@@ -15,7 +24,7 @@ const level: LevelData = {
   water: water as LevelData['water'],
   buildings: buildings as LevelData['buildings'],
   paths: paths as LevelData['paths'],
-  roads: roads as LevelData['roads'],
+  roads: shiftedRoads,
 };
 
 export default level;
