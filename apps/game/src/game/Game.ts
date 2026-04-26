@@ -29,8 +29,9 @@ import { MAX_PLAYERS } from '../multiplayer';
 import type { GameType } from './modes/types';
 import { createBusModel, tintBusModel, PLAYER_COLORS } from './objects/BusModel';
 import { createSky } from './objects/Sky';
-import { createPathGroundMaterial } from './PathShader';
-import type { IcePatchOverlay, PathGroundMaterial } from './PathShader';
+import type { IcePatchOverlay } from './PathShader';
+import { createTiledPathGroundMaterial } from './PathShaderTiled';
+import type { TiledPathGroundMaterial } from './PathShaderTiled';
 import { createRunnerModel, poseStanding } from './objects/RunnerModel';
 import type { RunnerModelResult } from './objects/RunnerModel';
 import {
@@ -257,6 +258,7 @@ export class Game {
     age: number;
   }[] = [];
   private setIcePatchesOnGround: ((patches: IcePatchOverlay[]) => void) | null = null;
+  private updateInsetCenter: ((playerX: number, playerZ: number) => void) | null = null;
 
   // Water zones (local XZ polygons + Y level) — set before buildGround
   private waterZones: WaterZone[] = [];
@@ -437,6 +439,7 @@ export class Game {
     this.shoeFlameEmitters = [];
     this.icePatches = [];
     this.setIcePatchesOnGround = null;
+    this.updateInsetCenter = null;
     this.engine?.stopRenderLoop();
     this.scene?.dispose();
     this.engine?.dispose();
@@ -1234,7 +1237,7 @@ export class Game {
       this.startCircleCenter = { x: cx, z: cz };
     }
 
-    const groundMat = createPathGroundMaterial(this.scene, {
+    const shaderOpts = {
       pathPositions: this.pathPositions,
       roads: this.roadPolylines,
       trails: this.trailPolylines,
@@ -1246,10 +1249,16 @@ export class Game {
       startLine: startLineInfo,
       startCircle: startCircleInfo,
       pathTextureUrl: this.pathTextureUrl,
-    });
-    ground.material = groundMat;
-    this.setIcePatchesOnGround = (groundMat as PathGroundMaterial).__setIcePatches ?? null;
+    };
+
+    // Use tiled two-level path shader for better performance on weaker devices.
+    // Falls back to the original single-texture MixMaterial when tiled shader
+    // is not available or not wanted.
+    const tiledMat = createTiledPathGroundMaterial(this.scene, shaderOpts);
+    ground.material = tiledMat;
+    this.setIcePatchesOnGround = tiledMat.__setIcePatches ?? null;
     this.setIcePatchesOnGround?.([]);
+    this.updateInsetCenter = tiledMat.__updateInsetCenter ?? null;
 
     // Apply terrain heights to ground vertices so the ground undulates
     const positions = ground.getVerticesData(VertexBuffer.PositionKind);
@@ -2042,6 +2051,7 @@ export class Game {
         );
       }
       this.updateBuildingLodForPlayer();
+      this.updateInsetCenter?.(this.busPos.x, this.busPos.z);
       return;
     }
 
@@ -2120,6 +2130,7 @@ export class Game {
         updateElasticObjects(this.elasticObjects, dt);
         this.updateRemoteBusMeshes(dt, engineVibeOffset);
         this.updateBuildingLodForPlayer();
+        this.updateInsetCenter?.(this.busPos.x, this.busPos.z);
         if (this.minimap) {
           this.minimap.draw(
             this.busPos.x,
@@ -2554,6 +2565,7 @@ export class Game {
     // --- Update remote bus meshes (multiplayer interpolation) ---
     this.updateRemoteBusMeshes(dt, engineVibeOffset);
     this.updateBuildingLodForPlayer();
+    this.updateInsetCenter?.(this.busPos.x, this.busPos.z);
 
     // Minimap
     if (this.minimap) {
