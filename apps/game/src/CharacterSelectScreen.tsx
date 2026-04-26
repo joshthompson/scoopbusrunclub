@@ -8,7 +8,7 @@ import {
   type CharacterSelection,
   type RunnerPreset,
 } from './game/characters';
-import { getRunnerPreviewUrl, getCorgiPreviewUrl } from './RunnerPreview3D';
+import { getRunnerPreviewUrl, getCorgiPreviewUrl, startLiveWavePreview } from './RunnerPreview3D';
 
 type PlayerRole = 'bus' | 'runner';
 
@@ -27,11 +27,10 @@ interface CharacterSelectScreenProps {
 
 // ── Runner preview (3D rendered image) ──
 
-function RunnerPreview(props: { preset: RunnerPreset }) {
+function RunnerPreview(props: { preset: RunnerPreset; hovered: boolean; onLiveRef: (el: HTMLDivElement) => void }) {
   const [src, setSrc] = createSignal<string>('');
 
   onMount(async () => {
-    // Render the 3D preview (cached after first call)
     let url: string;
     if (isCorgiPreset(props.preset)) {
       url = await getCorgiPreviewUrl(props.preset.id);
@@ -42,11 +41,63 @@ function RunnerPreview(props: { preset: RunnerPreset }) {
   });
 
   return (
-    <div class="runner-preview">
-      <Show when={src()}>
-        <img src={src()} alt={props.preset.name} class="runner-preview-img" />
+    <div
+      class="runner-preview"
+      ref={(el) => props.onLiveRef(el)}
+    >
+      <Show when={src() && !props.hovered}>
+        <img
+          src={src()}
+          alt={props.preset.name}
+          class="runner-preview-img"
+        />
       </Show>
     </div>
+  );
+}
+
+function RunnerTile(props: {
+  preset: RunnerPreset;
+  taken: boolean;
+  active: boolean;
+  onClick: () => void;
+}) {
+  let liveContainerRef: HTMLDivElement | undefined;
+  let cleanupLive: (() => void) | null = null;
+  const [hovered, setHovered] = createSignal(false);
+
+  function handleMouseEnter() {
+    setHovered(true);
+    if (!liveContainerRef) return;
+    const appearance = isCorgiPreset(props.preset) ? null : props.preset.appearance;
+    cleanupLive = startLiveWavePreview(liveContainerRef, appearance);
+  }
+
+  function handleMouseLeave() {
+    setHovered(false);
+    if (cleanupLive) {
+      cleanupLive();
+      cleanupLive = null;
+    }
+  }
+
+  return (
+    <button
+      class="char-tile"
+      classList={{ taken: props.taken, active: props.active }}
+      disabled={props.taken}
+      onClick={props.onClick}
+      title={props.preset.name}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <RunnerPreview
+        preset={props.preset}
+        hovered={hovered()}
+        onLiveRef={(el) => { liveContainerRef = el; }}
+      />
+      <span class="char-tile-label">{props.preset.name}</span>
+    </button>
   );
 }
 
@@ -141,16 +192,12 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
               const taken = () => isRunnerTaken(preset.id);
               const active = () => (selected() as any)?.runnerId === preset.id;
               return (
-                <button
-                  class="char-tile"
-                  classList={{ taken: taken(), active: active() }}
-                  disabled={taken()}
+                <RunnerTile
+                  preset={preset}
+                  taken={taken()}
+                  active={active()}
                   onClick={() => handleRunnerClick(preset.id)}
-                  title={preset.name}
-                >
-                  <RunnerPreview preset={preset} />
-                  <span class="char-tile-label">{preset.name}</span>
-                </button>
+                />
               );
             }}</For>
           </div>
