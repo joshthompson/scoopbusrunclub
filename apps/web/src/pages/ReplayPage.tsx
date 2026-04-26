@@ -36,6 +36,27 @@ import { COURSE_OVERRIDES } from "@/data/courses"
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Set of event IDs that have a corresponding 3D game level. */
+const GAME_LEVEL_IDS = new Set([
+  "haga",
+  "huddinge",
+  "judarskogen",
+  "kristineberg",
+  "cheltenham",
+  "lillsjon",
+  "uppsala",
+])
+
+/** Build a lookup: parkrunId → runner key (for 3D preview). */
+const parkrunIdToRunnerKey = new Map<string, string>()
+for (const [key, [accessor]] of Object.entries(runnerSignals)) {
+  const data = accessor()
+  if (data.id) {
+    // Game character IDs are all lowercase
+    parkrunIdToRunnerKey.set(data.id, key.toLowerCase())
+  }
+}
+
 interface Point2D {
   x: number
   y: number
@@ -358,6 +379,33 @@ export function ReplayPage(props: ReplayPageProps) {
 
   const hasData = createMemo(() => replayRunners().length > 0 && courseData() !== null)
 
+  // ---- 3D preview mode (for courses with game levels) ----
+  const has3DLevel = createMemo(() => GAME_LEVEL_IDS.has(eventId()))
+  const [show3D, setShow3D] = createSignal(true)
+
+  /** Build the iframe src URL for the 3D game preview */
+  const previewIframeSrc = createMemo(() => {
+    if (!has3DLevel()) return ""
+    const runners = replayRunners()
+    if (runners.length === 0) return ""
+
+    // Map each club member to their game character ID, skip non-members
+    const runnerParams = runners
+      .map((r) => {
+        const key = parkrunIdToRunnerKey.get(r.parkrunId)
+        if (!key) return null
+        return `${key}:${Math.round(r.finishSeconds)}`
+      })
+      .filter(Boolean)
+      .join(",")
+
+    if (!runnerParams) return ""
+    const base = window.location.hostname === "localhost"
+      ? "http://localhost:3011/game/"
+      : "/game/"
+    return `${base}?preview&id=${eventId()}&runners=${runnerParams}`
+  })
+
   // ---- Event date ----
   const eventDate = createMemo(() => {
     const r = props.results.find(
@@ -679,8 +727,39 @@ export function ReplayPage(props: ReplayPageProps) {
                 <p class={styles.eventDate}>{formatDate(new Date(`${date()}T00:00:00`))}</p>
               )}
             </Show>
+            {/* 2D / 3D toggle for courses with game levels */}
+            <Show when={has3DLevel() && previewIframeSrc()}>
+              <div class={styles.viewToggle}>
+                <button
+                  class={styles.toggleBtn + (!show3D() ? ` ${styles.toggleBtnActive}` : "")}
+                  onClick={() => setShow3D(false)}
+                >
+                  2D Replay
+                </button>
+                <button
+                  class={styles.toggleBtn + (show3D() ? ` ${styles.toggleBtnActive}` : "")}
+                  onClick={() => setShow3D(true)}
+                >
+                  3D Replay
+                </button>
+              </div>
+            </Show>
+
             <div class={styles.replayContainer}>
-              {/* ---- SVG Course + Runners ---- */}
+              {/* ---- 3D Game Preview ---- */}
+              <Show when={show3D() && previewIframeSrc()}>
+                <div class={styles.iframeContainer}>
+                  <iframe
+                    src={previewIframeSrc()}
+                    class={styles.previewIframe}
+                    allow="autoplay"
+                    title="3D Race Preview"
+                  />
+                </div>
+              </Show>
+
+              {/* ---- SVG Course + Runners (shown when NOT in 3D mode) ---- */}
+              <Show when={!show3D()}>
               <svg
                 ref={svgEl}
                 viewBox={viewBox()}
@@ -828,6 +907,7 @@ export function ReplayPage(props: ReplayPageProps) {
                 <div class={styles.disclaimer}>
                   The replay is based on finish times and map data which often doesn't reflect things like laps, direction or correct start/end locations.
                 </div>
+              </Show>
               </Show>
             </div>
           </FieldBlock>
@@ -1017,5 +1097,42 @@ const styles = {
     textDecoration: "underline",
     padding: "0.5rem",
     _hover: { opacity: 0.8 },
+  }),
+  viewToggle: css({
+    display: "flex",
+    justifyContent: "center",
+    gap: "0.4rem",
+    marginBottom: "0.5rem",
+  }),
+  toggleBtn: css({
+    fontFamily: '"Jersey 10", sans-serif',
+    padding: "0.3rem 1rem",
+    border: "2px solid var(--color-black)",
+    borderRadius: "2px",
+    background: "rgba(255,255,255,0.05)",
+    color: "var(--color-black)",
+    cursor: "pointer",
+    cornerShape: "notch",
+    fontSize: "1.25rem",
+    fontWeight: 600,
+    _hover: { background: "var(--overlay-white-15)" },
+  }),
+  toggleBtnActive: css({
+    background: "var(--color-white)",
+    _hover: { background: "var(--color-white)" },
+  }),
+  iframeContainer: css({
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "0.5rem",
+  }),
+  previewIframe: css({
+    width: "100%",
+    aspectRatio: "16 / 9",
+    border: "2px solid var(--color-black)",
+    borderRadius: "8px",
+    background: "#000",
   }),
 }

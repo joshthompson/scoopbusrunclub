@@ -673,4 +673,15 @@ function App() {
   );
 }
 
-render(() => <App />, document.getElementById('app')!);
+// --- Entry point: detect preview mode from URL params ---
+import { parsePreviewParams, PreviewMode } from './PreviewMode';
+
+const previewParams = parsePreviewParams();
+if (previewParams) {
+  render(
+    () => <PreviewMode courseId={previewParams.courseId} runners={previewParams.runners} />,
+    document.getElementById('app')!,
+  );
+} else {
+  render(() => <App />, document.getElementById('app')!);
+}

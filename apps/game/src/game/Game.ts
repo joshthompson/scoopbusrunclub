@@ -16,6 +16,7 @@ import {
   GroundMesh,
   ParticleSystem,
   SceneLoader,
+  DynamicTexture,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import arrowModelUrl from '../assets/models/arrow.glb?url';
@@ -178,6 +179,19 @@ import {
   type FenceCollider,
 } from './objects/Fence';
 import { PowerUpSystem, type PowerUpId } from './systems/powerups';
+import {
+  spawnPreviewRunners,
+  updatePreviewRunners,
+  disposePreviewRunners,
+  type PreviewRunner,
+  type PreviewRunnerDef,
+} from './systems/previewRunners';
+import {
+  createPreviewOrbitState,
+  setupPreviewOrbitInput,
+  updatePreviewOrbitCamera,
+  type PreviewOrbitState,
+} from './systems/previewCamera';
 
 // ---------- Game class ----------
 
@@ -357,6 +371,21 @@ export class Game {
     interactionSide: 1,
   };
 
+  // ---------- Preview mode state ----------
+  private previewMode = false;
+  private previewRunners: PreviewRunner[] = [];
+  private previewElapsed = 0; // simulated seconds elapsed
+  private previewSpeedMultiplier = 1; // playback speed
+  private previewPlaying = false;
+  private previewCountdownTimer = 0;
+  private followedRunnerIndex = 0; // which runner the camera follows
+  private previewOrbitState: PreviewOrbitState | null = null;
+  private previewOrbitCleanup: (() => void) | null = null;
+  /** Callback to notify UI of preview state changes */
+  private onPreviewTick?: (elapsed: number, finished: number, total: number) => void;
+  private onPreviewCountdown?: (text: string) => void;
+  private onPreviewRaceState?: (state: 'countdown' | 'racing' | 'finished') => void;
+
   constructor(
     canvas: HTMLCanvasElement,
     callbacks: GameCallbacks,
@@ -446,6 +475,16 @@ export class Game {
     this.icePatches = [];
     this.setIcePatchesOnGround = null;
     this.updateInsetCenter = null;
+    // Dispose preview orbit input listeners
+    if (this.previewOrbitCleanup) {
+      this.previewOrbitCleanup();
+      this.previewOrbitCleanup = null;
+    }
+    // Dispose preview runners
+    if (this.previewRunners.length > 0) {
+      disposePreviewRunners(this.previewRunners);
+      this.previewRunners = [];
+    }
     this.engine?.stopRenderLoop();
     this.scene?.dispose();
     this.engine?.dispose();
@@ -925,6 +964,169 @@ export class Game {
     await this.initScene(eventId, { skipBus: true, skipRunners: true, skipInput: true });
   }
 
+  // ---------- Preview mode (race replay in 3D) ----------
+
+  async initPreview(
+    eventId: string,
+    runnerDefs: PreviewRunnerDef[],
+    callbacks: {
+      onTick?: (elapsed: number, finished: number, total: number) => void;
+      onCountdown?: (text: string) => void;
+      onRaceState?: (state: 'countdown' | 'racing' | 'finished') => void;
+    },
+  ) {
+    this.previewMode = true;
+    this.onPreviewTick = callbacks.onTick;
+    this.onPreviewCountdown = callbacks.onCountdown;
+    this.onPreviewRaceState = callbacks.onRaceState;
+    await this.initScene(eventId, { skipBus: true, skipRunners: true, skipInput: false });
+
+    // Spawn preview runners
+    this.previewRunners = spawnPreviewRunners(
+      this.scene,
+      runnerDefs,
+      this.pathPositions,
+      (x, z) => this.getGroundY(x, z),
+    );
+
+    // Create name labels above runners
+    this.createPreviewRunnerLabels();
+
+    // Set up orbit camera behind the first runner
+    this.followedRunnerIndex = 0;
+    let initialOrbitYaw = Math.PI; // default
+    if (this.pathPositions.length > 1) {
+      const [sx, sz] = this.pathPositions[0];
+      const [nx, nz] = this.pathPositions[1];
+      const yaw = Math.atan2(nx - sx, nz - sz);
+      initialOrbitYaw = yaw + Math.PI; // camera behind runner
+      const groundY = this.getGroundY(sx, sz);
+      const fwd = new Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+      this.camera.position = new Vector3(sx - fwd.x * 8, groundY + 3, sz - fwd.z * 8);
+      this.camera.setTarget(new Vector3(sx, groundY + 1.2, sz));
+    }
+    this.previewOrbitState = createPreviewOrbitState(initialOrbitYaw);
+    this.previewOrbitCleanup = setupPreviewOrbitInput(this.canvas, this.previewOrbitState);
+
+    // Start countdown
+    this.previewCountdownTimer = 3;
+    this.previewElapsed = 0;
+    this.previewPlaying = false;
+    this.onPreviewCountdown?.('3');
+    this.onPreviewRaceState?.('countdown');
+  }
+
+  /** Create billboarded name labels above each preview runner's head */
+  private createPreviewRunnerLabels() {
+    for (const runner of this.previewRunners) {
+      const label = this.createBillboardLabel(runner.name, runner.model.root);
+      if (label) label.position.y = 2.2; // above head
+    }
+  }
+
+  /** Create a simple billboarded text plane parented to a node */
+  private createBillboardLabel(text: string, parent: TransformNode): Mesh | null {
+    const texW = 256;
+    const texH = 64;
+    const tex = new DynamicTexture(`labelTex_${text}`, { width: texW, height: texH }, this.scene, false);
+    tex.hasAlpha = true;
+    const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+    ctx.clearRect(0, 0, texW, texH);
+
+    // Draw arrow pointing down
+    const arrowW = 10;
+    const arrowX = texW / 2;
+    const arrowTop = texH - 16;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(arrowX - arrowW, arrowTop);
+    ctx.lineTo(arrowX + arrowW, arrowTop);
+    ctx.lineTo(arrowX, texH - 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw name text
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Outline
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.strokeText(text, texW / 2, texH / 2 - 8);
+    // Fill
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, texW / 2, texH / 2 - 8);
+    tex.update();
+
+    const mat = new StandardMaterial(`labelMat_${text}`, this.scene);
+    mat.diffuseTexture = tex;
+    mat.emissiveColor = new Color3(1, 1, 1);
+    mat.disableLighting = true;
+    mat.backFaceCulling = false;
+    mat.useAlphaFromDiffuseTexture = true;
+
+    const planeW = 2.0;
+    const planeH = 0.5;
+    const plane = MeshBuilder.CreatePlane(`label_${text}`, { width: planeW, height: planeH }, this.scene);
+    plane.material = mat;
+    plane.parent = parent;
+    plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    return plane;
+  }
+
+  /** Set the playback speed multiplier for preview mode */
+  setPreviewSpeed(speed: number) {
+    this.previewSpeedMultiplier = speed;
+  }
+
+  /** Toggle play/pause for preview mode */
+  setPreviewPlaying(playing: boolean) {
+    this.previewPlaying = playing;
+  }
+
+  /** Get current preview playing state */
+  isPreviewPlaying(): boolean {
+    return this.previewPlaying;
+  }
+
+  /** Get current preview elapsed seconds */
+  getPreviewElapsed(): number {
+    return this.previewElapsed;
+  }
+
+  /** Seek preview to specific elapsed seconds */
+  seekPreview(seconds: number) {
+    const newTime = Math.max(0, seconds);
+    this.previewElapsed = newTime;
+    // Reset any runner whose finish time is after the new time
+    for (const r of this.previewRunners) {
+      if (newTime < r.finishSeconds) {
+        r.state = 'racing';
+        r.finished = false;
+        r.runoffElapsed = 0;
+        r.fraction = 0;
+      }
+    }
+  }
+
+  /** Get max finish time of all preview runners */
+  getPreviewMaxTime(): number {
+    if (this.previewRunners.length === 0) return 0;
+    return Math.max(...this.previewRunners.map((r) => r.finishSeconds));
+  }
+
+  /** Get list of runner names for the UI follow-toggle */
+  getPreviewRunnerNames(): { index: number; name: string }[] {
+    return this.previewRunners.map((r, i) => ({ index: i, name: r.name }));
+  }
+
+  /** Set which runner the camera follows */
+  setFollowedRunner(index: number) {
+    if (index >= 0 && index < this.previewRunners.length) {
+      this.followedRunnerIndex = index;
+    }
+  }
+
   // ---------- Initialisation ----------
 
   async init(eventId: string) {
@@ -1197,7 +1399,7 @@ export class Game {
     }
 
     // Start countdown for real games
-    if (!this.demoMode) {
+    if (!this.demoMode && !this.previewMode) {
       this.raceState = 'countdown';
       this.countdownTimer = COUNTDOWN_DURATION;
       this.raceTimer = 0;
@@ -1230,7 +1432,9 @@ export class Game {
     // Game loop
     this.engine.runRenderLoop(() => {
       const dt = this.engine.getDeltaTime() / 1000;
-      if (this.demoMode) {
+      if (this.previewMode) {
+        this.updatePreview(dt);
+      } else if (this.demoMode) {
         this.updateDemoCamera(dt);
       } else {
         this.update(dt);
@@ -1897,6 +2101,81 @@ export class Game {
     }
   }
 
+
+  // ---------- Preview mode update (race replay) ----------
+
+  private updatePreview(dt: number) {
+    // Handle countdown
+    if (this.previewCountdownTimer > 0) {
+      const prevSec = Math.ceil(this.previewCountdownTimer);
+      this.previewCountdownTimer -= dt;
+      const curSec = Math.ceil(this.previewCountdownTimer);
+
+      if (curSec !== prevSec && curSec > 0) {
+        this.onPreviewCountdown?.(String(curSec));
+      }
+
+      if (this.previewCountdownTimer <= 0) {
+        this.onPreviewCountdown?.('Go!');
+        this.previewPlaying = true;
+        this.onPreviewRaceState?.('racing');
+        setTimeout(() => this.onPreviewCountdown?.(''), 600);
+      }
+
+      // Follow camera during countdown too
+      this.updatePreviewFollowCam(dt);
+      return;
+    }
+
+    // Advance simulation time if playing
+    if (this.previewPlaying) {
+      const maxTime = this.getPreviewMaxTime();
+      this.previewElapsed += dt * this.previewSpeedMultiplier;
+      if (this.previewElapsed >= maxTime) {
+        this.previewElapsed = maxTime;
+        this.previewPlaying = false;
+        this.onPreviewRaceState?.('finished');
+      }
+    }
+
+    // Update preview runners
+    const cameraPos = this.camera.position;
+    const finishedCount = updatePreviewRunners({
+      runners: this.previewRunners,
+      pathPositions: this.pathPositions,
+      pathCumDist: this.pathCumDist,
+      getGroundY: (x, z) => this.getGroundY(x, z),
+      elapsedSeconds: this.previewElapsed,
+      cameraX: cameraPos.x,
+      cameraZ: cameraPos.z,
+    }, dt);
+
+    this.onPreviewTick?.(this.previewElapsed, finishedCount, this.previewRunners.length);
+
+    // Follow-cam on selected runner
+    this.updatePreviewFollowCam(dt);
+
+    // Update building LOD using camera position (not busPos)
+    if (this.buildingLodEntries.length > 0) {
+      updateBuildingLod(this.buildingLodEntries, cameraPos.x, cameraPos.z);
+    }
+  }
+
+  /** Update the preview orbit camera targeting the selected runner */
+  private updatePreviewFollowCam(dt: number) {
+    const runner = this.previewRunners[this.followedRunnerIndex];
+    if (!runner || !this.previewOrbitState) return;
+    const pos = runner.anchor.position;
+    updatePreviewOrbitCamera({
+      dt,
+      camera: this.camera,
+      targetX: pos.x,
+      targetY: pos.y,
+      targetZ: pos.z,
+      getGroundY: (x, z) => this.getGroundY(x, z),
+      state: this.previewOrbitState,
+    });
+  }
 
   // ---------- Demo camera (title screen flyover) ----------
 
