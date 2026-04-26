@@ -52,10 +52,25 @@ export interface RunnerAppearance {
   heightScale?: number;    // optional height multiplier (default 1); e.g. 0.5 = half height, 1.2 = 20% taller
 }
 
-export interface RunnerPreset {
+export type RunnerPreset = RunnerPresetBase & (
+  | { appearance: RunnerAppearance }
+  | { corgi: true }
+)
+
+export interface RunnerPresetBase {
   id: string;              // unique stable key (lowercase, no spaces)
   name: string;            // display name
-  appearance: RunnerAppearance;
+}
+
+/** Type guard: is this preset a corgi (not a human runner)? */
+export function isCorgiPreset(preset: RunnerPreset): preset is RunnerPresetBase & { corgi: true } {
+  return 'corgi' in preset && (preset as any).corgi === true;
+}
+
+/** Check whether a runner id refers to a corgi preset. */
+export function isCorgiRunnerId(runnerId: string): boolean {
+  const preset = getRunnerPresetById(runnerId);
+  return preset != null && isCorgiPreset(preset);
 }
 
 // ────────────────────────────────────────────
@@ -258,6 +273,11 @@ export const RUNNER_PRESETS: RunnerPreset[] = [
       bottom: 'trousers',
       bottomColor: '#000000',
     },
+  },
+  {
+    id: 'link',
+    name: 'Link',
+    corgi: true,
   }
 ];
 

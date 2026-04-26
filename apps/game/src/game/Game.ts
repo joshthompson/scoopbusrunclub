@@ -31,12 +31,13 @@ import type { GameType } from './modes/types';
 import { createBusModel, tintBusModel, busColorPaletteFromOption, PLAYER_COLORS } from './objects/BusModel';
 import type { BusColorPalette } from './objects/BusModel';
 import type { CharacterSelection, RunnerAppearance } from './characters';
-import { getBusColorById, resolveRunnerAppearance } from './characters';
+import { getBusColorById, resolveRunnerAppearance, isCorgiRunnerId } from './characters';
 import { createSky } from './objects/Sky';
 import type { IcePatchOverlay } from './PathShader';
 import { createTiledPathGroundMaterial } from './PathShaderTiled';
 import type { TiledPathGroundMaterial } from './PathShaderTiled';
 import { createRunnerModel, poseStanding } from './objects/RunnerModel';
+import { createCorgiModel } from './objects/CorgiModel';
 import type { RunnerModelResult } from './objects/RunnerModel';
 import {
   ALTITUDE_EXAGGERATION,
@@ -516,11 +517,14 @@ export class Game {
     tintBusModel(result.root, palette, `p${playerIndex}`);
 
     // Determine runner appearance from their selection or fallback
+    const remoteIsCorgi = remoteCharSel?.type === 'runner' && isCorgiRunnerId(remoteCharSel.runnerId);
     const runnerAppearance: RunnerAppearance | undefined =
-      remoteCharSel?.type === 'runner'
+      !remoteIsCorgi && remoteCharSel?.type === 'runner'
         ? resolveRunnerAppearance(remoteCharSel.runnerId)
         : undefined;
-    const runnerModel = createRunnerModel(this.scene, 200000 + playerIndex, palette.body, runnerAppearance);
+    const runnerModel = remoteIsCorgi
+      ? createCorgiModel(this.scene, 200000 + playerIndex)
+      : createRunnerModel(this.scene, 200000 + playerIndex, palette.body, runnerAppearance);
 
     // Create exhaust flames for this remote bus (starts stopped)
     const flames = createExhaustFlamesForBus(this.scene, result.root);
@@ -1274,10 +1278,11 @@ export class Game {
       await this.buildBus();
     }
     if (!this.demoMode && this.localPlayerRole === 'runner') {
-      const runnerAppearance = this.charSelection?.type === 'runner'
+      const localIsCorgi = this.charSelection?.type === 'runner' && isCorgiRunnerId(this.charSelection.runnerId);
+      const runnerAppearance = !localIsCorgi && this.charSelection?.type === 'runner'
         ? resolveRunnerAppearance(this.charSelection.runnerId)
         : undefined;
-      this.localRunnerModel = buildLocalRunnerFn(this.scene, this.localPlayerIndex, this.busPos, this.busYaw, runnerAppearance);
+      this.localRunnerModel = buildLocalRunnerFn(this.scene, this.localPlayerIndex, this.busPos, this.busYaw, runnerAppearance, localIsCorgi);
       if (this.busMesh) {
         this.busMesh.setEnabled(false);
       }
@@ -2123,7 +2128,7 @@ export class Game {
       }
 
       // Follow camera during countdown too
-      this.updatePreviewFollowCam(dt);
+      this.updatePreviewFollowCam(dt, 1);
       return;
     }
 
@@ -2153,7 +2158,7 @@ export class Game {
     this.onPreviewTick?.(this.previewElapsed, finishedCount, this.previewRunners.length);
 
     // Follow-cam on selected runner
-    this.updatePreviewFollowCam(dt);
+    this.updatePreviewFollowCam(dt, this.previewSpeedMultiplier);
 
     // Update building LOD using camera position (not busPos)
     if (this.buildingLodEntries.length > 0) {
@@ -2162,16 +2167,18 @@ export class Game {
   }
 
   /** Update the preview orbit camera targeting the selected runner */
-  private updatePreviewFollowCam(dt: number) {
+  private updatePreviewFollowCam(dt: number, speedMultiplier: number) {
     const runner = this.previewRunners[this.followedRunnerIndex];
     if (!runner || !this.previewOrbitState) return;
     const pos = runner.anchor.position;
     updatePreviewOrbitCamera({
       dt,
+      speedMultiplier,
       camera: this.camera,
       targetX: pos.x,
       targetY: pos.y,
       targetZ: pos.z,
+      targetYaw: runner.model.root.rotation.y,
       getGroundY: (x, z) => this.getGroundY(x, z),
       state: this.previewOrbitState,
     });

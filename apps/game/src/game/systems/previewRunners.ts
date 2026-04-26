@@ -16,8 +16,9 @@ import {
   poseStanding,
 } from '../objects/RunnerModel';
 import type { RunnerModelResult } from '../objects/RunnerModel';
-import { resolveRunnerAppearance, RUNNER_PRESETS, generateRandomAppearance } from '../characters';
+import { resolveRunnerAppearance, RUNNER_PRESETS, generateRandomAppearance, isCorgiPreset } from '../characters';
 import type { RunnerAppearance } from '../characters';
+import { createCorgiModel } from '../objects/CorgiModel';
 
 export interface PreviewRunnerDef {
   runnerId: string;
@@ -97,17 +98,48 @@ export function spawnPreviewRunners(
     totalPathLen += Math.sqrt((bx - ax) ** 2 + (bz - az) ** 2);
   }
 
-  // Build evenly-spaced lane slots and shuffle them so positions are random but non-overlapping
+  // Build evenly-spaced lane slots, grouped so runners finishing within 10s
+  // of each other are always adjacent.
   const spacing = 0.9; // metres between lanes
   const totalRunners = defs.length;
-  const laneSlots: number[] = [];
-  for (let i = 0; i < totalRunners; i++) {
-    laneSlots.push((i - (totalRunners - 1) / 2) * spacing);
+
+  // 1. Create index array sorted by finish time
+  const sortedIndices = Array.from({ length: totalRunners }, (_, i) => i);
+  sortedIndices.sort((a, b) => defs[a].finishSeconds - defs[b].finishSeconds);
+
+  // 2. Split into groups where consecutive runners are within 10s
+  const groups: number[][] = [];
+  let currentGroup: number[] = [sortedIndices[0]];
+  for (let i = 1; i < sortedIndices.length; i++) {
+    const prev = defs[sortedIndices[i - 1]].finishSeconds;
+    const curr = defs[sortedIndices[i]].finishSeconds;
+    if (curr - prev <= 10) {
+      currentGroup.push(sortedIndices[i]);
+    } else {
+      groups.push(currentGroup);
+      currentGroup = [sortedIndices[i]];
+    }
   }
-  // Fisher-Yates shuffle
-  for (let i = laneSlots.length - 1; i > 0; i--) {
+  groups.push(currentGroup);
+
+  // 3. Shuffle within each group, then shuffle group order
+  for (const g of groups) {
+    for (let i = g.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [g[i], g[j]] = [g[j], g[i]];
+    }
+  }
+  for (let i = groups.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [laneSlots[i], laneSlots[j]] = [laneSlots[j], laneSlots[i]];
+    [groups[i], groups[j]] = [groups[j], groups[i]];
+  }
+
+  // 4. Flatten to get the final ordering, then assign lane offsets
+  const orderedIndices = groups.flat();
+  const laneForRunner = new Map<number, number>();
+  for (let slot = 0; slot < totalRunners; slot++) {
+    const offset = (slot - (totalRunners - 1) / 2) * spacing;
+    laneForRunner.set(orderedIndices[slot], offset);
   }
 
   const runners: PreviewRunner[] = [];
@@ -117,16 +149,21 @@ export function spawnPreviewRunners(
 
     // Resolve appearance from runner preset ID
     const preset = RUNNER_PRESETS.find((p) => p.id === def.runnerId);
-    const appearance: RunnerAppearance = preset
-      ? preset.appearance
-      : generateRandomAppearance();
     const name = preset?.name ?? def.runnerId;
 
-    const tshirtColor = new Color3(0.5, 0.5, 0.5); // fallback, appearance takes over
-    const model = createRunnerModel(scene, 50000 + i, tshirtColor, appearance);
+    let model: RunnerModelResult;
+    if (preset && isCorgiPreset(preset)) {
+      model = createCorgiModel(scene, 50000 + i);
+    } else {
+      const appearance: RunnerAppearance = preset && !isCorgiPreset(preset)
+        ? preset.appearance
+        : generateRandomAppearance();
+      const tshirtColor = new Color3(0.5, 0.5, 0.5); // fallback, appearance takes over
+      model = createRunnerModel(scene, 50000 + i, tshirtColor, appearance);
+    }
 
-    // Use the pre-shuffled lane slot for this runner
-    const laneOffset = laneSlots[i];
+    // Use the grouped lane slot for this runner
+    const laneOffset = laneForRunner.get(i) ?? 0;
     const rightX = Math.cos(startYaw);
     const rightZ = -Math.sin(startYaw);
 

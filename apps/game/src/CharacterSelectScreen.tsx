@@ -4,10 +4,11 @@ import {
   BUS_COLOR_OPTIONS,
   RUNNER_PRESETS,
   RANDOM_RUNNER_ID,
+  isCorgiPreset,
   type CharacterSelection,
   type RunnerPreset,
 } from './game/characters';
-import { getRunnerPreviewUrl } from './RunnerPreview3D';
+import { getRunnerPreviewUrl, getCorgiPreviewUrl } from './RunnerPreview3D';
 
 type PlayerRole = 'bus' | 'runner';
 
@@ -31,7 +32,12 @@ function RunnerPreview(props: { preset: RunnerPreset }) {
 
   onMount(async () => {
     // Render the 3D preview (cached after first call)
-    const url = await getRunnerPreviewUrl(props.preset.id, props.preset.appearance);
+    let url: string;
+    if (isCorgiPreset(props.preset)) {
+      url = await getCorgiPreviewUrl(props.preset.id);
+    } else {
+      url = await getRunnerPreviewUrl(props.preset.id, props.preset.appearance);
+    }
     setSrc(url);
   });
 

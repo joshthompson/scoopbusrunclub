@@ -20,10 +20,14 @@ const DEFAULT_PITCH = 0.35;     // ~20° above horizon
 // ---- State object (one per game instance) ----
 
 export interface PreviewOrbitState {
-  /** Current orbit yaw angle (radians) */
+  /** User orbit yaw offset from behind the runner (radians, 0 = directly behind) */
   orbitYaw: number;
   /** Current pitch angle (radians above horizon, 0 = level, π/2 = top-down) */
   orbitPitch: number;
+  /** Smoothed runner yaw (world-space) — interpolated to avoid jumps on sharp corners */
+  smoothedRunnerYaw: number;
+  /** Whether smoothedRunnerYaw has been initialized */
+  yawInitialized: boolean;
   /** Whether the user is currently dragging */
   isDragging: boolean;
   /** Last pointer X during a drag (pixels) */
@@ -44,8 +48,10 @@ export interface PreviewOrbitState {
 
 export function createPreviewOrbitState(initialYaw: number): PreviewOrbitState {
   return {
-    orbitYaw: initialYaw,
+    orbitYaw: 0, // start directly behind the runner
     orbitPitch: DEFAULT_PITCH,
+    smoothedRunnerYaw: initialYaw,
+    yawInitialized: false,
     isDragging: false,
     lastPointerX: 0,
     lastPointerY: 0,
@@ -170,25 +176,51 @@ export interface PreviewOrbitCameraParams {
   targetX: number;
   targetY: number;
   targetZ: number;
+  /** Runner's current world-space yaw (direction of travel) */
+  targetYaw: number;
+  /** Playback speed multiplier — scales smoothing so camera keeps up at high speeds */
+  speedMultiplier: number;
   getGroundY: (x: number, z: number) => number;
   state: PreviewOrbitState;
 }
 
-export function updatePreviewOrbitCamera(params: PreviewOrbitCameraParams): void {
-  const { dt, camera, targetX, targetY, targetZ, getGroundY, state } = params;
+/** Normalize an angle into (-π, π] */
+function normalizeAngle(a: number): number {
+  let r = a % (Math.PI * 2);
+  if (r > Math.PI) r -= Math.PI * 2;
+  if (r <= -Math.PI) r += Math.PI * 2;
+  return r;
+}
 
-  // --- Consume pointer drag deltas ---
+export function updatePreviewOrbitCamera(params: PreviewOrbitCameraParams): void {
+  const { dt, speedMultiplier, camera, targetX, targetY, targetZ, targetYaw, getGroundY, state } = params;
+
+  // Scale dt for smoothing so camera keeps up at high playback speeds
+  const sDt = dt * speedMultiplier;
+
+  // --- Smoothly track the runner's yaw so sharp corners don't jerk the camera ---
+  if (!state.yawInitialized) {
+    state.smoothedRunnerYaw = targetYaw;
+    state.yawInitialized = true;
+  } else {
+    // Shortest-arc interpolation (uses raw dt so rotation stays smooth at high speeds)
+    let delta = normalizeAngle(targetYaw - state.smoothedRunnerYaw);
+    const yawSmooth = 1 - Math.exp(-3 * dt);
+    state.smoothedRunnerYaw += delta * yawSmooth;
+  }
+
+  // --- Consume pointer drag deltas (not speed-scaled — user input is real-time) ---
   state.orbitYaw += state.pointerYawDelta;
   state.orbitPitch += state.pointerPitchDelta;
   state.pointerYawDelta = 0;
   state.pointerPitchDelta = 0;
 
-  // --- Keyboard rotation (yaw) ---
+  // --- Keyboard rotation (yaw offset, real-time) ---
   if (state.keyDir !== 0) {
     state.orbitYaw += state.keyDir * KEY_ROTATE_SPEED * dt;
   }
 
-  // --- Keyboard pitch ---
+  // --- Keyboard pitch (real-time) ---
   if (state.keyPitchDir !== 0) {
     state.orbitPitch += state.keyPitchDir * KEY_PITCH_SPEED * dt;
   }
@@ -203,25 +235,28 @@ export function updatePreviewOrbitCamera(params: PreviewOrbitCameraParams): void
     state.orbitYaw += AUTO_ROTATE_SPEED * dt;
   }
 
+  // --- Final world-space yaw = runner yaw + π (behind) + user offset ---
+  const worldYaw = state.smoothedRunnerYaw + Math.PI + state.orbitYaw;
+
   // --- Compute desired camera position on orbit sphere ---
   const horizDist = CAM_DIST * Math.cos(state.orbitPitch);
   const camHeight = CAM_DIST * Math.sin(state.orbitPitch);
-  const camX = targetX + Math.sin(state.orbitYaw) * horizDist;
-  const camZ = targetZ + Math.cos(state.orbitYaw) * horizDist;
+  const camX = targetX + Math.sin(worldYaw) * horizDist;
+  const camZ = targetZ + Math.cos(worldYaw) * horizDist;
   const targetGroundY = getGroundY(targetX, targetZ);
   const camGroundY = getGroundY(camX, camZ);
   const camY = Math.max(targetGroundY, camGroundY) + camHeight;
 
-  // --- Smooth camera position ---
-  const posSmooth = Math.min(1, 8 * dt);
+  // --- Smooth camera position (speed-scaled) ---
+  const posSmooth = Math.min(1, 8 * sDt);
   camera.position.x += (camX - camera.position.x) * posSmooth;
   camera.position.y += (camY - camera.position.y) * posSmooth;
   camera.position.z += (camZ - camera.position.z) * posSmooth;
 
-  // --- Smooth look-at ---
+  // --- Smooth look-at (speed-scaled) ---
   const lookTarget = new Vector3(targetX, targetY + LOOK_HEIGHT, targetZ);
   const prevTarget = camera.getTarget();
-  const lookSmooth = 1 - Math.exp(-6 * dt);
+  const lookSmooth = 1 - Math.exp(-6 * sDt);
   camera.setTarget(new Vector3(
     prevTarget.x + (lookTarget.x - prevTarget.x) * lookSmooth,
     prevTarget.y + (lookTarget.y - prevTarget.y) * lookSmooth,

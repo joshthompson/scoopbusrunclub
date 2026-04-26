@@ -16,6 +16,7 @@ import {
   poseStanding,
   poseJump,
 } from '../objects/RunnerModel';
+import { createCorgiModel } from '../objects/CorgiModel';
 import { applyRunnerInteractionPose } from './runnerInteractions';
 import { PLAYER_COLORS } from '../objects/BusModel';
 import type { Runner, RemotePlayersMap, ElasticObject, SolidObstacle, BuildingCollider } from '../types';
@@ -535,10 +536,13 @@ export function buildLocalRunner(
   busPos: Vector3,
   busYaw: number,
   appearance?: import('../characters').RunnerAppearance,
+  corgi?: boolean,
 ): RunnerModelResult {
   const palette = PLAYER_COLORS[localPlayerIndex - 1] ?? PLAYER_COLORS[0];
   const tshirtColor = palette.body;
-  const model = createRunnerModel(scene, 100000, tshirtColor, appearance);
+  const model = corgi
+    ? createCorgiModel(scene, 100000)
+    : createRunnerModel(scene, 100000, tshirtColor, appearance);
   model.root.position.set(busPos.x, busPos.y, busPos.z);
   model.root.rotation.y = busYaw;
   poseStanding(model);

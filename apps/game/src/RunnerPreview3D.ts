@@ -12,6 +12,7 @@ import {
   Color4,
 } from '@babylonjs/core';
 import { createRunnerModel, poseStanding } from './game/objects/RunnerModel';
+import { createCorgiModel } from './game/objects/CorgiModel';
 import type { RunnerAppearance } from './game/characters';
 
 const PREVIEW_WIDTH = 160;
@@ -85,6 +86,52 @@ export async function getRunnerPreviewUrl(presetId: string, appearance: RunnerAp
   const cached = previewCache.get(presetId);
   if (cached) return cached;
   const url = await renderRunnerPreview(appearance);
+  previewCache.set(presetId, url);
+  return url;
+}
+
+/**
+ * Render a corgi model to a data URL image.
+ * Camera is positioned lower to frame the smaller dog.
+ */
+export function renderCorgiPreview(): Promise<string> {
+  const { canvas, engine } = getSharedEngine();
+
+  const scene = new Scene(engine);
+  scene.clearColor = new Color4(0, 0, 0, 0);
+
+  // Camera: lower + closer to frame the corgi (~0.8 m tall with 1.25× scale)
+  const cam = new FreeCamera('prevCam', new Vector3(0, 0.55, 1.0), scene);
+  cam.setTarget(new Vector3(0, 0.35, 0));
+  cam.minZ = 0.1;
+
+  // Lighting
+  const light = new HemisphericLight('prevLight', new Vector3(0.3, 1, 0.5), scene);
+  light.intensity = 1.2;
+  light.groundColor = new Color3(0.3, 0.3, 0.35);
+
+  // Build corgi
+  const model = createCorgiModel(scene, 998);
+  poseStanding(model);
+  model.root.rotation.y = 0.3;
+
+  return new Promise<string>((resolve) => {
+    scene.executeWhenReady(() => {
+      engine.beginFrame();
+      scene.render();
+      engine.endFrame();
+
+      const dataUrl = canvas.toDataURL('image/png');
+      scene.dispose();
+      resolve(dataUrl);
+    });
+  });
+}
+
+export async function getCorgiPreviewUrl(presetId: string): Promise<string> {
+  const cached = previewCache.get(presetId);
+  if (cached) return cached;
+  const url = await renderCorgiPreview();
   previewCache.set(presetId, url);
   return url;
 }
