@@ -382,6 +382,7 @@ export function ReplayPage(props: ReplayPageProps) {
   // ---- 3D preview mode (for courses with game levels) ----
   const has3DLevel = createMemo(() => GAME_LEVEL_IDS.has(eventId()))
   const [show3D, setShow3D] = createSignal(true)
+  let iframeRef: HTMLIFrameElement | undefined
 
   /** Build the iframe src URL for the 3D game preview */
   const previewIframeSrc = createMemo(() => {
@@ -749,12 +750,34 @@ export function ReplayPage(props: ReplayPageProps) {
               {/* ---- 3D Game Preview ---- */}
               <Show when={show3D() && previewIframeSrc()}>
                 <div class={styles.iframeContainer}>
-                  <iframe
-                    src={previewIframeSrc()}
-                    class={styles.previewIframe}
-                    allow="autoplay"
-                    title="3D Race Preview"
-                  />
+                  <div class={styles.iframeWrapper}>
+                    <iframe
+                      ref={(el: HTMLIFrameElement) => { iframeRef = el }}
+                      src={previewIframeSrc()}
+                      class={styles.previewIframe}
+                      allow="autoplay; fullscreen"
+                      allowfullscreen
+                      title="3D Race Preview"
+                    />
+                    <button
+                      class={styles.fullscreenBtn}
+                      onClick={() => {
+                        if (document.fullscreenElement) {
+                          document.exitFullscreen()
+                        } else {
+                          const wrapper = iframeRef?.parentElement
+                          if (wrapper?.requestFullscreen) {
+                            wrapper.requestFullscreen()
+                          } else if ((wrapper as any)?.webkitRequestFullscreen) {
+                            ;(wrapper as any).webkitRequestFullscreen()
+                          }
+                        }
+                      }}
+                      title="Full screen"
+                    >
+                      ⛶
+                    </button>
+                  </div>
                 </div>
               </Show>
 
@@ -1128,11 +1151,42 @@ const styles = {
     alignItems: "center",
     gap: "0.5rem",
   }),
+  iframeWrapper: css({
+    position: "relative",
+    width: "100%",
+    "&:fullscreen": {
+      background: "#000",
+    },
+    "&:fullscreen iframe": {
+      minHeight: "100dvh",
+      aspectRatio: "unset",
+    },
+  }),
   previewIframe: css({
     width: "100%",
+    minHeight: "50dvh",
     aspectRatio: "16 / 9",
     border: "2px solid var(--color-black)",
     borderRadius: "8px",
     background: "#000",
+  }),
+  fullscreenBtn: css({
+    position: "absolute",
+    top: "0.5rem",
+    right: "0.5rem",
+    width: "2rem",
+    height: "2rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(0,0,0,0.5)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontSize: "1.2rem",
+    lineHeight: 1,
+    zIndex: 10,
+    _hover: { background: "rgba(0,0,0,0.8)" },
   }),
 }
