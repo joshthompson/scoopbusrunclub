@@ -6,6 +6,7 @@ import buildings from './buildings.json';
 import paths from './paths.json';
 import fences from './fences.json';
 import roads from './roads.json';
+import noTreeZones from './noTreeZones.json';
 import trackUrl from '../../assets/track.png';
 
 const level: LevelData = {
@@ -21,7 +22,6 @@ const level: LevelData = {
   fenceDistance: 150,
   /** Keep real-world 400m scale — don't stretch to 5km */
   targetLength: 400,
-  trees: false,
   kmSigns: false,
   parkrunSign: false,
   fences: false,
@@ -30,6 +30,7 @@ const level: LevelData = {
   startCircle: false,
   minimapZoom: 4,
   pathTexture: trackUrl,
+  noTreeZones: noTreeZones as LevelData['noTreeZones'],
 };
 
 export default level;

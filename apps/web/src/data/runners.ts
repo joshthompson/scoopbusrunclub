@@ -22,6 +22,7 @@ export type RunnerName =
   | 'alisa'
   | 'link'
   | 'otherJosh'
+  | 'mikael'
 
 export type RunnerState =
   // Default
@@ -336,5 +337,26 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
     height: 28,
     speed: 2.5,
     frameInterval: 80,
+  }),
+  mikael: createSignal<RunnerData>({
+    name: 'Mikael',
+    id: '9854274',
+    birthday: '01/01',
+    frames: {
+      run: generateFrames(assets.mikaelRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
+      sit: [assets.mikaelSit],
+      face: [assets.mikaelFace],
+      tailWalk: undefined,
+      tailSit: undefined,
+      scanner: undefined,
+      photographer: undefined,
+      runDirector: undefined,
+      marshal: undefined,
+      volunteerGeneric: undefined,
+    },
+    width: 21,
+    height: 28,
+    speed: 3.2,
+    frameInterval: 75,
   }),
 }

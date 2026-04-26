@@ -12,6 +12,8 @@ const POINT_EMOJI: Record<string, string> = {
   start: "🟢",
   finish: "🏁",
   mål: "🏁",
+  "maali/mål/finish": "🏁",
+  "lähtö/start": "🟢",
   "turnaround point": "🔄",
   "turning point": "🔄",
   "u-turn": "🔄",

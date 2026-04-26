@@ -27,7 +27,10 @@ import type { LevelData } from '../levels';
 import type { ItemCollectEvent, PlayerState } from '../multiplayer';
 import { MAX_PLAYERS } from '../multiplayer';
 import type { GameType } from './modes/types';
-import { createBusModel, tintBusModel, PLAYER_COLORS } from './objects/BusModel';
+import { createBusModel, tintBusModel, busColorPaletteFromOption, PLAYER_COLORS } from './objects/BusModel';
+import type { BusColorPalette } from './objects/BusModel';
+import type { CharacterSelection, RunnerAppearance } from './characters';
+import { getBusColorById, resolveRunnerAppearance } from './characters';
 import { createSky } from './objects/Sky';
 import type { IcePatchOverlay } from './PathShader';
 import { createTiledPathGroundMaterial } from './PathShaderTiled';
@@ -332,6 +335,8 @@ export class Game {
   private localPlayerRole: 'bus' | 'runner' = 'bus';
   /** Game type / mode for this session */
   private gameType: GameType = 'single-bus';
+  /** Character selection (bus colour or runner preset) */
+  private charSelection: CharacterSelection | null = null;
   private localRunnerModel: RunnerModelResult | null = null;
   private localRunnerAnimPhase = 0;
   private runnerJumpSideVel = 0;
@@ -356,13 +361,14 @@ export class Game {
     canvas: HTMLCanvasElement,
     callbacks: GameCallbacks,
     minimapCanvas?: HTMLCanvasElement,
-    options?: { localPlayerRole?: 'bus' | 'runner'; gameType?: GameType; items?: boolean },
+    options?: { localPlayerRole?: 'bus' | 'runner'; gameType?: GameType; items?: boolean; charSelection?: CharacterSelection | null },
   ) {
     this.canvas = canvas;
     this.callbacks = callbacks;
     this.localPlayerRole = options?.localPlayerRole ?? 'bus';
     this.gameType = options?.gameType ?? 'single-bus';
     this.itemsEnabled = options?.items ?? false;
+    this.charSelection = options?.charSelection ?? null;
     if (minimapCanvas) {
       this.minimap = new Minimap(minimapCanvas);
     }
@@ -453,15 +459,29 @@ export class Game {
   }
 
   /** Build a remote player visuals (bus + runner) for a specific peer with the given player index. */
-  async buildRemoteBusForPeer(peerId: string, playerIndex: number) {
+  async buildRemoteBusForPeer(peerId: string, playerIndex: number, remoteCharSel?: CharacterSelection) {
     if (!this.scene) return;
     // Don't rebuild if already exists
     if (this.remotePlayers.has(peerId)) return;
 
     const result = await createBusModel(this.scene);
-    const palette = PLAYER_COLORS[playerIndex - 1] ?? PLAYER_COLORS[1];
+
+    // Determine bus colour palette from their selection or fallback to index
+    let palette: BusColorPalette;
+    if (remoteCharSel?.type === 'bus') {
+      const opt = getBusColorById(remoteCharSel.busColorId);
+      palette = opt ? busColorPaletteFromOption(opt) : (PLAYER_COLORS[playerIndex - 1] ?? PLAYER_COLORS[1]);
+    } else {
+      palette = PLAYER_COLORS[playerIndex - 1] ?? PLAYER_COLORS[1];
+    }
     tintBusModel(result.root, palette, `p${playerIndex}`);
-    const runnerModel = createRunnerModel(this.scene, 200000 + playerIndex, palette.body);
+
+    // Determine runner appearance from their selection or fallback
+    const runnerAppearance: RunnerAppearance | undefined =
+      remoteCharSel?.type === 'runner'
+        ? resolveRunnerAppearance(remoteCharSel.runnerId)
+        : undefined;
+    const runnerModel = createRunnerModel(this.scene, 200000 + playerIndex, palette.body, runnerAppearance);
 
     // Create exhaust flames for this remote bus (starts stopped)
     const flames = createExhaustFlamesForBus(this.scene, result.root);
@@ -513,9 +533,17 @@ export class Game {
     if (!remote) return;
     const isFirstState = remote.state === null;
 
-    // If the peer's actual playerIndex differs from what we built with, re-tint
+    // If remote player has a different charSelection than what we built with,
+    // or if the playerIndex changed, rebuild/re-tint the model accordingly.
     if (state.playerIndex && state.playerIndex !== remote.playerIndex) {
-      const newPalette = PLAYER_COLORS[state.playerIndex - 1] ?? PLAYER_COLORS[1];
+      // Determine palette from charSelection or fallback
+      let newPalette: BusColorPalette;
+      if (state.charSelection?.type === 'bus') {
+        const opt = getBusColorById(state.charSelection.busColorId);
+        newPalette = opt ? busColorPaletteFromOption(opt) : (PLAYER_COLORS[state.playerIndex - 1] ?? PLAYER_COLORS[1]);
+      } else {
+        newPalette = PLAYER_COLORS[state.playerIndex - 1] ?? PLAYER_COLORS[1];
+      }
       tintBusModel(remote.mesh, newPalette, `p${state.playerIndex}`);
       // Re-tint the runner model's shirt
       if (remote.runnerModel) {
@@ -557,6 +585,7 @@ export class Game {
       scooping: this.scoopAnimTimer > 0,
       gameType: this.gameType,
       powerUp: this.powerUpSystem?.getHeldPowerUp() ?? undefined,
+      charSelection: this.charSelection ?? undefined,
     };
   }
 
@@ -647,10 +676,11 @@ export class Game {
 
     if (this.localRunnerModel) {
       const targetScale = this.runnerFikaTimer > 0 ? POWER_UP_FIKA_SCALE_MULTIPLIER : 1;
-      const currentScale = this.localRunnerModel.root.scaling.x;
+      const baseScale = (this.localRunnerModel.root as any).__baseScale ?? 1;
+      const currentFika = (this.localRunnerModel.root.scaling.x) / baseScale;
       const blend = Math.min(1, POWER_UP_FIKA_SCALE_TRANSITION_SPEED * dt);
-      const nextScale = currentScale + (targetScale - currentScale) * blend;
-      this.localRunnerModel.root.scaling.setAll(nextScale);
+      const nextFika = currentFika + (targetScale - currentFika) * blend;
+      this.localRunnerModel.root.scaling.setAll(nextFika * baseScale);
       const shoeActive = this.runnerShoeTimer > 0;
       this.localRunnerModel.leftShoe.setEnabled(shoeActive);
       this.localRunnerModel.rightShoe.setEnabled(shoeActive);
@@ -1013,6 +1043,13 @@ export class Game {
     this.buildingLodEntries = buildingResult.lodEntries;
     this.updateBuildingLodForPlayer();
     if (level.trees !== false) {
+      // Convert noTreeZones from GPS [lat, lon] polygons to world-space [x, z] polygons
+      const noTreeZones: [number, number][][] = (level.noTreeZones ?? []).map((polygon) =>
+        polygon.map(([lat, lon]): [number, number] => {
+          const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
+          return [rawX * this.scaleFactor, rawZ * this.scaleFactor];
+        }),
+      );
       const treeResult = buildTrees(
         this.scene,
         this.pathPositions,
@@ -1022,6 +1059,7 @@ export class Game {
         this.roadPolylines,
         this.trailPolylines,
         this.effectiveTreeCount,
+        noTreeZones,
       );
       this.elasticObjects.push(...treeResult.elasticObjects);
       this.solidObstacles.push(...treeResult.solidObstacles);
@@ -1034,7 +1072,10 @@ export class Game {
       await this.buildBus();
     }
     if (!this.demoMode && this.localPlayerRole === 'runner') {
-      this.localRunnerModel = buildLocalRunnerFn(this.scene, this.localPlayerIndex, this.busPos, this.busYaw);
+      const runnerAppearance = this.charSelection?.type === 'runner'
+        ? resolveRunnerAppearance(this.charSelection.runnerId)
+        : undefined;
+      this.localRunnerModel = buildLocalRunnerFn(this.scene, this.localPlayerIndex, this.busPos, this.busYaw, runnerAppearance);
       if (this.busMesh) {
         this.busMesh.setEnabled(false);
       }
@@ -1491,8 +1532,14 @@ export class Game {
     this.busBodyShell = result.bodyShell;
     this.scoopPivot = result.scoopPivot;
 
-    // Tint local bus to match player colour
-    const palette = PLAYER_COLORS[this.localPlayerIndex - 1] ?? PLAYER_COLORS[0];
+    // Tint local bus: use selected colour if available, else fallback to player index colour
+    let palette: BusColorPalette;
+    if (this.charSelection?.type === 'bus') {
+      const opt = getBusColorById(this.charSelection.busColorId);
+      palette = opt ? busColorPaletteFromOption(opt) : (PLAYER_COLORS[this.localPlayerIndex - 1] ?? PLAYER_COLORS[0]);
+    } else {
+      palette = PLAYER_COLORS[this.localPlayerIndex - 1] ?? PLAYER_COLORS[0];
+    }
     tintBusModel(this.busMesh, palette, 'local');
 
     // Store rest position for scoop animation offsets

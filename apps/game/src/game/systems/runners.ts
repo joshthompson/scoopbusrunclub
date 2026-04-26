@@ -534,10 +534,11 @@ export function buildLocalRunner(
   localPlayerIndex: number,
   busPos: Vector3,
   busYaw: number,
+  appearance?: import('../characters').RunnerAppearance,
 ): RunnerModelResult {
   const palette = PLAYER_COLORS[localPlayerIndex - 1] ?? PLAYER_COLORS[0];
   const tshirtColor = palette.body;
-  const model = createRunnerModel(scene, 100000, tshirtColor);
+  const model = createRunnerModel(scene, 100000, tshirtColor, appearance);
   model.root.position.set(busPos.x, busPos.y, busPos.z);
   model.root.rotation.y = busYaw;
   poseStanding(model);

@@ -71,4 +71,9 @@ export interface LevelData {
    */
   minimapZoom?: number;
   hide?: boolean;
+  /**
+   * Polygons (arrays of [lat, lon] points) where trees should NOT be spawned.
+   * Each polygon is a closed ring — the last point connects back to the first.
+   */
+  noTreeZones?: [number, number][][];
 }

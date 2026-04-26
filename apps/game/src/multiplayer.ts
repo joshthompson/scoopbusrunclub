@@ -6,6 +6,7 @@
  */
 import { joinRoom, type Room } from 'trystero';
 import type { GameType, TeamColor } from './game/modes/types';
+import type { CharacterSelection } from './game/characters';
 
 // ---------- Shared types ----------
 
@@ -46,6 +47,8 @@ export interface PlayerState {
   stuck?: boolean;
   /** Currently held power-up id, if any */
   powerUp?: string;
+  /** Character selection (bus colour or runner preset). */
+  charSelection?: CharacterSelection;
 }
 
 /** @deprecated Use PlayerState */
@@ -92,6 +95,10 @@ export interface LobbyMessage {
   driverIndex?: number;
   /** Team assignments for team-race (playerIndex → { team, role }) */
   teamAssignments?: Record<number, { team: TeamColor; role: 'bus' | 'runner' }>;
+  /** Character selection for this player (bus colour or runner preset). */
+  charSelection?: CharacterSelection;
+  /** All character selections by playerIndex, broadcast by host. */
+  charSelections?: Record<number, CharacterSelection>;
 }
 
 export type OnRemoteState = (state: PlayerState, peerId: string) => void;
@@ -134,6 +141,8 @@ export class Multiplayer {
   private _driverIndex = 1;
   /** Team assignments for team-race mode */
   private _teamAssignments = new Map<number, { team: TeamColor; role: 'bus' | 'runner' }>();
+  /** Character selections by playerIndex */
+  private _charSelections = new Map<number, CharacterSelection>();
 
   get roomCode() { return this._roomCode; }
   get isHost() { return this._isHost; }
@@ -156,6 +165,17 @@ export class Multiplayer {
   /** Team assignments */
   get teamAssignments() { return this._teamAssignments; }
   set teamAssignments(ta: Map<number, { team: TeamColor; role: 'bus' | 'runner' }>) { this._teamAssignments = ta; }
+  /** Character selections */
+  get charSelections() { return this._charSelections; }
+  set charSelections(cs: Map<number, CharacterSelection>) { this._charSelections = cs; }
+  /** Set this player's character selection */
+  setCharSelection(sel: CharacterSelection) {
+    this._charSelections.set(this._localPlayerIndex, sel);
+  }
+  /** Get character selection for a player index */
+  getCharSelection(playerIndex: number): CharacterSelection | undefined {
+    return this._charSelections.get(playerIndex);
+  }
 
   // ---------- Event setters ----------
 
@@ -217,6 +237,11 @@ export class Multiplayer {
             ([k, v]) => [Number(k), v]
           ));
         }
+        if (msg.charSelections) {
+          this._charSelections = new Map(Object.entries(msg.charSelections).map(
+            ([k, v]) => [Number(k), v]
+          ));
+        }
       }
       // If host sends us our player index and/or courseId, store them.
       // Only accept playerInfo from the peer we know is the host (or the
@@ -242,6 +267,11 @@ export class Multiplayer {
               ([k, v]) => [Number(k), v]
             ));
           }
+          if (msg.charSelections) {
+            this._charSelections = new Map(Object.entries(msg.charSelections).map(
+              ([k, v]) => [Number(k), v]
+            ));
+          }
           // Record the host's index
           this._peerPlayerIndex.set(peerId, 1);
         }
@@ -253,6 +283,13 @@ export class Multiplayer {
         }
       }
       // If we're host and joiner sends playerInfo, record their known index from PlayerState
+      // Also if a joiner sends a charSelection, store it for the host's selection map
+      if (this._isHost && msg.charSelection) {
+        const senderIdx = this._peerPlayerIndex.get(peerId);
+        if (senderIdx) {
+          this._charSelections.set(senderIdx, msg.charSelection);
+        }
+      }
       this._onLobbyMessage?.(msg, peerId);
     });
 
@@ -280,6 +317,8 @@ export class Multiplayer {
         // Tell the new joiner their own index + all peer indices + game config
         const teamAssignmentsObj: Record<number, { team: TeamColor; role: 'bus' | 'runner' }> = {};
         for (const [k, v] of this._teamAssignments) teamAssignmentsObj[k] = v;
+        const charSelectionsObj: Record<number, CharacterSelection> = {};
+        for (const [k, v] of this._charSelections) charSelectionsObj[k] = v;
         setTimeout(() => {
           this.sendLobby?.({
             type: 'playerInfo',
@@ -289,6 +328,7 @@ export class Multiplayer {
             gameType: this._gameType,
             driverIndex: this._driverIndex,
             teamAssignments: Object.keys(teamAssignmentsObj).length > 0 ? teamAssignmentsObj : undefined,
+            charSelections: Object.keys(charSelectionsObj).length > 0 ? charSelectionsObj : undefined,
           }, peerId);
           // Also broadcast updated indices to ALL existing peers
           // so they learn about the new joiner's index
@@ -357,6 +397,7 @@ export class Multiplayer {
     this._gameType = 'scoop-race';
     this._driverIndex = 1;
     this._teamAssignments = new Map();
+    this._charSelections = new Map();
   }
 }
 

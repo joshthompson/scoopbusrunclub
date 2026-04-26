@@ -6,6 +6,7 @@ import { Game } from './game/Game';
 import levels from './levels';
 import { TitleScreen } from './TitleScreen';
 import { LevelSelectScreen } from './LevelSelectScreen';
+import { RoleSelectScreen } from './RoleSelectScreen';
 import { CharacterSelectScreen } from './CharacterSelectScreen';
 import { GameTypeSelectScreen } from './GameTypeSelectScreen';
 import { LobbyScreen } from './LobbyScreen';
@@ -14,6 +15,7 @@ import type { PlayerState, ScoopEvent } from './multiplayer';
 import { getGameModeConfig, GAME_TYPE_LABELS } from './game/modes';
 import type { GameType, TeamColor } from './game/modes';
 import type { ItemCollectEvent } from './multiplayer';
+import type { CharacterSelection } from './game/characters';
 import type { PowerUpId } from './game/systems/powerups';
 import powerUpFika from './assets/power-ups/fika.png';
 import powerUpFire from './assets/power-ups/fire.png';
@@ -34,7 +36,7 @@ const PLAYER_COLOR_INFO = [
 
 type GameMode = 'single' | 'host' | 'join';
 type PlayerRole = 'bus' | 'runner';
-type Screen = 'title' | 'level-select' | 'character-select' | 'game-type-select' | 'lobby' | 'loading' | 'playing';
+type Screen = 'title' | 'level-select' | 'role-select' | 'character-select' | 'game-type-select' | 'lobby' | 'loading' | 'playing';
 
 const POWER_UP_IMAGE_BY_ID: Record<PowerUpId, string> = {
   fika: powerUpFika,
@@ -89,6 +91,7 @@ function App() {
   const [gameMode, setGameMode] = createSignal<GameMode>('single');
   const [playerRole, setPlayerRole] = createSignal<PlayerRole>('bus');
   const [gameType, setGameType] = createSignal<GameType>('single-bus');
+  const [charSelection, setCharSelection] = createSignal<CharacterSelection | null>(null);
   const [remoteStates, setRemoteStates] = createSignal<Map<string, PlayerState>>(new Map());
 
   const isMultiplayerMode = () => gameMode() === 'host' || gameMode() === 'join';
@@ -168,26 +171,53 @@ function App() {
   function handleLevelSelect(levelId: string) {
     currentEventId = levelId;
     if (gameMode() === 'single') {
-      setScreen('character-select');
+      setScreen('role-select');
     } else {
       // Host → go to lobby
       setScreen('lobby');
     }
   }
 
-  function handleCharacterSelect(role: PlayerRole) {
+  /** Single-player: user picked bus or runner → go to character select */
+  function handleRoleSelect(role: PlayerRole) {
     setPlayerRole(role);
     setGameType(role === 'bus' ? 'single-bus' : 'single-runner');
-    startGame(currentEventId);
+    setScreen('character-select');
+  }
+
+  // Guard to prevent double-starting once all players are ready
+  let gameStarting = false;
+
+  /** Check if all multiplayer players have selected; if so, start the game. */
+  function checkAllReady() {
+    if (gameStarting) return;
+    if (!isMultiplayerMode()) return;
+    if (!charSelection()) return; // local player hasn't selected yet
+    const totalPlayers = mp.peerCount + 1;
+    if (mp.charSelections.size >= totalPlayers) {
+      gameStarting = true;
+      startGame(currentEventId);
+    }
+  }
+
+  /** Character select completed (single-player or multiplayer). */
+  function handleCharacterSelect(selection: CharacterSelection) {
+    setCharSelection(selection);
+
+    if (isMultiplayerMode()) {
+      // Store and broadcast selection, then wait for all players
+      mp.setCharSelection(selection);
+      mp.broadcastLobby({ type: 'ready', charSelection: selection });
+      checkAllReady();
+    } else {
+      startGame(currentEventId);
+    }
   }
 
   function handleLobbyStart(courseId: string) {
     // For modes without level select (e.g. arena), fall back to the mode's default level
     let cid = courseId;
     if (!cid) {
-      // For joiners, mp.gameType was just updated from the start message, so use it directly
-      // instead of gameType() signal which may not have updated yet (Solid is reactive).
-      // For host, gameType() signal is already set from game-type-select screen.
       const gt = gameMode() === 'join' ? (mp.gameType ?? 'scoop-race') : gameType();
       const config = getGameModeConfig(gt);
       cid = config.defaultLevelId ?? 'haga';
@@ -197,7 +227,38 @@ function App() {
     if (gameMode() === 'join' && mp.gameType) {
       setGameType(mp.gameType);
     }
-    startGame(cid);
+
+    // Determine this player's role so we know what to select
+    const gt = gameMode() === 'join' ? (mp.gameType ?? 'scoop-race') : gameType();
+    const resolvedRole = getGameModeConfig(gt).getRoleForPlayer(
+      mp.localPlayerIndex,
+      mp.peerCount + 1,
+      mp.driverIndex,
+    );
+    setPlayerRole(resolvedRole);
+
+    // For team-race buses, colours are pre-assigned by team — skip select
+    if (gt === 'team-race' && resolvedRole === 'bus') {
+      startGame(cid);
+      return;
+    }
+
+    // Reset ready guard for the new character-select phase
+    gameStarting = false;
+
+    // Listen for character selections from other players
+    mp.onLobbyMessage = (msg, peerId) => {
+      if (msg.type === 'ready' && msg.charSelection) {
+        const idx = mp.getPlayerIndex(peerId);
+        if (idx) {
+          mp.charSelections.set(idx, msg.charSelection);
+        }
+        checkAllReady();
+      }
+    };
+
+    // Otherwise go to character select
+    setScreen('character-select');
   }
 
   function handleLobbyCancel() {
@@ -276,6 +337,7 @@ function App() {
       localPlayerRole: resolvedRole,
       gameType: gameType(),
       items: getGameModeConfig(gameType()).items,
+      charSelection: charSelection(),
     });
 
     activeGame = game;
@@ -293,13 +355,15 @@ function App() {
       // Build a remote bus for each currently-connected peer
       for (const peerId of mp.remotePeerIds) {
         const idx = mp.getPlayerIndex(peerId) || 2;
-        await game.buildRemoteBusForPeer(peerId, idx);
+        const remoteCharSel = mp.getCharSelection(idx);
+        await game.buildRemoteBusForPeer(peerId, idx, remoteCharSel);
       }
 
       // Handle new peers joining mid-game
       mp.onPeerJoin = async (peerId: string) => {
         const idx = mp.getPlayerIndex(peerId) || (mp.remotePeerIds.indexOf(peerId) + 2);
-        await game.buildRemoteBusForPeer(peerId, idx);
+        const remoteCharSel = mp.getCharSelection(idx);
+        await game.buildRemoteBusForPeer(peerId, idx, remoteCharSel);
       };
 
       // Handle peers leaving
@@ -388,6 +452,7 @@ function App() {
     setGameMode('single');
     setPlayerRole('bus');
     setGameType('single-bus');
+    setCharSelection(null);
     setRemoteStates(new Map());
 
     if (activeGame) {
@@ -428,11 +493,26 @@ function App() {
           }}
         />
       </Show>
+      <Show when={screen() === 'role-select'}>
+        <RoleSelectScreen
+          courseName={levels[currentEventId]?.name ?? currentEventId}
+          onSelect={handleRoleSelect}
+          onBack={() => setScreen('level-select')}
+        />
+      </Show>
       <Show when={screen() === 'character-select'}>
         <CharacterSelectScreen
+          role={playerRole()}
           courseName={levels[currentEventId]?.name ?? currentEventId}
           onSelect={handleCharacterSelect}
-          onBack={() => setScreen('level-select')}
+          onBack={() => {
+            if (isMultiplayerMode()) {
+              setScreen('lobby');
+            } else {
+              setScreen('role-select');
+            }
+          }}
+          waiting={isMultiplayerMode()}
         />
       </Show>
       <Show when={screen() === 'game-type-select'}>

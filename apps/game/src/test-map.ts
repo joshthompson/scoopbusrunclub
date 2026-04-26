@@ -58,7 +58,6 @@ const COLORS = {
 async function main() {
   const infoEl = document.getElementById('info')!;
   const appEl = document.getElementById('app')!;
-  const legendEl = document.getElementById('legend')!;
 
   // Parse level id from search param: ?event=haga
   const params = new URLSearchParams(window.location.search);
@@ -141,6 +140,22 @@ async function main() {
   const g = svgEl('g'); // main group — everything drawn here so viewBox panning works
   svg.appendChild(g);
 
+  // Layer sub-groups for toggle control
+  const layerWater = svgEl('g');
+  const layerBuildings = svgEl('g');
+  const layerPaths = svgEl('g');
+  const layerFences = svgEl('g');
+  const layerMainPath = svgEl('g');
+  const layerBuildingLabels = svgEl('g');
+  const layerWaterLabels = svgEl('g');
+  g.appendChild(layerWater);
+  g.appendChild(layerBuildings);
+  g.appendChild(layerPaths);
+  g.appendChild(layerFences);
+  g.appendChild(layerMainPath);
+  g.appendChild(layerBuildingLabels);
+  g.appendChild(layerWaterLabels);
+
   // Helper to convert [x, z] to SVG point string (z is flipped)
   const pt = (x: number, z: number) => `${x},${-z}`;
   const polyPoints = (pts: [number, number][]) =>
@@ -161,7 +176,7 @@ async function main() {
       'stroke-width': 0.5,
       'stroke-opacity': 0.8,
     });
-    g.appendChild(poly);
+    layerWater.appendChild(poly);
 
     // Label water body with its array index
     const cx = w.points.reduce((s, p) => s + p[0], 0) / w.points.length;
@@ -180,7 +195,7 @@ async function main() {
       'paint-order': 'stroke',
     });
     label.textContent = String(i);
-    g.appendChild(label);
+    layerWaterLabels.appendChild(label);
     waterLabels.push(label);
   }
 
@@ -198,7 +213,7 @@ async function main() {
       'stroke-width': 0.3,
       'stroke-opacity': 1,
     });
-    g.appendChild(poly);
+    layerBuildings.appendChild(poly);
 
     // Label building with its array index
     const cx = b.points.reduce((s, p) => s + p[0], 0) / b.points.length;
@@ -217,7 +232,7 @@ async function main() {
       'paint-order': 'stroke',
     });
     label.textContent = String(i);
-    g.appendChild(label);
+    layerBuildingLabels.appendChild(label);
     buildingLabels.push(label);
   }
 
@@ -235,7 +250,7 @@ async function main() {
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
     });
-    g.appendChild(path);
+    layerPaths.appendChild(path);
   }
 
   // --- Fences ---
@@ -252,7 +267,7 @@ async function main() {
       'stroke-opacity': 0.9,
       'stroke-linecap': 'round',
     });
-    g.appendChild(fencePath);
+    layerFences.appendChild(fencePath);
 
     // Fence posts as small circles at each vertex
     for (const [x, z] of f.points) {
@@ -263,7 +278,7 @@ async function main() {
         fill: COLORS.fence,
         'fill-opacity': 0.9,
       });
-      g.appendChild(circle);
+      layerFences.appendChild(circle);
     }
   }
 
@@ -279,7 +294,7 @@ async function main() {
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
     });
-    g.appendChild(outline);
+    layerMainPath.appendChild(outline);
 
     const mainPathEl = svgEl('path', {
       d: pathD(mainPath),
@@ -290,7 +305,7 @@ async function main() {
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
     });
-    g.appendChild(mainPathEl);
+    layerMainPath.appendChild(mainPathEl);
 
     // Start marker
     const [sx, sz] = mainPath[0];
@@ -298,7 +313,7 @@ async function main() {
       cx: sx, cy: -sz, r: 3,
       fill: '#40d040', stroke: '#fff', 'stroke-width': 1,
     });
-    g.appendChild(startMarker);
+    layerMainPath.appendChild(startMarker);
 
     // End marker (if not a loop)
     const [ex, ez] = mainPath[mainPath.length - 1];
@@ -308,29 +323,104 @@ async function main() {
         cx: ex, cy: -ez, r: 3,
         fill: '#d04040', stroke: '#fff', 'stroke-width': 1,
       });
-      g.appendChild(endMarker);
+      layerMainPath.appendChild(endMarker);
     }
   }
 
   appEl.appendChild(svg);
 
-  // ── Legend ───────────────────────────────────────────────────────────
+  // ── Sidebar ──────────────────────────────────────────────────────────
 
-  const legendItems: [string, string][] = [
-    ['Main path', COLORS.mainPath],
-    ['Footway', COLORS.footway],
-    ['Cycleway', COLORS.cycleway],
-    ['Building (grey)', COLORS.buildingGrey],
-    ['Building (red)', COLORS.buildingRed],
-    ['Water', COLORS.water],
-    ['Fence', COLORS.fence],
+  const sidebarEl = document.getElementById('sidebar')!;
+  sidebarEl.innerHTML = `<h3>${level.name}</h3>`;
+
+  // Layer toggles
+  const layerSection = document.createElement('div');
+  layerSection.className = 'sidebar-section';
+  const layerTitle = document.createElement('div');
+  layerTitle.className = 'sidebar-section-title';
+  layerTitle.textContent = 'Layers';
+  layerSection.appendChild(layerTitle);
+
+  const layerToggleItems: [string, string, SVGGElement][] = [
+    ['Main path', COLORS.mainPath, layerMainPath],
+    ['Paths', COLORS.footway, layerPaths],
+    ['Buildings', COLORS.buildingGrey, layerBuildings],
+    ['Water', COLORS.water, layerWater],
+    ['Fences', COLORS.fence, layerFences],
   ];
-  for (const [label, color] of legendItems) {
-    const item = document.createElement('div');
-    item.className = 'legend-item';
-    item.innerHTML = `<div class="legend-swatch" style="background:${color}"></div>${label}`;
-    legendEl.appendChild(item);
+  for (const [label, color, layer] of layerToggleItems) {
+    const row = document.createElement('div');
+    row.className = 'sidebar-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.addEventListener('change', () => {
+      layer.style.display = cb.checked ? '' : 'none';
+    });
+    const swatch = document.createElement('div');
+    swatch.className = 'sidebar-swatch';
+    swatch.style.background = color;
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    lbl.addEventListener('click', () => { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); });
+    row.appendChild(cb);
+    row.appendChild(swatch);
+    row.appendChild(lbl);
+    layerSection.appendChild(row);
   }
+  sidebarEl.appendChild(layerSection);
+
+  // Divider
+  const divider = document.createElement('hr');
+  divider.className = 'sidebar-divider';
+  sidebarEl.appendChild(divider);
+
+  // Display toggles
+  const displaySection = document.createElement('div');
+  displaySection.className = 'sidebar-section';
+  const displayTitle = document.createElement('div');
+  displayTitle.className = 'sidebar-section-title';
+  displayTitle.textContent = 'Display';
+  displaySection.appendChild(displayTitle);
+
+  const displayToggleItems: [string, SVGGElement][] = [
+    ['Building #s', layerBuildingLabels],
+    ['Water #s', layerWaterLabels],
+  ];
+  for (const [label, layer] of displayToggleItems) {
+    const row = document.createElement('div');
+    row.className = 'sidebar-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.addEventListener('change', () => {
+      layer.style.display = cb.checked ? '' : 'none';
+    });
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    lbl.addEventListener('click', () => { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); });
+    row.appendChild(cb);
+    row.appendChild(lbl);
+    displaySection.appendChild(row);
+  }
+  sidebarEl.appendChild(displaySection);
+
+  // Reframe button
+  const reframeDivider = document.createElement('hr');
+  reframeDivider.className = 'sidebar-divider';
+  sidebarEl.appendChild(reframeDivider);
+
+  const reframeBtn = document.createElement('button');
+  reframeBtn.textContent = 'Reframe';
+  reframeBtn.style.cssText = 'width:100%;padding:6px 0;margin-top:4px;background:#445;color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:4px;cursor:pointer;font-size:11px;';
+  reframeBtn.addEventListener('mouseenter', () => { reframeBtn.style.background = '#556'; });
+  reframeBtn.addEventListener('mouseleave', () => { reframeBtn.style.background = '#445'; });
+  reframeBtn.addEventListener('click', () => {
+    vbX = minX; vbY = -maxZ; vbW = width; vbH = height;
+    updateViewBox();
+  });
+  sidebarEl.appendChild(reframeBtn);
 
   // Course info
   const courseLen = mainPath.reduce((sum, [x, z], i) => {
@@ -347,7 +437,28 @@ async function main() {
   let dragStartX = 0, dragStartY = 0;
   let dragVbX = 0, dragVbY = 0;
 
-  const baseSize = Math.max(width, height);
+  const scaleLineEl = document.getElementById('scale-line')!;
+  const scaleLabelEl = document.getElementById('scale-label')!;
+
+  function updateScaleBar() {
+    const svgRect = svg.getBoundingClientRect();
+    if (svgRect.width === 0) return;
+    // How many metres per pixel at current zoom
+    const metersPerPx = vbW / svgRect.width;
+    // Target bar ~100px wide
+    const targetPx = 100;
+    const rawMeters = metersPerPx * targetPx;
+    // Round to a nice number
+    const niceSteps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+    let niceMeters = niceSteps[niceSteps.length - 1];
+    for (const s of niceSteps) {
+      if (s >= rawMeters * 0.5) { niceMeters = s; break; }
+    }
+    const barPx = niceMeters / metersPerPx;
+    scaleLineEl.style.width = `${Math.round(barPx)}px`;
+    scaleLabelEl.textContent = niceMeters >= 1000 ? `${niceMeters / 1000} km` : `${niceMeters} m`;
+  }
+
   function updateViewBox() {
     svg.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
     // Scale building labels inversely with zoom so they stay a constant visual size
@@ -362,7 +473,11 @@ async function main() {
       lbl.setAttribute('font-size', String(fontSize));
       lbl.setAttribute('stroke-width', String(strokeWidth));
     }
+    updateScaleBar();
   }
+
+  // Initial scale bar
+  updateScaleBar();
 
   svg.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
@@ -397,7 +512,7 @@ async function main() {
     const mx = vbX + ((e.clientX - rect.left) / rect.width) * vbW;
     const my = vbY + ((e.clientY - rect.top) / rect.height) * vbH;
 
-    const zoomFactor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+    const zoomFactor = e.deltaY > 0 ? 1.035 : 1 / 1.035;
     const newW = vbW * zoomFactor;
     const newH = vbH * zoomFactor;
 

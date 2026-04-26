@@ -63,6 +63,10 @@ export { default as rickFace } from '@/assets/runners/rick/face.png'
 export { default as rickScanner } from '@/assets/runners/rick/scanner.png'
 export { default as rickMarshal } from '@/assets/runners/rick/marshal.png'
 
+export { default as mikaelRun } from '@/assets/runners/mikael/run.png'
+export { default as mikaelSit } from '@/assets/runners/mikael/sit.png'
+export { default as mikaelFace } from '@/assets/runners/mikael/face.png'
+
 export { default as sophieRun } from '@/assets/runners/sophie/run.png'
 export { default as sophieSit } from '@/assets/runners/sophie/sit.png'
 export { default as sophieFace } from '@/assets/runners/sophie/face.png'

@@ -34,6 +34,29 @@ export interface PhysicsObjectResult {
   solidObstacles: SolidObstacle[];
 }
 
+// ---------- Polygon helpers ----------
+
+/** Ray-casting point-in-polygon test (works for any simple polygon). */
+function isInPolygon(px: number, pz: number, polygon: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, zi] = polygon[i];
+    const [xj, zj] = polygon[j];
+    if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** Check if a point falls inside any of the given polygons. */
+function isInAnyPolygon(px: number, pz: number, polygons: [number, number][][]): boolean {
+  for (const poly of polygons) {
+    if (isInPolygon(px, pz, poly)) return true;
+  }
+  return false;
+}
+
 // ---------- Trees ----------
 
 /**
@@ -50,6 +73,7 @@ export function buildTrees(
   roads: [number, number][][] = [],
   trails: [number, number][][] = [],
   treeCount = TREE_COUNT,
+  noTreeZones: [number, number][][] = [],
 ): PhysicsObjectResult {
   const result: PhysicsObjectResult = { elasticObjects: [], solidObstacles: [] };
   if (pathPositions.length < 2) return result;
@@ -98,6 +122,7 @@ export function buildTrees(
     }
     if (onRoadOrTrail) continue;
     if (isInWaterZone(x, z, waterZones)) continue;
+    if (isInAnyPolygon(x, z, noTreeZones)) continue;
 
     if (startCircleCenter) {
       const scDx = x - startCircleCenter.x;

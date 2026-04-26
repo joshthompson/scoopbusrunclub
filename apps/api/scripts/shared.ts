@@ -23,6 +23,7 @@ export const TRACKED_ATHLETES: { parkrunId: string; name: string }[] = [
   { parkrunId: "8943925", name: "Eline" },
   { parkrunId: "9679233", name: "Rick" },
   { parkrunId: "5346109", name: "Other Josh" },
+  { parkrunId: "9854274", name: "Mikael" },
 ];
 
 export const TRACKED_IDS = new Set(TRACKED_ATHLETES.map((a) => a.parkrunId));

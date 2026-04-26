@@ -420,13 +420,23 @@ export interface BusColorPalette {
   roof: Color3;
 }
 
-/** Fixed colour palettes for players 1–4 */
+/** Fixed colour palettes for players 1–4 (legacy fallback) */
 export const PLAYER_COLORS: BusColorPalette[] = [
   { body: new Color3(0.95, 0.78, 0.15), roof: new Color3(0.82, 0.65, 0.10) },  // P1 yellow (default)
   { body: new Color3(0.85, 0.25, 0.20), roof: new Color3(0.70, 0.18, 0.12) },  // P2 red
   { body: new Color3(0.20, 0.45, 0.85), roof: new Color3(0.14, 0.32, 0.70) },  // P3 blue
   { body: new Color3(0.60, 0.25, 0.80), roof: new Color3(0.45, 0.16, 0.65) },  // P4 purple
 ];
+
+/**
+ * Build a BusColorPalette from a BusColorOption (from the character config).
+ */
+export function busColorPaletteFromOption(opt: { bodyHex: string; roofHex: string }): BusColorPalette {
+  return {
+    body: Color3.FromHexString(opt.bodyHex),
+    roof: Color3.FromHexString(opt.roofHex),
+  };
+}
 
 /**
  * Re-tint a bus model's body + roof to the given palette.

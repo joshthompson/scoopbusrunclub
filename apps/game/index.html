@@ -668,6 +668,100 @@
         box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
         animation: none !important;
       }
+
+      /* ---------- Character select screen ---------- */
+      .char-select-content {
+        max-width: 600px;
+        width: 95vw;
+      }
+      .char-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+        margin: 16px 0;
+      }
+      .char-tile {
+        width: 110px;
+        height: 130px;
+        border: 3px solid rgba(255,255,255,0.2);
+        border-radius: 12px;
+        background: rgba(20,20,40,0.85);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px;
+        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .char-tile:hover:not(:disabled) {
+        transform: scale(1.08);
+        border-color: #ffc107;
+        box-shadow: 0 4px 20px rgba(255,193,7,0.4);
+      }
+      .char-tile.active {
+        border-color: #ffc107;
+        box-shadow: 0 0 16px rgba(255,193,7,0.6);
+        background: rgba(255,193,7,0.15);
+      }
+      .char-tile.taken {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .char-tile.taken::after {
+        content: '✕';
+        position: absolute;
+        font-size: 28px;
+        color: #ff4444;
+        font-weight: bold;
+      }
+      .char-tile-label {
+        font-family: 'Arial Black', sans-serif;
+        font-size: clamp(11px, 2vw, 14px);
+        color: #fff;
+        text-align: center;
+      }
+
+      /* Bus swatch */
+      .bus-swatch {
+        width: 56px;
+        height: 56px;
+        border-radius: 8px;
+        border: 2px solid rgba(0,0,0,0.3);
+        box-shadow: inset 0 -4px 0 rgba(0,0,0,0.15);
+      }
+
+      /* Runner preview (3D rendered image) */
+      .runner-preview {
+        position: relative;
+        width: 80px;
+        height: 90px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      .runner-preview.random-preview {
+        font-size: 36px;
+        justify-content: center;
+      }
+      .runner-preview-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        image-rendering: auto;
+      }
+
+      /* Responsive: ≤ 480px → 2 columns for buses */
+      @media (max-width: 480px) {
+        .bus-grid .char-tile {
+          width: calc(50% - 8px);
+          max-width: 140px;
+        }
+      }
     </style>
   </head>
   <body>
