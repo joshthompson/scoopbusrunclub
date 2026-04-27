@@ -43,10 +43,16 @@ export function parsePreviewParams(): {
 
   const runners: PreviewRunnerDef[] = [];
   for (const pair of runnersStr.split(',')) {
-    const [runnerId, timeStr] = pair.split(':');
-    const finishSeconds = Number(timeStr);
+    const parts = pair.split(':');
+    const runnerId = parts[0];
+    const finishSeconds = Number(parts[1]);
+    const roleStr = parts[2] as PreviewRunnerDef['role'];
     if (runnerId && Number.isFinite(finishSeconds) && finishSeconds > 0) {
-      runners.push({ runnerId, finishSeconds });
+      const def: PreviewRunnerDef = { runnerId, finishSeconds };
+      if (roleStr === 'parkwalker' || roleStr === 'tailwalker') {
+        def.role = roleStr;
+      }
+      runners.push(def);
     }
   }
 

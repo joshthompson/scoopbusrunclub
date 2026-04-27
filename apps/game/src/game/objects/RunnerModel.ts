@@ -8,6 +8,7 @@ import {
   TransformNode,
 } from '@babylonjs/core';
 import type { RunnerAppearance } from '../characters';
+import type { PreviewRunnerRole } from '../systems/previewRunners';
 import {
   hexToColor3,
   resolveColor,
@@ -808,6 +809,88 @@ export function poseHighFive(
   // Passive arm stays relaxed at side
   passiveArm.rotation.x = 0.1;
   passiveArm.rotation.z = 0;
+}
+
+// ── Volunteer vest overlay ──
+
+/** Hi-vis blue for parkwalkers */
+const PARKWALKER_BLUE = new Color3(0.0, 0.45, 0.9);
+/** Hi-vis orange for tailwalkers */
+const TAILWALKER_ORANGE = new Color3(1.0, 0.5, 0.0);
+/** Reflective silver-grey stripe accent */
+const REFLECTIVE_STRIPE = new Color3(0.78, 0.78, 0.78);
+
+/**
+ * Overlay a coloured hi-vis volunteer vest (with reflective stripes) on top
+ * of an existing runner model. Blue for parkwalker, orange for tailwalker.
+ *
+ * The vest covers the torso and upper-arm sleeves, identical to MarshalModel
+ * proportions but in the appropriate volunteer colour.
+ */
+export function applyVolunteerVest(
+  scene: Scene,
+  model: RunnerModelResult,
+  role: PreviewRunnerRole,
+  id: number,
+): void {
+  const vestColor = role === 'parkwalker' ? PARKWALKER_BLUE : TAILWALKER_ORANGE;
+  const emissive = role === 'parkwalker'
+    ? new Color3(0.0, 0.12, 0.25)
+    : new Color3(0.3, 0.15, 0.0);
+
+  const vestMat = makeMat(`rVest_${id}`, vestColor, scene);
+  vestMat.emissiveColor = emissive; // slight glow so it pops
+  const stripeMat = makeMat(`rVStripe_${id}`, REFLECTIVE_STRIPE, scene);
+  stripeMat.emissiveColor = new Color3(0.2, 0.2, 0.2);
+
+  // Dimensions must match RunnerModel defaults (heightScale=1)
+  const torsoH = 0.5;
+  const torsoW = 0.4;
+  const torsoD = 0.25;
+  const torsoY = 0.55 + torsoH / 2; // 0.80
+
+  // Vest torso overlay (slightly larger so it renders on top)
+  const vestTorso = MeshBuilder.CreateBox(`rVestTorso_${id}`, {
+    width: torsoW + 0.02, height: torsoH + 0.02, depth: torsoD + 0.02,
+  }, scene);
+  vestTorso.material = vestMat;
+  vestTorso.position.y = torsoY;
+  vestTorso.parent = model.root;
+
+  // Reflective stripe across the chest
+  const stripe1 = MeshBuilder.CreateBox(`rVStripe1_${id}`, {
+    width: torsoW + 0.04, height: 0.06, depth: torsoD + 0.04,
+  }, scene);
+  stripe1.material = stripeMat;
+  stripe1.position.y = torsoY - 0.05;
+  stripe1.parent = model.root;
+
+  // Second stripe higher up
+  const stripe2 = MeshBuilder.CreateBox(`rVStripe2_${id}`, {
+    width: torsoW + 0.04, height: 0.06, depth: torsoD + 0.04,
+  }, scene);
+  stripe2.material = stripeMat;
+  stripe2.position.y = torsoY + 0.12;
+  stripe2.parent = model.root;
+
+  // Vest sleeve overlays on upper arms (parented to arm pivots so they animate)
+  const armW = 0.15;
+  const armH = 0.55;
+  const armD = 0.15;
+
+  const leftSleeve = MeshBuilder.CreateBox(`rVSleeveL_${id}`, {
+    width: armW + 0.02, height: armH / 2 + 0.02, depth: armD + 0.02,
+  }, scene);
+  leftSleeve.material = vestMat;
+  leftSleeve.position.y = -armH / 4;
+  leftSleeve.parent = model.leftArm;
+
+  const rightSleeve = MeshBuilder.CreateBox(`rVSleeveR_${id}`, {
+    width: armW + 0.02, height: armH / 2 + 0.02, depth: armD + 0.02,
+  }, scene);
+  rightSleeve.material = vestMat;
+  rightSleeve.position.y = -armH / 4;
+  rightSleeve.parent = model.rightArm;
 }
 
 // ── Helper ──

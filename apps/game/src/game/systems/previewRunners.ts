@@ -19,10 +19,14 @@ import type { RunnerModelResult } from '../objects/RunnerModel';
 import { resolveRunnerAppearance, RUNNER_PRESETS, generateRandomAppearance, isCorgiPreset } from '../characters';
 import type { RunnerAppearance } from '../characters';
 import { createCorgiModel } from '../objects/CorgiModel';
+import { applyVolunteerVest } from '../objects/RunnerModel';
+
+export type PreviewRunnerRole = 'parkwalker' | 'tailwalker';
 
 export interface PreviewRunnerDef {
   runnerId: string;
   finishSeconds: number;
+  role?: PreviewRunnerRole;
 }
 
 export type PreviewRunnerState = 'racing' | 'runoff' | 'cheering';
@@ -160,6 +164,11 @@ export function spawnPreviewRunners(
         : generateRandomAppearance();
       const tshirtColor = new Color3(0.5, 0.5, 0.5); // fallback, appearance takes over
       model = createRunnerModel(scene, 50000 + i, tshirtColor, appearance);
+    }
+
+    // Apply volunteer vest overlay if runner has a parkwalker/tailwalker role
+    if (def.role && !(preset && isCorgiPreset(preset))) {
+      applyVolunteerVest(scene, model, def.role, 50000 + i);
     }
 
     // Use the grouped lane slot for this runner

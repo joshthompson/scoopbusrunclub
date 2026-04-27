@@ -379,6 +379,15 @@ export function ReplayPage(props: ReplayPageProps) {
 
   const hasData = createMemo(() => replayRunners().length > 0 && courseData() !== null)
 
+  // ---- Volunteers for this event number ----
+  const hasVolunteerData = createMemo(() => VOLUNTEER_EVENT_IDS.has(eventId()))
+  const eventVolunteers = createMemo(() => {
+    if (!hasVolunteerData()) return []
+    return props.volunteers.filter(
+      (v) => v.event === eventId() && v.eventNumber === eventNumber(),
+    )
+  })
+
   // ---- 3D preview mode (for courses with game levels) ----
   const has3DLevel = createMemo(() => GAME_LEVEL_IDS.has(eventId()))
   const [show3D, setShow3D] = createSignal(true)
@@ -390,12 +399,27 @@ export function ReplayPage(props: ReplayPageProps) {
     const runners = replayRunners()
     if (runners.length === 0) return ""
 
+    // Build a lookup of parkrunId → volunteer role for this event
+    const volunteers = eventVolunteers()
+    const parkrunIdToVolRole = new Map<string, string>()
+    for (const v of volunteers) {
+      for (const role of v.roles) {
+        const translated = translateRole(role)
+        if (translated === "Park Walker") {
+          parkrunIdToVolRole.set(v.parkrunId, "parkwalker")
+        } else if (translated === "Tail Walker") {
+          parkrunIdToVolRole.set(v.parkrunId, "tailwalker")
+        }
+      }
+    }
+
     // Map each club member to their game character ID, skip non-members
     const runnerParams = runners
       .map((r) => {
         const key = parkrunIdToRunnerKey.get(r.parkrunId)
         if (!key) return null
-        return `${key}:${Math.round(r.finishSeconds)}`
+        const role = parkrunIdToVolRole.get(r.parkrunId)
+        return role ? `${key}:${Math.round(r.finishSeconds)}:${role}` : `${key}:${Math.round(r.finishSeconds)}`
       })
       .filter(Boolean)
       .join(",")
@@ -413,15 +437,6 @@ export function ReplayPage(props: ReplayPageProps) {
       (r) => r.event === eventId() && r.eventNumber === eventNumber(),
     )
     return r?.date ?? null
-  })
-
-  // ---- Volunteers for this event number ----
-  const hasVolunteerData = createMemo(() => VOLUNTEER_EVENT_IDS.has(eventId()))
-  const eventVolunteers = createMemo(() => {
-    if (!hasVolunteerData()) return []
-    return props.volunteers.filter(
-      (v) => v.event === eventId() && v.eventNumber === eventNumber(),
-    )
   })
 
   // ---- Finish table data ----
