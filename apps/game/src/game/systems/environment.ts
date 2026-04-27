@@ -73,7 +73,8 @@ export function buildTrees(
   roads: [number, number][][] = [],
   trails: [number, number][][] = [],
   treeCount = TREE_COUNT,
-  noTreeZones: [number, number][][] = [],
+  fields: [number, number][][] = [],
+  manualTrees: [number, number][] = [],
 ): PhysicsObjectResult {
   const result: PhysicsObjectResult = { elasticObjects: [], solidObstacles: [] };
   if (pathPositions.length < 2) return result;
@@ -122,7 +123,7 @@ export function buildTrees(
     }
     if (onRoadOrTrail) continue;
     if (isInWaterZone(x, z, waterZones)) continue;
-    if (isInAnyPolygon(x, z, noTreeZones)) continue;
+    if (isInAnyPolygon(x, z, fields)) continue;
 
     if (startCircleCenter) {
       const scDx = x - startCircleCenter.x;
@@ -188,6 +189,66 @@ export function buildTrees(
 
     result.solidObstacles.push({ x, z, radius: 0.5 * scale, elasticIndex });
     placed++;
+  }
+
+  // ── Manual trees (placed at exact positions) ──
+  for (let mi = 0; mi < manualTrees.length; mi++) {
+    const [mx, mz] = manualTrees[mi];
+    const groundY = getGroundY(mx, mz);
+    const variant = rand();
+    const scale = 0.7 + rand() * 0.8;
+    const idx = placed + mi;
+
+    const treeRoot = new TransformNode(`tree_manual_${mi}`, scene);
+    treeRoot.position.set(mx, groundY, mz);
+
+    if (variant < 0.5) {
+      const trunk = MeshBuilder.CreateCylinder(
+        `tree_mt_${mi}`,
+        { height: 2.5 * scale, diameterTop: 0.25 * scale, diameterBottom: 0.35 * scale, tessellation: 6 },
+        scene,
+      );
+      trunk.position.set(0, 1.25 * scale, 0);
+      trunk.material = trunkMat;
+      trunk.parent = treeRoot;
+
+      const crown = MeshBuilder.CreateCylinder(
+        `tree_mc_${mi}`,
+        { height: 4 * scale, diameterTop: 0, diameterBottom: 2.8 * scale, tessellation: 6 },
+        scene,
+      );
+      crown.position.set(0, 3.5 * scale, 0);
+      crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
+      crown.parent = treeRoot;
+    } else {
+      const trunk = MeshBuilder.CreateCylinder(
+        `tree_mt_${mi}`,
+        { height: 2 * scale, diameterTop: 0.3 * scale, diameterBottom: 0.4 * scale, tessellation: 6 },
+        scene,
+      );
+      trunk.position.set(0, 1 * scale, 0);
+      trunk.material = trunkMat;
+      trunk.parent = treeRoot;
+
+      const crown = MeshBuilder.CreateSphere(
+        `tree_mc_${mi}`,
+        { diameter: 3 * scale, segments: 6 },
+        scene,
+      );
+      crown.position.set(0, 3.2 * scale, 0);
+      crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
+      crown.parent = treeRoot;
+    }
+
+    const elasticIndex = result.elasticObjects.length;
+    result.elasticObjects.push({
+      root: treeRoot,
+      tiltX: 0,
+      tiltZ: 0,
+      tiltVelX: 0,
+      tiltVelZ: 0,
+    });
+    result.solidObstacles.push({ x: mx, z: mz, radius: 0.5 * scale, elasticIndex });
   }
 
   return result;

@@ -15,7 +15,7 @@ import {
   DynamicTexture,
 } from '@babylonjs/core';
 import { MixMaterial } from '@babylonjs/materials';
-import grassUrl from '../assets/grass.png';
+import forestUrl from '../assets/forest.png';
 import dirtUrl from '../assets/dirt.png';
 import { PATH_TEXTURE_ANISOTROPY } from './constants';
 
@@ -38,10 +38,22 @@ export interface PathShaderOptions {
   edgeSoftness?: number;
   /** Resolution of the baked mask texture. Default 4096 */
   maskResolution?: number;
-  /** Grass texture tiling. Default 600 */
-  grassTiling?: number;
+  /** Forest texture tiling. Default 600 */
+  forestTiling?: number;
   /** Dirt texture tiling. Default 300 */
   dirtTiling?: number;
+  /** Field texture tiling. Default 600 */
+  fieldTiling?: number;
+  /** Sand texture tiling. Default 600 */
+  sandTiling?: number;
+  /** Concrete texture tiling. Default 400 */
+  concreteTiling?: number;
+  /** World-space field polygons [ [x,z], ... ][] — rendered with field texture, blocks tree spawns */
+  fields?: [number, number][][];
+  /** World-space concrete polygons [ [x,z], ... ][] — rendered with concrete texture */
+  concrete?: [number, number][][];
+  /** Water zones with polygon + Y level — sand rendered at shoreline */
+  waterZones?: { points: [number, number][]; y: number }[];
   /** If provided, paint a white start/finish line at this position & heading */
   startLine?: {
     x: number;
@@ -99,7 +111,7 @@ export function createPathGroundMaterial(
     roadHalfWidth = pathHalfWidth * 1.4,
     edgeSoftness = 1.5,
     maskResolution = 4096,
-    grassTiling = 600,
+    forestTiling = 600,
     dirtTiling = 300,
     startLine,
     startCircle,
@@ -121,11 +133,11 @@ export function createPathGroundMaterial(
     startCircle,
   );
 
-  // --- 2. Load grass + dirt textures ---
-  const grassTex = new Texture(grassUrl, scene);
-  grassTex.uScale = grassTiling;
-  grassTex.vScale = grassTiling;
-  grassTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
+  // --- 2. Load forest + dirt textures ---
+  const forestTex = new Texture(forestUrl, scene);
+  forestTex.uScale = forestTiling;
+  forestTex.vScale = forestTiling;
+  forestTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
 
   const dirtTex = new Texture(pathTextureUrl ?? dirtUrl, scene);
   dirtTex.uScale = dirtTiling;
@@ -136,13 +148,13 @@ export function createPathGroundMaterial(
   const mat = new MixMaterial('pathGroundMat', scene);
   mat.specularColor = Color3.Black();
 
-  // The mix-map: R=1 (full grass brightness), G=road mask, B=path mask (blend toward dirt)
+  // The mix-map: R=1 (full forest brightness), G=road mask, B=path mask (blend toward dirt)
   mat.mixTexture1 = maskTex;
   // Secondary mix-map: R=start-line mask
   mat.mixTexture2 = lineMaskTex;
 
-  // diffuseTexture1 is controlled by R channel → grass everywhere
-  mat.diffuseTexture1 = grassTex;
+  // diffuseTexture1 is controlled by R channel → forest everywhere
+  mat.diffuseTexture1 = forestTex;
 
   // diffuseTexture2 is controlled by G channel → roads (rendered under paths)
   const roadDyn = new DynamicTexture('roadTex', 4, scene, false);
@@ -155,8 +167,8 @@ export function createPathGroundMaterial(
   // diffuseTexture3 is controlled by B channel → dirt on path (rendered on top)
   mat.diffuseTexture3 = dirtTex;
 
-  // diffuseTexture4 must also be set to avoid shader errors (use grass)
-  mat.diffuseTexture4 = grassTex;
+  // diffuseTexture4 must also be set to avoid shader errors (use forest)
+  mat.diffuseTexture4 = forestTex;
 
   // diffuseTexture5 is controlled by mixTexture2.r → white start line
   const whiteDyn = new DynamicTexture('whiteTex', 4, scene, false);
@@ -172,8 +184,8 @@ export function createPathGroundMaterial(
   iCtx.fillRect(0, 0, 4, 4);
   iceDyn.update();
   mat.diffuseTexture6 = iceDyn;
-  mat.diffuseTexture7 = grassTex;
-  mat.diffuseTexture8 = grassTex;
+  mat.diffuseTexture7 = forestTex;
+  mat.diffuseTexture8 = forestTex;
 
   (mat as PathGroundMaterial).__setIcePatches = setIcePatches;
 

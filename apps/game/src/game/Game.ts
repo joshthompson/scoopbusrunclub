@@ -179,6 +179,7 @@ import {
   DEFAULT_FENCE_DISTANCE,
   type FenceCollider,
 } from './objects/Fence';
+import { buildLevelObjects, type PlacedObjectData } from './objects/LevelObjects';
 import { PowerUpSystem, type PowerUpId } from './systems/powerups';
 import {
   spawnPreviewRunners,
@@ -282,6 +283,8 @@ export class Game {
   private waterZones: WaterZone[] = [];
   private roadPolylines: [number, number][][] = [];
   private trailPolylines: [number, number][][] = [];
+  private fieldPolygons: [number, number][][] = [];
+  private concretePolygons: [number, number][][] = [];
   private buildingFootprints: BuildingFootprint[] = [];
   private buildingColliders: BuildingCollider[] = [];
   private buildingLodEntries: BuildingLodEntry[] = [];
@@ -1242,6 +1245,14 @@ export class Game {
       }),
     ).filter((t) => t.length >= 2);
     this.buildingFootprints = computeBuildingFootprintData(buildingFeatures, course.coordinates[0], this.scaleFactor);
+    // Convert regions from GPS [lat, lon] polygons to world-space [x, z] polygons
+    const gpsToWorld = (polygon: [number, number][]) =>
+      polygon.map(([lat, lon]): [number, number] => {
+        const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
+        return [rawX * this.scaleFactor, rawZ * this.scaleFactor];
+      });
+    this.fieldPolygons = (level.regions?.fields ?? []).map(gpsToWorld);
+    this.concretePolygons = (level.regions?.concrete ?? []).map(gpsToWorld);
     this.buildGround();
     buildWaterMeshes(this.scene, this.waterZones);
     const buildingResult = buildBuildingMeshes(this.scene, this.buildingFootprints, (x, z) => this.getGroundY(x, z));
@@ -1249,12 +1260,11 @@ export class Game {
     this.buildingLodEntries = buildingResult.lodEntries;
     this.updateBuildingLodForPlayer();
     if (level.trees !== false) {
-      // Convert noTreeZones from GPS [lat, lon] polygons to world-space [x, z] polygons
-      const noTreeZones: [number, number][][] = (level.noTreeZones ?? []).map((polygon) =>
-        polygon.map(([lat, lon]): [number, number] => {
+      const manualTreePositions: [number, number][] = (level.manualTrees ?? []).map(
+        ([lat, lon]): [number, number] => {
           const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
           return [rawX * this.scaleFactor, rawZ * this.scaleFactor];
-        }),
+        },
       );
       const treeResult = buildTrees(
         this.scene,
@@ -1265,10 +1275,55 @@ export class Game {
         this.roadPolylines,
         this.trailPolylines,
         this.effectiveTreeCount,
-        noTreeZones,
+        [...this.fieldPolygons, ...this.concretePolygons],
+        manualTreePositions,
       );
       this.elasticObjects.push(...treeResult.elasticObjects);
       this.solidObstacles.push(...treeResult.solidObstacles);
+    } else if (level.manualTrees && level.manualTrees.length > 0) {
+      // Even when procedural trees are disabled, place manual trees
+      const manualTreePositions: [number, number][] = level.manualTrees.map(
+        ([lat, lon]): [number, number] => {
+          const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
+          return [rawX * this.scaleFactor, rawZ * this.scaleFactor];
+        },
+      );
+      const treeResult = buildTrees(
+        this.scene,
+        this.pathPositions,
+        (x, z) => this.getGroundY(x, z),
+        this.waterZones,
+        this.startCircleCenter,
+        this.roadPolylines,
+        this.trailPolylines,
+        0, // no procedural trees
+        [...this.fieldPolygons, ...this.concretePolygons],
+        manualTreePositions,
+      );
+      this.elasticObjects.push(...treeResult.elasticObjects);
+      this.solidObstacles.push(...treeResult.solidObstacles);
+    }
+
+    // ── Level objects (benches, lampposts, tennis courts) ──
+    {
+      const toPlaced = (arr: [number, number, number][] | undefined, rotOffset = 0): PlacedObjectData[] =>
+        (arr ?? []).map(([lat, lon, rot]) => {
+          const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
+          return {
+            x: rawX * this.scaleFactor,
+            z: rawZ * this.scaleFactor,
+            rotation: (rot * Math.PI) / 180 + rotOffset,
+          };
+        });
+      const objs = level.objects;
+      const objResult = buildLevelObjects(
+        this.scene,
+        toPlaced(objs?.benches, Math.PI * 5 / 12),   // 75° CW offset
+        toPlaced(objs?.lampposts),
+        toPlaced(objs?.tennisCourts),
+        (x, z) => this.getGroundY(x, z),
+      );
+      this.solidObstacles.push(...objResult.solidObstacles);
     }
 
     // Procedural sky + clouds
@@ -1499,6 +1554,9 @@ export class Game {
       startLine: startLineInfo,
       startCircle: startCircleInfo,
       pathTextureUrl: this.pathTextureUrl,
+      fields: this.fieldPolygons,
+      concrete: this.concretePolygons,
+      waterZones: this.waterZones,
     };
 
     // Use tiled two-level path shader for better performance on weaker devices.
@@ -2269,14 +2327,15 @@ export class Game {
       dt,
       busRoofY: BUS_ROOF_Y,
       engineVibeOffset,
-      observerX: this.busPos.x,
-      observerZ: this.busPos.z,
+      observerX: this.camera.position.x,
+      observerZ: this.camera.position.z,
     });
   }
 
   private updateBuildingLodForPlayer() {
     if (this.buildingLodEntries.length === 0) return;
-    updateBuildingLod(this.buildingLodEntries, this.busPos.x, this.busPos.z);
+    const cam = this.camera.position;
+    updateBuildingLod(this.buildingLodEntries, cam.x, cam.z);
   }
 
   // ---------- Update ----------
@@ -2384,7 +2443,7 @@ export class Game {
         );
       }
       this.updateBuildingLodForPlayer();
-      this.updateInsetCenter?.(this.busPos.x, this.busPos.z);
+      this.updateInsetCenter?.(this.camera.position.x, this.camera.position.z);
       return;
     }
 
@@ -2463,7 +2522,7 @@ export class Game {
         updateElasticObjects(this.elasticObjects, dt);
         this.updateRemoteBusMeshes(dt, engineVibeOffset);
         this.updateBuildingLodForPlayer();
-        this.updateInsetCenter?.(this.busPos.x, this.busPos.z);
+        this.updateInsetCenter?.(this.camera.position.x, this.camera.position.z);
         if (this.minimap) {
           this.minimap.draw(
             this.busPos.x,
@@ -2898,7 +2957,7 @@ export class Game {
     // --- Update remote bus meshes (multiplayer interpolation) ---
     this.updateRemoteBusMeshes(dt, engineVibeOffset);
     this.updateBuildingLodForPlayer();
-    this.updateInsetCenter?.(this.busPos.x, this.busPos.z);
+    this.updateInsetCenter?.(this.camera.position.x, this.camera.position.z);
 
     // Minimap
     if (this.minimap) {

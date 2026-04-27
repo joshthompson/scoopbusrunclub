@@ -4,6 +4,7 @@ import course from './course.json';
 import altitude from './altitude.json';
 import water from './water.json';
 import roads from './roads.json';
+import objects from './objects.json';
 
 const level: LevelData = {
   id: 'lillsjon',
@@ -12,6 +13,7 @@ const level: LevelData = {
   altitude,
   water: water as LevelData['water'],
   roads: roads as LevelData['roads'],
+  objects: objects as LevelData['objects'],
   hide: true,
 };
 

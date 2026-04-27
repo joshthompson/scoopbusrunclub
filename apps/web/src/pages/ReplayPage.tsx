@@ -796,8 +796,8 @@ export function ReplayPage(props: ReplayPageProps) {
                 </div>
               </Show>
 
-              {/* ---- SVG Course + Runners (shown when NOT in 3D mode) ---- */}
-              <Show when={!show3D()}>
+              {/* ---- SVG Course + Runners (shown when NOT in 3D mode, or no 3D level) ---- */}
+              <Show when={!show3D() || !has3DLevel()}>
               <svg
                 ref={svgEl}
                 viewBox={viewBox()}

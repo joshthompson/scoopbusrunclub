@@ -299,13 +299,20 @@ function ParkrunImage(props: { parkrun: ParkrunEvent }) {
           src: new URL('../assets/misc/curly-wurly.png', import.meta.url).href,
           name: 'The Curly Wurly Parkrun',
         }
+      
+      case 'urheilupuisto':
+        return {
+          src: new URL('../assets/misc/pig-duck.png', import.meta.url).href,
+          name: 'Urheilupuisto Parkrun',
+          height: '71px'
+        }
       default:
         return null
     }
   })
   return (
     <Show when={image()}>
-      {(img) => <img src={img().src} alt={img().name} class={styles.parkrunImage} />}
+      {(img) => <img src={img().src} alt={img().name} class={styles.parkrunImage} style={{ height: img().height || 'auto', width: 'auto' }} />}
     </Show>
   )
 }

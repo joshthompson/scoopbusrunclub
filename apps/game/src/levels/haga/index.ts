@@ -7,7 +7,9 @@ import buildings from './buildings.json';
 import paths from './paths.json';
 import marshals from './marshals.json';
 import roads from './roads.json';
-import noTreeZones from './noTreeZones.json';
+import regions from './regions.json';
+import trees from './trees.json';
+import objects from './objects.json';
 
 const level: LevelData = {
   id: 'haga',
@@ -19,7 +21,9 @@ const level: LevelData = {
   paths: paths as LevelData['paths'],
   marshals: marshals as LevelData['marshals'],
   roads: roads as LevelData['roads'],
-  noTreeZones: noTreeZones as LevelData['noTreeZones'],
+  regions: regions as LevelData['regions'],
+  manualTrees: trees as LevelData['manualTrees'],
+  objects: objects as LevelData['objects'],
 };
 
 export default level;

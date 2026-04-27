@@ -6,7 +6,9 @@ import buildings from './buildings.json';
 import paths from './paths.json';
 import fences from './fences.json';
 import roads from './roads.json';
-import noTreeZones from './noTreeZones.json';
+import regions from './regions.json';
+import trees from './trees.json';
+import objects from './objects.json';
 import trackUrl from '../../assets/track.png';
 
 const level: LevelData = {
@@ -30,7 +32,10 @@ const level: LevelData = {
   startCircle: false,
   minimapZoom: 4,
   pathTexture: trackUrl,
-  noTreeZones: noTreeZones as LevelData['noTreeZones'],
+  regions: regions as LevelData['regions'],
+  manualTrees: trees as LevelData['manualTrees'],
+  objects: objects as LevelData['objects'],
+  trees: false,
 };
 
 export default level;

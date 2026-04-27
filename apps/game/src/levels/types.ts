@@ -72,8 +72,35 @@ export interface LevelData {
   minimapZoom?: number;
   hide?: boolean;
   /**
-   * Polygons (arrays of [lat, lon] points) where trees should NOT be spawned.
-   * Each polygon is a closed ring — the last point connects back to the first.
+   * Region polygons grouped by terrain type.
+   * Each sub-key is an array of polygons (arrays of [lat, lon] points).
+   * Fields stop random tree spawns and use field texture.
+   * Concrete uses a hard surface texture.
    */
-  noTreeZones?: [number, number][][];
+  regions?: LevelRegions;
+  /**
+   * Manually placed trees as [lat, lon] positions.
+   */
+  manualTrees?: [number, number][];
+  /**
+   * Placed objects — each sub-key is an array of [lat, lon, rotation]
+   * where rotation is compass heading in degrees (0 = north, 90 = east).
+   */
+  objects?: LevelObjects;
+}
+
+export interface LevelRegions {
+  /** Open grass fields — stops random tree spawns, uses field texture */
+  fields?: [number, number][][];
+  /** Hard concrete/paved areas — uses concrete texture */
+  concrete?: [number, number][][];
+}
+
+export interface LevelObjects {
+  /** Park benches */
+  benches?: [number, number, number][];
+  /** Street lampposts */
+  lampposts?: [number, number, number][];
+  /** Tennis courts */
+  tennisCourts?: [number, number, number][];
 }
