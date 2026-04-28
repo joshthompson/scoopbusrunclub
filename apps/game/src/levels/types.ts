@@ -21,7 +21,7 @@ export interface LevelData {
   roads?: [number, number][][];
   /** Buildings as polygons of [lat, lon] points */
   buildings?: {
-    type: 'grey' | 'red' | 'kristineberg';
+    type: 'grey' | 'red' | 'green' | 'yellow' | 'kristineberg';
     height?: number;
     points: [number, number][];
   }[];

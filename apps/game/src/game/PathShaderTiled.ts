@@ -24,7 +24,7 @@ import forestUrl from '../assets/forest.png';
 import dirtUrl from '../assets/dirt.png';
 import fieldUrl from '../assets/field.png';
 import sandUrl from '../assets/sand.png';
-import { PATH_TEXTURE_ANISOTROPY } from './constants';
+import { RENDER_TEXTURE_ANISOTROPY } from './constants';
 import type { PathShaderOptions, IcePatchOverlay } from './PathShader';
 
 // ---------- Configuration ----------
@@ -297,16 +297,16 @@ export function createTiledPathGroundMaterial(
 
   // --- 4. Load diffuse textures ---
   const forestTex = new Texture(forestUrl, scene);
-  forestTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
+  forestTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
 
   const dirtTex = new Texture(pathTextureUrl ?? dirtUrl, scene);
-  dirtTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
+  dirtTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
 
   const fieldTex = new Texture(fieldUrl, scene);
-  fieldTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
+  fieldTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
 
   const sandTex = new Texture(sandUrl, scene);
-  sandTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
+  sandTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
 
   // Solid-color tiny textures for road, white line, ice, concrete
   const roadDyn = makeSolidTexture(scene, 'roadTex', '#606066');
@@ -461,9 +461,9 @@ function bakeMask(
   const lineCtx = lineMaskTex.getContext() as unknown as CanvasRenderingContext2D;
   const zoneMaskTex = new DynamicTexture(`zoneMask_${label}`, size, scene, false);
   const zoneCtx = zoneMaskTex.getContext() as unknown as CanvasRenderingContext2D;
-  tex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
-  lineMaskTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
-  zoneMaskTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
+  tex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
+  lineMaskTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
+  zoneMaskTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
 
   paintMaskContent(ctx, lineCtx, zoneCtx, size, pathPositions, roads, trails,
     groundSize, pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,

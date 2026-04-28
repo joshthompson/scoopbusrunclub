@@ -11,7 +11,7 @@ import {
 import earcut from 'earcut';
 import { createStadiumStand } from '../objects/StadiumStand';
 import type { BuildingFootprint, BuildingCollider } from '../types';
-import { BUILDING_LOD_SWAP_DISTANCE } from '../constants';
+import { RENDER_BUILDING_LOD_DISTANCE } from '../constants';
 
 export interface BuildingLodEntry {
   detailedRoot: TransformNode;
@@ -25,6 +25,78 @@ export interface BuildingLodEntry {
 export interface BuildBuildingMeshesResult {
   colliders: BuildingCollider[];
   lodEntries: BuildingLodEntry[];
+}
+
+// ---------- Facade template cache (instanced windows / doors) ----------
+
+interface FacadeTemplateSet {
+  panel: Mesh;
+  frameV: Mesh;
+  frameH: Mesh;
+  mullionV: Mesh | null;
+  mullionH: Mesh | null;
+  innerWidth: number;
+  innerHeight: number;
+  frameThickness: number;
+}
+
+type FacadeTemplateCache = Map<string, FacadeTemplateSet>;
+
+function facadeCacheKey(
+  outerW: number, outerH: number, frameT: number, depth: number,
+  mullions: boolean, frameMatName: string, innerMatName: string,
+): string {
+  const q = (v: number) => Math.round(v * 50); // quantise to 0.02
+  return `${q(outerW)}_${q(outerH)}_${q(frameT)}_${q(depth)}_${mullions ? 1 : 0}_${frameMatName}_${innerMatName}`;
+}
+
+function getOrCreateFacadeTemplates(
+  cache: FacadeTemplateCache,
+  scene: Scene,
+  outerWidth: number,
+  outerHeight: number,
+  depth: number,
+  frameThickness: number,
+  frameMat: StandardMaterial,
+  innerMat: StandardMaterial,
+  addMullions: boolean,
+): FacadeTemplateSet {
+  const key = facadeCacheKey(outerWidth, outerHeight, frameThickness, depth, addMullions, frameMat.name, innerMat.name);
+  let set = cache.get(key);
+  if (set) return set;
+
+  const innerWidth = Math.max(outerWidth - frameThickness * 2, outerWidth * 0.45);
+  const innerHeight = Math.max(outerHeight - frameThickness * 2, outerHeight * 0.45);
+  const frameDepth = depth + 0.01;
+
+  const panel = MeshBuilder.CreateBox(`tpl_fp_${key}`, { width: innerWidth, height: innerHeight, depth }, scene);
+  panel.material = innerMat;
+  panel.isVisible = false;
+
+  const frameV = MeshBuilder.CreateBox(`tpl_fv_${key}`, { width: frameThickness, height: outerHeight, depth: frameDepth }, scene);
+  frameV.material = frameMat;
+  frameV.isVisible = false;
+
+  const frameH = MeshBuilder.CreateBox(`tpl_fh_${key}`, { width: outerWidth, height: frameThickness, depth: frameDepth }, scene);
+  frameH.material = frameMat;
+  frameH.isVisible = false;
+
+  let mullionV: Mesh | null = null;
+  let mullionH: Mesh | null = null;
+  if (addMullions) {
+    const mullionW = Math.max(0.06, frameThickness * 0.55);
+    mullionV = MeshBuilder.CreateBox(`tpl_mv_${key}`, { width: mullionW, height: innerHeight, depth: frameDepth }, scene);
+    mullionV.material = frameMat;
+    mullionV.isVisible = false;
+
+    mullionH = MeshBuilder.CreateBox(`tpl_mh_${key}`, { width: innerWidth, height: mullionW, depth: frameDepth }, scene);
+    mullionH.material = frameMat;
+    mullionH.isVisible = false;
+  }
+
+  set = { panel, frameV, frameH, mullionV, mullionH, innerWidth, innerHeight, frameThickness };
+  cache.set(key, set);
+  return set;
 }
 
 // ---------- Building mesh construction ----------
@@ -54,6 +126,14 @@ export function buildBuildingMeshes(
   redWallMat.diffuseColor = new Color3(0.66, 0.19, 0.14);
   redWallMat.specularColor = Color3.Black();
 
+  const greenWallMat = new StandardMaterial('buildingGreenMat', scene);
+  greenWallMat.diffuseColor = new Color3(0.55, 0.62, 0.49);
+  greenWallMat.specularColor = Color3.Black();
+
+  const yellowWallMat = new StandardMaterial('buildingYellowMat', scene);
+  yellowWallMat.diffuseColor = new Color3(1.0, 0.82, 0.13);
+  yellowWallMat.specularColor = Color3.Black();
+
   const trimWhiteMat = new StandardMaterial('buildingTrimWhiteMat', scene);
   trimWhiteMat.diffuseColor = new Color3(0.96, 0.95, 0.92);
   trimWhiteMat.specularColor = Color3.Black();
@@ -79,6 +159,14 @@ export function buildBuildingMeshes(
   grooveMat.diffuseColor = new Color3(0.48, 0.13, 0.09);
   grooveMat.specularColor = Color3.Black();
 
+  const greenGrooveMat = new StandardMaterial('buildingGreenGrooveMat', scene);
+  greenGrooveMat.diffuseColor = new Color3(0.42, 0.50, 0.36);
+  greenGrooveMat.specularColor = Color3.Black();
+
+  const yellowGrooveMat = new StandardMaterial('buildingYellowGrooveMat', scene);
+  yellowGrooveMat.diffuseColor = new Color3(0.82, 0.66, 0.08);
+  yellowGrooveMat.specularColor = Color3.Black();
+
   const foundationMat = new StandardMaterial('buildingFoundationMat', scene);
   foundationMat.diffuseColor = new Color3(0.45, 0.45, 0.47);
   foundationMat.specularColor = Color3.Black();
@@ -86,6 +174,8 @@ export function buildBuildingMeshes(
   const chimneyMat = new StandardMaterial('buildingChimneyMat', scene);
   chimneyMat.diffuseColor = new Color3(0.66, 0.43, 0.28);
   chimneyMat.specularColor = Color3.Black();
+
+  const facadeCache: FacadeTemplateCache = new Map();
 
   for (let i = 0; i < footprints.length; i++) {
     const building = footprints[i];
@@ -137,8 +227,12 @@ export function buildBuildingMeshes(
     const roofHeight = Math.max(1.25, Math.min(totalHeight * 0.32, 3.8));
     const wallHeight = Math.max(2.8, totalHeight - roofHeight);
     const roofOverhang = Math.min(0.45, Math.min(width, depth) * 0.08 + 0.12);
-    const trimMat = building.type === 'red' ? trimWhiteMat : greyTrimMat;
-    const wallMat = building.type === 'red' ? redWallMat : stoneWallMat;
+    const isSwedishHouse = building.type === 'red' || building.type === 'green' || building.type === 'yellow';
+    const trimMat = isSwedishHouse ? trimWhiteMat : greyTrimMat;
+    const wallMat = building.type === 'red' ? redWallMat
+      : building.type === 'green' ? greenWallMat
+        : building.type === 'yellow' ? yellowWallMat
+          : stoneWallMat;
 
     const centerOffsetRight = (minRight + maxRight) * 0.5;
     const centerOffsetFwd = (minFwd + maxFwd) * 0.5;
@@ -169,7 +263,7 @@ export function buildBuildingMeshes(
       lowDetailRoot,
       x: centerX,
       z: centerZ,
-      swapDistanceSq: BUILDING_LOD_SWAP_DISTANCE * BUILDING_LOD_SWAP_DISTANCE,
+      swapDistanceSq: RENDER_BUILDING_LOD_DISTANCE * RENDER_BUILDING_LOD_DISTANCE,
       lowDetailActive: false,
     });
 
@@ -276,10 +370,14 @@ export function buildBuildingMeshes(
       trimMat,
       windowMat,
       doorMat,
+      facadeCache,
     );
 
-    if (building.type === 'red') {
-      addSwedishHouseTrimPolygon(scene, root, i, localPolyPts, wallSegments, foundationHeight, wallHeight, width, depth, trimMat, roofMat, chimneyMat, grooveMat);
+    if (isSwedishHouse) {
+      const activeGrooveMat = building.type === 'green' ? greenGrooveMat
+        : building.type === 'yellow' ? yellowGrooveMat
+          : grooveMat;
+      addSwedishHouseTrimPolygon(scene, root, i, localPolyPts, wallSegments, foundationHeight, wallHeight, width, depth, trimMat, roofMat, chimneyMat, activeGrooveMat);
     }
 
     colliders.push({
@@ -446,77 +544,41 @@ function createFramedFacadeRect(
   frameMat: StandardMaterial,
   innerMat: StandardMaterial,
   addMullions: boolean,
+  facadeCache: FacadeTemplateCache = new Map(),
 ) {
   const anchor = new TransformNode(`${name}_anchor`, scene);
   anchor.parent = parent;
   anchor.position.set(x, y, z);
   anchor.rotation.y = yaw;
 
-  const innerWidth = Math.max(outerWidth - frameThickness * 2, outerWidth * 0.45);
-  const innerHeight = Math.max(outerHeight - frameThickness * 2, outerHeight * 0.45);
-  const frameDepth = depth + 0.01;
+  const tpl = getOrCreateFacadeTemplates(facadeCache, scene, outerWidth, outerHeight, depth, frameThickness, frameMat, innerMat, addMullions);
 
-  const panel = MeshBuilder.CreateBox(
-    `${name}_inner`,
-    { width: innerWidth, height: innerHeight, depth },
-    scene,
-  );
-  panel.material = innerMat;
+  const panel = tpl.panel.createInstance(`${name}_inner`);
   panel.parent = anchor;
 
-  const left = MeshBuilder.CreateBox(
-    `${name}_frame_left`,
-    { width: frameThickness, height: outerHeight, depth: frameDepth },
-    scene,
-  );
-  left.position.x = -(innerWidth + frameThickness) * 0.5;
-  left.material = frameMat;
+  const left = tpl.frameV.createInstance(`${name}_fl`);
+  left.position.x = -(tpl.innerWidth + tpl.frameThickness) * 0.5;
   left.parent = anchor;
 
-  const right = MeshBuilder.CreateBox(
-    `${name}_frame_right`,
-    { width: frameThickness, height: outerHeight, depth: frameDepth },
-    scene,
-  );
-  right.position.x = (innerWidth + frameThickness) * 0.5;
-  right.material = frameMat;
+  const right = tpl.frameV.createInstance(`${name}_fr`);
+  right.position.x = (tpl.innerWidth + tpl.frameThickness) * 0.5;
   right.parent = anchor;
 
-  const top = MeshBuilder.CreateBox(
-    `${name}_frame_top`,
-    { width: outerWidth, height: frameThickness, depth: frameDepth },
-    scene,
-  );
-  top.position.y = (innerHeight + frameThickness) * 0.5;
-  top.material = frameMat;
+  const top = tpl.frameH.createInstance(`${name}_ft`);
+  top.position.y = (tpl.innerHeight + tpl.frameThickness) * 0.5;
   top.parent = anchor;
 
-  const bottom = MeshBuilder.CreateBox(
-    `${name}_frame_bottom`,
-    { width: outerWidth, height: frameThickness, depth: frameDepth },
-    scene,
-  );
-  bottom.position.y = -(innerHeight + frameThickness) * 0.5;
-  bottom.material = frameMat;
+  const bottom = tpl.frameH.createInstance(`${name}_fb`);
+  bottom.position.y = -(tpl.innerHeight + tpl.frameThickness) * 0.5;
   bottom.parent = anchor;
 
-  if (addMullions) {
-    const mullionW = Math.max(0.06, frameThickness * 0.55);
-    const vertical = MeshBuilder.CreateBox(
-      `${name}_mullion_v`,
-      { width: mullionW, height: innerHeight, depth: frameDepth },
-      scene,
-    );
-    vertical.material = frameMat;
-    vertical.parent = anchor;
-
-    const horizontal = MeshBuilder.CreateBox(
-      `${name}_mullion_h`,
-      { width: innerWidth, height: mullionW, depth: frameDepth },
-      scene,
-    );
-    horizontal.material = frameMat;
-    horizontal.parent = anchor;
+  if (tpl.mullionV) {
+    const mv = tpl.mullionV.createInstance(`${name}_mv`);
+    mv.parent = anchor;
+  }
+  if (tpl.mullionH) {
+    const mh = tpl.mullionH.createInstance(`${name}_mh`);
+    mh.parent = anchor;
   }
 }
 
@@ -533,6 +595,7 @@ function addWindowsOnWall(
   doorWidth: number,
   trimMat: StandardMaterial,
   windowMat: StandardMaterial,
+  facadeCache: FacadeTemplateCache,
 ) {
   const span = wall.span;
   const count = span >= 15 ? 4 : span >= 9 ? 3 : span >= 5.5 ? 2 : 1;
@@ -571,6 +634,7 @@ function addWindowsOnWall(
         trimMat,
         windowMat,
         true,
+        facadeCache,
       );
     }
   }
@@ -585,10 +649,11 @@ function addBuildingFacadeFeaturesPolygon(
   wallSegments: { cx: number; cz: number; span: number; yaw: number; nx: number; nz: number }[],
   foundationHeight: number,
   wallHeight: number,
-  buildingType: 'grey' | 'red' | 'blue' | 'kristineberg',
+  buildingType: 'grey' | 'red' | 'blue' | 'green' | 'yellow' | 'kristineberg',
   trimMat: StandardMaterial,
   windowMat: StandardMaterial,
   doorMat: StandardMaterial,
+  facadeCache: FacadeTemplateCache,
 ) {
   if (wallSegments.length === 0) return;
   const facadeOffset = 0.08;
@@ -622,6 +687,7 @@ function addBuildingFacadeFeaturesPolygon(
     trimMat,
     doorMat,
     false,
+    facadeCache,
   );
 
   // Window rows
@@ -645,11 +711,12 @@ function addBuildingFacadeFeaturesPolygon(
       isFront ? frontDoorW : 0,
       trimMat,
       windowMat,
+      facadeCache,
     );
   }
 
-  // Doorstep for red houses
-  if (buildingType === 'red') {
+  // Doorstep for Swedish houses
+  if (buildingType === 'red' || buildingType === 'green' || buildingType === 'yellow') {
     const stepW = Math.max(0.7, Math.min(1.2, frontDoorW * 0.95));
     const step = MeshBuilder.CreateBox(
       `buildingStep_${buildingIndex}`,
@@ -728,7 +795,7 @@ export function addBuildingFacadeFeatures(
   depth: number,
   foundationHeight: number,
   wallHeight: number,
-  buildingType: 'grey' | 'red' | 'blue' | 'kristineberg',
+  buildingType: 'grey' | 'red' | 'blue' | 'green' | 'yellow' | 'kristineberg',
   trimMat: StandardMaterial,
   windowMat: StandardMaterial,
   doorMat: StandardMaterial,
@@ -766,7 +833,7 @@ export function addBuildingFacadeFeatures(
   addWindowsOnFace(scene, root, `buildingLeftWindows_${buildingIndex}`, depth, -(width * 0.5 + facadeOffset), sideRows, -Math.PI * 0.5, false, 0, trimMat, windowMat);
   addWindowsOnFace(scene, root, `buildingRightWindows_${buildingIndex}`, depth, width * 0.5 + facadeOffset, sideRows, Math.PI * 0.5, false, 0, trimMat, windowMat);
 
-  if (buildingType === 'red') {
+  if (buildingType === 'red' || buildingType === 'green' || buildingType === 'yellow') {
     const stepW = Math.max(0.7, Math.min(1.2, frontDoorW * 0.95));
     const step = MeshBuilder.CreateBox(
       `buildingStep_${buildingIndex}`,

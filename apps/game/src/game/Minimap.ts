@@ -37,6 +37,8 @@ const COL_TRAIL = '#1a4e12';
 const COL_BUILDING_GREY = '#8f8f96';
 const COL_BUILDING_RED = '#a94a46';
 const COL_BUILDING_BLUE = '#3f7fc7';
+const COL_BUILDING_GREEN = '#8C9E7E';
+const COL_BUILDING_YELLOW = '#FFD021';
 const COL_BORDER = '#ffffffcc';
 const COL_LOOKAHEAD = '#ffffff';
 const COL_LOOKAHEAD_OUTLINE = '#0f3c0a';
@@ -59,7 +61,7 @@ export class Minimap {
   private waterZones: { points: [number, number][] }[] = [];
   private roads: [number, number][][] = [];
   private trails: [number, number][][] = [];
-  private buildings: { type: 'grey' | 'red' | 'blue' | 'kristineberg'; points: [number, number][] }[] = [];
+  private buildings: { type: 'grey' | 'red' | 'blue' | 'green' | 'yellow' | 'kristineberg'; points: [number, number][] }[] = [];
 
 
   private gapThresholdSq = Infinity; // adaptive gap detection
@@ -113,7 +115,7 @@ export class Minimap {
     this.trails = trails;
   }
 
-  setBuildings(buildings: { type: 'grey' | 'red' | 'blue' | 'kristineberg'; points: [number, number][] }[]) {
+  setBuildings(buildings: { type: 'grey' | 'red' | 'blue' | 'green' | 'yellow' | 'kristineberg'; points: [number, number][] }[]) {
     this.buildings = buildings;
   }
 
@@ -202,7 +204,11 @@ export class Minimap {
           ? COL_BUILDING_BLUE
           : building.type === 'kristineberg'
             ? COL_BUILDING_BLUE
-            : COL_BUILDING_GREY;
+            : building.type === 'green'
+              ? COL_BUILDING_GREEN
+              : building.type === 'yellow'
+                ? COL_BUILDING_YELLOW
+                : COL_BUILDING_GREY;
       ctx.fill();
     }
 

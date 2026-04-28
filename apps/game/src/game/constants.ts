@@ -3,8 +3,6 @@ import type { GameMode } from './types';
 export const MODE: GameMode = 'SCOOP_THEN_RIDE';
 
 export const PATH_HALF_WIDTH = 5;
-export const PATH_MASK_RESOLUTION = 8192;
-export const PATH_TEXTURE_ANISOTROPY = 16;
 export const COURSE_TARGET_LENGTH = 5000;
 export const ALTITUDE_EXAGGERATION = 2.5;
 export const BUS_MAX_SPEED = 12 * 3;
@@ -26,7 +24,6 @@ export const RUNNER_JUMP_HEIGHT = 3;
 export const RUNNER_PLAYER_MAX_JUMPS = 2;
 export const RUNNER_PLAYER_JUMP_SIDE_VELOCITY = 5.5;
 export const RUNNER_COLLISION_RADIUS = 0.75;
-export const RUNNER_ANIMATION_CULL_DISTANCE = 500;
 export const SCOOP_DISTANCE = 3.5;
 export const RUNNER_ESCAPE_DISTANCE = 60;
 export const RUNNER_ESCAPE_SPEED = 2.5;
@@ -68,7 +65,7 @@ export const POWER_UP_ICE_GROW_SECONDS = 0.5;
 export const POWER_UP_ICE_DURATION_SECONDS = 30;
 export const POWER_UP_ICE_FADE_SECONDS = 1;
 export const POWER_UP_ICE_BASE_ALPHA = 0.4;
-export const TREE_COUNT = 1200;
+export const TREE_COUNT = 3000;
 export const TREE_SPREAD = 200;
 export const TREE_MIN_DIST_FROM_PATH = 8;
 export const AUTO_DRIVE_SPEED = 10;
@@ -96,8 +93,15 @@ export const BUS_DOWNHILL_SLOPE_THRESHOLD = -0.01;
 export const RUNNER_DOWNHILL_SPEED_BOOST = 1.5;
 export const RUNNER_DOWNHILL_SLOPE_THRESHOLD = -0.02;
 export const BUS_COLLISION_RADIUS = 2.0;
-export const BUILDING_LOD_SWAP_DISTANCE = 500;
 
 // Engine vibration (body oscillates on the wheels)
 export const ENGINE_VIBE_FREQUENCY = 3;   // Hz — fast idle-engine rumble
 export const ENGINE_VIBE_AMPLITUDE = 0.03; // metres — subtle vertical shake
+
+// ---------- Render / draw distance / LOD ----------
+export const RENDER_PATH_MASK_RESOLUTION = 8192;
+export const RENDER_TEXTURE_ANISOTROPY = 16;
+export const RENDER_BUILDING_LOD_DISTANCE = 500;
+export const RENDER_ANIMATION_CULL_DISTANCE = 500;
+export const RENDER_OBJECTS_MAX_DISTANCE = 500;
+export const RENDER_TREES_MAX_DISTANCE = 500;

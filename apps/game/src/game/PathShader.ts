@@ -17,7 +17,7 @@ import {
 import { MixMaterial } from '@babylonjs/materials';
 import forestUrl from '../assets/forest.png';
 import dirtUrl from '../assets/dirt.png';
-import { PATH_TEXTURE_ANISOTROPY } from './constants';
+import { RENDER_TEXTURE_ANISOTROPY } from './constants';
 
 // ---------- Types ----------
 
@@ -137,12 +137,12 @@ export function createPathGroundMaterial(
   const forestTex = new Texture(forestUrl, scene);
   forestTex.uScale = forestTiling;
   forestTex.vScale = forestTiling;
-  forestTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
+  forestTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
 
   const dirtTex = new Texture(pathTextureUrl ?? dirtUrl, scene);
   dirtTex.uScale = dirtTiling;
   dirtTex.vScale = dirtTiling;
-  dirtTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
+  dirtTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
 
   // --- 3. Build MixMaterial ---
   const mat = new MixMaterial('pathGroundMat', scene);
@@ -234,8 +234,8 @@ function bakeMaskTexture(
   const lineMaskTex = new DynamicTexture('pathLineMaskTex', supportedResolution, scene, false);
   const lineCtx = lineMaskTex.getContext() as unknown as CanvasRenderingContext2D;
   const size = supportedResolution;
-  tex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
-  lineMaskTex.anisotropicFilteringLevel = PATH_TEXTURE_ANISOTROPY;
+  tex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
+  lineMaskTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
 
   // Fill with R=255, G=0, B=0, A=255  →  grass everywhere, no dirt
   ctx.fillStyle = 'rgb(255, 0, 0)';

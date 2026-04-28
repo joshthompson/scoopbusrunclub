@@ -64,6 +64,8 @@ const COLORS = {
   bridleway: '#90a040',
   buildingGrey: '#8899aa',
   buildingRed: '#c06050',
+  buildingGreen: '#8C9E7E',
+  buildingYellow: '#FFD021',
   water: '#4488cc',
   river: '#3377bb',
   fence: '#806040',
@@ -80,7 +82,8 @@ const COLORS = {
 
 type RegionType = 'field' | 'concrete';
 interface RegionItem { type: RegionType; points: [number, number][]; }
-interface BuildingItem { type: 'grey' | 'red'; points: [number, number][]; }
+type BuildingType = 'grey' | 'red' | 'green' | 'yellow';
+interface BuildingItem { type: BuildingType; points: [number, number][]; }
 interface WaterItem { type: 'water' | 'river'; points: [number, number][]; }
 interface FenceItem { points: [number, number][]; }
 interface TreeItem { pos: [number, number]; }
@@ -123,7 +126,7 @@ async function main() {
   }));
 
   const buildingItems: BuildingItem[] = (level.buildings ?? []).map((b) => ({
-    type: b.type === 'red' ? 'red' as const : 'grey' as const,
+    type: (b.type === 'red' || b.type === 'green' || b.type === 'yellow') ? b.type as BuildingType : 'grey' as const,
     points: b.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
   }));
 
@@ -326,7 +329,7 @@ async function main() {
     for (let i = 0; i < buildingItems.length; i++) {
       const b = buildingItems[i];
       if (b.points.length < 3) continue;
-      const fill = b.type === 'red' ? COLORS.buildingRed : COLORS.buildingGrey;
+      const fill = b.type === 'red' ? COLORS.buildingRed : b.type === 'green' ? COLORS.buildingGreen : b.type === 'yellow' ? COLORS.buildingYellow : COLORS.buildingGrey;
       const isSel = selectedKind === 'building' && selectedIndex === i;
       const poly = svgEl('polygon', {
         points: polyPoints(b.points),
@@ -762,7 +765,37 @@ async function main() {
       info.className = 'sidebar-info';
       if (selectedKind === 'building') {
         const b = buildingItems[selectedIndex];
-        info.textContent = `Building #${selectedIndex} (${b.type}) — ${b.points.length} verts`;
+        info.textContent = `Building #${selectedIndex} — ${b.points.length} verts`;
+
+        const typeRow = document.createElement('div');
+        typeRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;align-items:center;';
+        const typeLabel = document.createElement('span');
+        typeLabel.style.cssText = 'color:#ccc;font-size:11px;';
+        typeLabel.textContent = 'Type:';
+        typeRow.appendChild(typeLabel);
+
+        const typeSelect = document.createElement('select');
+        typeSelect.style.cssText = 'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;';
+        const buildingTypes: { value: BuildingType; label: string; color: string }[] = [
+          { value: 'grey', label: 'Grey', color: COLORS.buildingGrey },
+          { value: 'red', label: 'Red', color: COLORS.buildingRed },
+          { value: 'green', label: 'Green', color: COLORS.buildingGreen },
+          { value: 'yellow', label: 'Yellow', color: COLORS.buildingYellow },
+        ];
+        for (const bt of buildingTypes) {
+          const opt = document.createElement('option');
+          opt.value = bt.value;
+          opt.textContent = bt.label;
+          if (bt.value === b.type) opt.selected = true;
+          typeSelect.appendChild(opt);
+        }
+        typeSelect.addEventListener('change', () => {
+          b.type = typeSelect.value as BuildingType;
+          renderBuildings();
+          renderSidebar();
+        });
+        typeRow.appendChild(typeSelect);
+        selSection.appendChild(typeRow);
       } else if (selectedKind === 'water') {
         const w = waterItems[selectedIndex];
         info.textContent = `Water #${selectedIndex} (${w.type}) — ${w.points.length} verts`;

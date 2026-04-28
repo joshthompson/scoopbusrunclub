@@ -4,7 +4,9 @@ import {
   StandardMaterial,
   Color3,
   TransformNode,
+  type Mesh,
 } from '@babylonjs/core';
+import type { ElasticObject } from '../types';
 
 // ── Shared types ────────────────────────────────────────────────────────
 
@@ -15,7 +17,9 @@ export interface PlacedObjectData {
 }
 
 export interface BuildLevelObjectsResult {
-  solidObstacles: { x: number; z: number; radius: number }[];
+  solidObstacles: { x: number; z: number; radius: number; elasticIndex?: number }[];
+  objectRoots: TransformNode[];
+  elasticObjects: ElasticObject[];
 }
 
 // ── Material caches ─────────────────────────────────────────────────────
@@ -57,186 +61,274 @@ function getGlassMat(scene: Scene) {
   return _glassMat;
 }
 
-// ── Bench ───────────────────────────────────────────────────────────────
+// ── Bench instanced templates ───────────────────────────────────────────
 
-function buildOneBench(scene: Scene, i: number, x: number, y: number, z: number, rotation: number) {
+// Geometry constants (shared between template creation and placement)
+const B_LEN = 1.5;
+const B_SEAT_D = 0.4;
+const B_SEAT_T = 0.05;
+const B_SEAT_H = 0.45;
+const B_BACK_H = 0.4;
+const B_BACK_T = 0.04;
+const B_LEG_W = 0.06;
+const B_LEG_D = 0.04;
+const B_SLAT_GAP = 0.02;
+const B_SLAT_D = (B_SEAT_D - B_SLAT_GAP * 2) / 3;
+const B_BACK_SLAT_H = 0.08;
+const B_BACK_SLAT_GAP = 0.04;
+const B_LEG_INSET = B_LEN * 0.35;
+
+interface BenchTemplates {
+  seatSlat: Mesh;
+  backSlat: Mesh;
+  frontLeg: Mesh;
+  rearLeg: Mesh;
+  crossbar: Mesh;
+}
+
+function createBenchTemplates(scene: Scene): BenchTemplates {
+  const wm = getWoodMat(scene);
+  const im = getIronMat(scene);
+
+  const seatSlat = MeshBuilder.CreateBox('tpl_bench_seat', { width: B_LEN, height: B_SEAT_T, depth: B_SLAT_D }, scene);
+  seatSlat.material = wm; seatSlat.isVisible = false;
+
+  const backSlat = MeshBuilder.CreateBox('tpl_bench_back', { width: B_LEN, height: B_BACK_SLAT_H, depth: B_BACK_T }, scene);
+  backSlat.material = wm; backSlat.isVisible = false;
+
+  const frontLeg = MeshBuilder.CreateBox('tpl_bench_fl', { width: B_LEG_W, height: B_SEAT_H, depth: B_LEG_D }, scene);
+  frontLeg.material = im; frontLeg.isVisible = false;
+
+  const rlH = B_SEAT_H + B_BACK_H;
+  const rearLeg = MeshBuilder.CreateBox('tpl_bench_rl', { width: B_LEG_W, height: rlH, depth: B_LEG_D }, scene);
+  rearLeg.material = im; rearLeg.isVisible = false;
+
+  const crossbar = MeshBuilder.CreateBox('tpl_bench_cb', { width: B_LEG_W, height: B_LEG_D, depth: B_SEAT_D * 0.8 }, scene);
+  crossbar.material = im; crossbar.isVisible = false;
+
+  return { seatSlat, backSlat, frontLeg, rearLeg, crossbar };
+}
+
+function placeBench(tpl: BenchTemplates, scene: Scene, i: number, x: number, y: number, z: number, rotation: number): TransformNode {
   const root = new TransformNode(`bench_${i}`, scene);
   root.position.set(x, y, z);
   root.rotation.y = rotation;
 
-  const wm = getWoodMat(scene);
-  const im = getIronMat(scene);
-
-  const benchLength = 1.5;
-  const seatDepth = 0.4;
-  const seatThickness = 0.05;
-  const seatHeight = 0.45;
-  const backHeight = 0.4;
-  const backThickness = 0.04;
-  const legWidth = 0.06;
-  const legDepth = 0.04;
-
-  // Seat (3 slats)
-  const slatGap = 0.02;
-  const slatDepth = (seatDepth - slatGap * 2) / 3;
+  // Seat slats
   for (let si = 0; si < 3; si++) {
-    const slat = MeshBuilder.CreateBox(`bench_${i}_s${si}`, { width: benchLength, height: seatThickness, depth: slatDepth }, scene);
-    slat.position.set(0, seatHeight, -seatDepth / 2 + slatDepth / 2 + si * (slatDepth + slatGap));
-    slat.material = wm;
-    slat.parent = root;
+    const inst = tpl.seatSlat.createInstance(`bench_${i}_s${si}`);
+    inst.position.set(0, B_SEAT_H, -B_SEAT_D / 2 + B_SLAT_D / 2 + si * (B_SLAT_D + B_SLAT_GAP));
+    inst.parent = root;
   }
 
-  // Back rest (2 slats)
-  const backSlatH = 0.08;
-  const backSlatGap = 0.04;
+  // Back rest slats
   for (let bi = 0; bi < 2; bi++) {
-    const slat = MeshBuilder.CreateBox(`bench_${i}_b${bi}`, { width: benchLength, height: backSlatH, depth: backThickness }, scene);
-    slat.position.set(0, seatHeight + seatThickness / 2 + 0.06 + backSlatH / 2 + bi * (backSlatH + backSlatGap), -seatDepth / 2);
-    slat.rotation.x = -0.21;
-    slat.material = wm;
-    slat.parent = root;
+    const inst = tpl.backSlat.createInstance(`bench_${i}_b${bi}`);
+    inst.position.set(0, B_SEAT_H + B_SEAT_T / 2 + 0.06 + B_BACK_SLAT_H / 2 + bi * (B_BACK_SLAT_H + B_BACK_SLAT_GAP), -B_SEAT_D / 2);
+    inst.rotation.x = -0.21;
+    inst.parent = root;
   }
 
-  // Legs
-  const legInset = benchLength * 0.35;
+  // Legs (left + right)
+  const rlH = B_SEAT_H + B_BACK_H;
   for (const side of [-1, 1]) {
-    const fl = MeshBuilder.CreateBox(`bench_${i}_fl${side}`, { width: legWidth, height: seatHeight, depth: legDepth }, scene);
-    fl.position.set(side * legInset, seatHeight / 2, seatDepth / 2 - legDepth / 2);
-    fl.material = im; fl.parent = root;
+    const fl = tpl.frontLeg.createInstance(`bench_${i}_fl${side}`);
+    fl.position.set(side * B_LEG_INSET, B_SEAT_H / 2, B_SEAT_D / 2 - B_LEG_D / 2);
+    fl.parent = root;
 
-    const rlH = seatHeight + backHeight;
-    const rl = MeshBuilder.CreateBox(`bench_${i}_rl${side}`, { width: legWidth, height: rlH, depth: legDepth }, scene);
-    rl.position.set(side * legInset, rlH / 2, -seatDepth / 2 + legDepth / 2);
+    const rl = tpl.rearLeg.createInstance(`bench_${i}_rl${side}`);
+    rl.position.set(side * B_LEG_INSET, rlH / 2, -B_SEAT_D / 2 + B_LEG_D / 2);
     rl.rotation.x = -0.10;
-    rl.material = im; rl.parent = root;
+    rl.parent = root;
 
-    const cb = MeshBuilder.CreateBox(`bench_${i}_cb${side}`, { width: legWidth, height: legDepth, depth: seatDepth * 0.8 }, scene);
-    cb.position.set(side * legInset, seatHeight * 0.35, 0);
-    cb.material = im; cb.parent = root;
+    const cb = tpl.crossbar.createInstance(`bench_${i}_cb${side}`);
+    cb.position.set(side * B_LEG_INSET, B_SEAT_H * 0.35, 0);
+    cb.parent = root;
   }
+
+  return root;
 }
 
-// ── Lamppost ────────────────────────────────────────────────────────────
+// ── Lamppost instanced templates ────────────────────────────────────────
 
-function buildOneLamppost(scene: Scene, i: number, x: number, y: number, z: number, rotation: number) {
+const LP_POLE_H = 4.0;
+const LP_POLE_D = 0.12;
+const LP_LANTERN_H = 0.4;
+const LP_LANTERN_D = 0.28;
+
+interface LampTemplates {
+  base: Mesh;
+  ring: Mesh;
+  pole: Mesh;
+  collar: Mesh;
+  lantern: Mesh;
+  roof: Mesh;
+  spike: Mesh;
+}
+
+function createLampTemplates(scene: Scene): LampTemplates {
+  const im = getIronMat(scene);
+  const gm = getGlassMat(scene);
+
+  const base = MeshBuilder.CreateCylinder('tpl_lamp_base', { height: 0.2, diameterTop: LP_POLE_D * 1.5, diameterBottom: LP_POLE_D * 2.8, tessellation: 8 }, scene);
+  base.material = im; base.isVisible = false;
+
+  const ring = MeshBuilder.CreateCylinder('tpl_lamp_ring', { height: 0.12, diameterTop: LP_POLE_D * 1.3, diameterBottom: LP_POLE_D * 1.5, tessellation: 8 }, scene);
+  ring.material = im; ring.isVisible = false;
+
+  const pole = MeshBuilder.CreateCylinder('tpl_lamp_pole', { height: LP_POLE_H - 0.8, diameterTop: LP_POLE_D * 0.75, diameterBottom: LP_POLE_D, tessellation: 8 }, scene);
+  pole.material = im; pole.isVisible = false;
+
+  const collar = MeshBuilder.CreateCylinder('tpl_lamp_collar', { height: 0.08, diameterTop: LP_POLE_D * 1.6, diameterBottom: LP_POLE_D * 1.0, tessellation: 8 }, scene);
+  collar.material = im; collar.isVisible = false;
+
+  const lantern = MeshBuilder.CreateCylinder('tpl_lamp_lantern', { height: LP_LANTERN_H, diameterTop: LP_LANTERN_D * 0.7, diameterBottom: LP_LANTERN_D, tessellation: 6 }, scene);
+  lantern.material = gm; lantern.isVisible = false;
+
+  const roof = MeshBuilder.CreateCylinder('tpl_lamp_roof', { height: 0.1, diameterTop: 0.06, diameterBottom: LP_LANTERN_D * 1.1, tessellation: 6 }, scene);
+  roof.material = im; roof.isVisible = false;
+
+  const spike = MeshBuilder.CreateCylinder('tpl_lamp_spike', { height: 0.15, diameterTop: 0, diameterBottom: 0.05, tessellation: 6 }, scene);
+  spike.material = im; spike.isVisible = false;
+
+  return { base, ring, pole, collar, lantern, roof, spike };
+}
+
+function placeLamppost(tpl: LampTemplates, scene: Scene, i: number, x: number, y: number, z: number, rotation: number): TransformNode {
   const root = new TransformNode(`lamp_${i}`, scene);
   root.position.set(x, y, z);
   root.rotation.y = rotation;
 
-  const im = getIronMat(scene);
-  const gm = getGlassMat(scene);
+  const b = tpl.base.createInstance(`lamp_${i}_base`);
+  b.position.y = 0.1; b.parent = root;
 
-  const poleH = 4.0;
-  const poleD = 0.12;
+  const r = tpl.ring.createInstance(`lamp_${i}_ring`);
+  r.position.y = 0.26; r.parent = root;
 
-  // Wide decorative base
-  const base = MeshBuilder.CreateCylinder(`lamp_${i}_base`, { height: 0.2, diameterTop: poleD * 1.5, diameterBottom: poleD * 2.8, tessellation: 8 }, scene);
-  base.position.y = 0.1;
-  base.material = im;
-  base.parent = root;
+  const p = tpl.pole.createInstance(`lamp_${i}_pole`);
+  p.position.y = 0.32 + (LP_POLE_H - 0.8) / 2; p.parent = root;
 
-  // Lower bulge ring
-  const ring1 = MeshBuilder.CreateCylinder(`lamp_${i}_r1`, { height: 0.12, diameterTop: poleD * 1.3, diameterBottom: poleD * 1.5, tessellation: 8 }, scene);
-  ring1.position.y = 0.26;
-  ring1.material = im;
-  ring1.parent = root;
+  const col = tpl.collar.createInstance(`lamp_${i}_col`);
+  col.position.y = LP_POLE_H - 0.44; col.parent = root;
 
-  // Main pole (slight taper)
-  const pole = MeshBuilder.CreateCylinder(`lamp_${i}_p`, { height: poleH - 0.8, diameterTop: poleD * 0.75, diameterBottom: poleD, tessellation: 8 }, scene);
-  pole.position.y = 0.32 + (poleH - 0.8) / 2;
-  pole.material = im;
-  pole.parent = root;
+  const lan = tpl.lantern.createInstance(`lamp_${i}_lan`);
+  lan.position.y = LP_POLE_H - 0.2; lan.parent = root;
 
-  // Collar ring below lantern
-  const collar = MeshBuilder.CreateCylinder(`lamp_${i}_col`, { height: 0.08, diameterTop: poleD * 1.6, diameterBottom: poleD * 1.0, tessellation: 8 }, scene);
-  collar.position.y = poleH - 0.44;
-  collar.material = im;
-  collar.parent = root;
+  const rf = tpl.roof.createInstance(`lamp_${i}_roof`);
+  rf.position.y = LP_POLE_H; rf.parent = root;
 
-  // Lantern body (hexagonal glass housing, centered on pole)
-  const lanternH = 0.4;
-  const lanternD = 0.28;
-  const lantern = MeshBuilder.CreateCylinder(`lamp_${i}_lan`, { height: lanternH, diameterTop: lanternD * 0.7, diameterBottom: lanternD, tessellation: 6 }, scene);
-  lantern.position.y = poleH - 0.2;
-  lantern.material = gm;
-  lantern.parent = root;
+  const sp = tpl.spike.createInstance(`lamp_${i}_spike`);
+  sp.position.y = LP_POLE_H + 0.125; sp.parent = root;
 
-  // Lantern roof (wider cap, tapered)
-  const roof = MeshBuilder.CreateCylinder(`lamp_${i}_roof`, { height: 0.1, diameterTop: 0.06, diameterBottom: lanternD * 1.1, tessellation: 6 }, scene);
-  roof.position.y = poleH;
-  roof.material = im;
-  roof.parent = root;
-
-  // Finial spike on top
-  const spike = MeshBuilder.CreateCylinder(`lamp_${i}_spike`, { height: 0.15, diameterTop: 0, diameterBottom: 0.05, tessellation: 6 }, scene);
-  spike.position.y = poleH + 0.125;
-  spike.material = im;
-  spike.parent = root;
+  return root;
 }
 
-// ── Tennis court ────────────────────────────────────────────────────────
+// ── Tennis court instanced templates ────────────────────────────────────
 
-function buildOneTennisCourt(scene: Scene, i: number, x: number, y: number, z: number, rotation: number) {
-  const root = new TransformNode(`tennis_${i}`, scene);
-  root.position.set(x, y, z);
-  root.rotation.y = rotation;
+const TC_L = 12;
+const TC_W = 5.5;
+const TC_NET_H = 1.07;
 
-  // Half-scale dimensions for game feel: ~12 × 5.5
-  const courtL = 12;
-  const courtW = 5.5;
+interface TennisTemplates {
+  surface: Mesh;
+  baseline: Mesh;     // 2 per court
+  sideline: Mesh;     // 2 per court
+  centerLine: Mesh;   // 1 per court
+  serviceLine: Mesh;  // 4 per court
+  net: Mesh;
+  post: Mesh;
+}
 
+function createTennisTemplates(scene: Scene): TennisTemplates {
   const cm = getCourtMat(scene);
   const wm = getWhiteMat(scene);
   const nm = getNetMat(scene);
   const im = getIronMat(scene);
-  const gm = getGreenMat(scene);
+
+  const surface = MeshBuilder.CreateBox('tpl_tc_surf', { width: TC_W, height: 0.02, depth: TC_L }, scene);
+  surface.material = cm; surface.isVisible = false;
+
+  const baseline = MeshBuilder.CreateBox('tpl_tc_bl', { width: TC_W + 0.06, height: 0.005, depth: 0.06 }, scene);
+  baseline.material = wm; baseline.isVisible = false;
+
+  const sideline = MeshBuilder.CreateBox('tpl_tc_sl', { width: 0.06, height: 0.005, depth: TC_L }, scene);
+  sideline.material = wm; sideline.isVisible = false;
+
+  const centerLine = MeshBuilder.CreateBox('tpl_tc_cl', { width: 0.06, height: 0.005, depth: TC_L * 0.54 }, scene);
+  centerLine.material = wm; centerLine.isVisible = false;
+
+  const serviceLine = MeshBuilder.CreateBox('tpl_tc_svl', { width: TC_W / 2 + 0.06, height: 0.005, depth: 0.06 }, scene);
+  serviceLine.material = wm; serviceLine.isVisible = false;
+
+  const net = MeshBuilder.CreateBox('tpl_tc_net', { width: TC_W + 0.5, height: TC_NET_H, depth: 0.03 }, scene);
+  net.material = nm; net.isVisible = false;
+
+  const post = MeshBuilder.CreateCylinder('tpl_tc_post', { height: TC_NET_H + 0.15, diameter: 0.06, tessellation: 8 }, scene);
+  post.material = im; post.isVisible = false;
+
+  return { surface, baseline, sideline, centerLine, serviceLine, net, post };
+}
+
+function placeTennisCourt(tpl: TennisTemplates, scene: Scene, i: number, x: number, y: number, z: number, rotation: number): TransformNode {
+  const root = new TransformNode(`tennis_${i}`, scene);
+  root.position.set(x, y, z);
+  root.rotation.y = rotation;
 
   // Surface
-  const surface = MeshBuilder.CreateBox(`tennis_${i}_surf`, { width: courtW, height: 0.02, depth: courtL }, scene);
-  surface.position.y = 0.01;
-  surface.material = cm;
-  surface.parent = root;
+  const surf = tpl.surface.createInstance(`tennis_${i}_surf`);
+  surf.position.y = 0.01; surf.parent = root;
 
-  // Boundary lines
-  const lines: [number, number, number, number][] = [
-    [0, 0, courtW + 0.06, 0.06],
-    [0, courtL, courtW + 0.06, 0.06],
-    [-courtW / 2, courtL / 2, 0.06, courtL],
-    [courtW / 2, courtL / 2, 0.06, courtL],
-    [0, courtL / 2, 0.06, courtL * 0.54],
-    [-courtW / 4, courtL * 0.365, courtW / 2 + 0.06, 0.06],
-    [-courtW / 4, courtL * 0.635, courtW / 2 + 0.06, 0.06],
-    [courtW / 4, courtL * 0.365, courtW / 2 + 0.06, 0.06],
-    [courtW / 4, courtL * 0.635, courtW / 2 + 0.06, 0.06],
+  // Baselines (near + far)
+  const bl0 = tpl.baseline.createInstance(`tennis_${i}_bl0`);
+  bl0.position.set(0, 0.025, -TC_L / 2); bl0.parent = root;
+
+  const bl1 = tpl.baseline.createInstance(`tennis_${i}_bl1`);
+  bl1.position.set(0, 0.025, TC_L / 2); bl1.parent = root;
+
+  // Sidelines (left + right)
+  const sl0 = tpl.sideline.createInstance(`tennis_${i}_sl0`);
+  sl0.position.set(-TC_W / 2, 0.025, 0); sl0.parent = root;
+
+  const sl1 = tpl.sideline.createInstance(`tennis_${i}_sl1`);
+  sl1.position.set(TC_W / 2, 0.025, 0); sl1.parent = root;
+
+  // Center service line
+  const cl = tpl.centerLine.createInstance(`tennis_${i}_cl`);
+  cl.position.set(0, 0.025, 0); cl.parent = root;
+
+  // Service lines (4 — left/right × near/far)
+  const svOffsets: [number, number][] = [
+    [-TC_W / 4, TC_L * 0.365 - TC_L / 2],
+    [-TC_W / 4, TC_L * 0.635 - TC_L / 2],
+    [TC_W / 4, TC_L * 0.365 - TC_L / 2],
+    [TC_W / 4, TC_L * 0.635 - TC_L / 2],
   ];
-  for (let li = 0; li < lines.length; li++) {
-    const [lx, lz, lw, ld] = lines[li];
-    const line = MeshBuilder.CreateBox(`tennis_${i}_l${li}`, { width: lw, height: 0.005, depth: ld }, scene);
-    line.position.set(lx, 0.025, lz - courtL / 2);
-    line.material = wm;
-    line.parent = root;
+  for (let li = 0; li < svOffsets.length; li++) {
+    const sv = tpl.serviceLine.createInstance(`tennis_${i}_sv${li}`);
+    sv.position.set(svOffsets[li][0], 0.025, svOffsets[li][1]);
+    sv.parent = root;
   }
 
   // Net
-  const netH = 1.07;
-  const net = MeshBuilder.CreateBox(`tennis_${i}_net`, { width: courtW + 0.5, height: netH, depth: 0.03 }, scene);
-  net.position.set(0, netH / 2, 0);
-  net.material = nm;
-  net.parent = root;
+  const n = tpl.net.createInstance(`tennis_${i}_net`);
+  n.position.set(0, TC_NET_H / 2, 0); n.parent = root;
 
   // Net posts
   for (const side of [-1, 1]) {
-    const post = MeshBuilder.CreateCylinder(`tennis_${i}_np${side}`, { height: netH + 0.15, diameter: 0.06, tessellation: 8 }, scene);
-    post.position.set(side * (courtW / 2 + 0.25), (netH + 0.15) / 2, 0);
-    post.material = im;
-    post.parent = root;
+    const p = tpl.post.createInstance(`tennis_${i}_np${side}`);
+    p.position.set(side * (TC_W / 2 + 0.25), (TC_NET_H + 0.15) / 2, 0);
+    p.parent = root;
   }
+
+  return root;
 }
 
 // ── Main builder ────────────────────────────────────────────────────────
 
 /**
  * Build all placed level objects (benches, lampposts, tennis courts).
+ * Uses instanced meshes — one set of invisible template meshes per object type,
+ * with lightweight instances stamped out per placement for minimal draw calls.
  */
 export function buildLevelObjects(
   scene: Scene,
@@ -245,24 +337,37 @@ export function buildLevelObjects(
   tennisCourts: PlacedObjectData[],
   getGroundY: (x: number, z: number) => number,
 ): BuildLevelObjectsResult {
-  const solidObstacles: { x: number; z: number; radius: number }[] = [];
+  const solidObstacles: { x: number; z: number; radius: number; elasticIndex?: number }[] = [];
+  const objectRoots: TransformNode[] = [];
+  const elasticObjects: ElasticObject[] = [];
+
+  // Create templates only for types that have placements
+  const benchTpl = benches.length > 0 ? createBenchTemplates(scene) : null;
+  const lampTpl = lampposts.length > 0 ? createLampTemplates(scene) : null;
+  const tennisTpl = tennisCourts.length > 0 ? createTennisTemplates(scene) : null;
 
   for (let i = 0; i < benches.length; i++) {
     const { x, z, rotation } = benches[i];
-    buildOneBench(scene, i, x, getGroundY(x, z), z, rotation);
-    solidObstacles.push({ x, z, radius: 0.8 });
+    const root = placeBench(benchTpl!, scene, i, x, getGroundY(x, z), z, rotation);
+    objectRoots.push(root);
+    const elasticIndex = elasticObjects.length;
+    elasticObjects.push({ root, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
+    solidObstacles.push({ x, z, radius: 0.8, elasticIndex });
   }
 
   for (let i = 0; i < lampposts.length; i++) {
     const { x, z, rotation } = lampposts[i];
-    buildOneLamppost(scene, i, x, getGroundY(x, z), z, rotation);
-    solidObstacles.push({ x, z, radius: 0.3 });
+    const root = placeLamppost(lampTpl!, scene, i, x, getGroundY(x, z), z, rotation);
+    objectRoots.push(root);
+    const elasticIndex = elasticObjects.length;
+    elasticObjects.push({ root, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
+    solidObstacles.push({ x, z, radius: 0.3, elasticIndex });
   }
 
   for (let i = 0; i < tennisCourts.length; i++) {
     const { x, z, rotation } = tennisCourts[i];
-    buildOneTennisCourt(scene, i, x, getGroundY(x, z), z, rotation);
+    objectRoots.push(placeTennisCourt(tennisTpl!, scene, i, x, getGroundY(x, z), z, rotation));
   }
 
-  return { solidObstacles };
+  return { solidObstacles, objectRoots, elasticObjects };
 }

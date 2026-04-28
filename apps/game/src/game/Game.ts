@@ -64,7 +64,9 @@ import {
   GRAVITY,
   MODE,
   PATH_HALF_WIDTH,
-  PATH_MASK_RESOLUTION,
+  RENDER_PATH_MASK_RESOLUTION,
+  RENDER_OBJECTS_MAX_DISTANCE,
+  RENDER_TREES_MAX_DISTANCE,
   TREE_COUNT,
   RUNNER_COLLISION_RADIUS,
   RUNNER_DOWNHILL_SLOPE_THRESHOLD,
@@ -302,6 +304,10 @@ export class Game {
   // Elastic objects — anything that tilts on collision and springs back (trees, signs, marshals)
   private elasticObjects: ElasticObject[] = [];
 
+  // Distance-culled node groups
+  private treeRoots: TransformNode[] = [];
+  private objectRoots: TransformNode[] = [];
+
   // Fence boundary collider — generated around path, blocks all entities
   private fenceCollider: FenceCollider = { segments: [] };
 
@@ -346,7 +352,7 @@ export class Game {
   private demoCamProgress = 0; // 0→1 along the path
   private resizeHandler: (() => void) | null = null;
   private mobileLikeDevice = false;
-  private effectivePathMaskResolution = PATH_MASK_RESOLUTION;
+  private effectivePathMaskResolution = RENDER_PATH_MASK_RESOLUTION;
   private effectiveTreeCount = TREE_COUNT;
 
   // Local player role
@@ -1155,7 +1161,7 @@ export class Game {
       const targetMaxDpr = 1.5;
       const targetDpr = Math.min(dpr, targetMaxDpr);
       this.engine.setHardwareScalingLevel(dpr / targetDpr);
-      this.effectivePathMaskResolution = Math.min(PATH_MASK_RESOLUTION, 2048);
+      this.effectivePathMaskResolution = Math.min(RENDER_PATH_MASK_RESOLUTION, 2048);
       this.effectiveTreeCount = this.demoMode
         ? Math.max(80, Math.floor(TREE_COUNT * 0.08))
         : Math.max(260, Math.floor(TREE_COUNT * 0.35));
@@ -1163,7 +1169,7 @@ export class Game {
     }
 
     this.engine.setHardwareScalingLevel(1);
-    this.effectivePathMaskResolution = PATH_MASK_RESOLUTION;
+    this.effectivePathMaskResolution = RENDER_PATH_MASK_RESOLUTION;
     this.effectiveTreeCount = TREE_COUNT;
   }
 
@@ -1259,6 +1265,7 @@ export class Game {
     this.buildingColliders = buildingResult.colliders;
     this.buildingLodEntries = buildingResult.lodEntries;
     this.updateBuildingLodForPlayer();
+    this.updateDistanceCulling();
     if (level.trees !== false) {
       const manualTreePositions: [number, number][] = (level.manualTrees ?? []).map(
         ([lat, lon]): [number, number] => {
@@ -1280,6 +1287,7 @@ export class Game {
       );
       this.elasticObjects.push(...treeResult.elasticObjects);
       this.solidObstacles.push(...treeResult.solidObstacles);
+      this.treeRoots.push(...treeResult.elasticObjects.map(e => e.root));
     } else if (level.manualTrees && level.manualTrees.length > 0) {
       // Even when procedural trees are disabled, place manual trees
       const manualTreePositions: [number, number][] = level.manualTrees.map(
@@ -1302,6 +1310,7 @@ export class Game {
       );
       this.elasticObjects.push(...treeResult.elasticObjects);
       this.solidObstacles.push(...treeResult.solidObstacles);
+      this.treeRoots.push(...treeResult.elasticObjects.map(e => e.root));
     }
 
     // ── Level objects (benches, lampposts, tennis courts) ──
@@ -1323,7 +1332,14 @@ export class Game {
         toPlaced(objs?.tennisCourts),
         (x, z) => this.getGroundY(x, z),
       );
+      // Offset elastic indices so they map into the global elasticObjects array
+      const elasticOffset = this.elasticObjects.length;
+      for (const obs of objResult.solidObstacles) {
+        if (obs.elasticIndex != null) obs.elasticIndex += elasticOffset;
+      }
+      this.elasticObjects.push(...objResult.elasticObjects);
       this.solidObstacles.push(...objResult.solidObstacles);
+      this.objectRoots.push(...objResult.objectRoots);
     }
 
     // Procedural sky + clouds
@@ -2222,6 +2238,8 @@ export class Game {
     if (this.buildingLodEntries.length > 0) {
       updateBuildingLod(this.buildingLodEntries, cameraPos.x, cameraPos.z);
     }
+    this.updateDistanceCulling();
+    this.updateInsetCenter?.(cameraPos.x, cameraPos.z);
   }
 
   /** Update the preview orbit camera targeting the selected runner */
@@ -2338,6 +2356,26 @@ export class Game {
     updateBuildingLod(this.buildingLodEntries, cam.x, cam.z);
   }
 
+  /** Hide trees and objects beyond their max render distance from the camera. */
+  private updateDistanceCulling() {
+    const cx = this.camera.position.x;
+    const cz = this.camera.position.z;
+
+    const treeDistSq = RENDER_TREES_MAX_DISTANCE * RENDER_TREES_MAX_DISTANCE;
+    for (const root of this.treeRoots) {
+      const dx = root.position.x - cx;
+      const dz = root.position.z - cz;
+      root.setEnabled(dx * dx + dz * dz < treeDistSq);
+    }
+
+    const objDistSq = RENDER_OBJECTS_MAX_DISTANCE * RENDER_OBJECTS_MAX_DISTANCE;
+    for (const root of this.objectRoots) {
+      const dx = root.position.x - cx;
+      const dz = root.position.z - cz;
+      root.setEnabled(dx * dx + dz * dz < objDistSq);
+    }
+  }
+
   // ---------- Update ----------
 
   private update(dt: number) {
@@ -2443,6 +2481,7 @@ export class Game {
         );
       }
       this.updateBuildingLodForPlayer();
+      this.updateDistanceCulling();
       this.updateInsetCenter?.(this.camera.position.x, this.camera.position.z);
       return;
     }
@@ -2522,6 +2561,7 @@ export class Game {
         updateElasticObjects(this.elasticObjects, dt);
         this.updateRemoteBusMeshes(dt, engineVibeOffset);
         this.updateBuildingLodForPlayer();
+        this.updateDistanceCulling();
         this.updateInsetCenter?.(this.camera.position.x, this.camera.position.z);
         if (this.minimap) {
           this.minimap.draw(
@@ -2957,6 +2997,7 @@ export class Game {
     // --- Update remote bus meshes (multiplayer interpolation) ---
     this.updateRemoteBusMeshes(dt, engineVibeOffset);
     this.updateBuildingLodForPlayer();
+    this.updateDistanceCulling();
     this.updateInsetCenter?.(this.camera.position.x, this.camera.position.z);
 
     // Minimap

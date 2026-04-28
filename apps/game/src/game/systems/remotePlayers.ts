@@ -1,6 +1,6 @@
 import type { RemotePlayersMap } from '../types';
 import { poseRunning, poseStanding } from '../objects/RunnerModel';
-import { RUNNER_ANIMATION_CULL_DISTANCE } from '../constants';
+import { RENDER_ANIMATION_CULL_DISTANCE } from '../constants';
 
 const SCOOP_ANIM_DURATION = 0.35;
 
@@ -16,7 +16,7 @@ export interface UpdateRemotePlayersParams {
 
 export function updateRemotePlayersSystem(params: UpdateRemotePlayersParams): void {
   const { remotePlayers, dt, busRoofY, engineVibeOffset, observerX, observerZ } = params;
-  const animationCullDistanceSq = RUNNER_ANIMATION_CULL_DISTANCE * RUNNER_ANIMATION_CULL_DISTANCE;
+  const animationCullDistanceSq = RENDER_ANIMATION_CULL_DISTANCE * RENDER_ANIMATION_CULL_DISTANCE;
 
   for (const [_peerId, remote] of remotePlayers) {
     if (!remote.state) continue;

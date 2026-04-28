@@ -1,5 +1,6 @@
 import {
   Color3,
+  type Mesh,
   MeshBuilder,
   Scene,
   StandardMaterial,
@@ -62,6 +63,8 @@ function isInAnyPolygon(px: number, pz: number, polygons: [number, number][][]):
 /**
  * Scatter trees across the landscape using a seeded RNG.
  * Trees avoid the path, roads, and trails and come in two variants (trunk + foliage).
+ * Uses instanced meshes so all trees of the same variant/colour share a single
+ * draw call, keeping the GPU budget tiny even with thousands of trees.
  * Returns the elastic objects and solid obstacles created.
  */
 export function buildTrees(
@@ -90,13 +93,92 @@ export function buildTrees(
   const foliageMats: StandardMaterial[] = [];
   for (let i = 0; i < FOLIAGE_SHADE_COUNT; i++) {
     const t = i / (FOLIAGE_SHADE_COUNT - 1); // 0 → 1
-    // Hue shifts from yellow-green (t=0) through mid-green to blue-green (t=1)
-    const r = 0.10 + 0.18 * (1 - t);          // 0.28 → 0.10
-    const g = 0.38 + 0.24 * Math.sin(t * Math.PI); // peaks mid-range
-    const b = 0.08 + 0.14 * t;                // 0.08 → 0.22
+    const r = 0.10 + 0.18 * (1 - t);
+    const g = 0.38 + 0.24 * Math.sin(t * Math.PI);
+    const b = 0.08 + 0.14 * t;
     foliageMats.push(makeColor(scene, `foliage${i}`, new Color3(r, g, b)));
   }
 
+  // ── Template meshes (invisible sources for instancing) ──
+  // One conifer trunk + one broadleaf trunk (same material → 2 draw calls)
+  const coniferTrunkTpl = MeshBuilder.CreateCylinder('tpl_ct', {
+    height: 2.5, diameterTop: 0.25, diameterBottom: 0.35, tessellation: 6,
+  }, scene);
+  coniferTrunkTpl.material = trunkMat;
+  coniferTrunkTpl.isVisible = false;
+
+  const broadleafTrunkTpl = MeshBuilder.CreateCylinder('tpl_bt', {
+    height: 2, diameterTop: 0.3, diameterBottom: 0.4, tessellation: 6,
+  }, scene);
+  broadleafTrunkTpl.material = trunkMat;
+  broadleafTrunkTpl.isVisible = false;
+
+  // Per-colour crown templates (12 colours × 2 variants = 24 draw calls)
+  const coniferCrownTpls: Mesh[] = foliageMats.map((mat, i) => {
+    const m = MeshBuilder.CreateCylinder(`tpl_cc_${i}`, {
+      height: 4, diameterTop: 0, diameterBottom: 2.8, tessellation: 6,
+    }, scene);
+    m.material = mat;
+    m.isVisible = false;
+    return m;
+  });
+
+  const broadleafCrownTpls: Mesh[] = foliageMats.map((mat, i) => {
+    const m = MeshBuilder.CreateSphere(`tpl_bc_${i}`, {
+      diameter: 3, segments: 6,
+    }, scene);
+    m.material = mat;
+    m.isVisible = false;
+    return m;
+  });
+
+  // ── Helper: stamp one tree using instances ──
+  function placeTree(
+    prefix: string,
+    idx: number,
+    x: number,
+    z: number,
+    groundY: number,
+    scale: number,
+    variantRoll: number,
+    colorIdx: number,
+  ) {
+    const treeRoot = new TransformNode(`${prefix}_${idx}`, scene);
+    treeRoot.position.set(x, groundY, z);
+    treeRoot.scaling.setAll(scale);
+
+    if (variantRoll < 0.5) {
+      // Conifer
+      const trunk = coniferTrunkTpl.createInstance(`${prefix}_t_${idx}`);
+      trunk.position.set(0, 1.25, 0);
+      trunk.parent = treeRoot;
+
+      const crown = coniferCrownTpls[colorIdx].createInstance(`${prefix}_c_${idx}`);
+      crown.position.set(0, 3.5, 0);
+      crown.parent = treeRoot;
+    } else {
+      // Broad-leaf
+      const trunk = broadleafTrunkTpl.createInstance(`${prefix}_t_${idx}`);
+      trunk.position.set(0, 1, 0);
+      trunk.parent = treeRoot;
+
+      const crown = broadleafCrownTpls[colorIdx].createInstance(`${prefix}_c_${idx}`);
+      crown.position.set(0, 3.2, 0);
+      crown.parent = treeRoot;
+    }
+
+    const elasticIndex = result.elasticObjects.length;
+    result.elasticObjects.push({
+      root: treeRoot,
+      tiltX: 0,
+      tiltZ: 0,
+      tiltVelX: 0,
+      tiltVelZ: 0,
+    });
+    result.solidObstacles.push({ x, z, radius: 0.5 * scale, elasticIndex });
+  }
+
+  // ── Procedural tree placement ──
   let placed = 0;
   let attempts = 0;
 
@@ -112,7 +194,6 @@ export function buildTrees(
     const z = cz + Math.sin(angle) * dist;
 
     if (distToPath(x, z, pathPositions) < TREE_MIN_DIST_FROM_PATH) continue;
-    // Also avoid roads and trails
     let onRoadOrTrail = false;
     for (const road of roads) {
       if (distToPath(x, z, road) < TREE_MIN_DIST_FROM_PATH) { onRoadOrTrail = true; break; }
@@ -132,62 +213,11 @@ export function buildTrees(
     }
 
     const groundY = getGroundY(x, z);
-    const variant = rand();
+    const variantRoll = rand();
     const scale = 0.7 + rand() * 0.8;
+    const colorIdx = Math.floor(rand() * FOLIAGE_SHADE_COUNT);
 
-    const treeRoot = new TransformNode(`tree_root_${placed}`, scene);
-    treeRoot.position.set(x, groundY, z);
-
-    if (variant < 0.5) {
-      // Conifer
-      const trunk = MeshBuilder.CreateCylinder(
-        `tree_t_${placed}`,
-        { height: 2.5 * scale, diameterTop: 0.25 * scale, diameterBottom: 0.35 * scale, tessellation: 6 },
-        scene,
-      );
-      trunk.position.set(0, 1.25 * scale, 0);
-      trunk.material = trunkMat;
-      trunk.parent = treeRoot;
-
-      const crown = MeshBuilder.CreateCylinder(
-        `tree_c_${placed}`,
-        { height: 4 * scale, diameterTop: 0, diameterBottom: 2.8 * scale, tessellation: 6 },
-        scene,
-      );
-      crown.position.set(0, 3.5 * scale, 0);
-      crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
-      crown.parent = treeRoot;
-    } else {
-      // Broad-leaf
-      const trunk = MeshBuilder.CreateCylinder(
-        `tree_t_${placed}`,
-        { height: 2 * scale, diameterTop: 0.3 * scale, diameterBottom: 0.4 * scale, tessellation: 6 },
-        scene,
-      );
-      trunk.position.set(0, 1 * scale, 0);
-      trunk.material = trunkMat;
-      trunk.parent = treeRoot;
-
-      const crown = MeshBuilder.CreateSphere(
-        `tree_c_${placed}`,
-        { diameter: 3 * scale, segments: 6 },
-        scene,
-      );
-      crown.position.set(0, 3.2 * scale, 0);
-      crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
-      crown.parent = treeRoot;
-    }
-
-    const elasticIndex = result.elasticObjects.length;
-    result.elasticObjects.push({
-      root: treeRoot,
-      tiltX: 0,
-      tiltZ: 0,
-      tiltVelX: 0,
-      tiltVelZ: 0,
-    });
-
-    result.solidObstacles.push({ x, z, radius: 0.5 * scale, elasticIndex });
+    placeTree('tree_root', placed, x, z, groundY, scale, variantRoll, colorIdx);
     placed++;
   }
 
@@ -195,60 +225,11 @@ export function buildTrees(
   for (let mi = 0; mi < manualTrees.length; mi++) {
     const [mx, mz] = manualTrees[mi];
     const groundY = getGroundY(mx, mz);
-    const variant = rand();
+    const variantRoll = rand();
     const scale = 0.7 + rand() * 0.8;
-    const idx = placed + mi;
+    const colorIdx = Math.floor(rand() * FOLIAGE_SHADE_COUNT);
 
-    const treeRoot = new TransformNode(`tree_manual_${mi}`, scene);
-    treeRoot.position.set(mx, groundY, mz);
-
-    if (variant < 0.5) {
-      const trunk = MeshBuilder.CreateCylinder(
-        `tree_mt_${mi}`,
-        { height: 2.5 * scale, diameterTop: 0.25 * scale, diameterBottom: 0.35 * scale, tessellation: 6 },
-        scene,
-      );
-      trunk.position.set(0, 1.25 * scale, 0);
-      trunk.material = trunkMat;
-      trunk.parent = treeRoot;
-
-      const crown = MeshBuilder.CreateCylinder(
-        `tree_mc_${mi}`,
-        { height: 4 * scale, diameterTop: 0, diameterBottom: 2.8 * scale, tessellation: 6 },
-        scene,
-      );
-      crown.position.set(0, 3.5 * scale, 0);
-      crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
-      crown.parent = treeRoot;
-    } else {
-      const trunk = MeshBuilder.CreateCylinder(
-        `tree_mt_${mi}`,
-        { height: 2 * scale, diameterTop: 0.3 * scale, diameterBottom: 0.4 * scale, tessellation: 6 },
-        scene,
-      );
-      trunk.position.set(0, 1 * scale, 0);
-      trunk.material = trunkMat;
-      trunk.parent = treeRoot;
-
-      const crown = MeshBuilder.CreateSphere(
-        `tree_mc_${mi}`,
-        { diameter: 3 * scale, segments: 6 },
-        scene,
-      );
-      crown.position.set(0, 3.2 * scale, 0);
-      crown.material = foliageMats[Math.floor(rand() * foliageMats.length)];
-      crown.parent = treeRoot;
-    }
-
-    const elasticIndex = result.elasticObjects.length;
-    result.elasticObjects.push({
-      root: treeRoot,
-      tiltX: 0,
-      tiltZ: 0,
-      tiltVelX: 0,
-      tiltVelZ: 0,
-    });
-    result.solidObstacles.push({ x: mx, z: mz, radius: 0.5 * scale, elasticIndex });
+    placeTree('tree_manual', mi, mx, mz, groundY, scale, variantRoll, colorIdx);
   }
 
   return result;

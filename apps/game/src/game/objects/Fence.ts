@@ -7,6 +7,7 @@ import {
   Mesh,
   TransformNode,
   Quaternion,
+  Matrix,
 } from '@babylonjs/core';
 
 // ---------- Types ----------
@@ -41,6 +42,9 @@ const POST_SPACING = 6;
  *
  * The polygon is defined as an array of [x, z] points forming a closed ring.
  * Posts are placed at regular intervals and connected with horizontal rails.
+ *
+ * Uses thin instances so all posts share one draw call and all rails share
+ * another, regardless of how many fence segments exist.
  */
 export function buildFenceMesh(
   scene: Scene,
@@ -62,10 +66,12 @@ export function buildFenceMesh(
 
   const fenceRoot = new TransformNode('fenceRoot', scene);
 
-  // Phase 1: Place all posts along each polygon edge.
-  // Track per-edge post groups so rails only connect posts on the same edge.
-  let postIndex = 0;
+  // ---------- Phase 1: Collect post and rail transform data ----------
+  const postMatrices: Matrix[] = [];
+  const railMatrices: Matrix[] = [];
   const edgePostGroups: { x: number; y: number; z: number }[][] = [];
+
+  const defaultDir = new Vector3(0, 0, 1); // box depth axis (unit rail is 1 deep along Z)
 
   for (let i = 0; i < polygon.length; i++) {
     const [ax, az] = polygon[i];
@@ -92,25 +98,15 @@ export function buildFenceMesh(
 
       edgePosts.push({ x: px, y: py, z: pz });
 
-      const post = MeshBuilder.CreateCylinder(
-        `fencePost_${postIndex}`,
-        { height: FENCE_HEIGHT, diameter: 0.12, tessellation: 6 },
-        scene,
-      );
-      post.material = postMat;
-      post.position.set(px, py + FENCE_HEIGHT / 2, pz);
-      post.parent = fenceRoot;
-      postIndex++;
+      // Post instance matrix: translate only (geometry is already correctly sized)
+      postMatrices.push(Matrix.Translation(px, py + FENCE_HEIGHT / 2, pz));
     }
 
     edgePostGroups.push(edgePosts);
   }
 
-  // Phase 2: Draw rails connecting consecutive posts within each edge.
-  // Uses quaternion rotation (not Euler angles) so rails are guaranteed to
-  // align perfectly from post A to post B regardless of direction.
-  const defaultDir = new Vector3(0, 0, 1); // box depth axis
-  let railIndex = 0;
+  // Collect rail transforms: each rail is a unit-depth (1.0) box scaled along Z
+  // to match the distance between consecutive posts, then rotated + translated.
   for (const posts of edgePostGroups) {
     for (let i = 0; i < posts.length - 1; i++) {
       const a = posts[i];
@@ -142,19 +138,49 @@ export function buildFenceMesh(
       const midY = (a.y + b.y) / 2;
       const midZ = (a.z + b.z) / 2;
 
+      // Scale: 1 on X/Y (box is already 0.06), fullDist on Z (unit-depth box)
+      const scale = new Vector3(1, 1, fullDist);
+
       for (const heightFrac of [0.4, 0.8]) {
-        const rail = MeshBuilder.CreateBox(
-          `fenceRail_${railIndex}_${heightFrac}`,
-          { width: 0.06, height: 0.06, depth: fullDist },
-          scene,
-        );
-        rail.material = railMat;
-        rail.position.set(midX, midY + FENCE_HEIGHT * heightFrac, midZ);
-        rail.rotationQuaternion = quat.clone();
-        rail.parent = fenceRoot;
+        const translation = new Vector3(midX, midY + FENCE_HEIGHT * heightFrac, midZ);
+        railMatrices.push(Matrix.Compose(scale, quat, translation));
       }
-      railIndex++;
     }
+  }
+
+  // ---------- Phase 2: Create source meshes with thin instances ----------
+
+  if (postMatrices.length > 0) {
+    const postSource = MeshBuilder.CreateCylinder(
+      'fencePost',
+      { height: FENCE_HEIGHT, diameter: 0.12, tessellation: 6 },
+      scene,
+    );
+    postSource.material = postMat;
+    postSource.parent = fenceRoot;
+
+    const postBuffer = new Float32Array(postMatrices.length * 16);
+    for (let i = 0; i < postMatrices.length; i++) {
+      postMatrices[i].copyToArray(postBuffer, i * 16);
+    }
+    postSource.thinInstanceSetBuffer('matrix', postBuffer, 16, false);
+  }
+
+  if (railMatrices.length > 0) {
+    // Unit-depth rail: 0.06 × 0.06 × 1.0 — scaled per-instance along Z
+    const railSource = MeshBuilder.CreateBox(
+      'fenceRail',
+      { width: 0.06, height: 0.06, depth: 1 },
+      scene,
+    );
+    railSource.material = railMat;
+    railSource.parent = fenceRoot;
+
+    const railBuffer = new Float32Array(railMatrices.length * 16);
+    for (let i = 0; i < railMatrices.length; i++) {
+      railMatrices[i].copyToArray(railBuffer, i * 16);
+    }
+    railSource.thinInstanceSetBuffer('matrix', railBuffer, 16, false);
   }
 
   return { segments };

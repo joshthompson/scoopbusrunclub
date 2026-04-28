@@ -38,7 +38,7 @@ import {
   RUNNER_MAX_SPEED,
   RUNNER_MIN_SPEED,
   RUNNER_PLAYER_ANIM_SPEED_FACTOR,
-  RUNNER_ANIMATION_CULL_DISTANCE,
+  RENDER_ANIMATION_CULL_DISTANCE,
   RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
   RUNNER_SIT_DURATION,
   SCOOP_ANIM_DURATION,
@@ -166,7 +166,7 @@ export function updateRunnersSystem(
     startExhaust: false,
   };
 
-  const animationCullDistanceSq = RUNNER_ANIMATION_CULL_DISTANCE * RUNNER_ANIMATION_CULL_DISTANCE;
+  const animationCullDistanceSq = RENDER_ANIMATION_CULL_DISTANCE * RENDER_ANIMATION_CULL_DISTANCE;
 
   for (const runner of ctx.runners) {
     // Skip runners owned by a remote player
