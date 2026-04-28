@@ -19,12 +19,33 @@ import {
   ShaderMaterial,
   Effect,
   Color3,
+  SpotLight,
+  TransformNode,
+  Vector3,
 } from '@babylonjs/core';
 import forestUrl from '../assets/forest.png';
 import dirtUrl from '../assets/dirt.png';
 import fieldUrl from '../assets/field.png';
 import sandUrl from '../assets/sand.png';
-import { RENDER_TEXTURE_ANISOTROPY } from './constants';
+import {
+  RENDER_TEXTURE_ANISOTROPY,
+  LIGHT_DAY_SUN_INTENSITY,
+  LIGHT_DAY_SUN_DIR_X,
+  LIGHT_DAY_SUN_DIR_Y,
+  LIGHT_DAY_SUN_DIR_Z,
+  LIGHT_DAY_HEMI_INTENSITY,
+  LIGHT_DAY_HEMI_GROUND_R,
+  LIGHT_DAY_HEMI_GROUND_G,
+  LIGHT_DAY_HEMI_GROUND_B,
+  LIGHT_NIGHT_TERRAIN_SUN_INTENSITY,
+  LIGHT_NIGHT_TERRAIN_HEMI_INTENSITY,
+  LIGHT_NIGHT_TERRAIN_HEMI_GROUND_R,
+  LIGHT_NIGHT_TERRAIN_HEMI_GROUND_G,
+  LIGHT_NIGHT_TERRAIN_HEMI_GROUND_B,
+  LIGHT_NIGHT_SUN_DIR_X,
+  LIGHT_NIGHT_SUN_DIR_Y,
+  LIGHT_NIGHT_SUN_DIR_Z,
+} from './constants';
 import type { PathShaderOptions, IcePatchOverlay } from './PathShader';
 
 // ---------- Configuration ----------
@@ -118,6 +139,17 @@ uniform float sunIntensity;
 uniform float hemiIntensity;
 uniform vec3 hemiGroundColor;
 
+// Dynamic spot lights (floodlights, headlights, etc.)
+#define MAX_SPOT_LIGHTS 12
+uniform int numSpotLights;
+uniform vec3 spotPositions[MAX_SPOT_LIGHTS];
+uniform vec3 spotDirections[MAX_SPOT_LIGHTS];
+uniform vec3 spotColors[MAX_SPOT_LIGHTS];
+uniform float spotIntensities[MAX_SPOT_LIGHTS];
+uniform float spotRanges[MAX_SPOT_LIGHTS];
+uniform float spotCosAngles[MAX_SPOT_LIGHTS]; // cos(half-angle)
+uniform float spotExponents[MAX_SPOT_LIGHTS];
+
 // Chunk debug grid
 uniform float chunkDebug;   // 0.0 = off, 1.0 = on
 uniform float chunkSizeUV;  // CHUNK_SIZE / groundSize in UV space
@@ -194,6 +226,37 @@ void main() {
   float hemiBlend = nrm.y * 0.5 + 0.5; // 1 at top, 0 at bottom
   vec3 hemiColor = mix(hemiGroundColor, vec3(1.0), hemiBlend);
   vec3 lighting = hemiColor * hemiIntensity + vec3(1.0) * sunIntensity * ndl;
+
+  // Accumulate dynamic spot light contributions
+  for (int i = 0; i < MAX_SPOT_LIGHTS; i++) {
+    if (i >= numSpotLights) break;
+    vec3 lightToFrag = vPositionW - spotPositions[i];
+    float dist = length(lightToFrag);
+    if (dist > spotRanges[i]) continue;
+
+    vec3 lightDir = normalize(lightToFrag);
+    // Cone test: dot of light direction and frag direction
+    float cosAngle = dot(lightDir, normalize(spotDirections[i]));
+    float outerCos = spotCosAngles[i];
+    if (cosAngle < outerCos - 0.15) continue; // early-out with margin
+
+    // Smooth cone edge: fade from 0 at outer boundary to 1 at inner edge
+    float innerCos = mix(outerCos, 1.0, 0.2);
+    float coneEdge = smoothstep(outerCos, innerCos, cosAngle);
+
+    // Additional angular falloff from centre
+    float coneFalloff = coneEdge * pow(cosAngle, spotExponents[i]);
+
+    // Distance attenuation — smooth fade to zero at range
+    float distNorm = dist / spotRanges[i];
+    float distAtten = clamp(1.0 - distNorm * distNorm, 0.0, 1.0);
+    distAtten *= distAtten; // squared for smoother falloff
+
+    // Lambertian NdotL
+    float spotNdl = max(dot(nrm, -lightDir), 0.0);
+
+    lighting += spotColors[i] * spotIntensities[i] * coneFalloff * distAtten * spotNdl;
+  }
 
   gl_FragColor = vec4(color * lighting, 1.0);
 
@@ -324,6 +387,9 @@ export function createTiledPathGroundMaterial(
       'sunDirection', 'sunIntensity',
       'hemiIntensity', 'hemiGroundColor',
       'chunkDebug', 'chunkSizeUV',
+      'numSpotLights',
+      'spotPositions', 'spotDirections', 'spotColors',
+      'spotIntensities', 'spotRanges', 'spotCosAngles', 'spotExponents',
     ],
     samplers: [
       'mixMap1Lo', 'mixMap1Hi', 'mixMap2Lo', 'mixMap2Hi',
@@ -364,17 +430,88 @@ export function createTiledPathGroundMaterial(
     class { x: number; y: number; z: number; w: number; constructor(x: number, y: number, z: number, w: number) { this.x = x; this.y = y; this.z = z; this.w = w; } }
   )(insetBounds[0], insetBounds[1], insetBounds[2], insetBounds[3]) as any);
 
-  // Lighting uniforms (match scene: sun dir [-0.5, -1, 0.5] normalized, intensity 0.8; hemi intensity 0.6)
-  const sunDir = new Color3(-0.5, -1, 0.5); // will be treated as vec3
+  // Lighting uniforms (values from constants.ts)
+  const isNight = opts.isNight ?? false;
+  const sunDir = isNight
+    ? new Color3(LIGHT_NIGHT_SUN_DIR_X, LIGHT_NIGHT_SUN_DIR_Y, LIGHT_NIGHT_SUN_DIR_Z)
+    : new Color3(LIGHT_DAY_SUN_DIR_X, LIGHT_DAY_SUN_DIR_Y, LIGHT_DAY_SUN_DIR_Z);
   const sunLen = Math.sqrt(sunDir.r * sunDir.r + sunDir.g * sunDir.g + sunDir.b * sunDir.b);
   mat.setVector3('sunDirection', { x: sunDir.r / sunLen, y: sunDir.g / sunLen, z: sunDir.b / sunLen } as any);
-  mat.setFloat('sunIntensity', 0.8);
-  mat.setFloat('hemiIntensity', 0.6);
-  mat.setVector3('hemiGroundColor', { x: 0.3, y: 0.25, z: 0.2 } as any);
+  mat.setFloat('sunIntensity', isNight ? LIGHT_NIGHT_TERRAIN_SUN_INTENSITY : LIGHT_DAY_SUN_INTENSITY);
+  mat.setFloat('hemiIntensity', isNight ? LIGHT_NIGHT_TERRAIN_HEMI_INTENSITY : LIGHT_DAY_HEMI_INTENSITY);
+  mat.setVector3('hemiGroundColor', isNight
+    ? { x: LIGHT_NIGHT_TERRAIN_HEMI_GROUND_R, y: LIGHT_NIGHT_TERRAIN_HEMI_GROUND_G, z: LIGHT_NIGHT_TERRAIN_HEMI_GROUND_B } as any
+    : { x: LIGHT_DAY_HEMI_GROUND_R, y: LIGHT_DAY_HEMI_GROUND_G, z: LIGHT_DAY_HEMI_GROUND_B } as any);
 
   // Chunk debug uniforms
   mat.setFloat('chunkDebug', CHUNK_DEBUG ? 1.0 : 0.0);
   mat.setFloat('chunkSizeUV', CHUNK_SIZE / groundSize);
+
+  // --- Dynamic spot light sync (updated every frame via onBind) ---
+  const MAX_SPOTS = 12;
+  // Pre-allocate typed arrays to avoid GC churn every frame
+  const spotPosArr = new Float32Array(MAX_SPOTS * 3);
+  const spotDirArr = new Float32Array(MAX_SPOTS * 3);
+  const spotColArr = new Float32Array(MAX_SPOTS * 3);
+  const _tmpDir = new Vector3();  // reusable temp to avoid GC
+  const spotIntArr = new Float32Array(MAX_SPOTS);
+  const spotRngArr = new Float32Array(MAX_SPOTS);
+  const spotCosArr = new Float32Array(MAX_SPOTS);
+  const spotExpArr = new Float32Array(MAX_SPOTS);
+
+  // Initialise to zero
+  mat.setInt('numSpotLights', 0);
+
+  mat.onBind = () => {
+    // Gather scene SpotLights
+    const lights = scene.lights;
+    let count = 0;
+    for (let li = 0; li < lights.length && count < MAX_SPOTS; li++) {
+      const light = lights[li];
+      if (!(light instanceof SpotLight) || !light.isEnabled()) continue;
+
+      // Get world-space position & direction
+      const pos = light.getAbsolutePosition();
+      const i3 = count * 3;
+      spotPosArr[i3] = pos.x;
+      spotPosArr[i3 + 1] = pos.y;
+      spotPosArr[i3 + 2] = pos.z;
+      // Transform local direction to world space when light has a parent
+      if (light.parent) {
+        Vector3.TransformNormalToRef(light.direction, (light.parent as TransformNode).getWorldMatrix(), _tmpDir);
+        _tmpDir.normalize();
+        spotDirArr[i3] = _tmpDir.x;
+        spotDirArr[i3 + 1] = _tmpDir.y;
+        spotDirArr[i3 + 2] = _tmpDir.z;
+      } else {
+        spotDirArr[i3] = light.direction.x;
+        spotDirArr[i3 + 1] = light.direction.y;
+        spotDirArr[i3 + 2] = light.direction.z;
+      }
+      spotColArr[i3] = light.diffuse.r;
+      spotColArr[i3 + 1] = light.diffuse.g;
+      spotColArr[i3 + 2] = light.diffuse.b;
+      spotIntArr[count] = light.intensity;
+      spotRngArr[count] = light.range;
+      spotCosArr[count] = Math.cos(light.angle * 0.5);
+      spotExpArr[count] = light.exponent;
+      count++;
+    }
+
+    const effect = mat.getEffect();
+    if (effect) {
+      effect.setInt('numSpotLights', count);
+      if (count > 0) {
+        effect.setArray3('spotPositions', Array.from(spotPosArr.subarray(0, count * 3)));
+        effect.setArray3('spotDirections', Array.from(spotDirArr.subarray(0, count * 3)));
+        effect.setArray3('spotColors', Array.from(spotColArr.subarray(0, count * 3)));
+        effect.setFloatArray('spotIntensities', spotIntArr.subarray(0, count));
+        effect.setFloatArray('spotRanges', spotRngArr.subarray(0, count));
+        effect.setFloatArray('spotCosAngles', spotCosArr.subarray(0, count));
+        effect.setFloatArray('spotExponents', spotExpArr.subarray(0, count));
+      }
+    }
+  };
 
   // --- 6. Ice patch update function (draws into high-res + low-res lineMask) ---
   const setIcePatches = (patches: IcePatchOverlay[]) => {

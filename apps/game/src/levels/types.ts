@@ -50,6 +50,11 @@ export interface LevelData {
   fences?: boolean;
   /** Disable the large starting circle behind the start line (default true) */
   startCircle?: boolean;
+  /**
+   * Time of day for the level. Affects skybox and lighting.
+   * Defaults to 'day' if not specified.
+   */
+  timeOfDay?: 'day' | 'night';
   /** Disable course marshals (default true) */
   showMarshals?: boolean;
   /**
@@ -103,4 +108,6 @@ export interface LevelObjects {
   lampposts?: [number, number, number][];
   /** Tennis courts */
   tennisCourts?: [number, number, number][];
+  /** Tall floodlight towers with spotlights */
+  floodlights?: [number, number, number][];
 }

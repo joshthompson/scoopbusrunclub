@@ -36,6 +36,7 @@ const level: LevelData = {
   manualTrees: trees as LevelData['manualTrees'],
   objects: objects as LevelData['objects'],
   trees: false,
+  timeOfDay: 'night',
 };
 
 export default level;

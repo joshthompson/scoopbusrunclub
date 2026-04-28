@@ -7,6 +7,8 @@ import {
   type Mesh,
 } from '@babylonjs/core';
 import type { ElasticObject } from '../types';
+import { createFloodlightTemplates, placeFloodlight } from './Floodlight';
+import type { FloodlightTemplates } from './Floodlight';
 
 // ── Shared types ────────────────────────────────────────────────────────
 
@@ -326,7 +328,7 @@ function placeTennisCourt(tpl: TennisTemplates, scene: Scene, i: number, x: numb
 // ── Main builder ────────────────────────────────────────────────────────
 
 /**
- * Build all placed level objects (benches, lampposts, tennis courts).
+ * Build all placed level objects (benches, lampposts, tennis courts, floodlights).
  * Uses instanced meshes — one set of invisible template meshes per object type,
  * with lightweight instances stamped out per placement for minimal draw calls.
  */
@@ -335,7 +337,9 @@ export function buildLevelObjects(
   benches: PlacedObjectData[],
   lampposts: PlacedObjectData[],
   tennisCourts: PlacedObjectData[],
+  floodlights: PlacedObjectData[],
   getGroundY: (x: number, z: number) => number,
+  isNight = false,
 ): BuildLevelObjectsResult {
   const solidObstacles: { x: number; z: number; radius: number; elasticIndex?: number }[] = [];
   const objectRoots: TransformNode[] = [];
@@ -345,6 +349,7 @@ export function buildLevelObjects(
   const benchTpl = benches.length > 0 ? createBenchTemplates(scene) : null;
   const lampTpl = lampposts.length > 0 ? createLampTemplates(scene) : null;
   const tennisTpl = tennisCourts.length > 0 ? createTennisTemplates(scene) : null;
+  const floodTpl = floodlights.length > 0 ? createFloodlightTemplates(scene) : null;
 
   for (let i = 0; i < benches.length; i++) {
     const { x, z, rotation } = benches[i];
@@ -367,6 +372,14 @@ export function buildLevelObjects(
   for (let i = 0; i < tennisCourts.length; i++) {
     const { x, z, rotation } = tennisCourts[i];
     objectRoots.push(placeTennisCourt(tennisTpl!, scene, i, x, getGroundY(x, z), z, rotation));
+  }
+
+  for (let i = 0; i < floodlights.length; i++) {
+    const { x, z, rotation } = floodlights[i];
+    const root = placeFloodlight(floodTpl!, scene, i, x, getGroundY(x, z), z, rotation, isNight);
+    objectRoots.push(root);
+    // Floodlights are solid obstacles with a larger collision radius (thick base)
+    solidObstacles.push({ x, z, radius: 0.6 });
   }
 
   return { solidObstacles, objectRoots, elasticObjects };

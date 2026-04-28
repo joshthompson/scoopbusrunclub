@@ -82,7 +82,7 @@ export interface ItemCollectEvent {
 
 /** Lobby chat / coordination messages */
 export interface LobbyMessage {
-  type: 'ready' | 'start' | 'playerInfo';
+  type: 'ready' | 'start' | 'playerInfo' | 'gameReady' | 'startCountdown';
   name?: string;
   courseId?: string;
   /** Assigned player index (1-based), sent by host to joiners */
@@ -99,6 +99,8 @@ export interface LobbyMessage {
   charSelection?: CharacterSelection;
   /** All character selections by playerIndex, broadcast by host. */
   charSelections?: Record<number, CharacterSelection>;
+  /** Unix-ms timestamp when the countdown should begin (host-synced start). */
+  startAtMs?: number;
 }
 
 export type OnRemoteState = (state: PlayerState, peerId: string) => void;

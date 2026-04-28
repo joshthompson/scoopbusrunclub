@@ -426,7 +426,7 @@ export function ReplayPage(props: ReplayPageProps) {
 
     if (!runnerParams) return ""
     const base = window.location.hostname === "localhost"
-      ? "http://localhost:3011/game/"
+      ? "http://localhost:3010/game/"
       : "/game/"
     return `${base}?preview&id=${eventId()}&runners=${runnerParams}`
   })

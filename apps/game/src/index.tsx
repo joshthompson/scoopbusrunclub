@@ -347,6 +347,8 @@ function App() {
     if (isMultiplayer && mp.roomCode) {
       // Set local player index (host=1, joiners get assigned by host)
       game.setLocalPlayerIndex(mp.localPlayerIndex);
+      // Don't auto-start countdown — wait for host to sync all players
+      game.setWaitForCountdown();
     }
 
     await game.init(eventId);
@@ -357,6 +359,46 @@ function App() {
         const idx = mp.getPlayerIndex(peerId) || 2;
         const remoteCharSel = mp.getCharSelection(idx);
         await game.buildRemoteBusForPeer(peerId, idx, remoteCharSel);
+      }
+
+      // --- Host-synced countdown start ---
+      const totalPlayers = mp.peerCount + 1;
+      const readyPeers = new Set<string>();
+
+      // Function to trigger the countdown (called when all players report ready)
+      function triggerSyncedCountdown() {
+        game.startCountdown();
+      }
+
+      if (mp.isHost) {
+        // Host is already ready (local init complete).
+        // Wait for all joiners to report 'gameReady'.
+        mp.onLobbyMessage = (msg, peerId) => {
+          if (msg.type === 'gameReady') {
+            readyPeers.add(peerId);
+            // All joiners ready → broadcast startCountdown to everyone, then start locally
+            if (readyPeers.size >= totalPlayers - 1) {
+              mp.broadcastLobby({ type: 'startCountdown' });
+              triggerSyncedCountdown();
+            }
+          }
+        };
+        // Broadcast our own readiness to peers (so they see us if we're the last one)
+        mp.broadcastLobby({ type: 'gameReady' });
+
+        // Edge case: solo host (no joiners) — start immediately
+        if (totalPlayers <= 1) {
+          triggerSyncedCountdown();
+        }
+      } else {
+        // Joiner: listen for host's startCountdown signal
+        mp.onLobbyMessage = (msg, _peerId) => {
+          if (msg.type === 'startCountdown') {
+            triggerSyncedCountdown();
+          }
+        };
+        // Tell the host we're ready
+        mp.broadcastLobby({ type: 'gameReady' });
       }
 
       // Handle new peers joining mid-game
@@ -422,6 +464,9 @@ function App() {
           }
         }
       }, 66);
+
+      // Show "Waiting..." while waiting for all players to load
+      setCountdown('Waiting...');
     }
 
     setScreen('playing');

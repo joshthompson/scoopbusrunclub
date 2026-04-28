@@ -66,6 +66,7 @@ const COLORS = {
   buildingRed: '#c06050',
   buildingGreen: '#8C9E7E',
   buildingYellow: '#FFD021',
+  buildingKristineberg: '#4488cc',
   water: '#4488cc',
   river: '#3377bb',
   fence: '#806040',
@@ -75,6 +76,7 @@ const COLORS = {
   bench: '#8B6914',
   lamppost: '#888899',
   tennisCourt: '#2d8a4e',
+  floodlight: '#ff9922',
   selected: '#ffcc00',
 };
 
@@ -82,12 +84,12 @@ const COLORS = {
 
 type RegionType = 'field' | 'concrete';
 interface RegionItem { type: RegionType; points: [number, number][]; }
-type BuildingType = 'grey' | 'red' | 'green' | 'yellow';
+type BuildingType = 'grey' | 'red' | 'green' | 'yellow' | 'kristineberg';
 interface BuildingItem { type: BuildingType; points: [number, number][]; }
 interface WaterItem { type: 'water' | 'river'; points: [number, number][]; }
 interface FenceItem { points: [number, number][]; }
 interface TreeItem { pos: [number, number]; }
-type ObjectKind = 'bench' | 'lamppost' | 'tennisCourt';
+type ObjectKind = 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight';
 interface ObjectItem { kind: ObjectKind; pos: [number, number]; rotation: number; }
 
 // ── Main ────────────────────────────────────────────────────────────────
@@ -126,7 +128,7 @@ async function main() {
   }));
 
   const buildingItems: BuildingItem[] = (level.buildings ?? []).map((b) => ({
-    type: (b.type === 'red' || b.type === 'green' || b.type === 'yellow') ? b.type as BuildingType : 'grey' as const,
+    type: (b.type === 'red' || b.type === 'green' || b.type === 'yellow' || b.type === 'kristineberg') ? b.type as BuildingType : 'grey' as const,
     points: b.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
   }));
 
@@ -164,6 +166,9 @@ async function main() {
     ...(level.objects?.tennisCourts ?? []).map(([lat, lon, rot]): ObjectItem => ({
       kind: 'tennisCourt', pos: gpsToLocal(lon, lat, origin), rotation: rot,
     })),
+    ...(level.objects?.floodlights ?? []).map(([lat, lon, rot]): ObjectItem => ({
+      kind: 'floodlight', pos: gpsToLocal(lon, lat, origin), rotation: rot,
+    })),
   ];
 
   // ── Compute bounding box ────────────────────────────────────────────
@@ -195,7 +200,7 @@ async function main() {
   // ── State ───────────────────────────────────────────────────────────
 
   type SelectionKind = 'building' | 'water' | 'fence' | 'region' | 'tree' | 'object';
-  type DrawMode = 'none' | 'building' | 'field' | 'concrete' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt';
+  type DrawMode = 'none' | 'building' | 'field' | 'concrete' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight';
 
   let selectedKind: SelectionKind | null = null;
   let selectedIndex: number = -1;
@@ -329,7 +334,7 @@ async function main() {
     for (let i = 0; i < buildingItems.length; i++) {
       const b = buildingItems[i];
       if (b.points.length < 3) continue;
-      const fill = b.type === 'red' ? COLORS.buildingRed : b.type === 'green' ? COLORS.buildingGreen : b.type === 'yellow' ? COLORS.buildingYellow : COLORS.buildingGrey;
+      const fill = b.type === 'red' ? COLORS.buildingRed : b.type === 'green' ? COLORS.buildingGreen : b.type === 'yellow' ? COLORS.buildingYellow : b.type === 'kristineberg' ? COLORS.buildingKristineberg : COLORS.buildingGrey;
       const isSel = selectedKind === 'building' && selectedIndex === i;
       const poly = svgEl('polygon', {
         points: polyPoints(b.points),
@@ -394,6 +399,7 @@ async function main() {
     bench: COLORS.bench,
     lamppost: COLORS.lamppost,
     tennisCourt: COLORS.tennisCourt,
+    floodlight: COLORS.floodlight,
   };
 
   function renderObjects() {
@@ -461,6 +467,26 @@ async function main() {
           x1: 0, y1: -s * 1.0, x2: 0, y2: -s * 1.4,
           stroke: isSel ? '#fff' : '#80cc80',
           'stroke-width': s * 0.15, 'stroke-linecap': 'round',
+        });
+        group.appendChild(indicator);
+      } else if (o.kind === 'floodlight') {
+        // Tall tower icon — outer ring + inner bright dot + cross-hairs
+        const outerRing = svgEl('circle', {
+          cx: 0, cy: 0, r: s * 0.9,
+          fill: 'none', stroke: isSel ? '#fff' : color,
+          'stroke-width': s * 0.15,
+        });
+        group.appendChild(outerRing);
+        const innerDot = svgEl('circle', {
+          cx: 0, cy: 0, r: s * 0.35,
+          fill: isSel ? '#fff' : '#ffcc44',
+        });
+        group.appendChild(innerDot);
+        // Direction indicator
+        const indicator = svgEl('line', {
+          x1: 0, y1: -s * 0.9, x2: 0, y2: -s * 1.3,
+          stroke: isSel ? '#fff' : '#dd8811',
+          'stroke-width': s * 0.12, 'stroke-linecap': 'round',
         });
         group.appendChild(indicator);
       }
@@ -669,6 +695,7 @@ async function main() {
       ['Bench', 'bench', COLORS.bench],
       ['Lamppost', 'lamppost', COLORS.lamppost],
       ['Tennis Court', 'tennisCourt', COLORS.tennisCourt],
+      ['Floodlight', 'floodlight', COLORS.floodlight],
     ];
     for (const [label, mode, color] of drawTools) {
       const btn = document.createElement('button');
@@ -704,7 +731,7 @@ async function main() {
       hint.textContent = 'Click on map to place trees.';
       drawSection.appendChild(hint);
     }
-    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt') {
+    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight') {
       const hint = document.createElement('div');
       hint.className = 'sidebar-hint';
       hint.textContent = 'Click to place. Scroll-wheel on placed object to rotate.';
@@ -781,6 +808,7 @@ async function main() {
           { value: 'red', label: 'Red', color: COLORS.buildingRed },
           { value: 'green', label: 'Green', color: COLORS.buildingGreen },
           { value: 'yellow', label: 'Yellow', color: COLORS.buildingYellow },
+          { value: 'kristineberg', label: 'Kristineberg', color: COLORS.buildingKristineberg },
         ];
         for (const bt of buildingTypes) {
           const opt = document.createElement('option');
@@ -810,7 +838,7 @@ async function main() {
         info.textContent = `Tree #${selectedIndex} @ (${t.pos[0].toFixed(1)}, ${t.pos[1].toFixed(1)})`;
       } else if (selectedKind === 'object') {
         const o = objectItems[selectedIndex];
-        const labels: Record<ObjectKind, string> = { bench: 'Bench', lamppost: 'Lamppost', tennisCourt: 'Tennis Court' };
+        const labels: Record<ObjectKind, string> = { bench: 'Bench', lamppost: 'Lamppost', tennisCourt: 'Tennis Court', floodlight: 'Floodlight' };
         info.textContent = `${labels[o.kind]} #${selectedIndex} rot=${o.rotation.toFixed(0)}°`;
       }
       selSection.appendChild(info);
@@ -969,9 +997,11 @@ async function main() {
         const benches = objectItems.filter(o => o.kind === 'bench');
         const lampposts = objectItems.filter(o => o.kind === 'lamppost');
         const courts = objectItems.filter(o => o.kind === 'tennisCourt');
+        const floodlights = objectItems.filter(o => o.kind === 'floodlight');
         if (benches.length) result.benches = toGps(benches);
         if (lampposts.length) result.lampposts = toGps(lampposts);
         if (courts.length) result.tennisCourts = toGps(courts);
+        if (floodlights.length) result.floodlights = toGps(floodlights);
         return result;
       }],
     ];
@@ -1091,7 +1121,7 @@ async function main() {
       select('tree', treeItems.length - 1);
       return;
     }
-    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt') {
+    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight') {
       objectItems.push({ kind: drawMode, pos: [x, z], rotation: 0 });
       select('object', objectItems.length - 1);
       return;

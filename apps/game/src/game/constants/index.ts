@@ -1,4 +1,4 @@
-import type { GameMode } from './types';
+import type { GameMode } from '../types';
 
 export const MODE: GameMode = 'SCOOP_THEN_RIDE';
 
@@ -105,3 +105,6 @@ export const RENDER_BUILDING_LOD_DISTANCE = 500;
 export const RENDER_ANIMATION_CULL_DISTANCE = 500;
 export const RENDER_OBJECTS_MAX_DISTANCE = 500;
 export const RENDER_TREES_MAX_DISTANCE = 500;
+
+// Re-export lighting constants so consumers can still import from './constants'
+export * from './lighting';

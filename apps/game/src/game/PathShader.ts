@@ -70,6 +70,8 @@ export interface PathShaderOptions {
   };
   /** If provided, use this URL as the path texture instead of the default dirt */
   pathTextureUrl?: string;
+  /** Whether the level is at night — adjusts ground shader lighting */
+  isNight?: boolean;
 }
 
 export interface IcePatchOverlay {

@@ -5,6 +5,7 @@ import {
   Vector3,
   HemisphericLight,
   DirectionalLight,
+  SpotLight,
   Color3,
   Color4,
   MeshBuilder,
@@ -105,6 +106,28 @@ import {
   POWER_UP_ICE_RADIUS_METRES,
   POWER_UP_SHOE_DURATION_SECONDS,
   POWER_UP_SHOE_SPEED_MULTIPLIER,
+  LIGHT_DAY_HEMI_INTENSITY,
+  LIGHT_DAY_HEMI_GROUND_R,
+  LIGHT_DAY_HEMI_GROUND_G,
+  LIGHT_DAY_HEMI_GROUND_B,
+  LIGHT_DAY_SUN_INTENSITY,
+  LIGHT_DAY_SUN_DIR_X,
+  LIGHT_DAY_SUN_DIR_Y,
+  LIGHT_DAY_SUN_DIR_Z,
+  LIGHT_NIGHT_HEMI_INTENSITY,
+  LIGHT_NIGHT_HEMI_DIFFUSE_R,
+  LIGHT_NIGHT_HEMI_DIFFUSE_G,
+  LIGHT_NIGHT_HEMI_DIFFUSE_B,
+  LIGHT_NIGHT_HEMI_GROUND_R,
+  LIGHT_NIGHT_HEMI_GROUND_G,
+  LIGHT_NIGHT_HEMI_GROUND_B,
+  LIGHT_NIGHT_SUN_INTENSITY,
+  LIGHT_NIGHT_SUN_DIR_X,
+  LIGHT_NIGHT_SUN_DIR_Y,
+  LIGHT_NIGHT_SUN_DIR_Z,
+  LIGHT_NIGHT_SUN_DIFFUSE_R,
+  LIGHT_NIGHT_SUN_DIFFUSE_G,
+  LIGHT_NIGHT_SUN_DIFFUSE_B,
 } from './constants';
 import {
   type BuildingCollider,
@@ -347,6 +370,12 @@ export class Game {
   // Pause state
   private paused = false;
 
+  /**
+   * When true the countdown does NOT start automatically after init().
+   * Call `startCountdown()` externally once all multiplayer players are ready.
+   */
+  private waitForCountdown = false;
+
   // Demo mode (title screen background)
   private demoMode = false;
   private demoCamProgress = 0; // 0→1 along the path
@@ -417,6 +446,36 @@ export class Game {
 
   setPaused(p: boolean) { this.paused = p; }
   isPaused() { return this.paused; }
+
+  /** Tell the game to NOT auto-start the countdown after init(). */
+  setWaitForCountdown() { this.waitForCountdown = true; }
+
+  /**
+   * Externally trigger the countdown start (used for multiplayer sync).
+   * This positions the cinematic camera and begins the 3-2-1 countdown.
+   */
+  startCountdown() {
+    this.waitForCountdown = false;
+    this.raceState = 'countdown';
+    this.countdownTimer = COUNTDOWN_DURATION;
+    this.raceTimer = 0;
+    this.finishedTimer = 0;
+    this.keepDrivingMode = false;
+    this.callbacks.onCountdown?.('3');
+    this.callbacks.onRaceStateChange?.('countdown');
+
+    // Position camera in front of the bus for the cinematic sweep
+    const frontDir = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
+    const camDist = 18;
+    const camHeight = 10;
+    const groundY = this.getGroundY(this.busPos.x, this.busPos.z);
+    this.camera.position = new Vector3(
+      this.busPos.x + frontDir.x * camDist,
+      Math.max(groundY, this.busPos.y) + camHeight,
+      this.busPos.z + frontDir.z * camDist,
+    );
+    this.camera.setTarget(new Vector3(this.busPos.x, this.busPos.y + (this.localPlayerRole === 'runner' ? 1.4 : 2.5), this.busPos.z));
+  }
 
   // ---------- Keep Driving (post-finish free roam) ----------
 
@@ -635,9 +694,7 @@ export class Game {
       gateIdx: this.currentGateIdx,
       role: this.localPlayerRole,
       scooping: this.scoopAnimTimer > 0,
-      gameType: this.gameType,
       powerUp: this.powerUpSystem?.getHeldPowerUp() ?? undefined,
-      charSelection: this.charSelection ?? undefined,
     };
   }
 
@@ -1225,7 +1282,10 @@ export class Game {
     this.engine = new Engine(this.canvas, true, { stencil: true });
     this.configurePerformanceProfile();
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = new Color4(0.68, 0.88, 1.0, 1); // bright sky blue fallback
+    const isNightFallback = level.timeOfDay === 'night';
+    this.scene.clearColor = isNightFallback
+      ? new Color4(0.02, 0.02, 0.06, 1) // dark night sky fallback
+      : new Color4(0.68, 0.88, 1.0, 1); // bright sky blue fallback
 
     // Camera
     this.camera = new FreeCamera('cam', new Vector3(0, 10, -15), this.scene);
@@ -1233,13 +1293,24 @@ export class Game {
     this.camera.fov = 1.0;
     this.camera.inputs.clear();
 
-    // Lights
+    // Lights — adapt to time of day (values from constants.ts)
+    const isNight = level.timeOfDay === 'night';
     const hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), this.scene);
-    hemi.intensity = 0.6;
-    hemi.groundColor = new Color3(0.3, 0.25, 0.2);
+    hemi.intensity = isNight ? LIGHT_NIGHT_HEMI_INTENSITY : LIGHT_DAY_HEMI_INTENSITY;
+    hemi.groundColor = isNight
+      ? new Color3(LIGHT_NIGHT_HEMI_GROUND_R, LIGHT_NIGHT_HEMI_GROUND_G, LIGHT_NIGHT_HEMI_GROUND_B)
+      : new Color3(LIGHT_DAY_HEMI_GROUND_R, LIGHT_DAY_HEMI_GROUND_G, LIGHT_DAY_HEMI_GROUND_B);
+    if (isNight) {
+      hemi.diffuse = new Color3(LIGHT_NIGHT_HEMI_DIFFUSE_R, LIGHT_NIGHT_HEMI_DIFFUSE_G, LIGHT_NIGHT_HEMI_DIFFUSE_B);
+    }
 
-    const sun = new DirectionalLight('sun', new Vector3(-0.5, -1, 0.5), this.scene);
-    sun.intensity = 0.8;
+    const sun = new DirectionalLight('sun',
+      new Vector3(LIGHT_DAY_SUN_DIR_X, LIGHT_DAY_SUN_DIR_Y, LIGHT_DAY_SUN_DIR_Z), this.scene);
+    sun.intensity = isNight ? LIGHT_NIGHT_SUN_INTENSITY : LIGHT_DAY_SUN_INTENSITY;
+    if (isNight) {
+      sun.direction = new Vector3(LIGHT_NIGHT_SUN_DIR_X, LIGHT_NIGHT_SUN_DIR_Y, LIGHT_NIGHT_SUN_DIR_Z);
+      sun.diffuse = new Color3(LIGHT_NIGHT_SUN_DIFFUSE_R, LIGHT_NIGHT_SUN_DIFFUSE_G, LIGHT_NIGHT_SUN_DIFFUSE_B);
+    }
 
     // Build world — water zones must be computed before ground so terrain dips
     this.waterZones = computeWaterZones(waterFeatures, course.coordinates[0], this.scaleFactor, (x, z) => this.getTerrainHeight(x, z));
@@ -1330,7 +1401,9 @@ export class Game {
         toPlaced(objs?.benches, Math.PI * 5 / 12),   // 75° CW offset
         toPlaced(objs?.lampposts),
         toPlaced(objs?.tennisCourts),
+        toPlaced(objs?.floodlights),
         (x, z) => this.getGroundY(x, z),
+        isNight,
       );
       // Offset elastic indices so they map into the global elasticObjects array
       const elasticOffset = this.elasticObjects.length;
@@ -1343,7 +1416,7 @@ export class Game {
     }
 
     // Procedural sky + clouds
-    createSky(this.scene);
+    createSky(this.scene, level.timeOfDay ?? 'day');
 
     if (!opts.skipBus) {
       await this.buildBus();
@@ -1475,7 +1548,7 @@ export class Game {
     }
 
     // Start countdown for real games
-    if (!this.demoMode && !this.previewMode) {
+    if (!this.demoMode && !this.previewMode && !this.waitForCountdown) {
       this.raceState = 'countdown';
       this.countdownTimer = COUNTDOWN_DURATION;
       this.raceTimer = 0;
@@ -1573,6 +1646,7 @@ export class Game {
       fields: this.fieldPolygons,
       concrete: this.concretePolygons,
       waterZones: this.waterZones,
+      isNight: this.level?.timeOfDay === 'night',
     };
 
     // Use tiled two-level path shader for better performance on weaker devices.
@@ -1825,6 +1899,9 @@ export class Game {
     }
     tintBusModel(this.busMesh, palette, 'local');
 
+    // Bus model is created disabled to avoid rendering during async load — enable now
+    this.busMesh.setEnabled(true);
+
     // Store rest position for scoop animation offsets
     (this.scoopPivot as any).__restY = this.scoopPivot.position.y;
     (this.scoopPivot as any).__restZ = this.scoopPivot.position.z;
@@ -1836,6 +1913,22 @@ export class Game {
 
     // --- Water wake particle systems (initially stopped) ---
     this.waterWake = createWaterWake(this.scene, this.busMesh!);
+
+    // --- Headlight at night (single centred beam) ---
+    if (this.level?.timeOfDay === 'night') {
+      const headlight = new SpotLight(
+        'busHeadlight',
+        new Vector3(0, 1.0, 2.5),        // centre front of bus
+        new Vector3(0, -0.15, 1),         // forward and slightly down
+        Math.PI * 0.7,                    // wide soft cone
+        0.3,                              // very soft falloff
+        this.scene,
+      );
+      headlight.diffuse = new Color3(1.0, 0.97, 0.85);
+      headlight.intensity = 3.0;
+      headlight.range = 80;
+      headlight.parent = this.busMesh!;
+    }
   }
 
 
@@ -2397,6 +2490,17 @@ export class Game {
 
     // --- Countdown phase ---
     if (this.raceState === 'countdown') {
+      // If waiting for multiplayer sync, don't tick down yet
+      if (this.waitForCountdown) {
+        this.updateRemoteBusMeshes(dt, engineVibeOffset);
+        this.updateBuildingLodForPlayer();
+        this.updateDistanceCulling();
+        if (this.minimap) {
+          this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers(), this.getMinimapLookaheadAnchor());
+        }
+        return;
+      }
+
       const prevSec = Math.ceil(this.countdownTimer);
       this.countdownTimer -= dt;
       const curSec = Math.ceil(this.countdownTimer);

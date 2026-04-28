@@ -34,6 +34,11 @@ export interface BusModelResult {
 export async function createBusModel(scene: Scene): Promise<BusModelResult> {
   const root = new TransformNode('bus', scene);
 
+  // Start disabled so partially-built meshes don't render while
+  // the scoop GLB is loading asynchronously.  Callers re-enable
+  // the root once the model is fully set up.
+  root.setEnabled(false);
+
   // Shell node for everything above the wheels — animated for engine vibration
   const bodyShell = new TransformNode('busBodyShell', scene);
   bodyShell.parent = root;

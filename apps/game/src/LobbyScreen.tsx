@@ -249,11 +249,13 @@ export function LobbyScreen(props: LobbyScreenProps) {
           {props.mode === 'host' ? 'Host Game' : 'Join Game'}
         </h2>
 
-        {/* Game type badge */}
-        <div class="lobby-game-type">
-          <span class="game-type-badge">{GAME_TYPE_LABELS[gt()]}</span>
-          <span class="game-type-badge-desc">{GAME_TYPE_DESCRIPTIONS[gt()]}</span>
-        </div>
+        {/* Game type badge — hide for joiners until the host sends the game type */}
+        <Show when={props.mode === 'host' || connected()}>
+          <div class="lobby-game-type">
+            <span class="game-type-badge">{GAME_TYPE_LABELS[gt()]}</span>
+            <span class="game-type-badge-desc">{GAME_TYPE_DESCRIPTIONS[gt()]}</span>
+          </div>
+        </Show>
 
         <Show when={courseName()}>
           <p class="lobby-course">{courseName()}</p>
