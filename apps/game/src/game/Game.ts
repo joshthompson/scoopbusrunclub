@@ -151,6 +151,13 @@ import {
 } from './systems/camera';
 import { updateRemotePlayersSystem } from './systems/remotePlayers';
 import {
+  resolveBusToBusCollisions,
+  applyBusYawRate,
+  type BusCollisionState,
+  type RemoteBusSnapshot,
+  type RemoteBusNudge,
+} from './systems/busCollision';
+import {
   computeTerrainHeight,
   computeWaterZones,
   buildWaterMeshes,
@@ -160,6 +167,7 @@ import {
   getWaterSurfaceYAt,
   getWaterDepressionAt,
 } from './systems/terrain';
+
 import {
   buildBuildingMeshes,
   resolvePositionAgainstBuildings,
@@ -243,6 +251,7 @@ export class Game {
   private busYaw = 0; // radians
   private busPitch = 0; // radians – slope tilt (positive = looking up)
   private busVelAngle = 0; // radians – actual velocity direction (lags behind busYaw for drift)
+  private busYawRate = 0; // rad/s – collision-induced angular velocity
   private busPos = new Vector3(0, 0, 0); // bus base position (ground level)
   private busVelY = 0; // vertical velocity (m/s) — >0 when airborne going up
   private busAirborne = false; // true while bus is above ground
@@ -306,6 +315,7 @@ export class Game {
 
   // Water zones (local XZ polygons + Y level) — set before buildGround
   private waterZones: WaterZone[] = [];
+
   private roadPolylines: [number, number][][] = [];
   private trailPolylines: [number, number][][] = [];
   private fieldPolygons: [number, number][][] = [];
@@ -375,6 +385,21 @@ export class Game {
    * Call `startCountdown()` externally once all multiplayer players are ready.
    */
   private waitForCountdown = false;
+
+  /**
+   * True once the scene has rendered enough frames for the GPU to have
+   * uploaded textures and geometry. Used to delay countdown / multiplayer
+   * readiness signals until the player actually sees the 3D world.
+   */
+  private sceneRendered = false;
+  private sceneRenderedFrameCount = 0;
+  /** How many successful render frames before we consider the scene ready. */
+  private static readonly SCENE_READY_FRAMES = 3;
+  /** Resolves once the scene has rendered enough frames. */
+  private sceneRenderedPromise: Promise<void> = Promise.resolve();
+  private sceneRenderedResolve: (() => void) | null = null;
+  /** Whether the initial countdown UI ("3") has been fired yet. */
+  private countdownUiStarted = false;
 
   // Demo mode (title screen background)
   private demoMode = false;
@@ -451,8 +476,17 @@ export class Game {
   setWaitForCountdown() { this.waitForCountdown = true; }
 
   /**
+   * Returns a promise that resolves once the scene has rendered at least
+   * one frame successfully (i.e. the player can actually see the world).
+   */
+  waitUntilSceneRendered(): Promise<void> {
+    return this.sceneRenderedPromise;
+  }
+
+  /**
    * Externally trigger the countdown start (used for multiplayer sync).
    * This positions the cinematic camera and begins the 3-2-1 countdown.
+   * The "3" UI callback is deferred until the scene has actually rendered.
    */
   startCountdown() {
     this.waitForCountdown = false;
@@ -461,8 +495,9 @@ export class Game {
     this.raceTimer = 0;
     this.finishedTimer = 0;
     this.keepDrivingMode = false;
-    this.callbacks.onCountdown?.('3');
-    this.callbacks.onRaceStateChange?.('countdown');
+    // Defer onCountdown('3') / onRaceStateChange to the update loop
+    // so the player sees the 3D world before the overlay appears.
+    this.countdownUiStarted = false;
 
     // Position camera in front of the bus for the cinematic sweep
     const frontDir = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
@@ -1006,6 +1041,7 @@ export class Game {
         this.localRunnerScoopVelY = 0;
         this.localRunnerScoopVelZ = 0;
         this.busSpeed = 0;
+        this.busYawRate = 0;
         this.localRunnerScoopState = 'sitting';
         this.localRunnerScoopSitTimer = RUNNER_SIT_DURATION;
       }
@@ -1018,6 +1054,7 @@ export class Game {
 
     if (this.localRunnerScoopState === 'sitting') {
       this.busSpeed = 0;
+      this.busYawRate = 0;
       this.busPos.y = this.getGroundY(this.busPos.x, this.busPos.z);
       this.localRunnerScoopSitTimer -= dt;
       if (this.localRunnerScoopSitTimer <= 0) {
@@ -1331,7 +1368,7 @@ export class Game {
     this.fieldPolygons = (level.regions?.fields ?? []).map(gpsToWorld);
     this.concretePolygons = (level.regions?.concrete ?? []).map(gpsToWorld);
     this.buildGround();
-    buildWaterMeshes(this.scene, this.waterZones);
+    buildWaterMeshes(this.scene, this.waterZones, { isNight });
     const buildingResult = buildBuildingMeshes(this.scene, this.buildingFootprints, (x, z) => this.getGroundY(x, z));
     this.buildingColliders = buildingResult.colliders;
     this.buildingLodEntries = buildingResult.lodEntries;
@@ -1547,17 +1584,19 @@ export class Game {
       this.setupInput();
     }
 
-    // Start countdown for real games
+    // Start countdown for real games.
+    // We set the state and position the camera here but defer the UI
+    // callbacks ("3", raceStateChange) until the scene has actually
+    // rendered a few frames so the player sees the 3D world first.
     if (!this.demoMode && !this.previewMode && !this.waitForCountdown) {
       this.raceState = 'countdown';
       this.countdownTimer = COUNTDOWN_DURATION;
       this.raceTimer = 0;
       this.finishedTimer = 0;
       this.keepDrivingMode = false;
-      this.callbacks.onCountdown?.('3');
-      this.callbacks.onRaceStateChange?.('countdown');
+      this.countdownUiStarted = false; // will fire once scene is rendered
 
-      // Position camera in front of the bus so the first frame shows the bus face-on
+      // Position camera in front of the bus so the first visible frame shows the bus
       const frontDir = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
       const camDist = 18;
       const camHeight = 10;
@@ -1578,6 +1617,19 @@ export class Game {
       this.camera.position = new Vector3(sx, startY, sz);
     }
 
+    // Wait for all materials/shaders to compile before rendering
+    await new Promise<void>((resolve) => {
+      this.scene.executeWhenReady(() => resolve());
+    });
+
+    // Prepare the "scene rendered" promise so callers can await the
+    // first successful render (used to gate countdown / readiness).
+    this.sceneRendered = false;
+    this.sceneRenderedFrameCount = 0;
+    this.sceneRenderedPromise = new Promise<void>((resolve) => {
+      this.sceneRenderedResolve = resolve;
+    });
+
     // Game loop
     this.engine.runRenderLoop(() => {
       const dt = this.engine.getDeltaTime() / 1000;
@@ -1588,7 +1640,23 @@ export class Game {
       } else {
         this.update(dt);
       }
-      this.scene.render();
+
+      try {
+        this.scene.render();
+        // Wait for a few successful render frames so the GPU has time
+        // to upload textures/geometry before we consider the scene ready.
+        if (!this.sceneRendered) {
+          this.sceneRenderedFrameCount++;
+          if (this.sceneRenderedFrameCount >= Game.SCENE_READY_FRAMES) {
+            this.sceneRendered = true;
+            this.sceneRenderedResolve?.();
+            this.sceneRenderedResolve = null;
+          }
+        }
+      } catch (_e) {
+        // Shader may not be fully compiled on the first frame(s);
+        // swallow so the render-loop stays alive and retries next frame.
+      }
     });
 
     this.resizeHandler = () => this.engine.resize();
@@ -2192,6 +2260,7 @@ export class Game {
           } else {
             // Nearly head-on — stop
             this.busSpeed = 0;
+            this.busYawRate = 0;
           }
         }
       }
@@ -2205,31 +2274,57 @@ export class Game {
   }
 
   /**
-   * Resolve collisions between the local bus and all remote buses.
-   * Both are treated as circles with BUS_COLLISION_RADIUS.
-   * On overlap the local bus is pushed out and bounced back.
+   * Resolve collisions between the local bus and all remote buses using
+   * OBB detection + impulse-based momentum conservation.
+   * Contact-point-aware so hitting the back of a bus spins it differently
+   * than a head-on or T-bone collision.
    */
   private resolveBusCollisions() {
     if (this.localPlayerRole === 'runner') return;
-    const br = BUS_COLLISION_RADIUS;
-    const minDist = br + br; // both buses have the same radius
-    for (const [_peerId, remote] of this.remotePlayers) {
+
+    // Gather remote bus snapshots, keyed by peerId for nudge feedback
+    const remotes: RemoteBusSnapshot[] = [];
+    for (const [peerId, remote] of this.remotePlayers) {
       if (!remote.state) continue;
       if (this.getRoleForPlayerIndex(remote.playerIndex, remote.state) !== 'bus') continue;
-      const rx = remote.smoothPos.x;
-      const rz = remote.smoothPos.z;
-      const dx = this.busPos.x - rx;
-      const dz = this.busPos.z - rz;
-      const distSq = dx * dx + dz * dz;
-      if (distSq < minDist * minDist && distSq > 0) {
-        const dist = Math.sqrt(distSq);
-        const overlap = minDist - dist;
-        const nx = dx / dist;
-        const nz = dz / dist;
-        // Push local bus out fully (remote bus position is authoritative)
-        this.busPos.x += nx * overlap;
-        this.busPos.z += nz * overlap;
-        this.busSpeed *= -0.15; // bounce-back
+      remotes.push({
+        id: peerId,
+        x: remote.smoothPos.x,
+        z: remote.smoothPos.z,
+        yaw: remote.smoothYaw,
+        speed: remote.state.speed,
+      });
+    }
+    if (remotes.length === 0) return;
+
+    const localState: BusCollisionState = {
+      x: this.busPos.x,
+      z: this.busPos.z,
+      yaw: this.busYaw,
+      speed: this.busSpeed,
+      velAngle: this.busVelAngle,
+      yawRate: this.busYawRate,
+    };
+
+    const { local, collided, remoteNudges } = resolveBusToBusCollisions(localState, remotes, 0);
+
+    if (collided) {
+      this.busPos.x = local.x;
+      this.busPos.z = local.z;
+      this.busSpeed = local.speed;
+      this.busVelAngle = local.velAngle;
+      this.busYaw = local.yaw;
+      this.busYawRate = local.yawRate;
+
+      // Apply predicted nudges to remote buses' visual positions so the
+      // collision looks two-sided before the authoritative network update.
+      // The normal lerp toward the real state will gradually correct these.
+      for (const nudge of remoteNudges) {
+        const remote = this.remotePlayers.get(nudge.id);
+        if (!remote) continue;
+        remote.smoothPos.x += nudge.dx;
+        remote.smoothPos.z += nudge.dz;
+        remote.smoothYaw += nudge.dYaw;
       }
     }
   }
@@ -2383,6 +2478,7 @@ export class Game {
       countdownTimer: this.countdownTimer,
       countdownDuration: COUNTDOWN_DURATION,
       getGroundY: (x, z) => this.getGroundY(x, z),
+      getWaterSurfaceY: (x, z) => this.getWaterSurfaceY(x, z),
     });
   }
 
@@ -2396,6 +2492,7 @@ export class Game {
         runnerYaw: this.busYaw,
         runnerPos: this.busPos,
         getGroundY: (x, z) => this.getGroundY(x, z),
+        getWaterSurfaceY: (x, z) => this.getWaterSurfaceY(x, z),
       });
       return;
     }
@@ -2408,6 +2505,7 @@ export class Game {
       busPos: this.busPos,
       cameraYawOffset: this.cameraYawOffset,
       getGroundY: (x, z) => this.getGroundY(x, z),
+      getWaterSurfaceY: (x, z) => this.getWaterSurfaceY(x, z),
     });
   }
 
@@ -2490,8 +2588,8 @@ export class Game {
 
     // --- Countdown phase ---
     if (this.raceState === 'countdown') {
-      // If waiting for multiplayer sync, don't tick down yet
-      if (this.waitForCountdown) {
+      // If waiting for multiplayer sync, or scene hasn't rendered yet, don't tick down
+      if (this.waitForCountdown || !this.sceneRendered) {
         this.updateRemoteBusMeshes(dt, engineVibeOffset);
         this.updateBuildingLodForPlayer();
         this.updateDistanceCulling();
@@ -2499,6 +2597,16 @@ export class Game {
           this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers(), this.getMinimapLookaheadAnchor());
         }
         return;
+      }
+
+      // Fire the countdown UI on the first frame the scene is actually visible.
+      // This is deferred from initScene() / startCountdown() so the player
+      // sees the 3D world before the "3" overlay appears.
+      if (!this.countdownUiStarted) {
+        this.countdownUiStarted = true;
+        this.countdownTimer = COUNTDOWN_DURATION;
+        this.callbacks.onCountdown?.('3');
+        this.callbacks.onRaceStateChange?.('countdown');
       }
 
       const prevSec = Math.ceil(this.countdownTimer);
@@ -2957,6 +3065,18 @@ export class Game {
 
       // Smooth the pitch so it doesn't jitter
       this.busPitch += (targetPitch - this.busPitch) * Math.min(1, 6 * dt);
+
+      // --- Apply collision-induced yaw rate (spin from off-centre hits) ---
+      if (this.busYawRate !== 0) {
+        const yawState: BusCollisionState = {
+          x: this.busPos.x, z: this.busPos.z,
+          yaw: this.busYaw, speed: this.busSpeed,
+          velAngle: this.busVelAngle, yawRate: this.busYawRate,
+        };
+        applyBusYawRate(yawState, dt);
+        this.busYaw = yawState.yaw;
+        this.busYawRate = yawState.yawRate;
+      }
 
       this.distanceTravelled += Math.abs(this.busSpeed) * dt;
 

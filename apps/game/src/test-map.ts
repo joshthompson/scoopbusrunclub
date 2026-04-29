@@ -200,7 +200,7 @@ async function main() {
   // ── State ───────────────────────────────────────────────────────────
 
   type SelectionKind = 'building' | 'water' | 'fence' | 'region' | 'tree' | 'object';
-  type DrawMode = 'none' | 'building' | 'field' | 'concrete' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight';
+  type DrawMode = 'none' | 'building' | 'field' | 'concrete' | 'fence' | 'water' | 'river' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight';
 
   let selectedKind: SelectionKind | null = null;
   let selectedIndex: number = -1;
@@ -402,9 +402,21 @@ async function main() {
     floodlight: COLORS.floodlight,
   };
 
+  // Real-world sizes (metres) for each object kind
+  // Tennis court: 12m long (Z) × 5.5m wide (X)
+  // Bench: 1.5m wide (X) × 0.4m deep (Z)
+  // Lamppost: ~0.3m pole (renders as circle)
+  // Floodlight: 1.4m base diameter
+  const OBJECT_SIZES: Record<ObjectKind, { w: number; h: number }> = {
+    tennisCourt: { w: 5.5, h: 12 },
+    bench: { w: 1.5, h: 0.5 },
+    lamppost: { w: 0.6, h: 0.6 },
+    floodlight: { w: 1.4, h: 1.4 },
+  };
+
   function renderObjects() {
     layerObjects.innerHTML = '';
-    const s = Math.max(vbW, vbH) * 0.005;
+    const minS = Math.max(vbW, vbH) * 0.005; // minimum visual size (zoom-adaptive)
     for (let i = 0; i < objectItems.length; i++) {
       const o = objectItems[i];
       const isSel = selectedKind === 'object' && selectedIndex === i;
@@ -412,6 +424,10 @@ async function main() {
       const cy = -o.pos[1];
       const rot = -o.rotation;
       const color = isSel ? COLORS.selected : OBJECT_COLORS[o.kind];
+      const realSize = OBJECT_SIZES[o.kind];
+      // Use real-world metres but enforce a minimum so things are visible when zoomed out
+      const hw = Math.max(realSize.w / 2, minS * 1.2); // half-width
+      const hh = Math.max(realSize.h / 2, minS * 1.2); // half-height
 
       const group = svgEl('g', {
         transform: `translate(${cx},${cy}) rotate(${rot})`,
@@ -422,71 +438,96 @@ async function main() {
 
       if (o.kind === 'bench') {
         const rect = svgEl('rect', {
-          x: -s * 1.2, y: -s * 0.5, width: s * 2.4, height: s * 1,
+          x: -hw, y: -hh, width: hw * 2, height: hh * 2,
           fill: color, stroke: isSel ? '#fff' : '#5a4510',
-          'stroke-width': s * 0.12, rx: s * 0.1,
+          'stroke-width': Math.max(hw * 0.08, 0.05), rx: Math.min(hw, hh) * 0.1,
         });
         group.appendChild(rect);
+        // Front indicator (backrest side)
         const indicator = svgEl('line', {
-          x1: 0, y1: -s * 0.5, x2: 0, y2: -s * 0.9,
+          x1: 0, y1: -hh, x2: 0, y2: -hh - Math.max(hh * 0.6, minS * 0.4),
           stroke: isSel ? '#fff' : '#c8a020',
-          'stroke-width': s * 0.15, 'stroke-linecap': 'round',
+          'stroke-width': Math.max(hw * 0.1, 0.05), 'stroke-linecap': 'round',
         });
         group.appendChild(indicator);
       } else if (o.kind === 'lamppost') {
+        const r = Math.max(hw, hh);
         const circle = svgEl('circle', {
-          cx: 0, cy: 0, r: s * 0.6,
+          cx: 0, cy: 0, r,
           fill: color, stroke: isSel ? '#fff' : '#555566',
-          'stroke-width': s * 0.12,
+          'stroke-width': Math.max(r * 0.15, 0.03),
         });
         group.appendChild(circle);
         const dot = svgEl('circle', {
-          cx: 0, cy: 0, r: s * 0.2,
+          cx: 0, cy: 0, r: r * 0.35,
           fill: isSel ? '#fff' : '#eeee88',
         });
         group.appendChild(dot);
         const indicator = svgEl('line', {
-          x1: 0, y1: -s * 0.6, x2: 0, y2: -s * 1.0,
+          x1: 0, y1: -r, x2: 0, y2: -r - Math.max(r * 0.6, minS * 0.4),
           stroke: isSel ? '#fff' : '#aaaa77',
-          'stroke-width': s * 0.12, 'stroke-linecap': 'round',
+          'stroke-width': Math.max(r * 0.15, 0.03), 'stroke-linecap': 'round',
         });
         group.appendChild(indicator);
       } else if (o.kind === 'tennisCourt') {
+        // Width = X (short side), Height = Z (long side)
         const rect = svgEl('rect', {
-          x: -s * 2.0, y: -s * 1.0, width: s * 4.0, height: s * 2.0,
+          x: -hw, y: -hh, width: hw * 2, height: hh * 2,
           fill: color, stroke: isSel ? '#fff' : '#1a6636',
-          'stroke-width': s * 0.12, rx: s * 0.05,
+          'stroke-width': Math.max(Math.min(hw, hh) * 0.04, 0.05), rx: Math.min(hw, hh) * 0.02,
         });
         group.appendChild(rect);
-        const net = svgEl('line', {
-          x1: -s * 2.0, y1: 0, x2: s * 2.0, y2: 0,
-          stroke: '#ffffff', 'stroke-width': s * 0.08, 'stroke-opacity': '0.6',
-        });
-        group.appendChild(net);
+        // Court lines: service boxes
+        const lineW = Math.max(Math.min(hw, hh) * 0.02, 0.04);
+        const lineColor = 'rgba(255,255,255,0.6)';
+        // Net across the middle (width-wise)
+        group.appendChild(svgEl('line', {
+          x1: -hw, y1: 0, x2: hw, y2: 0,
+          stroke: '#ffffff', 'stroke-width': lineW * 2, 'stroke-opacity': '0.7',
+        }));
+        // Outer boundary
+        group.appendChild(svgEl('rect', {
+          x: -hw * 0.92, y: -hh * 0.95, width: hw * 1.84, height: hh * 1.9,
+          fill: 'none', stroke: lineColor, 'stroke-width': lineW,
+        }));
+        // Centre service line
+        group.appendChild(svgEl('line', {
+          x1: 0, y1: -hh * 0.6, x2: 0, y2: hh * 0.6,
+          stroke: lineColor, 'stroke-width': lineW,
+        }));
+        // Service lines
+        group.appendChild(svgEl('line', {
+          x1: -hw * 0.92, y1: -hh * 0.6, x2: hw * 0.92, y2: -hh * 0.6,
+          stroke: lineColor, 'stroke-width': lineW,
+        }));
+        group.appendChild(svgEl('line', {
+          x1: -hw * 0.92, y1: hh * 0.6, x2: hw * 0.92, y2: hh * 0.6,
+          stroke: lineColor, 'stroke-width': lineW,
+        }));
+        // Indicator (front direction)
         const indicator = svgEl('line', {
-          x1: 0, y1: -s * 1.0, x2: 0, y2: -s * 1.4,
+          x1: 0, y1: -hh, x2: 0, y2: -hh - Math.max(hh * 0.15, minS * 0.4),
           stroke: isSel ? '#fff' : '#80cc80',
-          'stroke-width': s * 0.15, 'stroke-linecap': 'round',
+          'stroke-width': Math.max(Math.min(hw, hh) * 0.06, 0.05), 'stroke-linecap': 'round',
         });
         group.appendChild(indicator);
       } else if (o.kind === 'floodlight') {
-        // Tall tower icon — outer ring + inner bright dot + cross-hairs
+        const r = Math.max(hw, hh);
         const outerRing = svgEl('circle', {
-          cx: 0, cy: 0, r: s * 0.9,
+          cx: 0, cy: 0, r,
           fill: 'none', stroke: isSel ? '#fff' : color,
-          'stroke-width': s * 0.15,
+          'stroke-width': Math.max(r * 0.15, 0.03),
         });
         group.appendChild(outerRing);
         const innerDot = svgEl('circle', {
-          cx: 0, cy: 0, r: s * 0.35,
+          cx: 0, cy: 0, r: r * 0.4,
           fill: isSel ? '#fff' : '#ffcc44',
         });
         group.appendChild(innerDot);
-        // Direction indicator
         const indicator = svgEl('line', {
-          x1: 0, y1: -s * 0.9, x2: 0, y2: -s * 1.3,
+          x1: 0, y1: -r, x2: 0, y2: -r - Math.max(r * 0.4, minS * 0.4),
           stroke: isSel ? '#fff' : '#dd8811',
-          'stroke-width': s * 0.12, 'stroke-linecap': 'round',
+          'stroke-width': Math.max(r * 0.1, 0.03), 'stroke-linecap': 'round',
         });
         group.appendChild(indicator);
       }
@@ -554,7 +595,45 @@ async function main() {
     layerHandles.innerHTML = '';
     if (selectedKind === null || selectedIndex < 0) return;
     if (selectedKind === 'tree') return;
-    if (selectedKind === 'object') return;
+
+    // Rotation handle for objects
+    if (selectedKind === 'object') {
+      const o = objectItems[selectedIndex];
+      if (!o) return;
+      const cx = o.pos[0];
+      const cy = -o.pos[1];
+      const realSize = OBJECT_SIZES[o.kind];
+      const minS = Math.max(vbW, vbH) * 0.005;
+      const extent = Math.max(realSize.w, realSize.h) / 2 + Math.max(minS * 2, 2);
+      const rotRad = (-o.rotation) * Math.PI / 180;
+      // Handle sits above (in rotated space = along -Y in SVG = local forward)
+      const hx = cx + Math.sin(rotRad) * -extent;
+      const hy = cy + Math.cos(rotRad) * extent;
+      // Dashed line from centre to handle
+      layerHandles.appendChild(svgEl('line', {
+        x1: cx, y1: cy, x2: hx, y2: hy,
+        stroke: '#ff8800', 'stroke-width': handleRadius * 0.4,
+        'stroke-dasharray': `${handleRadius * 0.8},${handleRadius * 0.5}`,
+        'stroke-opacity': '0.7',
+      }));
+      // Rotation handle circle
+      const rHandle = svgEl('circle', {
+        cx: hx, cy: hy, r: handleRadius * 1.8,
+        fill: '#ff8800', stroke: '#fff', 'stroke-width': handleRadius * 0.3,
+        'data-rot-handle': 'true',
+        'data-idx': selectedIndex,
+      });
+      rHandle.style.cursor = 'crosshair';
+      layerHandles.appendChild(rHandle);
+      // Small arc icon inside the handle
+      const arcR = handleRadius * 0.9;
+      const arcD = `M ${hx - arcR} ${hy} A ${arcR} ${arcR} 0 0 1 ${hx} ${hy - arcR}`;
+      layerHandles.appendChild(svgEl('path', {
+        d: arcD, fill: 'none', stroke: '#fff', 'stroke-width': handleRadius * 0.25,
+        'stroke-linecap': 'round', 'pointer-events': 'none',
+      }));
+      return;
+    }
 
     let points: [number, number][] = [];
     if (selectedKind === 'building') points = buildingItems[selectedIndex]?.points ?? [];
@@ -611,8 +690,8 @@ async function main() {
   function renderDrawing() {
     layerDrawing.innerHTML = '';
     if (drawMode === 'none' || drawingPoints.length === 0) return;
-    if (drawMode !== 'building' && drawMode !== 'field' && drawMode !== 'concrete') return;
-    const color = drawMode === 'building' ? COLORS.buildingGrey : (drawMode === 'concrete' ? COLORS.concrete : COLORS.field);
+    if (drawMode !== 'building' && drawMode !== 'field' && drawMode !== 'concrete' && drawMode !== 'fence' && drawMode !== 'water' && drawMode !== 'river') return;
+    const color = drawMode === 'building' ? COLORS.buildingGrey : drawMode === 'concrete' ? COLORS.concrete : drawMode === 'fence' ? COLORS.fence : drawMode === 'water' ? COLORS.water : drawMode === 'river' ? COLORS.river : COLORS.field;
     if (drawingPoints.length >= 2) {
       const d = pathD(drawingPoints);
       layerDrawing.appendChild(svgEl('path', {
@@ -673,11 +752,22 @@ async function main() {
   function renderSidebar() {
     sidebarEl.innerHTML = '';
 
-    // Title
-    const title = document.createElement('h3');
-    title.textContent = level.name;
-    title.style.cssText = 'color:#fff;font-size:13px;margin:0 0 8px;';
-    sidebarEl.appendChild(title);
+    // Title — level dropdown
+    const selectEl = document.createElement('select');
+    selectEl.style.cssText = 'width:100%;background:#333;color:#fff;border:1px solid #555;border-radius:4px;padding:4px 6px;font-size:12px;margin:0 0 8px;cursor:pointer;';
+    for (const [id, meta] of Object.entries(levels)) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = meta.name + (meta.hide ? ' (hidden)' : '');
+      if (id === levelId) opt.selected = true;
+      selectEl.appendChild(opt);
+    }
+    selectEl.addEventListener('change', () => {
+      const url = new URL(window.location.href);
+      url.searchParams.set('event', selectEl.value);
+      window.location.href = url.toString();
+    });
+    sidebarEl.appendChild(selectEl);
 
     // ── Draw tools ──
     const drawSection = document.createElement('div');
@@ -691,6 +781,9 @@ async function main() {
       ['Building', 'building', COLORS.buildingGrey],
       ['Field', 'field', COLORS.field],
       ['Concrete', 'concrete', COLORS.concrete],
+      ['Fence', 'fence', COLORS.fence],
+      ['Water', 'water', COLORS.water],
+      ['River', 'river', COLORS.river],
       ['Tree', 'tree', COLORS.tree],
       ['Bench', 'bench', COLORS.bench],
       ['Lamppost', 'lamppost', COLORS.lamppost],
@@ -718,7 +811,7 @@ async function main() {
       drawSection.appendChild(btn);
     }
 
-    const isPolygonDraw = drawMode === 'building' || drawMode === 'field' || drawMode === 'concrete';
+    const isPolygonDraw = drawMode === 'building' || drawMode === 'field' || drawMode === 'concrete' || drawMode === 'fence' || drawMode === 'water' || drawMode === 'river';
     if (isPolygonDraw) {
       const hint = document.createElement('div');
       hint.className = 'sidebar-hint';
@@ -734,7 +827,7 @@ async function main() {
     if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight') {
       const hint = document.createElement('div');
       hint.className = 'sidebar-hint';
-      hint.textContent = 'Click to place. Scroll-wheel on placed object to rotate.';
+      hint.textContent = 'Click to place. Drag rotation handle to rotate.';
       drawSection.appendChild(hint);
     }
     sidebarEl.appendChild(drawSection);
@@ -1126,7 +1219,7 @@ async function main() {
       select('object', objectItems.length - 1);
       return;
     }
-    if (drawMode === 'building' || drawMode === 'field' || drawMode === 'concrete') {
+    if (drawMode === 'building' || drawMode === 'field' || drawMode === 'concrete' || drawMode === 'fence' || drawMode === 'water' || drawMode === 'river') {
       const now = performance.now();
       if (now - lastClickTime < 400 && drawingPoints.length >= 3) {
         // Second click of a double-click — close the polygon immediately
@@ -1135,7 +1228,15 @@ async function main() {
 
         let newKind: SelectionKind;
         let newIdx: number;
-        if (drawMode === 'building') {
+        if (drawMode === 'water' || drawMode === 'river') {
+          waterItems.push({ type: drawMode, points: [...drawingPoints] });
+          newKind = 'water';
+          newIdx = waterItems.length - 1;
+        } else if (drawMode === 'fence') {
+          fenceItems.push({ points: [...drawingPoints] });
+          newKind = 'fence';
+          newIdx = fenceItems.length - 1;
+        } else if (drawMode === 'building') {
           buildingItems.push({ type: 'grey', points: [...drawingPoints] });
           newKind = 'building';
           newIdx = buildingItems.length - 1;
@@ -1176,7 +1277,7 @@ async function main() {
   });
 
   svg.addEventListener('dblclick', (e) => {
-    if (drawMode !== 'building' && drawMode !== 'field' && drawMode !== 'concrete') return;
+    if (drawMode !== 'building' && drawMode !== 'field' && drawMode !== 'concrete' && drawMode !== 'fence' && drawMode !== 'water' && drawMode !== 'river') return;
     if (drawingPoints.length < 3) return;
 
     e.preventDefault();
@@ -1184,7 +1285,15 @@ async function main() {
 
     let newKind: SelectionKind;
     let newIdx: number;
-    if (drawMode === 'building') {
+    if (drawMode === 'water' || drawMode === 'river') {
+      waterItems.push({ type: drawMode, points: [...drawingPoints] });
+      newKind = 'water';
+      newIdx = waterItems.length - 1;
+    } else if (drawMode === 'fence') {
+      fenceItems.push({ points: [...drawingPoints] });
+      newKind = 'fence';
+      newIdx = fenceItems.length - 1;
+    } else if (drawMode === 'building') {
       buildingItems.push({ type: 'grey', points: [...drawingPoints] });
       newKind = 'building';
       newIdx = buildingItems.length - 1;
@@ -1223,6 +1332,17 @@ async function main() {
       return;
     }
 
+    // Rotation handle drag
+    if (target.getAttribute('data-rot-handle') === 'true') {
+      const idx = parseInt(target.getAttribute('data-idx')!, 10);
+      if (idx >= 0 && idx < objectItems.length) {
+        dragRotateIdx = idx;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
     // Tree drag
     if (target.getAttribute('data-kind') === 'tree' && drawMode !== 'tree') {
       const idx = parseInt(target.getAttribute('data-idx')!, 10);
@@ -1257,6 +1377,7 @@ async function main() {
 
   let dragTreeIdx = -1;
   let dragObjectIdx = -1;
+  let dragRotateIdx = -1;
 
   window.addEventListener('mousemove', (e) => {
     // Vertex drag
@@ -1272,6 +1393,22 @@ async function main() {
       if (points && vertIdx < points.length) {
         points[vertIdx] = [x, z];
         renderAll();
+      }
+      return;
+    }
+    // Rotation handle drag
+    if (dragRotateIdx >= 0) {
+      const o = objectItems[dragRotateIdx];
+      if (o) {
+        const [mx, mz] = clientToSvg(e.clientX, e.clientY);
+        const dx = mx - o.pos[0];
+        const dz = mz - o.pos[1];
+        // atan2 gives angle from +X axis; we want angle from +Z (forward)
+        // In SVG, y is flipped, so the angle from centre to mouse in map coords:
+        const angleDeg = Math.atan2(dx, dz) * 180 / Math.PI;
+        objectItems[dragRotateIdx].rotation = ((Math.round(angleDeg) % 360) + 360) % 360;
+        renderObjects();
+        renderHandles();
       }
       return;
     }
@@ -1315,6 +1452,11 @@ async function main() {
       renderSidebar();
       return;
     }
+    if (dragRotateIdx >= 0) {
+      dragRotateIdx = -1;
+      renderSidebar();
+      return;
+    }
     panning = false;
     svg.classList.remove('dragging');
   });
@@ -1322,21 +1464,6 @@ async function main() {
   // ── Zoom ────────────────────────────────────────────────────────────
 
   svg.addEventListener('wheel', (e) => {
-    // Rotate object on scroll when hovering over one
-    const target = e.target as SVGElement;
-    const objGroup = target.closest?.('[data-kind="object"]') as SVGElement | null;
-    if (objGroup) {
-      const idx = parseInt(objGroup.getAttribute('data-idx')!, 10);
-      if (idx >= 0 && idx < objectItems.length) {
-        e.preventDefault();
-        const step = e.deltaY > 0 ? 15 : -15;
-        objectItems[idx].rotation = ((objectItems[idx].rotation + step) % 360 + 360) % 360;
-        renderObjects();
-        if (selectedKind === 'object' && selectedIndex === idx) renderSidebar();
-        return;
-      }
-    }
-
     e.preventDefault();
     const rect = svg.getBoundingClientRect();
     const mx = vbX + ((e.clientX - rect.left) / rect.width) * vbW;

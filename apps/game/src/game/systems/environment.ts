@@ -102,13 +102,13 @@ export function buildTrees(
   // ── Template meshes (invisible sources for instancing) ──
   // One conifer trunk + one broadleaf trunk (same material → 2 draw calls)
   const coniferTrunkTpl = MeshBuilder.CreateCylinder('tpl_ct', {
-    height: 2.5, diameterTop: 0.25, diameterBottom: 0.35, tessellation: 6,
+    height: 3.75, diameterTop: 0.3, diameterBottom: 0.45, tessellation: 6,
   }, scene);
   coniferTrunkTpl.material = trunkMat;
   coniferTrunkTpl.isVisible = false;
 
   const broadleafTrunkTpl = MeshBuilder.CreateCylinder('tpl_bt', {
-    height: 2, diameterTop: 0.3, diameterBottom: 0.4, tessellation: 6,
+    height: 3, diameterTop: 0.35, diameterBottom: 0.5, tessellation: 6,
   }, scene);
   broadleafTrunkTpl.material = trunkMat;
   broadleafTrunkTpl.isVisible = false;
@@ -116,7 +116,7 @@ export function buildTrees(
   // Per-colour crown templates (12 colours × 2 variants = 24 draw calls)
   const coniferCrownTpls: Mesh[] = foliageMats.map((mat, i) => {
     const m = MeshBuilder.CreateCylinder(`tpl_cc_${i}`, {
-      height: 4, diameterTop: 0, diameterBottom: 2.8, tessellation: 6,
+      height: 6, diameterTop: 0, diameterBottom: 4.2, tessellation: 6,
     }, scene);
     m.material = mat;
     m.isVisible = false;
@@ -125,7 +125,7 @@ export function buildTrees(
 
   const broadleafCrownTpls: Mesh[] = foliageMats.map((mat, i) => {
     const m = MeshBuilder.CreateSphere(`tpl_bc_${i}`, {
-      diameter: 3, segments: 6,
+      diameter: 4.5, segments: 6,
     }, scene);
     m.material = mat;
     m.isVisible = false;
@@ -150,20 +150,20 @@ export function buildTrees(
     if (variantRoll < 0.5) {
       // Conifer
       const trunk = coniferTrunkTpl.createInstance(`${prefix}_t_${idx}`);
-      trunk.position.set(0, 1.25, 0);
+      trunk.position.set(0, 1.875, 0);
       trunk.parent = treeRoot;
 
       const crown = coniferCrownTpls[colorIdx].createInstance(`${prefix}_c_${idx}`);
-      crown.position.set(0, 3.5, 0);
+      crown.position.set(0, 5.25, 0);
       crown.parent = treeRoot;
     } else {
       // Broad-leaf
       const trunk = broadleafTrunkTpl.createInstance(`${prefix}_t_${idx}`);
-      trunk.position.set(0, 1, 0);
+      trunk.position.set(0, 1.5, 0);
       trunk.parent = treeRoot;
 
       const crown = broadleafCrownTpls[colorIdx].createInstance(`${prefix}_c_${idx}`);
-      crown.position.set(0, 3.2, 0);
+      crown.position.set(0, 4.8, 0);
       crown.parent = treeRoot;
     }
 

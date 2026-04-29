@@ -351,7 +351,54 @@ function App() {
       game.setWaitForCountdown();
     }
 
+    // --- Register lobby message handler BEFORE init so we never miss early messages ---
+    // Messages received during init are buffered via readyPeers / countdownRequested
+    // and acted on AFTER init completes.
+    const readyPeers = new Set<string>();
+    let countdownTriggered = false;
+    let countdownRequested = false; // set true if host/joiner signal arrives during init
+    let initComplete = false;
+
+    function triggerSyncedCountdown() {
+      if (countdownTriggered) return; // guard against double-fire
+      if (!initComplete) {
+        // Init hasn't finished yet — defer until after init
+        countdownRequested = true;
+        return;
+      }
+      countdownTriggered = true;
+      game.startCountdown();
+    }
+
+    if (isMultiplayer && mp.roomCode) {
+      const totalPlayers = mp.peerCount + 1;
+
+      if (mp.isHost) {
+        mp.onLobbyMessage = (msg, peerId) => {
+          if (msg.type === 'gameReady') {
+            readyPeers.add(peerId);
+            if (readyPeers.size >= totalPlayers - 1) {
+              mp.broadcastLobby({ type: 'startCountdown' });
+              triggerSyncedCountdown();
+            }
+          }
+        };
+      } else {
+        mp.onLobbyMessage = (msg, _peerId) => {
+          if (msg.type === 'startCountdown') {
+            triggerSyncedCountdown();
+          }
+        };
+      }
+    }
+
     await game.init(eventId);
+    initComplete = true;
+
+    // If a countdown signal arrived during init, fire it now
+    if (countdownRequested) {
+      triggerSyncedCountdown();
+    }
 
     if (isMultiplayer && mp.roomCode) {
       // Build a remote bus for each currently-connected peer
@@ -361,28 +408,14 @@ function App() {
         await game.buildRemoteBusForPeer(peerId, idx, remoteCharSel);
       }
 
+      // Wait for the scene to actually render a frame so the player
+      // sees the 3D world before the countdown begins.
+      await game.waitUntilSceneRendered();
+
       // --- Host-synced countdown start ---
       const totalPlayers = mp.peerCount + 1;
-      const readyPeers = new Set<string>();
-
-      // Function to trigger the countdown (called when all players report ready)
-      function triggerSyncedCountdown() {
-        game.startCountdown();
-      }
 
       if (mp.isHost) {
-        // Host is already ready (local init complete).
-        // Wait for all joiners to report 'gameReady'.
-        mp.onLobbyMessage = (msg, peerId) => {
-          if (msg.type === 'gameReady') {
-            readyPeers.add(peerId);
-            // All joiners ready → broadcast startCountdown to everyone, then start locally
-            if (readyPeers.size >= totalPlayers - 1) {
-              mp.broadcastLobby({ type: 'startCountdown' });
-              triggerSyncedCountdown();
-            }
-          }
-        };
         // Broadcast our own readiness to peers (so they see us if we're the last one)
         mp.broadcastLobby({ type: 'gameReady' });
 
@@ -390,13 +423,13 @@ function App() {
         if (totalPlayers <= 1) {
           triggerSyncedCountdown();
         }
+
+        // Check if all joiners already reported ready while we were loading
+        if (readyPeers.size >= totalPlayers - 1) {
+          mp.broadcastLobby({ type: 'startCountdown' });
+          triggerSyncedCountdown();
+        }
       } else {
-        // Joiner: listen for host's startCountdown signal
-        mp.onLobbyMessage = (msg, _peerId) => {
-          if (msg.type === 'startCountdown') {
-            triggerSyncedCountdown();
-          }
-        };
         // Tell the host we're ready
         mp.broadcastLobby({ type: 'gameReady' });
       }
@@ -465,8 +498,10 @@ function App() {
         }
       }, 66);
 
-      // Show "Waiting..." while waiting for all players to load
-      setCountdown('Waiting...');
+      // Show "Waiting..." only if countdown hasn't already been triggered
+      if (!countdownTriggered) {
+        setCountdown('Waiting...');
+      }
     }
 
     setScreen('playing');

@@ -98,10 +98,11 @@ export interface CountdownCameraParams {
   countdownTimer: number;
   countdownDuration: number;
   getGroundY: (x: number, z: number) => number;
+  getWaterSurfaceY?: (x: number, z: number) => number | null;
 }
 
 export function updateCountdownCameraSystem(params: CountdownCameraParams): void {
-  const { dt, camera, busYaw, busPos, countdownTimer, countdownDuration, getGroundY } = params;
+  const { dt, camera, busYaw, busPos, countdownTimer, countdownDuration, getGroundY, getWaterSurfaceY } = params;
 
   const t = Math.max(0, Math.min(1, 1 - countdownTimer / countdownDuration));
   const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -122,7 +123,14 @@ export function updateCountdownCameraSystem(params: CountdownCameraParams): void
   const camZ = busPos.z + orbitDir.z * dist;
   const groundY = getGroundY(busPos.x, busPos.z);
   const camGroundY = getGroundY(camX, camZ);
-  const camY = Math.max(groundY, camGroundY) + camHeight;
+  let baseY = Math.max(groundY, camGroundY);
+  if (getWaterSurfaceY) {
+    const waterAtBus = getWaterSurfaceY(busPos.x, busPos.z);
+    const waterAtCam = getWaterSurfaceY(camX, camZ);
+    if (waterAtBus !== null) baseY = Math.max(baseY, waterAtBus);
+    if (waterAtCam !== null) baseY = Math.max(baseY, waterAtCam);
+  }
+  const camY = baseY + camHeight;
 
   const desiredCamPos = new Vector3(camX, camY, camZ);
   const camSmooth = Math.min(1, 6 * dt);
@@ -141,10 +149,11 @@ export interface ChaseCameraParams {
   busPos: Vector3;
   cameraYawOffset: number;
   getGroundY: (x: number, z: number) => number;
+  getWaterSurfaceY?: (x: number, z: number) => number | null;
 }
 
 export function updateChaseCameraSystem(params: ChaseCameraParams): number {
-  const { dt, camera, busYaw, busSpeed, busPos, getGroundY } = params;
+  const { dt, camera, busYaw, busSpeed, busPos, getGroundY, getWaterSurfaceY } = params;
 
   const camDist = 18;
   const camHeight = 8;
@@ -162,7 +171,16 @@ export function updateChaseCameraSystem(params: ChaseCameraParams): number {
   const camZ = busPos.z - camForward.z * camDist;
   const groundY = getGroundY(busPos.x, busPos.z);
   const camGroundY = getGroundY(camX, camZ);
-  const camY = Math.max(groundY, camGroundY) + camHeight;
+  // Ensure the camera never dips below a water surface (avoids rendering
+  // inside water geometry which fills the screen with blue).
+  let baseY = Math.max(groundY, camGroundY);
+  if (getWaterSurfaceY) {
+    const waterAtBus = getWaterSurfaceY(busPos.x, busPos.z);
+    const waterAtCam = getWaterSurfaceY(camX, camZ);
+    if (waterAtBus !== null) baseY = Math.max(baseY, waterAtBus);
+    if (waterAtCam !== null) baseY = Math.max(baseY, waterAtCam);
+  }
+  const camY = baseY + camHeight;
 
   const desiredCamPos = new Vector3(camX, camY, camZ);
   const camSmooth = Math.min(1, 5 * dt);
@@ -187,10 +205,11 @@ export interface RunnerCameraParams {
   runnerYaw: number;
   runnerPos: Vector3;
   getGroundY: (x: number, z: number) => number;
+  getWaterSurfaceY?: (x: number, z: number) => number | null;
 }
 
 export function updateRunnerCameraSystem(params: RunnerCameraParams): void {
-  const { dt, camera, runnerYaw, runnerPos, getGroundY } = params;
+  const { dt, camera, runnerYaw, runnerPos, getGroundY, getWaterSurfaceY } = params;
 
   const camDist = 9;
   const camHeight = 3.2;
@@ -203,7 +222,14 @@ export function updateRunnerCameraSystem(params: RunnerCameraParams): void {
   const camZ = runnerPos.z - forward.z * camDist;
   const groundY = getGroundY(runnerPos.x, runnerPos.z);
   const camGroundY = getGroundY(camX, camZ);
-  const camY = Math.max(groundY, camGroundY) + camHeight;
+  let baseY = Math.max(groundY, camGroundY);
+  if (getWaterSurfaceY) {
+    const waterAtRunner = getWaterSurfaceY(runnerPos.x, runnerPos.z);
+    const waterAtCam = getWaterSurfaceY(camX, camZ);
+    if (waterAtRunner !== null) baseY = Math.max(baseY, waterAtRunner);
+    if (waterAtCam !== null) baseY = Math.max(baseY, waterAtCam);
+  }
+  const camY = baseY + camHeight;
 
   const desiredCamPos = new Vector3(camX, camY, camZ);
   const camSmooth = Math.min(1, 7 * dt);
