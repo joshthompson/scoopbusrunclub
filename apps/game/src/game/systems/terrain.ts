@@ -33,9 +33,89 @@ export function catmullRom(p0: number, p1: number, p2: number, p3: number, t: nu
 // ---------- Terrain height lookup ----------
 
 /**
+ * Pre-computed altitude point in local coordinates for terrain lookups.
+ */
+export interface LocalAltitudePoint {
+  x: number;
+  z: number;
+  h: number; // height (relative to min elevation, scaled)
+}
+
+/**
+ * Convert GPS altitude points [lat, lon, alt][] to local coordinates.
+ * Returns LocalAltitudePoint[] ready for terrain lookups.
+ */
+export function altitudeToLocal(
+  altitudePoints: [number, number, number][],
+  originCoord: number[],
+  scaleFactor: number,
+  elevationScale: number,
+): LocalAltitudePoint[] {
+  if (altitudePoints.length === 0) return [];
+
+  const minElev = Math.min(...altitudePoints.map((p) => p[2]));
+
+  return altitudePoints.map(([lat, lon, alt]) => {
+    const [rawX, rawZ] = gpsPointToLocal(lon, lat, originCoord);
+    return {
+      x: rawX * scaleFactor,
+      z: rawZ * scaleFactor,
+      h: (alt - minElev) * elevationScale,
+    };
+  });
+}
+
+/**
+ * Get terrain height at a world (x, z) position using Inverse Distance Weighting
+ * from scattered altitude sample points.
+ *
+ * Uses the K nearest altitude points weighted by 1/distance² for smooth
+ * interpolation. Falls back to nearest-point height if queried exactly on
+ * a sample point.
+ */
+export function computeTerrainHeightIDW(
+  x: number,
+  z: number,
+  altPoints: LocalAltitudePoint[],
+  k = 6,
+): number {
+  const n = altPoints.length;
+  if (n === 0) return 0;
+  if (n === 1) return altPoints[0].h;
+
+  // Find K nearest points
+  // For small point sets (<200) brute force is fine
+  const dists: { dist2: number; h: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const dx = x - altPoints[i].x;
+    const dz = z - altPoints[i].z;
+    const dist2 = dx * dx + dz * dz;
+    dists.push({ dist2, h: altPoints[i].h });
+  }
+  dists.sort((a, b) => a.dist2 - b.dist2);
+
+  // Exact match → return directly
+  if (dists[0].dist2 < 0.001) return dists[0].h;
+
+  // IDW with power=2 on K nearest
+  const kActual = Math.min(k, n);
+  let weightSum = 0;
+  let valueSum = 0;
+  for (let i = 0; i < kActual; i++) {
+    const w = 1 / dists[i].dist2; // 1/d²
+    weightSum += w;
+    valueSum += w * dists[i].h;
+  }
+
+  return valueSum / weightSum;
+}
+
+/**
  * Get smoothly interpolated terrain height at a world (x, z) position.
  * Projects onto the nearest path segment, then applies Catmull-Rom spline
  * interpolation through path heights for a smooth curved surface.
+ *
+ * @deprecated Use computeTerrainHeightIDW with altitude points for better results.
  */
 export function computeTerrainHeight(
   x: number,

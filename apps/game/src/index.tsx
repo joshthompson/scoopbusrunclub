@@ -101,6 +101,7 @@ function App() {
   let demoGame: Game | null = null;
   let activeGame: Game | null = null;
   let currentEventId = '';
+  let currentAltCourse = false;
   let mpSendInterval: ReturnType<typeof setInterval> | null = null;
 
   // --- Pause / resume toggle ---
@@ -168,8 +169,9 @@ function App() {
     }
   }
 
-  function handleLevelSelect(levelId: string) {
+  function handleLevelSelect(levelId: string, opts?: { altCourse?: boolean }) {
     currentEventId = levelId;
+    currentAltCourse = opts?.altCourse ?? false;
     if (gameMode() === 'single') {
       setScreen('role-select');
     } else {
@@ -341,6 +343,7 @@ function App() {
     });
 
     activeGame = game;
+    game.useAltCourse = currentAltCourse;
 
     // --- Multiplayer setup ---
     const isMultiplayer = isMultiplayerMode();
@@ -393,6 +396,8 @@ function App() {
     }
 
     await game.init(eventId);
+    // NOTE: useAltCourse is set on the game instance before init
+    // so initScene picks it up
     initComplete = true;
 
     // If a countdown signal arrived during init, fire it now

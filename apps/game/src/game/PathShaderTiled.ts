@@ -29,6 +29,8 @@ import fieldUrl from '../assets/field.png';
 import sandUrl from '../assets/sand.png';
 import {
   RENDER_TEXTURE_ANISOTROPY,
+  TERRAIN_LOD_NEAR_DIST,
+  TERRAIN_LOD_FAR_DIST,
   LIGHT_DAY_SUN_INTENSITY,
   LIGHT_DAY_SUN_DIR_X,
   LIGHT_DAY_SUN_DIR_Y,
@@ -52,15 +54,21 @@ import type { PathShaderOptions, IcePatchOverlay } from './PathShader';
 
 /** Low-res mask covers the full world. */
 const LO_RES = 1024;
-/** High-res inset covers a window around the player. */
-const HI_RES = 2048;
-/** World-space size of the high-res inset window (derived from CHUNK_SIZE × 6). */
+/** Mid-res inset covers a window around the player (current "high-res"). */
+const MID_RES = 2048;
+/** Ultra-hi-res inset covers a tight window around the player (2× mid quality). */
+const ULTRA_RES = 2048;
+/** World-space size of the mid-res inset window (derived from CHUNK_SIZE × 6). */
 export const CHUNK_SIZE = 250;
 /** When true, draws red outlines at chunk grid boundaries for debugging. */
 export const CHUNK_DEBUG = false;
-const INSET_SIZE = CHUNK_SIZE * 6;
-/** Re-bake threshold: player must move this far from last bake center. */
-const REBAKE_THRESHOLD = CHUNK_SIZE * 0.8;
+const MID_INSET_SIZE = CHUNK_SIZE * 6;
+/** World-space size of the ultra-hi-res inset window (half of mid → 2× pixel density). */
+const ULTRA_INSET_SIZE = CHUNK_SIZE * 3;
+/** Re-bake threshold for mid-res inset: player must move this far from last bake center. */
+const MID_REBAKE_THRESHOLD = CHUNK_SIZE * 0.8;
+/** Re-bake threshold for ultra-hi-res inset. */
+const ULTRA_REBAKE_THRESHOLD = CHUNK_SIZE * 0.3;
 
 // ---------- Types ----------
 
@@ -104,27 +112,38 @@ varying vec2 vUV;
 varying vec3 vNormalW;
 varying vec3 vPositionW;
 
-// Mask textures — low-res (full world) and high-res (inset)
+// Mask textures — three LOD levels: lo (full world), mid (inset), ultra (tight inset)
 uniform sampler2D mixMap1Lo;
-uniform sampler2D mixMap1Hi;
+uniform sampler2D mixMap1Mid;
+uniform sampler2D mixMap1Ultra;
 uniform sampler2D mixMap2Lo;
-uniform sampler2D mixMap2Hi;
-// Third mask: R=field(255)/concrete(128), G=sand/beach
+uniform sampler2D mixMap2Mid;
+uniform sampler2D mixMap2Ultra;
+// Third mask: R=field zone, G=sand/beach candidate, B=encoded water Y
 uniform sampler2D mixMap3Lo;
-uniform sampler2D mixMap3Hi;
+uniform sampler2D mixMap3Mid;
+uniform sampler2D mixMap3Ultra;
 
 // Inset bounds in UV space: vec4(uMin, vMin, uMax, vMax)
-uniform vec4 insetBounds;
+uniform vec4 midBounds;
+uniform vec4 ultraBounds;
+
+// Camera position for distance-based LOD selection
+uniform vec3 cameraPosition;
+uniform float lodNearDist;   // e.g. 50.0
+uniform float lodFarDist;    // e.g. 200.0
 
 // Diffuse textures (tiled)
 uniform sampler2D forestTex;
 uniform sampler2D dirtTex;
-uniform sampler2D roadTex;
-uniform sampler2D whiteTex;
-uniform sampler2D iceTex;
 uniform sampler2D fieldTex;
 uniform sampler2D sandTex;
-uniform sampler2D concreteTex;
+
+// Solid-color values (replacing tiny 4×4 textures)
+uniform vec3 roadColorVal;
+uniform vec3 whiteColorVal;
+uniform vec3 iceColorVal;
+uniform vec3 concreteColorVal;
 
 // Tiling factors
 uniform float forestTiling;
@@ -154,23 +173,51 @@ uniform float spotExponents[MAX_SPOT_LIGHTS];
 uniform float chunkDebug;   // 0.0 = off, 1.0 = on
 uniform float chunkSizeUV;  // CHUNK_SIZE / groundSize in UV space
 
-// Sample the best-available mix map: high-res inset if UV is within bounds,
-// otherwise fall back to low-res full-world texture.
-vec4 sampleMixMap(sampler2D lo, sampler2D hi, vec2 uv) {
-  // Check if UV is within the high-res inset bounds
-  if (uv.x >= insetBounds.x && uv.x <= insetBounds.z &&
-      uv.y >= insetBounds.y && uv.y <= insetBounds.w) {
-    vec2 hiUV = (uv - insetBounds.xy) / (insetBounds.zw - insetBounds.xy);
-    return texture2D(hi, hiUV);
+// Sample the best-available mix map using 3-level LOD:
+//   ultra (tight inset, 2× quality)  → within lodNearDist from camera
+//   mid   (wider inset, base quality) → lodNearDist – lodFarDist
+//   lo    (full world, low quality)   → beyond lodFarDist
+vec4 sampleMixMap(sampler2D lo, sampler2D mid, sampler2D ultra, vec2 uv) {
+  vec2 dxz = vPositionW.xz - cameraPosition.xz;
+  float dist = sqrt(dxz.x * dxz.x + dxz.y * dxz.y);
+
+  // --- Far LOD: only low-res available ---
+  float farEdge = lodFarDist + 10.0;
+  if (dist > farEdge) {
+    return texture2D(lo, uv);
   }
-  return texture2D(lo, uv);
+
+  vec4 loSample = texture2D(lo, uv);
+
+  // --- Mid LOD: blend lo → mid around lodFarDist ---
+  bool inMid = uv.x >= midBounds.x && uv.x <= midBounds.z &&
+               uv.y >= midBounds.y && uv.y <= midBounds.w;
+  if (!inMid) return loSample;
+
+  vec2 midUV = (uv - midBounds.xy) / (midBounds.zw - midBounds.xy);
+  vec4 midSample = texture2D(mid, midUV);
+  float midBlend = 1.0 - smoothstep(lodFarDist - 20.0, lodFarDist, dist);
+  vec4 result = mix(loSample, midSample, midBlend);
+
+  // --- Ultra LOD: blend mid → ultra around lodNearDist ---
+  float nearEdge = lodNearDist + 5.0;
+  if (dist > nearEdge) return result;
+
+  bool inUltra = uv.x >= ultraBounds.x && uv.x <= ultraBounds.z &&
+                 uv.y >= ultraBounds.y && uv.y <= ultraBounds.w;
+  if (!inUltra) return result;
+
+  vec2 hiUV = (uv - ultraBounds.xy) / (ultraBounds.zw - ultraBounds.xy);
+  vec4 ultraSample = texture2D(ultra, hiUV);
+  float ultraBlend = 1.0 - smoothstep(lodNearDist - 10.0, lodNearDist, dist);
+  return mix(result, ultraSample, ultraBlend);
 }
 
 void main() {
-  // Sample mix maps (uses high-res inset near player, low-res elsewhere)
-  vec4 mix1 = sampleMixMap(mixMap1Lo, mixMap1Hi, vUV);
-  vec4 mix2 = sampleMixMap(mixMap2Lo, mixMap2Hi, vUV);
-  vec4 mix3 = sampleMixMap(mixMap3Lo, mixMap3Hi, vUV);
+  // Sample mix maps (3-level LOD based on distance from camera)
+  vec4 mix1 = sampleMixMap(mixMap1Lo, mixMap1Mid, mixMap1Ultra, vUV);
+  vec4 mix2 = sampleMixMap(mixMap2Lo, mixMap2Mid, mixMap2Ultra, vUV);
+  vec4 mix3 = sampleMixMap(mixMap3Lo, mixMap3Mid, mixMap3Ultra, vUV);
 
   // Tiled texture coordinates
   vec2 forestUV = vUV * forestTiling;
@@ -182,29 +229,30 @@ void main() {
   // Sample diffuse textures
   vec3 forestColor = texture2D(forestTex, forestUV).rgb;
   vec3 dirtColor = texture2D(dirtTex, dirtUV).rgb;
-  vec3 roadColor = texture2D(roadTex, vec2(0.5)).rgb;
-  vec3 whiteColor = texture2D(whiteTex, vec2(0.5)).rgb;
-  vec3 iceColor = texture2D(iceTex, vec2(0.5)).rgb;
+  vec3 roadColor = roadColorVal;
+  vec3 whiteColor = whiteColorVal;
+  vec3 iceColor = iceColorVal;
   vec3 fieldColor = texture2D(fieldTex, fieldUV).rgb;
   vec3 sandColor = texture2D(sandTex, sandUV).rgb;
-  vec3 concreteColor = texture2D(concreteTex, concreteUV).rgb;
+  vec3 concreteColor = concreteColorVal;
 
   // Blending chain:
   //   1. Start with forest × R channel brightness
   vec3 color = forestColor * mix1.r;
-  //   2. Decode zone mask R channel: 1.0=field, ~0.5=concrete, 0.0=neither
-  float fieldFactor = smoothstep(0.65, 0.85, mix3.r);
-  float concreteFactor = smoothstep(0.25, 0.45, mix3.r) * (1.0 - smoothstep(0.55, 0.75, mix3.r));
+  //   2. Blend field zone — soft-edged gradient baked into zoneMask R channel
+  float fieldFactor = smoothstep(0.55, 1.0, mix3.r);
   color = mix(color, fieldColor, fieldFactor);
+  //   2b. Blend concrete — soft-edged gradient baked into lineMask B channel
+  float concreteFactor = smoothstep(0.55, 1.0, mix2.b);
   color = mix(color, concreteColor, concreteFactor);
-  //   3. Blend sand/beach — only where terrain is near/below water surface.
+  //   3. Blend sand/beach — smoothed candidate zone with height-based cutoff.
   //      Rendered before roads/paths so they draw on top of sand.
-  //      mix3.G = sand candidate zone, mix3.B = encoded water Y level.
+  //      mix3.G = sand candidate zone (soft-edged), mix3.B = encoded water Y.
   //      Decode water Y from B channel: [0,1] → [-100, +100] world units.
   //      Show sand where terrain Y is within 1m above the water surface,
   //      with a 0.5m soft transition.
-  float sandCandidate = mix3.g;
-  if (sandCandidate > 0.01) {
+  float sandCandidate = smoothstep(0.1, 0.8, mix3.g);
+  if (sandCandidate > 0.001) {
     float waterY = mix3.b * 200.0 - 100.0;
     float sandTop = waterY + 1.0;
     float softness = 0.5;
@@ -270,17 +318,28 @@ void main() {
     if (gridDist < lineThickness) {
       gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
     }
-    // Also outline the high-res inset bounds in yellow
+    // Also outline the mid-res inset bounds in yellow
     float ib = 0.0008;
-    float dLeft   = abs(vUV.x - insetBounds.x);
-    float dRight  = abs(vUV.x - insetBounds.z);
-    float dBottom = abs(vUV.y - insetBounds.y);
-    float dTop    = abs(vUV.y - insetBounds.w);
-    bool inVertRange = vUV.y >= insetBounds.y - ib && vUV.y <= insetBounds.w + ib;
-    bool inHorizRange = vUV.x >= insetBounds.x - ib && vUV.x <= insetBounds.z + ib;
+    float dLeft   = abs(vUV.x - midBounds.x);
+    float dRight  = abs(vUV.x - midBounds.z);
+    float dBottom = abs(vUV.y - midBounds.y);
+    float dTop    = abs(vUV.y - midBounds.w);
+    bool inVertRange = vUV.y >= midBounds.y - ib && vUV.y <= midBounds.w + ib;
+    bool inHorizRange = vUV.x >= midBounds.x - ib && vUV.x <= midBounds.z + ib;
     if ((dLeft < ib && inVertRange) || (dRight < ib && inVertRange) ||
         (dBottom < ib && inHorizRange) || (dTop < ib && inHorizRange)) {
       gl_FragColor = vec4(1.0, 1.0, 0.0, 1.0);
+    }
+    // Outline ultra-res inset bounds in cyan
+    float dLeftU   = abs(vUV.x - ultraBounds.x);
+    float dRightU  = abs(vUV.x - ultraBounds.z);
+    float dBottomU = abs(vUV.y - ultraBounds.y);
+    float dTopU    = abs(vUV.y - ultraBounds.w);
+    bool inVertRangeU = vUV.y >= ultraBounds.y - ib && vUV.y <= ultraBounds.w + ib;
+    bool inHorizRangeU = vUV.x >= ultraBounds.x - ib && vUV.x <= ultraBounds.z + ib;
+    if ((dLeftU < ib && inVertRangeU) || (dRightU < ib && inVertRangeU) ||
+        (dBottomU < ib && inHorizRangeU) || (dTopU < ib && inHorizRangeU)) {
+      gl_FragColor = vec4(0.0, 1.0, 1.0, 1.0);
     }
   }
 }
@@ -322,28 +381,37 @@ export function createTiledPathGroundMaterial(
 
   const maxTexSize = scene.getEngine().getCaps().maxTextureSize || 4096;
   const loRes = Math.min(LO_RES, maxTexSize);
-  const hiRes = Math.min(HI_RES, maxTexSize);
+  const midRes = Math.min(MID_RES, maxTexSize);
+  const ultraRes = Math.min(ULTRA_RES, maxTexSize);
 
   // --- 1. Bake low-res full-world masks ---
   const loMask = bakeMask(scene, 'lo', loRes, pathPositions, roads, trails, groundSize,
     pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
     -groundSize / 2, -groundSize / 2, groundSize, groundSize, fields, concrete, waterZones);
 
-  // --- 2. Bake high-res inset masks (initial center: first path point or 0,0) ---
+  // --- 2. Bake mid-res inset masks (initial center: first path point or 0,0) ---
   const initialCX = pathPositions.length > 0 ? pathPositions[0][0] : 0;
   const initialCZ = pathPositions.length > 0 ? pathPositions[0][1] : 0;
-  const halfInset = INSET_SIZE / 2;
+  const halfMidInset = MID_INSET_SIZE / 2;
+  const halfUltraInset = ULTRA_INSET_SIZE / 2;
 
-  const hiMask = bakeMask(scene, 'hi', hiRes, pathPositions, roads, trails, groundSize,
+  const midMask = bakeMask(scene, 'mid', midRes, pathPositions, roads, trails, groundSize,
     pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
-    initialCX - halfInset, initialCZ - halfInset, INSET_SIZE, INSET_SIZE, fields, concrete, waterZones);
+    initialCX - halfMidInset, initialCZ - halfMidInset, MID_INSET_SIZE, MID_INSET_SIZE, fields, concrete, waterZones);
 
-  let lastBakeCX = initialCX;
-  let lastBakeCZ = initialCZ;
+  // --- 2b. Bake ultra-hi-res inset masks (2× quality, tight window) ---
+  const ultraMask = bakeMask(scene, 'ultra', ultraRes, pathPositions, roads, trails, groundSize,
+    pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
+    initialCX - halfUltraInset, initialCZ - halfUltraInset, ULTRA_INSET_SIZE, ULTRA_INSET_SIZE, fields, concrete, waterZones);
+
+  let lastMidBakeCX = initialCX;
+  let lastMidBakeCZ = initialCZ;
+  let lastUltraBakeCX = initialCX;
+  let lastUltraBakeCZ = initialCZ;
 
   // Compute inset UV bounds
   const halfGround = groundSize / 2;
-  const computeInsetBounds = (cx: number, cz: number): [number, number, number, number] => {
+  const computeInsetBounds = (cx: number, cz: number, halfInset: number): [number, number, number, number] => {
     const uMin = (cx - halfInset + halfGround) / groundSize;
     const vMin = (cz - halfInset + halfGround) / groundSize;
     const uMax = (cx + halfInset + halfGround) / groundSize;
@@ -351,7 +419,8 @@ export function createTiledPathGroundMaterial(
     return [uMin, vMin, uMax, vMax];
   };
 
-  let insetBounds = computeInsetBounds(initialCX, initialCZ);
+  let midBounds = computeInsetBounds(initialCX, initialCZ, halfMidInset);
+  let ultraBoundsArr = computeInsetBounds(initialCX, initialCZ, halfUltraInset);
 
   // --- 3. Register shader code ---
   const shaderName = 'tiledPathGround';
@@ -371,19 +440,15 @@ export function createTiledPathGroundMaterial(
   const sandTex = new Texture(sandUrl, scene);
   sandTex.anisotropicFilteringLevel = RENDER_TEXTURE_ANISOTROPY;
 
-  // Solid-color tiny textures for road, white line, ice, concrete
-  const roadDyn = makeSolidTexture(scene, 'roadTex', '#606066');
-  const whiteDyn = makeSolidTexture(scene, 'whiteTex', '#ffffff');
-  const iceDyn = makeSolidTexture(scene, 'iceTex', '#85d2ff');
-  const concreteDyn = makeSolidTexture(scene, 'concreteTex', '#909090');
-
   // --- 5. Create ShaderMaterial ---
   const mat = new ShaderMaterial(shaderName, scene, shaderName, {
     attributes: ['position', 'normal', 'uv'],
     uniforms: [
       'worldViewProjection', 'world',
-      'insetBounds',
+      'midBounds', 'ultraBounds',
+      'cameraPosition', 'lodNearDist', 'lodFarDist',
       'forestTiling', 'dirtTiling', 'fieldTiling', 'sandTiling', 'concreteTiling',
+      'roadColorVal', 'whiteColorVal', 'iceColorVal', 'concreteColorVal',
       'sunDirection', 'sunIntensity',
       'hemiIntensity', 'hemiGroundColor',
       'chunkDebug', 'chunkSizeUV',
@@ -392,30 +457,36 @@ export function createTiledPathGroundMaterial(
       'spotIntensities', 'spotRanges', 'spotCosAngles', 'spotExponents',
     ],
     samplers: [
-      'mixMap1Lo', 'mixMap1Hi', 'mixMap2Lo', 'mixMap2Hi',
-      'mixMap3Lo', 'mixMap3Hi',
-      'forestTex', 'dirtTex', 'roadTex', 'whiteTex', 'iceTex',
-      'fieldTex', 'sandTex', 'concreteTex',
+      'mixMap1Lo', 'mixMap1Mid', 'mixMap1Ultra',
+      'mixMap2Lo', 'mixMap2Mid', 'mixMap2Ultra',
+      'mixMap3Lo', 'mixMap3Mid', 'mixMap3Ultra',
+      'forestTex', 'dirtTex',
+      'fieldTex', 'sandTex',
     ],
   });
 
   mat.backFaceCulling = true;
 
-  // Set textures
+  // Set mask textures (3 LOD levels × 3 mask types)
   mat.setTexture('mixMap1Lo', loMask.maskTex);
-  mat.setTexture('mixMap1Hi', hiMask.maskTex);
+  mat.setTexture('mixMap1Mid', midMask.maskTex);
+  mat.setTexture('mixMap1Ultra', ultraMask.maskTex);
   mat.setTexture('mixMap2Lo', loMask.lineMaskTex);
-  mat.setTexture('mixMap2Hi', hiMask.lineMaskTex);
+  mat.setTexture('mixMap2Mid', midMask.lineMaskTex);
+  mat.setTexture('mixMap2Ultra', ultraMask.lineMaskTex);
   mat.setTexture('mixMap3Lo', loMask.zoneMaskTex);
-  mat.setTexture('mixMap3Hi', hiMask.zoneMaskTex);
+  mat.setTexture('mixMap3Mid', midMask.zoneMaskTex);
+  mat.setTexture('mixMap3Ultra', ultraMask.zoneMaskTex);
   mat.setTexture('forestTex', forestTex);
   mat.setTexture('dirtTex', dirtTex);
-  mat.setTexture('roadTex', roadDyn);
-  mat.setTexture('whiteTex', whiteDyn);
-  mat.setTexture('iceTex', iceDyn);
   mat.setTexture('fieldTex', fieldTex);
   mat.setTexture('sandTex', sandTex);
-  mat.setTexture('concreteTex', concreteDyn);
+
+  // Solid-color uniforms (replaces tiny 4×4 textures — saves texture units)
+  mat.setVector3('roadColorVal', hexToVec3('#606066'));
+  mat.setVector3('whiteColorVal', hexToVec3('#ffffff'));
+  mat.setVector3('iceColorVal', hexToVec3('#85d2ff'));
+  mat.setVector3('concreteColorVal', hexToVec3('#909090'));
 
   // Set tiling
   mat.setFloat('forestTiling', forestTiling);
@@ -424,11 +495,18 @@ export function createTiledPathGroundMaterial(
   mat.setFloat('sandTiling', sandTiling);
   mat.setFloat('concreteTiling', concreteTiling);
 
-  // Set inset bounds
-  mat.setVector4('insetBounds', new (
-    // Use inline Vector4 to avoid extra import
-    class { x: number; y: number; z: number; w: number; constructor(x: number, y: number, z: number, w: number) { this.x = x; this.y = y; this.z = z; this.w = w; } }
-  )(insetBounds[0], insetBounds[1], insetBounds[2], insetBounds[3]) as any);
+  // Set inset bounds for both LOD levels
+  const vec4 = (x: number, y: number, z: number, w: number) =>
+    ({ x, y, z, w }) as any;
+  mat.setVector4('midBounds', vec4(midBounds[0], midBounds[1], midBounds[2], midBounds[3]));
+  mat.setVector4('ultraBounds', vec4(ultraBoundsArr[0], ultraBoundsArr[1], ultraBoundsArr[2], ultraBoundsArr[3]));
+
+  // LOD distance thresholds
+  mat.setFloat('lodNearDist', TERRAIN_LOD_NEAR_DIST);
+  mat.setFloat('lodFarDist', TERRAIN_LOD_FAR_DIST);
+
+  // Camera position (updated per-frame in onBind)
+  mat.setVector3('cameraPosition', { x: 0, y: 0, z: 0 } as any);
 
   // Lighting uniforms (values from constants.ts)
   const isNight = opts.isNight ?? false;
@@ -510,34 +588,58 @@ export function createTiledPathGroundMaterial(
         effect.setFloatArray('spotCosAngles', spotCosArr.subarray(0, count));
         effect.setFloatArray('spotExponents', spotExpArr.subarray(0, count));
       }
+
+      // Push camera position for distance-based LOD in the shader
+      const cam = scene.activeCamera;
+      if (cam) {
+        const cp = cam.position;
+        effect.setFloat3('cameraPosition', cp.x, cp.y, cp.z);
+      }
     }
   };
 
-  // --- 6. Ice patch update function (draws into high-res + low-res lineMask) ---
+  // --- 6. Ice patch update function (draws into all mask levels) ---
   const setIcePatches = (patches: IcePatchOverlay[]) => {
     loMask.setIcePatches(patches);
-    hiMask.setIcePatches(patches);
+    midMask.setIcePatches(patches);
+    ultraMask.setIcePatches(patches);
   };
 
   // --- 7. Inset center update (called from game loop) ---
   const updateInsetCenter = (playerX: number, playerZ: number) => {
-    const dx = playerX - lastBakeCX;
-    const dz = playerZ - lastBakeCZ;
-    if (dx * dx + dz * dz < REBAKE_THRESHOLD * REBAKE_THRESHOLD) return;
+    // --- Mid-res rebake ---
+    const mdx = playerX - lastMidBakeCX;
+    const mdz = playerZ - lastMidBakeCZ;
+    if (mdx * mdx + mdz * mdz >= MID_REBAKE_THRESHOLD * MID_REBAKE_THRESHOLD) {
+      lastMidBakeCX = playerX;
+      lastMidBakeCZ = playerZ;
 
-    // Re-bake high-res inset around new position
-    lastBakeCX = playerX;
-    lastBakeCZ = playerZ;
+      rebakeMask(midMask, midRes, pathPositions, roads, trails, groundSize,
+        pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
+        playerX - halfMidInset, playerZ - halfMidInset, MID_INSET_SIZE, MID_INSET_SIZE, fields, concrete, waterZones);
 
-    rebakeMask(hiMask, hiRes, pathPositions, roads, trails, groundSize,
-      pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
-      playerX - halfInset, playerZ - halfInset, INSET_SIZE, INSET_SIZE, fields, concrete, waterZones);
+      midBounds = computeInsetBounds(playerX, playerZ, halfMidInset);
+      mat.setVector4('midBounds', {
+        x: midBounds[0], y: midBounds[1], z: midBounds[2], w: midBounds[3],
+      } as any);
+    }
 
-    // Update inset UV bounds
-    insetBounds = computeInsetBounds(playerX, playerZ);
-    mat.setVector4('insetBounds', {
-      x: insetBounds[0], y: insetBounds[1], z: insetBounds[2], w: insetBounds[3],
-    } as any);
+    // --- Ultra-res rebake (tighter threshold, smaller window) ---
+    const udx = playerX - lastUltraBakeCX;
+    const udz = playerZ - lastUltraBakeCZ;
+    if (udx * udx + udz * udz >= ULTRA_REBAKE_THRESHOLD * ULTRA_REBAKE_THRESHOLD) {
+      lastUltraBakeCX = playerX;
+      lastUltraBakeCZ = playerZ;
+
+      rebakeMask(ultraMask, ultraRes, pathPositions, roads, trails, groundSize,
+        pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
+        playerX - halfUltraInset, playerZ - halfUltraInset, ULTRA_INSET_SIZE, ULTRA_INSET_SIZE, fields, concrete, waterZones);
+
+      ultraBoundsArr = computeInsetBounds(playerX, playerZ, halfUltraInset);
+      mat.setVector4('ultraBounds', {
+        x: ultraBoundsArr[0], y: ultraBoundsArr[1], z: ultraBoundsArr[2], w: ultraBoundsArr[3],
+      } as any);
+    }
   };
 
   // Attach helpers
@@ -746,45 +848,79 @@ function paintMaskContent(
   // mixTexture2 starts as all black (no start-line overlay)
   lineCtx.fillStyle = 'rgb(0, 0, 0)';
   lineCtx.fillRect(0, 0, size, size);
-  // zoneMask: R channel encodes region type (255=field, 128=concrete, 0=none)
-  //           G=sand candidate, B=encoded water Y — starts black
+  // zoneMask: R=field zone (soft-edged), G=sand candidate, B=encoded water Y
   zoneCtx.fillStyle = 'rgb(0, 0, 0)';
   zoneCtx.fillRect(0, 0, size, size);
 
   // World-to-pixel width conversion for this region
   const worldToPixelW = (w: number) => (w / worldW) * size;
 
-  // -- Paint concrete polygons into zoneMask R channel (half-intensity) --
-  // Painted first so fields can override if they overlap.
+  // -- Paint concrete polygons into lineMask B channel with soft gradient edges --
+  const CONCRETE_SOFT_EDGE = 6; // world-space transition width
   if (concrete.length > 0) {
+    const cSoftPx = worldToPixelW(CONCRETE_SOFT_EDGE);
+    lineCtx.globalCompositeOperation = 'lighten';
     for (const polygon of concrete) {
       if (polygon.length < 3) continue;
-      zoneCtx.fillStyle = 'rgb(128, 0, 0)';
-      zoneCtx.beginPath();
-      for (let i = 0; i < polygon.length; i++) {
-        const [px, py] = toPixel(polygon[i][0], polygon[i][1]);
-        if (i === 0) zoneCtx.moveTo(px, py);
-        else zoneCtx.lineTo(px, py);
-      }
-      zoneCtx.closePath();
-      zoneCtx.fill();
+      const drawConcretePoly = (style: string, stroke?: number) => {
+        lineCtx.beginPath();
+        for (let i = 0; i < polygon.length; i++) {
+          const [px, py] = toPixel(polygon[i][0], polygon[i][1]);
+          if (i === 0) lineCtx.moveTo(px, py);
+          else lineCtx.lineTo(px, py);
+        }
+        lineCtx.closePath();
+        if (stroke !== undefined) {
+          lineCtx.lineWidth = stroke;
+          lineCtx.lineJoin = 'round';
+          lineCtx.strokeStyle = style;
+          lineCtx.stroke();
+        } else {
+          lineCtx.fillStyle = style;
+          lineCtx.fill();
+        }
+      };
+      // Layered soft edge: outermost halo → solid core
+      drawConcretePoly('rgb(0, 0, 160)', cSoftPx * 2);
+      drawConcretePoly('rgb(0, 0, 200)', cSoftPx * 1.2);
+      drawConcretePoly('rgb(0, 0, 235)', cSoftPx * 0.5);
+      drawConcretePoly('rgb(0, 0, 255)');
     }
+    lineCtx.globalCompositeOperation = 'source-over';
   }
 
-  // -- Paint field polygons into zoneMask R channel (full intensity, overrides concrete) --
+  // -- Paint field polygons into zoneMask R channel with soft gradient edges --
+  const FIELD_SOFT_EDGE = 10; // world-space transition width
   if (fields.length > 0) {
+    const fSoftPx = worldToPixelW(FIELD_SOFT_EDGE);
+    zoneCtx.globalCompositeOperation = 'lighten';
     for (const polygon of fields) {
       if (polygon.length < 3) continue;
-      zoneCtx.fillStyle = 'rgb(255, 0, 0)';
-      zoneCtx.beginPath();
-      for (let i = 0; i < polygon.length; i++) {
-        const [px, py] = toPixel(polygon[i][0], polygon[i][1]);
-        if (i === 0) zoneCtx.moveTo(px, py);
-        else zoneCtx.lineTo(px, py);
-      }
-      zoneCtx.closePath();
-      zoneCtx.fill();
+      const drawFieldPoly = (style: string, stroke?: number) => {
+        zoneCtx.beginPath();
+        for (let i = 0; i < polygon.length; i++) {
+          const [px, py] = toPixel(polygon[i][0], polygon[i][1]);
+          if (i === 0) zoneCtx.moveTo(px, py);
+          else zoneCtx.lineTo(px, py);
+        }
+        zoneCtx.closePath();
+        if (stroke !== undefined) {
+          zoneCtx.lineWidth = stroke;
+          zoneCtx.lineJoin = 'round';
+          zoneCtx.strokeStyle = style;
+          zoneCtx.stroke();
+        } else {
+          zoneCtx.fillStyle = style;
+          zoneCtx.fill();
+        }
+      };
+      // Layered soft edge: outermost halo → solid core
+      drawFieldPoly('rgb(160, 0, 0)', fSoftPx * 2);
+      drawFieldPoly('rgb(200, 0, 0)', fSoftPx * 1.2);
+      drawFieldPoly('rgb(235, 0, 0)', fSoftPx * 0.5);
+      drawFieldPoly('rgb(255, 0, 0)');
     }
+    zoneCtx.globalCompositeOperation = 'source-over';
   }
 
   // -- Paint sand/beach candidate zones into zoneMask G+B channels --
@@ -796,27 +932,38 @@ function paintMaskContent(
   // Water Y encoding: map [-100, +100] → [0, 255]
   if (waterZones.length > 0) {
     const SAND_CANDIDATE_BUFFER = 20; // generous buffer to cover entire bank + margin
+    const SAND_SOFT_EDGE = 8; // extra soft transition beyond the buffer
     const bufferPx = worldToPixelW(SAND_CANDIDATE_BUFFER);
+    const sandSoftPx = worldToPixelW(SAND_SOFT_EDGE);
     zoneCtx.globalCompositeOperation = 'lighten';
     for (const wz of waterZones) {
       if (wz.points.length < 3) continue;
       // Encode water Y into 0-255 range: [-100, +100] → [0, 255]
       const encodedY = Math.max(0, Math.min(255, Math.round(((wz.y + 100) / 200) * 255)));
-      const color = `rgb(0, 255, ${encodedY})`;
-      // Stroke with generous buffer around polygon
-      zoneCtx.lineWidth = bufferPx * 2;
-      zoneCtx.lineJoin = 'round';
-      zoneCtx.strokeStyle = color;
-      zoneCtx.beginPath();
-      for (let i = 0; i < wz.points.length; i++) {
-        const [px, py] = toPixel(wz.points[i][0], wz.points[i][1]);
-        if (i === 0) zoneCtx.moveTo(px, py);
-        else zoneCtx.lineTo(px, py);
-      }
-      zoneCtx.closePath();
-      zoneCtx.stroke();
-      // Fill inside the polygon as well
-      zoneCtx.fillStyle = color;
+
+      // Helper to draw the water polygon outline + fill
+      const drawSandZone = (strokeWidth: number, g: number) => {
+        const style = `rgb(0, ${g}, ${encodedY})`;
+        zoneCtx.lineWidth = strokeWidth;
+        zoneCtx.lineJoin = 'round';
+        zoneCtx.strokeStyle = style;
+        zoneCtx.beginPath();
+        for (let i = 0; i < wz.points.length; i++) {
+          const [px, py] = toPixel(wz.points[i][0], wz.points[i][1]);
+          if (i === 0) zoneCtx.moveTo(px, py);
+          else zoneCtx.lineTo(px, py);
+        }
+        zoneCtx.closePath();
+        zoneCtx.stroke();
+      };
+
+      // Layered soft edge: outermost halo → solid core
+      drawSandZone(bufferPx * 2 + sandSoftPx * 2, 100);  // outermost halo
+      drawSandZone(bufferPx * 2 + sandSoftPx,     180);  // mid transition
+      drawSandZone(bufferPx * 2,                   255);  // core stroke
+
+      // Fill inside the polygon at full intensity
+      zoneCtx.fillStyle = `rgb(0, 255, ${encodedY})`;
       zoneCtx.beginPath();
       for (let i = 0; i < wz.points.length; i++) {
         const [px, py] = toPixel(wz.points[i][0], wz.points[i][1]);
@@ -1005,4 +1152,12 @@ function makeSolidTexture(scene: Scene, name: string, color: string): DynamicTex
   c.fillRect(0, 0, 4, 4);
   dyn.update();
   return dyn;
+}
+
+/** Convert a hex color string (#rrggbb) to an {x,y,z} object for setVector3. */
+function hexToVec3(hex: string): { x: number; y: number; z: number } {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  return { x: r, y: g, z: b } as any;
 }

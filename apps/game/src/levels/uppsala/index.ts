@@ -11,7 +11,7 @@ const level: LevelData = {
   id: 'uppsala',
   name: 'Uppsala',
   course: course as LevelData['course'],
-  altitude,
+  altitude: altitude as LevelData['altitude'],
   water: water as LevelData['water'],
   buildings: buildings as LevelData['buildings'],
   paths: paths as LevelData['paths'],

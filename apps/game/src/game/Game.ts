@@ -159,6 +159,8 @@ import {
 } from './systems/busCollision';
 import {
   computeTerrainHeight,
+  computeTerrainHeightIDW,
+  altitudeToLocal,
   computeWaterZones,
   buildWaterMeshes,
   computeRoadPolylines,
@@ -167,6 +169,7 @@ import {
   getWaterSurfaceYAt,
   getWaterDepressionAt,
 } from './systems/terrain';
+import type { LocalAltitudePoint } from './systems/terrain';
 
 import {
   buildBuildingMeshes,
@@ -245,6 +248,9 @@ export class Game {
   private scaleFactor = 1;
   private elevationScale = 1; // vertical exaggeration
   private originCoord: number[] = [0, 0]; // [lon, lat] of first path point
+  private localAltPoints: LocalAltitudePoint[] = []; // scattered altitude samples for IDW terrain
+  /** When true, use the level's altCourse instead of the main course */
+  useAltCourse = false;
 
   // Bus state
   private busSpeed = 0; // m/s (forward speed)
@@ -1275,15 +1281,35 @@ export class Game {
     const level: LevelData = await loadLevel(eventId);
     this.level = level;
 
-    const course = level.course;
+    // Pick the active course (alt course if requested and available)
+    const course = (this.useAltCourse && level.altCourse) ? level.altCourse : level.course;
 
     // Apply course overrides (section ordering / laps) if available
-    const override = COURSE_OVERRIDES[eventId];
+    // Alt courses use their own coordinate ordering, no overrides
+    const usingAltCourse = this.useAltCourse && !!level.altCourse;
+    const override = usingAltCourse ? undefined : COURSE_OVERRIDES[eventId];
     const indices = buildCourseIndices(course.coordinates.length, override);
     const orderedCoords = indices.map((i) => course.coordinates[i]);
 
-    // Elevation: reorder pre-fetched altitude to match ordered coords
-    const elevations = indices.map((i) => level.altitude[i] ?? 0);
+    // Altitude is now scattered [lat, lon, alt][] points.
+    // Derive per-path-point elevations by finding the nearest altitude sample.
+    const altitudePoints = level.altitude;
+    const elevations = orderedCoords.map((coord) => {
+      const lon = coord[0];
+      const lat = coord[1];
+      let bestAlt = 0;
+      let bestDist = Infinity;
+      for (const [aLat, aLon, aAlt] of altitudePoints) {
+        const dLat = lat - aLat;
+        const dLon = lon - aLon;
+        const d = dLat * dLat + dLon * dLon; // squared distance (fine for nearest)
+        if (d < bestDist) {
+          bestDist = d;
+          bestAlt = aAlt;
+        }
+      }
+      return bestAlt;
+    });
 
     // Water features come pre-fetched from the level file
     const waterFeatures = level.water;
@@ -1305,6 +1331,14 @@ export class Game {
     ]);
     this.pathHeights = heights.map((h) => h * this.elevationScale);
     this.pathTotalDistance = courseTargetLength;
+
+    // Convert altitude samples to local coordinates for IDW terrain
+    this.localAltPoints = altitudeToLocal(
+      altitudePoints,
+      this.originCoord,
+      this.scaleFactor,
+      this.elevationScale,
+    );
 
     // Pre-compute cumulative distances along path for spline parameterisation
     this.pathCumDist = [0];
@@ -1666,7 +1700,8 @@ export class Game {
   // ---------- Build environment ----------
 
   private buildGround() {
-    const subdivisions = 200;
+    // Higher subdivisions = smoother terrain close-up (15m/cell vs previous 30m/cell)
+    const subdivisions = 400;
     const ground = MeshBuilder.CreateGround(
       'ground',
       { width: 6000, height: 6000, subdivisions, updatable: true },
@@ -1768,11 +1803,14 @@ export class Game {
     if (this.groundMesh) {
       return this.groundMesh.getHeightAtCoordinates(x, z);
     }
-    return computeTerrainHeight(x, z, this.pathPositions, this.pathHeights);
+    return this.getTerrainHeight(x, z);
   }
 
   // Thin wrappers for extracted terrain/water helpers
   private getTerrainHeight(x: number, z: number): number {
+    if (this.localAltPoints.length > 0) {
+      return computeTerrainHeightIDW(x, z, this.localAltPoints);
+    }
     return computeTerrainHeight(x, z, this.pathPositions, this.pathHeights);
   }
 

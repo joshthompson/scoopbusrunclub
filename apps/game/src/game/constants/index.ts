@@ -106,5 +106,11 @@ export const RENDER_ANIMATION_CULL_DISTANCE = 500;
 export const RENDER_OBJECTS_MAX_DISTANCE = 500;
 export const RENDER_TREES_MAX_DISTANCE = 500;
 
+// ---------- Terrain LOD distance thresholds (metres from camera) ----------
+/** Below this distance: ultra-high-res terrain masks (2× quality) */
+export const TERRAIN_LOD_NEAR_DIST = 50;
+/** Beyond this distance: low-res terrain masks */
+export const TERRAIN_LOD_FAR_DIST = 200;
+
 // Re-export lighting constants so consumers can still import from './constants'
 export * from './lighting';

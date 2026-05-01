@@ -12,11 +12,13 @@ export interface LevelMeta {
   id: string;
   name: string;
   hide?: boolean;
+  /** Display name when alt course is selected (shift+click) */
+  altCourseName?: string;
 }
 
 const levelMeta: LevelMeta[] = [
   { id: 'cheltenham', name: 'Cheltenham', hide: true },
-  { id: 'haga', name: 'Haga' },
+  { id: 'haga', name: 'Haga', altCourseName: 'Haga (alt course)' },
   { id: 'huddinge', name: 'Huddinge' },
   { id: 'judarskogen', name: 'Judarskogen' },
   { id: 'kristineberg', name: 'Kristineberg' },

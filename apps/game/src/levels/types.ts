@@ -13,7 +13,10 @@ export interface LevelData {
   id: string;
   name: string;
   course: LevelCourse;
-  altitude: number[];
+  /** Altitude samples as [lat, lon, alt][] — independent of course coordinates */
+  altitude: [number, number, number][];
+  /** Optional alternative course (same map, different route) */
+  altCourse?: LevelCourse;
   water: LevelWaterFeature[];
   /** GPS positions [lat, lon] where course marshals stand */
   marshals?: [number, number][];

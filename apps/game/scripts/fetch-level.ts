@@ -158,7 +158,7 @@ async function fetchCourse(eventId: string): Promise<CourseData> {
 
 // ── Fetch elevation from Open-Meteo ──────────────────────────────────
 
-async function fetchElevations(coords: number[][]): Promise<number[]> {
+async function fetchElevations(coords: number[][]): Promise<[number, number, number][]> {
   const BATCH = 100;
   const elevations: number[] = new Array(coords.length).fill(0);
   const lats = coords.map((c) => c[1]);
@@ -187,7 +187,12 @@ async function fetchElevations(coords: number[][]): Promise<number[]> {
     }
   }
 
-  return elevations;
+  // Return as [lat, lon, alt][] matching course coordinates
+  return coords.map((c, i) => [
+    Math.round(c[1] * 1e6) / 1e6,
+    Math.round(c[0] * 1e6) / 1e6,
+    Math.round(elevations[i] * 10) / 10,
+  ]);
 }
 
 // ── Fetch water features from Overpass ───────────────────────────────
@@ -736,7 +741,7 @@ function writeLevelFile(
   id: string,
   name: string,
   course: CourseData,
-  altitude: number[],
+  altitude: [number, number, number][],
   water: WaterPolygon[],
   buildings: BuildingPolygon[],
   paths: PathPolyline[],
@@ -783,7 +788,7 @@ function writeLevelFile(
     `  id: '${id}',`,
     `  name: '${name}',`,
     `  course: course as LevelData['course'],`,
-    `  altitude,`,
+    `  altitude: altitude as LevelData['altitude'],`,
     `  water: water as LevelData['water'],`,
   ];
 
@@ -923,7 +928,7 @@ function regenerateIndex(levelNames: Record<string, string>) {
 
 interface ExistingLevel {
   course: CourseData;
-  altitude: number[];
+  altitude: [number, number, number][];
   water: WaterPolygon[];
   name: string;
   buildings?: BuildingPolygon[];

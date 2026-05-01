@@ -115,8 +115,12 @@ function buildCourseData(eventId: string, points: GpxPoint[]) {
   };
 }
 
-function buildAltitude(points: GpxPoint[]): number[] {
-  return points.map((p) => Math.round(p.ele * 10) / 10);
+function buildAltitude(points: GpxPoint[]): [number, number, number][] {
+  return points.map((p) => [
+    Math.round(p.lat * 1e6) / 1e6,
+    Math.round(p.lon * 1e6) / 1e6,
+    Math.round(p.ele * 10) / 10,
+  ]);
 }
 
 // ── Overpass fetchers (inlined from fetch-level.ts) ──────────────────
@@ -466,7 +470,7 @@ async function main() {
       `  id: '${eventId}',`,
       `  name: '${displayName}',`,
       `  course: course as LevelData['course'],`,
-      `  altitude,`,
+      `  altitude: altitude as LevelData['altitude'],`,
     ];
 
     if (existingWater) {

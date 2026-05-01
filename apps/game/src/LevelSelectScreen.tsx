@@ -3,12 +3,13 @@ import levels from './levels';
 import logoSrc from './assets/logo.png';
 
 interface LevelSelectScreenProps {
-  onSelect: (levelId: string) => void;
+  onSelect: (levelId: string, opts?: { altCourse?: boolean }) => void;
   onBack: () => void;
 }
 
 export function LevelSelectScreen(props: LevelSelectScreenProps) {
   const [showHidden, setShowHidden] = createSignal(false);
+  const [shiftHeld, setShiftHeld] = createSignal(false);
 
   const courseIds = () =>
     Object.keys(levels).filter((id) => showHidden() || !levels[id].hide);
@@ -20,6 +21,9 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
   const TAP_TIMEOUT = 800; // ms — reset if gap between taps exceeds this
 
   function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Shift') {
+      setShiftHeld(true);
+    }
     if (e.code !== 'Space') {
       spaceCount = 0;
       return;
@@ -34,8 +38,20 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
     }
   }
 
-  onMount(() => window.addEventListener('keydown', onKeyDown));
-  onCleanup(() => window.removeEventListener('keydown', onKeyDown));
+  function onKeyUp(e: KeyboardEvent) {
+    if (e.key === 'Shift') {
+      setShiftHeld(false);
+    }
+  }
+
+  onMount(() => {
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+  });
+  onCleanup(() => {
+    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('keyup', onKeyUp);
+  });
 
   return (
     <div id="title-screen">
@@ -46,9 +62,14 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
           <For each={courseIds()}>
             {(id) => {
               const level = levels[id];
+              const useAlt = () => shiftHeld() && !!level.altCourseName;
+              const displayName = () => useAlt() ? level.altCourseName! : level.name;
               return (
-                <button class="course-btn" onClick={() => props.onSelect(id)}>
-                  {level.name}
+                <button
+                  class="course-btn"
+                  onClick={() => props.onSelect(id, useAlt() ? { altCourse: true } : undefined)}
+                >
+                  {displayName()}
                 </button>
               );
             }}
