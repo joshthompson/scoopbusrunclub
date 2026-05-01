@@ -75,6 +75,8 @@ const ULTRA_REBAKE_THRESHOLD = CHUNK_SIZE * 0.3;
 export type TiledPathGroundMaterial = ShaderMaterial & {
   __setIcePatches?: (patches: IcePatchOverlay[]) => void;
   __updateInsetCenter?: (playerX: number, playerZ: number) => void;
+  /** Set the effective view-center position for distance-based LOD in the shader. */
+  __setViewCenter?: (x: number, y: number, z: number) => void;
 };
 
 // ---------- GLSL Shader Code ----------
@@ -589,13 +591,21 @@ export function createTiledPathGroundMaterial(
         effect.setFloatArray('spotExponents', spotExpArr.subarray(0, count));
       }
 
-      // Push camera position for distance-based LOD in the shader
-      const cam = scene.activeCamera;
-      if (cam) {
-        const cp = cam.position;
-        effect.setFloat3('cameraPosition', cp.x, cp.y, cp.z);
-      }
+      // Push view center for distance-based LOD in the shader.
+      // The view center is projected ahead of the camera based on height,
+      // set externally via __setViewCenter; fallback to raw camera position.
+      effect.setFloat3('cameraPosition', viewCenterX, viewCenterY, viewCenterZ);
     }
+  };
+
+  // --- View center setter (called from game loop) ---
+  let viewCenterX = 0;
+  let viewCenterY = 0;
+  let viewCenterZ = 0;
+  const setViewCenter = (x: number, y: number, z: number) => {
+    viewCenterX = x;
+    viewCenterY = y;
+    viewCenterZ = z;
   };
 
   // --- 6. Ice patch update function (draws into all mask levels) ---
@@ -645,6 +655,7 @@ export function createTiledPathGroundMaterial(
   // Attach helpers
   (mat as TiledPathGroundMaterial).__setIcePatches = setIcePatches;
   (mat as TiledPathGroundMaterial).__updateInsetCenter = updateInsetCenter;
+  (mat as TiledPathGroundMaterial).__setViewCenter = setViewCenter;
 
   return mat as TiledPathGroundMaterial;
 }

@@ -150,6 +150,7 @@ import {
   updateRunnerCameraSystem,
 } from './systems/camera';
 import { updateRemotePlayersSystem } from './systems/remotePlayers';
+import { computeViewCenterXZ } from './systems/viewCenter';
 import {
   resolveBusToBusCollisions,
   applyBusYawRate,
@@ -318,6 +319,9 @@ export class Game {
   }[] = [];
   private setIcePatchesOnGround: ((patches: IcePatchOverlay[]) => void) | null = null;
   private updateInsetCenter: ((playerX: number, playerZ: number) => void) | null = null;
+  private setViewCenterOnGround: ((x: number, y: number, z: number) => void) | null = null;
+  /** Cached view-center on the ground plane — updated once per frame. */
+  private viewCenter = { x: 0, z: 0 };
 
   // Water zones (local XZ polygons + Y level) — set before buildGround
   private waterZones: WaterZone[] = [];
@@ -585,6 +589,7 @@ export class Game {
     this.icePatches = [];
     this.setIcePatchesOnGround = null;
     this.updateInsetCenter = null;
+    this.setViewCenterOnGround = null;
     // Dispose preview orbit input listeners
     if (this.previewOrbitCleanup) {
       this.previewOrbitCleanup();
@@ -1760,6 +1765,7 @@ export class Game {
     this.setIcePatchesOnGround = tiledMat.__setIcePatches ?? null;
     this.setIcePatchesOnGround?.([]);
     this.updateInsetCenter = tiledMat.__updateInsetCenter ?? null;
+    this.setViewCenterOnGround = tiledMat.__setViewCenter ?? null;
 
     // Apply terrain heights to ground vertices so the ground undulates
     const positions = ground.getVerticesData(VertexBuffer.PositionKind);
@@ -2444,15 +2450,16 @@ export class Game {
     }
 
     // Update preview runners
-    const cameraPos = this.camera.position;
+    this.viewCenter = computeViewCenterXZ(this.camera);
+    this.setViewCenterOnGround?.(this.viewCenter.x, this.camera.position.y, this.viewCenter.z);
     const finishedCount = updatePreviewRunners({
       runners: this.previewRunners,
       pathPositions: this.pathPositions,
       pathCumDist: this.pathCumDist,
       getGroundY: (x, z) => this.getGroundY(x, z),
       elapsedSeconds: this.previewElapsed,
-      cameraX: cameraPos.x,
-      cameraZ: cameraPos.z,
+      cameraX: this.viewCenter.x,
+      cameraZ: this.viewCenter.z,
     }, dt);
 
     this.onPreviewTick?.(this.previewElapsed, finishedCount, this.previewRunners.length);
@@ -2460,12 +2467,12 @@ export class Game {
     // Follow-cam on selected runner
     this.updatePreviewFollowCam(dt, this.previewSpeedMultiplier);
 
-    // Update building LOD using camera position (not busPos)
+    // Update building LOD using view center (not raw camera XZ)
     if (this.buildingLodEntries.length > 0) {
-      updateBuildingLod(this.buildingLodEntries, cameraPos.x, cameraPos.z);
+      updateBuildingLod(this.buildingLodEntries, this.viewCenter.x, this.viewCenter.z);
     }
     this.updateDistanceCulling();
-    this.updateInsetCenter?.(cameraPos.x, cameraPos.z);
+    this.updateInsetCenter?.(this.viewCenter.x, this.viewCenter.z);
   }
 
   /** Update the preview orbit camera targeting the selected runner */
@@ -2574,21 +2581,20 @@ export class Game {
       dt,
       busRoofY: BUS_ROOF_Y,
       engineVibeOffset,
-      observerX: this.camera.position.x,
-      observerZ: this.camera.position.z,
+      observerX: this.viewCenter.x,
+      observerZ: this.viewCenter.z,
     });
   }
 
   private updateBuildingLodForPlayer() {
     if (this.buildingLodEntries.length === 0) return;
-    const cam = this.camera.position;
-    updateBuildingLod(this.buildingLodEntries, cam.x, cam.z);
+    updateBuildingLod(this.buildingLodEntries, this.viewCenter.x, this.viewCenter.z);
   }
 
-  /** Hide trees and objects beyond their max render distance from the camera. */
+  /** Hide trees and objects beyond their max render distance from the view center. */
   private updateDistanceCulling() {
-    const cx = this.camera.position.x;
-    const cz = this.camera.position.z;
+    const cx = this.viewCenter.x;
+    const cz = this.viewCenter.z;
 
     const treeDistSq = RENDER_TREES_MAX_DISTANCE * RENDER_TREES_MAX_DISTANCE;
     for (const root of this.treeRoots) {
@@ -2610,6 +2616,11 @@ export class Game {
   private update(dt: number) {
     // If paused, keep rendering the scene but skip all simulation
     if (this.paused) return;
+
+    // Compute the effective view center on the ground — used for LOD,
+    // culling, and terrain inset centering instead of raw camera XZ.
+    this.viewCenter = computeViewCenterXZ(this.camera);
+    this.setViewCenterOnGround?.(this.viewCenter.x, this.camera.position.y, this.viewCenter.z);
 
     // --- Engine vibration (scales with speed, max amplitude at full base speed) ---
     this.engineVibePhase += dt * ENGINE_VIBE_FREQUENCY * Math.PI * 2;
@@ -2732,7 +2743,7 @@ export class Game {
       }
       this.updateBuildingLodForPlayer();
       this.updateDistanceCulling();
-      this.updateInsetCenter?.(this.camera.position.x, this.camera.position.z);
+      this.updateInsetCenter?.(this.viewCenter.x, this.viewCenter.z);
       return;
     }
 
@@ -2812,7 +2823,7 @@ export class Game {
         this.updateRemoteBusMeshes(dt, engineVibeOffset);
         this.updateBuildingLodForPlayer();
         this.updateDistanceCulling();
-        this.updateInsetCenter?.(this.camera.position.x, this.camera.position.z);
+        this.updateInsetCenter?.(this.viewCenter.x, this.viewCenter.z);
         if (this.minimap) {
           this.minimap.draw(
             this.busPos.x,
@@ -3260,7 +3271,7 @@ export class Game {
     this.updateRemoteBusMeshes(dt, engineVibeOffset);
     this.updateBuildingLodForPlayer();
     this.updateDistanceCulling();
-    this.updateInsetCenter?.(this.camera.position.x, this.camera.position.z);
+    this.updateInsetCenter?.(this.viewCenter.x, this.viewCenter.z);
 
     // Minimap
     if (this.minimap) {
