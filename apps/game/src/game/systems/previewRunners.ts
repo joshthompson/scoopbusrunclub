@@ -12,6 +12,7 @@ import {
 } from '@babylonjs/core';
 import {
   createRunnerModel,
+  poseCheering,
   poseRunning,
   poseStanding,
 } from '../objects/RunnerModel';
@@ -414,39 +415,6 @@ export function updatePreviewRunners(
   }
 
   return finishedCount;
-}
-
-/**
- * Cheering pose: arms raise periodically, bounce only while arms are up.
- */
-function poseCheering(model: RunnerModelResult, phase: number, cycleLength: number): void {
-  // Arms: cycle between resting at sides and raised high
-  const armCycle = cycleLength;
-  const armRaiseDuration = 1.2;
-  const cyclePos = ((phase % armCycle) + armCycle) % armCycle;
-  let armRaise = 0;
-  if (cyclePos < armRaiseDuration) {
-    const t = cyclePos / armRaiseDuration;
-    armRaise = Math.sin(t * Math.PI); // 0→1→0 bell curve
-  }
-
-  // Legs: slight bend when bouncing (arms up), relaxed when standing
-  const legBend = armRaise * 0.15;
-  model.leftLeg.rotation.x = legBend;
-  model.rightLeg.rotation.x = legBend;
-  model.leftLeg.rotation.z = -0.05;
-  model.rightLeg.rotation.z = 0.05;
-
-  // Resting: slight outward splay; Raised: arms above head
-  const restX = 0.1;
-  const raisedX = -2.8;
-  const restZ = 0.2;
-  const raisedZ = 0.3;
-
-  model.leftArm.rotation.x = restX + (raisedX - restX) * armRaise;
-  model.rightArm.rotation.x = restX + (raisedX - restX) * armRaise;
-  model.leftArm.rotation.z = -(restZ + (raisedZ - restZ) * armRaise);
-  model.rightArm.rotation.z = restZ + (raisedZ - restZ) * armRaise;
 }
 
 /**

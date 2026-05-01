@@ -220,7 +220,7 @@ export function generateFencePolygon(
 
 // ---------- Minimum bounding circle (Welzl's algorithm) ----------
 
-interface Circle {
+export interface Circle {
   cx: number;
   cz: number;
   radius: number;
@@ -230,7 +230,7 @@ interface Circle {
  * Welzl's randomised algorithm for the minimum enclosing circle.
  * Returns centre (cx, cz) and radius.
  */
-function minBoundingCircle(points: [number, number][]): Circle {
+export function minBoundingCircle(points: [number, number][]): Circle {
   // Shuffle a copy to get expected O(n) performance
   const pts = [...points];
   for (let i = pts.length - 1; i > 0; i--) {

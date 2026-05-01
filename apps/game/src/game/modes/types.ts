@@ -8,6 +8,7 @@
 export type GameType =
   | 'single-bus'     // Single player as bus driver
   | 'single-runner'  // Single player as runner
+  | 'single-bus-mode' // Single player — pick up & deliver passengers
   | 'bus-race'       // 2+ players — all buses race to finish
   | 'scoop-race'     // 2+ players — 1 bus, rest are runners
   | 'team-race'      // 4+ players — 2 teams each with 1 bus + runners
@@ -94,6 +95,7 @@ export interface GameModeConfig {
 export const GAME_TYPE_LABELS: Record<GameType, string> = {
   'single-bus': 'Single Player (Bus)',
   'single-runner': 'Single Player (Runner)',
+  'single-bus-mode': 'Passenger Pickup',
   'bus-race': 'Bus Race',
   'scoop-race': 'Scoop Race',
   'team-race': 'Team Race',
@@ -104,6 +106,7 @@ export const GAME_TYPE_LABELS: Record<GameType, string> = {
 export const GAME_TYPE_DESCRIPTIONS: Record<GameType, string> = {
   'single-bus': 'Drive the bus and scoop up runners',
   'single-runner': 'Run the course and dodge the bus',
+  'single-bus-mode': 'Pick up and deliver passengers before time runs out!',
   'bus-race': 'All players are buses — race to the finish!',
   'scoop-race': 'One bus, rest are runners — classic scoop!',
   'team-race': 'Two teams with a bus each — best average runner time wins',

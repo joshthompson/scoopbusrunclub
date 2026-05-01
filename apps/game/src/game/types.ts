@@ -21,6 +21,11 @@ export interface GameCallbacks {
   onFinish?: (timeSeconds: number) => void;
   onPositionChange?: (position: number, total: number) => void;
   onPowerUpDisplayChange?: (powerUp: PowerUpId | null, rolling: boolean) => void;
+  // Bus Mode callbacks
+  onBusModeTimer?: (remaining: number) => void;
+  onBusModeDelivery?: (count: number) => void;
+  onBusModeBonus?: (seconds: number) => void;
+  onBusModeGameOver?: (deliveries: number) => void;
 }
 
 export type RunnerInteraction = 'none' | 'waving' | 'highfive';

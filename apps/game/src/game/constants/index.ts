@@ -114,3 +114,6 @@ export const TERRAIN_LOD_FAR_DIST = 200;
 
 // Re-export lighting constants so consumers can still import from './constants'
 export * from './lighting';
+
+// Re-export passenger-pickup constants
+export * from './passenger-pickup';

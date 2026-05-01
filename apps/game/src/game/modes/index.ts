@@ -7,6 +7,7 @@
 
 export * from './types';
 export { singleBusMode, singleRunnerMode } from './single-player';
+export { singleBusModMode } from './single-bus-mode';
 export { busRaceMode } from './bus-race';
 export { scoopRaceMode } from './scoop-race';
 export { teamRaceMode, computeTeamRaceResult } from './team-race';
@@ -22,6 +23,7 @@ export {
 
 import type { GameModeConfig, GameType } from './types';
 import { singleBusMode, singleRunnerMode } from './single-player';
+import { singleBusModMode } from './single-bus-mode';
 import { busRaceMode } from './bus-race';
 import { scoopRaceMode } from './scoop-race';
 import { teamRaceMode } from './team-race';
@@ -31,6 +33,7 @@ import { arenaMode } from './arena';
 export const GAME_MODES: Record<GameType, GameModeConfig> = {
   'single-bus': singleBusMode,
   'single-runner': singleRunnerMode,
+  'single-bus-mode': singleBusModMode,
   'bus-race': busRaceMode,
   'scoop-race': scoopRaceMode,
   'team-race': teamRaceMode,

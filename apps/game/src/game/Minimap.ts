@@ -159,6 +159,8 @@ export class Minimap {
     busYaw: number,
     players: MinimapPlayer[] = [],
     lookaheadStart?: { x: number; z: number },
+    passengerDots?: { x: number; z: number; color: string }[],
+    passengerFlags?: { x: number; z: number; color: string }[],
   ) {
     const S = this.cssSize;
     const R = S / 2;
@@ -243,12 +245,58 @@ export class Minimap {
     if (this.pathPositions.length > 1) {
       this.strokePath(ctx, project, 6, COL_PATH_OUTLINE);
       this.strokePath(ctx, project, 3.5, COL_PATH);
-      this.drawLookaheadSegment(
-        ctx,
-        project,
-        lookaheadStart?.x ?? busX,
-        lookaheadStart?.z ?? busZ,
-      );
+      if (lookaheadStart) {
+        this.drawLookaheadSegment(
+          ctx,
+          project,
+          lookaheadStart.x,
+          lookaheadStart.z,
+        );
+      }
+    }
+
+    // --- passenger dots (waiting passengers) ---
+    if (passengerDots) {
+      for (const dot of passengerDots) {
+        const [dx, dy] = project(dot.x, dot.z);
+        ctx.beginPath();
+        ctx.arc(dx, dy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = dot.color;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+
+    // --- passenger flags (delivery targets) ---
+    if (passengerFlags) {
+      for (const flag of passengerFlags) {
+        const [fx, fy] = project(flag.x, flag.z);
+        // Draw a small flag icon: pole + triangular flag
+        const poleH = 14;
+        const flagW = 8;
+        const flagH = 7;
+        // Pole
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.lineTo(fx, fy - poleH);
+        ctx.stroke();
+        // Triangular flag
+        ctx.fillStyle = flag.color;
+        ctx.beginPath();
+        ctx.moveTo(fx, fy - poleH);
+        ctx.lineTo(fx + flagW, fy - poleH + flagH / 2);
+        ctx.lineTo(fx, fy - poleH + flagH);
+        ctx.closePath();
+        ctx.fill();
+        // White outline for flag
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     }
 
     // --- player arrows: remote players first, then local on top ---

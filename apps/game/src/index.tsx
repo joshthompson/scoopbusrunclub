@@ -6,7 +6,7 @@ import { Game } from './game/Game';
 import levels from './levels';
 import { TitleScreen } from './TitleScreen';
 import { LevelSelectScreen } from './LevelSelectScreen';
-import { RoleSelectScreen } from './RoleSelectScreen';
+import { GameModeSelectScreen } from './GameModeSelectScreen';
 import { CharacterSelectScreen } from './CharacterSelectScreen';
 import { GameTypeSelectScreen } from './GameTypeSelectScreen';
 import { LobbyScreen } from './LobbyScreen';
@@ -17,6 +17,7 @@ import type { GameType, TeamColor } from './game/modes';
 import type { ItemCollectEvent } from './multiplayer';
 import type { CharacterSelection } from './game/characters';
 import type { PowerUpId } from './game/systems/powerups';
+import { PASSENGER_PICKUP_INITIAL_TIME } from './game/constants/passenger-pickup';
 import powerUpFika from './assets/power-ups/fika.png';
 import powerUpFire from './assets/power-ups/fire.png';
 import powerUpIce from './assets/power-ups/ice.png';
@@ -36,7 +37,7 @@ const PLAYER_COLOR_INFO = [
 
 type GameMode = 'single' | 'host' | 'join';
 type PlayerRole = 'bus' | 'runner';
-type Screen = 'title' | 'level-select' | 'role-select' | 'character-select' | 'game-type-select' | 'lobby' | 'loading' | 'playing';
+type Screen = 'title' | 'level-select' | 'game-mode-select' | 'character-select' | 'game-type-select' | 'lobby' | 'loading' | 'playing';
 
 const POWER_UP_IMAGE_BY_ID: Record<PowerUpId, string> = {
   fika: powerUpFika,
@@ -83,6 +84,14 @@ function App() {
   const [keepDriving, setKeepDriving] = createSignal(false);
   const [powerUpDisplay, setPowerUpDisplay] = createSignal<PowerUpId | null>(null);
   const [powerUpRolling, setPowerUpRolling] = createSignal(false);
+
+  // Bus Mode state
+  const [busModeTimer, setBusModeTimer] = createSignal(0);
+  const [busModeDeliveries, setBusModeDeliveries] = createSignal(0);
+  const [busModeBonus, setBusModeBonus] = createSignal<{ seconds: number; key: number } | null>(null);
+  const [busModeGameOver, setBusModeGameOver] = createSignal(false);
+  let bonusKey = 0;
+  const isBusMode = () => gameType() === 'single-bus-mode';
 
   // Pause menu
   const [paused, setPaused] = createSignal(false);
@@ -173,17 +182,25 @@ function App() {
     currentEventId = levelId;
     currentAltCourse = opts?.altCourse ?? false;
     if (gameMode() === 'single') {
-      setScreen('role-select');
+      setScreen('game-mode-select');
     } else {
       // Host → go to lobby
       setScreen('lobby');
     }
   }
 
-  /** Single-player: user picked bus or runner → go to character select */
-  function handleRoleSelect(role: PlayerRole) {
-    setPlayerRole(role);
-    setGameType(role === 'bus' ? 'single-bus' : 'single-runner');
+  /** Single-player: user picked a game mode → go to character select */
+  function handleSinglePlayerGameMode(mode: 'bus-race' | 'parkrun' | 'bus-mode') {
+    if (mode === 'bus-race') {
+      setPlayerRole('bus');
+      setGameType('single-bus');
+    } else if (mode === 'parkrun') {
+      setPlayerRole('runner');
+      setGameType('single-runner');
+    } else {
+      setPlayerRole('bus');
+      setGameType('single-bus-mode');
+    }
     setScreen('character-select');
   }
 
@@ -299,6 +316,10 @@ function App() {
     setRemoteStates(new Map());
     setPowerUpDisplay(null);
     setPowerUpRolling(false);
+    setBusModeTimer(gameType() === 'single-bus-mode' ? PASSENGER_PICKUP_INITIAL_TIME : 0);
+    setBusModeDeliveries(0);
+    setBusModeBonus(null);
+    setBusModeGameOver(false);
 
     // Validate
     if (!levels[eventId]) {
@@ -334,6 +355,17 @@ function App() {
       onPowerUpDisplayChange: (powerUp, rolling) => {
         setPowerUpDisplay(powerUp);
         setPowerUpRolling(rolling);
+      },
+      onBusModeTimer: (remaining) => setBusModeTimer(remaining),
+      onBusModeDelivery: (count) => setBusModeDeliveries(count),
+      onBusModeBonus: (seconds) => {
+        bonusKey++;
+        setBusModeBonus({ seconds, key: bonusKey });
+        setTimeout(() => setBusModeBonus(null), 1500);
+      },
+      onBusModeGameOver: (deliveries) => {
+        setBusModeGameOver(true);
+        setBusModeDeliveries(deliveries);
       },
     }, minimapRef, {
       localPlayerRole: resolvedRole,
@@ -539,6 +571,10 @@ function App() {
     setGameType('single-bus');
     setCharSelection(null);
     setRemoteStates(new Map());
+    setBusModeTimer(0);
+    setBusModeDeliveries(0);
+    setBusModeBonus(null);
+    setBusModeGameOver(false);
 
     if (activeGame) {
       activeGame.dispose();
@@ -578,10 +614,10 @@ function App() {
           }}
         />
       </Show>
-      <Show when={screen() === 'role-select'}>
-        <RoleSelectScreen
+      <Show when={screen() === 'game-mode-select'}>
+        <GameModeSelectScreen
           courseName={levels[currentEventId]?.name ?? currentEventId}
-          onSelect={handleRoleSelect}
+          onSelect={handleSinglePlayerGameMode}
           onBack={() => setScreen('level-select')}
         />
       </Show>
@@ -594,7 +630,7 @@ function App() {
             if (isMultiplayerMode()) {
               setScreen('lobby');
             } else {
-              setScreen('role-select');
+              setScreen('game-mode-select');
             }
           }}
           waiting={isMultiplayerMode()}
@@ -631,20 +667,46 @@ function App() {
           </div>
         </Show>
 
-        <div id="hud" style={powerUpDisplay() ? { top: 'calc(min(220px, 30vw) + 24px)' } : undefined}>
+        {/* Bus mode: large timer at top center */}
+        <Show when={isBusMode()}>
+          <div style={{
+            position: 'fixed',
+            top: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            'font-size': 'clamp(36px, 6vw, 64px)',
+            'font-weight': 'bold',
+            'font-family': 'sans-serif',
+            color: busModeTimer() < 15 ? '#ff3333' : '#ffc107',
+            'text-shadow': '0 0 8px rgba(255,200,0,0.6), 0 2px 4px rgba(0,0,0,0.5)',
+            'pointer-events': 'none',
+            'z-index': '20',
+          }}>
+            {fmtTime(busModeTimer())}
+          </div>
+        </Show>
+
+        <div id="hud" style={powerUpDisplay() ? { display: 'block', top: 'calc(min(220px, 30vw) + 24px)' } : { display: 'block' }}>
           <Show when={isMultiplayerMode()}>
             <p style={{ 'font-size': 'clamp(10px, 1.5vw, 14px)', opacity: 0.7 }}>
               {GAME_TYPE_LABELS[gameType()]}
             </p>
           </Show>
-          <Show when={playerRole() === 'bus'}>
+          <Show when={isBusMode()}>
+            <p style={{ 'font-family': 'sans-serif', 'font-size': 'clamp(14px, 2vw, 20px)' }}>🚌 Delivered: {busModeDeliveries()}</p>
+          </Show>
+          <Show when={!isBusMode() && playerRole() === 'bus'}>
             <p>🚌 Scooped: {scored()}</p>
           </Show>
-          <Show when={playerRole() === 'runner'}>
+          <Show when={!isBusMode() && playerRole() === 'runner'}>
             <p>🏃 Runner mode</p>
           </Show>
-          <p>🏃 Speed: {speed().toFixed(1)} km/h</p>
-          <p>⏱️ {fmtTime(raceTime())}</p>
+          <Show when={!isBusMode()}>
+            <p>🏃 Speed: {speed().toFixed(1)} km/h</p>
+          </Show>
+          <Show when={!isBusMode()}>
+            <p>⏱️ {fmtTime(raceTime())}</p>
+          </Show>
           <Show when={isMultiplayerMode() && raceState() === 'racing'}>
             <p style={{ color: '#ffc107', 'font-weight': 'bold', 'font-size': 'clamp(16px, 2.5vw, 24px)' }}>
               {ordinal(racePosition().position)}
@@ -673,9 +735,31 @@ function App() {
         </Show>
 
         {/* Bottom-right course progress */}
-        <div id="course-progress">
-          {courseProgress().covered.toFixed(1)}/{courseProgress().total}km
-        </div>
+        <Show when={!isBusMode()}>
+          <div id="course-progress">
+            {courseProgress().covered.toFixed(1)}/{courseProgress().total}km
+          </div>
+        </Show>
+
+        {/* Bus Mode: +15 seconds bonus popup */}
+        <Show when={busModeBonus()}>
+          <div id="bonus-popup" style={{
+            position: 'fixed',
+            top: '35%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            'font-size': 'clamp(36px, 6vw, 56px)',
+            'font-weight': 'bold',
+            'font-family': 'sans-serif',
+            color: '#4cff4c',
+            'text-shadow': '0 0 6px #fff, 0 0 12px #fff, 0 2px 6px rgba(0,0,0,0.7)',
+            'pointer-events': 'none',
+            animation: 'bonus-float 1.5s ease-out forwards',
+            'z-index': '200',
+          }}>
+            +{busModeBonus()!.seconds}s
+          </div>
+        </Show>
 
         {/* Centre countdown overlay */}
         <Show when={countdown() !== ''}>
@@ -686,8 +770,24 @@ function App() {
           </div>
         </Show>
 
-        {/* Finish screen */}
-        <Show when={raceState() === 'finished' && !keepDriving()}>
+        {/* Bus Mode game over screen */}
+        <Show when={busModeGameOver()}>
+          <div id="finish-overlay">
+            <div class="finish-card">
+              <h1>⏰ Time's Up!</h1>
+              <p class="finish-time" style={{ 'font-size': 'clamp(20px, 3vw, 32px)', 'margin-top': '16px' }}>
+                Passengers delivered: <strong>{busModeDeliveries()}</strong>
+              </p>
+              <div class="finish-buttons">
+                <button class="course-btn" onClick={handleReplay}>Play Again</button>
+                <button class="course-btn finish-exit-btn" onClick={handleExitToMenu}>Exit to Menu</button>
+              </div>
+            </div>
+          </div>
+        </Show>
+
+        {/* Finish screen (non-bus-mode) */}
+        <Show when={!isBusMode() && raceState() === 'finished' && !keepDriving()}>
           <div id="finish-overlay">
             <div class="finish-card">
               <h1>🏁 Finished!</h1>

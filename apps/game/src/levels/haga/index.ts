@@ -10,6 +10,7 @@ import marshals from './marshals.json';
 import roads from './roads.json';
 import regions from './regions.json';
 import trees from './trees.json';
+import fences from './fences.json';
 import objects from './objects.json';
 
 const level: LevelData = {
@@ -25,6 +26,7 @@ const level: LevelData = {
   roads: roads as LevelData['roads'],
   regions: regions as LevelData['regions'],
   manualTrees: trees as LevelData['manualTrees'],
+  customFences: fences as LevelData['customFences'],
   objects: objects as LevelData['objects'],
 };
 

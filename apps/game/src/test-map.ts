@@ -103,8 +103,55 @@ async function main() {
   const levelId = params.get('event') ?? undefined;
 
   if (!levelId || !levels[levelId]) {
-    const available = Object.keys(levels).join(', ');
-    infoEl.innerHTML = `<strong>Usage:</strong> test.html?event={level}<br>Available: ${available}`;
+    // Hide default UI and show a centred event picker
+    infoEl.style.display = 'none';
+    sidebarEl.style.display = 'none';
+    appEl.style.left = '0';
+    appEl.style.width = '100%';
+
+    const picker = document.createElement('div');
+    picker.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:100;';
+
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#222;border:1px solid #444;border-radius:12px;padding:28px 36px;min-width:280px;text-align:center;color:#ccc;font-family:system-ui,sans-serif;';
+
+    const title = document.createElement('h2');
+    title.textContent = 'Level Editor';
+    title.style.cssText = 'color:#fff;margin:0 0 4px;font-size:18px;';
+    card.appendChild(title);
+
+    const subtitle = document.createElement('p');
+    subtitle.textContent = 'Choose an event to edit';
+    subtitle.style.cssText = 'color:#888;margin:0 0 16px;font-size:13px;';
+    card.appendChild(subtitle);
+
+    const selectEl = document.createElement('select');
+    selectEl.style.cssText = 'width:100%;background:#333;color:#fff;border:1px solid #555;border-radius:6px;padding:8px 10px;font-size:14px;cursor:pointer;appearance:auto;';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Select event…';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    selectEl.appendChild(placeholder);
+
+    for (const [id, meta] of Object.entries(levels)) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = meta.name + (meta.hide ? ' (hidden)' : '');
+      selectEl.appendChild(opt);
+    }
+
+    selectEl.addEventListener('change', () => {
+      if (!selectEl.value) return;
+      const url = new URL(window.location.href);
+      url.searchParams.set('event', selectEl.value);
+      window.location.href = url.toString();
+    });
+
+    card.appendChild(selectEl);
+    picker.appendChild(card);
+    document.body.appendChild(picker);
     return;
   }
 
@@ -606,9 +653,9 @@ async function main() {
       const minS = Math.max(vbW, vbH) * 0.005;
       const extent = Math.max(realSize.w, realSize.h) / 2 + Math.max(minS * 2, 2);
       const rotRad = (-o.rotation) * Math.PI / 180;
-      // Handle sits above (in rotated space = along -Y in SVG = local forward)
-      const hx = cx + Math.sin(rotRad) * -extent;
-      const hy = cy + Math.cos(rotRad) * extent;
+      // Handle sits at the object's front (local -Y in SVG = forward direction)
+      const hx = cx + Math.sin(rotRad) * extent;
+      const hy = cy - Math.cos(rotRad) * extent;
       // Dashed line from centre to handle
       layerHandles.appendChild(svgEl('line', {
         x1: cx, y1: cy, x2: hx, y2: hy,
@@ -1403,9 +1450,9 @@ async function main() {
         const [mx, mz] = clientToSvg(e.clientX, e.clientY);
         const dx = mx - o.pos[0];
         const dz = mz - o.pos[1];
-        // atan2 gives angle from +X axis; we want angle from +Z (forward)
-        // In SVG, y is flipped, so the angle from centre to mouse in map coords:
-        const angleDeg = Math.atan2(dx, dz) * 180 / Math.PI;
+        // Negate so that clockwise drag → clockwise visual rotation
+        // (object renders with rotate(-rotation), so stored value is inverted)
+        const angleDeg = -(Math.atan2(dx, dz) * 180 / Math.PI);
         objectItems[dragRotateIdx].rotation = ((Math.round(angleDeg) % 360) + 360) % 360;
         renderObjects();
         renderHandles();

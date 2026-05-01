@@ -179,14 +179,23 @@ export function buildTrees(
   }
 
   // ── Procedural tree placement ──
+  // Build combined source points from path + roads + trails so trees populate everywhere
+  const sourcePoints: [number, number][] = [...pathPositions];
+  for (const road of roads) {
+    for (const pt of road) sourcePoints.push(pt);
+  }
+  for (const trail of trails) {
+    for (const pt of trail) sourcePoints.push(pt);
+  }
+
   let placed = 0;
   let attempts = 0;
 
   while (placed < treeCount && attempts < treeCount * 5) {
     attempts++;
 
-    const pathIdx = Math.floor(rand() * pathPositions.length);
-    const [cx, cz] = pathPositions[pathIdx];
+    const ptIdx = Math.floor(rand() * sourcePoints.length);
+    const [cx, cz] = sourcePoints[ptIdx];
 
     const dist = TREE_MIN_DIST_FROM_PATH + rand() * (TREE_SPREAD - TREE_MIN_DIST_FROM_PATH);
     const angle = rand() * Math.PI * 2;

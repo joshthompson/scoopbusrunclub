@@ -212,12 +212,14 @@ import {
 import {
   buildFenceMesh,
   generateFencePolygon,
+  minBoundingCircle,
   resolvePositionAgainstFence,
   DEFAULT_FENCE_DISTANCE,
   type FenceCollider,
 } from './objects/Fence';
 import { buildLevelObjects, type PlacedObjectData } from './objects/LevelObjects';
 import { PowerUpSystem, type PowerUpId } from './systems/powerups';
+import { PassengerSystem } from './systems/passengers';
 import {
   spawnPreviewRunners,
   updatePreviewRunners,
@@ -313,6 +315,7 @@ export class Game {
   private playerScoopCooldownUntil = new Map<number, number>();
   private itemsEnabled = false;
   private powerUpSystem: PowerUpSystem | null = null;
+  private passengerSystem: PassengerSystem | null = null;
   private enterHeldLastFrame = false;
   private runnerFikaTimer = 0;
   private runnerShoeTimer = 0;
@@ -589,6 +592,8 @@ export class Game {
     }
     this.powerUpSystem?.dispose();
     this.powerUpSystem = null;
+    this.passengerSystem?.dispose();
+    this.passengerSystem = null;
     for (const ps of this.shoeFlames) ps.dispose();
     this.shoeFlames = [];
     for (const emitter of this.shoeFlameEmitters) emitter.dispose();
@@ -1531,8 +1536,47 @@ export class Game {
         this.busMesh.setEnabled(false);
       }
     }
-    if (!opts.skipRunners) {
+    if (!opts.skipRunners && this.gameType !== 'single-bus-mode') {
       this.runners = spawnRunnersSystem(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z));
+    }
+    // Bus Mode: spawn passenger NPCs instead of regular runners
+    if (this.gameType === 'single-bus-mode' && !opts.skipRunners) {
+      // Pre-compute fence bounds so passenger/target spawns stay inside the fence
+      const fenceDistance = level.fenceDistance ?? DEFAULT_FENCE_DISTANCE;
+      const fenceCircle = minBoundingCircle(this.pathPositions);
+      const fenceBounds = {
+        cx: fenceCircle.cx,
+        cz: fenceCircle.cz,
+        radius: fenceCircle.radius + fenceDistance,
+      };
+
+      this.passengerSystem = new PassengerSystem(
+        this.scene,
+        this.pathPositions,
+        this.pathCumDist,
+        this.roadPolylines,
+        this.trailPolylines,
+        (x, z) => this.getGroundY(x, z),
+        {
+          onPickup: () => this.callbacks.onScoopRunner(),
+          onDelivery: (count) => this.callbacks.onBusModeDelivery?.(count),
+          onTimerChange: (remaining) => this.callbacks.onBusModeTimer?.(remaining),
+          onTimeBonus: (seconds) => this.callbacks.onBusModeBonus?.(seconds),
+          onGameOver: (deliveries) => {
+            this.raceState = 'finished';
+            this.callbacks.onRaceStateChange?.('finished');
+            this.callbacks.onBusModeGameOver?.(deliveries);
+          },
+          onTriggerScoopAnim: () => {
+            this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+          },
+          onTriggerBoost: () => {
+            this.boostTimer += SCOOP_BOOST_DURATION;
+          },
+        },
+        fenceBounds,
+      );
+      this.passengerSystem.spawn();
     }
     if (level.kmSigns !== false) {
       const kmResult = placeKmSigns(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z));
@@ -1711,12 +1755,19 @@ export class Game {
     this.engine.runRenderLoop(() => {
       if (this._disposed) return;
       const dt = this.engine.getDeltaTime() / 1000;
-      if (this.previewMode) {
-        this.updatePreview(dt);
-      } else if (this.demoMode) {
-        this.updateDemoCamera(dt);
-      } else {
-        this.update(dt);
+
+      // Update game logic — wrapped in try/catch to ensure scene.render()
+      // is always reached even if game logic throws.
+      try {
+        if (this.previewMode) {
+          this.updatePreview(dt);
+        } else if (this.demoMode) {
+          this.updateDemoCamera(dt);
+        } else {
+          this.update(dt);
+        }
+      } catch (e) {
+        console.warn('[Game] update error:', e);
       }
 
       try {
@@ -1990,25 +2041,36 @@ export class Game {
 
   /**
    * Update the direction arrow each frame so it points toward the
-   * next gate. Uses the camera's world matrix to compute relative
+   * next gate (or the closest passenger flag in bus mode).
+   * Uses the camera's world matrix to compute relative
    * direction, then rotates the arrow root around its local Y axis.
    */
   private updateDirectionArrow(dt: number) {
     if (!this.directionArrowRoot || !this.directionArrowRotNode) return;
 
-    // Hide arrow when all gates are cleared
-    if (this.currentGateIdx >= this.gatePositions.length) {
-      this.directionArrowRoot.setEnabled(false);
-      return;
+    // In bus mode, point toward closest active flag when carrying passengers
+    let target: { x: number; z: number } | null = null;
+    if (this.passengerSystem) {
+      target = this.passengerSystem.getClosestFlagTarget(this.busPos.x, this.busPos.z);
+      if (!target) {
+        // No passengers riding — hide arrow
+        this.directionArrowRoot.setEnabled(false);
+        return;
+      }
+    } else {
+      // Regular race mode — point to next gate
+      if (this.currentGateIdx >= this.gatePositions.length) {
+        this.directionArrowRoot.setEnabled(false);
+        return;
+      }
+      target = this.gatePositions[this.currentGateIdx];
     }
     this.directionArrowRoot.setEnabled(true);
 
-    const gate = this.gatePositions[this.currentGateIdx];
-
-    // Direction from bus to next gate in world space (horizontal)
-    const toGateX = gate.x - this.busPos.x;
-    const toGateZ = gate.z - this.busPos.z;
-    const worldAngle = Math.atan2(toGateX, toGateZ); // yaw angle in world
+    // Direction from bus to target in world space (horizontal)
+    const toTargetX = target.x - this.busPos.x;
+    const toTargetZ = target.z - this.busPos.z;
+    const worldAngle = Math.atan2(toTargetX, toTargetZ); // yaw angle in world
 
     // Camera's yaw in world space: the camera looks along its target direction
     const camFwd = this.camera.getTarget().subtract(this.camera.position);
@@ -3232,8 +3294,8 @@ export class Game {
       this.localPlayerRole === 'runner' ? RUNNER_COLLISION_RADIUS : BUS_COLLISION_RADIUS,
     );
 
-    // Check for finish (all gates cleared)
-    if (this.currentGateIdx >= this.gatePositions.length && this.raceState === 'racing') {
+    // Check for finish (all gates cleared) — skip for bus mode (timer-based)
+    if (this.gameType !== 'single-bus-mode' && this.currentGateIdx >= this.gatePositions.length && this.raceState === 'racing') {
       this.raceState = 'finished';
       this.callbacks.onRaceStateChange?.('finished');
       this.callbacks.onFinish?.(this.raceTimer);
@@ -3308,6 +3370,16 @@ export class Game {
     // Update elastic object tilt physics
     updateElasticObjects(this.elasticObjects, dt);
 
+    // --- Bus Mode: update passenger system ---
+    if (this.passengerSystem && this.raceState === 'racing') {
+      const pResult = this.passengerSystem.update(dt, this.busPos, this.busYaw, this.busSpeed, engineVibeOffset);
+      if (pResult.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+      if (pResult.boostTimerAdd > 0) this.boostTimer += pResult.boostTimerAdd;
+      if (pResult.triggerScoopAnim && this.exhaustFlames && !this.exhaustFlames.isStarted()) {
+        this.exhaustFlames.start();
+      }
+    }
+
     // --- Update remote bus meshes (multiplayer interpolation) ---
     this.updateRemoteBusMeshes(dt, engineVibeOffset);
     this.updateBuildingLodForPlayer();
@@ -3321,7 +3393,9 @@ export class Game {
         this.busPos.z,
         this.busYaw,
         this.buildMinimapPlayers(),
-        this.getMinimapLookaheadAnchor(),
+        this.passengerSystem ? undefined : this.getMinimapLookaheadAnchor(),
+        this.passengerSystem?.getMinimapDots(),
+        this.passengerSystem?.getMinimapFlags(),
       );
     }
   }
