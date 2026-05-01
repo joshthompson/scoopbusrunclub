@@ -232,6 +232,10 @@ import {
   type PreviewOrbitState,
 } from './systems/previewCamera';
 
+// Module-level engine cache: reuse the same WebGL context per canvas
+// to avoid context-loss issues when creating/destroying engines rapidly.
+const canvasEngineMap = new WeakMap<HTMLCanvasElement, Engine>();
+
 // ---------- Game class ----------
 
 export class Game {
@@ -240,6 +244,9 @@ export class Game {
   private scene!: Scene;
   private camera!: FreeCamera;
   private callbacks: GameCallbacks;
+
+  /** True once dispose() has been called — gates async continuations. */
+  private _disposed = false;
 
   // Path data
   private pathPositions: [number, number][] = [];
@@ -600,9 +607,14 @@ export class Game {
       disposePreviewRunners(this.previewRunners);
       this.previewRunners = [];
     }
+    this._disposed = true;
     this.engine?.stopRenderLoop();
     this.scene?.dispose();
-    this.engine?.dispose();
+    // Don't dispose the engine — it's reused across game instances to avoid
+    // WebGL context creation/destruction race conditions.
+    // Resolve sceneRenderedPromise to unblock any waiters (e.g. multiplayer sync)
+    this.sceneRenderedResolve?.();
+    this.sceneRenderedResolve = null;
   }
 
   // ---------- Remote bus (multiplayer) ----------
@@ -614,11 +626,12 @@ export class Game {
 
   /** Build a remote player visuals (bus + runner) for a specific peer with the given player index. */
   async buildRemoteBusForPeer(peerId: string, playerIndex: number, remoteCharSel?: CharacterSelection) {
-    if (!this.scene) return;
+    if (!this.scene || this._disposed) return;
     // Don't rebuild if already exists
     if (this.remotePlayers.has(peerId)) return;
 
     const result = await createBusModel(this.scene);
+    if (this._disposed) return;
 
     // Determine bus colour palette from their selection or fallback to index
     let palette: BusColorPalette;
@@ -1284,6 +1297,7 @@ export class Game {
   ) {
     // Lazy-load full level data (JSON chunks loaded on demand)
     const level: LevelData = await loadLevel(eventId);
+    if (this._disposed) return;
     this.level = level;
 
     // Pick the active course (alt course if requested and available)
@@ -1354,8 +1368,17 @@ export class Game {
       this.pathCumDist.push(this.pathCumDist[i - 1] + d);
     }
 
-    // Engine + scene
-    this.engine = new Engine(this.canvas, true, { stencil: true });
+    // Engine + scene — reuse existing engine for this canvas to avoid
+    // WebGL context creation/loss race conditions.
+    const cachedEngine = canvasEngineMap.get(this.canvas);
+    if (cachedEngine) {
+      cachedEngine.stopRenderLoop();
+      this.engine = cachedEngine;
+    } else {
+      this.engine = new Engine(this.canvas, true, { stencil: true });
+      canvasEngineMap.set(this.canvas, this.engine);
+    }
+    this.engine.resize();
     this.configurePerformanceProfile();
     this.scene = new Scene(this.engine);
     const isNightFallback = level.timeOfDay === 'night';
@@ -1497,6 +1520,7 @@ export class Game {
     if (!opts.skipBus) {
       await this.buildBus();
     }
+    if (this._disposed) return;
     if (!this.demoMode && this.localPlayerRole === 'runner') {
       const localIsCorgi = this.charSelection?.type === 'runner' && isCorgiRunnerId(this.charSelection.runnerId);
       const runnerAppearance = !localIsCorgi && this.charSelection?.type === 'runner'
@@ -1618,6 +1642,7 @@ export class Game {
     if (!opts.skipBus) {
       await this.buildDirectionArrow();
     }
+    if (this._disposed) return;
 
     if (!opts.skipInput) {
       this.setupInput();
@@ -1660,6 +1685,7 @@ export class Game {
     await new Promise<void>((resolve) => {
       this.scene.executeWhenReady(() => resolve());
     });
+    if (this._disposed) return;
 
     // Prepare the "scene rendered" promise so callers can await the
     // first successful render (used to gate countdown / readiness).
@@ -1669,8 +1695,21 @@ export class Game {
       this.sceneRenderedResolve = resolve;
     });
 
+    // Safety timeout: if scene doesn't render within 5 seconds after
+    // the render loop starts, force-resolve the scene-ready gate so
+    // the game never gets permanently stuck on the countdown.
+    const sceneReadyTimeout = setTimeout(() => {
+      if (!this.sceneRendered && !this._disposed) {
+        console.warn('[Game] Scene render timeout — forcing ready state');
+        this.sceneRendered = true;
+        this.sceneRenderedResolve?.();
+        this.sceneRenderedResolve = null;
+      }
+    }, 5000);
+
     // Game loop
     this.engine.runRenderLoop(() => {
+      if (this._disposed) return;
       const dt = this.engine.getDeltaTime() / 1000;
       if (this.previewMode) {
         this.updatePreview(dt);
@@ -1690,11 +1729,13 @@ export class Game {
             this.sceneRendered = true;
             this.sceneRenderedResolve?.();
             this.sceneRenderedResolve = null;
+            clearTimeout(sceneReadyTimeout);
           }
         }
-      } catch (_e) {
-        // Shader may not be fully compiled on the first frame(s);
-        // swallow so the render-loop stays alive and retries next frame.
+      } catch (e) {
+        // Log render errors — previously these were silently swallowed,
+        // hiding WebGL context-loss and shader compilation failures.
+        console.warn('[Game] scene.render() error:', e);
       }
     });
 
