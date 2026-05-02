@@ -134,7 +134,7 @@ export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerDat
       run: generateFrames(assets.lyraRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       sit: [assets.lyraSit],
       face: [assets.lyraFace],
-      tailWalk: [assets.lyraTailWalk],
+      tailWalk: generateFrames(assets.lyraTailWalk, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
       tailSit: [assets.lyraTailSit],
       scanner: undefined,
       photographer: undefined,
