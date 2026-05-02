@@ -103,3 +103,26 @@ export const getAllVolunteers = query({
     }));
   },
 });
+
+/**
+ * Return the last-updated timestamps used by the client-side cache.
+ * - parkrunDataUpdatedAt: set when parkrun data is ingested (runners, results, volunteers, courses, events)
+ * - scoopBusDataUpdatedAt: set when our own data changes (races / event calendar)
+ */
+export const getCacheVersion = query({
+  args: {},
+  handler: async (ctx) => {
+    const parkrunRow = await ctx.db
+      .query("appData")
+      .withIndex("by_key", (q) => q.eq("key", "parkrunDataUpdatedAt"))
+      .unique();
+    const scoopBusRow = await ctx.db
+      .query("appData")
+      .withIndex("by_key", (q) => q.eq("key", "scoopBusDataUpdatedAt"))
+      .unique();
+    return {
+      parkrunDataUpdatedAt: parkrunRow?.value ?? null,
+      scoopBusDataUpdatedAt: scoopBusRow?.value ?? null,
+    };
+  },
+});

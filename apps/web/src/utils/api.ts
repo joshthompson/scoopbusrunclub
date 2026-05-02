@@ -1,129 +1,60 @@
 const CONVEX_URL = import.meta.env.VITE_CONVEX_URL as string || "";
 
-const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-const CACHE_TTL_SHORT_MS = 15 * 60 * 1000; // 15 minutes
-const CACHE_TTL_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
-
-/** Fixed MM-DD dates where caching should be skipped (add more as needed) */
-const NO_CACHE_DATES: string[] = [
-  "01-01", // New Year's Day
-  "03-11", // Lithuania — Independence Restoration Day
-  "04-27", // South Africa — Freedom Day
-  "05-04", // Japan — Greenery Day
-  "07-01", // Canada — Canada Day
-  "08-09", // Singapore — National Day
-  "09-16", // Malaysia — Malaysia Day
-  "10-03", // Germany — German Unity Day
-  "10-26", // Austria — National Day
-  "12-25", // Christmas Day (AU, FR, IE, IT, NZ, UK)
-  "12-26", // Boxing Day (PL)
-];
-
-// ---------- Dynamic date helpers ----------
-
-/** Compute Easter Sunday for a given year (Anonymous Gregorian algorithm) */
-function easterSunday(year: number): Date {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31); // 3 = March, 4 = April
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(year, month - 1, day);
-}
-
-/** Ascension Day — Easter + 39 days (DK, FI, NO, SE) */
-function ascensionDay(year: number): string {
-  const d = easterSunday(year);
-  d.setDate(d.getDate() + 39);
-  return toMMDD(d);
-}
-
-/** Whit Monday — Easter + 50 days (NL) */
-function whitMonday(year: number): string {
-  const d = easterSunday(year);
-  d.setDate(d.getDate() + 50);
-  return toMMDD(d);
-}
-
-/** US Thanksgiving — 4th Thursday of November */
-function thanksgiving(year: number): string {
-  const nov1 = new Date(year, 10, 1); // November
-  const dayOfWeek = nov1.getDay(); // 0=Sun
-  const firstThursday = dayOfWeek <= 4 ? 1 + (4 - dayOfWeek) : 1 + (11 - dayOfWeek);
-  const fourthThursday = firstThursday + 21;
-  return toMMDD(new Date(year, 10, fourthThursday));
-}
-
-function toMMDD(d: Date): string {
-  return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Check if the given date is a special day (fixed or dynamic) */
-function isSpecialDate(date: Date): boolean {
-  const mmdd = toMMDD(date);
-  if (NO_CACHE_DATES.includes(mmdd)) return true;
-
-  const year = date.getFullYear();
-  const dynamicDates = [
-    ascensionDay(year),  // DK, FI, NO, SE — Ascension Day
-    whitMonday(year),    // NL — Whit Monday
-    thanksgiving(year),  // US — Thanksgiving
-  ];
-  return dynamicDates.includes(mmdd);
-}
-
 // ---------- Cache infrastructure ----------
 
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  version?: number;
-}
-
 const CACHE_PREFIX = "sbrc:";
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
-function activeCacheTTL(): number {
-  const now = new Date();
-  if (now.getDay() === 6 || isSpecialDate(now)) return CACHE_TTL_SHORT_MS;
-  return CACHE_TTL_MS;
+/** The single metadata key that controls all cache validity */
+const CACHE_META_KEY = `${CACHE_PREFIX}cache`;
+
+interface CacheMeta {
+  version: number;
+  parkrunDataUpdatedAt: string | null;
+  scoopBusDataUpdatedAt: string | null;
 }
 
-export function getCached<T>(key: string): T | null {
+/** Cache keys that belong to parkrun-scraped data */
+const PARKRUN_EXACT_KEYS = ["runners", "events", "volunteers", "celebrations"];
+const PARKRUN_PREFIX_KEYS = ["results:", "course:"];
+
+/** Cache keys that belong to our own data */
+const SCOOPBUS_EXACT_KEYS = ["races"];
+
+// ---------- Cache meta read / write ----------
+
+function getCacheMeta(): CacheMeta | null {
   try {
-    const raw = localStorage.getItem(CACHE_PREFIX + key);
+    const raw = localStorage.getItem(CACHE_META_KEY);
     if (!raw) return null;
-    const entry: CacheEntry<T> = JSON.parse(raw);
-    if (entry.version !== CACHE_VERSION || Date.now() - entry.timestamp > activeCacheTTL()) {
-      localStorage.removeItem(CACHE_PREFIX + key);
-      return null;
-    }
-    return entry.data;
+    const meta: CacheMeta = JSON.parse(raw);
+    if (meta.version !== CACHE_VERSION) return null;
+    return meta;
   } catch {
     return null;
   }
 }
 
-/** Read cache with a fixed TTL (ignores special-date logic). */
-export function getCachedWithTTL<T>(key: string, ttlMs: number): T | null {
+function setCacheMeta(meta: CacheMeta): void {
   try {
+    localStorage.setItem(CACHE_META_KEY, JSON.stringify(meta));
+  } catch {
+    // localStorage full or unavailable — silently skip
+  }
+}
+
+// ---------- Cache data read / write ----------
+
+/**
+ * Read a value from the localStorage cache.
+ * Returns null if missing or if the cache meta version doesn't match.
+ */
+export function getCached<T>(key: string): T | null {
+  try {
+    if (!getCacheMeta()) return null; // no valid meta → treat all cache as stale
     const raw = localStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return null;
-    const entry: CacheEntry<T> = JSON.parse(raw);
-    if (entry.version !== CACHE_VERSION || Date.now() - entry.timestamp > ttlMs) {
-      localStorage.removeItem(CACHE_PREFIX + key);
-      return null;
-    }
-    return entry.data;
+    return JSON.parse(raw) as T;
   } catch {
     return null;
   }
@@ -131,10 +62,118 @@ export function getCachedWithTTL<T>(key: string, ttlMs: number): T | null {
 
 export function setCache<T>(key: string, data: T): void {
   try {
-    const entry: CacheEntry<T> = { data, timestamp: Date.now(), version: CACHE_VERSION };
-    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
+    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(data));
   } catch {
     // localStorage full or unavailable — silently skip
+  }
+}
+
+// ---------- Cache invalidation ----------
+
+/** Remove specific cache entries related to parkrun data */
+function purgeParkrunCache(): void {
+  for (const key of PARKRUN_EXACT_KEYS) {
+    localStorage.removeItem(CACHE_PREFIX + key);
+  }
+  // Also remove prefixed keys (results:*, course:*)
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const fullKey = localStorage.key(i);
+    if (!fullKey || !fullKey.startsWith(CACHE_PREFIX)) continue;
+    const key = fullKey.slice(CACHE_PREFIX.length);
+    for (const prefix of PARKRUN_PREFIX_KEYS) {
+      if (key.startsWith(prefix)) {
+        localStorage.removeItem(fullKey);
+        break;
+      }
+    }
+  }
+}
+
+/** Remove specific cache entries related to ScoopBus data */
+function purgeScoopBusCache(): void {
+  for (const key of SCOOPBUS_EXACT_KEYS) {
+    localStorage.removeItem(CACHE_PREFIX + key);
+  }
+}
+
+/**
+ * Wipe all sbrc: keys from localStorage EXCEPT the admin auth token.
+ * Used when migrating from the old cache scheme or on version mismatch.
+ */
+function wipeAllCache(): void {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(CACHE_PREFIX) && key !== `${CACHE_PREFIX}admin_token`) {
+      keysToRemove.push(key);
+    }
+  }
+  for (const key of keysToRemove) {
+    localStorage.removeItem(key);
+  }
+}
+
+// ---------- Cache validity check (runs once per page load) ----------
+
+let cacheValidityPromise: Promise<void> | null = null;
+
+/**
+ * Ensures cache validity has been checked against the server.
+ * Returns a promise that resolves once the check is complete.
+ * Safe to call multiple times — only the first call triggers the fetch.
+ */
+export function ensureCacheValidity(): Promise<void> {
+  if (!cacheValidityPromise) {
+    cacheValidityPromise = checkCacheValidity();
+  }
+  return cacheValidityPromise;
+}
+
+async function checkCacheValidity(): Promise<void> {
+  try {
+    const response = await fetch(`${CONVEX_URL}/api/cache-version`);
+    if (!response.ok) return; // can't reach server — keep cached data as-is
+    const server: { parkrunDataUpdatedAt: string | null; scoopBusDataUpdatedAt: string | null } =
+      await response.json();
+
+    const meta = getCacheMeta();
+
+    // No valid meta → wipe everything (old scheme or version mismatch)
+    if (!meta) {
+      wipeAllCache();
+      setCacheMeta({
+        version: CACHE_VERSION,
+        parkrunDataUpdatedAt: server.parkrunDataUpdatedAt,
+        scoopBusDataUpdatedAt: server.scoopBusDataUpdatedAt,
+      });
+      return;
+    }
+
+    let metaChanged = false;
+
+    // Compare parkrun data timestamp
+    const serverParkrun = Number(server.parkrunDataUpdatedAt ?? "0");
+    const clientParkrun = Number(meta.parkrunDataUpdatedAt ?? "0");
+    if (serverParkrun > clientParkrun) {
+      purgeParkrunCache();
+      meta.parkrunDataUpdatedAt = server.parkrunDataUpdatedAt;
+      metaChanged = true;
+    }
+
+    // Compare scoopbus data timestamp
+    const serverScoopBus = Number(server.scoopBusDataUpdatedAt ?? "0");
+    const clientScoopBus = Number(meta.scoopBusDataUpdatedAt ?? "0");
+    if (serverScoopBus > clientScoopBus) {
+      purgeScoopBusCache();
+      meta.scoopBusDataUpdatedAt = server.scoopBusDataUpdatedAt;
+      metaChanged = true;
+    }
+
+    if (metaChanged) {
+      setCacheMeta(meta);
+    }
+  } catch {
+    // Network error — keep cached data as-is
   }
 }
 
@@ -159,6 +198,7 @@ export interface RunResultItem {
 }
 
 export async function fetchRecentResults(sinceDate: string): Promise<RunResultItem[]> {
+  await ensureCacheValidity();
   const cacheKey = `results:${sinceDate}`;
   const cached = getCached<RunResultItem[]>(cacheKey);
   if (cached) return cached;
@@ -172,6 +212,7 @@ export async function fetchRecentResults(sinceDate: string): Promise<RunResultIt
 }
 
 export async function fetchAllResults(): Promise<RunResultItem[]> {
+  await ensureCacheValidity();
   const cacheKey = "results:all";
   const cached = getCached<RunResultItem[]>(cacheKey);
   if (cached) return cached;
@@ -185,6 +226,7 @@ export async function fetchAllResults(): Promise<RunResultItem[]> {
 }
 
 export async function fetchRunners(): Promise<Runner[]> {
+  await ensureCacheValidity();
   const cacheKey = "runners";
   const cached = getCached<Runner[]>(cacheKey);
   if (cached) return cached;
@@ -218,6 +260,7 @@ export interface RaceItem {
 }
 
 export async function fetchPublicRaces(): Promise<RaceItem[]> {
+  await ensureCacheValidity();
   const cacheKey = "races";
   const cached = getCached<RaceItem[]>(cacheKey);
   if (cached) return cached;
@@ -238,6 +281,7 @@ export interface EventItem {
 }
 
 export async function fetchEvents(): Promise<EventItem[]> {
+  await ensureCacheValidity();
   const cacheKey = "events";
   const cached = getCached<EventItem[]>(cacheKey);
   if (cached) return cached;
@@ -261,6 +305,7 @@ export interface VolunteerItem {
 }
 
 export async function fetchVolunteers(): Promise<VolunteerItem[]> {
+  await ensureCacheValidity();
   const cacheKey = "volunteers";
   const cached = getCached<VolunteerItem[]>(cacheKey);
   if (cached) return cached;
@@ -285,8 +330,9 @@ export interface CourseData {
 }
 
 export async function fetchCourse(eventId: string): Promise<CourseData | null> {
+  await ensureCacheValidity();
   const cacheKey = `course:${eventId}`;
-  const cached = getCachedWithTTL<CourseData>(cacheKey, CACHE_TTL_WEEK_MS);
+  const cached = getCached<CourseData>(cacheKey);
   if (cached) return cached;
 
   const url = `${CONVEX_URL}/api/course?eventId=${encodeURIComponent(eventId)}`;

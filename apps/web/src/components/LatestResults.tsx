@@ -12,6 +12,7 @@ import { getMemberRoute } from "@/utils/memberRoute"
 import { runners } from '@/data/runners'
 import { getEvent } from '@/utils/events'
 import { RoleTranslations } from '@/data/volunteer-roles'
+import { getSpecialDayName } from '@/utils/special-days'
 import extLinkAsset from "@/assets/misc/ext-link.png"
 
 const parkrunIdToRunnerName = new Map<string, string>()
@@ -273,21 +274,27 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
   const isBusTrip = () => props.parkrun.name !== "Haga" && props.parkrun.results.length >= 4
   const isMilestone = () => isMilestoneEvent(props.parkrun.eventNumber)
   const isXmas = () => isChristmas(props.date)
+  const specialDay = () => getSpecialDayName(props.date)
   const displayName = () => getDisplayName(props.parkrun.name, props.parkrun.results.length)
 
   return (
-    <h4 class={styles.parkrunName}>
-      {isXmas() && <Emoji emoji="🎄" flipped />}
-      {isMilestone() && <Emoji emoji="🎉" flipped />}
-      {isBusTrip() && <Emoji emoji="🚌" flipped />}{' '}
-      <A href={`/event/${props.parkrun.eventId}`} class={styles.parkrunNameLink}>
-        {displayName()}
-      </A>{' '}
-      #{props.parkrun.eventNumber}{' '}
-      {isBusTrip() && <Emoji emoji="🚌" />}
-      {isMilestone() && <Emoji emoji="🎉" />}
-      {isXmas() && <Emoji emoji="🎄" />}
-    </h4>
+    <>
+      <h4 class={styles.parkrunName}>
+        {isXmas() && <Emoji emoji="🎄" flipped />}
+        {isMilestone() && <Emoji emoji="🎉" flipped />}
+        {isBusTrip() && <Emoji emoji="🚌" flipped />}{' '}
+        <A href={`/event/${props.parkrun.eventId}`} class={styles.parkrunNameLink}>
+          {displayName()}
+        </A>{' '}
+        #{props.parkrun.eventNumber}{' '}
+        {isBusTrip() && <Emoji emoji="🚌" />}
+        {isMilestone() && <Emoji emoji="🎉" />}
+        {isXmas() && <Emoji emoji="🎄" />}
+      </h4>
+      <Show when={specialDay()}>
+        {(name) => <span class={styles.specialDayTag}>⭐ {name()}</span>}
+      </Show>
+    </>
   )
 }
 
@@ -587,5 +594,14 @@ const styles = {
     textDecoration: 'none',
     margin: '4px auto 0',
     _hover: { background: 'var(--overlay-black-30)' },
+  }),
+  specialDayTag: css({
+    display: 'inline-block',
+    fontSize: '0.75rem',
+    fontWeight: 'bold',
+    background: 'var(--overlay-black-15)',
+    padding: '2px 10px',
+    borderRadius: '999px',
+    margin: '0 auto',
   }),
 }

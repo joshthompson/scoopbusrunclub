@@ -361,14 +361,13 @@ export function MemberPage(props: MemberPageProps) {
                   <RunnerSummaryStat label="Finishes with" type="text">{oftenRunsWith(30)()}</RunnerSummaryStat>
                 </div>
               </div>
-              {runner().id && (
-                <p>
-                  <a href={`https://www.parkrun.se/parkrunner/${runner().id}/all`} target="_blank" rel="noopener noreferrer">
-                    <span class={styles.link}>View {name()} on parkrun.se</span>
-                    &nbsp;&nbsp;<Icon name="external" size="small" />
-                  </a>
-                </p>
-              )}
+              {runner().id && <div class={styles.parkrunBlock}>
+                <a href={`https://www.parkrun.se/parkrunner/${runner().id}/all`} target="_blank" rel="noopener noreferrer">
+                  <span class={styles.link}>View {name()} on parkrun.se</span>
+                  &nbsp;&nbsp;<Icon name="external" size="small" />
+                </a>
+                <div>ID: <strong>A{runner().id}</strong></div>
+              </div>}
             </div>
           </FieldBlock>
 
@@ -560,5 +559,16 @@ const styles = {
   compareName: css({
     fontSize: '0.7rem',
     opacity: 0.8,
+  }),
+  parkrunBlock: css({
+    bottom: '20px',
+    right: '20px',
+    backgroundColor: '#9EC681',
+    p: '4px 12px',
+    mb: '-8px',
+    zIndex: 1,
+    alignSelf: 'flex-end',
+    borderRadius: '4px',
+    cornerShape: 'notch',
   }),
 }

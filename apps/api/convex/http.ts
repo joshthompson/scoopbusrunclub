@@ -29,6 +29,19 @@ http.route({
   }),
 });
 
+// --- GET /api/cache-version ---
+// Public, unauthenticated. Returns the two last-updated timestamps the
+// client uses to decide whether its localStorage cache is stale.
+
+http.route({
+  path: "/api/cache-version",
+  method: "GET",
+  handler: httpAction(async (ctx) => {
+    const result = await ctx.runQuery(api.queries.getCacheVersion);
+    return jsonResponse(result);
+  }),
+});
+
 // --- GET /api/runners ---
 
 http.route({
@@ -204,6 +217,12 @@ http.route({
       }
     }
 
+    // Mark parkrun data as updated so clients know to invalidate cache
+    await ctx.runMutation(internal.parkrun.setAppData, {
+      key: "parkrunDataUpdatedAt",
+      value: Date.now().toString(),
+    });
+
     return jsonResponse({ status: "ok", athletesStored: stored, eventsStored });
   }),
 });
@@ -253,6 +272,12 @@ http.route({
       }
     }
 
+    // Mark parkrun data as updated so clients know to invalidate cache
+    await ctx.runMutation(internal.parkrun.setAppData, {
+      key: "parkrunDataUpdatedAt",
+      value: Date.now().toString(),
+    });
+
     return jsonResponse({ status: "ok", volunteersStored: stored });
   }),
 });
@@ -286,6 +311,12 @@ http.route({
       eventId,
       coordinates,
       points: points ?? [],
+    });
+
+    // Mark parkrun data as updated so clients know to invalidate cache
+    await ctx.runMutation(internal.parkrun.setAppData, {
+      key: "parkrunDataUpdatedAt",
+      value: Date.now().toString(),
     });
 
     return jsonResponse({ status: "ok", eventId });
@@ -518,6 +549,10 @@ http.route({
     if ("error" in result) {
       return jsonResponse({ error: result.error }, 400);
     }
+    await ctx.runMutation(internal.parkrun.setAppData, {
+      key: "scoopBusDataUpdatedAt",
+      value: Date.now().toString(),
+    });
     return jsonResponse(result);
   }),
 });
@@ -543,6 +578,10 @@ http.route({
     if ("error" in result) {
       return jsonResponse({ error: result.error }, 400);
     }
+    await ctx.runMutation(internal.parkrun.setAppData, {
+      key: "scoopBusDataUpdatedAt",
+      value: Date.now().toString(),
+    });
     return jsonResponse(result);
   }),
 });
@@ -563,6 +602,10 @@ http.route({
     if ("error" in result) {
       return jsonResponse({ error: result.error }, 400);
     }
+    await ctx.runMutation(internal.parkrun.setAppData, {
+      key: "scoopBusDataUpdatedAt",
+      value: Date.now().toString(),
+    });
     return jsonResponse(result);
   }),
 });
@@ -625,6 +668,7 @@ for (const path of [
   "/api/admin/account/password",
   "/api/admin/races",
   "/api/admin/races/today",
+  "/api/cache-version",
   "/api/admin/logs",
   "/api/volunteers",
 ]) {
