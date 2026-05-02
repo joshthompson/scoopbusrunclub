@@ -12,17 +12,44 @@ export function isStandingState(state: RunnerState): boolean {
   return STANDING_STATES.includes(state)
 }
 
-/** Find a random x position that doesn't overlap any other standing-state runners */
+/** Find a random x position that doesn't overlap any other standing-state runners.
+ *  When `groupWith` is provided (same-role runners), try to place adjacent to the cluster first. */
 function findNonOverlappingX(
   canvasWidth: number,
   myWidth: number,
   others: { x: number; width: number }[],
+  groupWith?: { x: number; width: number }[],
 ): number {
   const margin = 40
+  const groupGap = 8 // tight spacing between grouped runners
 
   // 1. Must fit within 100% of the viewport
   const absStart = 0
   const absEnd = canvasWidth - myWidth
+
+  // --- Try to cluster next to same-role runners first ---
+  if (groupWith && groupWith.length > 0) {
+    const clusterLeft = Math.min(...groupWith.map(o => o.x))
+    const clusterRight = Math.max(...groupWith.map(o => o.x + o.width))
+
+    // Candidate positions: immediately to the right or left of the cluster
+    const candidates = [
+      clusterRight + groupGap,
+      clusterLeft - myWidth - groupGap,
+    ]
+
+    const nonGroupOthers = others.filter(
+      o => !groupWith.some(g => g.x === o.x && g.width === o.width),
+    )
+
+    for (const candidate of candidates) {
+      if (candidate < absStart || candidate > absEnd) continue
+      const overlaps = nonGroupOthers.some(
+        o => candidate < o.x + o.width + margin && candidate + myWidth + margin > o.x,
+      )
+      if (!overlaps) return candidate
+    }
+  }
 
   // 3. Preferred range: 35-55% of viewport
   const prefStart = Math.max(absStart, canvasWidth * 0.35)
@@ -147,7 +174,15 @@ export function createRunnerController(
           const otherStanding = $scene.getControllersByType<RunnerController>('runner')
             .filter(c => c.data.id !== id && isStandingState(c.data.activeState()))
             .map(c => ({ x: c.data.x(), width: c.data.width() }))
-          $.setX(findNonOverlappingX($scene.canvas.get().width(), $.width(), otherStanding))
+
+          // Collect same-role runners so scanners (& timekeepers) cluster together
+          const sameRole = state === 'scanner'
+            ? $scene.getControllersByType<RunnerController>('runner')
+                .filter(c => c.data.id !== id && c.data.activeState() === 'scanner')
+                .map(c => ({ x: c.data.x(), width: c.data.width() }))
+            : undefined
+
+          $.setX(findNonOverlappingX($scene.canvas.get().width(), $.width(), otherStanding, sameRole))
           $.setY(110)
           $.setScooped(false)
           $.setRotation(0)

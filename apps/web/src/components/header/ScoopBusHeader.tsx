@@ -35,6 +35,7 @@ function determineRunnerState(latestVol: VolunteerItem | undefined, latestSaturd
   // Only show volunteer state if they volunteered on the most recent Saturday with any results
   if (latestVol.date === latestSaturday) {
     if (latestVol.roles.includes('Streckkod scanning')) return 'scanner'
+    if (latestVol.roles.includes('Tidtagare')) return 'scanner'
     if (latestVol.roles.includes('Sistagångare')) return 'tail-walker'
     if (latestVol.roles.includes('Fotograf')) return 'photographer'
     if (latestVol.roles.includes('Loppansvarig')) return 'run-director'
