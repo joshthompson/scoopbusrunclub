@@ -50,6 +50,14 @@ import {
   BUS_FRICTION,
   BUS_GRAVITY,
   BUS_JUMP_PITCH_THRESHOLD,
+  BUS_CLIFF_SEPARATION_THRESHOLD,
+  BUS_LAUNCH_VEL_CAP,
+  BUS_LAUNCH_VEL_MIN,
+  BUS_LANDING_IMPACT_SPEED_PENALTY,
+  BUS_LANDING_IMPACT_MAX_PENALTY,
+  BUS_AIRBORNE_PITCH_LERP,
+  BUS_UPHILL_DRAG,
+  BUS_AIRBORNE_COLLISION_CLEARANCE,
   BUS_MAX_SPEED,
   BUS_ROOF_Y,
   BUS_START_OFFSET,
@@ -273,6 +281,7 @@ export class Game {
   private busAirborne = false; // true while bus is above ground
   private elasticPenaltyActive = false; // true while bus overlaps an elastic object (prevents re-applying penalty)
   private prevSlopePitch = 0; // previous frame's terrain pitch for detecting crests
+  private prevGroundY = 0; // previous frame's ground height for cliff detection
   private waterBobPhase = 0; // accumulator for water surface bobbing
   private engineVibePhase = 0; // accumulator for engine vibration
   private cameraYawOffset = 0; // smoothed yaw offset for reverse camera (0 = forward, π = reverse)
@@ -393,6 +402,9 @@ export class Game {
   private directionArrowRotNode: TransformNode | null = null;
   /** Smoothed relative angle applied to the arrow (avoids snapping on gate change) */
   private arrowDisplayAngle = 0;
+
+  // 3D gate flag (marks next checkpoint)
+  private gateFlagRoot: TransformNode | null = null;
 
   // Minimap
   private minimap: Minimap | null = null;
@@ -1589,6 +1601,7 @@ export class Game {
     }
     this.gatePositions = buildGatesSystem(this.pathPositions, this.pathCumDist, (x, z) => this.getGroundY(x, z));
     this.currentGateIdx = 0;
+    this.buildGateFlag();
     this.powerUpSystem = new PowerUpSystem({
       scene: this.scene,
       enabled: this.itemsEnabled,
@@ -1933,6 +1946,74 @@ export class Game {
   }
 
 
+  // ---------- 3D Gate Flag (checkpoint marker) ----------
+
+  /** Build a flag pole + banner in the local player's bus colour to mark the next gate. */
+  private buildGateFlag() {
+    if (this.gatePositions.length === 0) return;
+
+    // Resolve bus colour
+    let bodyColor = new Color3(0.95, 0.78, 0.15); // default yellow
+    if (this.charSelection?.type === 'bus') {
+      const opt = getBusColorById(this.charSelection.busColorId);
+      if (opt) bodyColor = Color3.FromHexString(opt.bodyHex);
+    } else {
+      const p = PLAYER_COLORS[this.localPlayerIndex - 1];
+      if (p) bodyColor = p.body.clone();
+    }
+
+    const root = new TransformNode('gateFlag', this.scene);
+
+    // Pole
+    const poleHeight = 6;
+    const pole = MeshBuilder.CreateCylinder('gateFlagPole', { diameter: 0.14, height: poleHeight, tessellation: 8 }, this.scene);
+    const poleMat = new StandardMaterial('gateFlagPoleMat', this.scene);
+    poleMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
+    poleMat.specularColor = Color3.Black();
+    pole.material = poleMat;
+    pole.position.y = poleHeight / 2;
+    pole.parent = root;
+
+    // Banner (rectangular plane)
+    const bannerW = 3.0;
+    const bannerH = 2.0;
+    const banner = MeshBuilder.CreatePlane('gateFlagBanner', { width: bannerW, height: bannerH }, this.scene);
+    const bannerMat = new StandardMaterial('gateFlagBannerMat', this.scene);
+    bannerMat.diffuseColor = bodyColor.clone();
+    bannerMat.specularColor = Color3.Black();
+    bannerMat.emissiveColor = bodyColor.scale(0.4);
+    bannerMat.backFaceCulling = false;
+    banner.material = bannerMat;
+    banner.position.y = poleHeight - bannerH / 2 - 0.3;
+    banner.position.x = bannerW / 2;
+    banner.parent = root;
+
+    // Ball at top
+    const ball = MeshBuilder.CreateSphere('gateFlagBall', { diameter: 0.5, segments: 6 }, this.scene);
+    const ballMat = new StandardMaterial('gateFlagBallMat', this.scene);
+    ballMat.diffuseColor = bodyColor.clone();
+    ballMat.emissiveColor = bodyColor.scale(0.6);
+    ballMat.specularColor = Color3.Black();
+    ball.material = ballMat;
+    ball.position.y = poleHeight + 0.25;
+    ball.parent = root;
+
+    this.gateFlagRoot = root;
+    this.updateGateFlag();
+  }
+
+  /** Move the gate flag to the current gate position (or hide if done). */
+  private updateGateFlag() {
+    if (!this.gateFlagRoot) return;
+    const gate = this.gatePositions[this.currentGateIdx];
+    if (!gate) {
+      this.gateFlagRoot.setEnabled(false);
+      return;
+    }
+    this.gateFlagRoot.setEnabled(true);
+    this.gateFlagRoot.position.set(gate.x, gate.y, gate.z);
+    this.gateFlagRoot.rotation.y = gate.yaw;
+  }
 
 
   // ---------- 3D Direction Arrow (HUD compass) ----------
@@ -2668,12 +2749,17 @@ export class Game {
     });
   }
 
-  private getMinimapLookaheadAnchor(): { x: number; z: number } {
+  private getMinimapLookaheadAnchor(): { x: number; z: number; pathDist: number; playerPathDist: number } {
     const gate = this.gatePositions[this.currentGateIdx];
+    // Compute player's path distance from the previous gate (or start)
+    const prevGate = this.gatePositions[this.currentGateIdx - 1];
+    const playerPathDist = prevGate ? prevGate.pathDist : 0;
     if (gate) {
-      return { x: gate.x, z: gate.z };
+      return { x: gate.x, z: gate.z, pathDist: gate.pathDist, playerPathDist };
     }
-    return { x: this.busPos.x, z: this.busPos.z };
+    // Past all gates — use total path distance
+    const totalDist = this.pathCumDist[this.pathCumDist.length - 1] ?? 0;
+    return { x: this.busPos.x, z: this.busPos.z, pathDist: totalDist, playerPathDist: totalDist };
   }
 
   // ---------- Remote bus interpolation ----------
@@ -3085,11 +3171,13 @@ export class Game {
         this.scoopAnimTimer = SCOOP_ANIM_DURATION;
       }
 
-      if (turnInput !== 0 && Math.abs(this.busSpeed) > 0.5) {
-        this.busYaw += turnInput * BUS_TURN_SPEED * dt;
-      } else if (turnInput !== 0 && accelInput !== 0 && Math.abs(this.busSpeed) <= 0.5) {
-        // Slow rotation at standstill when player is pressing forward/reverse + turn
-        this.busYaw += turnInput * BUS_TURN_SPEED_STANDSTILL * dt;
+      if (!this.busAirborne) {
+        if (turnInput !== 0 && Math.abs(this.busSpeed) > 0.5) {
+          this.busYaw += turnInput * BUS_TURN_SPEED * dt;
+        } else if (turnInput !== 0 && accelInput !== 0 && Math.abs(this.busSpeed) <= 0.5) {
+          // Slow rotation at standstill when player is pressing forward/reverse + turn
+          this.busYaw += turnInput * BUS_TURN_SPEED_STANDSTILL * dt;
+        }
       }
 
       // --- Steer front wheels visually ---
@@ -3149,7 +3237,12 @@ export class Game {
       this.busPos.z += forward.z * this.busSpeed * dt;
 
       // --- Solid-object collisions (push-back) ---
-      this.resolveCollisions();
+      // Skip ground-level obstacle collisions when bus is significantly above terrain
+      const preCollGroundY = this.getGroundY(this.busPos.x, this.busPos.z);
+      const aboveGround = this.busPos.y - preCollGroundY;
+      if (!this.busAirborne || aboveGround < BUS_AIRBORNE_COLLISION_CLEARANCE) {
+        this.resolveCollisions();
+      }
 
       // Follow terrain height / airborne physics
       groundY = this.getGroundY(this.busPos.x, this.busPos.z);
@@ -3187,36 +3280,84 @@ export class Game {
         this.busSpeed += BUS_DOWNHILL_ACCEL_BOOST * dt;
       }
 
+      // Apply uphill drag (proportional to slope steepness) — gentler than full friction
+      if (targetPitch > 0.01 && this.busSpeed > 0 && !this.busAirborne) {
+        const uphillFactor = Math.min(targetPitch / 0.3, 1); // 0→1 as slope goes from flat to ~17°
+        this.busSpeed = Math.max(0, this.busSpeed - BUS_UPHILL_DRAG * uphillFactor * dt);
+      }
+
       if (this.busAirborne) {
-        // Apply gravity
+        // --- Airborne: full projectile physics ---
+        // Gravity only affects vertical velocity; horizontal speed is fully preserved
         this.busVelY -= BUS_GRAVITY * dt;
         this.busPos.y += this.busVelY * dt;
+
+        // Smoothly tilt pitch toward the arc of flight (nose follows trajectory)
+        const speedXZ = Math.abs(this.busSpeed);
+        const flightPitch = speedXZ > 0.5 ? Math.atan2(this.busVelY, speedXZ) : 0;
+        this.busPitch += (flightPitch - this.busPitch) * Math.min(1, BUS_AIRBORNE_PITCH_LERP * dt);
 
         // Check landing
         if (this.busPos.y <= groundY) {
           this.busPos.y = groundY;
+
+          // --- Landing impact: lose a fraction of speed based on how hard the landing was ---
+          const impactVelY = Math.abs(this.busVelY); // downward speed at moment of landing
+          const penaltyFraction = Math.min(
+            BUS_LANDING_IMPACT_MAX_PENALTY,
+            impactVelY * BUS_LANDING_IMPACT_SPEED_PENALTY,
+          );
+          this.busSpeed *= (1 - penaltyFraction);
+
           this.busVelY = 0;
           this.busAirborne = false;
         }
       } else {
-        // On the ground — detect crest (slope was uphill, now levelling/downhill)
-        const pitchDrop = this.prevSlopePitch - targetPitch;
+        // --- On the ground: detect launches ---
         const absSpeed = Math.abs(this.busSpeed);
-        if (pitchDrop > BUS_JUMP_PITCH_THRESHOLD && absSpeed > 4 && this.prevSlopePitch > 0.03) {
-          // Launch! Vertical velocity based on forward speed and how steep the slope was
-          this.busVelY = Math.sin(this.prevSlopePitch) * absSpeed * 0.7;
-          this.busVelY = Math.max(this.busVelY, 1.5); // minimum pop
-          this.busVelY = Math.min(this.busVelY, 8);   // cap so it doesn't fly to space
+
+        // 1) Cliff / terrain-drop launch: ground has fallen away beneath the bus
+        //    Compare current ground height to where the bus actually is.
+        //    If terrain dropped sharply and bus is now above it, launch into the air.
+        let launched = false;
+        const groundDrop = this.prevGroundY - groundY; // positive when terrain drops
+        if (absSpeed > 2 && groundDrop > BUS_CLIFF_SEPARATION_THRESHOLD) {
+          // Bus was on ground last frame at prevGroundY, ground is now lower.
+          // Carry velocity from the slope we were on as vertical momentum.
+          const slopeVelY = Math.sin(this.prevSlopePitch) * absSpeed;
+          this.busVelY = Math.max(slopeVelY, 0); // at minimum, zero (don't fling downward)
+          this.busVelY = Math.max(this.busVelY, BUS_LAUNCH_VEL_MIN);
+          this.busVelY = Math.min(this.busVelY, BUS_LAUNCH_VEL_CAP);
+          this.busPos.y = this.prevGroundY; // keep bus at the edge height, don't snap down
           this.busAirborne = true;
-        } else {
-          this.busPos.y = groundY; // stay on ground
+          launched = true;
+        }
+
+        // 2) Crest launch: slope was going up, now levelling/going down
+        if (!launched) {
+          const pitchDrop = this.prevSlopePitch - targetPitch;
+          if (pitchDrop > BUS_JUMP_PITCH_THRESHOLD && absSpeed > 4 && this.prevSlopePitch > 0.03) {
+            // Launch velocity based on forward speed and slope steepness
+            this.busVelY = Math.sin(this.prevSlopePitch) * absSpeed * 0.7;
+            this.busVelY = Math.max(this.busVelY, BUS_LAUNCH_VEL_MIN);
+            this.busVelY = Math.min(this.busVelY, BUS_LAUNCH_VEL_CAP);
+            this.busAirborne = true;
+            launched = true;
+          }
+        }
+
+        if (!launched) {
+          this.busPos.y = groundY; // snap to ground
         }
       }
 
+      this.prevGroundY = groundY;
       this.prevSlopePitch = targetPitch;
 
-      // Smooth the pitch so it doesn't jitter
-      this.busPitch += (targetPitch - this.busPitch) * Math.min(1, 6 * dt);
+      // Smooth the pitch so it doesn't jitter (only when grounded — airborne pitch handled above)
+      if (!this.busAirborne) {
+        this.busPitch += (targetPitch - this.busPitch) * Math.min(1, 6 * dt);
+      }
 
       // --- Apply collision-induced yaw rate (spin from off-centre hits) ---
       if (this.busYawRate !== 0) {
@@ -3280,6 +3421,7 @@ export class Game {
     if (newGateIdx > this.currentGateIdx) {
       this.currentGateIdx = newGateIdx;
       this.callbacks.onGatePass?.(this.currentGateIdx, this.gatePositions.length);
+      this.updateGateFlag();
     }
 
     // Broadcast race position

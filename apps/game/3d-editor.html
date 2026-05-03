@@ -75,7 +75,9 @@
         <div class="toggle-row"><input type="checkbox" id="tog-ground" checked><label for="tog-ground">Ground</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-wireframe"><label for="tog-wireframe">Wireframe</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-buildings" checked><label for="tog-buildings">Buildings</label></div>
-        <div class="toggle-row"><input type="checkbox" id="tog-trees" checked><label for="tog-trees">Trees</label></div>
+        <div class="toggle-row"><input type="checkbox" id="tog-objects" checked><label for="tog-objects">Objects</label></div>
+        <div class="toggle-row"><input type="checkbox" id="tog-manual-trees" checked><label for="tog-manual-trees">Manual Trees</label></div>
+        <div class="toggle-row"><input type="checkbox" id="tog-gen-trees"><label for="tog-gen-trees">Generated Trees</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-water" checked><label for="tog-water">Water</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-course" checked><label for="tog-course">Course Path</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-altpoints" checked><label for="tog-altpoints">Altitude Points</label></div>
@@ -96,6 +98,7 @@
 
       <div class="section">
         <div class="section-title">Actions</div>
+        <button class="btn" id="btn-remesh" onclick="window.doRemesh();">Remesh Terrain</button>
         <button class="btn btn-primary" id="btn-export">Copy altitude.json</button>
       </div>
 

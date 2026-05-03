@@ -52,6 +52,8 @@ import {
   COURSE_TARGET_LENGTH,
   PATH_HALF_WIDTH,
 } from './game/constants';
+import { buildLevelObjects } from './game/objects/LevelObjects';
+import type { PlacedObjectData } from './game/objects/LevelObjects';
 
 // ── Global state ──
 
@@ -80,7 +82,9 @@ let waterZones: WaterZone[] = [];
 let groundMesh: Mesh | null = null;
 let groundWireframe: LinesMesh | null = null;
 let buildingRoot: TransformNode | null = null;
-let treeRoot: TransformNode | null = null;
+let objectRoot: TransformNode | null = null;
+let manualTreeRoot: TransformNode | null = null;
+let generatedTreeRoot: TransformNode | null = null;
 let waterRoot: TransformNode | null = null;
 let courseLines: LinesMesh | null = null;
 let altPointMeshes: Mesh[] = [];
@@ -251,7 +255,9 @@ async function initEditor(levelId: string) {
   buildGroundMesh(pathPositions, pathHeights);
   buildCoursePath(pathPositions, pathHeights);
   buildBuildingsSimple();
-  buildTreesSimple();
+  buildObjectsSimple();
+  buildManualTrees();
+  buildGeneratedTrees();
   buildWater();
   buildAltitudePoints();
 
@@ -339,6 +345,7 @@ function buildGroundMesh(pathPositions?: [number, number][], pathHeights?: numbe
   buildGroundWireframe(groundMesh);
 }
 
+/** Synchronous terrain height application — used for initial build. */
 function applyTerrainHeights(mesh: Mesh) {
   const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
   if (!positions) return;
@@ -356,6 +363,55 @@ function applyTerrainHeights(mesh: Mesh) {
 
     positions[i + 1] = h;
   }
+  mesh.updateVerticesData(VertexBuffer.PositionKind, positions);
+
+  const normals = mesh.getVerticesData(VertexBuffer.NormalKind);
+  const indices = mesh.getIndices();
+  if (normals && indices) {
+    VertexData.ComputeNormals(positions, indices, normals);
+    mesh.updateVerticesData(VertexBuffer.NormalKind, normals);
+  }
+}
+
+/**
+ * Async chunked terrain height application — processes vertices in batches,
+ * yielding to the event loop between chunks so the editor stays responsive.
+ * Automatically cancels prior in-flight updates when a new one starts.
+ */
+let _terrainUpdateId = 0;
+const TERRAIN_CHUNK_SIZE = 5000; // vertices per chunk
+
+async function applyTerrainHeightsAsync(mesh: Mesh): Promise<void> {
+  const updateId = ++_terrainUpdateId;
+  const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+  if (!positions) return;
+
+  const totalVertices = positions.length / 3;
+
+  for (let start = 0; start < totalVertices; start += TERRAIN_CHUNK_SIZE) {
+    if (updateId !== _terrainUpdateId) return; // superseded by newer update
+
+    const end = Math.min(start + TERRAIN_CHUNK_SIZE, totalVertices);
+    for (let v = start; v < end; v++) {
+      const i = v * 3;
+      const x = positions[i];
+      const z = positions[i + 2];
+      let h = getTerrainHeight(x, z) - 0.08;
+
+      const waterInfo = getWaterDepressionAt(x, z, waterZones, (wx, wz) => getTerrainHeight(wx, wz));
+      if (waterInfo !== null) h = waterInfo;
+
+      positions[i + 1] = h;
+    }
+
+    // Yield to the event loop between chunks
+    if (end < totalVertices) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  if (updateId !== _terrainUpdateId) return; // superseded
+
   mesh.updateVerticesData(VertexBuffer.PositionKind, positions);
 
   const normals = mesh.getVerticesData(VertexBuffer.NormalKind);
@@ -486,14 +542,45 @@ function buildBuildingsSimple() {
   }
 }
 
-// ── Trees (simplified — instanced cones on cylinders) ──
+// ── Objects (benches, lampposts, tennis courts, floodlights) ──
 
-function buildTreesSimple() {
-  if (treeRoot) treeRoot.dispose();
-  treeRoot = new TransformNode('trees', scene);
+function buildObjectsSimple() {
+  if (objectRoot) objectRoot.dispose();
+  objectRoot = new TransformNode('objects', scene);
 
-  // Only show manual trees + a few procedural ones
-  const manualTrees = level.manualTrees ?? [];
+  const objects = level.objects;
+  if (!objects) return;
+
+  const toPlaced = (items: [number, number, number][] | undefined): PlacedObjectData[] => {
+    if (!items) return [];
+    return items.map(([lat, lon, rot]) => {
+      const [x, z] = gpsToWorld(lat, lon);
+      return { x, z, rotation: (rot ?? 0) * (Math.PI / 180) };
+    });
+  };
+
+  const result = buildLevelObjects(
+    scene,
+    toPlaced(objects.benches),
+    toPlaced(objects.lampposts),
+    toPlaced(objects.tennisCourts),
+    toPlaced(objects.floodlights),
+    (x, z) => getTerrainHeight(x, z),
+    level.timeOfDay === 'night',
+  );
+
+  for (const root of result.objectRoots) {
+    root.parent = objectRoot;
+  }
+}
+
+// ── Trees (manual + generated, with separate toggles) ──
+
+let _trunkTpl: Mesh | null = null;
+let _crownTpl: Mesh | null = null;
+
+function ensureTreeTemplates() {
+  if (_trunkTpl) return;
 
   const trunkMat = new StandardMaterial('trunkMat', scene);
   trunkMat.diffuseColor = new Color3(0.4, 0.26, 0.13);
@@ -503,76 +590,90 @@ function buildTreesSimple() {
   foliageMat.diffuseColor = new Color3(0.2, 0.5, 0.15);
   foliageMat.specularColor = Color3.Black();
 
-  // Template meshes for instancing
-  const trunkTpl = MeshBuilder.CreateCylinder('tpl_trunk', {
+  _trunkTpl = MeshBuilder.CreateCylinder('tpl_trunk', {
     height: 3.5, diameterTop: 0.3, diameterBottom: 0.45, tessellation: 6,
   }, scene);
-  trunkTpl.material = trunkMat;
-  trunkTpl.isVisible = false;
+  _trunkTpl.material = trunkMat;
+  _trunkTpl.isVisible = false;
 
-  const crownTpl = MeshBuilder.CreateCylinder('tpl_crown', {
+  _crownTpl = MeshBuilder.CreateCylinder('tpl_crown', {
     height: 5.5, diameterTop: 0, diameterBottom: 4, tessellation: 6,
   }, scene);
-  crownTpl.material = foliageMat;
-  crownTpl.isVisible = false;
+  _crownTpl.material = foliageMat;
+  _crownTpl.isVisible = false;
+}
 
-  function placeTree(lat: number, lon: number, idx: number) {
+function buildManualTrees() {
+  if (manualTreeRoot) manualTreeRoot.dispose();
+  manualTreeRoot = new TransformNode('manualTrees', scene);
+
+  const manualTrees = level.manualTrees ?? [];
+  if (manualTrees.length === 0) return;
+
+  ensureTreeTemplates();
+
+  manualTrees.forEach(([lat, lon], i) => {
     const [wx, wz] = gpsToWorld(lat, lon);
     const gy = getTerrainHeight(wx, wz);
 
-    const trunk = trunkTpl.createInstance(`mtrunk_${idx}`);
+    const trunk = _trunkTpl!.createInstance(`mtrunk_${i}`);
     trunk.position.set(wx, gy + 1.75, wz);
-    trunk.parent = treeRoot;
+    trunk.parent = manualTreeRoot;
 
-    const crown = crownTpl.createInstance(`mcrown_${idx}`);
+    const crown = _crownTpl!.createInstance(`mcrown_${i}`);
     crown.position.set(wx, gy + 5.75, wz);
-    crown.parent = treeRoot;
+    crown.parent = manualTreeRoot;
+  });
+}
+
+function buildGeneratedTrees() {
+  if (generatedTreeRoot) generatedTreeRoot.dispose();
+  generatedTreeRoot = new TransformNode('generatedTrees', scene);
+  // Off by default — toggled via sidebar
+  generatedTreeRoot.setEnabled(false);
+
+  if (level.trees === false) return;
+
+  ensureTreeTemplates();
+
+  const pathPositions: [number, number][] = [];
+  const coords = level.course.coordinates;
+  for (const c of coords) {
+    const [rawX, rawZ] = gpsPointToLocal(c[0], c[1], originCoord);
+    pathPositions.push([rawX * scaleFactor, rawZ * scaleFactor]);
   }
 
-  manualTrees.forEach(([lat, lon], i) => placeTree(lat, lon, i));
+  let seed = 42;
+  const rand = () => {
+    seed = (seed * 16807 + 0) % 2147483647;
+    return seed / 2147483647;
+  };
 
-  // If level has procedural trees enabled, scatter some simple ones:
-  if (level.trees !== false) {
-    const pathPositions: [number, number][] = [];
-    const coords = level.course.coordinates;
-    for (const c of coords) {
-      const [rawX, rawZ] = gpsPointToLocal(c[0], c[1], originCoord);
-      pathPositions.push([rawX * scaleFactor, rawZ * scaleFactor]);
-    }
+  const treeCount = Math.min(500, pathPositions.length * 10);
+  let placed = 0;
+  let attempts = 0;
+  while (placed < treeCount && attempts < treeCount * 20) {
+    attempts++;
+    const srcIdx = Math.floor(rand() * pathPositions.length);
+    const [sx, sz] = pathPositions[srcIdx];
+    const angle = rand() * Math.PI * 2;
+    const dist = 30 + rand() * 300;
+    const x = sx + Math.cos(angle) * dist;
+    const z = sz + Math.sin(angle) * dist;
 
-    // Simple seeded scatter
-    let seed = 42;
-    const rand = () => {
-      seed = (seed * 16807 + 0) % 2147483647;
-      return seed / 2147483647;
-    };
+    const trunk = _trunkTpl!.createInstance(`ptrunk_${placed}`);
+    const gy = getTerrainHeight(x, z);
+    const scale = 0.7 + rand() * 0.6;
+    trunk.position.set(x, gy + 1.75 * scale, z);
+    trunk.scaling.setAll(scale);
+    trunk.parent = generatedTreeRoot;
 
-    const treeCount = Math.min(500, pathPositions.length * 10);
-    let placed = 0;
-    let attempts = 0;
-    while (placed < treeCount && attempts < treeCount * 20) {
-      attempts++;
-      const srcIdx = Math.floor(rand() * pathPositions.length);
-      const [sx, sz] = pathPositions[srcIdx];
-      const angle = rand() * Math.PI * 2;
-      const dist = 30 + rand() * 300;
-      const x = sx + Math.cos(angle) * dist;
-      const z = sz + Math.sin(angle) * dist;
+    const crown = _crownTpl!.createInstance(`pcrown_${placed}`);
+    crown.position.set(x, gy + 5.75 * scale, z);
+    crown.scaling.setAll(scale);
+    crown.parent = generatedTreeRoot;
 
-      const trunk = trunkTpl.createInstance(`ptrunk_${placed}`);
-      const gy = getTerrainHeight(x, z);
-      const scale = 0.7 + rand() * 0.6;
-      trunk.position.set(x, gy + 1.75 * scale, z);
-      trunk.scaling.setAll(scale);
-      trunk.parent = treeRoot;
-
-      const crown = crownTpl.createInstance(`pcrown_${placed}`);
-      crown.position.set(x, gy + 5.75 * scale, z);
-      crown.scaling.setAll(scale);
-      crown.parent = treeRoot;
-
-      placed++;
-    }
+    placed++;
   }
 }
 
@@ -630,14 +731,16 @@ function updatePointPosition(index: number) {
 function rebuildTerrain() {
   localAltPoints = altitudeToLocal(altitudeData, originCoord, scaleFactor, elevationScale);
 
-  // Refresh ground
+  // Refresh ground asynchronously (non-blocking)
   if (groundMesh) {
-    applyTerrainHeights(groundMesh);
-    if (groundWireframe) {
-      groundWireframe.dispose();
-      buildGroundWireframe(groundMesh);
-      groundWireframe!.isVisible = (document.getElementById('tog-wireframe') as HTMLInputElement).checked;
-    }
+    applyTerrainHeightsAsync(groundMesh).then(() => {
+      const wireframeVisible = (document.getElementById('tog-wireframe') as HTMLInputElement).checked;
+      if (wireframeVisible && groundMesh) {
+        if (groundWireframe) groundWireframe.dispose();
+        buildGroundWireframe(groundMesh);
+        groundWireframe!.isVisible = true;
+      }
+    });
   }
 
   // Refresh point markers
@@ -764,7 +867,7 @@ function setupInput(canvas: HTMLCanvasElement) {
       const altDelta = dy * 0.05; // scale sensitivity
       altitudeData[selectedPointIndex][2] = dragOriginalAlt + altDelta;
 
-      // Update local point
+      // Update local point (lightweight — just moves the sphere)
       localAltPoints = altitudeToLocal(altitudeData, originCoord, scaleFactor, elevationScale);
       updatePointPosition(selectedPointIndex);
       updatePointEditorUI();
@@ -786,10 +889,9 @@ function setupInput(canvas: HTMLCanvasElement) {
       isDraggingPoint = false;
       canvas.style.cursor = 'default';
 
-      // If it was a short click (not a real drag), just keep selection
-      // If it was a drag, rebuild terrain with new heights
       if (!wasClick && selectedPointIndex !== null) {
-        rebuildTerrainKeepSelection();
+        // Schedule a debounced remesh (resets the 5s timer)
+        scheduleRemesh();
       }
       return;
     }
@@ -920,18 +1022,34 @@ function updatePointEditorUI() {
     `Level: ${level.name}\nPoints: ${altitudeData.length}\nScale: ${scaleFactor.toFixed(2)}`;
 }
 
-function rebuildTerrainKeepSelection() {
+// ── Remesh: debounced (5 s) or manual via button ──
+let _remeshTimer: ReturnType<typeof setTimeout> | null = null;
+const REMESH_DEBOUNCE = 5000; // ms
+
+function scheduleRemesh() {
+  if (_remeshTimer !== null) clearTimeout(_remeshTimer);
+  _remeshTimer = setTimeout(() => {
+    _remeshTimer = null;
+    doRemesh();
+  }, REMESH_DEBOUNCE);
+}
+
+function doRemesh() {
+  // Cancel any pending scheduled remesh
+  if (_remeshTimer !== null) { clearTimeout(_remeshTimer); _remeshTimer = null; }
+
   const selIdx = selectedPointIndex;
   localAltPoints = altitudeToLocal(altitudeData, originCoord, scaleFactor, elevationScale);
 
-  // Refresh ground mesh
   if (groundMesh) {
-    applyTerrainHeights(groundMesh);
-    if (groundWireframe) {
-      groundWireframe.dispose();
-      buildGroundWireframe(groundMesh);
-      groundWireframe!.isVisible = (document.getElementById('tog-wireframe') as HTMLInputElement).checked;
-    }
+    applyTerrainHeightsAsync(groundMesh).then(() => {
+      const wireframeVisible = (document.getElementById('tog-wireframe') as HTMLInputElement).checked;
+      if (wireframeVisible && groundMesh) {
+        if (groundWireframe) groundWireframe.dispose();
+        buildGroundWireframe(groundMesh);
+        groundWireframe!.isVisible = true;
+      }
+    });
   }
 
   // Refresh point markers
@@ -943,6 +1061,14 @@ function rebuildTerrainKeepSelection() {
   } else {
     deselectPoint();
   }
+}
+
+// Expose for the sidebar button
+(window as any).doRemesh = () => doRemesh();
+
+function rebuildTerrainKeepSelection() {
+  // Schedule a remesh immediately
+  doRemesh();
 }
 
 // ── Sidebar: toggles ──
@@ -962,7 +1088,9 @@ function setupToggles() {
     if (groundWireframe) groundWireframe.isVisible = checked;
   });
   bind('tog-buildings', () => buildingRoot);
-  bind('tog-trees', () => treeRoot);
+  bind('tog-objects', () => objectRoot);
+  bind('tog-manual-trees', () => manualTreeRoot);
+  bind('tog-gen-trees', () => generatedTreeRoot);
   bind('tog-water', () => waterRoot);
   bind('tog-course', () => courseLines);
   bind('tog-altpoints', () => altPointRoot);

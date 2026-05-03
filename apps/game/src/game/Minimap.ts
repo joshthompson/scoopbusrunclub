@@ -158,7 +158,7 @@ export class Minimap {
     busZ: number,
     busYaw: number,
     players: MinimapPlayer[] = [],
-    lookaheadStart?: { x: number; z: number },
+    lookaheadAnchor?: { x: number; z: number; pathDist?: number; playerPathDist?: number },
     passengerDots?: { x: number; z: number; color: string }[],
     passengerFlags?: { x: number; z: number; color: string }[],
   ) {
@@ -245,13 +245,37 @@ export class Minimap {
     if (this.pathPositions.length > 1) {
       this.strokePath(ctx, project, 6, COL_PATH_OUTLINE);
       this.strokePath(ctx, project, 3.5, COL_PATH);
-      if (lookaheadStart) {
+      if (lookaheadAnchor) {
         this.drawLookaheadSegment(
           ctx,
           project,
-          lookaheadStart.x,
-          lookaheadStart.z,
+          lookaheadAnchor.x,
+          lookaheadAnchor.z,
+          lookaheadAnchor.pathDist,
+          lookaheadAnchor.playerPathDist,
         );
+
+        // --- gate flag marker on minimap ---
+        const localPlayer = players.find(p => p.isLocal);
+        if (localPlayer) {
+          const [gx, gy] = project(lookaheadAnchor.x, lookaheadAnchor.z);
+          const poleH = 12;
+          const flagW = 7;
+          const flagH = 6;
+          // Pole
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(gx, gy);
+          ctx.lineTo(gx, gy - poleH);
+          ctx.stroke();
+          // Rectangular flag in bus colour
+          ctx.fillStyle = localPlayer.color;
+          ctx.fillRect(gx, gy - poleH, flagW, flagH);
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(gx, gy - poleH, flagW, flagH);
+        }
       }
     }
 
@@ -459,14 +483,25 @@ export class Minimap {
   private drawLookaheadSegment(
     ctx: CanvasRenderingContext2D,
     project: (wx: number, wz: number) => [number, number],
-    startX: number,
-    startZ: number,
+    anchorX: number,
+    anchorZ: number,
+    nextGatePathDist?: number,
+    playerPathDist?: number,
   ) {
     if (this.pathPositions.length < 2 || this.pathTotalDist <= 0) return;
 
-    const anchorDist = this.findClosestPathDistance(startX, startZ);
-    const startDist = Math.max(0, anchorDist - LOOKAHEAD_BACKTRACK_METRES);
-    const endDist = Math.min(this.pathTotalDist, anchorDist + LOOKAHEAD_SEGMENT_METRES);
+    // Use precise path distances if provided, otherwise fall back to nearest-point guess
+    let startDist: number;
+    let endDist: number;
+    if (nextGatePathDist != null && playerPathDist != null) {
+      // Show from player's last gate to well past the next gate
+      startDist = Math.max(0, playerPathDist);
+      endDist = Math.min(this.pathTotalDist, nextGatePathDist + LOOKAHEAD_SEGMENT_METRES * 0.3);
+    } else {
+      const anchorDist = this.findClosestPathDistance(anchorX, anchorZ);
+      startDist = Math.max(0, anchorDist - LOOKAHEAD_BACKTRACK_METRES);
+      endDist = Math.min(this.pathTotalDist, anchorDist + LOOKAHEAD_SEGMENT_METRES);
+    }
 
     const points: [number, number][] = [];
     for (let d = startDist; d < endDist; d += LOOKAHEAD_SAMPLE_STEP) {

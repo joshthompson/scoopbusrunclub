@@ -77,7 +77,7 @@ export function computeTerrainHeightIDW(
   x: number,
   z: number,
   altPoints: LocalAltitudePoint[],
-  k = 6,
+  k = 12,
 ): number {
   const n = altPoints.length;
   if (n === 0) return 0;
