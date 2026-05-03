@@ -36,7 +36,6 @@ import { getBusColorById, resolveRunnerAppearance, isCorgiRunnerId } from './cha
 import { createSky } from './objects/Sky';
 import type { IcePatchOverlay } from './PathShader';
 import { createTiledPathGroundMaterial } from './PathShaderTiled';
-import type { TiledPathGroundMaterial } from './PathShaderTiled';
 import { createRunnerModel, poseStanding } from './objects/RunnerModel';
 import { createCorgiModel } from './objects/CorgiModel';
 import type { RunnerModelResult } from './objects/RunnerModel';
@@ -2214,7 +2213,7 @@ export class Game {
     if (this.level?.timeOfDay === 'night') {
       const headlight = new SpotLight(
         'busHeadlight',
-        new Vector3(0, 1.0, 2.5),        // centre front of bus
+        new Vector3(0, 1.0, 6.5),        // in front of scoop
         new Vector3(0, -0.15, 1),         // forward and slightly down
         Math.PI * 0.7,                    // wide soft cone
         0.3,                              // very soft falloff

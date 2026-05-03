@@ -10,7 +10,7 @@ export const singleBusMode: GameModeConfig = {
   type: 'single-bus',
   label: 'Bus Driver',
   description: 'Drive the bus and scoop up runners',
-  items: true,
+  items: false,
   minPlayers: 1,
   maxPlayers: 1,
   usesLevelSelect: true,
