@@ -17,6 +17,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         editor: path.resolve(__dirname, 'editor.html'),
+        '3d-editor': path.resolve(__dirname, '3d-editor.html'),
       },
     },
   },
