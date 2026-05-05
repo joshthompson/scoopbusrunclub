@@ -9,6 +9,42 @@
       html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
       #app { width: 100%; height: 100%; }
       #gameCanvas { width: 100% !important; height: 100% !important; outline: none; }
+
+      /* ---------- Local multiplayer split-screen ---------- */
+      .local-split-divider {
+        position: fixed;
+        background: rgba(0,0,0,0.6);
+        pointer-events: none;
+        z-index: 5;
+      }
+      /* landscape: vertical divider */
+      @media (orientation: landscape) {
+        .local-split-divider { top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); }
+      }
+      /* portrait: horizontal divider */
+      @media (orientation: portrait) {
+        .local-split-divider { left: 0; right: 0; top: 50%; height: 2px; transform: translateY(-50%); }
+      }
+      .local-player-label {
+        position: fixed;
+        font-family: monospace;
+        font-size: clamp(11px, 1.8vw, 16px);
+        color: #fff;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+        background: rgba(0,0,0,0.4);
+        padding: 4px 10px;
+        border-radius: 0 0 8px 0;
+        pointer-events: none;
+        z-index: 10;
+      }
+      @media (orientation: landscape) {
+        .local-player-label-p1 { top: 0; left: 0; }
+        .local-player-label-p2 { top: 0; left: 50%; }
+      }
+      @media (orientation: portrait) {
+        .local-player-label-p1 { bottom: 0; left: 0; top: auto; }
+        .local-player-label-p2 { top: 0; left: 0; }
+      }
       #hud {
         display: none;
         position: absolute;
@@ -57,6 +93,22 @@
         z-index: 10;
         max-width: 30vw;
         max-height: 30vw;
+      }
+      #minimap-p2 {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 10;
+        max-width: 30vw;
+        max-height: 30vw;
+        display: none;
+      }
+      body.local-mp #minimap-p2 { display: block; }
+      @media (orientation: landscape) {
+        #minimap-p2 { bottom: 20px; left: calc(50% + 20px); }
+      }
+      @media (orientation: portrait) {
+        #minimap-p2 { bottom: calc(50% + 20px); left: 20px; }
       }
       #loading {
         position: absolute;
@@ -115,7 +167,7 @@
       }
       .course-btn:hover {
         transform: scale(1.07);
-        box-shadow: 0 6px 20px rgba(255,193,7,0.5);
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
       }
       .course-btn:active {
         transform: scale(0.97);
@@ -152,6 +204,9 @@
       }
       .host-btn {
         background: linear-gradient(180deg, #4caf50 0%, #2e7d32 100%) !important;
+      }
+      .local-btn {
+        background: linear-gradient(180deg, #e65100 0%, #ac120a 100%) !important;
       }
       .pickup-btn,
       .join-btn {
@@ -406,6 +461,29 @@
         pointer-events: none;
         z-index: 10;
         letter-spacing: 0.04em;
+      }
+      /* Local multiplayer: P1 course-progress positioned in P1's viewport */
+      @media (orientation: landscape) {
+        .course-progress-local { right: calc(50% + 20px) !important; }
+      }
+      /* P2 course progress */
+      #course-progress-p2 {
+        position: absolute;
+        color: #fff;
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-size: clamp(18px, 3.5vw, 32px);
+        text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+        background: rgba(0,0,0,0.45);
+        padding: 8px 18px;
+        border-radius: 12px;
+        pointer-events: none;
+        z-index: 10;
+        letter-spacing: 0.04em;
+        bottom: 20px;
+        right: 20px;
+      }
+      @media (orientation: portrait) {
+        #course-progress-p2 { bottom: calc(50% + 20px); right: 20px; }
       }
 
       /* ---------- Countdown overlay ---------- */
@@ -930,6 +1008,12 @@
       @keyframes bonus-float {
         0% { opacity: 1; transform: translateX(-50%) translateY(0); }
         100% { opacity: 0; transform: translateX(-50%) translateY(-60px); }
+      }
+      @keyframes finished-banner-float {
+        0%   { opacity: 0; transform: translate(-50%, 0); }
+        15%  { opacity: 1; transform: translate(-50%, -20px); }
+        60%  { opacity: 1; transform: translate(-50%, -80px); }
+        100% { opacity: 0; transform: translate(-50%, -160px); }
       }
     </style>
   </head>

@@ -136,6 +136,8 @@ export interface RunnerUpdateContext {
   buildingColliders: BuildingCollider[];
   /** Current engine vibration Y offset (applied to roof riders). */
   engineVibeOffset: number;
+  /** When true, also simulate runners owned by other local players (P2). */
+  localMultiplayer?: boolean;
 }
 
 export interface ScoopEvent {
@@ -169,9 +171,9 @@ export function updateRunnersSystem(
   const animationCullDistanceSq = RENDER_ANIMATION_CULL_DISTANCE * RENDER_ANIMATION_CULL_DISTANCE;
 
   for (const runner of ctx.runners) {
-    // Skip runners owned by a remote player
+    // Skip runners owned by a remote player (but in local multiplayer, simulate all local players)
     if (runner.ownerPlayerIndex !== 0 && runner.ownerPlayerIndex !== ctx.localPlayerIndex) {
-      continue;
+      if (!ctx.localMultiplayer) continue;
     }
 
     const pos = runner.mesh.position;
@@ -399,12 +401,26 @@ export function updateRunnersSystem(
       }
 
       case 'riding': {
-        const sinY = Math.sin(ctx.busYaw);
-        const cosY = Math.cos(ctx.busYaw);
-        pos.x = ctx.busPos.x + cosY * runner.ridingOffsetX + sinY * runner.ridingOffsetZ;
-        pos.z = ctx.busPos.z - sinY * runner.ridingOffsetX + cosY * runner.ridingOffsetZ;
-        pos.y = ctx.busPos.y + BUS_ROOF_Y + ctx.engineVibeOffset;
-        runner.mesh.rotation.y = ctx.busYaw;
+        // Determine which bus this runner is riding on
+        let riderBusPos = ctx.busPos;
+        let riderBusYaw = ctx.busYaw;
+        let riderVibeOffset = ctx.engineVibeOffset;
+        if (runner.ownerPlayerIndex !== ctx.localPlayerIndex) {
+          for (const [_peerId, remote] of ctx.remotePlayers) {
+            if (remote.playerIndex === runner.ownerPlayerIndex) {
+              riderBusPos = remote.smoothPos;
+              riderBusYaw = remote.smoothYaw;
+              riderVibeOffset = ctx.engineVibeOffset; // same vibe offset approximation
+              break;
+            }
+          }
+        }
+        const sinY = Math.sin(riderBusYaw);
+        const cosY = Math.cos(riderBusYaw);
+        pos.x = riderBusPos.x + cosY * runner.ridingOffsetX + sinY * runner.ridingOffsetZ;
+        pos.z = riderBusPos.z - sinY * runner.ridingOffsetX + cosY * runner.ridingOffsetZ;
+        pos.y = riderBusPos.y + BUS_ROOF_Y + riderVibeOffset;
+        runner.mesh.rotation.y = riderBusYaw;
         if (animateRunner) {
           runner.animPhase += dt;
           poseSittingAnimated(runner.model, runner.animPhase);

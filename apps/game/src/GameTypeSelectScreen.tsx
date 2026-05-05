@@ -8,7 +8,7 @@
  * - Arena (3+ players)
  */
 import logoSrc from './assets/logo.png';
-import { HOST_GAME_TYPES, GAME_TYPE_LABELS, GAME_TYPE_DESCRIPTIONS } from './game/modes';
+import { HOST_GAME_TYPES, GAME_TYPE_LABELS, GAME_TYPE_DESCRIPTIONS, getGameModeConfig } from './game/modes';
 import type { GameType } from './game/modes';
 
 const GAME_TYPE_EMOJI: Record<string, string> = {
@@ -21,16 +21,26 @@ const GAME_TYPE_EMOJI: Record<string, string> = {
 interface GameTypeSelectScreenProps {
   onSelect: (gameType: GameType) => void;
   onBack: () => void;
+  /** If set, only show game types with minPlayers <= this value */
+  maxPlayers?: number;
+  /** Optional heading override */
+  heading?: string;
 }
 
 export function GameTypeSelectScreen(props: GameTypeSelectScreenProps) {
+  const gameTypes = () => {
+    const mp = props.maxPlayers;
+    if (mp == null) return HOST_GAME_TYPES;
+    return HOST_GAME_TYPES.filter((gt) => getGameModeConfig(gt).minPlayers <= mp);
+  };
+
   return (
     <div id="title-screen">
       <div class="title-content">
         <img src={logoSrc} alt="Scoop Bus" class="title-logo" />
-        <h2 class="screen-heading">Choose Game Type</h2>
+        <h2 class="screen-heading">{props.heading ?? 'Choose Game Type'}</h2>
         <div class="course-buttons">
-          {HOST_GAME_TYPES.map((gt) => (
+          {gameTypes().map((gt) => (
             <button
               class="course-btn game-type-btn"
               onClick={() => props.onSelect(gt)}

@@ -18,6 +18,7 @@ import {
   ParticleSystem,
   SceneLoader,
   DynamicTexture,
+  Viewport,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import arrowModelUrl from '../assets/models/arrow.glb?url';
@@ -36,7 +37,7 @@ import { getBusColorById, resolveRunnerAppearance, isCorgiRunnerId } from './cha
 import { createSky } from './objects/Sky';
 import type { IcePatchOverlay } from './PathShader';
 import { createTiledPathGroundMaterial } from './PathShaderTiled';
-import { createRunnerModel, poseStanding } from './objects/RunnerModel';
+import { createRunnerModel, poseStanding, poseRunning } from './objects/RunnerModel';
 import { createCorgiModel } from './objects/CorgiModel';
 import type { RunnerModelResult } from './objects/RunnerModel';
 import {
@@ -135,6 +136,20 @@ import {
   LIGHT_NIGHT_SUN_DIFFUSE_R,
   LIGHT_NIGHT_SUN_DIFFUSE_G,
   LIGHT_NIGHT_SUN_DIFFUSE_B,
+  BUS_HEADLIGHT_INTENSITY,
+  BUS_HEADLIGHT_RANGE,
+  BUS_HEADLIGHT_ANGLE,
+  BUS_HEADLIGHT_EXPONENT,
+  BUS_HEADLIGHT_COLOR_R,
+  BUS_HEADLIGHT_COLOR_G,
+  BUS_HEADLIGHT_COLOR_B,
+  BUS_REVERSE_LIGHT_INTENSITY,
+  BUS_REVERSE_LIGHT_RANGE,
+  BUS_REVERSE_LIGHT_ANGLE,
+  BUS_REVERSE_LIGHT_EXPONENT,
+  BUS_REVERSE_LIGHT_COLOR_R,
+  BUS_REVERSE_LIGHT_COLOR_G,
+  BUS_REVERSE_LIGHT_COLOR_B,
 } from './constants';
 import {
   type BuildingCollider,
@@ -198,6 +213,7 @@ import {
   buildLocalRunner as buildLocalRunnerFn,
   updateLocalRunnerVisual as updateLocalRunnerVisualFn,
   packRemoteRiders,
+  assignRoofSeat,
 } from './systems/runners';
 import {
   updateRunnerInteractions,
@@ -295,6 +311,8 @@ export class Game {
   private waterWake: ParticleSystem[] = []; // wake/ripple spray when driving through water
   private waterWakeActive = false; // whether wake is currently emitting
   private distanceTravelled = 0;
+  private busHeadlight: SpotLight | null = null;
+  private busReverseLights: SpotLight[] = [];
 
   // Input
   private keys: Record<string, boolean> = {};
@@ -338,6 +356,8 @@ export class Game {
   private setIcePatchesOnGround: ((patches: IcePatchOverlay[]) => void) | null = null;
   private updateInsetCenter: ((playerX: number, playerZ: number) => void) | null = null;
   private setViewCenterOnGround: ((x: number, y: number, z: number) => void) | null = null;
+  /** Set the second view center for local multiplayer (both players get high shader detail). */
+  private setViewCenter2OnGround: ((x: number, y: number, z: number) => void) | null = null;
   /** Cached view-center on the ground plane — updated once per frame. */
   private viewCenter = { x: 0, z: 0 };
 
@@ -401,12 +421,18 @@ export class Game {
   private directionArrowRotNode: TransformNode | null = null;
   /** Smoothed relative angle applied to the arrow (avoids snapping on gate change) */
   private arrowDisplayAngle = 0;
+  // P2 direction arrow (local multiplayer)
+  private p2DirectionArrowRoot: TransformNode | null = null;
+  private p2DirectionArrowRotNode: TransformNode | null = null;
+  private p2ArrowDisplayAngle = 0;
 
   // 3D gate flag (marks next checkpoint)
   private gateFlagRoot: TransformNode | null = null;
+  private p2GateFlagRoot: TransformNode | null = null;
 
   // Minimap
   private minimap: Minimap | null = null;
+  private p2Minimap: Minimap | null = null;
 
   // Pause state
   private paused = false;
@@ -457,6 +483,30 @@ export class Game {
   private localRunnerScoopVelZ = 0;
   private localRunnerScoopSitTimer = 0;
 
+  // ---------- Local multiplayer (P2) ----------
+  private localMultiplayer = false;
+  private p2Role: 'bus' | 'runner' = 'runner';
+  private p2CharSelection: CharacterSelection | null = null;
+  private p2Camera: FreeCamera | null = null;
+  private p2CameraYawOffset = 0;
+  private p2Pos = new Vector3(0, 0, 0);
+  private p2Yaw = 0;
+  private p2Speed = 0;
+  private p2VelAngle = 0;
+  private p2VelY = 0;
+  private p2Airborne = false;
+  private p2JumpHeldLast = false;
+  private p2EnterHeldLast = false;
+  private p2JumpsUsed = 0;
+  private p2JumpSideVel = 0;
+  private p2ScoopAnimTimer = 0;
+  private p2BoostTimer = 0;
+  private p2ElasticPenaltyActive = false;
+  private p2GateIdx = 0;
+  private p2Finished = false;
+  private p2FinishTime = 0;
+  private p2RaceTimer = 0;
+
   // Player runner interaction state (wave / high-five)
   private playerInteraction: PlayerRunnerState = {
     x: 0, z: 0, yaw: 0, speed: 0,
@@ -485,7 +535,7 @@ export class Game {
     canvas: HTMLCanvasElement,
     callbacks: GameCallbacks,
     minimapCanvas?: HTMLCanvasElement,
-    options?: { localPlayerRole?: 'bus' | 'runner'; gameType?: GameType; items?: boolean; charSelection?: CharacterSelection | null },
+    options?: { localPlayerRole?: 'bus' | 'runner'; gameType?: GameType; items?: boolean; charSelection?: CharacterSelection | null; localMultiplayer?: boolean; p2Role?: 'bus' | 'runner'; p2CharSelection?: CharacterSelection | null; p2MinimapCanvas?: HTMLCanvasElement },
   ) {
     this.canvas = canvas;
     this.callbacks = callbacks;
@@ -493,8 +543,14 @@ export class Game {
     this.gameType = options?.gameType ?? 'single-bus';
     this.itemsEnabled = options?.items ?? false;
     this.charSelection = options?.charSelection ?? null;
+    this.localMultiplayer = options?.localMultiplayer ?? false;
+    this.p2Role = options?.p2Role ?? 'runner';
+    this.p2CharSelection = options?.p2CharSelection ?? null;
     if (minimapCanvas) {
       this.minimap = new Minimap(minimapCanvas);
+    }
+    if (options?.localMultiplayer && options.p2MinimapCanvas) {
+      this.p2Minimap = new Minimap(options.p2MinimapCanvas);
     }
   }
 
@@ -613,6 +669,7 @@ export class Game {
     this.setIcePatchesOnGround = null;
     this.updateInsetCenter = null;
     this.setViewCenterOnGround = null;
+    this.setViewCenter2OnGround = null;
     // Dispose preview orbit input listeners
     if (this.previewOrbitCleanup) {
       this.previewOrbitCleanup();
@@ -625,7 +682,13 @@ export class Game {
     }
     this._disposed = true;
     this.engine?.stopRenderLoop();
+    // Dispose local bus lights before scene teardown
+    this.busHeadlight?.dispose();
+    this.busHeadlight = null;
+    for (const rl of this.busReverseLights) rl.dispose();
+    this.busReverseLights = [];
     this.scene?.dispose();
+    this.p2Camera = null;
     // Don't dispose the engine — it's reused across game instances to avoid
     // WebGL context creation/destruction race conditions.
     // Resolve sceneRenderedPromise to unblock any waiters (e.g. multiplayer sync)
@@ -682,6 +745,42 @@ export class Game {
     (scoopPivot as any).__restY = scoopPivot.position.y;
     (scoopPivot as any).__restZ = scoopPivot.position.z;
 
+    // --- Night headlight + reverse lights (same config as local bus) ---
+    const isNight = this.level?.timeOfDay === 'night';
+    let headlight: SpotLight | null = null;
+    const reverseLights: SpotLight[] = [];
+    if (isNight) {
+      headlight = new SpotLight(
+        `busHeadlight_${peerId}`,
+        new Vector3(0, 1.0, 6.5),
+        new Vector3(0, -0.15, 1),
+        BUS_HEADLIGHT_ANGLE,
+        BUS_HEADLIGHT_EXPONENT,
+        this.scene,
+      );
+      headlight.diffuse = new Color3(BUS_HEADLIGHT_COLOR_R, BUS_HEADLIGHT_COLOR_G, BUS_HEADLIGHT_COLOR_B);
+      headlight.intensity = BUS_HEADLIGHT_INTENSITY;
+      headlight.range = BUS_HEADLIGHT_RANGE;
+      headlight.parent = result.root;
+
+      for (const side of [-1, 1]) {
+        const rl = new SpotLight(
+          `busReverseLight_${peerId}_${side}`,
+          new Vector3(side * 2.4 * 0.38, 0.9 + 0.3, -7.0 / 2 - 0.1),
+          new Vector3(0, -0.1, -1),
+          BUS_REVERSE_LIGHT_ANGLE,
+          BUS_REVERSE_LIGHT_EXPONENT,
+          this.scene,
+        );
+        rl.diffuse = new Color3(BUS_REVERSE_LIGHT_COLOR_R, BUS_REVERSE_LIGHT_COLOR_G, BUS_REVERSE_LIGHT_COLOR_B);
+        rl.intensity = BUS_REVERSE_LIGHT_INTENSITY;
+        rl.range = BUS_REVERSE_LIGHT_RANGE;
+        rl.parent = result.root;
+        rl.setEnabled(false);
+        reverseLights.push(rl);
+      }
+    }
+
     this.remotePlayers.set(peerId, {
       mesh: result.root,
       bodyShell: result.bodyShell,
@@ -697,6 +796,8 @@ export class Game {
       riderAnchors: [],
       runnerModel,
       runnerAnimPhase: 0,
+      headlight,
+      reverseLights,
     });
   }
 
@@ -705,6 +806,8 @@ export class Game {
     const remote = this.remotePlayers.get(peerId);
     if (remote) {
       remote.exhaustFlames?.dispose();
+      remote.headlight?.dispose();
+      for (const rl of remote.reverseLights) rl.dispose();
       for (const anchor of remote.riderAnchors) anchor.dispose();
       for (const rider of remote.riderModels) rider.root.dispose();
       remote.runnerModel?.root.dispose();
@@ -1408,6 +1511,32 @@ export class Game {
     this.camera.fov = 1.0;
     this.camera.inputs.clear();
 
+    // Local multiplayer: set up split-screen with a second camera for P2
+    if (this.localMultiplayer) {
+      // Layer mask setup: default meshes 0x0FFFFFFF visible to both cameras.
+      // P1-exclusive (arrow) = 0x10000000, P2-exclusive = 0x20000000.
+      this.camera.layerMask = 0x1FFFFFFF;
+      const isLandscape = this.canvas.width >= this.canvas.height;
+      if (isLandscape) {
+        this.camera.viewport = new Viewport(0, 0, 0.5, 1);
+      } else {
+        // Portrait: P1 bottom, P2 top (BabylonJS y=0 is bottom)
+        this.camera.viewport = new Viewport(0, 0, 1, 0.5);
+      }
+
+      this.p2Camera = new FreeCamera('cam-p2', new Vector3(0, 10, -15), this.scene);
+      this.p2Camera.minZ = 0.1;
+      this.p2Camera.fov = 1.0;
+      this.p2Camera.inputs.clear();
+      this.p2Camera.layerMask = 0x2FFFFFFF;
+      if (isLandscape) {
+        this.p2Camera.viewport = new Viewport(0.5, 0, 0.5, 1);
+      } else {
+        this.p2Camera.viewport = new Viewport(0, 0.5, 1, 0.5);
+      }
+      this.scene.activeCameras = [this.camera, this.p2Camera];
+    }
+
     // Lights — adapt to time of day (values from constants.ts)
     const isNight = level.timeOfDay === 'night';
     const hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), this.scene);
@@ -1547,6 +1676,37 @@ export class Game {
         this.busMesh.setEnabled(false);
       }
     }
+    // Local multiplayer: initialise P2 starting position and spawn P2's visual model as a remote player
+    if (this.localMultiplayer) {
+      // P2 starts one lane to the right of P1 (side-by-side, like remote multiplayer)
+      const rightX = Math.cos(this.busYaw);
+      const rightZ = -Math.sin(this.busYaw);
+      const lateralOffset = 4; // metres — same lane spacing as remote multiplayer
+      this.p2Pos.set(
+        this.busPos.x + rightX * lateralOffset,
+        0,
+        this.busPos.z + rightZ * lateralOffset,
+      );
+      this.p2Pos.y = this.getGroundY(this.p2Pos.x, this.p2Pos.z);
+      this.p2Yaw = this.busYaw;
+      this.p2GateIdx = 0;
+      this.p2Finished = false;
+      this.p2FinishTime = 0;
+      this.p2RaceTimer = 0;
+
+      // Build a remote-player-style visual for P2 using playerIndex 2
+      await this.buildRemoteBusForPeer('__p2__', 2, this.p2CharSelection ?? undefined);
+      if (this._disposed) return;
+      const p2Remote = this.remotePlayers.get('__p2__');
+      if (p2Remote) {
+        // Enable it and snap it to P2 start position
+        p2Remote.mesh.setEnabled(this.p2Role === 'bus');
+        p2Remote.runnerModel?.root.setEnabled(this.p2Role === 'runner');
+        p2Remote.smoothPos.copyFrom(this.p2Pos);
+        p2Remote.smoothYaw = this.p2Yaw;
+        p2Remote.state = { x: this.p2Pos.x, y: this.p2Pos.y, z: this.p2Pos.z, yaw: this.p2Yaw, pitch: 0, speed: 0, dist: 0, scooped: 0, boosting: false, scooping: false, raceState: 'countdown', raceTime: 0, gateIdx: 0, playerIndex: 2, role: this.p2Role };
+      }
+    }
     if (!opts.skipRunners && this.gameType !== 'single-bus-mode') {
       this.runners = spawnRunnersSystem(this.scene, this.pathPositions, (x, z) => this.getGroundY(x, z));
     }
@@ -1600,7 +1760,10 @@ export class Game {
     }
     this.gatePositions = buildGatesSystem(this.pathPositions, this.pathCumDist, (x, z) => this.getGroundY(x, z));
     this.currentGateIdx = 0;
-    this.buildGateFlag();
+    if (this.gameType !== 'single-bus-mode') {
+      this.buildGateFlag();
+      this.buildP2GateFlag();
+    }
     this.powerUpSystem = new PowerUpSystem({
       scene: this.scene,
       enabled: this.itemsEnabled,
@@ -1635,7 +1798,7 @@ export class Game {
       const rightX = Math.cos(yaw);
       const rightZ = -Math.sin(yaw);
       const lateralSpacing = 4; // metres between each player's lane
-      const totalPlayers = MAX_PLAYERS;
+      const totalPlayers = this.localMultiplayer ? 2 : MAX_PLAYERS;
       // Centre the fan: player indices 1..N get offsets centred around 0
       const laneOffset = (this.localPlayerIndex - 1) - (totalPlayers - 1) / 2;
       this.busPos.x = sx - forwardX * BUS_START_OFFSET + rightX * laneOffset * lateralSpacing;
@@ -1644,6 +1807,28 @@ export class Game {
       this.busPos.y = startH;
       this.busYaw = yaw;
       this.busVelAngle = yaw;
+
+      // Reposition P2 next to P1 now that we have the final start-line position
+      if (this.localMultiplayer) {
+        this.p2Pos.set(
+          this.busPos.x + rightX * lateralSpacing,
+          0,
+          this.busPos.z + rightZ * lateralSpacing,
+        );
+        this.p2Pos.y = this.getGroundY(this.p2Pos.x, this.p2Pos.z);
+        this.p2Yaw = yaw;
+        const p2Remote = this.remotePlayers.get('__p2__');
+        if (p2Remote) {
+          p2Remote.smoothPos.copyFrom(this.p2Pos);
+          p2Remote.smoothYaw = this.p2Yaw;
+          if (p2Remote.state) {
+            p2Remote.state.x = this.p2Pos.x;
+            p2Remote.state.y = this.p2Pos.y;
+            p2Remote.state.z = this.p2Pos.z;
+            p2Remote.state.yaw = this.p2Yaw;
+          }
+        }
+      }
     }
 
     // --- Marshals ---
@@ -1694,9 +1879,23 @@ export class Game {
         this.minimap.setZoom(this.level.minimapZoom);
       }
     }
+    if (this.p2Minimap) {
+      this.p2Minimap.setPath(this.pathPositions);
+      this.p2Minimap.setWaterZones(this.waterZones);
+      this.p2Minimap.setRoads(this.roadPolylines);
+      this.p2Minimap.setTrails(this.trailPolylines);
+      this.p2Minimap.setBuildings(this.buildingFootprints);
+      if (this.level?.minimapZoom) {
+        this.p2Minimap.setZoom(this.level.minimapZoom);
+      }
+    }
 
-    if (!opts.skipBus) {
+    if (!opts.skipBus && this.gameType !== 'single-bus-mode') {
       await this.buildDirectionArrow();
+      // In local multiplayer, also build a second arrow for P2 parented to p2Camera
+      if (this.localMultiplayer && this.p2Camera) {
+        await this.buildDirectionArrowForCamera(this.p2Camera, 'p2');
+      }
     }
     if (this._disposed) return;
 
@@ -1802,7 +2001,19 @@ export class Game {
       }
     });
 
-    this.resizeHandler = () => this.engine.resize();
+    this.resizeHandler = () => {
+      this.engine.resize();
+      if (this.localMultiplayer && this.p2Camera) {
+        const landscape = this.canvas.width >= this.canvas.height;
+        if (landscape) {
+          this.camera.viewport = new Viewport(0, 0, 0.5, 1);
+          this.p2Camera.viewport = new Viewport(0.5, 0, 0.5, 1);
+        } else {
+          this.camera.viewport = new Viewport(0, 0, 1, 0.5);
+          this.p2Camera.viewport = new Viewport(0, 0.5, 1, 0.5);
+        }
+      }
+    };
     window.addEventListener('resize', this.resizeHandler);
   }
 
@@ -1870,6 +2081,7 @@ export class Game {
     this.setIcePatchesOnGround?.([]);
     this.updateInsetCenter = tiledMat.__updateInsetCenter ?? null;
     this.setViewCenterOnGround = tiledMat.__setViewCenter ?? null;
+    this.setViewCenter2OnGround = tiledMat.__setViewCenter2 ?? null;
 
     // Apply terrain heights to ground vertices so the ground undulates
     const positions = ground.getVerticesData(VertexBuffer.PositionKind);
@@ -1997,8 +2209,71 @@ export class Game {
     ball.position.y = poleHeight + 0.25;
     ball.parent = root;
 
+    // In local multiplayer, set P1-exclusive layerMask so P2 doesn't see this flag
+    if (this.localMultiplayer) {
+      for (const mesh of [pole, banner, ball]) {
+        mesh.layerMask = 0x10000000;
+      }
+    }
+
     this.gateFlagRoot = root;
     this.updateGateFlag();
+  }
+
+  /** Build P2's gate flag (only visible in P2's viewport). */
+  private buildP2GateFlag() {
+    if (!this.localMultiplayer || this.gatePositions.length === 0) return;
+
+    // Resolve P2 bus colour
+    let bodyColor = new Color3(0.85, 0.25, 0.2); // default red for P2
+    if (this.p2CharSelection?.type === 'bus') {
+      const opt = getBusColorById(this.p2CharSelection.busColorId);
+      if (opt) bodyColor = Color3.FromHexString(opt.bodyHex);
+    } else {
+      const p = PLAYER_COLORS[1]; // player index 2
+      if (p) bodyColor = p.body.clone();
+    }
+
+    const root = new TransformNode('gateFlag_p2', this.scene);
+
+    const poleHeight = 6;
+    const pole = MeshBuilder.CreateCylinder('gateFlagPole_p2', { diameter: 0.14, height: poleHeight, tessellation: 8 }, this.scene);
+    const poleMat = new StandardMaterial('gateFlagPoleMat_p2', this.scene);
+    poleMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
+    poleMat.specularColor = Color3.Black();
+    pole.material = poleMat;
+    pole.position.y = poleHeight / 2;
+    pole.parent = root;
+
+    const bannerW = 3.0;
+    const bannerH = 2.0;
+    const banner = MeshBuilder.CreatePlane('gateFlagBanner_p2', { width: bannerW, height: bannerH }, this.scene);
+    const bannerMat = new StandardMaterial('gateFlagBannerMat_p2', this.scene);
+    bannerMat.diffuseColor = bodyColor.clone();
+    bannerMat.specularColor = Color3.Black();
+    bannerMat.emissiveColor = bodyColor.scale(0.4);
+    bannerMat.backFaceCulling = false;
+    banner.material = bannerMat;
+    banner.position.y = poleHeight - bannerH / 2 - 0.3;
+    banner.position.x = bannerW / 2;
+    banner.parent = root;
+
+    const ball = MeshBuilder.CreateSphere('gateFlagBall_p2', { diameter: 0.5, segments: 6 }, this.scene);
+    const ballMat = new StandardMaterial('gateFlagBallMat_p2', this.scene);
+    ballMat.diffuseColor = bodyColor.clone();
+    ballMat.emissiveColor = bodyColor.scale(0.6);
+    ballMat.specularColor = Color3.Black();
+    ball.material = ballMat;
+    ball.position.y = poleHeight + 0.25;
+    ball.parent = root;
+
+    // P2-exclusive layerMask
+    for (const mesh of [pole, banner, ball]) {
+      mesh.layerMask = 0x20000000;
+    }
+
+    this.p2GateFlagRoot = root;
+    this.updateP2GateFlag();
   }
 
   /** Move the gate flag to the current gate position (or hide if done). */
@@ -2014,6 +2289,19 @@ export class Game {
     this.gateFlagRoot.rotation.y = gate.yaw;
   }
 
+  /** Move P2's gate flag to P2's current gate position. */
+  private updateP2GateFlag() {
+    if (!this.p2GateFlagRoot) return;
+    const gate = this.gatePositions[this.p2GateIdx];
+    if (!gate) {
+      this.p2GateFlagRoot.setEnabled(false);
+      return;
+    }
+    this.p2GateFlagRoot.setEnabled(true);
+    this.p2GateFlagRoot.position.set(gate.x, gate.y, gate.z);
+    this.p2GateFlagRoot.rotation.y = gate.yaw;
+  }
+
 
   // ---------- 3D Direction Arrow (HUD compass) ----------
 
@@ -2023,6 +2311,10 @@ export class Game {
    * behaves like a HUD element.
    */
   private async buildDirectionArrow() {
+    await this.buildDirectionArrowForCamera(this.camera, 'p1');
+  }
+
+  private async buildDirectionArrowForCamera(camera: FreeCamera, suffix: string) {
     // ── Node hierarchy ──
     //  camera
     //   └─ root    (position only — screen placement + bobbing)
@@ -2033,11 +2325,11 @@ export class Game {
     // at rotNode's origin, rotation.y on rotNode spins the model in
     // place without any lateral shift.
 
-    const root = new TransformNode('dirArrowRoot', this.scene);
-    root.parent = this.camera;
+    const root = new TransformNode(`dirArrowRoot_${suffix}`, this.scene);
+    root.parent = camera;
     root.position = new Vector3(0, 2.8, 8);
 
-    const rotNode = new TransformNode('dirArrowRot', this.scene);
+    const rotNode = new TransformNode(`dirArrowRot_${suffix}`, this.scene);
     rotNode.parent = root;
 
     // Load the arrow GLB model
@@ -2104,7 +2396,7 @@ export class Game {
     glbRoot.position = glbRoot.position.subtract(localOffset);
 
     // Orange emissive material so it's always clearly visible
-    const arrowMat = new StandardMaterial('arrowMat', this.scene);
+    const arrowMat = new StandardMaterial(`arrowMat_${suffix}`, this.scene);
     arrowMat.diffuseColor = new Color3(1.0, 0.45, 0.0);
     arrowMat.emissiveColor = new Color3(1.0, 0.5, 0.0);
     arrowMat.specularColor = new Color3(1, 1, 1);
@@ -2115,8 +2407,19 @@ export class Game {
       }
     }
 
-    this.directionArrowRoot = root;
-    this.directionArrowRotNode = rotNode;
+    // Set layerMask so arrow is only visible in the owning player's camera
+    const arrowLayerMask = suffix === 'p2' ? 0x20000000 : 0x10000000;
+    for (const mesh of result.meshes) {
+      mesh.layerMask = arrowLayerMask;
+    }
+
+    if (suffix === 'p2') {
+      this.p2DirectionArrowRoot = root;
+      this.p2DirectionArrowRotNode = rotNode;
+    } else {
+      this.directionArrowRoot = root;
+      this.directionArrowRotNode = rotNode;
+    }
   }
 
   /**
@@ -2126,52 +2429,85 @@ export class Game {
    * direction, then rotates the arrow root around its local Y axis.
    */
   private updateDirectionArrow(dt: number) {
-    if (!this.directionArrowRoot || !this.directionArrowRotNode) return;
+    this.updateDirectionArrowForPlayer(
+      this.directionArrowRoot,
+      this.directionArrowRotNode,
+      this.camera,
+      this.busPos,
+      this.currentGateIdx,
+      'p1',
+      dt,
+    );
+    // Update P2's arrow in local multiplayer
+    if (this.localMultiplayer) {
+      this.updateDirectionArrowForPlayer(
+        this.p2DirectionArrowRoot,
+        this.p2DirectionArrowRotNode,
+        this.p2Camera,
+        this.p2Pos,
+        this.p2GateIdx,
+        'p2',
+        dt,
+      );
+    }
+  }
+
+  private updateDirectionArrowForPlayer(
+    arrowRoot: TransformNode | null,
+    arrowRotNode: TransformNode | null,
+    camera: FreeCamera | null,
+    playerPos: Vector3,
+    gateIdx: number,
+    _suffix: string,
+    dt: number,
+  ) {
+    if (!arrowRoot || !arrowRotNode || !camera) return;
 
     // In bus mode, point toward closest active flag when carrying passengers
     let target: { x: number; z: number } | null = null;
     if (this.passengerSystem) {
-      target = this.passengerSystem.getClosestFlagTarget(this.busPos.x, this.busPos.z);
+      target = this.passengerSystem.getClosestFlagTarget(playerPos.x, playerPos.z);
       if (!target) {
-        // No passengers riding — hide arrow
-        this.directionArrowRoot.setEnabled(false);
+        arrowRoot.setEnabled(false);
         return;
       }
     } else {
       // Regular race mode — point to next gate
-      if (this.currentGateIdx >= this.gatePositions.length) {
-        this.directionArrowRoot.setEnabled(false);
+      if (gateIdx >= this.gatePositions.length) {
+        arrowRoot.setEnabled(false);
         return;
       }
-      target = this.gatePositions[this.currentGateIdx];
+      target = this.gatePositions[gateIdx];
     }
-    this.directionArrowRoot.setEnabled(true);
+    arrowRoot.setEnabled(true);
 
-    // Direction from bus to target in world space (horizontal)
-    const toTargetX = target.x - this.busPos.x;
-    const toTargetZ = target.z - this.busPos.z;
-    const worldAngle = Math.atan2(toTargetX, toTargetZ); // yaw angle in world
+    // Direction from player to target in world space (horizontal)
+    const toTargetX = target.x - playerPos.x;
+    const toTargetZ = target.z - playerPos.z;
+    const worldAngle = Math.atan2(toTargetX, toTargetZ);
 
-    // Camera's yaw in world space: the camera looks along its target direction
-    const camFwd = this.camera.getTarget().subtract(this.camera.position);
+    // Camera's yaw in world space
+    const camFwd = camera.getTarget().subtract(camera.position);
     const camYaw = Math.atan2(camFwd.x, camFwd.z);
 
-    // Arrow rotation = relative angle (gate direction minus camera direction)
-    // Applied to rotNode — root only handles positioning
     const targetAngle = worldAngle - camYaw;
 
-    // Smoothly interpolate toward target angle via shortest arc
-    let delta = targetAngle - this.arrowDisplayAngle;
-    // Wrap delta into [-PI, PI] so the arrow takes the short way round
+    // Pick the right display angle state for this player
+    let displayAngle = _suffix === 'p2' ? this.p2ArrowDisplayAngle : this.arrowDisplayAngle;
+    let delta = targetAngle - displayAngle;
     delta = ((delta + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-    const smoothSpeed = 6; // radians/sec blend rate
-    this.arrowDisplayAngle += delta * Math.min(1, smoothSpeed * dt);
+    displayAngle += delta * Math.min(1, 6 * dt);
+    if (_suffix === 'p2') {
+      this.p2ArrowDisplayAngle = displayAngle;
+    } else {
+      this.arrowDisplayAngle = displayAngle;
+    }
 
-    this.directionArrowRotNode.rotation.y = this.arrowDisplayAngle;
+    arrowRotNode.rotation.y = displayAngle;
 
-    // Gentle bobbing animation (on the position node)
+    // Gentle bobbing animation
     const bob = Math.sin(performance.now() * 0.003) * 0.12;
-    this.directionArrowRoot.position.y = 2.8 + bob;
+    arrowRoot.position.y = 2.8 + bob;
   }
 
 
@@ -2215,14 +2551,33 @@ export class Game {
         'busHeadlight',
         new Vector3(0, 1.0, 6.5),        // in front of scoop
         new Vector3(0, -0.15, 1),         // forward and slightly down
-        Math.PI * 0.7,                    // wide soft cone
-        0.3,                              // very soft falloff
+        BUS_HEADLIGHT_ANGLE,
+        BUS_HEADLIGHT_EXPONENT,
         this.scene,
       );
-      headlight.diffuse = new Color3(1.0, 0.97, 0.85);
-      headlight.intensity = 3.0;
-      headlight.range = 80;
+      headlight.diffuse = new Color3(BUS_HEADLIGHT_COLOR_R, BUS_HEADLIGHT_COLOR_G, BUS_HEADLIGHT_COLOR_B);
+      headlight.intensity = BUS_HEADLIGHT_INTENSITY;
+      headlight.range = BUS_HEADLIGHT_RANGE;
       headlight.parent = this.busMesh!;
+      this.busHeadlight = headlight;
+
+      // --- Reverse lights (soft red glow from tail lights, off by default) ---
+      for (const side of [-1, 1]) {
+        const rl = new SpotLight(
+          `busReverseLight_${side}`,
+          new Vector3(side * 2.4 * 0.38, 0.9 + 0.3, -7.0 / 2 - 0.1),
+          new Vector3(0, -0.1, -1),       // backward and slightly down
+          BUS_REVERSE_LIGHT_ANGLE,
+          BUS_REVERSE_LIGHT_EXPONENT,
+          this.scene,
+        );
+        rl.diffuse = new Color3(BUS_REVERSE_LIGHT_COLOR_R, BUS_REVERSE_LIGHT_COLOR_G, BUS_REVERSE_LIGHT_COLOR_B);
+        rl.intensity = BUS_REVERSE_LIGHT_INTENSITY;
+        rl.range = BUS_REVERSE_LIGHT_RANGE;
+        rl.parent = this.busMesh!;
+        rl.setEnabled(false);
+        this.busReverseLights.push(rl);
+      }
     }
   }
 
@@ -2595,6 +2950,139 @@ export class Game {
     }
   }
 
+  /**
+   * Collision resolution for P2 — solid obstacles, buildings, fence, wall-sliding.
+   * Mirrors resolveCollisions() but operates on p2Pos / p2Speed / p2VelAngle.
+   */
+  private resolveP2Collisions(radius: number) {
+    const preCollX = this.p2Pos.x;
+    const preCollZ = this.p2Pos.z;
+    let touchingElastic = false;
+
+    for (const obs of this.solidObstacles) {
+      const dx = this.p2Pos.x - obs.x;
+      const dz = this.p2Pos.z - obs.z;
+      const distSq = dx * dx + dz * dz;
+      const minDist = radius + obs.radius;
+      if (distSq < minDist * minDist && distSq > 0) {
+        const dist = Math.sqrt(distSq);
+        const nx = dx / dist;
+        const nz = dz / dist;
+
+        if (obs.elasticIndex != null) {
+          touchingElastic = true;
+          const elastic = this.elasticObjects[obs.elasticIndex];
+          if (elastic) {
+            const pushStrength = Math.abs(this.p2Speed) * 0.15;
+            elastic.tiltVelX += -nx * pushStrength;
+            elastic.tiltVelZ += -nz * pushStrength;
+          }
+          if (!this.p2ElasticPenaltyActive) {
+            this.p2Speed *= ELASTIC_SPEED_PENALTY;
+            this.p2ElasticPenaltyActive = true;
+          }
+        } else {
+          const overlap = minDist - dist;
+          this.p2Pos.x += nx * overlap;
+          this.p2Pos.z += nz * overlap;
+        }
+      }
+    }
+
+    this.resolvePositionAgainstBuildingsLocal(this.p2Pos, radius);
+    resolvePositionAgainstFence(this.p2Pos, radius, this.fenceCollider);
+
+    if (!touchingElastic) {
+      this.p2ElasticPenaltyActive = false;
+    }
+
+    // Wall-sliding velocity response
+    const pushX = this.p2Pos.x - preCollX;
+    const pushZ = this.p2Pos.z - preCollZ;
+    const pushDistSq = pushX * pushX + pushZ * pushZ;
+
+    if (pushDistSq > 1e-6) {
+      const pushDist = Math.sqrt(pushDistSq);
+      const nx = pushX / pushDist;
+      const nz = pushZ / pushDist;
+
+      if (this.p2Role === 'runner') {
+        const fwdX = Math.sin(this.p2Yaw);
+        const fwdZ = Math.cos(this.p2Yaw);
+        const rightX = Math.cos(this.p2Yaw);
+        const rightZ = -Math.sin(this.p2Yaw);
+        let velX = fwdX * this.p2Speed + rightX * this.p2JumpSideVel;
+        let velZ = fwdZ * this.p2Speed + rightZ * this.p2JumpSideVel;
+        const normalDot = velX * nx + velZ * nz;
+        if (normalDot < 0) {
+          velX -= normalDot * nx;
+          velZ -= normalDot * nz;
+          this.p2Speed = (velX * fwdX + velZ * fwdZ) * 0.92;
+          this.p2JumpSideVel = (velX * rightX + velZ * rightZ) * 0.92;
+        }
+      } else {
+        let velX = Math.sin(this.p2VelAngle) * this.p2Speed;
+        let velZ = Math.cos(this.p2VelAngle) * this.p2Speed;
+        const normalDot = velX * nx + velZ * nz;
+        if (normalDot < 0) {
+          velX -= normalDot * nx;
+          velZ -= normalDot * nz;
+          const slideSpeedSq = velX * velX + velZ * velZ;
+          if (slideSpeedSq > 0.01) {
+            const slideSpeed = Math.sqrt(slideSpeedSq);
+            this.p2VelAngle = Math.atan2(velX, velZ);
+            this.p2Speed = slideSpeed * 0.92;
+          } else {
+            this.p2Speed = 0;
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * P2 bus scoop detection against NPC runners.
+   * Mirrors the NPC scoop logic in updateRunnersSystem for P1.
+   */
+  private tryScoopNpcRunnersForP2() {
+    if (this.p2Role !== 'bus') return;
+    if (Math.abs(this.p2Speed) <= 0.5) return;
+
+    for (const runner of this.runners) {
+      if (runner.state !== 'running') continue;
+      if (runner.ownerPlayerIndex !== 0) continue; // already scooped
+
+      const dx = runner.mesh.position.x - this.p2Pos.x;
+      const dz = runner.mesh.position.z - this.p2Pos.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > SCOOP_DISTANCE * SCOOP_DISTANCE) continue;
+
+      // Scoop this runner (assign to player index 2)
+      runner.ownerPlayerIndex = 2;
+      // Launch runner with proper physics (mirrors launchRunnerOntoLocalBus)
+      runner.state = 'launched';
+      runner.interaction = 'none';
+      runner.interactionTimer = 0;
+      const absSpd = Math.abs(this.p2Speed);
+      const fwdX = Math.sin(this.p2Yaw);
+      const fwdZ = Math.cos(this.p2Yaw);
+      runner.velX = fwdX * this.p2Speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
+      runner.velY = Math.max(SCOOP_MIN_UP, absSpd * SCOOP_UP_FACTOR) + Math.random() * 3;
+      runner.velZ = fwdZ * this.p2Speed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3;
+
+      // Assign a roof seat so the runner lands on P2's bus
+      if (MODE === 'SCOOP_THEN_RIDE') {
+        assignRoofSeat(this.runners, 2, runner);
+      }
+
+      // Boost P2 on scoop
+      this.p2BoostTimer += SCOOP_BOOST_DURATION;
+      this.p2ScoopAnimTimer = SCOOP_ANIM_DURATION;
+
+      this.callbacks.onP2ScoopRunner?.();
+    }
+  }
+
 
   // ---------- Preview mode update (race replay) ----------
 
@@ -2712,6 +3200,258 @@ export class Game {
 
   // ---------- Chase Camera ----------
 
+  // ---------- Local Multiplayer P2 ----------
+
+  /** Update P2 physics: bus or runner movement driven by arrow keys + enter. */
+  private updateP2(dt: number) {
+    if (this.paused || this.raceState === 'countdown') return;
+
+    const p2Remote = this.remotePlayers.get('__p2__');
+
+    // P2 race timer
+    if (this.raceState === 'racing' && !this.p2Finished) {
+      this.p2RaceTimer += dt;
+    }
+
+    // ── Inputs ──
+    const up = this.isKey('arrowup');
+    const down = this.isKey('arrowdown');
+    const left = this.isKey('arrowleft');
+    const right = this.isKey('arrowright');
+    const enterHeld = this.isKey('enter');
+    const enterPressed = enterHeld && !this.p2EnterHeldLast;
+    this.p2EnterHeldLast = enterHeld;
+
+    let accelInput = 0;
+    if (up) accelInput += 1;
+    if (down) accelInput -= 1;
+    let turnInput = 0;
+    if (left) turnInput -= 1;
+    if (right) turnInput += 1;
+
+    if (!this.p2Finished) {
+      if (this.p2Role === 'runner') {
+        // ── Runner movement (matches P1 runner physics) ──
+        if (turnInput !== 0) this.p2Yaw += turnInput * RUNNER_PLAYER_TURN_SPEED * dt;
+
+        const targetSpeed = accelInput * RUNNER_PLAYER_SPEED;
+        const blend = Math.min(1, (accelInput !== 0 ? RUNNER_PLAYER_ACCELERATION : RUNNER_PLAYER_DECELERATION) * dt);
+        this.p2Speed += (targetSpeed - this.p2Speed) * blend;
+        this.p2Speed = Math.max(-RUNNER_PLAYER_SPEED * 0.45, Math.min(RUNNER_PLAYER_SPEED, this.p2Speed));
+
+        // Jump (Enter key for P2)
+        if (enterPressed && this.p2JumpsUsed < RUNNER_PLAYER_MAX_JUMPS) {
+          this.p2Airborne = true;
+          this.p2JumpsUsed++;
+          this.p2VelY = Math.sqrt(2 * GRAVITY * RUNNER_JUMP_HEIGHT);
+          this.p2JumpSideVel = left !== right ? (left ? -RUNNER_PLAYER_JUMP_SIDE_VELOCITY : RUNNER_PLAYER_JUMP_SIDE_VELOCITY) : 0;
+        }
+        this.p2JumpHeldLast = enterHeld;
+
+        const fwd = new Vector3(Math.sin(this.p2Yaw), 0, Math.cos(this.p2Yaw));
+        const rgt = new Vector3(Math.cos(this.p2Yaw), 0, -Math.sin(this.p2Yaw));
+        this.p2Pos.x += (fwd.x * this.p2Speed + rgt.x * this.p2JumpSideVel) * dt;
+        this.p2Pos.z += (fwd.z * this.p2Speed + rgt.z * this.p2JumpSideVel) * dt;
+        this.p2JumpSideVel *= Math.exp(-8 * dt);
+
+        // Runner collision resolution
+        this.resolveP2Collisions(RUNNER_COLLISION_RADIUS);
+
+        if (this.p2Airborne) {
+          this.p2VelY -= GRAVITY * dt;
+          this.p2Pos.y += this.p2VelY * dt;
+          const gY = this.getGroundY(this.p2Pos.x, this.p2Pos.z);
+          if (this.p2Pos.y <= gY && this.p2VelY < 0) {
+            this.p2Pos.y = gY;
+            this.p2VelY = 0;
+            this.p2Airborne = false;
+            this.p2JumpsUsed = 0;
+            this.p2JumpSideVel = 0;
+          }
+        } else {
+          this.p2Pos.y = this.getGroundY(this.p2Pos.x, this.p2Pos.z);
+          this.p2JumpsUsed = 0;
+        }
+      } else {
+        // ── Bus movement (matches P1 bus physics — drift, boost, slope, collisions) ──
+
+        // Scoop trigger (Enter key for P2 bus)
+        if (enterHeld && this.p2ScoopAnimTimer <= 0) {
+          this.p2ScoopAnimTimer = SCOOP_ANIM_DURATION;
+        }
+
+        if (turnInput !== 0 && Math.abs(this.p2Speed) > 0.5) {
+          this.p2Yaw += turnInput * BUS_TURN_SPEED * dt;
+        } else if (turnInput !== 0 && accelInput !== 0 && Math.abs(this.p2Speed) <= 0.5) {
+          this.p2Yaw += turnInput * BUS_TURN_SPEED_STANDSTILL * dt;
+        }
+
+        // Acceleration / braking / friction (same as P1)
+        if (accelInput > 0) {
+          this.p2Speed += BUS_ACCELERATION * dt;
+        } else if (accelInput < 0) {
+          this.p2Speed -= BUS_BRAKE * dt;
+        } else {
+          if (this.p2Speed > 0) {
+            this.p2Speed = Math.max(0, this.p2Speed - BUS_FRICTION * dt);
+          } else if (this.p2Speed < 0) {
+            this.p2Speed = Math.min(0, this.p2Speed + BUS_FRICTION * dt);
+          }
+        }
+
+        // Clamp speed (boosted max while scoop-boost is active)
+        const effectiveMaxSpeed = this.p2BoostTimer > 0 ? BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER : BUS_MAX_SPEED;
+        this.p2Speed = Math.max(-effectiveMaxSpeed * 0.3, Math.min(effectiveMaxSpeed, this.p2Speed));
+
+        // Tick boost timer
+        if (this.p2BoostTimer > 0) {
+          this.p2BoostTimer -= dt;
+          if (this.p2BoostTimer <= 0) this.p2BoostTimer = 0;
+        }
+
+        // Drift model (velocity angle lags behind heading)
+        const absSpeed = Math.abs(this.p2Speed);
+        const speedRatio = absSpeed / BUS_MAX_SPEED;
+        const p2InWater = this.isInWater(this.p2Pos.x, this.p2Pos.z);
+        const baseGrip = p2InWater ? WATER_DRIFT_GRIP : DRIFT_GRIP;
+        const grip = baseGrip * (1 - speedRatio * DRIFT_HIGH_SPEED_GRIP_FACTOR);
+        let velAngleDiff = this.p2Yaw - this.p2VelAngle;
+        while (velAngleDiff > Math.PI) velAngleDiff -= 2 * Math.PI;
+        while (velAngleDiff < -Math.PI) velAngleDiff += 2 * Math.PI;
+        this.p2VelAngle += velAngleDiff * Math.min(1, grip * dt);
+
+        const forward = new Vector3(Math.sin(this.p2VelAngle), 0, Math.cos(this.p2VelAngle));
+        this.p2Pos.x += forward.x * this.p2Speed * dt;
+        this.p2Pos.z += forward.z * this.p2Speed * dt;
+
+        // Solid-object + building + fence collisions
+        this.resolveP2Collisions(BUS_COLLISION_RADIUS);
+
+        // Follow terrain
+        let groundY = this.getGroundY(this.p2Pos.x, this.p2Pos.z);
+        const waterSurfY = this.getWaterSurfaceY(this.p2Pos.x, this.p2Pos.z);
+        if (waterSurfY !== null) {
+          groundY = waterSurfY - WATER_SINK;
+        }
+        this.p2Pos.y = groundY;
+
+        // Slope boost / drag
+        const headingDir = new Vector3(Math.sin(this.p2Yaw), 0, Math.cos(this.p2Yaw));
+        const slopeProbe = 2.0;
+        const hAhead = this.getGroundY(
+          this.p2Pos.x + headingDir.x * slopeProbe,
+          this.p2Pos.z + headingDir.z * slopeProbe,
+        );
+        const hBehind = this.getGroundY(
+          this.p2Pos.x - headingDir.x * slopeProbe,
+          this.p2Pos.z - headingDir.z * slopeProbe,
+        );
+        const slopePitch = Math.atan2(hAhead - hBehind, slopeProbe * 2);
+        if (slopePitch < BUS_DOWNHILL_SLOPE_THRESHOLD && this.p2Speed > 0) {
+          this.p2Speed += BUS_DOWNHILL_ACCEL_BOOST * dt;
+        }
+        if (slopePitch > 0.01 && this.p2Speed > 0) {
+          const uphillFactor = Math.min(slopePitch / 0.3, 1);
+          this.p2Speed = Math.max(0, this.p2Speed - BUS_UPHILL_DRAG * uphillFactor * dt);
+        }
+
+        // Scoop anim timer decrement
+        if (this.p2ScoopAnimTimer > 0) {
+          this.p2ScoopAnimTimer -= dt;
+        }
+
+        // NPC runner scoop detection (P2 bus scoops NPC runners)
+        this.tryScoopNpcRunnersForP2();
+      }
+    } else {
+      // P2 finished: coast to stop
+      if (this.p2Speed > 0) this.p2Speed = Math.max(0, this.p2Speed - 8 * dt);
+      else if (this.p2Speed < 0) this.p2Speed = Math.min(0, this.p2Speed + 8 * dt);
+      if (Math.abs(this.p2Speed) > 0.01) {
+        const fwd = new Vector3(Math.sin(this.p2Yaw), 0, Math.cos(this.p2Yaw));
+        this.p2Pos.x += fwd.x * this.p2Speed * dt;
+        this.p2Pos.z += fwd.z * this.p2Speed * dt;
+      }
+      this.p2Pos.y = this.getGroundY(this.p2Pos.x, this.p2Pos.z);
+    }
+
+    // ── Gate check for P2 ──
+    const newP2GateIdx = checkGatePass(this.gatePositions, this.p2GateIdx, this.p2Pos.x, this.p2Pos.z);
+    if (newP2GateIdx > this.p2GateIdx) {
+      this.p2GateIdx = newP2GateIdx;
+      this.updateP2GateFlag();
+    }
+    if (!this.p2Finished && this.gameType !== 'single-bus-mode' && this.p2GateIdx >= this.gatePositions.length && this.raceState === 'racing') {
+      this.p2Finished = true;
+      this.p2FinishTime = this.p2RaceTimer;
+      this.callbacks.onP2Finish?.(this.p2FinishTime);
+    }
+
+    // ── P2 course progress ──
+    if (this.raceState === 'racing') {
+      const totalKm = this.pathTotalDistance / 1000;
+      const p2CoveredKm = (this.p2GateIdx > 0
+        ? this.gatePositions[this.p2GateIdx - 1].pathDist
+        : 0) / 1000;
+      this.callbacks.onP2CourseProgress?.(parseFloat(p2CoveredKm.toFixed(1)), parseFloat(totalKm.toFixed(1)));
+    }
+
+    // ── Update P2 remote-player visual ──
+    if (p2Remote) {
+      p2Remote.smoothPos.copyFrom(this.p2Pos);
+      p2Remote.smoothYaw = this.p2Yaw;
+      p2Remote.smoothPitch = 0;
+      // Keep state in sync so updateRemoteBusMeshes works correctly
+      p2Remote.state = {
+        x: this.p2Pos.x,
+        y: this.p2Pos.y,
+        z: this.p2Pos.z,
+        yaw: this.p2Yaw,
+        pitch: 0,
+        speed: this.p2Speed,
+        dist: 0,
+        scooped: 0,
+        boosting: this.p2BoostTimer > 0,
+        scooping: this.p2ScoopAnimTimer > 0,
+        raceState: this.p2Finished ? 'finished' : this.raceState,
+        raceTime: this.p2RaceTimer,
+        gateIdx: this.p2GateIdx,
+        playerIndex: 2,
+        role: this.p2Role,
+      };
+    }
+  }
+
+  /** Update P2's camera (split-screen). */
+  private updateP2Camera(dt: number) {
+    if (!this.p2Camera) return;
+    if (this.p2Role === 'runner') {
+      updateRunnerCameraSystem({
+        dt,
+        camera: this.p2Camera,
+        runnerYaw: this.p2Yaw,
+        runnerPos: this.p2Pos,
+        getGroundY: (x, z) => this.getGroundY(x, z),
+        getWaterSurfaceY: (x, z) => this.getWaterSurfaceY(x, z),
+      });
+    } else {
+      const targetYawOffset = this.p2Speed < -1 ? Math.PI : 0;
+      const camSwingSpeed = 3;
+      const yawDiff = targetYawOffset - this.p2CameraYawOffset;
+      this.p2CameraYawOffset += Math.sign(yawDiff) * Math.min(Math.abs(yawDiff), camSwingSpeed * dt);
+      this.p2CameraYawOffset = updateChaseCameraSystem({
+        dt,
+        camera: this.p2Camera,
+        busYaw: this.p2Yaw,
+        busSpeed: this.p2Speed,
+        busPos: this.p2Pos,
+        cameraYawOffset: this.p2CameraYawOffset,
+        getGroundY: (x, z) => this.getGroundY(x, z),
+        getWaterSurfaceY: (x, z) => this.getWaterSurfaceY(x, z),
+      });
+    }
+  }
+
   private updateChaseCam(dt: number) {
     if (this.localPlayerRole === 'runner') {
       updateRunnerCameraSystem({
@@ -2761,6 +3501,30 @@ export class Game {
     return { x: this.busPos.x, z: this.busPos.z, pathDist: totalDist, playerPathDist: totalDist };
   }
 
+  private getP2MinimapLookaheadAnchor(): { x: number; z: number; pathDist: number; playerPathDist: number } {
+    const gate = this.gatePositions[this.p2GateIdx];
+    const prevGate = this.gatePositions[this.p2GateIdx - 1];
+    const playerPathDist = prevGate ? prevGate.pathDist : 0;
+    if (gate) {
+      return { x: gate.x, z: gate.z, pathDist: gate.pathDist, playerPathDist };
+    }
+    const totalDist = this.pathCumDist[this.pathCumDist.length - 1] ?? 0;
+    return { x: this.p2Pos.x, z: this.p2Pos.z, pathDist: totalDist, playerPathDist: totalDist };
+  }
+
+  private drawP2Minimap() {
+    if (!this.p2Minimap) return;
+    this.p2Minimap.draw(
+      this.p2Pos.x,
+      this.p2Pos.z,
+      this.p2Yaw,
+      this.buildMinimapPlayers(),
+      this.passengerSystem ? undefined : this.getP2MinimapLookaheadAnchor(),
+      this.passengerSystem?.getMinimapDots(),
+      this.passengerSystem?.getMinimapFlags(),
+    );
+  }
+
   // ---------- Remote bus interpolation ----------
 
   private updateRemoteBusMeshes(dt: number, engineVibeOffset: number) {
@@ -2774,28 +3538,55 @@ export class Game {
     });
   }
 
+  /** Toggle local bus reverse lights (red tail glow when reversing). */
+  private updateLocalReverseLights() {
+    const reversing = this.busSpeed < -0.5;
+    for (const rl of this.busReverseLights) {
+      rl.setEnabled(reversing);
+    }
+  }
+
   private updateBuildingLodForPlayer() {
     if (this.buildingLodEntries.length === 0) return;
     updateBuildingLod(this.buildingLodEntries, this.viewCenter.x, this.viewCenter.z);
+    // In local multiplayer, also run LOD from P2's position to ensure high detail near P2
+    if (this.localMultiplayer) {
+      updateBuildingLod(this.buildingLodEntries, this.p2Pos.x, this.p2Pos.z);
+    }
   }
 
-  /** Hide trees and objects beyond their max render distance from the view center. */
+  /** Hide trees and objects beyond their max render distance from EITHER player. */
   private updateDistanceCulling() {
     const cx = this.viewCenter.x;
     const cz = this.viewCenter.z;
+    const hasP2 = this.localMultiplayer;
+    const p2x = this.p2Pos.x;
+    const p2z = this.p2Pos.z;
 
     const treeDistSq = RENDER_TREES_MAX_DISTANCE * RENDER_TREES_MAX_DISTANCE;
     for (const root of this.treeRoots) {
-      const dx = root.position.x - cx;
-      const dz = root.position.z - cz;
-      root.setEnabled(dx * dx + dz * dz < treeDistSq);
+      const dx1 = root.position.x - cx;
+      const dz1 = root.position.z - cz;
+      let visible = dx1 * dx1 + dz1 * dz1 < treeDistSq;
+      if (!visible && hasP2) {
+        const dx2 = root.position.x - p2x;
+        const dz2 = root.position.z - p2z;
+        visible = dx2 * dx2 + dz2 * dz2 < treeDistSq;
+      }
+      root.setEnabled(visible);
     }
 
     const objDistSq = RENDER_OBJECTS_MAX_DISTANCE * RENDER_OBJECTS_MAX_DISTANCE;
     for (const root of this.objectRoots) {
-      const dx = root.position.x - cx;
-      const dz = root.position.z - cz;
-      root.setEnabled(dx * dx + dz * dz < objDistSq);
+      const dx1 = root.position.x - cx;
+      const dz1 = root.position.z - cz;
+      let visible = dx1 * dx1 + dz1 * dz1 < objDistSq;
+      if (!visible && hasP2) {
+        const dx2 = root.position.x - p2x;
+        const dz2 = root.position.z - p2z;
+        visible = dx2 * dx2 + dz2 * dz2 < objDistSq;
+      }
+      root.setEnabled(visible);
     }
   }
 
@@ -2807,8 +3598,22 @@ export class Game {
 
     // Compute the effective view center on the ground — used for LOD,
     // culling, and terrain inset centering instead of raw camera XZ.
-    this.viewCenter = computeViewCenterXZ(this.camera);
-    this.setViewCenterOnGround?.(this.viewCenter.x, this.camera.position.y, this.viewCenter.z);
+    const p1View = computeViewCenterXZ(this.camera);
+    this.viewCenter = p1View;
+    this.setViewCenterOnGround?.(p1View.x, this.camera.position.y, p1View.z);
+    // In local multiplayer, give P2 their own area of high shader detail
+    // instead of averaging both positions (which degrades detail for both).
+    // The inset center uses the midpoint so both players stay within the
+    // high-res texture window.
+    if (this.localMultiplayer && this.p2Camera) {
+      const p2View = computeViewCenterXZ(this.p2Camera);
+      this.setViewCenter2OnGround?.(p2View.x, this.p2Camera.position.y, p2View.z);
+      // Use midpoint for viewCenter (still used for inset rebaking)
+      this.viewCenter = {
+        x: (p1View.x + p2View.x) / 2,
+        z: (p1View.z + p2View.z) / 2,
+      };
+    }
 
     // --- Engine vibration (scales with speed, max amplitude at full base speed) ---
     this.engineVibePhase += dt * ENGINE_VIBE_FREQUENCY * Math.PI * 2;
@@ -2816,6 +3621,7 @@ export class Game {
     const engineVibeOffset = Math.sin(this.engineVibePhase) * ENGINE_VIBE_AMPLITUDE * speedFraction;
     this.powerUpSystem?.update(Date.now());
     this.updateRunnerPowerUpEffects(dt);
+    this.updateLocalReverseLights();
 
     const enterHeld = this.isKey('enter');
     if (enterHeld && !this.enterHeldLastFrame) {
@@ -2831,8 +3637,9 @@ export class Game {
         this.updateBuildingLodForPlayer();
         this.updateDistanceCulling();
         if (this.minimap) {
-          this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers(), this.getMinimapLookaheadAnchor());
+          this.minimap.draw(this.busPos.x, this.busPos.z, this.busYaw, this.buildMinimapPlayers(), this.passengerSystem ? undefined : this.getMinimapLookaheadAnchor());
         }
+        this.drawP2Minimap();
         return;
       }
 
@@ -2880,6 +3687,7 @@ export class Game {
         remotePlayers: this.remotePlayers,
         buildingColliders: this.buildingColliders,
         engineVibeOffset,
+        localMultiplayer: this.localMultiplayer,
       }, dt);
       this.pendingScoopEvents.push(...runnerResult.scoopEvents);
       if (runnerResult.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
@@ -2919,6 +3727,19 @@ export class Game {
 
       // Cinematic orbit camera during countdown
       this.updateCountdownCamera(dt);
+      // P2 camera during countdown
+      if (this.localMultiplayer && this.p2Camera) {
+        updateCountdownCameraSystem({
+          dt,
+          camera: this.p2Camera,
+          busYaw: this.p2Yaw,
+          busPos: this.p2Pos,
+          countdownTimer: this.countdownTimer,
+          countdownDuration: COUNTDOWN_DURATION,
+          getGroundY: (x, z) => this.getGroundY(x, z),
+          getWaterSurfaceY: (x, z) => this.getWaterSurfaceY(x, z),
+        });
+      }
 
       if (this.minimap) {
         this.minimap.draw(
@@ -2926,9 +3747,10 @@ export class Game {
           this.busPos.z,
           this.busYaw,
           this.buildMinimapPlayers(),
-          this.getMinimapLookaheadAnchor(),
+          this.passengerSystem ? undefined : this.getMinimapLookaheadAnchor(),
         );
       }
+      this.drawP2Minimap();
       this.updateBuildingLodForPlayer();
       this.updateDistanceCulling();
       this.updateInsetCenter?.(this.viewCenter.x, this.viewCenter.z);
@@ -2994,6 +3816,7 @@ export class Game {
           remotePlayers: this.remotePlayers,
           buildingColliders: this.buildingColliders,
           engineVibeOffset,
+          localMultiplayer: this.localMultiplayer,
         }, dt);
         this.pendingScoopEvents.push(...runnerResult2.scoopEvents);
         if (runnerResult2.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
@@ -3018,9 +3841,10 @@ export class Game {
             this.busPos.z,
             this.busYaw,
             this.buildMinimapPlayers(),
-            this.getMinimapLookaheadAnchor(),
+            this.passengerSystem ? undefined : this.getMinimapLookaheadAnchor(),
           );
         }
+        this.drawP2Minimap();
         return;
       }
     }
@@ -3040,9 +3864,10 @@ export class Game {
     this.callbacks.onCourseProgress?.(parseFloat(coveredKm.toFixed(1)), parseFloat(totalKm.toFixed(1)));
 
     // --- Acceleration input (computed early so steering can reference it) ---
+    // In local multiplayer P1 uses only WASD; arrow keys are reserved for P2.
     let accelInput = 0;
-    if (this.isKey('w') || this.isKey('arrowup')) accelInput += 1;
-    if (this.isKey('s') || this.isKey('arrowdown')) accelInput -= 1;
+    if (this.isKey('w') || (!this.localMultiplayer && this.isKey('arrowup'))) accelInput += 1;
+    if (this.isKey('s') || (!this.localMultiplayer && this.isKey('arrowdown'))) accelInput -= 1;
     // Blend touch accel: touch = accelerate, drag down (back toward you) = reverse
     if (this.touchActive) {
       accelInput += this.touchDeltaY > 0.1 ? -1 : 1;
@@ -3051,8 +3876,8 @@ export class Game {
 
     // --- Steering ---
     let turnInput = 0;
-    if (this.isKey('a') || this.isKey('arrowleft')) turnInput -= 1;
-    if (this.isKey('d') || this.isKey('arrowright')) turnInput += 1;
+    if (this.isKey('a') || (!this.localMultiplayer && this.isKey('arrowleft'))) turnInput -= 1;
+    if (this.isKey('d') || (!this.localMultiplayer && this.isKey('arrowright'))) turnInput += 1;
     // Blend touch steering
     if (this.touchActive) turnInput += this.touchDeltaX;
     turnInput = Math.max(-1, Math.min(1, turnInput));
@@ -3114,8 +3939,8 @@ export class Game {
         this.busAirborne = true;
         this.runnerJumpsUsed += 1;
         this.busVelY = Math.sqrt(2 * GRAVITY * RUNNER_JUMP_HEIGHT);
-        const leftHeld = this.isKey('a') || this.isKey('arrowleft');
-        const rightHeld = this.isKey('d') || this.isKey('arrowright');
+        const leftHeld = this.isKey('a') || (!this.localMultiplayer && this.isKey('arrowleft'));
+        const rightHeld = this.isKey('d') || (!this.localMultiplayer && this.isKey('arrowright'));
         if (leftHeld !== rightHeld) {
           this.runnerJumpSideVel = leftHeld ? -RUNNER_PLAYER_JUMP_SIDE_VELOCITY : RUNNER_PLAYER_JUMP_SIDE_VELOCITY;
         } else {
@@ -3461,6 +4286,7 @@ export class Game {
       remotePlayers: this.remotePlayers,
       buildingColliders: this.buildingColliders,
       engineVibeOffset,
+      localMultiplayer: this.localMultiplayer,
     }, dt);
     this.pendingScoopEvents.push(...runnerResult3.scoopEvents);
     if (runnerResult3.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
@@ -3523,6 +4349,10 @@ export class Game {
 
     // --- Update remote bus meshes (multiplayer interpolation) ---
     this.updateRemoteBusMeshes(dt, engineVibeOffset);
+    if (this.localMultiplayer) {
+      this.updateP2(dt);
+      this.updateP2Camera(dt);
+    }
     this.updateBuildingLodForPlayer();
     this.updateDistanceCulling();
     this.updateInsetCenter?.(this.viewCenter.x, this.viewCenter.z);
@@ -3539,5 +4369,6 @@ export class Game {
         this.passengerSystem?.getMinimapFlags(),
       );
     }
+    this.drawP2Minimap();
   }
 }

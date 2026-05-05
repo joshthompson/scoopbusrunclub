@@ -54,3 +54,21 @@ export const FLOODLIGHT_SOFT_EXPONENT = 0.1;              // extremely soft fall
 export const FLOODLIGHT_SOFT_COLOR_R = 0.85;
 export const FLOODLIGHT_SOFT_COLOR_G = 0.82;
 export const FLOODLIGHT_SOFT_COLOR_B = 0.7;
+
+// Bus headlight (night)
+export const BUS_HEADLIGHT_INTENSITY = 3.0;
+export const BUS_HEADLIGHT_RANGE = 80;
+export const BUS_HEADLIGHT_ANGLE = Math.PI * 0.7;         // wide soft cone
+export const BUS_HEADLIGHT_EXPONENT = 0.3;                // very soft falloff
+export const BUS_HEADLIGHT_COLOR_R = 1.0;
+export const BUS_HEADLIGHT_COLOR_G = 0.97;
+export const BUS_HEADLIGHT_COLOR_B = 0.85;
+
+// Bus reverse lights (red, soft glow when reversing)
+export const BUS_REVERSE_LIGHT_INTENSITY = 1.5;
+export const BUS_REVERSE_LIGHT_RANGE = 15;
+export const BUS_REVERSE_LIGHT_ANGLE = Math.PI * 0.6;     // moderate cone
+export const BUS_REVERSE_LIGHT_EXPONENT = 1.0;            // soft centre falloff
+export const BUS_REVERSE_LIGHT_COLOR_R = 1.0;
+export const BUS_REVERSE_LIGHT_COLOR_G = 0.12;
+export const BUS_REVERSE_LIGHT_COLOR_B = 0.08;

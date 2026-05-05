@@ -1,6 +1,6 @@
 import logoSrc from './assets/logo.png';
 
-type GameMode = 'single' | 'host' | 'join';
+type GameMode = 'single' | 'local' | 'host' | 'join';
 
 interface TitleScreenProps {
   onSelectMode: (mode: GameMode) => void;
@@ -15,11 +15,14 @@ export function TitleScreen(props: TitleScreenProps) {
           <button class="course-btn" onClick={() => props.onSelectMode('single')}>
             Single Player
           </button>
+          <button class="course-btn local-btn" onClick={() => props.onSelectMode('local')}>
+            Local Multiplayer
+          </button>
           <button class="course-btn host-btn" onClick={() => props.onSelectMode('host')}>
-            Host Game
+            Host Online Multiplayer
           </button>
           <button class="course-btn join-btn" onClick={() => props.onSelectMode('join')}>
-            Join Game
+            Join Online Multiplayer
           </button>
         </div>
       </div>

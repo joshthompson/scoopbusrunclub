@@ -1,4 +1,4 @@
-import type { Color3, Mesh, ParticleSystem, TransformNode, Vector3 } from '@babylonjs/core';
+import type { Color3, Mesh, ParticleSystem, SpotLight, TransformNode, Vector3 } from '@babylonjs/core';
 import type { LevelData } from '../levels';
 import type { PlayerState } from '../multiplayer';
 import type { MarshalModelResult } from './objects/MarshalModel';
@@ -26,6 +26,10 @@ export interface GameCallbacks {
   onBusModeDelivery?: (count: number) => void;
   onBusModeBonus?: (seconds: number) => void;
   onBusModeGameOver?: (deliveries: number) => void;
+  // Local multiplayer P2 callbacks
+  onP2Finish?: (timeSeconds: number) => void;
+  onP2ScoopRunner?: () => void;
+  onP2CourseProgress?: (coveredKm: number, totalKm: number) => void;
 }
 
 export type RunnerInteraction = 'none' | 'waving' | 'highfive';
@@ -76,6 +80,8 @@ export interface RemotePlayer {
   riderAnchors: Mesh[];
   runnerModel: RunnerModelResult | null;
   runnerAnimPhase: number;
+  headlight: SpotLight | null;
+  reverseLights: SpotLight[];
 }
 
 export type RemotePlayersMap = Map<string, RemotePlayer>;

@@ -77,6 +77,8 @@ export type TiledPathGroundMaterial = ShaderMaterial & {
   __updateInsetCenter?: (playerX: number, playerZ: number) => void;
   /** Set the effective view-center position for distance-based LOD in the shader. */
   __setViewCenter?: (x: number, y: number, z: number) => void;
+  /** Set a second view-center (for local multiplayer) so both players get high detail. */
+  __setViewCenter2?: (x: number, y: number, z: number) => void;
 };
 
 // ---------- GLSL Shader Code ----------
@@ -130,8 +132,10 @@ uniform sampler2D mixMap3Ultra;
 uniform vec4 midBounds;
 uniform vec4 ultraBounds;
 
-// Camera position for distance-based LOD selection
+// Camera positions for distance-based LOD selection
 uniform vec3 cameraPosition;
+uniform vec3 cameraPosition2;
+uniform float hasSecondCamera;  // 0.0 = single player, 1.0 = two areas of detail
 uniform float lodNearDist;   // e.g. 50.0
 uniform float lodFarDist;    // e.g. 200.0
 
@@ -179,9 +183,16 @@ uniform float chunkSizeUV;  // CHUNK_SIZE / groundSize in UV space
 //   ultra (tight inset, 2× quality)  → within lodNearDist from camera
 //   mid   (wider inset, base quality) → lodNearDist – lodFarDist
 //   lo    (full world, low quality)   → beyond lodFarDist
+// When hasSecondCamera > 0, use the minimum distance from either camera
+// so both players get high detail around them.
 vec4 sampleMixMap(sampler2D lo, sampler2D mid, sampler2D ultra, vec2 uv) {
-  vec2 dxz = vPositionW.xz - cameraPosition.xz;
-  float dist = sqrt(dxz.x * dxz.x + dxz.y * dxz.y);
+  vec2 dxz1 = vPositionW.xz - cameraPosition.xz;
+  float dist = sqrt(dxz1.x * dxz1.x + dxz1.y * dxz1.y);
+  if (hasSecondCamera > 0.5) {
+    vec2 dxz2 = vPositionW.xz - cameraPosition2.xz;
+    float dist2 = sqrt(dxz2.x * dxz2.x + dxz2.y * dxz2.y);
+    dist = min(dist, dist2);
+  }
 
   // --- Far LOD: only low-res available ---
   float farEdge = lodFarDist + 10.0;
@@ -448,7 +459,7 @@ export function createTiledPathGroundMaterial(
     uniforms: [
       'worldViewProjection', 'world',
       'midBounds', 'ultraBounds',
-      'cameraPosition', 'lodNearDist', 'lodFarDist',
+      'cameraPosition', 'cameraPosition2', 'hasSecondCamera', 'lodNearDist', 'lodFarDist',
       'forestTiling', 'dirtTiling', 'fieldTiling', 'sandTiling', 'concreteTiling',
       'roadColorVal', 'whiteColorVal', 'iceColorVal', 'concreteColorVal',
       'sunDirection', 'sunIntensity',
@@ -507,8 +518,10 @@ export function createTiledPathGroundMaterial(
   mat.setFloat('lodNearDist', TERRAIN_LOD_NEAR_DIST);
   mat.setFloat('lodFarDist', TERRAIN_LOD_FAR_DIST);
 
-  // Camera position (updated per-frame in onBind)
+  // Camera positions (updated per-frame in onBind)
   mat.setVector3('cameraPosition', { x: 0, y: 0, z: 0 } as any);
+  mat.setVector3('cameraPosition2', { x: 0, y: 0, z: 0 } as any);
+  mat.setFloat('hasSecondCamera', 0.0);
 
   // Lighting uniforms (values from constants.ts)
   const isNight = opts.isNight ?? false;
@@ -591,14 +604,15 @@ export function createTiledPathGroundMaterial(
         effect.setFloatArray('spotExponents', spotExpArr.subarray(0, count));
       }
 
-      // Push view center for distance-based LOD in the shader.
-      // The view center is projected ahead of the camera based on height,
-      // set externally via __setViewCenter; fallback to raw camera position.
+      // Push view centers for distance-based LOD in the shader.
+      // Each player gets their own area of high detail.
       effect.setFloat3('cameraPosition', viewCenterX, viewCenterY, viewCenterZ);
+      effect.setFloat3('cameraPosition2', viewCenter2X, viewCenter2Y, viewCenter2Z);
+      effect.setFloat('hasSecondCamera', hasSecondCameraFlag);
     }
   };
 
-  // --- View center setter (called from game loop) ---
+  // --- View center setters (called from game loop) ---
   let viewCenterX = 0;
   let viewCenterY = 0;
   let viewCenterZ = 0;
@@ -606,6 +620,18 @@ export function createTiledPathGroundMaterial(
     viewCenterX = x;
     viewCenterY = y;
     viewCenterZ = z;
+  };
+
+  // Second view center for local multiplayer — both players get high detail
+  let viewCenter2X = 0;
+  let viewCenter2Y = 0;
+  let viewCenter2Z = 0;
+  let hasSecondCameraFlag = 0;
+  const setViewCenter2 = (x: number, y: number, z: number) => {
+    viewCenter2X = x;
+    viewCenter2Y = y;
+    viewCenter2Z = z;
+    hasSecondCameraFlag = 1;
   };
 
   // --- 6. Ice patch update function (draws into all mask levels) ---
@@ -656,6 +682,7 @@ export function createTiledPathGroundMaterial(
   (mat as TiledPathGroundMaterial).__setIcePatches = setIcePatches;
   (mat as TiledPathGroundMaterial).__updateInsetCenter = updateInsetCenter;
   (mat as TiledPathGroundMaterial).__setViewCenter = setViewCenter;
+  (mat as TiledPathGroundMaterial).__setViewCenter2 = setViewCenter2;
 
   return mat as TiledPathGroundMaterial;
 }

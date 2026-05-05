@@ -91,6 +91,14 @@ export function updateRemotePlayersSystem(params: UpdateRemotePlayersParams): vo
       }
     }
 
+    // Toggle reverse lights (soft red glow when reversing)
+    if (remote.reverseLights.length > 0) {
+      const reversing = !isRunner && s.speed < -0.5;
+      for (const rl of remote.reverseLights) {
+        rl.setEnabled(reversing);
+      }
+    }
+
     const sinY = Math.sin(remote.smoothYaw);
     const cosY = Math.cos(remote.smoothYaw);
     for (const anchor of remote.riderAnchors) {

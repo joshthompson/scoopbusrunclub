@@ -10,9 +10,11 @@ import { GameModeSelectScreen } from './GameModeSelectScreen';
 import { CharacterSelectScreen } from './CharacterSelectScreen';
 import { GameTypeSelectScreen } from './GameTypeSelectScreen';
 import { LobbyScreen } from './LobbyScreen';
+import { LocalRoleSelectScreen } from './LocalRoleSelectScreen';
+import { LocalResultsScreen } from './LocalResultsScreen';
 import { mp, MAX_PLAYERS } from './multiplayer';
 import type { PlayerState, ScoopEvent } from './multiplayer';
-import { getGameModeConfig, GAME_TYPE_LABELS } from './game/modes';
+import { getGameModeConfig } from './game/modes';
 import type { GameType, TeamColor } from './game/modes';
 import type { ItemCollectEvent } from './multiplayer';
 import type { CharacterSelection } from './game/characters';
@@ -35,9 +37,9 @@ const PLAYER_COLOR_INFO = [
   { name: 'Purple', css: '#9940cc' },
 ];
 
-type GameMode = 'single' | 'host' | 'join';
+type GameMode = 'single' | 'local' | 'host' | 'join';
 type PlayerRole = 'bus' | 'runner';
-type Screen = 'title' | 'level-select' | 'game-mode-select' | 'character-select' | 'game-type-select' | 'lobby' | 'loading' | 'playing';
+type Screen = 'title' | 'level-select' | 'game-mode-select' | 'character-select' | 'game-type-select' | 'local-game-type-select' | 'local-role-select' | 'lobby' | 'loading' | 'playing';
 
 const POWER_UP_IMAGE_BY_ID: Record<PowerUpId, string> = {
   fika: powerUpFika,
@@ -103,10 +105,18 @@ function App() {
   const [charSelection, setCharSelection] = createSignal<CharacterSelection | null>(null);
   const [remoteStates, setRemoteStates] = createSignal<Map<string, PlayerState>>(new Map());
 
+  // Local multiplayer state
+  const [localP2Role, setLocalP2Role] = createSignal<PlayerRole>('runner');
+  const [p2FinishTime, setP2FinishTime] = createSignal<number | null>(null);
+  const [p2Scored, setP2Scored] = createSignal(0);
+  const [p2CourseProgress, setP2CourseProgress] = createSignal({ covered: 0, total: 5 });
+  const isLocalMultiplayer = () => gameMode() === 'local';
+
   const isMultiplayerMode = () => gameMode() === 'host' || gameMode() === 'join';
 
   let canvasRef!: HTMLCanvasElement;
   let minimapRef!: HTMLCanvasElement;
+  let p2MinimapRef!: HTMLCanvasElement;
   let demoGame: Game | null = null;
   let activeGame: Game | null = null;
   let currentEventId = '';
@@ -160,6 +170,9 @@ function App() {
     } else if (mode === 'host') {
       // Host picks game type first
       setScreen('game-type-select');
+    } else if (mode === 'local') {
+      // Local multiplayer: pick a level first
+      setScreen('level-select');
     } else {
       // Single player picks a level first
       setScreen('level-select');
@@ -183,10 +196,39 @@ function App() {
     currentAltCourse = opts?.altCourse ?? false;
     if (gameMode() === 'single') {
       setScreen('game-mode-select');
+    } else if (gameMode() === 'local') {
+      // Local multiplayer: pick game type filtered to 2 players
+      setScreen('local-game-type-select');
     } else {
       // Host → go to lobby
       setScreen('lobby');
     }
+  }
+
+  /** Local multiplayer: user picked a game type */
+  function handleLocalGameTypeSelect(gt: GameType) {
+    setGameType(gt);
+    const config = getGameModeConfig(gt);
+    if (config.hasTeams || config.hostCanAssignDriver) {
+      // Modes with distinct roles need a role selection step
+      setScreen('local-role-select');
+    } else if (config.minPlayers >= 2 && gt === 'scoop-race') {
+      // Scoop race has 1 bus + 1 runner — pick roles
+      setScreen('local-role-select');
+    } else {
+      // Bus race: both players get the same role (bus) — skip role select
+      setPlayerRole('bus');
+      setLocalP2Role('bus');
+      startGame(currentEventId);
+    }
+  }
+
+  /** Local multiplayer: P1 picked their role */
+  function handleLocalRoleSelect(p1Role: 'bus' | 'runner') {
+    const p2Role: PlayerRole = p1Role === 'bus' ? 'runner' : 'bus';
+    setPlayerRole(p1Role);
+    setLocalP2Role(p2Role);
+    startGame(currentEventId);
   }
 
   /** Single-player: user picked a game mode → go to character select */
@@ -320,6 +362,9 @@ function App() {
     setBusModeDeliveries(0);
     setBusModeBonus(null);
     setBusModeGameOver(false);
+    // Reset local multiplayer P2 state
+    setP2FinishTime(null);
+    setP2Scored(0);
 
     // Validate
     if (!levels[eventId]) {
@@ -367,11 +412,17 @@ function App() {
         setBusModeGameOver(true);
         setBusModeDeliveries(deliveries);
       },
+      onP2Finish: (time: number) => setP2FinishTime(time),
+      onP2ScoopRunner: () => setP2Scored((s) => s + 1),
+      onP2CourseProgress: (covered: number, total: number) => setP2CourseProgress({ covered, total }),
     }, minimapRef, {
       localPlayerRole: resolvedRole,
       gameType: gameType(),
       items: getGameModeConfig(gameType()).items,
       charSelection: charSelection(),
+      localMultiplayer: isLocalMultiplayer(),
+      p2Role: isLocalMultiplayer() ? localP2Role() : undefined,
+      p2MinimapCanvas: isLocalMultiplayer() ? p2MinimapRef : undefined,
     });
 
     activeGame = game;
@@ -542,6 +593,9 @@ function App() {
     }
 
     setScreen('playing');
+    if (isLocalMultiplayer()) {
+      document.body.classList.add('local-mp');
+    }
   }
 
   function handleKeepDriving() {
@@ -560,6 +614,7 @@ function App() {
 
   function handleExitToMenu() {
     setPaused(false);
+    document.body.classList.remove('local-mp');
     // Clean up multiplayer
     if (mpSendInterval) {
       clearInterval(mpSendInterval);
@@ -608,10 +663,27 @@ function App() {
           onBack={() => {
             if (gameMode() === 'host') {
               setScreen('game-type-select');
+            } else if (gameMode() === 'local') {
+              setScreen('title');
             } else {
               setScreen('title');
             }
           }}
+        />
+      </Show>
+      <Show when={screen() === 'local-game-type-select'}>
+        <GameTypeSelectScreen
+          maxPlayers={2}
+          heading="Local — Choose Game Type"
+          onSelect={handleLocalGameTypeSelect}
+          onBack={() => setScreen('level-select')}
+        />
+      </Show>
+      <Show when={screen() === 'local-role-select'}>
+        <LocalRoleSelectScreen
+          gameType={gameType()}
+          onSelect={handleLocalRoleSelect}
+          onBack={() => setScreen('local-game-type-select')}
         />
       </Show>
       <Show when={screen() === 'game-mode-select'}>
@@ -652,6 +724,16 @@ function App() {
         />
       </Show>
       <Show when={screen() === 'playing'}>
+        {/* Local multiplayer player labels — shown in each half of split screen */}
+        <Show when={isLocalMultiplayer()}>
+          <div class="local-player-label local-player-label-p1">
+            <span style={{ color: '#f0c820' }}>P1</span> 🚌 Yellow Bus
+          </div>
+          <div class="local-player-label local-player-label-p2">
+            <span style={{ color: '#d94030' }}>P2</span> 🚌 Red Bus
+          </div>
+          <div class="local-split-divider" />
+        </Show>
         {/* Top-left HUD */}
         <Show when={powerUpDisplay()}>
           <div
@@ -686,33 +768,7 @@ function App() {
           </div>
         </Show>
 
-        <div id="hud" style={powerUpDisplay() ? { display: 'block', top: 'calc(min(220px, 30vw) + 24px)' } : { display: 'block' }}>
-          <Show when={isMultiplayerMode()}>
-            <p style={{ 'font-size': 'clamp(10px, 1.5vw, 14px)', opacity: 0.7 }}>
-              {GAME_TYPE_LABELS[gameType()]}
-            </p>
-          </Show>
-          <Show when={isBusMode()}>
-            <p style={{ 'font-family': 'sans-serif', 'font-size': 'clamp(14px, 2vw, 20px)' }}>🚌 Delivered: {busModeDeliveries()}</p>
-          </Show>
-          <Show when={!isBusMode() && playerRole() === 'bus'}>
-            <p>🚌 Scooped: {scored()}</p>
-          </Show>
-          <Show when={!isBusMode() && playerRole() === 'runner'}>
-            <p>🏃 Runner mode</p>
-          </Show>
-          <Show when={!isBusMode()}>
-            <p>🏃 Speed: {speed().toFixed(1)} km/h</p>
-          </Show>
-          <Show when={!isBusMode()}>
-            <p>⏱️ {fmtTime(raceTime())}</p>
-          </Show>
-          <Show when={isMultiplayerMode() && raceState() === 'racing'}>
-            <p style={{ color: '#ffc107', 'font-weight': 'bold', 'font-size': 'clamp(16px, 2.5vw, 24px)' }}>
-              {ordinal(racePosition().position)}
-            </p>
-          </Show>
-        </div>
+
 
         {/* Top-right multiplayer HUD — show each opponent's status only when finished */}
         <Show when={isMultiplayerMode() && remoteStates().size > 0 && raceState() === 'finished' && !keepDriving()}>
@@ -721,7 +777,7 @@ function App() {
               const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
               return (
                 <div class="mp-player-block" style={{ 'border-left': `3px solid ${info.css}` }}>
-                  <p style={{ color: info.css }}>🚌 P{rs.playerIndex || '?'} {info.name}</p>
+                  <p style={{ color: info.css }}>🚌 {info.name} Bus</p>
                   <Show when={rs.raceState === 'finished'}>
                     <p style={{ color: '#ffc107' }}>🏁 {fmtTime(rs.raceTime)}</p>
                   </Show>
@@ -734,10 +790,22 @@ function App() {
           </div>
         </Show>
 
-        {/* Bottom-right course progress */}
+        {/* Bottom-right course progress / bus mode delivered count */}
         <Show when={!isBusMode()}>
-          <div id="course-progress">
+          <div id="course-progress" classList={{ 'course-progress-local': isLocalMultiplayer() }}>
             {courseProgress().covered.toFixed(1)}/{courseProgress().total}km
+          </div>
+        </Show>
+        <Show when={isBusMode()}>
+          <div id="course-progress">
+            🚌 Delivered: {busModeDeliveries()}
+          </div>
+        </Show>
+
+        {/* P2 course progress (local multiplayer) */}
+        <Show when={isLocalMultiplayer() && !isBusMode()}>
+          <div id="course-progress-p2">
+            {p2CourseProgress().covered.toFixed(1)}/{p2CourseProgress().total}km
           </div>
         </Show>
 
@@ -786,8 +854,22 @@ function App() {
           </div>
         </Show>
 
-        {/* Finish screen (non-bus-mode) */}
-        <Show when={!isBusMode() && raceState() === 'finished' && !keepDriving()}>
+        {/* Local multiplayer results screen */}
+        <Show when={isLocalMultiplayer() && !isBusMode() && raceState() === 'finished' && !keepDriving()}>
+          <LocalResultsScreen
+            p1Role={playerRole()}
+            p2Role={localP2Role()}
+            p1FinishTime={finishTime()}
+            p2FinishTime={p2FinishTime()}
+            p1Scored={scored()}
+            p2Scored={p2Scored()}
+            onReplay={handleReplay}
+            onExit={handleExitToMenu}
+          />
+        </Show>
+
+        {/* Finish screen (non-bus-mode, non-local-multiplayer) */}
+        <Show when={!isLocalMultiplayer() && !isBusMode() && raceState() === 'finished' && !keepDriving()}>
           <div id="finish-overlay">
             <div class="finish-card">
               <h1>🏁 Finished!</h1>
@@ -803,11 +885,11 @@ function App() {
                   // Add local player
                   const localIdx = (activeGame as any)?.localPlayerIndex ?? 1;
                   const localInfo = PLAYER_COLOR_INFO[localIdx - 1] ?? PLAYER_COLOR_INFO[0];
-                  players.push({ name: `P${localIdx} ${localInfo.name} (You)`, css: localInfo.css, time: finishTime(), finished: true, index: localIdx });
+                  players.push({ name: `${localInfo.name} Bus (You)`, css: localInfo.css, time: finishTime(), finished: true, index: localIdx });
                   // Add remote players
                   for (const [, rs] of states) {
                     const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
-                    players.push({ name: `P${rs.playerIndex} ${info.name}`, css: info.css, time: rs.raceTime, finished: rs.raceState === 'finished', index: rs.playerIndex });
+                    players.push({ name: `${info.name} Bus`, css: info.css, time: rs.raceTime, finished: rs.raceState === 'finished', index: rs.playerIndex });
                   }
                   // Sort: finished first (by time), then unfinished
                   players.sort((a, b) => {
@@ -854,6 +936,7 @@ function App() {
       </Show>
       <canvas id="gameCanvas" ref={canvasRef} />
       <canvas id="minimap" ref={minimapRef} />
+      <canvas id="minimap-p2" ref={p2MinimapRef} />
     </>
   );
 }
