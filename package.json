@@ -22,7 +22,9 @@
     "fetch-all-maps": "pnpm --filter @scoopbus/api run fetch-all-maps",
     "game:dev": "nx run game:dev",
     "game:build": "nx run game:build",
-    "game:level": "pnpm --filter @scoopbus/game run fetch-level"
+    "game:level": "pnpm --filter @scoopbus/game run fetch-level",
+    "wake:install": "bash scripts/setup-wake-job.sh",
+    "wake:disable": "bash scripts/setup-wake-job.sh --disable"
   },
   "license": "MIT",
   "devDependencies": {

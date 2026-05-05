@@ -34,7 +34,7 @@ async function main() {
       stdio: "inherit",
     });
   } catch (error) {
-    console.error("fetch-results failed:", error);
+    console.error("\n✗ fetch-results exited with an error. See output above for details.");
     process.exit(1);
   }
 
@@ -56,7 +56,7 @@ async function main() {
       stdio: "inherit",
     });
   } catch (error) {
-    console.error("fetch-parkrun failed:", error);
+    console.error("\n✗ fetch-parkrun exited with an error. See output above for details.");
     process.exit(1);
   }
 
