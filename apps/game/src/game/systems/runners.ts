@@ -24,6 +24,8 @@ import { resolvePositionAgainstBuildings } from './buildings';
 import { mulberry32 } from './terrain';
 import {
   BUS_COLLISION_RADIUS,
+  BUS_ROOF_L,
+  BUS_ROOF_W,
   BUS_ROOF_Y,
   GRAVITY,
   MODE,
@@ -127,6 +129,7 @@ export interface RunnerUpdateContext {
   getGroundY: (x: number, z: number) => number;
   busPos: Vector3;
   busYaw: number;
+  busPitch: number;
   busSpeed: number;
   localPlayerRole: 'bus' | 'runner';
   localPlayerIndex: number;
@@ -282,20 +285,28 @@ export function updateRunnersSystem(
         if (MODE === 'SCOOP_THEN_RIDE') {
           let scooperBusPos = ctx.busPos;
           let scooperBusYaw = ctx.busYaw;
+          let scooperBusPitch = ctx.busPitch;
           if (runner.ownerPlayerIndex !== ctx.localPlayerIndex) {
             for (const [_peerId, remote] of ctx.remotePlayers) {
               if (remote.playerIndex === runner.ownerPlayerIndex) {
                 scooperBusPos = remote.smoothPos;
                 scooperBusYaw = remote.smoothYaw;
+                scooperBusPitch = remote.smoothPitch;
                 break;
               }
             }
           }
 
+          // Home toward roof seat (accounting for pitch)
+          const cosPL = Math.cos(scooperBusPitch);
+          const sinPL = Math.sin(scooperBusPitch);
+          const localYL = BUS_ROOF_Y + ctx.engineVibeOffset;
+          const localZL = runner.ridingOffsetZ;
+          const afterPitchZL = -localYL * sinPL + localZL * cosPL;
           const sinY = Math.sin(scooperBusYaw);
           const cosY = Math.cos(scooperBusYaw);
-          const seatWorldX = scooperBusPos.x + cosY * runner.ridingOffsetX + sinY * runner.ridingOffsetZ;
-          const seatWorldZ = scooperBusPos.z - sinY * runner.ridingOffsetX + cosY * runner.ridingOffsetZ;
+          const seatWorldX = scooperBusPos.x + cosY * runner.ridingOffsetX + sinY * afterPitchZL;
+          const seatWorldZ = scooperBusPos.z - sinY * runner.ridingOffsetX + cosY * afterPitchZL;
 
           const homingStrength = 6;
           const toSeatX = seatWorldX - pos.x;
@@ -367,8 +378,8 @@ export function updateRunnersSystem(
             }
           }
 
-          // Land when reaching roof height
-          const roofWorldY = scooperBusPos.y + BUS_ROOF_Y;
+          // Land when reaching roof height (accounting for pitch at rider's Z offset)
+          const roofWorldY = scooperBusPos.y + localYL * cosPL + localZL * sinPL;
           if (pos.y <= roofWorldY && runner.velY < 0) {
             runner.state = 'riding';
             runner.mesh.rotation.x = 0;
@@ -404,23 +415,33 @@ export function updateRunnersSystem(
         // Determine which bus this runner is riding on
         let riderBusPos = ctx.busPos;
         let riderBusYaw = ctx.busYaw;
+        let riderBusPitch = ctx.busPitch;
         let riderVibeOffset = ctx.engineVibeOffset;
         if (runner.ownerPlayerIndex !== ctx.localPlayerIndex) {
           for (const [_peerId, remote] of ctx.remotePlayers) {
             if (remote.playerIndex === runner.ownerPlayerIndex) {
               riderBusPos = remote.smoothPos;
               riderBusYaw = remote.smoothYaw;
+              riderBusPitch = remote.smoothPitch;
               riderVibeOffset = ctx.engineVibeOffset; // same vibe offset approximation
               break;
             }
           }
         }
+        // Apply pitch rotation so riders stay on the tilted roof
+        const cosPR = Math.cos(riderBusPitch);
+        const sinPR = Math.sin(riderBusPitch);
+        const localYR = BUS_ROOF_Y + riderVibeOffset;
+        const localZR = runner.ridingOffsetZ;
+        const afterPitchYR = localYR * cosPR + localZR * sinPR;
+        const afterPitchZR = -localYR * sinPR + localZR * cosPR;
         const sinY = Math.sin(riderBusYaw);
         const cosY = Math.cos(riderBusYaw);
-        pos.x = riderBusPos.x + cosY * runner.ridingOffsetX + sinY * runner.ridingOffsetZ;
-        pos.z = riderBusPos.z - sinY * runner.ridingOffsetX + cosY * runner.ridingOffsetZ;
-        pos.y = riderBusPos.y + BUS_ROOF_Y + riderVibeOffset;
+        pos.x = riderBusPos.x + cosY * runner.ridingOffsetX + sinY * afterPitchZR;
+        pos.z = riderBusPos.z - sinY * runner.ridingOffsetX + cosY * afterPitchZR;
+        pos.y = riderBusPos.y + afterPitchYR;
         runner.mesh.rotation.y = riderBusYaw;
+        runner.mesh.rotation.x = -riderBusPitch;
         if (animateRunner) {
           runner.animPhase += dt;
           poseSittingAnimated(runner.model, runner.animPhase);
@@ -501,19 +522,17 @@ export function assignRoofSeat(allRunners: Runner[], localPlayerIndex: number, n
   const seatIndex = riders.length;
   const totalRiders = seatIndex + 1;
 
-  const roofW = 2.0;
-  const roofL = 6.0;
   const cols = Math.min(totalRiders, 3);
   const rows = Math.ceil(totalRiders / cols);
-  const spacingX = cols > 1 ? roofW / (cols - 1) : 0;
-  const spacingZ = rows > 1 ? roofL / (rows - 1) : 0;
+  const spacingX = cols > 1 ? BUS_ROOF_W / (cols - 1) : 0;
+  const spacingZ = rows > 1 ? BUS_ROOF_L / (rows - 1) : 0;
 
   const allRiders = [...riders, newRider];
   for (let i = 0; i < allRiders.length; i++) {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    allRiders[i].ridingOffsetX = cols > 1 ? -roofW / 2 + col * spacingX : 0;
-    allRiders[i].ridingOffsetZ = rows > 1 ? -roofL / 2 + row * spacingZ : 0;
+    allRiders[i].ridingOffsetX = cols > 1 ? -BUS_ROOF_W / 2 + col * spacingX : 0;
+    allRiders[i].ridingOffsetZ = rows > 1 ? -BUS_ROOF_L / 2 + row * spacingZ : 0;
   }
 }
 
@@ -526,18 +545,16 @@ export function packRemoteRiders(remote: { riderAnchors: Mesh[]; smoothPos: Vect
   const count = remote.riderAnchors.length;
   if (count === 0) return;
 
-  const roofW = 2.0;
-  const roofL = 6.0;
   const cols = Math.min(count, 3);
   const rows = Math.ceil(count / cols);
-  const spacingX = cols > 1 ? roofW / (cols - 1) : 0;
-  const spacingZ = rows > 1 ? roofL / (rows - 1) : 0;
+  const spacingX = cols > 1 ? BUS_ROOF_W / (cols - 1) : 0;
+  const spacingZ = rows > 1 ? BUS_ROOF_L / (rows - 1) : 0;
 
   for (let i = 0; i < count; i++) {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    const ox = cols > 1 ? -roofW / 2 + col * spacingX : 0;
-    const oz = rows > 1 ? -roofL / 2 + row * spacingZ : 0;
+    const ox = cols > 1 ? -BUS_ROOF_W / 2 + col * spacingX : 0;
+    const oz = rows > 1 ? -BUS_ROOF_L / 2 + row * spacingZ : 0;
 
     (remote.riderAnchors[i] as any).__roofOffsetX = ox;
     (remote.riderAnchors[i] as any).__roofOffsetZ = oz;
@@ -575,6 +592,7 @@ export interface LocalRunnerVisualContext {
   busAirborne: boolean;
   scoopState: 'free' | 'launched' | 'sitting';
   runnerJumpSideVel: number;
+  jumpsUsed: number;
   getGroundY: (x: number, z: number) => number;
 }
 
@@ -605,6 +623,24 @@ export function updateLocalRunnerVisual(
     const groundY = ctx.getGroundY(ctx.busPos.x, ctx.busPos.z);
     const jumpHeight = Math.max(0, ctx.busPos.y - groundY);
     const jumpLift = Math.min(1, jumpHeight / RUNNER_JUMP_HEIGHT);
+
+    if (ctx.jumpsUsed >= 2) {
+      // Forward somersault on double jump — exactly one full rotation
+      const flipSpeed = 2 * Math.PI / 0.55; // complete one rotation in ~0.55s
+      animPhase += dt * flipSpeed;
+      // Cap at exactly one full rotation (2π)
+      const flipAngle = Math.min(animPhase, 2 * Math.PI);
+      ctx.model.root.rotation.x = flipAngle;
+      ctx.model.root.rotation.z = ctx.runnerJumpSideVel * 0.02;
+      ctx.model.root.rotation.y = ctx.busYaw;
+      poseJump(
+        ctx.model,
+        jumpLift,
+        ctx.runnerJumpSideVel / RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
+      );
+      return animPhase;
+    }
+
     ctx.model.root.rotation.x = -0.2;
     ctx.model.root.rotation.z = ctx.runnerJumpSideVel * 0.03;
     ctx.model.root.rotation.y = ctx.busYaw;
@@ -613,7 +649,8 @@ export function updateLocalRunnerVisual(
       jumpLift,
       ctx.runnerJumpSideVel / RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
     );
-    return animPhase;
+    // Reset animPhase so double-jump somersault starts cleanly from 0
+    return 0;
   }
 
   ctx.model.root.rotation.x = 0;

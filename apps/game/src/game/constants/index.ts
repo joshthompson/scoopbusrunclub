@@ -1,4 +1,5 @@
 import type { GameMode } from '../types';
+import { PASSENGER_TRAY_POSITION, PASSENGER_TRAY_SIZE } from '../objects/BusModel';
 
 export const MODE: GameMode = 'SCOOP_THEN_RIDE';
 
@@ -47,7 +48,9 @@ export const BUS_UPHILL_DRAG = 5;                     // extra drag (m/s²) when
 export const BUS_AIRBORNE_COLLISION_CLEARANCE = 1.5;  // metres above ground to skip obstacle collisions
 export const BUS_START_OFFSET = 15;
 export const START_CIRCLE_RADIUS = 15;
-export const BUS_ROOF_Y = 2.85;
+export const BUS_ROOF_Y = PASSENGER_TRAY_POSITION[1];
+export const BUS_ROOF_W = PASSENGER_TRAY_SIZE[0];
+export const BUS_ROOF_L = PASSENGER_TRAY_SIZE[1];
 export const GATE_SPACING = 100;
 export const GATE_RADIUS = 25;
 export const POWER_UP_ITEM_SPACING = 250;
@@ -78,6 +81,21 @@ export const TREE_SPREAD = 200;
 export const TREE_MIN_DIST_FROM_PATH = 8;
 export const AUTO_DRIVE_SPEED = 10;
 export const DEMO_CAMERA_SPEED = 10; // metres/s — title screen flyover speed
+
+// ---------- Camera ----------
+/** Base field-of-view (radians) when playing as bus driver */
+export const CAMERA_FOV_BUS = 0.5;
+/** Base field-of-view (radians) when playing as runner */
+export const CAMERA_FOV_RUNNER = 0.9;
+/** Extra FOV added per unit of speed (radians / (m/s)). FOV = base + speed * this */
+export const CAMERA_FOV_SPEED_FACTOR = 0.01;
+/** How fast FOV tweens to target value (higher = snappier). Uses exponential smoothing. */
+export const CAMERA_FOV_LERP_SPEED = 4;
+/** Camera elevation angle for chase cam (radians). Lower = closer to ground level */
+export const CAMERA_ANGLE_BUS = 0.42;
+/** Camera elevation angle for runner cam (radians) */
+export const CAMERA_ANGLE_RUNNER = 0.34;
+
 export const DRIFT_GRIP = 6;
 export const DRIFT_HIGH_SPEED_GRIP_FACTOR = 0.45;
 export const WATER_DRIFT_GRIP = 2.5;

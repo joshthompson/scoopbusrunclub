@@ -1,5 +1,13 @@
 import { FreeCamera, Vector3 } from '@babylonjs/core';
-import { DEMO_CAMERA_SPEED } from '../constants';
+import {
+  CAMERA_ANGLE_BUS,
+  CAMERA_ANGLE_RUNNER,
+  CAMERA_FOV_BUS,
+  CAMERA_FOV_LERP_SPEED,
+  CAMERA_FOV_RUNNER,
+  CAMERA_FOV_SPEED_FACTOR,
+  DEMO_CAMERA_SPEED,
+} from '../constants';
 
 export interface DemoCameraParams {
   dt: number;
@@ -155,9 +163,17 @@ export interface ChaseCameraParams {
 export function updateChaseCameraSystem(params: ChaseCameraParams): number {
   const { dt, camera, busYaw, busSpeed, busPos, getGroundY, getWaterSurfaceY } = params;
 
-  const camDist = 18;
-  const camHeight = 8;
-  const lookAhead = 8;
+  // Pull camera closer as speed (and FOV) increases so the bus doesn't drift too far ahead
+  const baseDist = 18;
+  const minDist = 10;
+  const speedFrac = Math.min(1, Math.abs(busSpeed) / 72); // 72 = boosted max
+  const camDist = baseDist - (baseDist - minDist) * speedFrac;
+  const camHeight = camDist * Math.tan(CAMERA_ANGLE_BUS);
+  const lookAhead = 8 - 6 * speedFrac; // reduce look-ahead significantly at speed
+
+  // Dynamic FOV based on speed — tween smoothly to target
+  const targetFov = CAMERA_FOV_BUS + Math.abs(busSpeed) * CAMERA_FOV_SPEED_FACTOR;
+  camera.fov += (targetFov - camera.fov) * Math.min(1, CAMERA_FOV_LERP_SPEED * dt);
 
   const targetYawOffset = busSpeed < -1 ? Math.PI : 0;
   const camSwingSpeed = 3;
@@ -212,9 +228,13 @@ export function updateRunnerCameraSystem(params: RunnerCameraParams): void {
   const { dt, camera, runnerYaw, runnerPos, getGroundY, getWaterSurfaceY } = params;
 
   const camDist = 9;
-  const camHeight = 3.2;
+  const camHeight = camDist * Math.tan(CAMERA_ANGLE_RUNNER);
   const lookAhead = 6;
   const lookHeight = 1.4;
+
+  // Tween FOV smoothly to target
+  const targetFov = CAMERA_FOV_RUNNER;
+  camera.fov += (targetFov - camera.fov) * Math.min(1, CAMERA_FOV_LERP_SPEED * dt);
 
   const forward = new Vector3(Math.sin(runnerYaw), 0, Math.cos(runnerYaw));
 

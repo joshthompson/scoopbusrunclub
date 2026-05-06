@@ -34,6 +34,8 @@ import {
 } from '../objects/RunnerModel';
 import type { RunnerModelResult } from '../objects/RunnerModel';
 import {
+  BUS_ROOF_L,
+  BUS_ROOF_W,
   BUS_ROOF_Y,
   GRAVITY,
   PASSENGER_PICKUP_COOLDOWN,
@@ -413,6 +415,7 @@ export class PassengerSystem {
     busYaw: number,
     busSpeed: number,
     engineVibeOffset: number,
+    busPitch = 0,
   ): { triggerScoopAnim: boolean; boostTimerAdd: number } {
     if (this.gameOver) return { triggerScoopAnim: false, boostTimerAdd: 0 };
 
@@ -470,11 +473,16 @@ export class PassengerSystem {
           p.velY -= GRAVITY * dt;
           pos.y += p.velY * dt;
 
-          // Home toward roof seat
+          // Home toward roof seat (accounting for pitch)
+          const cosP = Math.cos(busPitch);
+          const sinP = Math.sin(busPitch);
+          const localY = BUS_ROOF_Y + engineVibeOffset;
+          const localZ = p.ridingOffsetZ;
+          const afterPitchZ = -localY * sinP + localZ * cosP;
           const sinY = Math.sin(busYaw);
           const cosY = Math.cos(busYaw);
-          const seatWorldX = busPos.x + cosY * p.ridingOffsetX + sinY * p.ridingOffsetZ;
-          const seatWorldZ = busPos.z - sinY * p.ridingOffsetX + cosY * p.ridingOffsetZ;
+          const seatWorldX = busPos.x + cosY * p.ridingOffsetX + sinY * afterPitchZ;
+          const seatWorldZ = busPos.z - sinY * p.ridingOffsetX + cosY * afterPitchZ;
 
           const homingStrength = 6;
           pos.x += (seatWorldX - pos.x) * Math.min(1, homingStrength * dt);
@@ -485,8 +493,8 @@ export class PassengerSystem {
           p.animPhase += dt * 12;
           poseFlailing(p.model, p.animPhase);
 
-          // Land on roof
-          const roofWorldY = busPos.y + BUS_ROOF_Y;
+          // Land on roof (accounting for pitch at this passenger's Z offset)
+          const roofWorldY = busPos.y + localY * cosP + localZ * sinP;
           if (pos.y <= roofWorldY && p.velY < 0) {
             p.state = 'riding';
             p.mesh.rotation.x = 0;
@@ -497,13 +505,20 @@ export class PassengerSystem {
         }
 
         case 'riding': {
-          // Follow bus
+          // Follow bus (accounting for pitch so passengers stay on tilted roof)
+          const cosPR = Math.cos(busPitch);
+          const sinPR = Math.sin(busPitch);
+          const localYR = BUS_ROOF_Y + engineVibeOffset;
+          const localZR = p.ridingOffsetZ;
+          const afterPitchYR = localYR * cosPR + localZR * sinPR;
+          const afterPitchZR = -localYR * sinPR + localZR * cosPR;
           const sinY2 = Math.sin(busYaw);
           const cosY2 = Math.cos(busYaw);
-          pos.x = busPos.x + cosY2 * p.ridingOffsetX + sinY2 * p.ridingOffsetZ;
-          pos.z = busPos.z - sinY2 * p.ridingOffsetX + cosY2 * p.ridingOffsetZ;
-          pos.y = busPos.y + BUS_ROOF_Y + engineVibeOffset;
+          pos.x = busPos.x + cosY2 * p.ridingOffsetX + sinY2 * afterPitchZR;
+          pos.z = busPos.z - sinY2 * p.ridingOffsetX + cosY2 * afterPitchZR;
+          pos.y = busPos.y + afterPitchYR;
           p.mesh.rotation.y = busYaw;
+          p.mesh.rotation.x = -busPitch;
           p.animPhase += dt;
           poseSittingAnimated(p.model, p.animPhase);
 
@@ -520,13 +535,20 @@ export class PassengerSystem {
         case 'standing': {
           // Phase 1: Stand up on the roof (brief 0.4s)
           p.deliveredTimer += dt;
-          // Follow bus while standing up
+          // Follow bus while standing up (accounting for pitch)
+          const cosPS = Math.cos(busPitch);
+          const sinPS = Math.sin(busPitch);
+          const localYS = BUS_ROOF_Y + engineVibeOffset;
+          const localZS = p.ridingOffsetZ;
+          const afterPitchYS = localYS * cosPS + localZS * sinPS;
+          const afterPitchZS = -localYS * sinPS + localZS * cosPS;
           const sinYS = Math.sin(busYaw);
           const cosYS = Math.cos(busYaw);
-          pos.x = busPos.x + cosYS * p.ridingOffsetX + sinYS * p.ridingOffsetZ;
-          pos.z = busPos.z - sinYS * p.ridingOffsetX + cosYS * p.ridingOffsetZ;
-          pos.y = busPos.y + BUS_ROOF_Y + engineVibeOffset;
+          pos.x = busPos.x + cosYS * p.ridingOffsetX + sinYS * afterPitchZS;
+          pos.z = busPos.z - sinYS * p.ridingOffsetX + cosYS * afterPitchZS;
+          pos.y = busPos.y + afterPitchYS;
           p.mesh.rotation.y = busYaw;
+          p.mesh.rotation.x = -busPitch;
           poseStanding(p.model);
 
           if (p.deliveredTimer >= 0.4) {
@@ -640,19 +662,17 @@ export class PassengerSystem {
     const seatIndex = riders.length;
     const totalRiders = seatIndex + 1;
 
-    const roofW = 2.0;
-    const roofL = 6.0;
     const cols = Math.min(totalRiders, 3);
     const rows = Math.ceil(totalRiders / cols);
-    const spacingX = cols > 1 ? roofW / (cols - 1) : 0;
-    const spacingZ = rows > 1 ? roofL / (rows - 1) : 0;
+    const spacingX = cols > 1 ? BUS_ROOF_W / (cols - 1) : 0;
+    const spacingZ = rows > 1 ? BUS_ROOF_L / (rows - 1) : 0;
 
     const allRiders = [...riders, newRider];
     for (let i = 0; i < allRiders.length; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      allRiders[i].ridingOffsetX = cols > 1 ? -roofW / 2 + col * spacingX : 0;
-      allRiders[i].ridingOffsetZ = rows > 1 ? -roofL / 2 + row * spacingZ : 0;
+      allRiders[i].ridingOffsetX = cols > 1 ? -BUS_ROOF_W / 2 + col * spacingX : 0;
+      allRiders[i].ridingOffsetZ = rows > 1 ? -BUS_ROOF_L / 2 + row * spacingZ : 0;
     }
   }
 

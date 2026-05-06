@@ -194,6 +194,86 @@ export function createPathGroundMaterial(
   return mat as PathGroundMaterial;
 }
 
+// ---------- Corner curve smoothing ----------
+
+/** Max world-space distance from a corner to begin the curve (metres) */
+const CORNER_CURVE_OFFSET = 2;
+/** Max fraction of a line segment length consumed by curve on each side */
+const MAX_CURVE_FRACTION = 0.35;
+
+/**
+ * Draw a polyline with smooth quadratic Bezier curves at corners.
+ * Curves start/end at CORNER_CURVE_OFFSET metres from each corner,
+ * capped at MAX_CURVE_FRACTION of the adjacent segment length.
+ * Only applies to interior vertices (not the path endpoints).
+ */
+function drawSmoothedPolyline(
+  targetCtx: CanvasRenderingContext2D,
+  points: [number, number][],
+  toPixel: (wx: number, wz: number) => [number, number],
+) {
+  if (points.length < 2) return;
+  if (points.length === 2) {
+    const [px0, py0] = toPixel(points[0][0], points[0][1]);
+    const [px1, py1] = toPixel(points[1][0], points[1][1]);
+    targetCtx.moveTo(px0, py0);
+    targetCtx.lineTo(px1, py1);
+    return;
+  }
+
+  // Pre-compute segment lengths
+  const segLengths: number[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const dx = points[i + 1][0] - points[i][0];
+    const dz = points[i + 1][1] - points[i][1];
+    segLengths.push(Math.sqrt(dx * dx + dz * dz));
+  }
+
+  // Start at first point
+  const [startPx, startPy] = toPixel(points[0][0], points[0][1]);
+  targetCtx.moveTo(startPx, startPy);
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const prevLen = segLengths[i - 1];
+    const nextLen = segLengths[i];
+
+    // Offset clamped to CORNER_CURVE_OFFSET and MAX_CURVE_FRACTION of each adjacent segment
+    const offsetBefore = Math.min(CORNER_CURVE_OFFSET, prevLen * MAX_CURVE_FRACTION);
+    const offsetAfter = Math.min(CORNER_CURVE_OFFSET, nextLen * MAX_CURVE_FRACTION);
+
+    const [cx, cz] = points[i];
+    const [prevX, prevZ] = points[i - 1];
+    const [nextX, nextZ] = points[i + 1];
+
+    // Point before corner
+    const dxPrev = cx - prevX;
+    const dzPrev = cz - prevZ;
+    const tBefore = prevLen > 0 ? (1 - offsetBefore / prevLen) : 1;
+    const beforeX = prevX + dxPrev * tBefore;
+    const beforeZ = prevZ + dzPrev * tBefore;
+
+    // Point after corner
+    const dxNext = nextX - cx;
+    const dzNext = nextZ - cz;
+    const tAfter = nextLen > 0 ? (offsetAfter / nextLen) : 0;
+    const afterX = cx + dxNext * tAfter;
+    const afterZ = cz + dzNext * tAfter;
+
+    // Line to the point before the corner
+    const [bPx, bPy] = toPixel(beforeX, beforeZ);
+    targetCtx.lineTo(bPx, bPy);
+
+    // Quadratic curve through the corner to the point after
+    const [cPx, cPy] = toPixel(cx, cz);
+    const [aPx, aPy] = toPixel(afterX, afterZ);
+    targetCtx.quadraticCurveTo(cPx, cPy, aPx, aPy);
+  }
+
+  // Final line to last point
+  const [endPx, endPy] = toPixel(points[points.length - 1][0], points[points.length - 1][1]);
+  targetCtx.lineTo(endPx, endPy);
+}
+
 // ---------- Mask baking ----------
 
 /**
@@ -291,11 +371,7 @@ function bakeMaskTexture(
     ctx.lineJoin = 'round';
     ctx.strokeStyle = color;
     ctx.beginPath();
-    for (let i = 0; i < pathPositions.length; i++) {
-      const [px, py] = toPixel(pathPositions[i][0], pathPositions[i][1]);
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
+    drawSmoothedPolyline(ctx, pathPositions, toPixel);
     ctx.stroke();
   };
 
@@ -306,11 +382,7 @@ function bakeMaskTexture(
     ctx.lineJoin = 'round';
     ctx.strokeStyle = color;
     ctx.beginPath();
-    for (let i = 0; i < roadPoints.length; i++) {
-      const [px, py] = toPixel(roadPoints[i][0], roadPoints[i][1]);
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
+    drawSmoothedPolyline(ctx, roadPoints, toPixel);
     ctx.stroke();
   };
 

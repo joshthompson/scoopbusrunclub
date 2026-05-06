@@ -30,7 +30,7 @@ import type { LevelData } from '../levels';
 import type { ItemCollectEvent, PlayerState } from '../multiplayer';
 import { MAX_PLAYERS } from '../multiplayer';
 import type { GameType } from './modes/types';
-import { createBusModel, tintBusModel, busColorPaletteFromOption, PLAYER_COLORS } from './objects/BusModel';
+import { createBusModel, tintBusModel, busColorPaletteFromOption, PLAYER_COLORS, WHEEL_ROLL_SPEED } from './objects/BusModel';
 import type { BusColorPalette } from './objects/BusModel';
 import type { CharacterSelection, RunnerAppearance } from './characters';
 import { getBusColorById, resolveRunnerAppearance, isCorgiRunnerId } from './characters';
@@ -61,6 +61,8 @@ import {
   BUS_MAX_SPEED,
   BUS_ROOF_Y,
   BUS_START_OFFSET,
+  CAMERA_FOV_BUS,
+  CAMERA_FOV_RUNNER,
   BUS_TURN_SPEED,
   BUS_TURN_SPEED_STANDSTILL,
   COUNTDOWN_DURATION,
@@ -207,6 +209,7 @@ import {
   setWaterWakeActive,
   updateWakeIntensity,
 } from './systems/busEffects';
+import { createBoostEffects, type BoostEffectsInstance } from './systems/boostEffects';
 import {
   spawnRunners as spawnRunnersSystem,
   updateRunnersSystem,
@@ -466,6 +469,11 @@ export class Game {
   private effectivePathMaskResolution = RENDER_PATH_MASK_RESOLUTION;
   private effectiveTreeCount = TREE_COUNT;
 
+  // Boost visual effects (camera shake, speed lines, radial blur, DoF)
+  private boostEffects: BoostEffectsInstance | null = null;
+  private p2BoostEffects: BoostEffectsInstance | null = null;
+  private boostEffectsElapsed = 0;
+
   // Local player role
   private localPlayerRole: 'bus' | 'runner' = 'bus';
   /** Game type / mode for this session */
@@ -657,6 +665,10 @@ export class Game {
       window.removeEventListener('resize', this.resizeHandler);
       this.resizeHandler = null;
     }
+    this.boostEffects?.dispose();
+    this.boostEffects = null;
+    this.p2BoostEffects?.dispose();
+    this.p2BoostEffects = null;
     this.powerUpSystem?.dispose();
     this.powerUpSystem = null;
     this.passengerSystem?.dispose();
@@ -1508,7 +1520,7 @@ export class Game {
     // Camera
     this.camera = new FreeCamera('cam', new Vector3(0, 10, -15), this.scene);
     this.camera.minZ = 0.1;
-    this.camera.fov = 1.0;
+    this.camera.fov = this.localPlayerRole === 'runner' ? CAMERA_FOV_RUNNER : CAMERA_FOV_BUS;
     this.camera.inputs.clear();
 
     // Local multiplayer: set up split-screen with a second camera for P2
@@ -1526,7 +1538,7 @@ export class Game {
 
       this.p2Camera = new FreeCamera('cam-p2', new Vector3(0, 10, -15), this.scene);
       this.p2Camera.minZ = 0.1;
-      this.p2Camera.fov = 1.0;
+      this.p2Camera.fov = this.localPlayerRole === 'runner' ? CAMERA_FOV_BUS : CAMERA_FOV_RUNNER;
       this.p2Camera.inputs.clear();
       this.p2Camera.layerMask = 0x2FFFFFFF;
       if (isLandscape) {
@@ -1535,6 +1547,22 @@ export class Game {
         this.p2Camera.viewport = new Viewport(0, 0.5, 1, 0.5);
       }
       this.scene.activeCameras = [this.camera, this.p2Camera];
+    }
+
+    // --- Boost visual effects (per-camera) ---
+    this.boostEffects = createBoostEffects({
+      scene: this.scene,
+      camera: this.camera,
+      particleLayerMask: this.localMultiplayer ? 0x10000000 : undefined,
+      enableDepthOfField: !this.mobileLikeDevice,
+    });
+    if (this.localMultiplayer && this.p2Camera) {
+      this.p2BoostEffects = createBoostEffects({
+        scene: this.scene,
+        camera: this.p2Camera,
+        particleLayerMask: 0x20000000,
+        enableDepthOfField: !this.mobileLikeDevice,
+      });
     }
 
     // Lights — adapt to time of day (values from constants.ts)
@@ -3450,6 +3478,10 @@ export class Game {
         getWaterSurfaceY: (x, z) => this.getWaterSurfaceY(x, z),
       });
     }
+
+    // P2 boost visual effects
+    const p2BoostIntensity = Math.min(1, this.p2BoostTimer / 0.5);
+    this.p2BoostEffects?.update(dt, p2BoostIntensity, this.boostEffectsElapsed);
   }
 
   private updateChaseCam(dt: number) {
@@ -3679,6 +3711,7 @@ export class Game {
         getGroundY: (x, z) => this.getGroundY(x, z),
         busPos: this.busPos,
         busYaw: this.busYaw,
+        busPitch: this.busPitch,
         busSpeed: this.busSpeed,
         localPlayerRole: this.localPlayerRole,
         localPlayerIndex: this.localPlayerIndex,
@@ -3713,7 +3746,7 @@ export class Game {
         this.busBodyShell.position.y = engineVibeOffset;
       }
       if (this.localPlayerRole === 'runner') {
-        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       }
 
       // Callbacks for static HUD values
@@ -3797,10 +3830,15 @@ export class Game {
           this.busMesh.setEnabled(this.localPlayerRole === 'bus');
         }
         if (this.localPlayerRole === 'runner') {
-          this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+          this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
         }
 
         this.updateChaseCam(dt);
+        // Boost effects fade-out during finish coast
+        this.boostEffectsElapsed += dt;
+        const finishBoostIntensity = Math.min(1, this.boostTimer / 0.5);
+        this.boostEffects?.update(dt, finishBoostIntensity, this.boostEffectsElapsed);
+
         const runnerResult2 = updateRunnersSystem({
           scene: this.scene,
           runners: this.runners,
@@ -3808,6 +3846,7 @@ export class Game {
           getGroundY: (x, z) => this.getGroundY(x, z),
           busPos: this.busPos,
           busYaw: this.busYaw,
+          busPitch: this.busPitch,
           busSpeed: this.busSpeed,
           localPlayerRole: this.localPlayerRole,
           localPlayerIndex: this.localPlayerIndex,
@@ -3899,7 +3938,7 @@ export class Game {
         if (this.busMesh) {
           this.busMesh.setEnabled(false);
         }
-        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       } else {
       // Human-like direct control: no drift, runner jump with optional side leap.
       if (turnInput !== 0) {
@@ -3986,7 +4025,7 @@ export class Game {
       if (this.busMesh) {
         this.busMesh.setEnabled(false);
       }
-      this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+      this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       }
     } else {
       // --- Space = manual scoop animation (bus mode) ---
@@ -4014,6 +4053,21 @@ export class Game {
       }
       if (this.frontWheelRight) {
         this.frontWheelRight.rotation.y += (targetWheelY - this.frontWheelRight.rotation.y) * steerSmooth;
+      }
+
+      // --- Roll all wheels based on bus speed ---
+      const rollDelta = this.busSpeed * WHEEL_ROLL_SPEED * dt;
+      const allWheelPivots = this.busMesh!.getChildren().filter(
+        (c) => c.name.startsWith('frontWheel') || c.name.startsWith('rearWheelPivot'),
+      );
+      for (const pivot of allWheelPivots) {
+        const wheelRoot = pivot.getChildren().find((c) => c.name.startsWith('wheelGlbRoot'));
+        if (wheelRoot) {
+          // Right-side wheels are flipped (rotation.y = PI) so negate roll direction
+          const isRight = pivot.name.includes('Right') || pivot.name === 'rearWheelPivot_2';
+          const direction = isRight ? -1 : 1;
+          (wheelRoot as TransformNode).rotation.x += direction * rollDelta;
+        }
       }
 
       // --- Apply acceleration ---
@@ -4235,6 +4289,11 @@ export class Game {
     // --- Third-person chase camera ---
     this.updateChaseCam(dt);
 
+    // --- Boost visual effects (after camera so shake offsets final position) ---
+    this.boostEffectsElapsed += dt;
+    const boostIntensity = Math.min(1, this.boostTimer / 0.5); // ramp over 0.5s
+    this.boostEffects?.update(dt, boostIntensity, this.boostEffectsElapsed);
+
     // Callbacks
     this.callbacks.onSpeedChange(Math.abs(this.busSpeed) * 3.6); // m/s → km/h
     this.callbacks.onDistanceChange(this.distanceTravelled);
@@ -4278,6 +4337,7 @@ export class Game {
       getGroundY: (x, z) => this.getGroundY(x, z),
       busPos: this.busPos,
       busYaw: this.busYaw,
+      busPitch: this.busPitch,
       busSpeed: this.busSpeed,
       localPlayerRole: this.localPlayerRole,
       localPlayerIndex: this.localPlayerIndex,
@@ -4339,7 +4399,7 @@ export class Game {
 
     // --- Bus Mode: update passenger system ---
     if (this.passengerSystem && this.raceState === 'racing') {
-      const pResult = this.passengerSystem.update(dt, this.busPos, this.busYaw, this.busSpeed, engineVibeOffset);
+      const pResult = this.passengerSystem.update(dt, this.busPos, this.busYaw, this.busSpeed, engineVibeOffset, this.busPitch);
       if (pResult.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
       if (pResult.boostTimerAdd > 0) this.boostTimer += pResult.boostTimerAdd;
       if (pResult.triggerScoopAnim && this.exhaustFlames && !this.exhaustFlames.isStarted()) {

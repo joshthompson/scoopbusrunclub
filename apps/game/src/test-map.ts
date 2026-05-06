@@ -85,7 +85,7 @@ const COLORS = {
 type RegionType = 'field' | 'concrete';
 interface RegionItem { type: RegionType; points: [number, number][]; }
 type BuildingType = 'grey' | 'red' | 'green' | 'yellow' | 'kristineberg';
-interface BuildingItem { type: BuildingType; points: [number, number][]; }
+interface BuildingItem { type: BuildingType; height?: number; points: [number, number][]; }
 interface WaterItem { type: 'water' | 'river'; points: [number, number][]; }
 interface FenceItem { points: [number, number][]; }
 interface TreeItem { pos: [number, number]; }
@@ -176,6 +176,7 @@ async function main() {
 
   const buildingItems: BuildingItem[] = (level.buildings ?? []).map((b) => ({
     type: (b.type === 'red' || b.type === 'green' || b.type === 'yellow' || b.type === 'kristineberg') ? b.type as BuildingType : 'grey' as const,
+    height: b.height,
     points: b.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
   }));
 
@@ -964,6 +965,26 @@ async function main() {
         });
         typeRow.appendChild(typeSelect);
         selSection.appendChild(typeRow);
+
+        const heightRow = document.createElement('div');
+        heightRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;align-items:center;';
+        const heightLabel = document.createElement('span');
+        heightLabel.style.cssText = 'color:#ccc;font-size:11px;';
+        heightLabel.textContent = 'Height:';
+        heightRow.appendChild(heightLabel);
+
+        const heightInput = document.createElement('input');
+        heightInput.type = 'number';
+        heightInput.style.cssText = 'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;';
+        heightInput.placeholder = 'optional (meters)';
+        heightInput.value = b.height !== undefined ? b.height.toString() : '';
+        heightInput.addEventListener('change', () => {
+          const val = heightInput.value.trim();
+          b.height = val === '' ? undefined : parseFloat(val);
+          renderSidebar();
+        });
+        heightRow.appendChild(heightInput);
+        selSection.appendChild(heightRow);
       } else if (selectedKind === 'water') {
         const w = waterItems[selectedIndex];
         info.textContent = `Water #${selectedIndex} (${w.type}) — ${w.points.length} verts`;
@@ -1105,10 +1126,16 @@ async function main() {
     exportSection.appendChild(exportTitle);
 
     const exportItems: [string, () => unknown][] = [
-      ['buildings.json', () => buildingItems.map((b) => ({
-        type: b.type,
-        points: b.points.map(([x, z]) => localToGps(x, z, origin)),
-      }))],
+      ['buildings.json', () => buildingItems.map((b) => {
+        const obj: Record<string, unknown> = {
+          type: b.type,
+          points: b.points.map(([x, z]) => localToGps(x, z, origin)),
+        };
+        if (b.height !== undefined) {
+          obj.height = b.height;
+        }
+        return obj;
+      })],
       ['water.json', () => waterItems.map((w) => ({
         type: w.type,
         coords: w.points.map(([x, z]) => {

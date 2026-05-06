@@ -101,14 +101,20 @@ export function updateRemotePlayersSystem(params: UpdateRemotePlayersParams): vo
 
     const sinY = Math.sin(remote.smoothYaw);
     const cosY = Math.cos(remote.smoothYaw);
+    const cosPitch = Math.cos(remote.smoothPitch);
+    const sinPitch = Math.sin(remote.smoothPitch);
     for (const anchor of remote.riderAnchors) {
       anchor.setEnabled(!isRunner);
       const roofOffsetX = (anchor as MeshWithRoofOffset).__roofOffsetX ?? 0;
       const roofOffsetZ = (anchor as MeshWithRoofOffset).__roofOffsetZ ?? 0;
-      anchor.position.x = remote.smoothPos.x + cosY * roofOffsetX + sinY * roofOffsetZ;
-      anchor.position.z = remote.smoothPos.z - sinY * roofOffsetX + cosY * roofOffsetZ;
-      anchor.position.y = remote.smoothPos.y + busRoofY + engineVibeOffset;
+      const localY = busRoofY + engineVibeOffset;
+      const afterPitchY = localY * cosPitch + roofOffsetZ * sinPitch;
+      const afterPitchZ = -localY * sinPitch + roofOffsetZ * cosPitch;
+      anchor.position.x = remote.smoothPos.x + cosY * roofOffsetX + sinY * afterPitchZ;
+      anchor.position.z = remote.smoothPos.z - sinY * roofOffsetX + cosY * afterPitchZ;
+      anchor.position.y = remote.smoothPos.y + afterPitchY;
       anchor.rotation.y = remote.smoothYaw;
+      anchor.rotation.x = -remote.smoothPitch;
     }
   }
 }

@@ -82,7 +82,7 @@ export interface BusColorOption {
   name: string;            // display label
   cssColor: string;        // for UI swatches
   bodyHex: string;         // hex colour for the 3D body
-  roofHex: string;         // hex colour for the 3D roof (darker shade)
+  scoopHex: string;        // hex colour for the scoop/plow
 }
 
 // ────────────────────────────────────────────
@@ -289,14 +289,14 @@ export const RANDOM_RUNNER_ID = '__random__';
 // ────────────────────────────────────────────
 
 export const BUS_COLOR_OPTIONS: BusColorOption[] = [
-  { id: 'yellow',  name: 'Yellow',  cssColor: '#f0c820', bodyHex: '#f0c820', roofHex: '#d1a610' },
-  { id: 'red',     name: 'Red',     cssColor: '#d94030', bodyHex: '#d94030', roofHex: '#b02e1e' },
-  { id: 'blue',    name: 'Blue',    cssColor: '#3470d8', bodyHex: '#3470d8', roofHex: '#2352b3' },
-  { id: 'purple',  name: 'Purple',  cssColor: '#9940cc', bodyHex: '#9940cc', roofHex: '#7328a6' },
-  { id: 'orange',  name: 'Orange',  cssColor: '#e88020', bodyHex: '#e88020', roofHex: '#c06818' },
-  { id: 'green',   name: 'Green',   cssColor: '#3aaa40', bodyHex: '#3aaa40', roofHex: '#2d8832' },
-  { id: 'black',   name: 'Black',   cssColor: '#333333', bodyHex: '#333333', roofHex: '#1a1a1a' },
-  { id: 'pink',    name: 'Pink',    cssColor: '#e868a8', bodyHex: '#e868a8', roofHex: '#c05088' },
+  { id: 'yellow',  name: 'Yellow',  cssColor: '#f0c820', bodyHex: '#f0c820', scoopHex: '#3470d8' },
+  { id: 'red',     name: 'Red',     cssColor: '#d94030', bodyHex: '#d94030', scoopHex: '#9940cc' },
+  { id: 'blue',    name: 'Blue',    cssColor: '#3470d8', bodyHex: '#3470d8', scoopHex: '#e88020' },
+  { id: 'purple',  name: 'Purple',  cssColor: '#9940cc', bodyHex: '#9940cc', scoopHex: '#3aaa40' },
+  { id: 'orange',  name: 'Orange',  cssColor: '#e88020', bodyHex: '#e88020', scoopHex: '#222222' },
+  { id: 'green',   name: 'Green',   cssColor: '#3aaa40', bodyHex: '#3aaa40', scoopHex: '#e868a8' },
+  { id: 'black',   name: 'Black',   cssColor: '#333333', bodyHex: '#333333', scoopHex: '#f0c820' },
+  { id: 'pink',    name: 'Pink',    cssColor: '#e868a8', bodyHex: '#e868a8', scoopHex: '#d94030' },
 ];
 
 // ────────────────────────────────────────────
