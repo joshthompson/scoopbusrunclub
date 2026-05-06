@@ -15,6 +15,7 @@ import {
   poseSittingAnimated,
   poseStanding,
   poseJump,
+  poseTuck,
 } from '../objects/RunnerModel';
 import { createCorgiModel } from '../objects/CorgiModel';
 import { applyRunnerInteractionPose } from './runnerInteractions';
@@ -626,18 +627,39 @@ export function updateLocalRunnerVisual(
 
     if (ctx.jumpsUsed >= 2) {
       // Forward somersault on double jump — exactly one full rotation
-      const flipSpeed = 2 * Math.PI / 0.55; // complete one rotation in ~0.55s
+      // Rotate around torso center (~0.8m above feet) instead of foot origin
+      const TORSO_MID_Y = 0.8;
+      const flipSpeed = 2 * Math.PI / 0.55; // one full rotation in ~0.55s
       animPhase += dt * flipSpeed;
-      // Cap at exactly one full rotation (2π)
       const flipAngle = Math.min(animPhase, 2 * Math.PI);
-      ctx.model.root.rotation.x = flipAngle;
-      ctx.model.root.rotation.z = ctx.runnerJumpSideVel * 0.02;
-      ctx.model.root.rotation.y = ctx.busYaw;
-      poseJump(
-        ctx.model,
-        jumpLift,
-        ctx.runnerJumpSideVel / RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
-      );
+      const flipDone = flipAngle >= 2 * Math.PI;
+
+      if (flipDone) {
+        // Rotation complete — return to normal jump pose
+        ctx.model.root.position.set(ctx.busPos.x, ctx.busPos.y, ctx.busPos.z);
+        ctx.model.root.rotation.x = -0.2;
+        ctx.model.root.rotation.z = 0;
+        ctx.model.root.rotation.y = ctx.busYaw;
+        poseJump(ctx.model, jumpLift, 0);
+      } else {
+        // Mid-flip: offset position so rotation pivots around torso center
+        const sinA = Math.sin(flipAngle);
+        const cosA = Math.cos(flipAngle);
+        const offsetY = TORSO_MID_Y * (1 - cosA);
+        const offsetZ = TORSO_MID_Y * sinA;
+        const fwdX = Math.sin(ctx.busYaw);
+        const fwdZ = Math.cos(ctx.busYaw);
+
+        ctx.model.root.position.set(
+          ctx.busPos.x - fwdX * offsetZ,
+          ctx.busPos.y + offsetY,
+          ctx.busPos.z - fwdZ * offsetZ,
+        );
+        ctx.model.root.rotation.x = flipAngle;
+        ctx.model.root.rotation.z = 0;
+        ctx.model.root.rotation.y = ctx.busYaw;
+        poseTuck(ctx.model);
+      }
       return animPhase;
     }
 

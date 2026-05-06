@@ -259,6 +259,7 @@ import {
   updatePreviewOrbitCamera,
   type PreviewOrbitState,
 } from './systems/previewCamera';
+import { GamepadManager } from './systems/gamepad';
 
 // Module-level engine cache: reuse the same WebGL context per canvas
 // to avoid context-loss issues when creating/destroying engines rapidly.
@@ -319,6 +320,11 @@ export class Game {
 
   // Input
   private keys: Record<string, boolean> = {};
+  private gamepadManager = new GamepadManager();
+  private gamepadCameraOrbitP1 = 0; // right-analog camera yaw offset for P1
+  private gamepadCameraOrbitP2 = 0; // right-analog camera yaw offset for P2
+  private gamepadRearCamP1 = false; // triangle toggle for rear camera P1
+  private gamepadRearCamP2 = false; // triangle toggle for rear camera P2
 
   // Touch input (virtual joystick)
   private touchActive = false;
@@ -3242,20 +3248,46 @@ export class Game {
     }
 
     // ── Inputs ──
+    const gp2 = this.gamepadManager.getState(1);
     const up = this.isKey('arrowup');
     const down = this.isKey('arrowdown');
     const left = this.isKey('arrowleft');
     const right = this.isKey('arrowright');
-    const enterHeld = this.isKey('enter');
-    const enterPressed = enterHeld && !this.p2EnterHeldLast;
+    const enterHeld = this.isKey('enter') || gp2.actionHeld;
+    const enterPressed = (enterHeld && !this.p2EnterHeldLast) || gp2.actionPressed;
     this.p2EnterHeldLast = enterHeld;
+
+    // Gamepad P2: Triangle held = rear camera
+    this.gamepadRearCamP2 = gp2.rearCameraHeld;
+    // Gamepad P2: Right analog orbits camera
+    const P2_CAMERA_ORBIT_SPEED = 3.0;
+    if (Math.abs(gp2.cameraX) > 0) {
+      this.gamepadCameraOrbitP2 += gp2.cameraX * P2_CAMERA_ORBIT_SPEED * dt;
+    } else {
+      this.gamepadCameraOrbitP2 *= Math.exp(-5 * dt);
+      if (Math.abs(this.gamepadCameraOrbitP2) < 0.01) this.gamepadCameraOrbitP2 = 0;
+    }
 
     let accelInput = 0;
     if (up) accelInput += 1;
     if (down) accelInput -= 1;
+    // Gamepad P2: R2 = accelerate, L2 = reverse (triggers)
+    if (gp2.connected) {
+      if (gp2.accel > 0.05) accelInput += gp2.accel;
+      if (gp2.reverse > 0.05) accelInput -= gp2.reverse;
+    }
+    accelInput = Math.max(-1, Math.min(1, accelInput));
     let turnInput = 0;
     if (left) turnInput -= 1;
     if (right) turnInput += 1;
+    // Gamepad P2: Left stick X = steer, Y forward = accelerate
+    if (gp2.connected) {
+      turnInput += gp2.steerX;
+      if (gp2.steerY < -0.1) accelInput += -gp2.steerY;
+      if (gp2.steerY > 0.1) accelInput -= gp2.steerY;
+      accelInput = Math.max(-1, Math.min(1, accelInput));
+    }
+    turnInput = Math.max(-1, Math.min(1, turnInput));
 
     if (!this.p2Finished) {
       if (this.p2Role === 'runner') {
@@ -3453,11 +3485,14 @@ export class Game {
   /** Update P2's camera (split-screen). */
   private updateP2Camera(dt: number) {
     if (!this.p2Camera) return;
+    // Gamepad: right-analog orbit + Triangle rear camera for P2
+    const gpOrbitP2 = this.gamepadCameraOrbitP2 + (this.gamepadRearCamP2 ? Math.PI : 0);
+
     if (this.p2Role === 'runner') {
       updateRunnerCameraSystem({
         dt,
         camera: this.p2Camera,
-        runnerYaw: this.p2Yaw,
+        runnerYaw: this.p2Yaw + gpOrbitP2,
         runnerPos: this.p2Pos,
         getGroundY: (x, z) => this.getGroundY(x, z),
         getWaterSurfaceY: (x, z) => this.getWaterSurfaceY(x, z),
@@ -3470,7 +3505,7 @@ export class Game {
       this.p2CameraYawOffset = updateChaseCameraSystem({
         dt,
         camera: this.p2Camera,
-        busYaw: this.p2Yaw,
+        busYaw: this.p2Yaw + gpOrbitP2,
         busSpeed: this.p2Speed,
         busPos: this.p2Pos,
         cameraYawOffset: this.p2CameraYawOffset,
@@ -3485,11 +3520,14 @@ export class Game {
   }
 
   private updateChaseCam(dt: number) {
+    // Gamepad: right-analog orbit + Triangle rear camera for P1
+    const gpOrbitP1 = this.gamepadCameraOrbitP1 + (this.gamepadRearCamP1 ? Math.PI : 0);
+
     if (this.localPlayerRole === 'runner') {
       updateRunnerCameraSystem({
         dt,
         camera: this.camera,
-        runnerYaw: this.busYaw,
+        runnerYaw: this.busYaw + gpOrbitP1,
         runnerPos: this.busPos,
         getGroundY: (x, z) => this.getGroundY(x, z),
         getWaterSurfaceY: (x, z) => this.getWaterSurfaceY(x, z),
@@ -3500,7 +3538,7 @@ export class Game {
     this.cameraYawOffset = updateChaseCameraSystem({
       dt,
       camera: this.camera,
-      busYaw: this.busYaw,
+      busYaw: this.busYaw + gpOrbitP1,
       busSpeed: this.busSpeed,
       busPos: this.busPos,
       cameraYawOffset: this.cameraYawOffset,
@@ -3628,6 +3666,9 @@ export class Game {
     // If paused, keep rendering the scene but skip all simulation
     if (this.paused) return;
 
+    // Poll gamepad inputs once per frame
+    this.gamepadManager.poll();
+
     // Compute the effective view center on the ground — used for LOD,
     // culling, and terrain inset centering instead of raw camera XZ.
     const p1View = computeViewCenterXZ(this.camera);
@@ -3655,11 +3696,28 @@ export class Game {
     this.updateRunnerPowerUpEffects(dt);
     this.updateLocalReverseLights();
 
-    const enterHeld = this.isKey('enter');
-    if (enterHeld && !this.enterHeldLastFrame) {
+    const enterHeld = this.isKey('enter') || this.gamepadManager.getState(0).itemPressed;
+    if ((enterHeld && !this.enterHeldLastFrame) || this.gamepadManager.getState(0).itemPressed) {
       this.useHeldPowerUp();
     }
     this.enterHeldLastFrame = enterHeld;
+
+    // Gamepad: Triangle held = rear camera for P1
+    const gp1 = this.gamepadManager.getState(0);
+    this.gamepadRearCamP1 = gp1.rearCameraHeld;
+    // Gamepad: Right analog stick orbits camera for P1
+    const CAMERA_ORBIT_SPEED = 3.0; // rad/s
+    if (Math.abs(gp1.cameraX) > 0) {
+      this.gamepadCameraOrbitP1 += gp1.cameraX * CAMERA_ORBIT_SPEED * dt;
+    } else {
+      // Smoothly return to 0 when stick released
+      this.gamepadCameraOrbitP1 *= Math.exp(-5 * dt);
+      if (Math.abs(this.gamepadCameraOrbitP1) < 0.01) this.gamepadCameraOrbitP1 = 0;
+    }
+    // Reset gamepad orbit when rear cam toggles off
+    if (!this.gamepadRearCamP1 && Math.abs(this.gamepadCameraOrbitP1) < 0.01) {
+      this.gamepadCameraOrbitP1 = 0;
+    }
 
     // --- Countdown phase ---
     if (this.raceState === 'countdown') {
@@ -3911,6 +3969,11 @@ export class Game {
     if (this.touchActive) {
       accelInput += this.touchDeltaY > 0.1 ? -1 : 1;
     }
+    // Gamepad P1: R2 = accelerate, L2 = reverse (triggers)
+    if (gp1.connected) {
+      if (gp1.accel > 0.05) accelInput += gp1.accel;
+      if (gp1.reverse > 0.05) accelInput -= gp1.reverse;
+    }
     accelInput = Math.max(-1, Math.min(1, accelInput));
 
     // --- Steering ---
@@ -3919,6 +3982,14 @@ export class Game {
     if (this.isKey('d') || (!this.localMultiplayer && this.isKey('arrowright'))) turnInput += 1;
     // Blend touch steering
     if (this.touchActive) turnInput += this.touchDeltaX;
+    // Gamepad P1: Left stick X = steer, Y forward = accelerate
+    if (gp1.connected) {
+      turnInput += gp1.steerX;
+      if (gp1.steerY < -0.1) accelInput += -gp1.steerY; // push forward (negative Y) = accel
+      if (gp1.steerY > 0.1) accelInput -= gp1.steerY;  // pull back (positive Y) = reverse
+      accelInput = Math.max(-1, Math.min(1, accelInput));
+    }
+    turnInput = Math.max(-1, Math.min(1, turnInput));
     turnInput = Math.max(-1, Math.min(1, turnInput));
     if (this.isControlLockedByIcePatch(this.busPos.x, this.busPos.z)) {
       turnInput = 0;
@@ -3971,8 +4042,8 @@ export class Game {
       const maxReverse = this.runnerShoeTimer > 0 ? 0 : RUNNER_PLAYER_SPEED * 0.45;
       this.busSpeed = Math.max(-maxReverse, Math.min(RUNNER_PLAYER_SPEED * playerSpeedMultiplier * totalRunnerSpeedBoost, this.busSpeed));
 
-      const jumpHeld = this.isKey(' ') || this.isKey('space') || this.isKey('spacebar');
-      const jumpPressed = jumpHeld && !this.jumpHeldLastFrame;
+      const jumpHeld = this.isKey(' ') || this.isKey('space') || this.isKey('spacebar') || gp1.actionHeld;
+      const jumpPressed = (jumpHeld && !this.jumpHeldLastFrame) || gp1.actionPressed;
       this.jumpHeldLastFrame = jumpHeld;
       if (jumpPressed && this.runnerJumpsUsed < RUNNER_PLAYER_MAX_JUMPS) {
         this.busAirborne = true;
@@ -4028,9 +4099,9 @@ export class Game {
       this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       }
     } else {
-      // --- Space = manual scoop animation (bus mode) ---
-      const scoopKeyHeld = this.isKey(' ') || this.isKey('space') || this.isKey('spacebar');
-      if (scoopKeyHeld && this.scoopAnimTimer <= 0) {
+      // --- Space / Gamepad X = manual scoop animation (bus mode) ---
+      const scoopKeyHeld = this.isKey(' ') || this.isKey('space') || this.isKey('spacebar') || gp1.actionHeld;
+      if ((scoopKeyHeld || gp1.actionPressed) && this.scoopAnimTimer <= 0) {
         this.scoopAnimTimer = SCOOP_ANIM_DURATION;
       }
 

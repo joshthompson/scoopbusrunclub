@@ -650,6 +650,22 @@ export function poseJump(
   model.rightLeg.rotation.z = legSplayZ - lean * 0.12;
 }
 
+/** Tucked pose for somersault: arms hugged to chest, legs pulled up forward. */
+export function poseTuck(
+  model: RunnerModelResult,
+): void {
+  // Arms crossed over chest
+  model.leftArm.rotation.x = -1.8;
+  model.leftArm.rotation.z = 0.4;
+  model.rightArm.rotation.x = -1.8;
+  model.rightArm.rotation.z = -0.4;
+  // Legs pulled up forward (knees to chest)
+  model.leftLeg.rotation.x = -1.4;
+  model.leftLeg.rotation.z = -0.05;
+  model.rightLeg.rotation.x = -1.4;
+  model.rightLeg.rotation.z = 0.05;
+}
+
 /** Sitting pose: legs forward and flat, arms resting at sides. */
 export function poseSitting(
   model: RunnerModelResult,
