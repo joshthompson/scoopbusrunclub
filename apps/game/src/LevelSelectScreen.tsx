@@ -1,6 +1,8 @@
 import { For, createSignal, onMount, onCleanup } from 'solid-js';
 import levels from './levels';
 import logoSrc from './assets/logo.png';
+import { useMenuNav } from './useMenuNav';
+import { MuteButton } from './MuteButton';
 
 interface LevelSelectScreenProps {
   onSelect: (levelId: string, opts?: { altCourse?: boolean }) => void;
@@ -13,6 +15,9 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
 
   const courseIds = () =>
     Object.keys(levels).filter((id) => showHidden() || !levels[id].hide);
+
+  const { isFocused, setFocusedIndex } = useMenuNav(() => 1 + courseIds().length + 1, { onBack: props.onBack }); // mute + courses + back
+  setFocusedIndex(1);
 
   // Tap space 5 times in a row to reveal hidden courses
   let spaceCount = 0;
@@ -55,6 +60,7 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
 
   return (
     <div id="title-screen">
+      <MuteButton focused={isFocused(0)} />
       <div class="title-content">
         <img src={logoSrc} alt="Scoop Bus" class="title-logo" />
         <h2 class="screen-heading">Select Course</h2>
@@ -67,6 +73,7 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
               return (
                 <button
                   class="course-btn"
+                  classList={{ 'menu-focused': isFocused(1 + courseIds().indexOf(id)) }}
                   onClick={() => props.onSelect(id, useAlt() ? { altCourse: true } : undefined)}
                 >
                   {displayName()}
@@ -75,7 +82,7 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
             }}
           </For>
         </div>
-        <button class="course-btn cancel-btn back-btn" onClick={props.onBack}>
+        <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(1 + courseIds().length) }} onClick={props.onBack}>
           Back
         </button>
       </div>

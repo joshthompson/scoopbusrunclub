@@ -218,8 +218,9 @@ async function initEditor(levelId: string) {
       const [rawX, rawZ] = gpsPointToLocal(lon, lat, originCoord);
       return [rawX * scaleFactor, rawZ * scaleFactor];
     });
-  fieldPolygons = (level.regions?.fields ?? []).map(gpsToWorldPoly);
-  concretePolygons = (level.regions?.concrete ?? []).map(gpsToWorldPoly);
+  const regionEntries = level.regions ?? [];
+  fieldPolygons = regionEntries.filter((r) => r.type === 'field').map((r) => gpsToWorldPoly(r.points));
+  concretePolygons = regionEntries.filter((r) => r.type === 'concrete').map((r) => gpsToWorldPoly(r.points));
 
   // ── Babylon.js setup ──
   const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;

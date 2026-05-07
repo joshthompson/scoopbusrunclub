@@ -10,9 +10,10 @@ import { GameModeSelectScreen } from './GameModeSelectScreen';
 import { CharacterSelectScreen } from './CharacterSelectScreen';
 import { GameTypeSelectScreen } from './GameTypeSelectScreen';
 import { LobbyScreen } from './LobbyScreen';
+import { RoomBrowserScreen } from './RoomBrowserScreen';
 import { LocalRoleSelectScreen } from './LocalRoleSelectScreen';
 import { LocalResultsScreen } from './LocalResultsScreen';
-import { mp, MAX_PLAYERS } from './multiplayer';
+import { mp, lobby, MAX_PLAYERS } from './multiplayer';
 import type { PlayerState, ScoopEvent } from './multiplayer';
 import { getGameModeConfig } from './game/modes';
 import type { GameType, TeamColor } from './game/modes';
@@ -25,6 +26,8 @@ import powerUpFire from './assets/power-ups/fire.png';
 import powerUpIce from './assets/power-ups/ice.png';
 import powerUpMallet from './assets/power-ups/mallet.png';
 import powerUpShoe from './assets/power-ups/shoe.png';
+import { toggleMute, getMuted } from './music';
+import { useMenuNav } from './useMenuNav';
 
 // Babylon.js needs earcut on window for CreatePolygon
 (window as any).earcut = earcut;
@@ -37,9 +40,9 @@ const PLAYER_COLOR_INFO = [
   { name: 'Purple', css: '#9940cc' },
 ];
 
-type GameMode = 'single' | 'local' | 'host' | 'join';
+type GameMode = 'single' | 'local' | 'host' | 'join' | 'online';
 type PlayerRole = 'bus' | 'runner';
-type Screen = 'title' | 'level-select' | 'game-mode-select' | 'character-select' | 'game-type-select' | 'local-game-type-select' | 'local-role-select' | 'lobby' | 'loading' | 'playing';
+type Screen = 'title' | 'room-browser' | 'level-select' | 'game-mode-select' | 'character-select' | 'game-type-select' | 'local-game-type-select' | 'local-role-select' | 'lobby' | 'loading' | 'playing';
 
 const POWER_UP_IMAGE_BY_ID: Record<PowerUpId, string> = {
   fika: powerUpFika,
@@ -67,6 +70,113 @@ function getRandomCourseId(): string {
   const courseIds = Object.keys(levels).filter((id) => !levels[id]?.hide);
   if (courseIds.length === 0) return 'haga';
   return courseIds[Math.floor(Math.random() * courseIds.length)];
+}
+
+/** Pause menu overlay — extracted so useMenuNav mounts/unmounts with Show */
+function PauseOverlay(props: {
+  isMultiplayer: boolean;
+  musicMuted: boolean;
+  onResume: () => void;
+  onToggleMute: () => void;
+  onExit: () => void;
+}) {
+  const { isFocused } = useMenuNav(() => 3, { onBack: props.onResume });
+
+  return (
+    <div id="pause-overlay">
+      <div class="pause-card">
+        <h1>Paused</h1>
+        <Show when={props.isMultiplayer}>
+          <p class="pause-note">Game continues in multiplayer</p>
+        </Show>
+        <div class="pause-buttons">
+          <button class="course-btn" classList={{ 'menu-focused': isFocused(0) }} onClick={props.onResume}>Resume</button>
+          <button class="course-btn mute-pause-btn" classList={{ 'menu-focused': isFocused(1) }} onClick={props.onToggleMute}>
+            {props.musicMuted ? '🔇 Unmute Music' : '🔊 Mute Music'}
+          </button>
+          <button class="course-btn finish-exit-btn" classList={{ 'menu-focused': isFocused(2) }} onClick={props.onExit}>Exit to Menu</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Bus Mode game-over overlay with keyboard/gamepad nav */
+function BusModeFinishOverlay(props: { deliveries: number; onReplay: () => void; onExit: () => void }) {
+  const { isFocused } = useMenuNav(() => 2);
+  return (
+    <div id="finish-overlay">
+      <div class="finish-card">
+        <h1>⏰ Time's Up!</h1>
+        <p class="finish-time" style={{ 'font-size': 'clamp(20px, 3vw, 32px)', 'margin-top': '16px' }}>
+          Passengers delivered: <strong>{props.deliveries}</strong>
+        </p>
+        <div class="finish-buttons">
+          <button class="course-btn" classList={{ 'menu-focused': isFocused(0) }} onClick={props.onReplay}>Play Again</button>
+          <button class="course-btn finish-exit-btn" classList={{ 'menu-focused': isFocused(1) }} onClick={props.onExit}>Exit to Menu</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Race finish overlay with keyboard/gamepad nav */
+function FinishOverlay(props: {
+  finishTime: number;
+  playerRole: PlayerRole;
+  scored: number;
+  isMultiplayer: boolean;
+  remoteStates: Map<string, PlayerState>;
+  localPlayerIndex: number;
+  onKeepDriving: () => void;
+  onReplay: () => void;
+  onExit: () => void;
+}) {
+  const { isFocused } = useMenuNav(() => 3);
+  return (
+    <div id="finish-overlay">
+      <div class="finish-card">
+        <h1>🏁 Finished!</h1>
+        <p class="finish-time">Finished in {fmtTime(props.finishTime)}</p>
+        <Show when={props.playerRole === 'bus'}>
+          <p class="finish-scooped">Runners scooped: {props.scored}</p>
+        </Show>
+        <Show when={props.isMultiplayer && props.remoteStates.size > 0}>
+          {(() => {
+            const states = props.remoteStates;
+            const players: { name: string; css: string; time: number; finished: boolean; index: number }[] = [];
+            const localIdx = props.localPlayerIndex;
+            const localInfo = PLAYER_COLOR_INFO[localIdx - 1] ?? PLAYER_COLOR_INFO[0];
+            players.push({ name: `${localInfo.name} Bus (You)`, css: localInfo.css, time: props.finishTime, finished: true, index: localIdx });
+            for (const [, rs] of states) {
+              const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
+              players.push({ name: `${info.name} Bus`, css: info.css, time: rs.raceTime, finished: rs.raceState === 'finished', index: rs.playerIndex });
+            }
+            players.sort((a, b) => {
+              if (a.finished && !b.finished) return -1;
+              if (!a.finished && b.finished) return 1;
+              if (a.finished && b.finished) return a.time - b.time;
+              return 0;
+            });
+            return (
+              <div style={{ 'margin-top': '12px' }}>
+                <For each={players}>{(p, i) => (
+                  <p style={{ color: p.css, margin: '4px 0', 'font-size': 'clamp(14px, 2vw, 20px)' }}>
+                    {ordinal(i() + 1)} — {p.name}{p.finished ? ` — ${fmtTime(p.time)}` : ' — still racing...'}
+                  </p>
+                )}</For>
+              </div>
+            );
+          })()}
+        </Show>
+        <div class="finish-buttons">
+          <button class="course-btn" classList={{ 'menu-focused': isFocused(0) }} onClick={props.onKeepDriving}>Keep Driving</button>
+          <button class="course-btn" classList={{ 'menu-focused': isFocused(1) }} onClick={props.onReplay}>Replay</button>
+          <button class="course-btn finish-exit-btn" classList={{ 'menu-focused': isFocused(2) }} onClick={props.onExit}>Exit to Menu</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function App() {
@@ -97,6 +207,12 @@ function App() {
 
   // Pause menu
   const [paused, setPaused] = createSignal(false);
+  const [musicMuted, setMusicMuted] = createSignal(getMuted());
+
+  function handleToggleMuteInPause() {
+    const nowMuted = toggleMute();
+    setMusicMuted(nowMuted);
+  }
 
   // Multiplayer state
   const [gameMode, setGameMode] = createSignal<GameMode>('single');
@@ -151,6 +267,24 @@ function App() {
     window.addEventListener('keydown', onKey);
     onCleanup(() => window.removeEventListener('keydown', onKey));
 
+    // Gamepad poll for pause (Options/Start = button 9)
+    let prevStart = false;
+    function pollPauseGamepad() {
+      if (screen() === 'playing') {
+        const gamepads = navigator.getGamepads();
+        for (let i = 0; i < gamepads.length; i++) {
+          const gp = gamepads[i];
+          if (!gp?.connected) continue;
+          const startPressed = gp.buttons[9]?.pressed ?? false;
+          if (startPressed && !prevStart) togglePause();
+          prevStart = startPressed;
+          break;
+        }
+      }
+      requestAnimationFrame(pollPauseGamepad);
+    }
+    requestAnimationFrame(pollPauseGamepad);
+
     // Start background demo animation
     demoGame = new Game(canvasRef, {
       onScoopRunner: () => {},
@@ -164,7 +298,10 @@ function App() {
   function handleSelectMode(mode: GameMode) {
     setGameMode(mode);
 
-    if (mode === 'join') {
+    if (mode === 'online') {
+      // Show room browser for discovering/hosting games
+      setScreen('room-browser');
+    } else if (mode === 'join') {
       // Go straight to lobby for code entry
       setScreen('lobby');
     } else if (mode === 'host') {
@@ -187,6 +324,8 @@ function App() {
       setScreen('level-select');
     } else {
       // Arena etc — go straight to lobby (no level select)
+      // Set the default level for this mode
+      currentEventId = config.defaultLevelId ?? 'kristineberg';
       setScreen('lobby');
     }
   }
@@ -276,6 +415,8 @@ function App() {
   }
 
   function handleLobbyStart(courseId: string) {
+    // Stop lobby announcing now that game is starting
+    lobby.stopAnnouncing();
     // For modes without level select (e.g. arena), fall back to the mode's default level
     let cid = courseId;
     if (!cid) {
@@ -324,7 +465,22 @@ function App() {
 
   function handleLobbyCancel() {
     mp.disconnect();
-    setScreen('title');
+    lobby.stopAnnouncing();
+    setScreen('room-browser');
+  }
+
+  /** Room browser: user wants to host a game */
+  function handleRoomBrowserHost() {
+    setGameMode('host');
+    setScreen('game-type-select');
+  }
+
+  /** Room browser: user wants to join a discovered game */
+  function handleRoomBrowserJoin(roomCode: string) {
+    setGameMode('join');
+    // Set the code before screen transition so LobbyScreen onMount can read it
+    (window as any).__pendingJoinCode = roomCode;
+    setScreen('lobby');
   }
 
   async function startGame(eventId: string) {
@@ -711,6 +867,13 @@ function App() {
       <Show when={screen() === 'game-type-select'}>
         <GameTypeSelectScreen
           onSelect={handleGameTypeSelect}
+          onBack={() => setScreen('room-browser')}
+        />
+      </Show>
+      <Show when={screen() === 'room-browser'}>
+        <RoomBrowserScreen
+          onHost={handleRoomBrowserHost}
+          onJoin={handleRoomBrowserJoin}
           onBack={() => setScreen('title')}
         />
       </Show>
@@ -840,18 +1003,7 @@ function App() {
 
         {/* Bus Mode game over screen */}
         <Show when={busModeGameOver()}>
-          <div id="finish-overlay">
-            <div class="finish-card">
-              <h1>⏰ Time's Up!</h1>
-              <p class="finish-time" style={{ 'font-size': 'clamp(20px, 3vw, 32px)', 'margin-top': '16px' }}>
-                Passengers delivered: <strong>{busModeDeliveries()}</strong>
-              </p>
-              <div class="finish-buttons">
-                <button class="course-btn" onClick={handleReplay}>Play Again</button>
-                <button class="course-btn finish-exit-btn" onClick={handleExitToMenu}>Exit to Menu</button>
-              </div>
-            </div>
-          </div>
+          <BusModeFinishOverlay deliveries={busModeDeliveries()} onReplay={handleReplay} onExit={handleExitToMenu} />
         </Show>
 
         {/* Local multiplayer results screen */}
@@ -870,68 +1022,28 @@ function App() {
 
         {/* Finish screen (non-bus-mode, non-local-multiplayer) */}
         <Show when={!isLocalMultiplayer() && !isBusMode() && raceState() === 'finished' && !keepDriving()}>
-          <div id="finish-overlay">
-            <div class="finish-card">
-              <h1>🏁 Finished!</h1>
-              <p class="finish-time">Finished in {fmtTime(finishTime())}</p>
-              <Show when={playerRole() === 'bus'}>
-                <p class="finish-scooped">Runners scooped: {scored()}</p>
-              </Show>
-              <Show when={isMultiplayerMode() && remoteStates().size > 0}>
-                {(() => {
-                  // Build ranked leaderboard
-                  const states = remoteStates();
-                  const players: { name: string; css: string; time: number; finished: boolean; index: number }[] = [];
-                  // Add local player
-                  const localIdx = (activeGame as any)?.localPlayerIndex ?? 1;
-                  const localInfo = PLAYER_COLOR_INFO[localIdx - 1] ?? PLAYER_COLOR_INFO[0];
-                  players.push({ name: `${localInfo.name} Bus (You)`, css: localInfo.css, time: finishTime(), finished: true, index: localIdx });
-                  // Add remote players
-                  for (const [, rs] of states) {
-                    const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
-                    players.push({ name: `${info.name} Bus`, css: info.css, time: rs.raceTime, finished: rs.raceState === 'finished', index: rs.playerIndex });
-                  }
-                  // Sort: finished first (by time), then unfinished
-                  players.sort((a, b) => {
-                    if (a.finished && !b.finished) return -1;
-                    if (!a.finished && b.finished) return 1;
-                    if (a.finished && b.finished) return a.time - b.time;
-                    return 0;
-                  });
-                  return (
-                    <div style={{ 'margin-top': '12px' }}>
-                      <For each={players}>{(p, i) => (
-                        <p style={{ color: p.css, margin: '4px 0', 'font-size': 'clamp(14px, 2vw, 20px)' }}>
-                          {ordinal(i() + 1)} — {p.name}{p.finished ? ` — ${fmtTime(p.time)}` : ' — still racing...'}
-                        </p>
-                      )}</For>
-                    </div>
-                  );
-                })()}
-              </Show>
-              <div class="finish-buttons">
-                <button class="course-btn" onClick={handleKeepDriving}>Keep Driving</button>
-                <button class="course-btn" onClick={handleReplay}>Replay</button>
-                <button class="course-btn finish-exit-btn" onClick={handleExitToMenu}>Exit to Menu</button>
-              </div>
-            </div>
-          </div>
+          <FinishOverlay
+            finishTime={finishTime()}
+            playerRole={playerRole()}
+            scored={scored()}
+            isMultiplayer={isMultiplayerMode()}
+            remoteStates={remoteStates()}
+            localPlayerIndex={(activeGame as any)?.localPlayerIndex ?? 1}
+            onKeepDriving={handleKeepDriving}
+            onReplay={handleReplay}
+            onExit={handleExitToMenu}
+          />
         </Show>
 
         {/* Pause menu overlay */}
         <Show when={paused() && (raceState() !== 'finished' || keepDriving())}>
-          <div id="pause-overlay">
-            <div class="pause-card">
-              <h1>Paused</h1>
-              <Show when={isMultiplayerMode()}>
-                <p class="pause-note">Game continues in multiplayer</p>
-              </Show>
-              <div class="pause-buttons">
-                <button class="course-btn" onClick={handleResume}>Resume</button>
-                <button class="course-btn finish-exit-btn" onClick={handleExitToMenu}>Exit to Menu</button>
-              </div>
-            </div>
-          </div>
+          <PauseOverlay
+            isMultiplayer={isMultiplayerMode()}
+            musicMuted={musicMuted()}
+            onResume={handleResume}
+            onToggleMute={handleToggleMuteInPause}
+            onExit={handleExitToMenu}
+          />
         </Show>
       </Show>
       <canvas id="gameCanvas" ref={canvasRef} />

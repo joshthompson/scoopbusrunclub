@@ -8,6 +8,8 @@
  */
 import logoSrc from './assets/logo.png';
 import type { GameType } from './game/modes';
+import { useMenuNav } from './useMenuNav';
+import { MuteButton } from './MuteButton';
 
 interface LocalRoleSelectScreenProps {
   gameType: GameType;
@@ -16,8 +18,12 @@ interface LocalRoleSelectScreenProps {
 }
 
 export function LocalRoleSelectScreen(props: LocalRoleSelectScreenProps) {
+  const { isFocused, setFocusedIndex } = useMenuNav(() => 4, { onBack: props.onBack }); // mute + 2 roles + back
+  setFocusedIndex(1);
+
   return (
     <div id="title-screen">
+      <MuteButton focused={isFocused(0)} />
       <div class="title-content">
         <img src={logoSrc} alt="Scoop Bus" class="title-logo" />
         <h2 class="screen-heading">Local Multiplayer Roles</h2>
@@ -28,6 +34,7 @@ export function LocalRoleSelectScreen(props: LocalRoleSelectScreenProps) {
         <div class="course-buttons">
           <button
             class="course-btn host-btn"
+            classList={{ 'menu-focused': isFocused(1) }}
             onClick={() => props.onSelect('bus')}
           >
             <span style={{ 'font-size': '1.4em' }}>🚌</span>
@@ -37,6 +44,7 @@ export function LocalRoleSelectScreen(props: LocalRoleSelectScreenProps) {
           </button>
           <button
             class="course-btn runner-btn"
+            classList={{ 'menu-focused': isFocused(2) }}
             onClick={() => props.onSelect('runner')}
           >
             <span style={{ 'font-size': '1.4em' }}>🏃</span>
@@ -45,7 +53,7 @@ export function LocalRoleSelectScreen(props: LocalRoleSelectScreenProps) {
             <small>P2 = Bus Driver</small>
           </button>
         </div>
-        <button class="course-btn cancel-btn back-btn" onClick={props.onBack}>
+        <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(3) }} onClick={props.onBack}>
           Back
         </button>
       </div>

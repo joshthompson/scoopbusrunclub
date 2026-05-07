@@ -109,6 +109,7 @@ export function buildBuildingMeshes(
   scene: Scene,
   footprints: BuildingFootprint[],
   getGroundY: (x: number, z: number) => number,
+  opts?: { isNight?: boolean },
 ): BuildBuildingMeshesResult {
   const colliders: BuildingCollider[] = [];
   const lodEntries: BuildingLodEntry[] = [];
@@ -147,9 +148,16 @@ export function buildBuildingMeshes(
   roofMat.specularColor = Color3.Black();
 
   const windowMat = new StandardMaterial('buildingWindowMat', scene);
-  windowMat.diffuseColor = new Color3(0.36, 0.48, 0.58);
-  windowMat.emissiveColor = new Color3(0.06, 0.08, 0.1);
-  windowMat.specularColor = new Color3(0.2, 0.24, 0.3);
+  if (opts?.isNight) {
+    // Warm lit-from-inside glow at night
+    windowMat.diffuseColor = new Color3(0.95, 0.82, 0.35);
+    windowMat.emissiveColor = new Color3(0.7, 0.55, 0.2);
+    windowMat.specularColor = new Color3(0.1, 0.08, 0.04);
+  } else {
+    windowMat.diffuseColor = new Color3(0.36, 0.48, 0.58);
+    windowMat.emissiveColor = new Color3(0.06, 0.08, 0.1);
+    windowMat.specularColor = new Color3(0.2, 0.24, 0.3);
+  }
 
   const doorMat = new StandardMaterial('buildingDoorMat', scene);
   doorMat.diffuseColor = new Color3(0.35, 0.22, 0.14);

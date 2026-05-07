@@ -10,6 +10,7 @@ import {
   Color4,
   MeshBuilder,
   StandardMaterial,
+  ShaderMaterial,
   Mesh,
   VertexBuffer,
   VertexData,
@@ -19,6 +20,9 @@ import {
   SceneLoader,
   DynamicTexture,
   Viewport,
+  Effect,
+  RenderTargetTexture,
+  Constants,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import arrowModelUrl from '../assets/models/arrow.glb?url';
@@ -30,7 +34,7 @@ import type { LevelData } from '../levels';
 import type { ItemCollectEvent, PlayerState } from '../multiplayer';
 import { MAX_PLAYERS } from '../multiplayer';
 import type { GameType } from './modes/types';
-import { createBusModel, tintBusModel, busColorPaletteFromOption, PLAYER_COLORS, WHEEL_ROLL_SPEED } from './objects/BusModel';
+import { createBusModel, tintBusModel, busColorPaletteFromOption, PLAYER_COLORS, WHEEL_ROLL_SPEED, LIGHT_FRONT_POSITION } from './objects/BusModel';
 import type { BusColorPalette } from './objects/BusModel';
 import type { CharacterSelection, RunnerAppearance } from './characters';
 import { getBusColorById, resolveRunnerAppearance, isCorgiRunnerId } from './characters';
@@ -158,6 +162,7 @@ import {
   type BuildingFootprint,
   type ElasticObject,
   type GameCallbacks,
+  type Goose,
   type InitSceneOptions,
   type Marshal,
   type RaceState,
@@ -244,6 +249,7 @@ import {
   type FenceCollider,
 } from './objects/Fence';
 import { buildLevelObjects, type PlacedObjectData } from './objects/LevelObjects';
+import { spawnGeese, updateGeeseSystem, type GooseSpawnPoint } from './systems/geese';
 import { PowerUpSystem, type PowerUpId } from './systems/powerups';
 import { PassengerSystem } from './systems/passengers';
 import {
@@ -317,6 +323,9 @@ export class Game {
   private distanceTravelled = 0;
   private busHeadlight: SpotLight | null = null;
   private busReverseLights: SpotLight[] = [];
+  private shadowCamera: FreeCamera | null = null;
+  private shadowRTT: RenderTargetTexture | null = null;
+  private shadowDepthMat: ShaderMaterial | null = null;
 
   // Input
   private keys: Record<string, boolean> = {};
@@ -335,6 +344,12 @@ export class Game {
 
   // Runners
   private runners: Runner[] = [];
+
+  // Geese (scoopable, AI-driven)
+  private geese: Goose[] = [];
+
+  // Scooped objects (benches etc. flying through the air)
+  private scoopedObjects: import('./types').ScoopedObject[] = [];
 
   // Marshals (course marshals standing at fixed GPS points)
   private marshals: Marshal[] = [];
@@ -367,6 +382,7 @@ export class Game {
   private setViewCenterOnGround: ((x: number, y: number, z: number) => void) | null = null;
   /** Set the second view center for local multiplayer (both players get high shader detail). */
   private setViewCenter2OnGround: ((x: number, y: number, z: number) => void) | null = null;
+  private setShadowMapOnGround: ((rtt: RenderTargetTexture, cam: FreeCamera, light: SpotLight) => void) | null = null;
   /** Cached view-center on the ground plane — updated once per frame. */
   private viewCenter = { x: 0, z: 0 };
 
@@ -377,6 +393,7 @@ export class Game {
   private trailPolylines: [number, number][][] = [];
   private fieldPolygons: [number, number][][] = [];
   private concretePolygons: [number, number][][] = [];
+  private regionEntries: { type: 'field' | 'concrete'; points: [number, number][]; zIndex: number }[] = [];
   private buildingFootprints: BuildingFootprint[] = [];
   private buildingColliders: BuildingCollider[] = [];
   private buildingLodEntries: BuildingLodEntry[] = [];
@@ -438,6 +455,8 @@ export class Game {
   // 3D gate flag (marks next checkpoint)
   private gateFlagRoot: TransformNode | null = null;
   private p2GateFlagRoot: TransformNode | null = null;
+  // Checkered finish flag (visible at last path point, hidden on finish)
+  private finishFlagRoot: TransformNode | null = null;
 
   // Minimap
   private minimap: Minimap | null = null;
@@ -705,6 +724,12 @@ export class Game {
     this.busHeadlight = null;
     for (const rl of this.busReverseLights) rl.dispose();
     this.busReverseLights = [];
+    this.shadowRTT?.dispose();
+    this.shadowRTT = null;
+    this.shadowCamera?.dispose();
+    this.shadowCamera = null;
+    this.shadowDepthMat?.dispose();
+    this.shadowDepthMat = null;
     this.scene?.dispose();
     this.p2Camera = null;
     // Don't dispose the engine — it's reused across game instances to avoid
@@ -1606,11 +1631,17 @@ export class Game {
         const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
         return [rawX * this.scaleFactor, rawZ * this.scaleFactor];
       });
-    this.fieldPolygons = (level.regions?.fields ?? []).map(gpsToWorld);
-    this.concretePolygons = (level.regions?.concrete ?? []).map(gpsToWorld);
+    const regionEntries = (level.regions ?? []).map((r) => ({
+      type: r.type,
+      points: gpsToWorld(r.points),
+      zIndex: r.zIndex ?? 0,
+    }));
+    this.fieldPolygons = regionEntries.filter((r) => r.type === 'field').map((r) => r.points);
+    this.concretePolygons = regionEntries.filter((r) => r.type === 'concrete').map((r) => r.points);
+    this.regionEntries = regionEntries;
     this.buildGround();
     buildWaterMeshes(this.scene, this.waterZones, { isNight });
-    const buildingResult = buildBuildingMeshes(this.scene, this.buildingFootprints, (x, z) => this.getGroundY(x, z));
+    const buildingResult = buildBuildingMeshes(this.scene, this.buildingFootprints, (x, z) => this.getGroundY(x, z), { isNight });
     this.buildingColliders = buildingResult.colliders;
     this.buildingLodEntries = buildingResult.lodEntries;
     this.updateBuildingLodForPlayer();
@@ -1691,6 +1722,22 @@ export class Game {
       this.elasticObjects.push(...objResult.elasticObjects);
       this.solidObstacles.push(...objResult.solidObstacles);
       this.objectRoots.push(...objResult.objectRoots);
+    }
+
+    // ── Geese (scoopable AI entities) ──
+    {
+      const geeseData = (level.objects?.geese ?? []).map(([lat, lon, rot]) => {
+        const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
+        return {
+          x: rawX * this.scaleFactor,
+          z: rawZ * this.scaleFactor,
+          rotation: (rot * Math.PI) / 180,
+        } as GooseSpawnPoint;
+      });
+      console.log('[Geese] spawn data:', geeseData.length, 'geese');
+      if (geeseData.length > 0) {
+        this.geese = spawnGeese(this.scene, geeseData, (x, z) => this.getGroundY(x, z));
+      }
     }
 
     // Procedural sky + clouds
@@ -1794,9 +1841,10 @@ export class Game {
     }
     this.gatePositions = buildGatesSystem(this.pathPositions, this.pathCumDist, (x, z) => this.getGroundY(x, z));
     this.currentGateIdx = 0;
-    if (this.gameType !== 'single-bus-mode') {
+    if (this.gameType !== 'single-bus-mode' && !this.demoMode) {
       this.buildGateFlag();
       this.buildP2GateFlag();
+      this.buildFinishFlag();
     }
     this.powerUpSystem = new PowerUpSystem({
       scene: this.scene,
@@ -1807,6 +1855,23 @@ export class Game {
       pathCumDist: this.pathCumDist,
       getGroundY: (x, z) => this.getGroundY(x, z),
     });
+
+    // --- Night mode: register shadow casters for headlight shadow map ---
+    if (isNight && this.shadowRTT && this.shadowDepthMat && this.busHeadlight) {
+      const addShadowCaster = (node: TransformNode) => {
+        for (const m of node.getChildMeshes(false)) {
+          this.shadowRTT!.renderList!.push(m);
+          this.shadowRTT!.setMaterialForRendering(m, this.shadowDepthMat!);
+        }
+      };
+      for (const runner of this.runners) {
+        addShadowCaster(runner.mesh);
+      }
+      if (this.localRunnerModel) {
+        addShadowCaster(this.localRunnerModel.root);
+      }
+      this.setShadowMapOnGround?.(this.shadowRTT, this.shadowCamera!, this.busHeadlight);
+    }
 
     // Place sign & position bus behind start line
     if (this.pathPositions.length > 1) {
@@ -1924,7 +1989,7 @@ export class Game {
       }
     }
 
-    if (!opts.skipBus && this.gameType !== 'single-bus-mode') {
+    if (!opts.skipBus) {
       await this.buildDirectionArrow();
       // In local multiplayer, also build a second arrow for P2 parented to p2Camera
       if (this.localMultiplayer && this.p2Camera) {
@@ -2102,6 +2167,7 @@ export class Game {
       pathTextureUrl: this.pathTextureUrl,
       fields: this.fieldPolygons,
       concrete: this.concretePolygons,
+      regions: this.regionEntries,
       waterZones: this.waterZones,
       isNight: this.level?.timeOfDay === 'night',
     };
@@ -2116,6 +2182,7 @@ export class Game {
     this.updateInsetCenter = tiledMat.__updateInsetCenter ?? null;
     this.setViewCenterOnGround = tiledMat.__setViewCenter ?? null;
     this.setViewCenter2OnGround = tiledMat.__setViewCenter2 ?? null;
+    this.setShadowMapOnGround = tiledMat.__setShadowMap ?? null;
 
     // Apply terrain heights to ground vertices so the ground undulates
     const positions = ground.getVerticesData(VertexBuffer.PositionKind);
@@ -2318,6 +2385,12 @@ export class Game {
       this.gateFlagRoot.setEnabled(false);
       return;
     }
+    // When reaching the final gate, hide the gate flag and show the finish flag instead
+    if (this.currentGateIdx === this.gatePositions.length - 1) {
+      this.gateFlagRoot.setEnabled(false);
+      if (this.finishFlagRoot) this.finishFlagRoot.setEnabled(true);
+      return;
+    }
     this.gateFlagRoot.setEnabled(true);
     this.gateFlagRoot.position.set(gate.x, gate.y, gate.z);
     this.gateFlagRoot.rotation.y = gate.yaw;
@@ -2331,9 +2404,82 @@ export class Game {
       this.p2GateFlagRoot.setEnabled(false);
       return;
     }
+    // When reaching the final gate, hide the gate flag and show the finish flag
+    if (this.p2GateIdx === this.gatePositions.length - 1) {
+      this.p2GateFlagRoot.setEnabled(false);
+      if (this.finishFlagRoot) this.finishFlagRoot.setEnabled(true);
+      return;
+    }
     this.p2GateFlagRoot.setEnabled(true);
     this.p2GateFlagRoot.position.set(gate.x, gate.y, gate.z);
     this.p2GateFlagRoot.rotation.y = gate.yaw;
+  }
+
+  /** Build a checkered flag at the final path point (finish line). */
+  private buildFinishFlag() {
+    if (this.pathPositions.length < 2) return;
+
+    const lastIdx = this.pathPositions.length - 1;
+    const [lx, lz] = this.pathPositions[lastIdx];
+    const [px, pz] = this.pathPositions[lastIdx - 1];
+    const yaw = Math.atan2(lx - px, lz - pz);
+    const y = this.getGroundY(lx, lz);
+
+    const root = new TransformNode('finishFlag', this.scene);
+
+    // Pole
+    const poleHeight = 7;
+    const pole = MeshBuilder.CreateCylinder('finishFlagPole', { diameter: 0.14, height: poleHeight, tessellation: 8 }, this.scene);
+    const poleMat = new StandardMaterial('finishFlagPoleMat', this.scene);
+    poleMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
+    poleMat.specularColor = Color3.Black();
+    pole.material = poleMat;
+    pole.position.y = poleHeight / 2;
+    pole.parent = root;
+
+    // Checkered banner
+    const bannerW = 3.0;
+    const bannerH = 2.0;
+    const banner = MeshBuilder.CreatePlane('finishFlagBanner', { width: bannerW, height: bannerH }, this.scene);
+    const bannerMat = new StandardMaterial('finishFlagBannerMat', this.scene);
+
+    // Create checkered texture
+    const texSize = 128;
+    const checkerTex = new DynamicTexture('finishCheckerTex', { width: texSize, height: texSize }, this.scene, false);
+    const ctx = checkerTex.getContext();
+    const squares = 8;
+    const sqSize = texSize / squares;
+    for (let row = 0; row < squares; row++) {
+      for (let col = 0; col < squares; col++) {
+        ctx.fillStyle = (row + col) % 2 === 0 ? '#ffffff' : '#111111';
+        ctx.fillRect(col * sqSize, row * sqSize, sqSize, sqSize);
+      }
+    }
+    checkerTex.update();
+
+    bannerMat.diffuseTexture = checkerTex;
+    bannerMat.specularColor = Color3.Black();
+    bannerMat.emissiveColor = new Color3(0.3, 0.3, 0.3);
+    bannerMat.backFaceCulling = false;
+    banner.material = bannerMat;
+    banner.position.y = poleHeight - bannerH / 2 - 0.3;
+    banner.position.x = bannerW / 2;
+    banner.parent = root;
+
+    // Ball at top (black)
+    const ball = MeshBuilder.CreateSphere('finishFlagBall', { diameter: 0.5, segments: 6 }, this.scene);
+    const ballMat = new StandardMaterial('finishFlagBallMat', this.scene);
+    ballMat.diffuseColor = new Color3(0.1, 0.1, 0.1);
+    ballMat.emissiveColor = new Color3(0.05, 0.05, 0.05);
+    ballMat.specularColor = Color3.Black();
+    ball.material = ballMat;
+    ball.position.y = poleHeight + 0.25;
+    ball.parent = root;
+
+    root.position.set(lx, y, lz);
+    root.rotation.y = yaw;
+    root.setEnabled(false); // Hidden until all regular gates are passed
+    this.finishFlagRoot = root;
   }
 
 
@@ -2441,10 +2587,12 @@ export class Game {
       }
     }
 
-    // Set layerMask so arrow is only visible in the owning player's camera
-    const arrowLayerMask = suffix === 'p2' ? 0x20000000 : 0x10000000;
-    for (const mesh of result.meshes) {
-      mesh.layerMask = arrowLayerMask;
+    // Set layerMask so arrow is only visible in the owning player's camera (local multiplayer only)
+    if (this.localMultiplayer) {
+      const arrowLayerMask = suffix === 'p2' ? 0x20000000 : 0x10000000;
+      for (const mesh of result.meshes) {
+        mesh.layerMask = arrowLayerMask;
+      }
     }
 
     if (suffix === 'p2') {
@@ -2497,10 +2645,14 @@ export class Game {
   ) {
     if (!arrowRoot || !arrowRotNode || !camera) return;
 
-    // In bus mode, point toward closest active flag when carrying passengers
+    // In bus mode, point toward closest active flag when carrying passengers,
+    // or closest waiting passenger if none are riding
     let target: { x: number; z: number } | null = null;
     if (this.passengerSystem) {
       target = this.passengerSystem.getClosestFlagTarget(playerPos.x, playerPos.z);
+      if (!target) {
+        target = this.passengerSystem.getClosestWaitingPassenger(playerPos.x, playerPos.z);
+      }
       if (!target) {
         arrowRoot.setEnabled(false);
         return;
@@ -2583,7 +2735,7 @@ export class Game {
     if (this.level?.timeOfDay === 'night') {
       const headlight = new SpotLight(
         'busHeadlight',
-        new Vector3(0, 1.0, 6.5),        // in front of scoop
+        new Vector3(LIGHT_FRONT_POSITION[0], LIGHT_FRONT_POSITION[1], LIGHT_FRONT_POSITION[2]),
         new Vector3(0, -0.15, 1),         // forward and slightly down
         BUS_HEADLIGHT_ANGLE,
         BUS_HEADLIGHT_EXPONENT,
@@ -2594,6 +2746,49 @@ export class Game {
       headlight.range = BUS_HEADLIGHT_RANGE;
       headlight.parent = this.busMesh!;
       this.busHeadlight = headlight;
+
+      // --- Shadow map for headlight ---
+      if (!Effect.ShadersStore['shadowDepthVertexShader']) {
+        Effect.ShadersStore['shadowDepthVertexShader'] =
+          'precision highp float;\n' +
+          'attribute vec3 position;\n' +
+          'uniform mat4 worldViewProjection;\n' +
+          'void main(){gl_Position=worldViewProjection*vec4(position,1.0);}';
+        Effect.ShadersStore['shadowDepthFragmentShader'] =
+          'precision highp float;\n' +
+          'void main(){gl_FragColor=vec4(gl_FragCoord.z,0.,0.,1.);}';
+      }
+
+      const shadowCam = new FreeCamera(
+        'shadowCam',
+        new Vector3(LIGHT_FRONT_POSITION[0], LIGHT_FRONT_POSITION[1], LIGHT_FRONT_POSITION[2]),
+        this.scene,
+      );
+      shadowCam.fov = headlight.angle;
+      shadowCam.minZ = 0.5;
+      shadowCam.maxZ = headlight.range;
+      shadowCam.parent = this.busMesh!;
+      // Match headlight direction: (0, -0.15, 1) → pitch slightly down
+      shadowCam.rotation.x = Math.atan2(0.15, 1);
+      shadowCam.inputs.clear();
+
+      const shadowRTT = new RenderTargetTexture('shadowMap', 1024, this.scene, false, true,
+        Constants.TEXTURETYPE_HALF_FLOAT);
+      shadowRTT.activeCamera = shadowCam;
+      shadowRTT.clearColor = new Color4(1, 1, 1, 1);
+      shadowRTT.renderList = [];
+      shadowRTT.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONEVERYFRAME;
+      this.scene.customRenderTargets.push(shadowRTT);
+
+      const depthMat = new ShaderMaterial('shadowDepth', this.scene, 'shadowDepth', {
+        attributes: ['position'],
+        uniforms: ['worldViewProjection'],
+      });
+      depthMat.backFaceCulling = false;
+
+      this.shadowCamera = shadowCam;
+      this.shadowRTT = shadowRTT;
+      this.shadowDepthMat = depthMat;
 
       // --- Reverse lights (soft red glow from tail lights, off by default) ---
       for (const side of [-1, 1]) {
@@ -2792,7 +2987,37 @@ export class Game {
         const nx = dx / dist;
         const nz = dz / dist;
 
-        if (obs.elasticIndex != null) {
+        if (obs.scoopable && this.localPlayerRole === 'bus' && Math.abs(this.busSpeed) > 0.5) {
+          // Scoopable collision: launch the object into the air
+          const absSpeed = Math.abs(this.busSpeed);
+          const fwdX = Math.sin(this.busYaw);
+          const fwdZ = Math.cos(this.busYaw);
+          // Find the matching objectRoot by position
+          let scoopedRoot: TransformNode | null = null;
+          for (const root of this.objectRoots) {
+            const rdx = root.position.x - obs.x;
+            const rdz = root.position.z - obs.z;
+            if (rdx * rdx + rdz * rdz < 0.1) {
+              scoopedRoot = root;
+              break;
+            }
+          }
+          if (scoopedRoot) {
+            this.scoopedObjects.push({
+              root: scoopedRoot,
+              velX: fwdX * this.busSpeed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3,
+              velY: Math.max(SCOOP_MIN_UP, absSpeed * SCOOP_UP_FACTOR) + Math.random() * 3,
+              velZ: fwdZ * this.busSpeed * SCOOP_FORWARD_FACTOR + (Math.random() - 0.5) * 3,
+              landedTimer: 0,
+              state: 'launched',
+              obstacleIndex: this.solidObstacles.indexOf(obs),
+            });
+            // Remove from solid obstacles so it no longer blocks
+            obs.radius = 0;
+          }
+          // Small speed penalty
+          this.busSpeed *= ELASTIC_SPEED_PENALTY;
+        } else if (obs.elasticIndex != null) {
           touchingElastic = true;
           // Elastic collision: tilt the object and slow down, but DON'T block the bus
           const elastic = this.elasticObjects[obs.elasticIndex];
@@ -3792,6 +4017,21 @@ export class Game {
       // NPC wave / high-five during countdown
       updateRunnerInteractions(this.runners, null, dt);
       updateMarshals(this.marshals, dt);
+      // Update geese during countdown (keeps Y synced with ground mesh)
+      if (this.geese.length > 0) {
+        updateGeeseSystem({
+          scene: this.scene,
+          geese: this.geese,
+          getGroundY: (x, z) => this.getGroundY(x, z),
+          busPos: this.busPos,
+          busYaw: this.busYaw,
+          busSpeed: 0,
+          localPlayerRole: this.localPlayerRole,
+          solidObstacles: this.solidObstacles,
+          buildingColliders: this.buildingColliders,
+          waterZones: this.waterZones,
+        }, dt);
+      }
       this.updateRemoteBusMeshes(dt, engineVibeOffset);
 
       // Ensure bus mesh is positioned (so it's visible during countdown)
@@ -4393,6 +4633,7 @@ export class Game {
     // Check for finish (all gates cleared) — skip for bus mode (timer-based)
     if (this.gameType !== 'single-bus-mode' && this.currentGateIdx >= this.gatePositions.length && this.raceState === 'racing') {
       this.raceState = 'finished';
+      if (this.finishFlagRoot) this.finishFlagRoot.setEnabled(false);
       this.callbacks.onRaceStateChange?.('finished');
       this.callbacks.onFinish?.(this.raceTimer);
     }
@@ -4467,6 +4708,49 @@ export class Game {
 
     // Update elastic object tilt physics
     updateElasticObjects(this.elasticObjects, dt);
+
+    // Update geese AI and scooping
+    if (this.geese.length > 0) {
+      updateGeeseSystem({
+        scene: this.scene,
+        geese: this.geese,
+        getGroundY: (x, z) => this.getGroundY(x, z),
+        busPos: this.busPos,
+        busYaw: this.busYaw,
+        busSpeed: this.busSpeed,
+        localPlayerRole: this.localPlayerRole,
+        solidObstacles: this.solidObstacles,
+        buildingColliders: this.buildingColliders,
+        waterZones: this.waterZones,
+      }, dt);
+    }
+
+    // Update scooped objects (benches etc. flying through the air)
+    for (let i = this.scoopedObjects.length - 1; i >= 0; i--) {
+      const obj = this.scoopedObjects[i];
+      const pos = obj.root.position;
+      if (obj.state === 'launched') {
+        obj.velY -= GRAVITY * dt;
+        pos.x += obj.velX * dt;
+        pos.y += obj.velY * dt;
+        pos.z += obj.velZ * dt;
+        obj.root.rotation.x += 6 * dt;
+        obj.root.rotation.z += 4 * dt;
+        const groundY = this.getGroundY(pos.x, pos.z);
+        if (pos.y <= groundY && obj.velY < 0) {
+          pos.y = groundY;
+          obj.state = 'landed';
+          obj.landedTimer = 5;
+          obj.root.rotation.x = 0;
+          obj.root.rotation.z = 0;
+        }
+      } else {
+        obj.landedTimer -= dt;
+        if (obj.landedTimer <= 0) {
+          this.scoopedObjects.splice(i, 1);
+        }
+      }
+    }
 
     // --- Bus Mode: update passenger system ---
     if (this.passengerSystem && this.raceState === 'racing') {

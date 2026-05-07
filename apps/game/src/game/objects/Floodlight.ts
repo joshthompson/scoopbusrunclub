@@ -113,6 +113,11 @@ export function createFloodlightTemplates(scene: Scene): FloodlightTemplates {
 
 // ── Placement ───────────────────────────────────────────────────────────
 
+export interface PlaceFloodlightResult {
+  root: TransformNode;
+  primaryLight: SpotLight | null;
+}
+
 /**
  * Place a single floodlight tower and optionally create SpotLights for night.
  */
@@ -125,7 +130,7 @@ export function placeFloodlight(
   z: number,
   rotation: number,
   isNight: boolean,
-): TransformNode {
+): PlaceFloodlightResult {
   const root = new TransformNode(`floodlight_${i}`, scene);
   root.position.set(x, y, z);
   root.rotation.y = rotation;
@@ -159,6 +164,7 @@ export function placeFloodlight(
   l.parent = root;
 
   // --- Actual lights (night mode) ---
+  let primaryLight: SpotLight | null = null;
   if (isNight) {
     const lightY = housingY - 0.1;
 
@@ -175,6 +181,7 @@ export function placeFloodlight(
     primary.intensity = FLOODLIGHT_PRIMARY_INTENSITY;
     primary.range = FLOODLIGHT_PRIMARY_RANGE;
     primary.parent = root;
+    primaryLight = primary;
 
     // Softer ambient wash — even wider, much further, very gentle
     const soft = new SpotLight(
@@ -191,5 +198,5 @@ export function placeFloodlight(
     soft.parent = root;
   }
 
-  return root;
+  return { root, primaryLight };
 }

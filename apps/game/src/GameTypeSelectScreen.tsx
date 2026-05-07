@@ -10,6 +10,8 @@
 import logoSrc from './assets/logo.png';
 import { HOST_GAME_TYPES, GAME_TYPE_LABELS, GAME_TYPE_DESCRIPTIONS, getGameModeConfig } from './game/modes';
 import type { GameType } from './game/modes';
+import { useMenuNav } from './useMenuNav';
+import { MuteButton } from './MuteButton';
 
 const GAME_TYPE_EMOJI: Record<string, string> = {
   'bus-race': '🚌',
@@ -34,15 +36,20 @@ export function GameTypeSelectScreen(props: GameTypeSelectScreenProps) {
     return HOST_GAME_TYPES.filter((gt) => getGameModeConfig(gt).minPlayers <= mp);
   };
 
+  const { isFocused, setFocusedIndex } = useMenuNav(() => 1 + gameTypes().length + 1, { onBack: props.onBack });
+  setFocusedIndex(1);
+
   return (
     <div id="title-screen">
+      <MuteButton focused={isFocused(0)} />
       <div class="title-content">
         <img src={logoSrc} alt="Scoop Bus" class="title-logo" />
         <h2 class="screen-heading">{props.heading ?? 'Choose Game Type'}</h2>
         <div class="course-buttons">
-          {gameTypes().map((gt) => (
+          {gameTypes().map((gt, i) => (
             <button
               class="course-btn game-type-btn"
+              classList={{ 'menu-focused': isFocused(1 + i) }}
               onClick={() => props.onSelect(gt)}
             >
               <span class="game-type-emoji">{GAME_TYPE_EMOJI[gt] ?? '🎮'}</span>
@@ -51,7 +58,7 @@ export function GameTypeSelectScreen(props: GameTypeSelectScreenProps) {
             </button>
           ))}
         </div>
-        <button class="course-btn cancel-btn back-btn" onClick={props.onBack}>
+        <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(1 + gameTypes().length) }} onClick={props.onBack}>
           Back
         </button>
       </div>

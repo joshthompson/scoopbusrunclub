@@ -26,8 +26,12 @@ export const RUNNER_PLAYER_MAX_JUMPS = 2;
 export const RUNNER_PLAYER_JUMP_SIDE_VELOCITY = 5.5;
 export const RUNNER_COLLISION_RADIUS = 0.75;
 export const SCOOP_DISTANCE = 3.5;
-export const RUNNER_ESCAPE_DISTANCE = 60;
-export const RUNNER_ESCAPE_SPEED = 2.5;
+/** Time horizon (seconds) to predict if the bus will hit the runner */
+export const RUNNER_ESCAPE_LOOKAHEAD = 0.8;
+/** Radius around runner (metres) that counts as a near-miss for triggering escape */
+export const RUNNER_ESCAPE_NEAR_MISS_RADIUS = 1.3;
+/** Speed (m/s) the runner moves laterally to escape the bus path */
+export const RUNNER_ESCAPE_SPEED = 8;
 export const SCOOP_UP_FACTOR = 0.75;
 export const SCOOP_MIN_UP = 10;
 export const SCOOP_FORWARD_FACTOR = 0.5;
@@ -92,7 +96,7 @@ export const CAMERA_FOV_SPEED_FACTOR = 0.01;
 /** How fast FOV tweens to target value (higher = snappier). Uses exponential smoothing. */
 export const CAMERA_FOV_LERP_SPEED = 4;
 /** Camera elevation angle for chase cam (radians). Lower = closer to ground level */
-export const CAMERA_ANGLE_BUS = 0.42;
+export const CAMERA_ANGLE_BUS = 0.62;
 /** Camera elevation angle for runner cam (radians) */
 export const CAMERA_ANGLE_RUNNER = 0.34;
 
@@ -131,6 +135,28 @@ export const RENDER_BUILDING_LOD_DISTANCE = 500;
 export const RENDER_ANIMATION_CULL_DISTANCE = 500;
 export const RENDER_OBJECTS_MAX_DISTANCE = 500;
 export const RENDER_TREES_MAX_DISTANCE = 500;
+
+// ---------- Goose constants ----------
+/** Metres — geese within this distance form a herd */
+export const GOOSE_HERD_RADIUS = 2;
+/** Metres — geese flee when bus/runner is within this distance */
+export const GOOSE_FLEE_RADIUS = 6;
+/** Metres — maximum wander distance from current position */
+export const GOOSE_WANDER_RADIUS = 10;
+/** m/s — walking speed */
+export const GOOSE_WALK_SPEED = 2;
+/** m/s — flee speed */
+export const GOOSE_FLEE_SPEED = 6;
+/** Seconds — max idle sitting time */
+export const GOOSE_IDLE_MAX = 20;
+/** Metres — minimum separation between geese in a herd */
+export const GOOSE_MIN_SEPARATION = 0.5;
+/** bus/runner scoop distance */
+export const GOOSE_SCOOP_DISTANCE = 3.5;
+/** Metres — merge herds within this radius */
+export const GOOSE_HERD_MERGE_RADIUS = 2;
+/** Seconds — how long a landed goose stays before getting up */
+export const GOOSE_LANDED_DURATION = 3;
 
 // ---------- Terrain LOD distance thresholds (metres from camera) ----------
 /** Below this distance: ultra-high-res terrain masks (2× quality) */

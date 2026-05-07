@@ -52,6 +52,8 @@ export interface PathShaderOptions {
   fields?: [number, number][][];
   /** World-space concrete polygons [ [x,z], ... ][] — rendered with concrete texture */
   concrete?: [number, number][][];
+  /** World-space region polygons with type and z-index — higher zIndex renders on top */
+  regions?: { type: 'field' | 'concrete'; points: [number, number][]; zIndex: number }[];
   /** Water zones with polygon + Y level — sand rendered at shoreline */
   waterZones?: { points: [number, number][]; y: number }[];
   /** If provided, paint a white start/finish line at this position & heading */

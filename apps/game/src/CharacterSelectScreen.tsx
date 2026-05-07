@@ -1,4 +1,4 @@
-import { createSignal, Show, For, onMount } from 'solid-js';
+import { createSignal, Show, For, onMount, onCleanup } from 'solid-js';
 import logoSrc from './assets/logo.png';
 import {
   BUS_COLOR_OPTIONS,
@@ -9,6 +9,8 @@ import {
   type RunnerPreset,
 } from './game/characters';
 import { getRunnerPreviewUrl, getCorgiPreviewUrl, startLiveWavePreview } from './RunnerPreview3D';
+import { useMenuNav } from './useMenuNav';
+import { MuteButton } from './MuteButton';
 
 type PlayerRole = 'bus' | 'runner';
 
@@ -60,6 +62,7 @@ function RunnerTile(props: {
   preset: RunnerPreset;
   taken: boolean;
   active: boolean;
+  focused: boolean;
   onClick: () => void;
 }) {
   let liveContainerRef: HTMLDivElement | undefined;
@@ -84,7 +87,7 @@ function RunnerTile(props: {
   return (
     <button
       class="char-tile"
-      classList={{ taken: props.taken, active: props.active }}
+      classList={{ taken: props.taken, active: props.active, 'menu-focused': props.focused }}
       disabled={props.taken}
       onClick={props.onClick}
       title={props.preset.name}
@@ -105,6 +108,32 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
   const [selected, setSelected] = createSignal<CharacterSelection | null>(null);
 
   const isBus = () => props.role === 'bus';
+
+  const sortedRunnerPresets = () => [...RUNNER_PRESETS].sort((a, b) => a.name.localeCompare(b.name));
+  // Detect grid columns from actual CSS grid layout
+  const [gridCols, setGridCols] = createSignal(4);
+  let gridRef: HTMLDivElement | undefined;
+  function updateGridCols() {
+    if (!gridRef) return;
+    const style = getComputedStyle(gridRef);
+    const cols = style.gridTemplateColumns.split(' ').length;
+    if (cols > 0) setGridCols(cols);
+  }
+  onMount(() => {
+    updateGridCols();
+    window.addEventListener('resize', updateGridCols);
+  });
+  onCleanup(() => window.removeEventListener('resize', updateGridCols));
+
+  const gridCount = () => isBus() ? BUS_COLOR_OPTIONS.length : 1 + sortedRunnerPresets().length;
+  const totalCount = () => 1 + gridCount() + 1; // mute + grid items + back button
+  const { isFocused, setFocusedIndex } = useMenuNav(totalCount, {
+    onBack: props.onBack,
+    gridStart: 1,
+    gridCount,
+    gridCols,
+  });
+  setFocusedIndex(1);
 
   function isBusTaken(id: string) {
     return props.takenBusColors?.includes(id) ?? false;
@@ -130,6 +159,7 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
 
   return (
     <div id="title-screen">
+      <MuteButton focused={isFocused(0)} />
       <div class="title-content char-select-content">
         <img src={logoSrc} alt="Scoop Bus" class="title-logo" />
         <Show when={props.courseName}>
@@ -150,14 +180,14 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
         {/* ─── Bus colour grid ─── */}
         <Show when={isBus() && !(props.waiting && selected())}>
           <h2 class="screen-heading">Select Bus</h2>
-          <div class="char-grid bus-grid">
-            <For each={BUS_COLOR_OPTIONS}>{(opt) => {
+          <div class="char-grid bus-grid" ref={gridRef}>
+            <For each={BUS_COLOR_OPTIONS}>{(opt, i) => {
               const taken = () => isBusTaken(opt.id);
               const active = () => (selected() as any)?.busColorId === opt.id;
               return (
                 <button
                   class="char-tile"
-                  classList={{ taken: taken(), active: active() }}
+                  classList={{ taken: taken(), active: active(), 'menu-focused': isFocused(1 + i()) }}
                   disabled={taken()}
                   onClick={() => handleBusClick(opt.id)}
                   title={opt.name}
@@ -168,7 +198,7 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
               );
             }}</For>
           </div>
-          <button class="course-btn cancel-btn back-btn" onClick={props.onBack}>
+          <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(1 + BUS_COLOR_OPTIONS.length) }} onClick={props.onBack}>
             Back
           </button>
         </Show>
@@ -176,11 +206,11 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
         {/* ─── Runner grid ─── */}
         <Show when={!isBus() && !(props.waiting && selected())}>
           <h2 class="screen-heading">Select Runner</h2>
-          <div class="char-grid runner-grid">
+          <div class="char-grid runner-grid" ref={gridRef}>
             {/* Random option */}
             <button
               class="char-tile"
-              classList={{ active: (selected() as any)?.runnerId === RANDOM_RUNNER_ID }}
+              classList={{ active: (selected() as any)?.runnerId === RANDOM_RUNNER_ID, 'menu-focused': isFocused(1) }}
               onClick={() => handleRunnerClick(RANDOM_RUNNER_ID)}
               title="Random"
             >
@@ -188,7 +218,7 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
               <span class="char-tile-label">Random</span>
             </button>
 
-            <For each={[...RUNNER_PRESETS].sort((a, b) => a.name.localeCompare(b.name))}>{(preset) => {
+            <For each={sortedRunnerPresets()}>{(preset, i) => {
               const taken = () => isRunnerTaken(preset.id);
               const active = () => (selected() as any)?.runnerId === preset.id;
               return (
@@ -196,12 +226,13 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
                   preset={preset}
                   taken={taken()}
                   active={active()}
+                  focused={isFocused(2 + i())}
                   onClick={() => handleRunnerClick(preset.id)}
                 />
               );
             }}</For>
           </div>
-          <button class="course-btn cancel-btn back-btn" onClick={props.onBack}>
+          <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(1 + 1 + sortedRunnerPresets().length) }} onClick={props.onBack}>
             Back
           </button>
         </Show>

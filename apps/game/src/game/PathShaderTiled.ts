@@ -22,7 +22,9 @@ import {
   SpotLight,
   TransformNode,
   Vector3,
+  Matrix,
 } from '@babylonjs/core';
+import type { RenderTargetTexture } from '@babylonjs/core';
 import forestUrl from '../assets/forest.png';
 import dirtUrl from '../assets/dirt.png';
 import fieldUrl from '../assets/field.png';
@@ -79,6 +81,8 @@ export type TiledPathGroundMaterial = ShaderMaterial & {
   __setViewCenter?: (x: number, y: number, z: number) => void;
   /** Set a second view-center (for local multiplayer) so both players get high detail. */
   __setViewCenter2?: (x: number, y: number, z: number) => void;
+  /** Connect a shadow map RTT + its camera + the light it shadows. */
+  __setShadowMap?: (rtt: RenderTargetTexture, cam: { getViewMatrix(): Matrix; getProjectionMatrix(): Matrix }, light: SpotLight) => void;
 };
 
 // ---------- GLSL Shader Code ----------
@@ -94,16 +98,19 @@ attribute vec2 uv;
 // Uniforms
 uniform mat4 worldViewProjection;
 uniform mat4 world;
+uniform mat4 shadowMatrix;
 
 // Varyings
 varying vec2 vUV;
 varying vec3 vNormalW;
 varying vec3 vPositionW;
+varying vec4 vPositionFromLight;
 
 void main() {
   vUV = uv;
   vPositionW = (world * vec4(position, 1.0)).xyz;
   vNormalW = normalize((world * vec4(normal, 0.0)).xyz);
+  vPositionFromLight = shadowMatrix * vec4(vPositionW, 1.0);
   gl_Position = worldViewProjection * vec4(position, 1.0);
 }
 `;
@@ -115,6 +122,7 @@ precision highp float;
 varying vec2 vUV;
 varying vec3 vNormalW;
 varying vec3 vPositionW;
+varying vec4 vPositionFromLight;
 
 // Mask textures — three LOD levels: lo (full world), mid (inset), ultra (tight inset)
 uniform sampler2D mixMap1Lo;
@@ -174,6 +182,11 @@ uniform float spotIntensities[MAX_SPOT_LIGHTS];
 uniform float spotRanges[MAX_SPOT_LIGHTS];
 uniform float spotCosAngles[MAX_SPOT_LIGHTS]; // cos(half-angle)
 uniform float spotExponents[MAX_SPOT_LIGHTS];
+
+// Shadow map
+uniform sampler2D shadowMap;
+uniform float hasShadowMap;
+uniform int shadowLightIndex;
 
 // Chunk debug grid
 uniform float chunkDebug;   // 0.0 = off, 1.0 = on
@@ -316,7 +329,20 @@ void main() {
     // Lambertian NdotL
     float spotNdl = max(dot(nrm, -lightDir), 0.0);
 
-    lighting += spotColors[i] * spotIntensities[i] * coneFalloff * distAtten * spotNdl;
+    // Shadow map test for the headlight
+    float shadow = 1.0;
+    if (hasShadowMap > 0.5 && i == shadowLightIndex) {
+      vec3 shadowNDC = vPositionFromLight.xyz / vPositionFromLight.w;
+      vec2 shadowUV = shadowNDC.xy * 0.5 + 0.5;
+      float fragDepth = shadowNDC.z * 0.5 + 0.5;
+      if (shadowUV.x > 0.0 && shadowUV.x < 1.0 && shadowUV.y > 0.0 && shadowUV.y < 1.0 && fragDepth > 0.0 && fragDepth < 1.0) {
+        float storedDepth = texture2D(shadowMap, shadowUV).r;
+        float bias = 0.002;
+        shadow = (fragDepth - bias > storedDepth) ? 0.0 : 1.0;
+      }
+    }
+
+    lighting += spotColors[i] * spotIntensities[i] * coneFalloff * distAtten * spotNdl * shadow;
   }
 
   gl_FragColor = vec4(color * lighting, 1.0);
@@ -389,8 +415,17 @@ export function createTiledPathGroundMaterial(
     pathTextureUrl,
     fields = [],
     concrete = [],
+    regions: regionsProp = [],
     waterZones = [],
   } = opts;
+
+  // Build sorted regions array — merge legacy fields/concrete with new regions prop
+  const regions: { type: 'field' | 'concrete'; points: [number, number][]; zIndex: number }[] = [
+    ...fields.map((pts) => ({ type: 'field' as const, points: pts, zIndex: 0 })),
+    ...concrete.map((pts) => ({ type: 'concrete' as const, points: pts, zIndex: 0 })),
+    ...regionsProp,
+  ];
+  regions.sort((a, b) => a.zIndex - b.zIndex);
 
   const maxTexSize = scene.getEngine().getCaps().maxTextureSize || 4096;
   const loRes = Math.min(LO_RES, maxTexSize);
@@ -400,7 +435,7 @@ export function createTiledPathGroundMaterial(
   // --- 1. Bake low-res full-world masks ---
   const loMask = bakeMask(scene, 'lo', loRes, pathPositions, roads, trails, groundSize,
     pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
-    -groundSize / 2, -groundSize / 2, groundSize, groundSize, fields, concrete, waterZones);
+    -groundSize / 2, -groundSize / 2, groundSize, groundSize, regions, waterZones);
 
   // --- 2. Bake mid-res inset masks (initial center: first path point or 0,0) ---
   const initialCX = pathPositions.length > 0 ? pathPositions[0][0] : 0;
@@ -410,12 +445,12 @@ export function createTiledPathGroundMaterial(
 
   const midMask = bakeMask(scene, 'mid', midRes, pathPositions, roads, trails, groundSize,
     pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
-    initialCX - halfMidInset, initialCZ - halfMidInset, MID_INSET_SIZE, MID_INSET_SIZE, fields, concrete, waterZones);
+    initialCX - halfMidInset, initialCZ - halfMidInset, MID_INSET_SIZE, MID_INSET_SIZE, regions, waterZones);
 
   // --- 2b. Bake ultra-hi-res inset masks (2× quality, tight window) ---
   const ultraMask = bakeMask(scene, 'ultra', ultraRes, pathPositions, roads, trails, groundSize,
     pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
-    initialCX - halfUltraInset, initialCZ - halfUltraInset, ULTRA_INSET_SIZE, ULTRA_INSET_SIZE, fields, concrete, waterZones);
+    initialCX - halfUltraInset, initialCZ - halfUltraInset, ULTRA_INSET_SIZE, ULTRA_INSET_SIZE, regions, waterZones);
 
   let lastMidBakeCX = initialCX;
   let lastMidBakeCZ = initialCZ;
@@ -468,6 +503,7 @@ export function createTiledPathGroundMaterial(
       'numSpotLights',
       'spotPositions', 'spotDirections', 'spotColors',
       'spotIntensities', 'spotRanges', 'spotCosAngles', 'spotExponents',
+      'shadowMatrix', 'hasShadowMap', 'shadowLightIndex',
     ],
     samplers: [
       'mixMap1Lo', 'mixMap1Mid', 'mixMap1Ultra',
@@ -475,6 +511,7 @@ export function createTiledPathGroundMaterial(
       'mixMap3Lo', 'mixMap3Mid', 'mixMap3Ultra',
       'forestTex', 'dirtTex',
       'fieldTex', 'sandTex',
+      'shadowMap',
     ],
   });
 
@@ -540,6 +577,11 @@ export function createTiledPathGroundMaterial(
   mat.setFloat('chunkDebug', CHUNK_DEBUG ? 1.0 : 0.0);
   mat.setFloat('chunkSizeUV', CHUNK_SIZE / groundSize);
 
+  // Shadow map (disabled by default, enabled via __setShadowMap)
+  mat.setFloat('hasShadowMap', 0.0);
+  mat.setInt('shadowLightIndex', -1);
+  mat.setMatrix('shadowMatrix', Matrix.Identity());
+
   // --- Dynamic spot light sync (updated every frame via onBind) ---
   const MAX_SPOTS = 12;
   // Pre-allocate typed arrays to avoid GC churn every frame
@@ -555,13 +597,22 @@ export function createTiledPathGroundMaterial(
   // Initialise to zero
   mat.setInt('numSpotLights', 0);
 
+  // Shadow map closure state
+  let shadowRTT: RenderTargetTexture | null = null;
+  let shadowCamera: { getViewMatrix(): Matrix; getProjectionMatrix(): Matrix } | null = null;
+  let shadowLight: SpotLight | null = null;
+  const _shadowVP = new Matrix();
+
   mat.onBind = () => {
     // Gather scene SpotLights
     const lights = scene.lights;
     let count = 0;
+    let shadowIdx = -1;
     for (let li = 0; li < lights.length && count < MAX_SPOTS; li++) {
       const light = lights[li];
       if (!(light instanceof SpotLight) || !light.isEnabled()) continue;
+
+      if (light === shadowLight) shadowIdx = count;
 
       // Get world-space position & direction
       const pos = light.getAbsolutePosition();
@@ -609,6 +660,17 @@ export function createTiledPathGroundMaterial(
       effect.setFloat3('cameraPosition', viewCenterX, viewCenterY, viewCenterZ);
       effect.setFloat3('cameraPosition2', viewCenter2X, viewCenter2Y, viewCenter2Z);
       effect.setFloat('hasSecondCamera', hasSecondCameraFlag);
+
+      // Shadow map uniforms
+      if (shadowRTT && shadowCamera && shadowIdx >= 0) {
+        shadowCamera.getViewMatrix().multiplyToRef(shadowCamera.getProjectionMatrix(), _shadowVP);
+        effect.setMatrix('shadowMatrix', _shadowVP);
+        effect.setFloat('hasShadowMap', 1.0);
+        effect.setInt('shadowLightIndex', shadowIdx);
+        effect.setTexture('shadowMap', shadowRTT);
+      } else {
+        effect.setFloat('hasShadowMap', 0.0);
+      }
     }
   };
 
@@ -652,7 +714,7 @@ export function createTiledPathGroundMaterial(
 
       rebakeMask(midMask, midRes, pathPositions, roads, trails, groundSize,
         pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
-        playerX - halfMidInset, playerZ - halfMidInset, MID_INSET_SIZE, MID_INSET_SIZE, fields, concrete, waterZones);
+        playerX - halfMidInset, playerZ - halfMidInset, MID_INSET_SIZE, MID_INSET_SIZE, regions, waterZones);
 
       midBounds = computeInsetBounds(playerX, playerZ, halfMidInset);
       mat.setVector4('midBounds', {
@@ -669,7 +731,7 @@ export function createTiledPathGroundMaterial(
 
       rebakeMask(ultraMask, ultraRes, pathPositions, roads, trails, groundSize,
         pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
-        playerX - halfUltraInset, playerZ - halfUltraInset, ULTRA_INSET_SIZE, ULTRA_INSET_SIZE, fields, concrete, waterZones);
+        playerX - halfUltraInset, playerZ - halfUltraInset, ULTRA_INSET_SIZE, ULTRA_INSET_SIZE, regions, waterZones);
 
       ultraBoundsArr = computeInsetBounds(playerX, playerZ, halfUltraInset);
       mat.setVector4('ultraBounds', {
@@ -683,6 +745,11 @@ export function createTiledPathGroundMaterial(
   (mat as TiledPathGroundMaterial).__updateInsetCenter = updateInsetCenter;
   (mat as TiledPathGroundMaterial).__setViewCenter = setViewCenter;
   (mat as TiledPathGroundMaterial).__setViewCenter2 = setViewCenter2;
+  (mat as TiledPathGroundMaterial).__setShadowMap = (rtt, cam, light) => {
+    shadowRTT = rtt;
+    shadowCamera = cam;
+    shadowLight = light;
+  };
 
   return mat as TiledPathGroundMaterial;
 }
@@ -727,8 +794,7 @@ function bakeMask(
   worldMinZ: number,
   worldW: number,
   worldH: number,
-  fields: [number, number][][] = [],
-  concrete: [number, number][][] = [],
+  regions: { type: 'field' | 'concrete'; points: [number, number][]; zIndex: number }[] = [],
   waterZones: { points: [number, number][]; y: number }[] = [],
 ): BakedMask {
   const size = resolution;
@@ -744,7 +810,7 @@ function bakeMask(
 
   paintMaskContent(ctx, lineCtx, zoneCtx, size, pathPositions, roads, trails,
     groundSize, pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
-    worldMinX, worldMinZ, worldW, worldH, fields, concrete, waterZones);
+    worldMinX, worldMinZ, worldW, worldH, regions, waterZones);
 
   // Save static line canvas for ice patch updates
   const staticLineCanvas = document.createElement('canvas');
@@ -802,8 +868,7 @@ function rebakeMask(
   worldMinZ: number,
   worldW: number,
   worldH: number,
-  fields: [number, number][][] = [],
-  concrete: [number, number][][] = [],
+  regions: { type: 'field' | 'concrete'; points: [number, number][]; zIndex: number }[] = [],
   waterZones: { points: [number, number][]; y: number }[] = [],
 ) {
   const size = resolution;
@@ -813,7 +878,7 @@ function rebakeMask(
 
   paintMaskContent(ctx, lineCtx, zoneCtx, size, pathPositions, roads, trails,
     groundSize, pathHalfWidth, roadHalfWidth, edgeSoftness, startLine, startCircle,
-    worldMinX, worldMinZ, worldW, worldH, fields, concrete, waterZones);
+    worldMinX, worldMinZ, worldW, worldH, regions, waterZones);
 
   // Update static line canvas backup
   const staticCtx = mask.staticLineCanvas.getContext('2d')!;
@@ -956,8 +1021,7 @@ function paintMaskContent(
   worldMinZ: number,
   worldW: number,
   worldH: number,
-  fields: [number, number][][] = [],
-  concrete: [number, number][][] = [],
+  regions: { type: 'field' | 'concrete'; points: [number, number][]; zIndex: number }[] = [],
   waterZones: { points: [number, number][]; y: number }[] = [],
 ) {
   const toPixel = makeToPixelFn(worldMinX, worldMinZ, worldW, worldH, size);
@@ -975,13 +1039,34 @@ function paintMaskContent(
   // World-to-pixel width conversion for this region
   const worldToPixelW = (w: number) => (w / worldW) * size;
 
-  // -- Paint concrete polygons into lineMask B channel with soft gradient edges --
+  // -- Paint region polygons sorted by zIndex (lowest first, highest on top) --
+  // Concrete → lineMask B channel (soft gradient edges)
+  // Field → zoneMask R channel (soft gradient edges)
+  // When a higher-zIndex region overlaps, it clears the opposing channel so it renders on top.
   const CONCRETE_SOFT_EDGE = 6; // world-space transition width
-  if (concrete.length > 0) {
-    const cSoftPx = worldToPixelW(CONCRETE_SOFT_EDGE);
-    lineCtx.globalCompositeOperation = 'lighten';
-    for (const polygon of concrete) {
-      if (polygon.length < 3) continue;
+  const FIELD_SOFT_EDGE = 10; // world-space transition width
+  const sortedRegions = [...regions].sort((a, b) => a.zIndex - b.zIndex);
+
+  for (const region of sortedRegions) {
+    const polygon = region.points;
+    if (polygon.length < 3) continue;
+
+    if (region.type === 'concrete') {
+      const cSoftPx = worldToPixelW(CONCRETE_SOFT_EDGE);
+
+      // Clear field channel under this concrete region so concrete renders on top
+      zoneCtx.globalCompositeOperation = 'source-over';
+      zoneCtx.beginPath();
+      for (let i = 0; i < polygon.length; i++) {
+        const [px, py] = toPixel(polygon[i][0], polygon[i][1]);
+        if (i === 0) zoneCtx.moveTo(px, py);
+        else zoneCtx.lineTo(px, py);
+      }
+      zoneCtx.closePath();
+      zoneCtx.fillStyle = 'rgb(0, 0, 0)';
+      zoneCtx.fill();
+
+      lineCtx.globalCompositeOperation = 'lighten';
       const drawConcretePoly = (style: string, stroke?: number) => {
         lineCtx.beginPath();
         for (let i = 0; i < polygon.length; i++) {
@@ -1000,22 +1085,27 @@ function paintMaskContent(
           lineCtx.fill();
         }
       };
-      // Layered soft edge: outermost halo → solid core
       drawConcretePoly('rgb(0, 0, 160)', cSoftPx * 2);
       drawConcretePoly('rgb(0, 0, 200)', cSoftPx * 1.2);
       drawConcretePoly('rgb(0, 0, 235)', cSoftPx * 0.5);
       drawConcretePoly('rgb(0, 0, 255)');
-    }
-    lineCtx.globalCompositeOperation = 'source-over';
-  }
+      lineCtx.globalCompositeOperation = 'source-over';
+    } else {
+      const fSoftPx = worldToPixelW(FIELD_SOFT_EDGE);
 
-  // -- Paint field polygons into zoneMask R channel with soft gradient edges --
-  const FIELD_SOFT_EDGE = 10; // world-space transition width
-  if (fields.length > 0) {
-    const fSoftPx = worldToPixelW(FIELD_SOFT_EDGE);
-    zoneCtx.globalCompositeOperation = 'lighten';
-    for (const polygon of fields) {
-      if (polygon.length < 3) continue;
+      // Clear concrete channel under this field region so field renders on top
+      lineCtx.globalCompositeOperation = 'source-over';
+      lineCtx.beginPath();
+      for (let i = 0; i < polygon.length; i++) {
+        const [px, py] = toPixel(polygon[i][0], polygon[i][1]);
+        if (i === 0) lineCtx.moveTo(px, py);
+        else lineCtx.lineTo(px, py);
+      }
+      lineCtx.closePath();
+      lineCtx.fillStyle = 'rgb(0, 0, 0)';
+      lineCtx.fill();
+
+      zoneCtx.globalCompositeOperation = 'lighten';
       const drawFieldPoly = (style: string, stroke?: number) => {
         zoneCtx.beginPath();
         for (let i = 0; i < polygon.length; i++) {
@@ -1034,13 +1124,12 @@ function paintMaskContent(
           zoneCtx.fill();
         }
       };
-      // Layered soft edge: outermost halo → solid core
       drawFieldPoly('rgb(160, 0, 0)', fSoftPx * 2);
       drawFieldPoly('rgb(200, 0, 0)', fSoftPx * 1.2);
       drawFieldPoly('rgb(235, 0, 0)', fSoftPx * 0.5);
       drawFieldPoly('rgb(255, 0, 0)');
+      zoneCtx.globalCompositeOperation = 'source-over';
     }
-    zoneCtx.globalCompositeOperation = 'source-over';
   }
 
   // -- Paint sand/beach candidate zones into zoneMask G+B channels --

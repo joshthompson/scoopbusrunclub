@@ -97,12 +97,16 @@ export interface LevelData {
   objects?: LevelObjects;
 }
 
-export interface LevelRegions {
-  /** Open grass fields — stops random tree spawns, uses field texture */
-  fields?: [number, number][][];
-  /** Hard concrete/paved areas — uses concrete texture */
-  concrete?: [number, number][][];
+export type RegionType = 'field' | 'concrete';
+
+export interface RegionEntry {
+  type: RegionType;
+  points: [number, number][];
+  /** Optional render order — higher values render on top. Default 0. */
+  zIndex?: number;
 }
+
+export type LevelRegions = RegionEntry[];
 
 export interface LevelObjects {
   /** Park benches */
@@ -113,4 +117,6 @@ export interface LevelObjects {
   tennisCourts?: [number, number, number][];
   /** Tall floodlight towers with spotlights */
   floodlights?: [number, number, number][];
+  /** Canada geese starting positions [lat, lon, rotation] */
+  geese?: [number, number, number][];
 }

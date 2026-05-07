@@ -353,6 +353,24 @@ export function buildGates(
     gates.push({ x, z, y, pathDist: dist, yaw });
   }
 
+  // Always place a final gate at the last path point so the race ends at the course end
+  const lastIdx = pathPositions.length - 1;
+  const [lx, lz] = pathPositions[lastIdx];
+  const [px, pz] = pathPositions[lastIdx - 1];
+  const lastYaw = Math.atan2(lx - px, lz - pz);
+  const lastY = getGroundY(lx, lz);
+
+  // If the last regular gate is too close to the finish, remove it
+  if (gates.length > 0) {
+    const lastRegular = gates[gates.length - 1];
+    const distToEnd = totalDist - lastRegular.pathDist;
+    if (distToEnd < GATE_SPACING / 2) {
+      gates.pop();
+    }
+  }
+
+  gates.push({ x: lx, z: lz, y: lastY, pathDist: totalDist, yaw: lastYaw });
+
   return gates;
 }
 
@@ -503,7 +521,7 @@ export function placeEventLandmarks(
     const lx2 = x2 * scaleFactor;
     const lz2 = z2 * scaleFactor;
     const tentY = getGroundY((lx1 + lx2) / 2, (lz1 + lz2) / 2);
-    createCopperTent(scene, lx1, lz1, lx2, lz2, tentY);
+    void createCopperTent(scene, lx1, lz1, lx2, lz2, tentY);
 
     const tentCx = (lx1 + lx2) / 2;
     const tentCz = (lz1 + lz2) / 2;

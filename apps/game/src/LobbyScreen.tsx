@@ -1,5 +1,5 @@
 import { createSignal, Show, For } from 'solid-js';
-import { mp, generateRoomCode, MAX_PLAYERS } from './multiplayer';
+import { mp, lobby, generateRoomCode, MAX_PLAYERS } from './multiplayer';
 import levels from './levels';
 import logoSrc from './assets/logo.png';
 import {
@@ -154,6 +154,27 @@ export function LobbyScreen(props: LobbyScreenProps) {
     mp.courseId = props.courseId ?? '';
     mp.gameType = props.gameType ?? 'scoop-race';
     connectToRoom(roomCode());
+    // Announce to lobby
+    const config = getGameModeConfig(props.gameType ?? 'scoop-race');
+    lobby.startAnnouncing({
+      roomCode: roomCode(),
+      courseId: props.courseId ?? '',
+      gameType: props.gameType ?? 'scoop-race',
+      playerCount: 1,
+      maxPlayers: config.maxPlayers,
+      started: false,
+    });
+  }
+
+  // Auto-join if coming from room browser with a pending code
+  const pendingCode = props.mode === 'join' ? (window as any).__pendingJoinCode : undefined;
+  if (pendingCode) {
+    delete (window as any).__pendingJoinCode;
+    setInputCode(pendingCode);
+    setRoomCode(pendingCode);
+    setJoining(true);
+    setStatus('Connecting...');
+    connectToRoom(pendingCode);
   }
 
   function connectToRoom(code: string) {
@@ -168,7 +189,10 @@ export function LobbyScreen(props: LobbyScreenProps) {
       setPeerCount(mp.peerCount);
       const playerCount = mp.peerCount + 1;
       setStatus(`${playerCount} player${playerCount > 1 ? 's' : ''} connected`);
-      if (isHost) rebuildTeamDefaults();
+      if (isHost) {
+        rebuildTeamDefaults();
+        lobby.updateAnnouncement({ playerCount });
+      }
     };
 
     mp.onPeerLeave = (_peerId) => {
@@ -180,7 +204,10 @@ export function LobbyScreen(props: LobbyScreenProps) {
         const playerCount = mp.peerCount + 1;
         setStatus(`${playerCount} player${playerCount > 1 ? 's' : ''} connected`);
       }
-      if (isHost) rebuildTeamDefaults();
+      if (isHost) {
+        rebuildTeamDefaults();
+        lobby.updateAnnouncement({ playerCount: mp.peerCount + 1 });
+      }
     };
 
     mp.onLobbyMessage = (msg, peerId) => {
@@ -225,6 +252,8 @@ export function LobbyScreen(props: LobbyScreenProps) {
     const cid = hostCourseId();
     const taObj: Record<number, { team: TeamColor; role: 'bus' | 'runner' }> = {};
     for (const [k, v] of teamAssignments()) taObj[k] = v;
+    lobby.stopAnnouncing();
+    lobby.updateAnnouncement({ started: true });
     mp.broadcastLobby({
       type: 'start',
       courseId: cid,
@@ -236,6 +265,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
   }
 
   function handleCancel() {
+    lobby.stopAnnouncing();
     mp.disconnect();
     props.onCancel();
   }
@@ -259,14 +289,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
 
         <Show when={courseName()}>
           <p class="lobby-course">{courseName()}</p>
-        </Show>
-
-        <Show when={props.mode === 'host'}>
-          <div class="room-code-display">
-            <span class="room-code-label">Room Code</span>
-            <span class="room-code-value">{roomCode()}</span>
-            <span class="room-code-hint">Share this code with your friends</span>
-          </div>
         </Show>
 
         <Show when={props.mode === 'join' && !joining()}>

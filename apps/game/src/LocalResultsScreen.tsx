@@ -5,6 +5,8 @@
  */
 import { For } from 'solid-js';
 import logoSrc from './assets/logo.png';
+import { useMenuNav } from './useMenuNav';
+import { MuteButton } from './MuteButton';
 
 interface LocalResultsScreenProps {
   p1Role: 'bus' | 'runner';
@@ -30,6 +32,9 @@ const PLAYERS = [
 ];
 
 export function LocalResultsScreen(props: LocalResultsScreenProps) {
+  const { isFocused, setFocusedIndex } = useMenuNav(() => 3); // mute + replay + exit
+  setFocusedIndex(1);
+
   // Build a sorted leaderboard
   const leaderboard = () => {
     const entries = [
@@ -66,6 +71,7 @@ export function LocalResultsScreen(props: LocalResultsScreenProps) {
 
   return (
     <div id="finish-overlay">
+      <MuteButton focused={isFocused(0)} />
       <div class="finish-card" style={{ 'max-width': '900px' }}>
         <img src={logoSrc} alt="Scoop Bus" class="title-logo" style={{ width: '80px', margin: '0 auto 12px' }} />
         <h1>🏁 Race Finished!</h1>
@@ -155,8 +161,8 @@ export function LocalResultsScreen(props: LocalResultsScreenProps) {
         </table>
 
         <div class="finish-buttons" style={{ 'margin-top': '24px' }}>
-          <button class="course-btn" onClick={props.onReplay}>Play Again</button>
-          <button class="course-btn finish-exit-btn" onClick={props.onExit}>Exit to Menu</button>
+          <button class="course-btn" classList={{ 'menu-focused': isFocused(1) }} onClick={props.onReplay}>Play Again</button>
+          <button class="course-btn finish-exit-btn" classList={{ 'menu-focused': isFocused(2) }} onClick={props.onExit}>Exit to Menu</button>
         </div>
       </div>
     </div>

@@ -35,7 +35,8 @@ import {
   RUNNER_COUNT,
   RUNNER_DOWNHILL_SLOPE_THRESHOLD,
   RUNNER_DOWNHILL_SPEED_BOOST,
-  RUNNER_ESCAPE_DISTANCE,
+  RUNNER_ESCAPE_LOOKAHEAD,
+  RUNNER_ESCAPE_NEAR_MISS_RADIUS,
   RUNNER_ESCAPE_SPEED,
   RUNNER_JUMP_HEIGHT,
   RUNNER_MAX_SPEED,
@@ -44,7 +45,6 @@ import {
   RENDER_ANIMATION_CULL_DISTANCE,
   RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
   RUNNER_SIT_DURATION,
-  SCOOP_ANIM_DURATION,
   SCOOP_BOOST_DURATION,
   SCOOP_DISTANCE,
   SCOOP_FORWARD_FACTOR,
@@ -110,6 +110,7 @@ export function spawnRunners(
       ridingOffsetX: 0,
       ridingOffsetZ: 0,
       escapeDir: 0,
+      escaping: false,
       ownerPlayerIndex: 0,
       tshirtColor,
       interaction: 'none',
@@ -198,63 +199,116 @@ export function updateRunnersSystem(
         const perpX = -segDz / segLen;
         const perpZ = segDx / segLen;
 
-        // Escape behaviour
+        // Escape behaviour – predict if the bus will pass through the runner's vicinity
         const busDx = ctx.busPos.x - pos.x;
         const busDz = ctx.busPos.z - pos.z;
         const busDist = Math.sqrt(busDx * busDx + busDz * busDz);
 
-        if (ctx.localPlayerRole === 'bus' && busDist < RUNNER_ESCAPE_DISTANCE && Math.abs(ctx.busSpeed) > 0.5) {
-          if (runner.escapeDir === 0) {
-            const busPerp = perpX * busDx + perpZ * busDz;
-            runner.escapeDir = busPerp > 0 ? -1 : 1;
+        // Bus forward direction from yaw
+        const busFwdX = Math.sin(ctx.busYaw);
+        const busFwdZ = Math.cos(ctx.busYaw);
+        const absSpeed = Math.abs(ctx.busSpeed);
+        // Signed direction the bus is actually moving (forward or reverse)
+        const busMoveDirX = busFwdX * Math.sign(ctx.busSpeed);
+        const busMoveDirZ = busFwdZ * Math.sign(ctx.busSpeed);
+
+        let busWillHit = false;
+        if (ctx.localPlayerRole === 'bus' && absSpeed > 0.5) {
+          // Vector from bus to runner
+          const toRunnerX = pos.x - ctx.busPos.x;
+          const toRunnerZ = pos.z - ctx.busPos.z;
+          // Project onto bus move direction – how far ahead is the runner along the bus travel line
+          const alongDist = toRunnerX * busMoveDirX + toRunnerZ * busMoveDirZ;
+          if (alongDist > 0 && alongDist < absSpeed * RUNNER_ESCAPE_LOOKAHEAD) {
+            // Perpendicular distance from the bus travel line to the runner
+            const crossDist = Math.abs(toRunnerX * busMoveDirZ - toRunnerZ * busMoveDirX);
+            if (crossDist < RUNNER_ESCAPE_NEAR_MISS_RADIUS + BUS_COLLISION_RADIUS) {
+              busWillHit = true;
+            }
           }
-          const escapeTarget = runner.escapeDir * PATH_HALF_WIDTH * 1.8;
-          if (runner.lateralOffset < escapeTarget) {
-            runner.lateralOffset = Math.min(runner.lateralOffset + RUNNER_ESCAPE_SPEED * dt, escapeTarget);
-          } else {
-            runner.lateralOffset = Math.max(runner.lateralOffset - RUNNER_ESCAPE_SPEED * dt, escapeTarget);
-          }
-        } else {
-          runner.escapeDir = 0;
         }
 
-        const dx = target[0] + perpX * runner.lateralOffset - pos.x;
-        const dz = target[1] + perpZ * runner.lateralOffset - pos.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-
-        if (dist < 1) {
-          runner.targetIdx += 1;
-          if (runner.targetIdx >= ctx.pathPositions.length) {
-            runner.targetIdx = 0;
-            const [sx, sz] = ctx.pathPositions[0];
-            pos.x = sx + runner.lateralOffset;
-            pos.z = sz;
-            pos.y = ctx.getGroundY(pos.x, pos.z);
+        if (busWillHit) {
+          // Enter escape mode
+          if (!runner.escaping) {
+            runner.escaping = true;
+            // Pick escape direction: perpendicular to bus travel, away from bus line
+            const toRunnerX = pos.x - ctx.busPos.x;
+            const toRunnerZ = pos.z - ctx.busPos.z;
+            const crossSign = toRunnerX * busMoveDirZ - toRunnerZ * busMoveDirX;
+            runner.escapeDir = crossSign >= 0 ? 1 : -1;
           }
-        } else {
-          const currentHeight = ctx.getGroundY(pos.x, pos.z);
-          const aheadHeight = ctx.getGroundY(
-            pos.x + (dx / dist) * 2,
-            pos.z + (dz / dist) * 2,
-          );
-          const runnerSlope = Math.atan2(aheadHeight - currentHeight, 2);
-          const runningSpeedMultiplier = runnerSlope < RUNNER_DOWNHILL_SLOPE_THRESHOLD ? RUNNER_DOWNHILL_SPEED_BOOST : 1;
+          // Move perpendicular to bus travel direction to get out of the way
+          const escapeX = -busMoveDirZ * runner.escapeDir;
+          const escapeZ = busMoveDirX * runner.escapeDir;
+          pos.x += escapeX * RUNNER_ESCAPE_SPEED * dt;
+          pos.z += escapeZ * RUNNER_ESCAPE_SPEED * dt;
+          pos.y = ctx.getGroundY(pos.x, pos.z);
+          runner.mesh.rotation.y = Math.atan2(escapeX, escapeZ);
 
-          const move = runner.speed * runningSpeedMultiplier * dt;
-          pos.x += (dx / dist) * move;
-          pos.z += (dz / dist) * move;
-          runner.mesh.rotation.y = Math.atan2(dx, dz);
-        }
-
-        pos.y = ctx.getGroundY(pos.x, pos.z);
-        if (animateRunner) {
-          runner.animPhase += dt * runner.speed * 3;
-          // Use interaction pose (wave / high-five) when active, otherwise run
-          if (!applyRunnerInteractionPose(runner)) {
+          if (animateRunner) {
+            runner.animPhase += dt * RUNNER_ESCAPE_SPEED * 3;
             poseRunning(runner.model, runner.animPhase);
           }
         } else {
-          poseStanding(runner.model);
+          // Not being threatened – return to path
+          if (runner.escaping) {
+            runner.escaping = false;
+            runner.escapeDir = 0;
+            // Snap targetIdx to the closest path point so the runner rejoins smoothly
+            let bestIdx = runner.targetIdx;
+            let bestDistSq = Infinity;
+            for (let pi = 0; pi < ctx.pathPositions.length; pi++) {
+              const pp = ctx.pathPositions[pi];
+              const ddx = pp[0] - pos.x;
+              const ddz = pp[1] - pos.z;
+              const dSq = ddx * ddx + ddz * ddz;
+              if (dSq < bestDistSq) {
+                bestDistSq = dSq;
+                bestIdx = pi;
+              }
+            }
+            runner.targetIdx = bestIdx;
+          }
+
+          const dx = target[0] + perpX * runner.lateralOffset - pos.x;
+          const dz = target[1] + perpZ * runner.lateralOffset - pos.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+
+          if (dist < 1) {
+            runner.targetIdx += 1;
+            if (runner.targetIdx >= ctx.pathPositions.length) {
+              runner.targetIdx = 0;
+              const [sx, sz] = ctx.pathPositions[0];
+              pos.x = sx + runner.lateralOffset;
+              pos.z = sz;
+              pos.y = ctx.getGroundY(pos.x, pos.z);
+            }
+          } else {
+            const currentHeight = ctx.getGroundY(pos.x, pos.z);
+            const aheadHeight = ctx.getGroundY(
+              pos.x + (dx / dist) * 2,
+              pos.z + (dz / dist) * 2,
+            );
+            const runnerSlope = Math.atan2(aheadHeight - currentHeight, 2);
+            const runningSpeedMultiplier = runnerSlope < RUNNER_DOWNHILL_SLOPE_THRESHOLD ? RUNNER_DOWNHILL_SPEED_BOOST : 1;
+
+            const move = runner.speed * runningSpeedMultiplier * dt;
+            pos.x += (dx / dist) * move;
+            pos.z += (dz / dist) * move;
+            runner.mesh.rotation.y = Math.atan2(dx, dz);
+          }
+
+          pos.y = ctx.getGroundY(pos.x, pos.z);
+          if (animateRunner) {
+            runner.animPhase += dt * runner.speed * 3;
+            // Use interaction pose (wave / high-five) when active, otherwise run
+            if (!applyRunnerInteractionPose(runner)) {
+              poseRunning(runner.model, runner.animPhase);
+            }
+          } else {
+            poseStanding(runner.model);
+          }
         }
 
         // Check if scooped by local bus
@@ -452,6 +506,26 @@ export function updateRunnersSystem(
 
       case 'sitting': {
         pos.y = ctx.getGroundY(pos.x, pos.z);
+
+        // Can be re-scooped while sitting (not while launched/flying)
+        const bxS = ctx.busPos.x - pos.x;
+        const bzS = ctx.busPos.z - pos.z;
+        if (
+          ctx.localPlayerRole === 'bus'
+          && runner.ownerPlayerIndex === 0
+          && Math.sqrt(bxS * bxS + bzS * bzS) < SCOOP_DISTANCE
+          && Math.abs(ctx.busSpeed) > 0.5
+        ) {
+          runner.ownerPlayerIndex = ctx.localPlayerIndex;
+          launchRunnerOntoLocalBus(runner, ctx.busSpeed, ctx.busYaw, ctx.runners, ctx.localPlayerIndex, result);
+          result.scoopEvents.push({
+            runnerIndex: ctx.runners.indexOf(runner),
+            playerIndex: ctx.localPlayerIndex,
+          });
+          result.scoopCount++;
+          break;
+        }
+
         runner.fadeTimer -= dt;
         if (animateRunner) {
           runner.animPhase += dt;
@@ -519,7 +593,9 @@ function launchRunnerOntoLocalBus(
  * As more runners board, everyone squeezes closer together to fit.
  */
 export function assignRoofSeat(allRunners: Runner[], localPlayerIndex: number, newRider: Runner) {
-  const riders = allRunners.filter((r) => r.state === 'riding' && r.ownerPlayerIndex === localPlayerIndex);
+  const riders = allRunners.filter(
+    (r) => (r.state === 'riding' || (r.state === 'launched' && r !== newRider)) && r.ownerPlayerIndex === localPlayerIndex,
+  );
   const seatIndex = riders.length;
   const totalRiders = seatIndex + 1;
 

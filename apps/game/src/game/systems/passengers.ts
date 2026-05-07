@@ -867,6 +867,28 @@ export class PassengerSystem {
     return closest;
   }
 
+  /**
+   * Get the closest waiting passenger position to a given world position.
+   * Returns null if no passengers are waiting.
+   */
+  getClosestWaitingPassenger(busX: number, busZ: number): { x: number; z: number } | null {
+    let closest: { x: number; z: number } | null = null;
+    let closestDistSq = Infinity;
+    for (const p of this.passengers) {
+      if (p.state === 'waiting') {
+        const pos = p.mesh.position;
+        const dx = pos.x - busX;
+        const dz = pos.z - busZ;
+        const distSq = dx * dx + dz * dz;
+        if (distSq < closestDistSq) {
+          closestDistSq = distSq;
+          closest = { x: pos.x, z: pos.z };
+        }
+      }
+    }
+    return closest;
+  }
+
   /** Is the game over? */
   isGameOver(): boolean {
     return this.gameOver;

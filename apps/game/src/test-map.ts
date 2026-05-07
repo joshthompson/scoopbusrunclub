@@ -77,19 +77,20 @@ const COLORS = {
   lamppost: '#888899',
   tennisCourt: '#2d8a4e',
   floodlight: '#ff9922',
+  goose: '#4a4a4a',
   selected: '#ffcc00',
 };
 
 // ── Layer items (edited in-place) ───────────────────────────────────────
 
 type RegionType = 'field' | 'concrete';
-interface RegionItem { type: RegionType; points: [number, number][]; }
+interface RegionItem { type: RegionType; points: [number, number][]; zIndex?: number; }
 type BuildingType = 'grey' | 'red' | 'green' | 'yellow' | 'kristineberg';
 interface BuildingItem { type: BuildingType; height?: number; points: [number, number][]; }
 interface WaterItem { type: 'water' | 'river'; points: [number, number][]; }
 interface FenceItem { points: [number, number][]; }
 interface TreeItem { pos: [number, number]; }
-type ObjectKind = 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight';
+type ObjectKind = 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose';
 interface ObjectItem { kind: ObjectKind; pos: [number, number]; rotation: number; }
 
 // ── Main ────────────────────────────────────────────────────────────────
@@ -189,16 +190,11 @@ async function main() {
     points: f.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
   }));
 
-  const regionItems: RegionItem[] = [
-    ...(level.regions?.fields ?? []).map((polygon): RegionItem => ({
-      type: 'field',
-      points: polygon.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
-    })),
-    ...(level.regions?.concrete ?? []).map((polygon): RegionItem => ({
-      type: 'concrete',
-      points: polygon.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
-    })),
-  ];
+  const regionItems: RegionItem[] = (level.regions ?? []).map((r): RegionItem => ({
+    type: r.type,
+    points: r.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
+    zIndex: r.zIndex,
+  }));
 
   const treeItems: TreeItem[] = (level.manualTrees ?? []).map(([lat, lon]) => ({
     pos: gpsToLocal(lon, lat, origin),
@@ -216,6 +212,9 @@ async function main() {
     })),
     ...(level.objects?.floodlights ?? []).map(([lat, lon, rot]): ObjectItem => ({
       kind: 'floodlight', pos: gpsToLocal(lon, lat, origin), rotation: rot,
+    })),
+    ...(level.objects?.geese ?? []).map(([lat, lon, rot]): ObjectItem => ({
+      kind: 'goose', pos: gpsToLocal(lon, lat, origin), rotation: rot,
     })),
   ];
 
@@ -248,7 +247,7 @@ async function main() {
   // ── State ───────────────────────────────────────────────────────────
 
   type SelectionKind = 'building' | 'water' | 'fence' | 'region' | 'tree' | 'object';
-  type DrawMode = 'none' | 'building' | 'field' | 'concrete' | 'fence' | 'water' | 'river' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight';
+  type DrawMode = 'none' | 'building' | 'field' | 'concrete' | 'fence' | 'water' | 'river' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose';
 
   let selectedKind: SelectionKind | null = null;
   let selectedIndex: number = -1;
@@ -448,6 +447,7 @@ async function main() {
     lamppost: COLORS.lamppost,
     tennisCourt: COLORS.tennisCourt,
     floodlight: COLORS.floodlight,
+    goose: COLORS.goose,
   };
 
   // Real-world sizes (metres) for each object kind
@@ -460,6 +460,7 @@ async function main() {
     bench: { w: 1.5, h: 0.5 },
     lamppost: { w: 0.6, h: 0.6 },
     floodlight: { w: 1.4, h: 1.4 },
+    goose: { w: 0.5, h: 0.5 },
   };
 
   function renderObjects() {
@@ -578,6 +579,28 @@ async function main() {
           'stroke-width': Math.max(r * 0.1, 0.03), 'stroke-linecap': 'round',
         });
         group.appendChild(indicator);
+      } else if (o.kind === 'goose') {
+        // Goose icon: small circle body with a direction indicator
+        const r = Math.max(hw, hh);
+        const body = svgEl('circle', {
+          cx: 0, cy: 0, r,
+          fill: color, stroke: isSel ? '#fff' : '#222',
+          'stroke-width': Math.max(r * 0.15, 0.03),
+        });
+        group.appendChild(body);
+        // Neck/head indicator (forward direction)
+        const neckLine = svgEl('line', {
+          x1: 0, y1: 0, x2: 0, y2: -r - Math.max(r * 0.8, minS * 0.5),
+          stroke: isSel ? '#fff' : '#222',
+          'stroke-width': Math.max(r * 0.2, 0.04), 'stroke-linecap': 'round',
+        });
+        group.appendChild(neckLine);
+        // Small head dot
+        const headDot = svgEl('circle', {
+          cx: 0, cy: -r - Math.max(r * 0.8, minS * 0.5), r: Math.max(r * 0.3, minS * 0.15),
+          fill: isSel ? '#fff' : '#111',
+        });
+        group.appendChild(headDot);
       }
 
       layerObjects.appendChild(group);
@@ -837,6 +860,7 @@ async function main() {
       ['Lamppost', 'lamppost', COLORS.lamppost],
       ['Tennis Court', 'tennisCourt', COLORS.tennisCourt],
       ['Floodlight', 'floodlight', COLORS.floodlight],
+      ['Goose', 'goose', COLORS.goose],
     ];
     for (const [label, mode, color] of drawTools) {
       const btn = document.createElement('button');
@@ -872,7 +896,7 @@ async function main() {
       hint.textContent = 'Click on map to place trees.';
       drawSection.appendChild(hint);
     }
-    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight') {
+    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight' || drawMode === 'goose') {
       const hint = document.createElement('div');
       hint.className = 'sidebar-hint';
       hint.textContent = 'Click to place. Drag rotation handle to rotate.';
@@ -994,12 +1018,56 @@ async function main() {
         const r = regionItems[selectedIndex];
         const labels: Record<RegionType, string> = { field: 'Field', concrete: 'Concrete' };
         info.textContent = `${labels[r.type]} #${selectedIndex} — ${r.points.length} verts`;
+
+        // Type selector
+        const regionTypeRow = document.createElement('div');
+        regionTypeRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;align-items:center;';
+        const regionTypeLabel = document.createElement('span');
+        regionTypeLabel.style.cssText = 'color:#ccc;font-size:11px;';
+        regionTypeLabel.textContent = 'Type:';
+        regionTypeRow.appendChild(regionTypeLabel);
+        const regionTypeSelect = document.createElement('select');
+        regionTypeSelect.style.cssText = 'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;';
+        for (const t of ['field', 'concrete'] as RegionType[]) {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+          if (t === r.type) opt.selected = true;
+          regionTypeSelect.appendChild(opt);
+        }
+        regionTypeSelect.addEventListener('change', () => {
+          r.type = regionTypeSelect.value as RegionType;
+          renderAll();
+          renderSidebar();
+        });
+        regionTypeRow.appendChild(regionTypeSelect);
+        selSection.appendChild(regionTypeRow);
+
+        // Z-index input
+        const zRow = document.createElement('div');
+        zRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;align-items:center;';
+        const zLabel = document.createElement('span');
+        zLabel.style.cssText = 'color:#ccc;font-size:11px;';
+        zLabel.textContent = 'Z-Index:';
+        zRow.appendChild(zLabel);
+        const zInput = document.createElement('input');
+        zInput.type = 'number';
+        zInput.style.cssText = 'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;';
+        zInput.placeholder = '0';
+        zInput.value = r.zIndex != null ? r.zIndex.toString() : '';
+        zInput.addEventListener('change', () => {
+          const val = zInput.value.trim();
+          r.zIndex = val === '' ? undefined : parseInt(val, 10);
+          renderSidebar();
+        });
+        zRow.appendChild(zInput);
+        selSection.appendChild(zRow);
       } else if (selectedKind === 'tree') {
         const t = treeItems[selectedIndex];
         info.textContent = `Tree #${selectedIndex} @ (${t.pos[0].toFixed(1)}, ${t.pos[1].toFixed(1)})`;
       } else if (selectedKind === 'object') {
         const o = objectItems[selectedIndex];
-        const labels: Record<ObjectKind, string> = { bench: 'Bench', lamppost: 'Lamppost', tennisCourt: 'Tennis Court', floodlight: 'Floodlight' };
+        const labels: Record<ObjectKind, string> = { bench: 'Bench', lamppost: 'Lamppost', tennisCourt: 'Tennis Court', floodlight: 'Floodlight', goose: 'Goose' };
         info.textContent = `${labels[o.kind]} #${selectedIndex} rot=${o.rotation.toFixed(0)}°`;
       }
       selSection.appendChild(info);
@@ -1144,12 +1212,14 @@ async function main() {
         }),
       }))],
       ['regions.json', () => {
-        const result: Record<string, unknown> = {};
-        const fields = regionItems.filter(r => r.type === 'field');
-        const concretes = regionItems.filter(r => r.type === 'concrete');
-        if (fields.length) result.fields = fields.map(f => f.points.map(([x, z]) => localToGps(x, z, origin)));
-        if (concretes.length) result.concrete = concretes.map(c => c.points.map(([x, z]) => localToGps(x, z, origin)));
-        return result;
+        return regionItems.map(r => {
+          const entry: Record<string, unknown> = {
+            type: r.type,
+            points: r.points.map(([x, z]) => localToGps(x, z, origin)),
+          };
+          if (r.zIndex != null && r.zIndex !== 0) entry.zIndex = r.zIndex;
+          return entry;
+        });
       }],
       ['fences.json', () => fenceItems.map((f) => ({
         points: f.points.map(([x, z]) => localToGps(x, z, origin)),
@@ -1165,10 +1235,12 @@ async function main() {
         const lampposts = objectItems.filter(o => o.kind === 'lamppost');
         const courts = objectItems.filter(o => o.kind === 'tennisCourt');
         const floodlights = objectItems.filter(o => o.kind === 'floodlight');
+        const geese = objectItems.filter(o => o.kind === 'goose');
         if (benches.length) result.benches = toGps(benches);
         if (lampposts.length) result.lampposts = toGps(lampposts);
         if (courts.length) result.tennisCourts = toGps(courts);
         if (floodlights.length) result.floodlights = toGps(floodlights);
+        if (geese.length) result.geese = toGps(geese);
         return result;
       }],
     ];
@@ -1288,7 +1360,7 @@ async function main() {
       select('tree', treeItems.length - 1);
       return;
     }
-    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight') {
+    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight' || drawMode === 'goose') {
       objectItems.push({ kind: drawMode, pos: [x, z], rotation: 0 });
       select('object', objectItems.length - 1);
       return;
@@ -1430,7 +1502,7 @@ async function main() {
 
     // Object drag
     const objGroup = (target as Element).closest?.('[data-kind="object"]') as SVGElement | null;
-    if (objGroup && drawMode !== 'bench' && drawMode !== 'lamppost' && drawMode !== 'tennisCourt') {
+    if (objGroup && drawMode !== 'bench' && drawMode !== 'lamppost' && drawMode !== 'tennisCourt' && drawMode !== 'goose') {
       const idx = parseInt(objGroup.getAttribute('data-idx')!, 10);
       if (idx >= 0 && idx < objectItems.length) {
         dragObjectIdx = idx;

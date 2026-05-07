@@ -4,7 +4,7 @@
  * Players connect via a shared room code. One hosts, others join.
  * During gameplay each player broadcasts their player state ~15 times/sec.
  */
-import { joinRoom, type Room } from 'trystero';
+import { joinRoom, selfId, type Room } from 'trystero';
 import type { GameType, TeamColor } from './game/modes/types';
 import type { CharacterSelection } from './game/characters';
 
@@ -417,3 +417,113 @@ export function generateRoomCode(): string {
   }
   return code;
 }
+
+// ---------- Lobby discovery ----------
+
+/** Info about a hosted room, broadcast to the discovery lobby */
+export interface RoomInfo {
+  roomCode: string;
+  hostId: string;
+  courseId: string;
+  gameType: GameType;
+  playerCount: number;
+  maxPlayers: number;
+  started: boolean;
+}
+
+const LOBBY_ROOM_ID = '__scoopbus_lobby__';
+const LOBBY_ANNOUNCE_INTERVAL_MS = 3000;
+
+/**
+ * Lobby discovery: joins a shared "lobby" room to discover hosted games.
+ * Hosts announce their room info periodically; browsers collect it.
+ */
+export class LobbyDiscovery {
+  private room: Room | null = null;
+  private announceInterval: ReturnType<typeof setInterval> | null = null;
+  private sendAnnounce: ((info: RoomInfo) => void) | null = null;
+  private sendRemove: ((hostId: string) => void) | null = null;
+  private _rooms = new Map<string, RoomInfo>();
+  private _onChange: (() => void) | null = null;
+  private _currentAnnouncement: RoomInfo | null = null;
+
+  get rooms(): RoomInfo[] {
+    return [...this._rooms.values()].filter(r => !r.started);
+  }
+
+  set onChange(fn: (() => void) | null) { this._onChange = fn; }
+
+  /** Join the lobby room to listen for hosted games */
+  joinLobby() {
+    if (this.room) return;
+    this.room = joinRoom({ appId: APP_ID }, LOBBY_ROOM_ID);
+
+    const [sendAnnounce, onAnnounce] = this.room.makeAction('roomAnnounce');
+    const [sendRemove, onRemove] = this.room.makeAction('roomRemove');
+
+    this.sendAnnounce = (info: RoomInfo) => sendAnnounce(info as any);
+    this.sendRemove = (hostId: string) => sendRemove(hostId as any);
+
+    onAnnounce((data, _peerId: string) => {
+      const info = data as unknown as RoomInfo;
+      this._rooms.set(info.hostId, info);
+      this._onChange?.();
+    });
+
+    onRemove((data, _peerId: string) => {
+      const hostId = data as unknown as string;
+      this._rooms.delete(hostId);
+      this._onChange?.();
+    });
+
+    // Clean up peers that leave
+    this.room.onPeerLeave((peerId: string) => {
+      this._rooms.delete(peerId);
+      this._onChange?.();
+    });
+  }
+
+  /** Start announcing a hosted room */
+  startAnnouncing(info: Omit<RoomInfo, 'hostId'>) {
+    this.joinLobby();
+    const fullInfo: RoomInfo = { ...info, hostId: selfId };
+    this._currentAnnouncement = fullInfo;
+
+    // Announce immediately then periodically
+    const announce = () => this.sendAnnounce?.(this._currentAnnouncement!);
+    announce();
+    this.announceInterval = setInterval(announce, LOBBY_ANNOUNCE_INTERVAL_MS);
+  }
+
+  /** Update the announced room info (e.g. player count changed) */
+  updateAnnouncement(info: Partial<RoomInfo>) {
+    if (!this._currentAnnouncement) return;
+    this._currentAnnouncement = { ...this._currentAnnouncement, ...info, hostId: selfId };
+    this.sendAnnounce?.(this._currentAnnouncement);
+  }
+
+  /** Stop announcing (game started or host left) */
+  stopAnnouncing() {
+    if (this.announceInterval) {
+      clearInterval(this.announceInterval);
+      this.announceInterval = null;
+    }
+    this.sendRemove?.(selfId);
+  }
+
+  /** Leave the lobby room entirely */
+  leaveLobby() {
+    this.stopAnnouncing();
+    if (this.room) {
+      this.room.leave().catch(() => {});
+      this.room = null;
+    }
+    this.sendAnnounce = null;
+    this.sendRemove = null;
+    this._rooms.clear();
+    this._onChange = null;
+    this._currentAnnouncement = null;
+  }
+}
+
+export const lobby = new LobbyDiscovery();

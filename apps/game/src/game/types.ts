@@ -49,6 +49,8 @@ export interface Runner {
   ridingOffsetX: number;
   ridingOffsetZ: number;
   escapeDir: number;
+  /** Whether the runner is currently in escape mode (fleeing off the path) */
+  escaping: boolean;
   ownerPlayerIndex: number;
   tshirtColor: Color3;
   riderModelCreated?: boolean; // tracks if rider model has been created (for SCOOP_THEN_RIDE)
@@ -118,6 +120,8 @@ export type SolidObstacle = {
   z: number;
   radius: number;
   elasticIndex?: number;
+  /** If true, this object can be scooped into the air by the bus */
+  scoopable?: boolean;
 };
 
 export type ElasticObject = {
@@ -127,3 +131,41 @@ export type ElasticObject = {
   tiltVelX: number;
   tiltVelZ: number;
 };
+
+/** A scooped object flying through the air (bench, etc.) */
+export interface ScoopedObject {
+  root: TransformNode;
+  velX: number;
+  velY: number;
+  velZ: number;
+  /** Time remaining before despawn after landing */
+  landedTimer: number;
+  state: 'launched' | 'landed';
+  /** Index into solidObstacles — set to -1 once removed */
+  obstacleIndex: number;
+}
+
+/** A scoopable object that gets launched into the air on bus impact (ragdolls, doesn't ride). */
+export type ScoopableState = 'ground' | 'launched' | 'landed';
+
+export interface Goose {
+  model: import('./objects/GooseModel').GooseModelResult;
+  mesh: Mesh;
+  x: number;
+  z: number;
+  yaw: number;
+  state: 'idle' | 'walking' | 'fleeing' | 'launched' | 'landed';
+  velX: number;
+  velY: number;
+  velZ: number;
+  animPhase: number;
+  /** Current target position (wander/herd destination) */
+  targetX: number;
+  targetZ: number;
+  /** Timer for idle sitting (seconds remaining) */
+  idleTimer: number;
+  /** Index of the herd this goose belongs to (-1 = solo) */
+  herdId: number;
+  /** Timer before the goose despawns after landing */
+  landedTimer: number;
+}
