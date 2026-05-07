@@ -21,6 +21,7 @@ import {
   StandardMaterial,
   TransformNode,
   Vector3,
+  VertexBuffer,
 } from '@babylonjs/core';
 import {
   createRunnerModel,
@@ -57,10 +58,12 @@ import {
 import { mulberry32 } from './terrain';
 
 /** Flag pole height */
-const FLAG_POLE_HEIGHT = 8;
+const FLAG_POLE_HEIGHT = 12;
 /** Flag banner size */
-const FLAG_BANNER_WIDTH = 2.5;
-const FLAG_BANNER_HEIGHT = 1.8;
+const FLAG_BANNER_WIDTH = 3.75;
+const FLAG_BANNER_HEIGHT = 2.7;
+/** Banner subdivision count for wind deformation */
+const FLAG_BANNER_SUBDIVISIONS = 10;
 
 // ---------- Types ----------
 
@@ -771,12 +774,14 @@ export class PassengerSystem {
     pole.position.y = FLAG_POLE_HEIGHT / 2;
     pole.parent = root;
 
-    // Banner (triangular plane — we use a flat box rotated to simulate a pennant)
-    const banner = MeshBuilder.CreatePlane(
+    // Banner with subdivisions for wind deformation
+    // Use CreateGround (supports subdivisions) rotated vertical
+    const banner = MeshBuilder.CreateGround(
       `flagBanner_${index}`,
-      { width: FLAG_BANNER_WIDTH, height: FLAG_BANNER_HEIGHT },
+      { width: FLAG_BANNER_WIDTH, height: FLAG_BANNER_HEIGHT, subdivisions: FLAG_BANNER_SUBDIVISIONS, updatable: true },
       this.scene,
     );
+    banner.rotation.x = -Math.PI / 2;
     const bannerMat = new StandardMaterial(`flagBannerMat_${index}`, this.scene);
     bannerMat.diffuseColor = color.clone();
     bannerMat.specularColor = Color3.Black();
@@ -786,6 +791,25 @@ export class PassengerSystem {
     banner.position.y = FLAG_POLE_HEIGHT - FLAG_BANNER_HEIGHT / 2 - 0.2;
     banner.position.x = FLAG_BANNER_WIDTH / 2;
     banner.parent = root;
+
+    // Store rest positions for wind animation
+    const restPositions = banner.getVerticesData(VertexBuffer.PositionKind)!.slice();
+    const bannerIdx = index;
+    this.scene.registerBeforeRender(() => {
+      if (!banner.isEnabled() || banner.isDisposed()) return;
+      const positions = banner.getVerticesData(VertexBuffer.PositionKind);
+      if (!positions) return;
+      const t = performance.now() / 1000;
+      for (let i = 0; i < positions.length; i += 3) {
+        const restX = restPositions[i];
+        // Normalise x across banner width: 0 at pole edge, 1 at far edge
+        const nx = (restX + FLAG_BANNER_WIDTH / 2) / FLAG_BANNER_WIDTH;
+        const amplitude = nx * nx * 0.4;
+        // Deform Y (vertical axis in ground mesh = Z after rotation = perpendicular to flag face)
+        positions[i + 1] = restPositions[i + 1] + Math.sin(t * 4 + nx * 6 + bannerIdx) * amplitude;
+      }
+      banner.updateVerticesData(VertexBuffer.PositionKind, positions);
+    });
 
     // Sphere at the top of the pole for visibility
     const ball = MeshBuilder.CreateSphere(

@@ -78,6 +78,7 @@ const COLORS = {
   tennisCourt: '#2d8a4e',
   floodlight: '#ff9922',
   goose: '#4a4a4a',
+  deer: '#8B4513',
   selected: '#ffcc00',
 };
 
@@ -90,7 +91,7 @@ interface BuildingItem { type: BuildingType; height?: number; points: [number, n
 interface WaterItem { type: 'water' | 'river'; points: [number, number][]; }
 interface FenceItem { points: [number, number][]; }
 interface TreeItem { pos: [number, number]; }
-type ObjectKind = 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose';
+type ObjectKind = 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose' | 'deer';
 interface ObjectItem { kind: ObjectKind; pos: [number, number]; rotation: number; }
 
 // ── Main ────────────────────────────────────────────────────────────────
@@ -216,6 +217,9 @@ async function main() {
     ...(level.objects?.geese ?? []).map(([lat, lon, rot]): ObjectItem => ({
       kind: 'goose', pos: gpsToLocal(lon, lat, origin), rotation: rot,
     })),
+    ...(level.objects?.deer ?? []).map(([lat, lon, rot]): ObjectItem => ({
+      kind: 'deer', pos: gpsToLocal(lon, lat, origin), rotation: rot,
+    })),
   ];
 
   // ── Compute bounding box ────────────────────────────────────────────
@@ -247,7 +251,7 @@ async function main() {
   // ── State ───────────────────────────────────────────────────────────
 
   type SelectionKind = 'building' | 'water' | 'fence' | 'region' | 'tree' | 'object';
-  type DrawMode = 'none' | 'building' | 'field' | 'concrete' | 'fence' | 'water' | 'river' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose';
+  type DrawMode = 'none' | 'building' | 'field' | 'concrete' | 'fence' | 'water' | 'river' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose' | 'deer';
 
   let selectedKind: SelectionKind | null = null;
   let selectedIndex: number = -1;
@@ -448,6 +452,7 @@ async function main() {
     tennisCourt: COLORS.tennisCourt,
     floodlight: COLORS.floodlight,
     goose: COLORS.goose,
+    deer: COLORS.deer,
   };
 
   // Real-world sizes (metres) for each object kind
@@ -461,6 +466,7 @@ async function main() {
     lamppost: { w: 0.6, h: 0.6 },
     floodlight: { w: 1.4, h: 1.4 },
     goose: { w: 0.5, h: 0.5 },
+    deer: { w: 1.0, h: 1.2 },
   };
 
   function renderObjects() {
@@ -601,6 +607,41 @@ async function main() {
           fill: isSel ? '#fff' : '#111',
         });
         group.appendChild(headDot);
+      } else if (o.kind === 'deer') {
+        // Deer icon: oval body with antler-like lines and direction indicator
+        const r = Math.max(hw, hh);
+        const body = svgEl('ellipse', {
+          cx: 0, cy: 0, rx: r * 0.7, ry: r,
+          fill: color, stroke: isSel ? '#fff' : '#3a2010',
+          'stroke-width': Math.max(r * 0.12, 0.03),
+        });
+        group.appendChild(body);
+        // Neck/head line (forward direction)
+        const neckLen = Math.max(r * 1.2, minS * 0.6);
+        const neckLine = svgEl('line', {
+          x1: 0, y1: 0, x2: 0, y2: -r - neckLen,
+          stroke: isSel ? '#fff' : '#3a2010',
+          'stroke-width': Math.max(r * 0.15, 0.03), 'stroke-linecap': 'round',
+        });
+        group.appendChild(neckLine);
+        // Head
+        const headY = -r - neckLen;
+        const headDot = svgEl('circle', {
+          cx: 0, cy: headY, r: Math.max(r * 0.35, minS * 0.18),
+          fill: isSel ? '#fff' : '#5a3a1a',
+        });
+        group.appendChild(headDot);
+        // Antlers (V shape)
+        const antlerH = Math.max(r * 0.5, minS * 0.3);
+        const antlerW = Math.max(r * 0.4, minS * 0.2);
+        for (const side of [-1, 1]) {
+          const antler = svgEl('line', {
+            x1: 0, y1: headY, x2: side * antlerW, y2: headY - antlerH,
+            stroke: isSel ? '#fff' : '#7a5a2a',
+            'stroke-width': Math.max(r * 0.08, 0.02), 'stroke-linecap': 'round',
+          });
+          group.appendChild(antler);
+        }
       }
 
       layerObjects.appendChild(group);
@@ -861,6 +902,7 @@ async function main() {
       ['Tennis Court', 'tennisCourt', COLORS.tennisCourt],
       ['Floodlight', 'floodlight', COLORS.floodlight],
       ['Goose', 'goose', COLORS.goose],
+      ['Deer', 'deer', COLORS.deer],
     ];
     for (const [label, mode, color] of drawTools) {
       const btn = document.createElement('button');
@@ -896,7 +938,7 @@ async function main() {
       hint.textContent = 'Click on map to place trees.';
       drawSection.appendChild(hint);
     }
-    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight' || drawMode === 'goose') {
+    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight' || drawMode === 'goose' || drawMode === 'deer') {
       const hint = document.createElement('div');
       hint.className = 'sidebar-hint';
       hint.textContent = 'Click to place. Drag rotation handle to rotate.';
@@ -1067,7 +1109,7 @@ async function main() {
         info.textContent = `Tree #${selectedIndex} @ (${t.pos[0].toFixed(1)}, ${t.pos[1].toFixed(1)})`;
       } else if (selectedKind === 'object') {
         const o = objectItems[selectedIndex];
-        const labels: Record<ObjectKind, string> = { bench: 'Bench', lamppost: 'Lamppost', tennisCourt: 'Tennis Court', floodlight: 'Floodlight', goose: 'Goose' };
+        const labels: Record<ObjectKind, string> = { bench: 'Bench', lamppost: 'Lamppost', tennisCourt: 'Tennis Court', floodlight: 'Floodlight', goose: 'Goose', deer: 'Deer' };
         info.textContent = `${labels[o.kind]} #${selectedIndex} rot=${o.rotation.toFixed(0)}°`;
       }
       selSection.appendChild(info);
@@ -1236,11 +1278,13 @@ async function main() {
         const courts = objectItems.filter(o => o.kind === 'tennisCourt');
         const floodlights = objectItems.filter(o => o.kind === 'floodlight');
         const geese = objectItems.filter(o => o.kind === 'goose');
+        const deerObjs = objectItems.filter(o => o.kind === 'deer');
         if (benches.length) result.benches = toGps(benches);
         if (lampposts.length) result.lampposts = toGps(lampposts);
         if (courts.length) result.tennisCourts = toGps(courts);
         if (floodlights.length) result.floodlights = toGps(floodlights);
         if (geese.length) result.geese = toGps(geese);
+        if (deerObjs.length) result.deer = toGps(deerObjs);
         return result;
       }],
     ];
@@ -1360,7 +1404,7 @@ async function main() {
       select('tree', treeItems.length - 1);
       return;
     }
-    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight' || drawMode === 'goose') {
+    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight' || drawMode === 'goose' || drawMode === 'deer') {
       objectItems.push({ kind: drawMode, pos: [x, z], rotation: 0 });
       select('object', objectItems.length - 1);
       return;

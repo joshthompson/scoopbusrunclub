@@ -4,7 +4,12 @@ import track3Url from './assets/music/desifreemusic-driving-bass-neon-city-vibes
 import track4Url from './assets/music/universfield-motivational-electronic-background-226021.mp3';
 
 const STORAGE_KEY = 'sbrc-music-muted';
-const trackUrls = [track1Url, track2Url, track3Url, track4Url];
+const trackUrls = [
+  { url: track1Url, track: 'Cyberpunk', artist: 'Monume' },
+  { url: track2Url, track: 'Retro', artist: 'The Mountain' },
+  { url: track3Url, track: 'Driving Bass', artist: 'Desifreemusic' },
+  { url: track4Url, track: 'Motivational Electronic', artist: 'Universfield' },
+];
 
 let audio: HTMLAudioElement | null = null;
 let currentIndex = 0;
@@ -24,7 +29,7 @@ function playNext() {
     audio.pause();
     audio.removeEventListener('ended', onEnded);
   }
-  audio = new Audio(trackUrls[currentIndex]);
+  audio = new Audio(trackUrls[currentIndex].url);
   audio.volume = 0.35;
   audio.addEventListener('ended', onEnded);
   audio.play().catch(() => {});

@@ -158,6 +158,32 @@ export const GOOSE_HERD_MERGE_RADIUS = 2;
 /** Seconds — how long a landed goose stays before getting up */
 export const GOOSE_LANDED_DURATION = 3;
 
+// ---------- Deer constants ----------
+/** Metres — deer within this distance form a herd (10× geese) */
+export const DEER_HERD_RADIUS = 20;
+/** Metres — deer flee when bus/runner is within this distance */
+export const DEER_FLEE_RADIUS = 20;
+/** Metres — deer start running (not fleeing) at this distance */
+export const DEER_RUN_TRIGGER_RADIUS = 20;
+/** Metres — maximum wander distance from current position */
+export const DEER_WANDER_RADIUS = 25;
+/** m/s — walking speed */
+export const DEER_WALK_SPEED = 5;
+/** m/s — running speed (alert but not panicked) */
+export const DEER_RUN_SPEED = 15;
+/** m/s — flee speed (much faster than geese) */
+export const DEER_FLEE_SPEED = 20;
+/** Seconds — max idle standing time */
+export const DEER_IDLE_MAX = 15;
+/** Metres — minimum separation between deer in a herd */
+export const DEER_MIN_SEPARATION = 3.0;
+/** bus/runner scoop distance */
+export const DEER_SCOOP_DISTANCE = 4.0;
+/** Metres — merge herds within this radius (10× geese) */
+export const DEER_HERD_MERGE_RADIUS = 20;
+/** Seconds — how long a landed deer stays before getting up */
+export const DEER_LANDED_DURATION = 4;
+
 // ---------- Terrain LOD distance thresholds (metres from camera) ----------
 /** Below this distance: ultra-high-res terrain masks (2× quality) */
 export const TERRAIN_LOD_NEAR_DIST = 50;

@@ -119,4 +119,6 @@ export interface LevelObjects {
   floodlights?: [number, number, number][];
   /** Canada geese starting positions [lat, lon, rotation] */
   geese?: [number, number, number][];
+  /** Deer starting positions [lat, lon, rotation] */
+  deer?: [number, number, number][];
 }

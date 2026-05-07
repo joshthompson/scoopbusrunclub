@@ -37,7 +37,7 @@ import type { GameType } from './modes/types';
 import { createBusModel, tintBusModel, busColorPaletteFromOption, PLAYER_COLORS, WHEEL_ROLL_SPEED, LIGHT_FRONT_POSITION } from './objects/BusModel';
 import type { BusColorPalette } from './objects/BusModel';
 import type { CharacterSelection, RunnerAppearance } from './characters';
-import { getBusColorById, resolveRunnerAppearance, isCorgiRunnerId } from './characters';
+import { getBusColorById, resolveRunnerAppearance, isCorgiRunnerId, resolveColor, hexToColor3 } from './characters';
 import { createSky } from './objects/Sky';
 import type { IcePatchOverlay } from './PathShader';
 import { createTiledPathGroundMaterial } from './PathShaderTiled';
@@ -163,6 +163,7 @@ import {
   type ElasticObject,
   type GameCallbacks,
   type Goose,
+  type Deer,
   type InitSceneOptions,
   type Marshal,
   type RaceState,
@@ -250,6 +251,7 @@ import {
 } from './objects/Fence';
 import { buildLevelObjects, type PlacedObjectData } from './objects/LevelObjects';
 import { spawnGeese, updateGeeseSystem, type GooseSpawnPoint } from './systems/geese';
+import { spawnDeer, updateDeerSystem, type DeerSpawnPoint } from './systems/deer';
 import { PowerUpSystem, type PowerUpId } from './systems/powerups';
 import { PassengerSystem } from './systems/passengers';
 import {
@@ -347,6 +349,9 @@ export class Game {
 
   // Geese (scoopable, AI-driven)
   private geese: Goose[] = [];
+
+  // Deer (scoopable, AI-driven, faster with larger herds)
+  private deer: Deer[] = [];
 
   // Scooped objects (benches etc. flying through the air)
   private scoopedObjects: import('./types').ScoopedObject[] = [];
@@ -1740,6 +1745,22 @@ export class Game {
       }
     }
 
+    // ── Deer (scoopable AI entities, faster with larger herds) ──
+    {
+      const deerData = (level.objects?.deer ?? []).map(([lat, lon, rot]) => {
+        const [rawX, rawZ] = gpsPointToLocal(lon, lat, this.originCoord);
+        return {
+          x: rawX * this.scaleFactor,
+          z: rawZ * this.scaleFactor,
+          rotation: (rot * Math.PI) / 180,
+        } as DeerSpawnPoint;
+      });
+      console.log('[Deer] spawn data:', deerData.length, 'deer');
+      if (deerData.length > 0) {
+        this.deer = spawnDeer(this.scene, deerData, (x, z) => this.getGroundY(x, z));
+      }
+    }
+
     // Procedural sky + clouds
     createSky(this.scene, level.timeOfDay ?? 'day');
 
@@ -2264,11 +2285,14 @@ export class Game {
   private buildGateFlag() {
     if (this.gatePositions.length === 0) return;
 
-    // Resolve bus colour
+    // Resolve flag colour from character selection
     let bodyColor = new Color3(0.95, 0.78, 0.15); // default yellow
     if (this.charSelection?.type === 'bus') {
       const opt = getBusColorById(this.charSelection.busColorId);
       if (opt) bodyColor = Color3.FromHexString(opt.bodyHex);
+    } else if (this.charSelection?.type === 'runner') {
+      const appearance = resolveRunnerAppearance(this.charSelection.runnerId);
+      bodyColor = hexToColor3(resolveColor(appearance.topColor));
     } else {
       const p = PLAYER_COLORS[this.localPlayerIndex - 1];
       if (p) bodyColor = p.body.clone();
@@ -2277,7 +2301,7 @@ export class Game {
     const root = new TransformNode('gateFlag', this.scene);
 
     // Pole
-    const poleHeight = 6;
+    const poleHeight = 9;
     const pole = MeshBuilder.CreateCylinder('gateFlagPole', { diameter: 0.14, height: poleHeight, tessellation: 8 }, this.scene);
     const poleMat = new StandardMaterial('gateFlagPoleMat', this.scene);
     poleMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
@@ -2286,10 +2310,11 @@ export class Game {
     pole.position.y = poleHeight / 2;
     pole.parent = root;
 
-    // Banner (rectangular plane)
-    const bannerW = 3.0;
-    const bannerH = 2.0;
-    const banner = MeshBuilder.CreatePlane('gateFlagBanner', { width: bannerW, height: bannerH }, this.scene);
+    // Banner (rectangular plane with subdivisions for wind)
+    const bannerW = 4.5;
+    const bannerH = 3.0;
+    const banner = MeshBuilder.CreateGround('gateFlagBanner', { width: bannerW, height: bannerH, subdivisions: 10, updatable: true }, this.scene);
+    banner.rotation.x = -Math.PI / 2;
     const bannerMat = new StandardMaterial('gateFlagBannerMat', this.scene);
     bannerMat.diffuseColor = bodyColor.clone();
     bannerMat.specularColor = Color3.Black();
@@ -2299,6 +2324,21 @@ export class Game {
     banner.position.y = poleHeight - bannerH / 2 - 0.3;
     banner.position.x = bannerW / 2;
     banner.parent = root;
+
+    // Wind flapping animation
+    const restPositions = banner.getVerticesData(VertexBuffer.PositionKind)!.slice();
+    this.scene.registerBeforeRender(() => {
+      if (!banner.isEnabled() || banner.isDisposed()) return;
+      const positions = banner.getVerticesData(VertexBuffer.PositionKind);
+      if (!positions) return;
+      const t = performance.now() / 1000;
+      for (let i = 0; i < positions.length; i += 3) {
+        const nx = (restPositions[i] + bannerW / 2) / bannerW;
+        const amplitude = nx * nx * 0.4;
+        positions[i + 1] = restPositions[i + 1] + Math.sin(t * 4 + nx * 6) * amplitude;
+      }
+      banner.updateVerticesData(VertexBuffer.PositionKind, positions);
+    });
 
     // Ball at top
     const ball = MeshBuilder.CreateSphere('gateFlagBall', { diameter: 0.5, segments: 6 }, this.scene);
@@ -2325,11 +2365,14 @@ export class Game {
   private buildP2GateFlag() {
     if (!this.localMultiplayer || this.gatePositions.length === 0) return;
 
-    // Resolve P2 bus colour
+    // Resolve P2 flag colour
     let bodyColor = new Color3(0.85, 0.25, 0.2); // default red for P2
     if (this.p2CharSelection?.type === 'bus') {
       const opt = getBusColorById(this.p2CharSelection.busColorId);
       if (opt) bodyColor = Color3.FromHexString(opt.bodyHex);
+    } else if (this.p2CharSelection?.type === 'runner') {
+      const appearance = resolveRunnerAppearance(this.p2CharSelection.runnerId);
+      bodyColor = hexToColor3(resolveColor(appearance.topColor));
     } else {
       const p = PLAYER_COLORS[1]; // player index 2
       if (p) bodyColor = p.body.clone();
@@ -2337,7 +2380,7 @@ export class Game {
 
     const root = new TransformNode('gateFlag_p2', this.scene);
 
-    const poleHeight = 6;
+    const poleHeight = 9;
     const pole = MeshBuilder.CreateCylinder('gateFlagPole_p2', { diameter: 0.14, height: poleHeight, tessellation: 8 }, this.scene);
     const poleMat = new StandardMaterial('gateFlagPoleMat_p2', this.scene);
     poleMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
@@ -2346,9 +2389,10 @@ export class Game {
     pole.position.y = poleHeight / 2;
     pole.parent = root;
 
-    const bannerW = 3.0;
-    const bannerH = 2.0;
-    const banner = MeshBuilder.CreatePlane('gateFlagBanner_p2', { width: bannerW, height: bannerH }, this.scene);
+    const bannerW = 4.5;
+    const bannerH = 3.0;
+    const banner = MeshBuilder.CreateGround('gateFlagBanner_p2', { width: bannerW, height: bannerH, subdivisions: 10, updatable: true }, this.scene);
+    banner.rotation.x = -Math.PI / 2;
     const bannerMat = new StandardMaterial('gateFlagBannerMat_p2', this.scene);
     bannerMat.diffuseColor = bodyColor.clone();
     bannerMat.specularColor = Color3.Black();
@@ -2358,6 +2402,21 @@ export class Game {
     banner.position.y = poleHeight - bannerH / 2 - 0.3;
     banner.position.x = bannerW / 2;
     banner.parent = root;
+
+    // Wind flapping animation
+    const restPositions2 = banner.getVerticesData(VertexBuffer.PositionKind)!.slice();
+    this.scene.registerBeforeRender(() => {
+      if (!banner.isEnabled() || banner.isDisposed()) return;
+      const positions = banner.getVerticesData(VertexBuffer.PositionKind);
+      if (!positions) return;
+      const t = performance.now() / 1000;
+      for (let i = 0; i < positions.length; i += 3) {
+        const nx = (restPositions2[i] + bannerW / 2) / bannerW;
+        const amplitude = nx * nx * 0.4;
+        positions[i + 1] = restPositions2[i + 1] + Math.sin(t * 4 + nx * 6 + 1) * amplitude;
+      }
+      banner.updateVerticesData(VertexBuffer.PositionKind, positions);
+    });
 
     const ball = MeshBuilder.CreateSphere('gateFlagBall_p2', { diameter: 0.5, segments: 6 }, this.scene);
     const ballMat = new StandardMaterial('gateFlagBallMat_p2', this.scene);
@@ -2428,7 +2487,7 @@ export class Game {
     const root = new TransformNode('finishFlag', this.scene);
 
     // Pole
-    const poleHeight = 7;
+    const poleHeight = 10.5;
     const pole = MeshBuilder.CreateCylinder('finishFlagPole', { diameter: 0.14, height: poleHeight, tessellation: 8 }, this.scene);
     const poleMat = new StandardMaterial('finishFlagPoleMat', this.scene);
     poleMat.diffuseColor = new Color3(0.9, 0.9, 0.9);
@@ -2438,9 +2497,10 @@ export class Game {
     pole.parent = root;
 
     // Checkered banner
-    const bannerW = 3.0;
-    const bannerH = 2.0;
-    const banner = MeshBuilder.CreatePlane('finishFlagBanner', { width: bannerW, height: bannerH }, this.scene);
+    const bannerW = 4.5;
+    const bannerH = 3.0;
+    const banner = MeshBuilder.CreateGround('finishFlagBanner', { width: bannerW, height: bannerH, subdivisions: 10, updatable: true }, this.scene);
+    banner.rotation.x = -Math.PI / 2;
     const bannerMat = new StandardMaterial('finishFlagBannerMat', this.scene);
 
     // Create checkered texture
@@ -2465,6 +2525,21 @@ export class Game {
     banner.position.y = poleHeight - bannerH / 2 - 0.3;
     banner.position.x = bannerW / 2;
     banner.parent = root;
+
+    // Wind flapping animation
+    const finishRestPositions = banner.getVerticesData(VertexBuffer.PositionKind)!.slice();
+    this.scene.registerBeforeRender(() => {
+      if (!banner.isEnabled() || banner.isDisposed()) return;
+      const positions = banner.getVerticesData(VertexBuffer.PositionKind);
+      if (!positions) return;
+      const t = performance.now() / 1000;
+      for (let i = 0; i < positions.length; i += 3) {
+        const nx = (finishRestPositions[i] + bannerW / 2) / bannerW;
+        const amplitude = nx * nx * 0.4;
+        positions[i + 1] = finishRestPositions[i + 1] + Math.sin(t * 4 + nx * 6 + 2) * amplitude;
+      }
+      banner.updateVerticesData(VertexBuffer.PositionKind, positions);
+    });
 
     // Ball at top (black)
     const ball = MeshBuilder.CreateSphere('finishFlagBall', { diameter: 0.5, segments: 6 }, this.scene);
@@ -3780,6 +3855,7 @@ export class Game {
       localPlayerIndex: this.localPlayerIndex,
       busPos: this.busPos,
       busYaw: this.busYaw,
+      charSelection: this.charSelection,
     });
   }
 
@@ -4022,6 +4098,21 @@ export class Game {
         updateGeeseSystem({
           scene: this.scene,
           geese: this.geese,
+          getGroundY: (x, z) => this.getGroundY(x, z),
+          busPos: this.busPos,
+          busYaw: this.busYaw,
+          busSpeed: 0,
+          localPlayerRole: this.localPlayerRole,
+          solidObstacles: this.solidObstacles,
+          buildingColliders: this.buildingColliders,
+          waterZones: this.waterZones,
+        }, dt);
+      }
+      // Update deer during countdown
+      if (this.deer.length > 0) {
+        updateDeerSystem({
+          scene: this.scene,
+          deer: this.deer,
           getGroundY: (x, z) => this.getGroundY(x, z),
           busPos: this.busPos,
           busYaw: this.busYaw,
@@ -4714,6 +4805,22 @@ export class Game {
       updateGeeseSystem({
         scene: this.scene,
         geese: this.geese,
+        getGroundY: (x, z) => this.getGroundY(x, z),
+        busPos: this.busPos,
+        busYaw: this.busYaw,
+        busSpeed: this.busSpeed,
+        localPlayerRole: this.localPlayerRole,
+        solidObstacles: this.solidObstacles,
+        buildingColliders: this.buildingColliders,
+        waterZones: this.waterZones,
+      }, dt);
+    }
+
+    // Update deer AI and scooping
+    if (this.deer.length > 0) {
+      updateDeerSystem({
+        scene: this.scene,
+        deer: this.deer,
         getGroundY: (x, z) => this.getGroundY(x, z),
         busPos: this.busPos,
         busYaw: this.busYaw,

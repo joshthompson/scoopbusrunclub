@@ -169,3 +169,21 @@ export interface Goose {
   /** Timer before the goose despawns after landing */
   landedTimer: number;
 }
+
+export interface Deer {
+  model: import('./objects/DeerModel').DeerModelResult;
+  mesh: Mesh;
+  x: number;
+  z: number;
+  yaw: number;
+  state: 'idle' | 'walking' | 'running' | 'fleeing' | 'launched' | 'landed';
+  velX: number;
+  velY: number;
+  velZ: number;
+  animPhase: number;
+  targetX: number;
+  targetZ: number;
+  idleTimer: number;
+  herdId: number;
+  landedTimer: number;
+}
