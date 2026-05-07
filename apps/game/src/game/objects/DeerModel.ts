@@ -28,6 +28,7 @@ const EYE_RING = new Color3(0.85, 0.78, 0.60);
 const ANTLER_COLOR = new Color3(0.60, 0.45, 0.25);
 const TAIL_COLOR = new Color3(0.80, 0.70, 0.50);
 const EAR_INNER = new Color3(0.75, 0.55, 0.40);
+const RUMP_WHITE = new Color3(0.95, 0.93, 0.88);
 
 // ── Dimensions (metres) ───────────────────────────────────
 
@@ -115,6 +116,7 @@ export function createDeerModel(
   const antlerMat = makeMat(`dAntler_${id}`, ANTLER_COLOR, scene);
   const tailMat = makeMat(`dTail_${id}`, TAIL_COLOR, scene);
   const earInnerMat = makeMat(`dEarIn_${id}`, EAR_INNER, scene);
+  const rumpMat = makeMat(`dRump_${id}`, RUMP_WHITE, scene);
 
   // ═══════════════════════════════════════
   //  Body
@@ -144,6 +146,14 @@ export function createDeerModel(
   tail.position.set(0, BODY_Y + BODY_H / 4, -BODY_D / 2 - TAIL_D / 2 + 0.02);
   tail.rotation.x = -0.3;
   tail.parent = root;
+
+  // White rump patch (roe deer heart-shaped marking)
+  const rump = MeshBuilder.CreateBox(`dRump_${id}`, {
+    width: BODY_W - 0.02, height: BODY_H * 0.6, depth: 0.02,
+  }, scene);
+  rump.material = rumpMat;
+  rump.position.set(0, BODY_Y + BODY_H * 0.05, -BODY_D / 2 - 0.005);
+  rump.parent = root;
 
   // ═══════════════════════════════════════
   //  Neck

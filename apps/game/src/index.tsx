@@ -1047,8 +1047,8 @@ function App() {
         </Show>
       </Show>
       <canvas id="gameCanvas" ref={canvasRef} />
-      <canvas id="minimap" ref={minimapRef} />
-      <canvas id="minimap-p2" ref={p2MinimapRef} />
+      <canvas id="minimap" ref={minimapRef} style={{ display: screen() === 'playing' ? 'block' : 'none' }} />
+      <canvas id="minimap-p2" ref={p2MinimapRef} style={{ display: screen() === 'playing' ? 'block' : 'none' }} />
     </>
   );
 }

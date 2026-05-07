@@ -992,13 +992,15 @@
         margin: 16px 0;
       }
       .runner-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        max-width: 840px;
+        margin: 8px auto;
         max-height: min(55vh, 420px);
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
         scrollbar-color: rgba(255,255,255,0.3) transparent;
         padding: 8px 4px;
-        margin: 8px 0;
       }
       .char-tile {
         width: 100%;
