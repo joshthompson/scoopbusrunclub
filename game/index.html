@@ -842,6 +842,53 @@
         gap: 14px;
         align-items: center;
       }
+      .pause-sliders {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 20px;
+        width: 100%;
+      }
+      .volume-slider-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: monospace;
+        font-size: clamp(13px, 2vw, 16px);
+        color: #fff;
+        cursor: pointer;
+      }
+      .volume-slider-row span {
+        min-width: 80px;
+        text-align: left;
+      }
+      .volume-slider-row input[type="range"] {
+        flex: 1;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: rgba(255,255,255,0.2);
+        border-radius: 3px;
+        outline: none;
+        cursor: pointer;
+      }
+      .volume-slider-row input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #f0c820;
+        border: 2px solid #fff;
+        cursor: pointer;
+      }
+      .volume-slider-row input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #f0c820;
+        border: 2px solid #fff;
+        cursor: pointer;
+      }
 
       /* ---------- Game type select screen ---------- */
       .game-type-btn {
@@ -991,9 +1038,13 @@
         justify-content: center;
         margin: 16px 0;
       }
+      .bus-grid {
+        max-width: 600px;
+        margin: 16px auto;
+      }
       .runner-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-        max-width: 840px;
+        grid-template-columns: repeat(5, 1fr);
+        max-width: 600px;
         margin: 8px auto;
         max-height: min(55vh, 420px);
         overflow-y: auto;
@@ -1068,7 +1119,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        overflow: hidden;
+        overflow: visible;
       }
       .runner-preview.random-preview {
         font-size: 36px;
@@ -1079,6 +1130,9 @@
         height: 100%;
         object-fit: contain;
         image-rendering: auto;
+      }
+      .bus-preview-img {
+        transform: scale(1.4);
       }
 
       /* When many runners, tiles fill grid cells */
@@ -1243,12 +1297,12 @@
         100% { opacity: 0; transform: translate(-50%, -160px); }
       }
     </style>
-    <script type="module" crossorigin src="/game/assets/main-CxefxCKn.js"></script>
+    <script type="module" crossorigin src="/game/assets/main-CLr_zKFA.js"></script>
     <link rel="modulepreload" crossorigin href="/game/assets/preload-helper-CeUGa9z8.js">
-    <link rel="modulepreload" crossorigin href="/game/assets/BusModel-6c6Cis8G.js">
-    <link rel="modulepreload" crossorigin href="/game/assets/LevelObjects-BY9I5Di0.js">
-    <link rel="modulepreload" crossorigin href="/game/assets/index-CGnQ6wLH.js">
-    <link rel="modulepreload" crossorigin href="/game/assets/RunnerModel-BFpNKxhF.js">
+    <link rel="modulepreload" crossorigin href="/game/assets/BusModel-Dvz4HLhR.js">
+    <link rel="modulepreload" crossorigin href="/game/assets/LevelObjects-CAvaQ_S7.js">
+    <link rel="modulepreload" crossorigin href="/game/assets/index-Iig5s0y6.js">
+    <link rel="modulepreload" crossorigin href="/game/assets/RunnerModel-B0NSOD5c.js">
   </head>
   <body>
     <div id="app"></div>
