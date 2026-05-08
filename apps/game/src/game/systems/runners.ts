@@ -109,6 +109,7 @@ export function spawnRunners(
       lateralOffset,
       ridingOffsetX: 0,
       ridingOffsetZ: 0,
+      ridingYawOffset: 0,
       escapeDir: 0,
       escaping: false,
       ownerPlayerIndex: 0,
@@ -437,6 +438,7 @@ export function updateRunnersSystem(
           const roofWorldY = scooperBusPos.y + localYL * cosPL + localZL * sinPL;
           if (pos.y <= roofWorldY && runner.velY < 0) {
             runner.state = 'riding';
+            runner.ridingYawOffset = (Math.random() - 0.5) * (40 * Math.PI / 180); // ±20°
             runner.mesh.rotation.x = 0;
             runner.mesh.rotation.z = 0;
             poseSitting(runner.model);
@@ -495,7 +497,7 @@ export function updateRunnersSystem(
         pos.x = riderBusPos.x + cosY * runner.ridingOffsetX + sinY * afterPitchZR;
         pos.z = riderBusPos.z - sinY * runner.ridingOffsetX + cosY * afterPitchZR;
         pos.y = riderBusPos.y + afterPitchYR;
-        runner.mesh.rotation.y = riderBusYaw;
+        runner.mesh.rotation.y = riderBusYaw + runner.ridingYawOffset;
         runner.mesh.rotation.x = -riderBusPitch;
         if (animateRunner) {
           runner.animPhase += dt;

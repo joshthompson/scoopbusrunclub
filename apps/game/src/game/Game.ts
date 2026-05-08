@@ -37,7 +37,7 @@ import type { GameType } from './modes/types';
 import { createBusModel, tintBusModel, busColorPaletteFromOption, PLAYER_COLORS, WHEEL_ROLL_SPEED, LIGHT_FRONT_POSITION } from './objects/BusModel';
 import type { BusColorPalette } from './objects/BusModel';
 import type { CharacterSelection, RunnerAppearance } from './characters';
-import { getBusColorById, resolveRunnerAppearance, isCorgiRunnerId, resolveColor, hexToColor3 } from './characters';
+import { resolveBusColor, resolveRunnerAppearance, isCorgiRunnerId, resolveColor, hexToColor3 } from './characters';
 import { createSky } from './objects/Sky';
 import type { IcePatchOverlay } from './PathShader';
 import { createTiledPathGroundMaterial } from './PathShaderTiled';
@@ -91,6 +91,7 @@ import {
   RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
   RUNNER_PLAYER_MAX_JUMPS,
   RUNNER_PLAYER_SPEED,
+  REVERSE_SPEED_MULTIPLIER,
   RUNNER_PLAYER_TURN_SPEED,
   RUNNER_JUMP_HEIGHT,
   RUNNER_SIT_DURATION,
@@ -252,6 +253,7 @@ import {
 import { buildLevelObjects, type PlacedObjectData } from './objects/LevelObjects';
 import { spawnGeese, updateGeeseSystem, type GooseSpawnPoint } from './systems/geese';
 import { spawnDeer, updateDeerSystem, type DeerSpawnPoint } from './systems/deer';
+import { updateGameSounds, resetGameSounds, disposeGameSounds, playThud, type BusSoundSource } from './systems/sounds';
 import { PowerUpSystem, type PowerUpId } from './systems/powerups';
 import { PassengerSystem } from './systems/passengers';
 import {
@@ -307,6 +309,7 @@ export class Game {
   private busVelY = 0; // vertical velocity (m/s) — >0 when airborne going up
   private busAirborne = false; // true while bus is above ground
   private elasticPenaltyActive = false; // true while bus overlaps an elastic object (prevents re-applying penalty)
+  private collisionThudPlayed = false; // true while bus overlaps a solid/elastic object (prevents repeat thud)
   private prevSlopePitch = 0; // previous frame's terrain pitch for detecting crests
   private prevGroundY = 0; // previous frame's ground height for cliff detection
   private waterBobPhase = 0; // accumulator for water surface bobbing
@@ -724,6 +727,8 @@ export class Game {
     }
     this._disposed = true;
     this.engine?.stopRenderLoop();
+    // Dispose game sounds
+    disposeGameSounds();
     // Dispose local bus lights before scene teardown
     this.busHeadlight?.dispose();
     this.busHeadlight = null;
@@ -763,8 +768,8 @@ export class Game {
     // Determine bus colour palette from their selection or fallback to index
     let palette: BusColorPalette;
     if (remoteCharSel?.type === 'bus') {
-      const opt = getBusColorById(remoteCharSel.busColorId);
-      palette = opt ? busColorPaletteFromOption(opt) : (PLAYER_COLORS[playerIndex - 1] ?? PLAYER_COLORS[1]);
+      const opt = resolveBusColor(remoteCharSel.busColorId);
+      palette = busColorPaletteFromOption(opt);
     } else {
       palette = PLAYER_COLORS[playerIndex - 1] ?? PLAYER_COLORS[1];
     }
@@ -876,8 +881,8 @@ export class Game {
       // Determine palette from charSelection or fallback
       let newPalette: BusColorPalette;
       if (state.charSelection?.type === 'bus') {
-        const opt = getBusColorById(state.charSelection.busColorId);
-        newPalette = opt ? busColorPaletteFromOption(opt) : (PLAYER_COLORS[state.playerIndex - 1] ?? PLAYER_COLORS[1]);
+        const opt = resolveBusColor(state.charSelection.busColorId);
+        newPalette = busColorPaletteFromOption(opt);
       } else {
         newPalette = PLAYER_COLORS[state.playerIndex - 1] ?? PLAYER_COLORS[1];
       }
@@ -1462,6 +1467,9 @@ export class Game {
     eventId: string,
     opts: InitSceneOptions,
   ) {
+    // Reset game sounds for the new session
+    resetGameSounds();
+
     // Lazy-load full level data (JSON chunks loaded on demand)
     const level: LevelData = await loadLevel(eventId);
     if (this._disposed) return;
@@ -1967,6 +1975,7 @@ export class Game {
     const landmarkResult = placeEventLandmarksSystem(this.scene, eventId, this.originCoord, this.scaleFactor, (x, z) => this.getGroundY(x, z));
     this.solidObstacles.push(...landmarkResult.solidObstacles);
     this.buildingFootprints.push(...landmarkResult.buildingFootprints);
+    this.buildingColliders.push(...landmarkResult.buildingColliders);
 
     // --- Fence boundary ---
     if (level.fences !== false) {
@@ -2288,7 +2297,7 @@ export class Game {
     // Resolve flag colour from character selection
     let bodyColor = new Color3(0.95, 0.78, 0.15); // default yellow
     if (this.charSelection?.type === 'bus') {
-      const opt = getBusColorById(this.charSelection.busColorId);
+      const opt = resolveBusColor(this.charSelection.busColorId);
       if (opt) bodyColor = Color3.FromHexString(opt.bodyHex);
     } else if (this.charSelection?.type === 'runner') {
       const appearance = resolveRunnerAppearance(this.charSelection.runnerId);
@@ -2334,8 +2343,8 @@ export class Game {
       const t = performance.now() / 1000;
       for (let i = 0; i < positions.length; i += 3) {
         const nx = (restPositions[i] + bannerW / 2) / bannerW;
-        const amplitude = nx * nx * 0.4;
-        positions[i + 1] = restPositions[i + 1] + Math.sin(t * 4 + nx * 6) * amplitude;
+        const amplitude = nx * nx * 1.2;
+        positions[i + 1] = restPositions[i + 1] + Math.sin(t * 8 + nx * 6) * amplitude;
       }
       banner.updateVerticesData(VertexBuffer.PositionKind, positions);
     });
@@ -2368,7 +2377,7 @@ export class Game {
     // Resolve P2 flag colour
     let bodyColor = new Color3(0.85, 0.25, 0.2); // default red for P2
     if (this.p2CharSelection?.type === 'bus') {
-      const opt = getBusColorById(this.p2CharSelection.busColorId);
+      const opt = resolveBusColor(this.p2CharSelection.busColorId);
       if (opt) bodyColor = Color3.FromHexString(opt.bodyHex);
     } else if (this.p2CharSelection?.type === 'runner') {
       const appearance = resolveRunnerAppearance(this.p2CharSelection.runnerId);
@@ -2412,8 +2421,8 @@ export class Game {
       const t = performance.now() / 1000;
       for (let i = 0; i < positions.length; i += 3) {
         const nx = (restPositions2[i] + bannerW / 2) / bannerW;
-        const amplitude = nx * nx * 0.4;
-        positions[i + 1] = restPositions2[i + 1] + Math.sin(t * 4 + nx * 6 + 1) * amplitude;
+        const amplitude = nx * nx * 1.2;
+        positions[i + 1] = restPositions2[i + 1] + Math.sin(t * 8 + nx * 6 + 1) * amplitude;
       }
       banner.updateVerticesData(VertexBuffer.PositionKind, positions);
     });
@@ -2535,8 +2544,8 @@ export class Game {
       const t = performance.now() / 1000;
       for (let i = 0; i < positions.length; i += 3) {
         const nx = (finishRestPositions[i] + bannerW / 2) / bannerW;
-        const amplitude = nx * nx * 0.4;
-        positions[i + 1] = finishRestPositions[i + 1] + Math.sin(t * 4 + nx * 6 + 2) * amplitude;
+        const amplitude = nx * nx * 1.2;
+        positions[i + 1] = finishRestPositions[i + 1] + Math.sin(t * 8 + nx * 6 + 2) * amplitude;
       }
       banner.updateVerticesData(VertexBuffer.PositionKind, positions);
     });
@@ -2784,8 +2793,8 @@ export class Game {
     // Tint local bus: use selected colour if available, else fallback to player index colour
     let palette: BusColorPalette;
     if (this.charSelection?.type === 'bus') {
-      const opt = getBusColorById(this.charSelection.busColorId);
-      palette = opt ? busColorPaletteFromOption(opt) : (PLAYER_COLORS[this.localPlayerIndex - 1] ?? PLAYER_COLORS[0]);
+      const opt = resolveBusColor(this.charSelection.busColorId);
+      palette = busColorPaletteFromOption(opt);
     } else {
       palette = PLAYER_COLORS[this.localPlayerIndex - 1] ?? PLAYER_COLORS[0];
     }
@@ -3131,6 +3140,15 @@ export class Game {
     const pushX = this.busPos.x - preCollX;
     const pushZ = this.busPos.z - preCollZ;
     const pushDistSq = pushX * pushX + pushZ * pushZ;
+
+    // Play thud on initial impact with any solid/elastic obstacle
+    const isColliding = touchingElastic || pushDistSq > 1e-6;
+    if (isColliding && !this.collisionThudPlayed) {
+      playThud(this.busSpeed);
+      this.collisionThudPlayed = true;
+    } else if (!isColliding) {
+      this.collisionThudPlayed = false;
+    }
 
     if (pushDistSq > 1e-6) {
       const pushDist = Math.sqrt(pushDistSq);
@@ -3597,7 +3615,7 @@ export class Game {
         const targetSpeed = accelInput * RUNNER_PLAYER_SPEED;
         const blend = Math.min(1, (accelInput !== 0 ? RUNNER_PLAYER_ACCELERATION : RUNNER_PLAYER_DECELERATION) * dt);
         this.p2Speed += (targetSpeed - this.p2Speed) * blend;
-        this.p2Speed = Math.max(-RUNNER_PLAYER_SPEED * 0.45, Math.min(RUNNER_PLAYER_SPEED, this.p2Speed));
+        this.p2Speed = Math.max(-RUNNER_PLAYER_SPEED * REVERSE_SPEED_MULTIPLIER, Math.min(RUNNER_PLAYER_SPEED, this.p2Speed));
 
         // Jump (Enter key for P2)
         if (enterPressed && this.p2JumpsUsed < RUNNER_PLAYER_MAX_JUMPS) {
@@ -3661,7 +3679,7 @@ export class Game {
 
         // Clamp speed (boosted max while scoop-boost is active)
         const effectiveMaxSpeed = this.p2BoostTimer > 0 ? BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER : BUS_MAX_SPEED;
-        this.p2Speed = Math.max(-effectiveMaxSpeed * 0.3, Math.min(effectiveMaxSpeed, this.p2Speed));
+        this.p2Speed = Math.max(-effectiveMaxSpeed * REVERSE_SPEED_MULTIPLIER, Math.min(effectiveMaxSpeed, this.p2Speed));
 
         // Tick boost timer
         if (this.p2BoostTimer > 0) {
@@ -4176,6 +4194,26 @@ export class Game {
       this.updateBuildingLodForPlayer();
       this.updateDistanceCulling();
       this.updateInsetCenter?.(this.viewCenter.x, this.viewCenter.z);
+
+      // --- Engine sounds during countdown (with rev on forward input) ---
+      {
+        const listener = { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z };
+        // Detect forward key held for rev effect
+        const gp1State = this.gamepadManager.getState(0);
+        const revving = this.isKey('w') || (!this.localMultiplayer && this.isKey('arrowup')) || (this.touchActive && this.touchDeltaY <= 0.1) || gp1State.accel > 0.1;
+        const revSpeed = revving ? 8 : 0; // simulate ~8 m/s for rev sound
+        const busSources: BusSoundSource[] = [
+          { x: this.busPos.x, y: this.busPos.y, z: this.busPos.z, speed: revSpeed, slope: 0 },
+        ];
+        for (const [, remote] of this.remotePlayers) {
+          if (remote.state) {
+            busSources.push({ x: remote.smoothPos.x, y: remote.smoothPos.y, z: remote.smoothPos.z, speed: remote.state.speed, slope: remote.smoothPitch });
+          }
+        }
+        const goosePositions = this.geese.map(g => ({ x: g.x, z: g.z }));
+        updateGameSounds(listener, busSources, goosePositions);
+      }
+
       return;
     }
 
@@ -4370,7 +4408,7 @@ export class Game {
       const blend = Math.min(1, accelRate * dt);
       this.busSpeed += (targetSpeed - this.busSpeed) * blend;
       
-      const maxReverse = this.runnerShoeTimer > 0 ? 0 : RUNNER_PLAYER_SPEED * 0.45;
+      const maxReverse = this.runnerShoeTimer > 0 ? 0 : RUNNER_PLAYER_SPEED * REVERSE_SPEED_MULTIPLIER;
       this.busSpeed = Math.max(-maxReverse, Math.min(RUNNER_PLAYER_SPEED * playerSpeedMultiplier * totalRunnerSpeedBoost, this.busSpeed));
 
       const jumpHeld = this.isKey(' ') || this.isKey('space') || this.isKey('spacebar') || gp1.actionHeld;
@@ -4488,7 +4526,7 @@ export class Game {
 
       // Clamp speed (boosted max while scoop-boost is active)
       const effectiveMaxSpeed = this.boostTimer > 0 ? BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER : BUS_MAX_SPEED;
-      this.busSpeed = Math.max(-effectiveMaxSpeed * 0.3, Math.min(effectiveMaxSpeed, this.busSpeed));
+      this.busSpeed = Math.max(-effectiveMaxSpeed * REVERSE_SPEED_MULTIPLIER, Math.min(effectiveMaxSpeed, this.busSpeed));
 
       // Tick boost timer and stop exhaust flames when expired
       if (this.boostTimer > 0) {
@@ -4854,6 +4892,15 @@ export class Game {
       } else {
         obj.landedTimer -= dt;
         if (obj.landedTimer <= 0) {
+          // Restore obstacle so it can be scooped again
+          if (obj.obstacleIndex >= 0) {
+            const obs = this.solidObstacles[obj.obstacleIndex];
+            if (obs) {
+              obs.radius = 0.8;
+              obs.x = pos.x;
+              obs.z = pos.z;
+            }
+          }
           this.scoopedObjects.splice(i, 1);
         }
       }
@@ -4878,6 +4925,21 @@ export class Game {
     this.updateBuildingLodForPlayer();
     this.updateDistanceCulling();
     this.updateInsetCenter?.(this.viewCenter.x, this.viewCenter.z);
+
+    // --- Proximity-based game sounds ---
+    {
+      const listener = { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z };
+      const busSources: BusSoundSource[] = [
+        { x: this.busPos.x, y: this.busPos.y, z: this.busPos.z, speed: this.busSpeed, slope: this.busPitch },
+      ];
+      for (const [, remote] of this.remotePlayers) {
+        if (remote.state) {
+          busSources.push({ x: remote.smoothPos.x, y: remote.smoothPos.y, z: remote.smoothPos.z, speed: remote.state.speed, slope: remote.smoothPitch });
+        }
+      }
+      const goosePositions = this.geese.map(g => ({ x: g.x, z: g.z }));
+      updateGameSounds(listener, busSources, goosePositions);
+    }
 
     // Minimap
     if (this.minimap) {

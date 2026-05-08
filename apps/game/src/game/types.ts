@@ -48,6 +48,7 @@ export interface Runner {
   lateralOffset: number;
   ridingOffsetX: number;
   ridingOffsetZ: number;
+  ridingYawOffset: number;
   escapeDir: number;
   /** Whether the runner is currently in escape mode (fleeing off the path) */
   escaping: boolean;

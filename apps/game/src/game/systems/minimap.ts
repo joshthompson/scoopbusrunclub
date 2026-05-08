@@ -3,7 +3,7 @@ import { PLAYER_COLORS } from '../objects/BusModel';
 import type { MinimapPlayer } from '../Minimap';
 import type { RemotePlayersMap } from '../types';
 import type { CharacterSelection } from '../characters';
-import { resolveRunnerAppearance, resolveColor, getBusColorById } from '../characters';
+import { resolveRunnerAppearance, resolveColor, resolveBusColor } from '../characters';
 
 function color3ToHex(c: { r: number; g: number; b: number }): string {
   const r = Math.round(c.r * 255).toString(16).padStart(2, '0');
@@ -18,8 +18,8 @@ function resolveMinimapColor(charSel: CharacterSelection | null | undefined, pla
     return resolveColor(appearance.topColor);
   }
   if (charSel?.type === 'bus') {
-    const opt = getBusColorById(charSel.busColorId);
-    if (opt) return opt.bodyHex;
+    const opt = resolveBusColor(charSel.busColorId);
+    return opt.bodyHex;
   }
   const palette = PLAYER_COLORS[playerIndex - 1] ?? PLAYER_COLORS[0];
   return color3ToHex(palette.body);

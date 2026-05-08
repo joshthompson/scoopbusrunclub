@@ -94,6 +94,8 @@ export interface GooseModelResult {
   leftLeg: TransformNode;
   rightLeg: TransformNode;
   neck: TransformNode;
+  leftWing: TransformNode;
+  rightWing: TransformNode;
 }
 
 export function createGooseModel(
@@ -134,16 +136,29 @@ export function createGooseModel(
   breast.parent = root;
 
   // ═══════════════════════════════════════
-  //  Wings (darker slabs on each side)
+  //  Wings (darker slabs on each side, pivoted for animation)
   // ═══════════════════════════════════════
-  for (const side of [-1, 1]) {
-    const wing = MeshBuilder.CreateBox(`gWing${side > 0 ? 'R' : 'L'}_${id}`, {
-      width: WING_W, height: WING_H, depth: WING_D,
-    }, scene);
-    wing.material = wingMat;
-    wing.position.set(side * (BODY_W / 2 + WING_W / 2 - 0.005), BODY_Y + 0.01, -0.01);
-    wing.parent = root;
-  }
+  const leftWingPivot = new TransformNode(`gLWingPiv_${id}`, scene);
+  leftWingPivot.position = new Vector3(-(BODY_W / 2 - 0.005), BODY_Y + 0.01 + WING_H / 2, -0.01);
+  leftWingPivot.parent = root;
+
+  const leftWing = MeshBuilder.CreateBox(`gWingL_${id}`, {
+    width: WING_W, height: WING_H, depth: WING_D,
+  }, scene);
+  leftWing.material = wingMat;
+  leftWing.position.set(-(WING_W / 2), -WING_H / 2, 0);
+  leftWing.parent = leftWingPivot;
+
+  const rightWingPivot = new TransformNode(`gRWingPiv_${id}`, scene);
+  rightWingPivot.position = new Vector3(BODY_W / 2 - 0.005, BODY_Y + 0.01 + WING_H / 2, -0.01);
+  rightWingPivot.parent = root;
+
+  const rightWing = MeshBuilder.CreateBox(`gWingR_${id}`, {
+    width: WING_W, height: WING_H, depth: WING_D,
+  }, scene);
+  rightWing.material = wingMat;
+  rightWing.position.set(WING_W / 2, -WING_H / 2, 0);
+  rightWing.parent = rightWingPivot;
 
   // ═══════════════════════════════════════
   //  Tail
@@ -271,6 +286,8 @@ export function createGooseModel(
     leftLeg: leftLegPivot,
     rightLeg: rightLegPivot,
     neck: neckPivot,
+    leftWing: leftWingPivot,
+    rightWing: rightWingPivot,
   };
 }
 
@@ -283,6 +300,9 @@ export function poseGooseWalking(model: GooseModelResult, phase: number) {
   model.rightLeg.rotation.x = -swing;
   // Subtle neck bob
   model.neck.rotation.x = Math.sin(phase * 2) * 0.08;
+  // Wings down
+  model.leftWing.rotation.z = 0;
+  model.rightWing.rotation.z = 0;
 }
 
 /** Idle/standing pose — legs straight, neck slightly tilted. */
@@ -290,6 +310,8 @@ export function poseGooseIdle(model: GooseModelResult) {
   model.leftLeg.rotation.x = 0;
   model.rightLeg.rotation.x = 0;
   model.neck.rotation.x = 0;
+  model.leftWing.rotation.z = 0;
+  model.rightWing.rotation.z = 0;
 }
 
 /** Sitting pose — legs tucked, neck upright. */
@@ -297,16 +319,33 @@ export function poseGooseSitting(model: GooseModelResult) {
   model.leftLeg.rotation.x = -1.2;
   model.rightLeg.rotation.x = -1.2;
   model.neck.rotation.x = -0.1;
-  // Lower body slightly when sitting
+  model.leftWing.rotation.z = 0;
+  model.rightWing.rotation.z = 0;
 }
 
-/** Fleeing pose — fast leg swing, neck stretched forward. */
+/** Fleeing pose — fast leg swing, neck stretched forward, wings raised. */
 export function poseGooseFleeing(model: GooseModelResult, phase: number) {
   const swing = Math.sin(phase) * 0.7;
   model.leftLeg.rotation.x = swing;
   model.rightLeg.rotation.x = -swing;
   // Neck stretched forward for running
   model.neck.rotation.x = 0.35;
+  // Wings raised and flapping slightly
+  const flap = Math.sin(phase * 2) * 0.15;
+  model.leftWing.rotation.z = 0.6 + flap;
+  model.rightWing.rotation.z = -(0.6 + flap);
+}
+
+/** Swimming pose — legs tucked (hidden under water), neck upright, wings folded. */
+export function poseGooseSwimming(model: GooseModelResult, phase: number) {
+  // Tuck legs up so they're hidden below the body
+  model.leftLeg.rotation.x = -1.2;
+  model.rightLeg.rotation.x = -1.2;
+  // Gentle neck sway
+  model.neck.rotation.x = Math.sin(phase * 1.5) * 0.05;
+  // Wings folded against body
+  model.leftWing.rotation.z = 0;
+  model.rightWing.rotation.z = 0;
 }
 
 // ── Helper ──

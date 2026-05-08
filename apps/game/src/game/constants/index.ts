@@ -11,12 +11,13 @@ export const BUS_ACCELERATION = 12;
 export const BUS_BRAKE = 20;
 export const BUS_FRICTION = 10;
 export const COUNTDOWN_DURATION = 3.0;
-export const BUS_TURN_SPEED = 1.08;
+export const BUS_TURN_SPEED = 1.12;
 export const BUS_TURN_SPEED_STANDSTILL = 0.4;
 export const RUNNER_COUNT = 30;
 export const RUNNER_MIN_SPEED = 2.5;
 export const RUNNER_MAX_SPEED = 4.5 * 2;
 export const RUNNER_PLAYER_SPEED = RUNNER_MAX_SPEED + 2;
+export const REVERSE_SPEED_MULTIPLIER = 0.8;
 export const RUNNER_PLAYER_ACCELERATION = 8;
 export const RUNNER_PLAYER_DECELERATION = 7;
 export const RUNNER_PLAYER_ANIM_SPEED_FACTOR = 0.5;
@@ -140,13 +141,13 @@ export const RENDER_TREES_MAX_DISTANCE = 500;
 /** Metres — geese within this distance form a herd */
 export const GOOSE_HERD_RADIUS = 2;
 /** Metres — geese flee when bus/runner is within this distance */
-export const GOOSE_FLEE_RADIUS = 6;
+export const GOOSE_FLEE_RADIUS = 15;
 /** Metres — maximum wander distance from current position */
-export const GOOSE_WANDER_RADIUS = 10;
+export const GOOSE_WANDER_RADIUS = 15;
 /** m/s — walking speed */
-export const GOOSE_WALK_SPEED = 2;
+export const GOOSE_WALK_SPEED = 3;
 /** m/s — flee speed */
-export const GOOSE_FLEE_SPEED = 6;
+export const GOOSE_FLEE_SPEED = 10;
 /** Seconds — max idle sitting time */
 export const GOOSE_IDLE_MAX = 20;
 /** Metres — minimum separation between geese in a herd */
@@ -160,13 +161,13 @@ export const GOOSE_LANDED_DURATION = 3;
 
 // ---------- Deer constants ----------
 /** Metres — deer within this distance form a herd (10× geese) */
-export const DEER_HERD_RADIUS = 20;
+export const DEER_HERD_RADIUS = 40;
 /** Metres — deer flee when bus/runner is within this distance */
 export const DEER_FLEE_RADIUS = 20;
 /** Metres — deer start running (not fleeing) at this distance */
 export const DEER_RUN_TRIGGER_RADIUS = 20;
 /** Metres — maximum wander distance from current position */
-export const DEER_WANDER_RADIUS = 25;
+export const DEER_WANDER_RADIUS = 50;
 /** m/s — walking speed */
 export const DEER_WALK_SPEED = 5;
 /** m/s — running speed (alert but not panicked) */
@@ -176,7 +177,7 @@ export const DEER_FLEE_SPEED = 20;
 /** Seconds — max idle standing time */
 export const DEER_IDLE_MAX = 15;
 /** Metres — minimum separation between deer in a herd */
-export const DEER_MIN_SEPARATION = 3.0;
+export const DEER_MIN_SEPARATION = 6.0;
 /** bus/runner scoop distance */
 export const DEER_SCOOP_DISTANCE = 4.0;
 /** Metres — merge herds within this radius (10× geese) */

@@ -372,6 +372,7 @@ export function updateDeerSystem(
         let newZ = deer.z + (dz / dist) * speed * dt;
 
         if (isInWaterZone(newX, newZ, ctx.waterZones)) {
+          // Retarget along perpendicular to avoid water
           const perpX = -dz / dist;
           const perpZ = dx / dist;
           const alt1X = deer.x + perpX * speed * dt;
@@ -379,9 +380,23 @@ export function updateDeerSystem(
           if (!isInWaterZone(alt1X, alt1Z, ctx.waterZones)) {
             newX = alt1X;
             newZ = alt1Z;
+            // Retarget so deer keeps running along water edge
+            const runDistance = DEER_RUN_TRIGGER_RADIUS * 2;
+            deer.targetX = deer.x + perpX * runDistance;
+            deer.targetZ = deer.z + perpZ * runDistance;
           } else {
-            newX = deer.x - perpX * speed * dt;
-            newZ = deer.z - perpZ * speed * dt;
+            const alt2X = deer.x - perpX * speed * dt;
+            const alt2Z = deer.z - perpZ * speed * dt;
+            if (!isInWaterZone(alt2X, alt2Z, ctx.waterZones)) {
+              newX = alt2X;
+              newZ = alt2Z;
+              deer.targetX = deer.x - perpX * DEER_RUN_TRIGGER_RADIUS * 2;
+              deer.targetZ = deer.z - perpZ * DEER_RUN_TRIGGER_RADIUS * 2;
+            } else {
+              // Both sides blocked — stay put
+              newX = deer.x;
+              newZ = deer.z;
+            }
           }
         }
 
@@ -429,6 +444,7 @@ export function updateDeerSystem(
         let newZ = deer.z + (dz / dist) * speed * dt;
 
         if (isInWaterZone(newX, newZ, ctx.waterZones)) {
+          // Retarget along perpendicular to avoid water
           const perpX = -dz / dist;
           const perpZ = dx / dist;
           const alt1X = deer.x + perpX * speed * dt;
@@ -436,9 +452,23 @@ export function updateDeerSystem(
           if (!isInWaterZone(alt1X, alt1Z, ctx.waterZones)) {
             newX = alt1X;
             newZ = alt1Z;
+            // Retarget so deer keeps fleeing along water edge
+            const fleeDistance = DEER_FLEE_RADIUS * 3;
+            deer.targetX = deer.x + perpX * fleeDistance;
+            deer.targetZ = deer.z + perpZ * fleeDistance;
           } else {
-            newX = deer.x - perpX * speed * dt;
-            newZ = deer.z - perpZ * speed * dt;
+            const alt2X = deer.x - perpX * speed * dt;
+            const alt2Z = deer.z - perpZ * speed * dt;
+            if (!isInWaterZone(alt2X, alt2Z, ctx.waterZones)) {
+              newX = alt2X;
+              newZ = alt2Z;
+              deer.targetX = deer.x - perpX * DEER_FLEE_RADIUS * 3;
+              deer.targetZ = deer.z - perpZ * DEER_FLEE_RADIUS * 3;
+            } else {
+              // Both sides blocked — stay put
+              newX = deer.x;
+              newZ = deer.z;
+            }
           }
         }
 

@@ -97,6 +97,7 @@ export interface Passenger {
   // Roof seat
   ridingOffsetX: number;
   ridingOffsetZ: number;
+  ridingYawOffset: number;
 
   // Delivery phases
   deliveredTimer: number;
@@ -404,6 +405,7 @@ export class PassengerSystem {
         velZ: 0,
         ridingOffsetX: 0,
         ridingOffsetZ: 0,
+        ridingYawOffset: 0,
         deliveredTimer: 0,
         cooldownTimer: 0,
         dismountVelY: 0,
@@ -500,6 +502,7 @@ export class PassengerSystem {
           const roofWorldY = busPos.y + localY * cosP + localZ * sinP;
           if (pos.y <= roofWorldY && p.velY < 0) {
             p.state = 'riding';
+            p.ridingYawOffset = (Math.random() - 0.5) * (40 * Math.PI / 180); // ±20°
             p.mesh.rotation.x = 0;
             p.mesh.rotation.z = 0;
             poseSitting(p.model);
@@ -520,7 +523,7 @@ export class PassengerSystem {
           pos.x = busPos.x + cosY2 * p.ridingOffsetX + sinY2 * afterPitchZR;
           pos.z = busPos.z - sinY2 * p.ridingOffsetX + cosY2 * afterPitchZR;
           pos.y = busPos.y + afterPitchYR;
-          p.mesh.rotation.y = busYaw;
+          p.mesh.rotation.y = busYaw + p.ridingYawOffset;
           p.mesh.rotation.x = -busPitch;
           p.animPhase += dt;
           poseSittingAnimated(p.model, p.animPhase);

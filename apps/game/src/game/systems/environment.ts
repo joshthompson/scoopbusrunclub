@@ -15,7 +15,7 @@ import { createCopperTent } from '../objects/CopperTent';
 import { createHagaGate } from '../objects/HagaGate';
 import { createParkrunSign } from '../objects/ParkrunSign';
 import type { Marshal, Runner } from '../types';
-import type { BuildingFootprint, ElasticObject, SolidObstacle } from '../types';
+import type { BuildingCollider, BuildingFootprint, ElasticObject, SolidObstacle } from '../types';
 import {
   PATH_HALF_WIDTH,
   START_CIRCLE_RADIUS,
@@ -494,6 +494,7 @@ export function updateMarshals(marshals: Marshal[], dt: number) {
 
 export interface LandmarkResult extends PhysicsObjectResult {
   buildingFootprints: BuildingFootprint[];
+  buildingColliders: BuildingCollider[];
 }
 
 /**
@@ -510,6 +511,7 @@ export function placeEventLandmarks(
     elasticObjects: [],
     solidObstacles: [],
     buildingFootprints: [],
+    buildingColliders: [],
   };
 
   if (eventId === 'haga') {
@@ -526,23 +528,34 @@ export function placeEventLandmarks(
     const tentCx = (lx1 + lx2) / 2;
     const tentCz = (lz1 + lz2) / 2;
     const tentLength = Math.sqrt((lx2 - lx1) ** 2 + (lz2 - lz1) ** 2);
-    result.solidObstacles.push({ x: tentCx, z: tentCz, radius: tentLength * 0.45 });
 
-    // Minimap rectangle
+    // Use an oriented bounding box collider matching the tent shape
+    // instead of a single oversized circle
     const tentYaw = Math.atan2(lx2 - lx1, lz2 - lz1);
+    const tentHalfLength = tentLength * 0.48; // slightly inset from visual edges
+    const tentHalfWidth = tentLength * 0.2;   // tent is ~40% as wide as it is long
+    result.buildingColliders.push({
+      x: tentCx,
+      z: tentCz,
+      yaw: tentYaw,
+      halfWidth: tentHalfWidth,
+      halfDepth: tentHalfLength,
+    });
+
+    // Minimap rectangle (slightly larger visual bounds than collision)
     const tentRightX = Math.cos(tentYaw);
     const tentRightZ = -Math.sin(tentYaw);
     const tentFwdX = Math.sin(tentYaw);
     const tentFwdZ = Math.cos(tentYaw);
-    const tentHalfLength = tentLength * 0.5;
-    const tentHalfWidth = tentLength * 0.24;
+    const tentMapHalfLength = tentLength * 0.5;
+    const tentMapHalfWidth = tentLength * 0.24;
     result.buildingFootprints.push({
       type: 'blue',
       points: [
-        [tentCx - tentFwdX * tentHalfLength - tentRightX * tentHalfWidth, tentCz - tentFwdZ * tentHalfLength - tentRightZ * tentHalfWidth],
-        [tentCx + tentFwdX * tentHalfLength - tentRightX * tentHalfWidth, tentCz + tentFwdZ * tentHalfLength - tentRightZ * tentHalfWidth],
-        [tentCx + tentFwdX * tentHalfLength + tentRightX * tentHalfWidth, tentCz + tentFwdZ * tentHalfLength + tentRightZ * tentHalfWidth],
-        [tentCx - tentFwdX * tentHalfLength + tentRightX * tentHalfWidth, tentCz - tentFwdZ * tentHalfLength + tentRightZ * tentHalfWidth],
+        [tentCx - tentFwdX * tentMapHalfLength - tentRightX * tentMapHalfWidth, tentCz - tentFwdZ * tentMapHalfLength - tentRightZ * tentMapHalfWidth],
+        [tentCx + tentFwdX * tentMapHalfLength - tentRightX * tentMapHalfWidth, tentCz + tentFwdZ * tentMapHalfLength - tentRightZ * tentMapHalfWidth],
+        [tentCx + tentFwdX * tentMapHalfLength + tentRightX * tentMapHalfWidth, tentCz + tentFwdZ * tentMapHalfLength + tentRightZ * tentMapHalfWidth],
+        [tentCx - tentFwdX * tentMapHalfLength + tentRightX * tentMapHalfWidth, tentCz - tentFwdZ * tentMapHalfLength + tentRightZ * tentMapHalfWidth],
       ],
     });
 

@@ -284,6 +284,9 @@ export const RUNNER_PRESETS: RunnerPreset[] = [
 /** Special "random runner" sentinel id. */
 export const RANDOM_RUNNER_ID = '__random__';
 
+/** Special "random bus" sentinel id. */
+export const RANDOM_BUS_ID = '__random_bus__';
+
 // ────────────────────────────────────────────
 // Bus colour options
 // ────────────────────────────────────────────
@@ -297,6 +300,7 @@ export const BUS_COLOR_OPTIONS: BusColorOption[] = [
   { id: 'green',   name: 'Green',   cssColor: '#3aaa40', bodyHex: '#3aaa40', scoopHex: '#e868a8' },
   { id: 'black',   name: 'Black',   cssColor: '#333333', bodyHex: '#333333', scoopHex: '#f0c820' },
   { id: 'pink',    name: 'Pink',    cssColor: '#e868a8', bodyHex: '#e868a8', scoopHex: '#d94030' },
+  { id: 'white',   name: 'White',   cssColor: '#f0f0f0', bodyHex: '#f0f0f0', scoopHex: '#333333' },
 ];
 
 // ────────────────────────────────────────────
@@ -368,6 +372,43 @@ export function getRunnerPresetById(id: string): RunnerPreset | undefined {
 /** Pick a random runner preset (excluding the RANDOM sentinel). */
 export function pickRandomRunner(): RunnerPreset {
   return RUNNER_PRESETS[Math.floor(Math.random() * RUNNER_PRESETS.length)];
+}
+
+/** Pick a random bus colour option. */
+export function pickRandomBusColor(): BusColorOption {
+  return BUS_COLOR_OPTIONS[Math.floor(Math.random() * BUS_COLOR_OPTIONS.length)];
+}
+
+/** Generate a random bus colour option with unique hex values. */
+export function generateRandomBusColor(): BusColorOption {
+  const hue = Math.floor(Math.random() * 360);
+  const scoopHue = (hue + 120 + Math.floor(Math.random() * 120)) % 360;
+  // Convert HSL to hex for the 3D model
+  const toHex = (h: number, s: number, l: number) => {
+    const c = document.createElement('canvas').getContext('2d')!;
+    c.fillStyle = `hsl(${h}, ${s}%, ${l}%)`;
+    return c.fillStyle; // returns '#rrggbb'
+  };
+  const bHex = toHex(hue, 70, 50);
+  const sHex = toHex(scoopHue, 70, 50);
+  // Encode hex values in the id so they survive serialisation
+  const id = `${RANDOM_BUS_ID}${bHex}_${sHex}`;
+  return { id, name: 'Random', cssColor: bHex, bodyHex: bHex, scoopHex: sHex };
+}
+
+/** Resolve a bus colour id. Handles random bus ids (prefix-encoded hex). */
+export function resolveBusColor(busColorId: string): BusColorOption {
+  if (busColorId.startsWith(RANDOM_BUS_ID)) {
+    const encoded = busColorId.slice(RANDOM_BUS_ID.length);
+    if (encoded) {
+      // Decode: "#aabbcc_#ddeeff"
+      const [bodyHex, scoopHex] = encoded.split('_');
+      return { id: busColorId, name: 'Random', cssColor: bodyHex, bodyHex, scoopHex };
+    }
+    // Bare RANDOM_BUS_ID with no encoding — generate now
+    return generateRandomBusColor();
+  }
+  return getBusColorById(busColorId) ?? pickRandomBusColor();
 }
 
 function pick<T>(arr: readonly T[]): T {

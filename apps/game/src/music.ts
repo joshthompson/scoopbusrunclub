@@ -4,6 +4,8 @@ import track3Url from './assets/music/desifreemusic-driving-bass-neon-city-vibes
 import track4Url from './assets/music/universfield-motivational-electronic-background-226021.mp3';
 
 const STORAGE_KEY = 'sbrc-music-muted';
+const VOLUME_KEY = 'sbrc-music-volume';
+const DEFAULT_MUSIC_VOLUME = 0.5;
 const trackUrls = [
   { url: track1Url, track: 'Cyberpunk', artist: 'Monume' },
   { url: track2Url, track: 'Retro', artist: 'The Mountain' },
@@ -23,6 +25,13 @@ function setMuted(muted: boolean) {
   localStorage.setItem(STORAGE_KEY, muted ? '1' : '0');
 }
 
+function getStoredVolume(): number {
+  const v = localStorage.getItem(VOLUME_KEY);
+  if (v === null) return DEFAULT_MUSIC_VOLUME;
+  const n = parseFloat(v);
+  return isNaN(n) ? DEFAULT_MUSIC_VOLUME : Math.max(0, Math.min(1, n));
+}
+
 function playNext() {
   if (isMuted()) return;
   if (audio) {
@@ -30,7 +39,7 @@ function playNext() {
     audio.removeEventListener('ended', onEnded);
   }
   audio = new Audio(trackUrls[currentIndex].url);
-  audio.volume = 0.35;
+  audio.volume = getStoredVolume();
   audio.addEventListener('ended', onEnded);
   audio.play().catch(() => {});
 }
@@ -70,4 +79,18 @@ export function toggleMute(): boolean {
 /** Get current mute state. */
 export function getMuted(): boolean {
   return isMuted();
+}
+
+/** Get current music volume (0–1). */
+export function getMusicVolume(): number {
+  return getStoredVolume();
+}
+
+/** Set music volume (0–1). Persists to localStorage. */
+export function setMusicVolume(vol: number): void {
+  const clamped = Math.max(0, Math.min(1, vol));
+  localStorage.setItem(VOLUME_KEY, String(clamped));
+  if (audio) {
+    audio.volume = clamped;
+  }
 }

@@ -16,6 +16,7 @@ import {
 import { createRunnerModel, poseStanding, poseWaving } from './game/objects/RunnerModel';
 import type { RunnerModelResult } from './game/objects/RunnerModel';
 import { createCorgiModel } from './game/objects/CorgiModel';
+import { createBusModel, tintBusModel, busColorPaletteFromOption } from './game/objects/BusModel';
 import type { RunnerAppearance } from './game/characters';
 
 const PREVIEW_WIDTH = 160;
@@ -136,6 +137,57 @@ export async function getCorgiPreviewUrl(presetId: string): Promise<string> {
   if (cached) return cached;
   const url = await renderCorgiPreview();
   previewCache.set(presetId, url);
+  return url;
+}
+
+/**
+ * Render a bus model with the given colour option to a data URL image.
+ * Camera is positioned to show the bus at a 3/4 angle.
+ */
+export function renderBusPreview(bodyHex: string, scoopHex: string): Promise<string> {
+  const { canvas, engine } = getSharedEngine();
+
+  const scene = new Scene(engine);
+  scene.clearColor = new Color4(0, 0, 0, 0);
+
+  // Camera: angled view of the bus — bus is ~15m long, ~4m tall
+  const cam = new FreeCamera('prevCam', new Vector3(8, 5, 12), scene);
+  cam.setTarget(new Vector3(0, 1.5, 0));
+  cam.fov = 1.0;
+  cam.minZ = 0.1;
+
+  // Lighting
+  const light = new HemisphericLight('prevLight', new Vector3(0.3, 1, 0.5), scene);
+  light.intensity = 1.2;
+  light.groundColor = new Color3(0.3, 0.3, 0.35);
+
+  return createBusModel(scene).then((busModel) => {
+    busModel.root.setEnabled(true);
+    busModel.root.rotation.y = -0.4;
+
+    const palette = busColorPaletteFromOption({ bodyHex, scoopHex });
+    tintBusModel(busModel.root, palette, 'preview');
+
+    return new Promise<string>((resolve) => {
+      scene.executeWhenReady(() => {
+        engine.beginFrame();
+        scene.render();
+        engine.endFrame();
+
+        const dataUrl = canvas.toDataURL('image/png');
+        scene.dispose();
+        resolve(dataUrl);
+      });
+    });
+  });
+}
+
+export async function getBusPreviewUrl(colorId: string, bodyHex: string, scoopHex: string): Promise<string> {
+  const cacheKey = `bus_${colorId}`;
+  const cached = previewCache.get(cacheKey);
+  if (cached) return cached;
+  const url = await renderBusPreview(bodyHex, scoopHex);
+  previewCache.set(cacheKey, url);
   return url;
 }
 

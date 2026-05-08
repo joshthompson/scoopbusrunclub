@@ -4,11 +4,13 @@ import {
   BUS_COLOR_OPTIONS,
   RUNNER_PRESETS,
   RANDOM_RUNNER_ID,
+  RANDOM_BUS_ID,
+  generateRandomBusColor,
   isCorgiPreset,
   type CharacterSelection,
   type RunnerPreset,
 } from './game/characters';
-import { getRunnerPreviewUrl, getCorgiPreviewUrl, startLiveWavePreview } from './RunnerPreview3D';
+import { getRunnerPreviewUrl, getCorgiPreviewUrl, getBusPreviewUrl, startLiveWavePreview } from './RunnerPreview3D';
 import { useMenuNav } from './useMenuNav';
 import { MuteButton } from './MuteButton';
 
@@ -28,6 +30,27 @@ interface CharacterSelectScreenProps {
 }
 
 // ── Runner preview (3D rendered image) ──
+
+function BusPreview(props: { colorId: string; bodyHex: string; scoopHex: string; cssColor: string }) {
+  const [src, setSrc] = createSignal<string>('');
+
+  onMount(async () => {
+    const url = await getBusPreviewUrl(props.colorId, props.bodyHex, props.scoopHex);
+    setSrc(url);
+  });
+
+  return (
+    <div class="runner-preview">
+      <Show when={src()} fallback={<div class="bus-swatch" style={{ background: props.cssColor }} />}>
+        <img
+          src={src()}
+          alt={props.colorId}
+          class="runner-preview-img bus-preview-img"
+        />
+      </Show>
+    </div>
+  );
+}
 
 function RunnerPreview(props: { preset: RunnerPreset; hovered: boolean; onLiveRef: (el: HTMLDivElement) => void }) {
   const [src, setSrc] = createSignal<string>('');
@@ -125,7 +148,7 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
   });
   onCleanup(() => window.removeEventListener('resize', updateGridCols));
 
-  const gridCount = () => isBus() ? BUS_COLOR_OPTIONS.length : 1 + sortedRunnerPresets().length;
+  const gridCount = () => isBus() ? BUS_COLOR_OPTIONS.length + 1 : sortedRunnerPresets().length + 1;
   const totalCount = () => 1 + gridCount() + 1; // mute + grid items + back button
   const { isFocused, setFocusedIndex } = useMenuNav(totalCount, {
     onBack: props.onBack,
@@ -145,7 +168,9 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
 
   function handleBusClick(id: string) {
     if (isBusTaken(id)) return;
-    const sel: CharacterSelection = { type: 'bus', busColorId: id };
+    // Resolve random immediately so the colour is deterministic from here on
+    const busColorId = id === RANDOM_BUS_ID ? generateRandomBusColor().id : id;
+    const sel: CharacterSelection = { type: 'bus', busColorId };
     setSelected(sel);
     props.onSelect(sel);
   }
@@ -192,13 +217,23 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
                   onClick={() => handleBusClick(opt.id)}
                   title={opt.name}
                 >
-                  <div class="bus-swatch" style={{ background: opt.cssColor }} />
+                  <BusPreview colorId={opt.id} bodyHex={opt.bodyHex} scoopHex={opt.scoopHex} cssColor={opt.cssColor} />
                   <span class="char-tile-label">{opt.name}</span>
                 </button>
               );
             }}</For>
+            {/* Random bus option */}
+            <button
+              class="char-tile"
+              classList={{ active: (selected() as any)?.busColorId?.startsWith(RANDOM_BUS_ID), 'menu-focused': isFocused(1 + BUS_COLOR_OPTIONS.length) }}
+              onClick={() => handleBusClick(RANDOM_BUS_ID)}
+              title="Random"
+            >
+              <div class="runner-preview random-preview">🎲</div>
+              <span class="char-tile-label">Random</span>
+            </button>
           </div>
-          <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(1 + BUS_COLOR_OPTIONS.length) }} onClick={props.onBack}>
+          <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(1 + BUS_COLOR_OPTIONS.length + 1) }} onClick={props.onBack}>
             Back
           </button>
         </Show>
@@ -207,17 +242,6 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
         <Show when={!isBus() && !(props.waiting && selected())}>
           <h2 class="screen-heading">Select Runner</h2>
           <div class="char-grid runner-grid" ref={gridRef}>
-            {/* Random option */}
-            <button
-              class="char-tile"
-              classList={{ active: (selected() as any)?.runnerId === RANDOM_RUNNER_ID, 'menu-focused': isFocused(1) }}
-              onClick={() => handleRunnerClick(RANDOM_RUNNER_ID)}
-              title="Random"
-            >
-              <div class="runner-preview random-preview">🎲</div>
-              <span class="char-tile-label">Random</span>
-            </button>
-
             <For each={sortedRunnerPresets()}>{(preset, i) => {
               const taken = () => isRunnerTaken(preset.id);
               const active = () => (selected() as any)?.runnerId === preset.id;
@@ -226,13 +250,23 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
                   preset={preset}
                   taken={taken()}
                   active={active()}
-                  focused={isFocused(2 + i())}
+                  focused={isFocused(1 + i())}
                   onClick={() => handleRunnerClick(preset.id)}
                 />
               );
             }}</For>
+            {/* Random option */}
+            <button
+              class="char-tile"
+              classList={{ active: (selected() as any)?.runnerId === RANDOM_RUNNER_ID, 'menu-focused': isFocused(1 + sortedRunnerPresets().length) }}
+              onClick={() => handleRunnerClick(RANDOM_RUNNER_ID)}
+              title="Random"
+            >
+              <div class="runner-preview random-preview">🎲</div>
+              <span class="char-tile-label">Random</span>
+            </button>
           </div>
-          <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(1 + 1 + sortedRunnerPresets().length) }} onClick={props.onBack}>
+          <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(1 + sortedRunnerPresets().length + 1) }} onClick={props.onBack}>
             Back
           </button>
         </Show>

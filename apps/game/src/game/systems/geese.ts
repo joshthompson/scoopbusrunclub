@@ -17,11 +17,11 @@ import {
   MeshBuilder,
   Mesh,
 } from '@babylonjs/core';
-import { createGooseModel, poseGooseWalking, poseGooseIdle, poseGooseSitting, poseGooseFleeing } from '../objects/GooseModel';
+import { createGooseModel, poseGooseWalking, poseGooseIdle, poseGooseSitting, poseGooseFleeing, poseGooseSwimming } from '../objects/GooseModel';
 import type { GooseModelResult } from '../objects/GooseModel';
 import type { Goose, SolidObstacle, BuildingCollider, WaterZone } from '../types';
 import { resolvePositionAgainstBuildings } from './buildings';
-import { isInWaterZone } from './terrain';
+import { isInWaterZone, getWaterSurfaceYAt } from './terrain';
 import {
   GOOSE_HERD_RADIUS,
   GOOSE_FLEE_RADIUS,
@@ -201,8 +201,7 @@ function pickWanderTarget(
     const tx = goose.x + Math.cos(angle) * dist;
     const tz = goose.z + Math.sin(angle) * dist;
 
-    // Reject if in water
-    if (isInWaterZone(tx, tz, waterZones)) continue;
+    // Geese can go on water — no water rejection
 
     // Reject if inside solid obstacle
     let blocked = false;
@@ -242,10 +241,17 @@ export function updateGeeseSystem(
     switch (goose.state) {
       case 'idle': {
         goose.idleTimer -= dt;
-        poseGooseSitting(goose.model);
 
-        // Keep Y synced with ground (ground mesh may load after spawn)
-        pos.y = ctx.getGroundY(pos.x, pos.z);
+        // Keep Y synced — float on water or sit on ground
+        const idleWaterY = getWaterSurfaceYAt(pos.x, pos.z, ctx.waterZones);
+        if (idleWaterY !== null) {
+          pos.y = idleWaterY;
+          poseGooseSwimming(goose.model, goose.animPhase);
+          goose.animPhase += dt * 0.5;
+        } else {
+          pos.y = ctx.getGroundY(pos.x, pos.z);
+          poseGooseSitting(goose.model);
+        }
         goose.mesh.rotation.y = goose.yaw;
 
         // Check for flee trigger
@@ -310,13 +316,7 @@ export function updateGeeseSystem(
         let newX = goose.x + moveX;
         let newZ = goose.z + moveZ;
 
-        // Avoid water
-        if (isInWaterZone(newX, newZ, ctx.waterZones)) {
-          // Stop and go idle
-          goose.state = 'idle';
-          goose.idleTimer = _rand() * GOOSE_IDLE_MAX * 0.3;
-          break;
-        }
+        // Geese can walk into water — no water avoidance
 
         // Avoid solid obstacles
         for (const obs of ctx.solidObstacles) {
@@ -353,11 +353,19 @@ export function updateGeeseSystem(
 
         pos.x = goose.x;
         pos.z = goose.z;
-        pos.y = ctx.getGroundY(goose.x, goose.z);
         goose.mesh.rotation.y = goose.yaw;
 
-        goose.animPhase += dt * speed * 4;
-        poseGooseWalking(goose.model, goose.animPhase);
+        // Float on water or walk on ground
+        const walkWaterY = getWaterSurfaceYAt(goose.x, goose.z, ctx.waterZones);
+        if (walkWaterY !== null) {
+          pos.y = walkWaterY;
+          goose.animPhase += dt * speed * 2;
+          poseGooseSwimming(goose.model, goose.animPhase);
+        } else {
+          pos.y = ctx.getGroundY(goose.x, goose.z);
+          goose.animPhase += dt * speed * 4;
+          poseGooseWalking(goose.model, goose.animPhase);
+        }
         break;
       }
 
@@ -380,21 +388,7 @@ export function updateGeeseSystem(
         let newX = goose.x + (dx / dist) * speed * dt;
         let newZ = goose.z + (dz / dist) * speed * dt;
 
-        // Avoid water — if flee target is in water, pick new direction
-        if (isInWaterZone(newX, newZ, ctx.waterZones)) {
-          // Try perpendicular directions
-          const perpX = -dz / dist;
-          const perpZ = dx / dist;
-          const alt1X = goose.x + perpX * speed * dt;
-          const alt1Z = goose.z + perpZ * speed * dt;
-          if (!isInWaterZone(alt1X, alt1Z, ctx.waterZones)) {
-            newX = alt1X;
-            newZ = alt1Z;
-          } else {
-            newX = goose.x - perpX * speed * dt;
-            newZ = goose.z - perpZ * speed * dt;
-          }
-        }
+        // Geese can flee into water — no water avoidance
 
         // Avoid solid obstacles
         for (const obs of ctx.solidObstacles) {
@@ -415,11 +409,19 @@ export function updateGeeseSystem(
 
         pos.x = goose.x;
         pos.z = goose.z;
-        pos.y = ctx.getGroundY(goose.x, goose.z);
         goose.mesh.rotation.y = goose.yaw;
 
-        goose.animPhase += dt * speed * 5;
-        poseGooseFleeing(goose.model, goose.animPhase);
+        // Float on water or run on ground
+        const fleeWaterY = getWaterSurfaceYAt(goose.x, goose.z, ctx.waterZones);
+        if (fleeWaterY !== null) {
+          pos.y = fleeWaterY;
+          goose.animPhase += dt * speed * 3;
+          poseGooseSwimming(goose.model, goose.animPhase);
+        } else {
+          pos.y = ctx.getGroundY(goose.x, goose.z);
+          goose.animPhase += dt * speed * 5;
+          poseGooseFleeing(goose.model, goose.animPhase);
+        }
         break;
       }
 
@@ -462,17 +464,23 @@ export function updateGeeseSystem(
           }
         }
 
-        // Land on ground
+        // Land on ground or water
         const groundY = ctx.getGroundY(pos.x, pos.z);
-        if (pos.y <= groundY && goose.velY < 0) {
-          pos.y = groundY;
+        const launchWaterY = getWaterSurfaceYAt(pos.x, pos.z, ctx.waterZones);
+        const landY = launchWaterY !== null ? Math.max(groundY, launchWaterY) : groundY;
+        if (pos.y <= landY && goose.velY < 0) {
+          pos.y = landY;
           goose.state = 'landed';
           goose.landedTimer = GOOSE_LANDED_DURATION;
           goose.mesh.rotation.x = 0;
           goose.mesh.rotation.z = 0;
           goose.x = pos.x;
           goose.z = pos.z;
-          poseGooseSitting(goose.model);
+          if (launchWaterY !== null) {
+            poseGooseSwimming(goose.model, goose.animPhase);
+          } else {
+            poseGooseSitting(goose.model);
+          }
         }
         break;
       }
@@ -482,8 +490,15 @@ export function updateGeeseSystem(
         if (checkScoop(goose, ctx, result)) break;
 
         goose.landedTimer -= dt;
-        pos.y = ctx.getGroundY(pos.x, pos.z);
-        poseGooseSitting(goose.model);
+        const landedWaterY = getWaterSurfaceYAt(pos.x, pos.z, ctx.waterZones);
+        if (landedWaterY !== null) {
+          pos.y = landedWaterY;
+          poseGooseSwimming(goose.model, goose.animPhase);
+          goose.animPhase += dt * 0.5;
+        } else {
+          pos.y = ctx.getGroundY(pos.x, pos.z);
+          poseGooseSitting(goose.model);
+        }
 
         if (goose.landedTimer <= 0) {
           // Get back up and return to idle

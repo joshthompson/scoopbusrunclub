@@ -26,7 +26,8 @@ import powerUpFire from './assets/power-ups/fire.png';
 import powerUpIce from './assets/power-ups/ice.png';
 import powerUpMallet from './assets/power-ups/mallet.png';
 import powerUpShoe from './assets/power-ups/shoe.png';
-import { toggleMute, getMuted } from './music';
+import { toggleMute, getMuted, getMusicVolume, setMusicVolume } from './music';
+import { getGameVolume, setGameVolume } from './game/systems/sounds';
 import { useMenuNav } from './useMenuNav';
 
 // Babylon.js needs earcut on window for CreatePolygon
@@ -81,6 +82,20 @@ function PauseOverlay(props: {
   onExit: () => void;
 }) {
   const { isFocused } = useMenuNav(() => 3, { onBack: props.onResume });
+  const [musicVol, setMusicVol] = createSignal(getMusicVolume());
+  const [gameVol, setGameVol] = createSignal(getGameVolume());
+
+  function handleMusicVol(e: Event) {
+    const val = parseFloat((e.target as HTMLInputElement).value);
+    setMusicVol(val);
+    setMusicVolume(val);
+  }
+
+  function handleGameVol(e: Event) {
+    const val = parseFloat((e.target as HTMLInputElement).value);
+    setGameVol(val);
+    setGameVolume(val);
+  }
 
   return (
     <div id="pause-overlay">
@@ -89,10 +104,20 @@ function PauseOverlay(props: {
         <Show when={props.isMultiplayer}>
           <p class="pause-note">Game continues in multiplayer</p>
         </Show>
+        <div class="pause-sliders">
+          <label class="volume-slider-row">
+            <span>🎵 Music</span>
+            <input type="range" min="0" max="1" step="0.05" value={musicVol()} onInput={handleMusicVol} />
+          </label>
+          <label class="volume-slider-row">
+            <span>🔊 Game</span>
+            <input type="range" min="0" max="1" step="0.05" value={gameVol()} onInput={handleGameVol} />
+          </label>
+        </div>
         <div class="pause-buttons">
           <button class="course-btn" classList={{ 'menu-focused': isFocused(0) }} onClick={props.onResume}>Resume</button>
           <button class="course-btn mute-pause-btn" classList={{ 'menu-focused': isFocused(1) }} onClick={props.onToggleMute}>
-            {props.musicMuted ? '🔇 Unmute Music' : '🔊 Mute Music'}
+            {props.musicMuted ? '🔇 Unmute Music' : '🔇 Mute Music'}
           </button>
           <button class="course-btn finish-exit-btn" classList={{ 'menu-focused': isFocused(2) }} onClick={props.onExit}>Exit to Menu</button>
         </div>
