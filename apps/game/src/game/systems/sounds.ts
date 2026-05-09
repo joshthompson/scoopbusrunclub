@@ -39,7 +39,7 @@ export function setGameVolume(vol: number): void {
 // ── Constants ──
 
 /** Beyond this distance (metres) sounds are silent / not loaded */
-const MAX_AUDIBLE_DISTANCE = 200;
+const MAX_AUDIBLE_DISTANCE = 100;
 /** Bus engine base volume (when stopped but nearby) — this is the "x1" baseline */
 const BUS_ENGINE_BASE_VOLUME = 0.08;
 /** At normal max speed the engine is this many times the base volume */

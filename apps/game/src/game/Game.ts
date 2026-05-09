@@ -96,6 +96,7 @@ import {
   RUNNER_JUMP_HEIGHT,
   RUNNER_SIT_DURATION,
   SCOOP_ANIM_DURATION,
+  SCOOP_BOOST_ACCELERATION,
   SCOOP_BOOST_DURATION,
   SCOOP_BOOST_MULTIPLIER,
   SCOOP_DISTANCE,
@@ -3665,7 +3666,11 @@ export class Game {
         }
 
         // Acceleration / braking / friction (same as P1)
-        if (accelInput > 0) {
+        if (this.p2BoostTimer > 0) {
+          // Boosting: rapidly accelerate to boosted max speed, cannot slow down
+          const boostedMax = BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER;
+          this.p2Speed = Math.min(boostedMax, this.p2Speed + SCOOP_BOOST_ACCELERATION * dt);
+        } else if (accelInput > 0) {
           this.p2Speed += BUS_ACCELERATION * dt;
         } else if (accelInput < 0) {
           this.p2Speed -= BUS_BRAKE * dt;
@@ -3728,7 +3733,7 @@ export class Game {
         if (slopePitch < BUS_DOWNHILL_SLOPE_THRESHOLD && this.p2Speed > 0) {
           this.p2Speed += BUS_DOWNHILL_ACCEL_BOOST * dt;
         }
-        if (slopePitch > 0.01 && this.p2Speed > 0) {
+        if (slopePitch > 0.01 && this.p2Speed > 0 && this.p2BoostTimer <= 0) {
           const uphillFactor = Math.min(slopePitch / 0.3, 1);
           this.p2Speed = Math.max(0, this.p2Speed - BUS_UPHILL_DRAG * uphillFactor * dt);
         }
@@ -3833,7 +3838,9 @@ export class Game {
     }
 
     // P2 boost visual effects
-    const p2BoostIntensity = Math.min(1, this.p2BoostTimer / 0.5);
+    const p2BoostIntensity = Math.abs(this.p2Speed) > BUS_MAX_SPEED
+      ? Math.min(1, (Math.abs(this.p2Speed) - BUS_MAX_SPEED) / (BUS_MAX_SPEED * (SCOOP_BOOST_MULTIPLIER - 1) * 0.5))
+      : 0; // effects only when above base max speed
     this.p2BoostEffects?.update(dt, p2BoostIntensity, this.boostEffectsElapsed);
   }
 
@@ -4511,7 +4518,11 @@ export class Game {
       }
 
       // --- Apply acceleration ---
-      if (accelInput > 0) {
+      if (this.boostTimer > 0) {
+        // Boosting: rapidly accelerate to boosted max speed, cannot slow down
+        const boostedMax = BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER;
+        this.busSpeed = Math.min(boostedMax, this.busSpeed + SCOOP_BOOST_ACCELERATION * dt);
+      } else if (accelInput > 0) {
         this.busSpeed += BUS_ACCELERATION * dt;
       } else if (accelInput < 0) {
         this.busSpeed -= BUS_BRAKE * dt;
@@ -4599,7 +4610,7 @@ export class Game {
       }
 
       // Apply uphill drag (proportional to slope steepness) — gentler than full friction
-      if (targetPitch > 0.01 && this.busSpeed > 0 && !this.busAirborne) {
+      if (targetPitch > 0.01 && this.busSpeed > 0 && !this.busAirborne && this.boostTimer <= 0) {
         const uphillFactor = Math.min(targetPitch / 0.3, 1); // 0→1 as slope goes from flat to ~17°
         this.busSpeed = Math.max(0, this.busSpeed - BUS_UPHILL_DRAG * uphillFactor * dt);
       }
@@ -4731,7 +4742,9 @@ export class Game {
 
     // --- Boost visual effects (after camera so shake offsets final position) ---
     this.boostEffectsElapsed += dt;
-    const boostIntensity = Math.min(1, this.boostTimer / 0.5); // ramp over 0.5s
+    const boostIntensity = Math.abs(this.busSpeed) > BUS_MAX_SPEED
+      ? Math.min(1, (Math.abs(this.busSpeed) - BUS_MAX_SPEED) / (BUS_MAX_SPEED * (SCOOP_BOOST_MULTIPLIER - 1) * 0.5))
+      : 0; // effects only when above base max speed
     this.boostEffects?.update(dt, boostIntensity, this.boostEffectsElapsed);
 
     // Callbacks

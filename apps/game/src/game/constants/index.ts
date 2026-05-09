@@ -39,6 +39,7 @@ export const SCOOP_FORWARD_FACTOR = 0.5;
 export const SCOOP_ANIM_DURATION = 0.35;
 export const SCOOP_BOOST_DURATION = 2;
 export const SCOOP_BOOST_MULTIPLIER = 2;
+export const SCOOP_BOOST_ACCELERATION = 80; // rapid acceleration (m/s²) to reach max speed while boosting
 export const RUNNER_SIT_DURATION = 2.5;
 export const GRAVITY = 20;
 export const BUS_GRAVITY = 20;
@@ -89,7 +90,7 @@ export const DEMO_CAMERA_SPEED = 10; // metres/s — title screen flyover speed
 
 // ---------- Camera ----------
 /** Base field-of-view (radians) when playing as bus driver */
-export const CAMERA_FOV_BUS = 0.5;
+export const CAMERA_FOV_BUS = 0.8;
 /** Base field-of-view (radians) when playing as runner */
 export const CAMERA_FOV_RUNNER = 0.9;
 /** Extra FOV added per unit of speed (radians / (m/s)). FOV = base + speed * this */
@@ -97,7 +98,7 @@ export const CAMERA_FOV_SPEED_FACTOR = 0.01;
 /** How fast FOV tweens to target value (higher = snappier). Uses exponential smoothing. */
 export const CAMERA_FOV_LERP_SPEED = 4;
 /** Camera elevation angle for chase cam (radians). Lower = closer to ground level */
-export const CAMERA_ANGLE_BUS = 0.62;
+export const CAMERA_ANGLE_BUS = 0.4;
 /** Camera elevation angle for runner cam (radians) */
 export const CAMERA_ANGLE_RUNNER = 0.34;
 
