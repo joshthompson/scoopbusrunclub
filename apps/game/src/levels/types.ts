@@ -6,7 +6,7 @@ export interface LevelCourse {
 
 export interface LevelWaterFeature {
   coords: [number, number][];
-  type: 'water' | 'river';
+  type: 'water' | 'river' | 'island';
 }
 
 export interface LevelData {

@@ -37,7 +37,8 @@ export const SCOOP_UP_FACTOR = 0.75;
 export const SCOOP_MIN_UP = 10;
 export const SCOOP_FORWARD_FACTOR = 0.5;
 export const SCOOP_ANIM_DURATION = 0.35;
-export const SCOOP_BOOST_DURATION = 2;
+export const SCOOP_BOOST_DURATION = 1;
+export const SCOOP_BOOST_EASE_DURATION = 0.5; // seconds to ease back from boosted max to base max
 export const SCOOP_BOOST_MULTIPLIER = 2;
 export const SCOOP_BOOST_ACCELERATION = 80; // rapid acceleration (m/s²) to reach max speed while boosting
 export const RUNNER_SIT_DURATION = 2.5;
@@ -85,6 +86,7 @@ export const POWER_UP_ICE_BASE_ALPHA = 0.4;
 export const TREE_COUNT = 3000;
 export const TREE_SPREAD = 200;
 export const TREE_MIN_DIST_FROM_PATH = 8;
+export const TREE_HEIGHT_SCALE = 2;
 export const AUTO_DRIVE_SPEED = 10;
 export const DEMO_CAMERA_SPEED = 10; // metres/s — title screen flyover speed
 

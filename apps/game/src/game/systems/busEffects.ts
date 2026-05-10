@@ -227,3 +227,84 @@ export function updateWakeIntensity(wake: ParticleSystem[], active: boolean, bus
     wake[2].maxEmitPower = 1 + t * 3;
   }
 }
+
+/**
+ * Create dirt-spray particle systems (left + right rear tyres).
+ * Attached to the bus; dormant until the bus drives on dirt paths.
+ */
+export function createDirtSpray(scene: Scene, busMesh: TransformNode): ParticleSystem[] {
+  const tex = new DynamicTexture('dirtTex', 64, scene, false);
+  const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+  const cx = 32, cy = 32, r = 30;
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  grad.addColorStop(0, 'rgba(200,170,120,0.45)');
+  grad.addColorStop(0.5, 'rgba(190,160,110,0.3)');
+  grad.addColorStop(1, 'rgba(180,150,100,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  tex.update();
+
+  const systems: ParticleSystem[] = [];
+
+  // Left and right rear-tyre sprays
+  for (const side of [-1, 1]) {
+    const ps = new ParticleSystem(`dirt_${side < 0 ? 'L' : 'R'}`, 150, scene);
+    ps.particleTexture = tex;
+
+    const emitter = MeshBuilder.CreateBox(`dirtEmit_${side}`, { size: 0.01 }, scene);
+    emitter.isVisible = false;
+    emitter.position = new Vector3(side * 1.0, 0.2, -3.2);
+    emitter.parent = busMesh;
+    ps.emitter = emitter;
+
+    // Gentle puff upward — particles stay roughly where generated
+    ps.direction1 = new Vector3(side * 0.3, 0.2, -0.1);
+    ps.direction2 = new Vector3(side * 0.6, 0.6, 0.1);
+    ps.minEmitBox = new Vector3(-0.2, 0, -0.2);
+    ps.maxEmitBox = new Vector3(0.2, 0.1, 0.2);
+
+    ps.color1 = new Color4(0.78, 0.65, 0.45, 0.35);  // light tan
+    ps.color2 = new Color4(0.72, 0.58, 0.38, 0.25);  // soft sandy brown
+    ps.colorDead = new Color4(0.7, 0.55, 0.35, 0);   // fade out
+
+    ps.minSize = 0.2;
+    ps.maxSize = 0.6;
+    ps.minLifeTime = 0.4;
+    ps.maxLifeTime = 1.0;
+    ps.emitRate = 60;
+    ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    ps.minEmitPower = 0.3;
+    ps.maxEmitPower = 0.8;
+    ps.updateSpeed = 0.02;
+    ps.gravity = new Vector3(0, -0.5, 0); // very gentle settle
+
+    ps.stop();
+    systems.push(ps);
+  }
+
+  return systems;
+}
+
+/** Start or stop the dirt spray. */
+export function setDirtSprayActive(spray: ParticleSystem[], currentlyActive: boolean, active: boolean): boolean {
+  if (active === currentlyActive) return currentlyActive;
+  for (const ps of spray) {
+    if (active) ps.start();
+    else ps.stop();
+  }
+  return active;
+}
+
+/** Scale dirt spray intensity with bus speed. */
+export function updateDirtSprayIntensity(spray: ParticleSystem[], active: boolean, busSpeed: number): void {
+  if (!active) return;
+  const speedKmh = Math.abs(busSpeed) * 3.6;
+  const t = Math.min(1, speedKmh / 50); // 0 at rest, 1 at 50 km/h+
+  for (const ps of spray) {
+    ps.emitRate = 15 + t * 60;
+    ps.minEmitPower = 0.2 + t * 0.3;
+    ps.maxEmitPower = 0.5 + t * 0.6;
+    ps.minSize = 0.15 + t * 0.15;
+    ps.maxSize = 0.35 + t * 0.4;
+  }
+}

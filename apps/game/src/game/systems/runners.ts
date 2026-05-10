@@ -672,6 +672,7 @@ export interface LocalRunnerVisualContext {
   scoopState: 'free' | 'launched' | 'sitting';
   runnerJumpSideVel: number;
   jumpsUsed: number;
+  flipDirection: 'forward' | 'back' | 'left' | 'right';
   getGroundY: (x: number, z: number) => number;
 }
 
@@ -704,7 +705,7 @@ export function updateLocalRunnerVisual(
     const jumpLift = Math.min(1, jumpHeight / RUNNER_JUMP_HEIGHT);
 
     if (ctx.jumpsUsed >= 2) {
-      // Forward somersault on double jump — exactly one full rotation
+      // Somersault on double jump — direction depends on input at jump time
       // Rotate around torso center (~0.8m above feet) instead of foot origin
       const TORSO_MID_Y = 0.8;
       const flipSpeed = 2 * Math.PI / 0.55; // one full rotation in ~0.55s
@@ -724,17 +725,53 @@ export function updateLocalRunnerVisual(
         const sinA = Math.sin(flipAngle);
         const cosA = Math.cos(flipAngle);
         const offsetY = TORSO_MID_Y * (1 - cosA);
-        const offsetZ = TORSO_MID_Y * sinA;
         const fwdX = Math.sin(ctx.busYaw);
         const fwdZ = Math.cos(ctx.busYaw);
+        const rgtX = Math.cos(ctx.busYaw);
+        const rgtZ = -Math.sin(ctx.busYaw);
 
-        ctx.model.root.position.set(
-          ctx.busPos.x - fwdX * offsetZ,
-          ctx.busPos.y + offsetY,
-          ctx.busPos.z - fwdZ * offsetZ,
-        );
-        ctx.model.root.rotation.x = flipAngle;
-        ctx.model.root.rotation.z = 0;
+        const dir = ctx.flipDirection;
+        if (dir === 'back') {
+          // Backflip: negative X rotation, offset forward
+          const offsetZ = TORSO_MID_Y * sinA;
+          ctx.model.root.position.set(
+            ctx.busPos.x + fwdX * offsetZ,
+            ctx.busPos.y + offsetY,
+            ctx.busPos.z + fwdZ * offsetZ,
+          );
+          ctx.model.root.rotation.x = -flipAngle;
+          ctx.model.root.rotation.z = 0;
+        } else if (dir === 'left') {
+          // Left barrel roll: positive Z rotation
+          const offsetSide = TORSO_MID_Y * sinA;
+          ctx.model.root.position.set(
+            ctx.busPos.x + rgtX * offsetSide,
+            ctx.busPos.y + offsetY,
+            ctx.busPos.z + rgtZ * offsetSide,
+          );
+          ctx.model.root.rotation.x = 0;
+          ctx.model.root.rotation.z = flipAngle;
+        } else if (dir === 'right') {
+          // Right barrel roll: negative Z rotation
+          const offsetSide = TORSO_MID_Y * sinA;
+          ctx.model.root.position.set(
+            ctx.busPos.x - rgtX * offsetSide,
+            ctx.busPos.y + offsetY,
+            ctx.busPos.z - rgtZ * offsetSide,
+          );
+          ctx.model.root.rotation.x = 0;
+          ctx.model.root.rotation.z = -flipAngle;
+        } else {
+          // Forward flip (default)
+          const offsetZ = TORSO_MID_Y * sinA;
+          ctx.model.root.position.set(
+            ctx.busPos.x - fwdX * offsetZ,
+            ctx.busPos.y + offsetY,
+            ctx.busPos.z - fwdZ * offsetZ,
+          );
+          ctx.model.root.rotation.x = flipAngle;
+          ctx.model.root.rotation.z = 0;
+        }
         ctx.model.root.rotation.y = ctx.busYaw;
         poseTuck(ctx.model);
       }

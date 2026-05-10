@@ -7,6 +7,8 @@ import buildings from './buildings.json';
 import paths from './paths.json';
 import roads from './roads.json';
 import objects from './objects.json';
+import trees from './trees.json';
+import regions from './regions.json';
 
 const level: LevelData = {
   id: 'cheltenham',
@@ -18,6 +20,8 @@ const level: LevelData = {
   paths: paths as LevelData['paths'],
   roads: roads as LevelData['roads'],
   objects: objects as LevelData['objects'],
+  manualTrees: trees as LevelData['manualTrees'],
+  regions: regions as LevelData['regions'],
 };
 
 export default level;

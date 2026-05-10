@@ -98,6 +98,7 @@ import {
   SCOOP_ANIM_DURATION,
   SCOOP_BOOST_ACCELERATION,
   SCOOP_BOOST_DURATION,
+  SCOOP_BOOST_EASE_DURATION,
   SCOOP_BOOST_MULTIPLIER,
   SCOOP_DISTANCE,
   SCOOP_FORWARD_FACTOR,
@@ -201,6 +202,8 @@ import {
   isInWaterZone,
   getWaterSurfaceYAt,
   getWaterDepressionAt,
+  distToPath,
+  pointInPolygon,
 } from './systems/terrain';
 import type { LocalAltitudePoint } from './systems/terrain';
 
@@ -216,6 +219,9 @@ import {
   createWaterWake,
   setWaterWakeActive,
   updateWakeIntensity,
+  createDirtSpray,
+  setDirtSprayActive,
+  updateDirtSprayIntensity,
 } from './systems/busEffects';
 import { createBoostEffects, type BoostEffectsInstance } from './systems/boostEffects';
 import {
@@ -254,7 +260,7 @@ import {
 import { buildLevelObjects, type PlacedObjectData } from './objects/LevelObjects';
 import { spawnGeese, updateGeeseSystem, type GooseSpawnPoint } from './systems/geese';
 import { spawnDeer, updateDeerSystem, type DeerSpawnPoint } from './systems/deer';
-import { updateGameSounds, resetGameSounds, disposeGameSounds, playThud, type BusSoundSource } from './systems/sounds';
+import { updateGameSounds, resetGameSounds, disposeGameSounds, playThud, playScooped, stopScooped, playHuh, type BusSoundSource } from './systems/sounds';
 import { PowerUpSystem, type PowerUpId } from './systems/powerups';
 import { PassengerSystem } from './systems/passengers';
 import {
@@ -323,9 +329,12 @@ export class Game {
   private frontWheelRight: TransformNode | null = null;
   private scoopAnimTimer = 0; // >0 while scoop is animating
   private boostTimer = 0; // >0 while scoop speed-boost is active
+  private boostEaseTimer = 0; // >0 while easing back from boost to base max speed
   private exhaustFlames: ParticleSystem | null = null; // flame particles from exhaust
   private waterWake: ParticleSystem[] = []; // wake/ripple spray when driving through water
   private waterWakeActive = false; // whether wake is currently emitting
+  private dirtSpray: ParticleSystem[] = []; // dirt particles when driving on paths
+  private dirtSprayActive = false; // whether dirt spray is currently emitting
   private distanceTravelled = 0;
   private busHeadlight: SpotLight | null = null;
   private busReverseLights: SpotLight[] = [];
@@ -518,6 +527,7 @@ export class Game {
   private localRunnerAnimPhase = 0;
   private runnerJumpSideVel = 0;
   private runnerJumpsUsed = 0;
+  private runnerFlipDirection: 'forward' | 'back' | 'left' | 'right' = 'forward';
   private jumpHeldLastFrame = false;
   private localRunnerScoopState: 'free' | 'launched' | 'sitting' = 'free';
   private localRunnerScoopVelX = 0;
@@ -543,6 +553,7 @@ export class Game {
   private p2JumpSideVel = 0;
   private p2ScoopAnimTimer = 0;
   private p2BoostTimer = 0;
+  private p2BoostEaseTimer = 0;
   private p2ElasticPenaltyActive = false;
   private p2GateIdx = 0;
   private p2Finished = false;
@@ -1102,6 +1113,7 @@ export class Game {
 
   private beginLocalRunnerScoop(_scooperPlayerIndex: number, scooperPose: { yaw: number; speed: number }) {
     this.localRunnerScoopState = 'launched';
+    playScooped();
     this.busAirborne = false;
     this.runnerJumpsUsed = 0;
     this.runnerJumpSideVel = 0;
@@ -1234,6 +1246,8 @@ export class Game {
       const groundY = this.getGroundY(this.busPos.x, this.busPos.z);
       if (this.busPos.y <= groundY && this.localRunnerScoopVelY < 0) {
         this.busPos.y = groundY;
+        stopScooped();
+        playThud(this.busSpeed);
         this.localRunnerScoopVelX = 0;
         this.localRunnerScoopVelY = 0;
         this.localRunnerScoopVelZ = 0;
@@ -2272,6 +2286,40 @@ export class Game {
     return isInWaterZone(x, z, this.waterZones);
   }
 
+  /** Check if position is on a dirt path (running path or trail), excluding roads/fields/concrete/track surfaces. */
+  private isOnDirtPath(x: number, z: number): boolean {
+    // If the main running path uses a track texture (e.g. Kristineberg), don't count it as dirt
+    const onMainPath = !this.pathTextureUrl && distToPath(x, z, this.pathPositions) < PATH_HALF_WIDTH;
+
+    // Check trail polylines (always dirt)
+    let onTrail = false;
+    const trailHalfWidth = PATH_HALF_WIDTH * 0.4;
+    for (const trail of this.trailPolylines) {
+      if (distToPath(x, z, trail) < trailHalfWidth) {
+        onTrail = true;
+        break;
+      }
+    }
+
+    if (!onMainPath && !onTrail) return false;
+
+    // Exclude if on a road
+    const roadHalfWidth = PATH_HALF_WIDTH * 1.4;
+    for (const road of this.roadPolylines) {
+      if (distToPath(x, z, road) < roadHalfWidth) return false;
+    }
+
+    // Exclude if inside field or concrete regions
+    for (const poly of this.fieldPolygons) {
+      if (pointInPolygon(x, z, poly)) return false;
+    }
+    for (const poly of this.concretePolygons) {
+      if (pointInPolygon(x, z, poly)) return false;
+    }
+
+    return true;
+  }
+
   private getWaterSurfaceY(x: number, z: number): number | null {
     return getWaterSurfaceYAt(x, z, this.waterZones);
   }
@@ -2815,6 +2863,9 @@ export class Game {
 
     // --- Water wake particle systems (initially stopped) ---
     this.waterWake = createWaterWake(this.scene, this.busMesh!);
+
+    // --- Dirt spray particle systems (initially stopped) ---
+    this.dirtSpray = createDirtSpray(this.scene, this.busMesh!);
 
     // --- Headlight at night (single centred beam) ---
     if (this.level?.timeOfDay === 'night') {
@@ -3682,14 +3733,28 @@ export class Game {
           }
         }
 
-        // Clamp speed (boosted max while scoop-boost is active)
-        const effectiveMaxSpeed = this.p2BoostTimer > 0 ? BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER : BUS_MAX_SPEED;
+        // Clamp speed (boosted max while scoop-boost is active, lerp during ease-back)
+        let effectiveMaxSpeed: number;
+        if (this.p2BoostTimer > 0) {
+          effectiveMaxSpeed = BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER;
+        } else if (this.p2BoostEaseTimer > 0) {
+          const t = this.p2BoostEaseTimer / SCOOP_BOOST_EASE_DURATION;
+          effectiveMaxSpeed = BUS_MAX_SPEED + (BUS_MAX_SPEED * (SCOOP_BOOST_MULTIPLIER - 1)) * t;
+        } else {
+          effectiveMaxSpeed = BUS_MAX_SPEED;
+        }
         this.p2Speed = Math.max(-effectiveMaxSpeed * REVERSE_SPEED_MULTIPLIER, Math.min(effectiveMaxSpeed, this.p2Speed));
 
         // Tick boost timer
         if (this.p2BoostTimer > 0) {
           this.p2BoostTimer -= dt;
-          if (this.p2BoostTimer <= 0) this.p2BoostTimer = 0;
+          if (this.p2BoostTimer <= 0) {
+            this.p2BoostTimer = 0;
+            this.p2BoostEaseTimer = SCOOP_BOOST_EASE_DURATION;
+          }
+        } else if (this.p2BoostEaseTimer > 0) {
+          this.p2BoostEaseTimer -= dt;
+          if (this.p2BoostEaseTimer <= 0) this.p2BoostEaseTimer = 0;
         }
 
         // Drift model (velocity angle lags behind heading)
@@ -4107,7 +4172,10 @@ export class Game {
         localMultiplayer: this.localMultiplayer,
       }, dt);
       this.pendingScoopEvents.push(...runnerResult.scoopEvents);
-      if (runnerResult.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+      if (runnerResult.triggerScoopAnim) {
+        this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+        playScooped();
+      }
       if (runnerResult.boostTimerAdd > 0) this.boostTimer += runnerResult.boostTimerAdd;
       if (runnerResult.startExhaust && this.exhaustFlames && !this.exhaustFlames.isStarted()) {
         this.exhaustFlames.start();
@@ -4160,7 +4228,7 @@ export class Game {
         this.busBodyShell.position.y = engineVibeOffset;
       }
       if (this.localPlayerRole === 'runner') {
-        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, flipDirection: this.runnerFlipDirection, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       }
 
       // Callbacks for static HUD values
@@ -4255,6 +4323,12 @@ export class Game {
         }
         this.waterWakeActive = setWaterWakeActive(this.waterWake, this.waterWakeActive, finWaterY !== null && Math.abs(this.busSpeed) > 0.5);
         updateWakeIntensity(this.waterWake, this.waterWakeActive, this.busSpeed);
+
+        // Dirt spray during coast
+        const finOnDirt = finWaterY === null && Math.abs(this.busSpeed) > 1 && this.isOnDirtPath(this.busPos.x, this.busPos.z);
+        this.dirtSprayActive = setDirtSprayActive(this.dirtSpray, this.dirtSprayActive, finOnDirt);
+        updateDirtSprayIntensity(this.dirtSpray, this.dirtSprayActive, this.busSpeed);
+
         this.busPos.y = finGroundY;
 
         // Update bus mesh
@@ -4264,7 +4338,7 @@ export class Game {
           this.busMesh.setEnabled(this.localPlayerRole === 'bus');
         }
         if (this.localPlayerRole === 'runner') {
-          this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+          this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, flipDirection: this.runnerFlipDirection, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
         }
 
         this.updateChaseCam(dt);
@@ -4292,7 +4366,10 @@ export class Game {
           localMultiplayer: this.localMultiplayer,
         }, dt);
         this.pendingScoopEvents.push(...runnerResult2.scoopEvents);
-        if (runnerResult2.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+        if (runnerResult2.triggerScoopAnim) {
+          this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+          playScooped();
+        }
         if (runnerResult2.boostTimerAdd > 0) this.boostTimer += runnerResult2.boostTimerAdd;
         if (runnerResult2.startExhaust && this.exhaustFlames && !this.exhaustFlames.isStarted()) {
           this.exhaustFlames.start();
@@ -4379,13 +4456,14 @@ export class Game {
         groundY = this.getGroundY(this.busPos.x, this.busPos.z);
         this.waterWakeActive = setWaterWakeActive(this.waterWake, this.waterWakeActive, false);
         updateWakeIntensity(this.waterWake, this.waterWakeActive, this.busSpeed);
+        this.dirtSprayActive = setDirtSprayActive(this.dirtSpray, this.dirtSprayActive, false);
 
         this.busPitch = 0;
 
         if (this.busMesh) {
           this.busMesh.setEnabled(false);
         }
-        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+        this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, flipDirection: this.runnerFlipDirection, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       } else {
       // Human-like direct control: no drift, runner jump with optional side leap.
       if (turnInput !== 0) {
@@ -4425,12 +4503,21 @@ export class Game {
         this.busAirborne = true;
         this.runnerJumpsUsed += 1;
         this.busVelY = Math.sqrt(2 * GRAVITY * RUNNER_JUMP_HEIGHT);
+        playHuh();
         const leftHeld = this.isKey('a') || (!this.localMultiplayer && this.isKey('arrowleft'));
         const rightHeld = this.isKey('d') || (!this.localMultiplayer && this.isKey('arrowright'));
+        const backHeld = this.isKey('s') || (!this.localMultiplayer && this.isKey('arrowdown'));
         if (leftHeld !== rightHeld) {
           this.runnerJumpSideVel = leftHeld ? -RUNNER_PLAYER_JUMP_SIDE_VELOCITY : RUNNER_PLAYER_JUMP_SIDE_VELOCITY;
         } else {
           this.runnerJumpSideVel = 0;
+        }
+        // Determine flip direction for double jump
+        if (this.runnerJumpsUsed >= 2) {
+          if (backHeld) this.runnerFlipDirection = 'back';
+          else if (leftHeld && !rightHeld) this.runnerFlipDirection = 'left';
+          else if (rightHeld && !leftHeld) this.runnerFlipDirection = 'right';
+          else this.runnerFlipDirection = 'forward';
         }
       }
 
@@ -4450,6 +4537,7 @@ export class Game {
       groundY = this.getGroundY(this.busPos.x, this.busPos.z);
       this.waterWakeActive = setWaterWakeActive(this.waterWake, this.waterWakeActive, false);
       updateWakeIntensity(this.waterWake, this.waterWakeActive, this.busSpeed);
+      this.dirtSprayActive = setDirtSprayActive(this.dirtSpray, this.dirtSprayActive, false);
 
       if (this.busAirborne) {
         this.busVelY -= GRAVITY * dt;
@@ -4472,7 +4560,7 @@ export class Game {
       if (this.busMesh) {
         this.busMesh.setEnabled(false);
       }
-      this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
+      this.localRunnerAnimPhase = updateLocalRunnerVisualFn({ model: this.localRunnerModel!, busPos: this.busPos, busYaw: this.busYaw, busSpeed: this.busSpeed * (this.runnerFikaTimer > 0 ? POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER : 1), busAirborne: this.busAirborne, scoopState: this.localRunnerScoopState, runnerJumpSideVel: this.runnerJumpSideVel, jumpsUsed: this.runnerJumpsUsed, flipDirection: this.runnerFlipDirection, getGroundY: (x, z) => this.getGroundY(x, z) }, dt, this.localRunnerAnimPhase);
       }
     } else {
       // --- Space / Gamepad X = manual scoop animation (bus mode) ---
@@ -4535,8 +4623,16 @@ export class Game {
         }
       }
 
-      // Clamp speed (boosted max while scoop-boost is active)
-      const effectiveMaxSpeed = this.boostTimer > 0 ? BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER : BUS_MAX_SPEED;
+      // Clamp speed (boosted max while scoop-boost is active, lerp during ease-back)
+      let effectiveMaxSpeed: number;
+      if (this.boostTimer > 0) {
+        effectiveMaxSpeed = BUS_MAX_SPEED * SCOOP_BOOST_MULTIPLIER;
+      } else if (this.boostEaseTimer > 0) {
+        const t = this.boostEaseTimer / SCOOP_BOOST_EASE_DURATION; // 1→0 as ease progresses
+        effectiveMaxSpeed = BUS_MAX_SPEED + (BUS_MAX_SPEED * (SCOOP_BOOST_MULTIPLIER - 1)) * t;
+      } else {
+        effectiveMaxSpeed = BUS_MAX_SPEED;
+      }
       this.busSpeed = Math.max(-effectiveMaxSpeed * REVERSE_SPEED_MULTIPLIER, Math.min(effectiveMaxSpeed, this.busSpeed));
 
       // Tick boost timer and stop exhaust flames when expired
@@ -4544,8 +4640,12 @@ export class Game {
         this.boostTimer -= dt;
         if (this.boostTimer <= 0) {
           this.boostTimer = 0;
+          this.boostEaseTimer = SCOOP_BOOST_EASE_DURATION;
           this.exhaustFlames?.stop();
         }
+      } else if (this.boostEaseTimer > 0) {
+        this.boostEaseTimer -= dt;
+        if (this.boostEaseTimer <= 0) this.boostEaseTimer = 0;
       }
 
       // --- Move bus (with drift) ---
@@ -4585,6 +4685,11 @@ export class Game {
       }
       this.waterWakeActive = setWaterWakeActive(this.waterWake, this.waterWakeActive, waterSurfY !== null && !this.busAirborne);
       updateWakeIntensity(this.waterWake, this.waterWakeActive, this.busSpeed);
+
+      // Dirt spray on paths/trails
+      const onDirt = !this.busAirborne && waterSurfY === null && Math.abs(this.busSpeed) > 1 && this.isOnDirtPath(this.busPos.x, this.busPos.z);
+      this.dirtSprayActive = setDirtSprayActive(this.dirtSpray, this.dirtSprayActive, onDirt);
+      updateDirtSprayIntensity(this.dirtSpray, this.dirtSprayActive, this.busSpeed);
 
       // Compute slope pitch from terrain height a short distance ahead vs behind
       const headingDir = new Vector3(Math.sin(this.busYaw), 0, Math.cos(this.busYaw));
@@ -4803,7 +4908,10 @@ export class Game {
       localMultiplayer: this.localMultiplayer,
     }, dt);
     this.pendingScoopEvents.push(...runnerResult3.scoopEvents);
-    if (runnerResult3.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+    if (runnerResult3.triggerScoopAnim) {
+      this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+      playScooped();
+    }
     if (runnerResult3.boostTimerAdd > 0) this.boostTimer += runnerResult3.boostTimerAdd;
     if (runnerResult3.startExhaust && this.exhaustFlames && !this.exhaustFlames.isStarted()) {
       this.exhaustFlames.start();
@@ -4922,7 +5030,10 @@ export class Game {
     // --- Bus Mode: update passenger system ---
     if (this.passengerSystem && this.raceState === 'racing') {
       const pResult = this.passengerSystem.update(dt, this.busPos, this.busYaw, this.busSpeed, engineVibeOffset, this.busPitch);
-      if (pResult.triggerScoopAnim) this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+      if (pResult.triggerScoopAnim) {
+        this.scoopAnimTimer = SCOOP_ANIM_DURATION;
+        playScooped();
+      }
       if (pResult.boostTimerAdd > 0) this.boostTimer += pResult.boostTimerAdd;
       if (pResult.triggerScoopAnim && this.exhaustFlames && !this.exhaustFlames.isStarted()) {
         this.exhaustFlames.start();

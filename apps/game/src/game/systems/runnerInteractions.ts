@@ -16,6 +16,7 @@ import {
   INTERACTION_COOLDOWN,
   INTERACTION_CLOSING_SPEED,
 } from '../constants';
+import { playHello } from './sounds';
 
 // ── Per-pair cooldown tracker ──
 
@@ -202,6 +203,7 @@ export function updateRunnerInteractions(
       r.interactionTimer = duration;
       r.interactionSide = runnerSide;
 
+      playHello();
       startPairCooldown('p', i);
       break; // one interaction per frame for the player
     }

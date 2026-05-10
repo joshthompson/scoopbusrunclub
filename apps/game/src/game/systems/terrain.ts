@@ -220,17 +220,27 @@ export function distToPath(x: number, z: number, pathPositions: [number, number]
 
 // ---------- Water helpers ----------
 
-/** Quick check: is (x,z) inside any water zone polygon? */
+/** Quick check: is (x,z) inside any water zone polygon? Returns false for islands. */
 export function isInWaterZone(x: number, z: number, waterZones: WaterZone[]): boolean {
+  // If point is inside any island, it's land — not water
   for (const wz of waterZones) {
+    if (wz.isIsland && pointInPolygon(x, z, wz.points)) return false;
+  }
+  for (const wz of waterZones) {
+    if (wz.isIsland) continue;
     if (pointInPolygon(x, z, wz.points)) return true;
   }
   return false;
 }
 
-/** Return water surface Y at (x,z) if inside a water zone, or null. */
+/** Return water surface Y at (x,z) if inside a water zone, or null. Returns null for islands. */
 export function getWaterSurfaceYAt(x: number, z: number, waterZones: WaterZone[]): number | null {
+  // If point is inside any island, it's land — not water
   for (const wz of waterZones) {
+    if (wz.isIsland && pointInPolygon(x, z, wz.points)) return null;
+  }
+  for (const wz of waterZones) {
+    if (wz.isIsland) continue;
     if (pointInPolygon(x, z, wz.points)) return wz.y;
   }
   return null;
@@ -250,7 +260,15 @@ export function getWaterDepressionAt(
 ): number | null {
   const BANK_WIDTH = 15; // metres — transition zone around water edges
 
+  // If point is inside any island, it's land — never depress
   for (const wz of waterZones) {
+    if (!wz.isIsland) continue;
+    if (pointInPolygon(x, z, wz.points)) return null;
+  }
+
+  for (const wz of waterZones) {
+    if (wz.isIsland) continue;
+
     // Quick bounding box check
     let mnX = Infinity, mxX = -Infinity, mnZ = Infinity, mxZ = -Infinity;
     for (const [px, pz] of wz.points) {
@@ -306,18 +324,19 @@ export function computeWaterZones(
     }
     if (!isFinite(minH)) minH = 0;
 
-    zones.push({ points: localPts, y: minH + 0.1 });
+    zones.push({ points: localPts, y: minH + 0.1, isIsland: wf.type === 'island' });
   }
   console.log(`[water] ${zones.length} water zones stored`);
   return zones;
 }
 
 /**
- * Render pre-computed water zones as blue meshes.
+ * Render pre-computed water zones as blue meshes (islands are skipped — terrain stays elevated).
  */
 export function buildWaterMeshes(scene: Scene, waterZones: WaterZone[]) {
   for (let i = 0; i < waterZones.length; i++) {
     const wz = waterZones[i];
+    if (wz.isIsland) continue;
     if (wz.points.length >= 3) {
       createWaterMesh(scene, `water_${i}`, wz.points, wz.y);
     } else if (wz.points.length >= 2) {

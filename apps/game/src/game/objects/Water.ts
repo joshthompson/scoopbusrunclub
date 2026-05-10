@@ -94,3 +94,35 @@ export function createWaterRibbon(
     return null;
   }
 }
+
+/**
+ * Render an island polygon as a flat green/land mesh sitting above water.
+ */
+export function createIslandMesh(
+  scene: Scene,
+  name: string,
+  points: [number, number][],
+  y = 0.2,
+): Mesh | null {
+  if (points.length < 3) return null;
+
+  const vectors = points.map(([x, z]) => new Vector3(x, 0, z));
+
+  try {
+    const poly = MeshBuilder.CreatePolygon(
+      name,
+      { shape: vectors, sideOrientation: Mesh.DOUBLESIDE },
+      scene,
+      earcut,
+    );
+    poly.position.y = y;
+    const mat = new StandardMaterial(`${name}_mat`, scene);
+    mat.diffuseColor = new Color3(0.3, 0.55, 0.2);
+    mat.specularColor = new Color3(0.1, 0.1, 0.1);
+    poly.material = mat;
+    return poly;
+  } catch (e) {
+    console.warn(`[water] Failed to create island polygon ${name}:`, e);
+    return null;
+  }
+}

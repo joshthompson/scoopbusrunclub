@@ -114,6 +114,7 @@ export type BuildingCollider = {
 export type WaterZone = {
   points: [number, number][];
   y: number;
+  isIsland?: boolean;
 };
 
 export type SolidObstacle = {

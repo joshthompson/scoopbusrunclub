@@ -10,6 +10,19 @@ import { getMuted } from '../../music';
 import busEngineUrl from '../../assets/sounds/freesound_community-bus-engine-47297.mp3';
 import gooseUrl from '../../assets/sounds/freesound_community-goose-2-28880.mp3';
 import thudUrl from '../../assets/sounds/freesound_community-loud-thud-45719.m4a';
+import scoopedUrl from '../../assets/sounds/scooped1.mp3';
+import hello1Url from '../../assets/sounds/hello1.mp3';
+import hello2Url from '../../assets/sounds/hello2.mp3';
+import hello3Url from '../../assets/sounds/hello3.mp3';
+import hello4Url from '../../assets/sounds/hello4.mp3';
+import hello5Url from '../../assets/sounds/hello5.mp3';
+import hello6Url from '../../assets/sounds/hello6.mp3';
+import huh1Url from '../../assets/sounds/huh1.mp3';
+import huh2Url from '../../assets/sounds/huh2.mp3';
+import huh3Url from '../../assets/sounds/huh3.mp3';
+import huh4Url from '../../assets/sounds/huh4.mp3';
+import huh5Url from '../../assets/sounds/huh5.mp3';
+import huh6Url from '../../assets/sounds/huh6.mp3';
 
 // ── Volume control ──
 
@@ -226,6 +239,72 @@ export function playThud(speed: number): void {
   const volume = THUD_BASE_VOLUME * (0.3 + 0.7 * speedFactor) * masterVolume;
   const audio = new Audio(thudUrl);
   audio.volume = Math.max(0, Math.min(1, volume));
+  audio.play().catch(() => {});
+}
+
+// ── Scooped sound ──
+
+const SCOOPED_VOLUME = 0.3;
+
+/**
+ * Play the scooped sound when a runner is scooped by the bus.
+ * Plays once.
+ */
+export function playScooped(): void {
+  return
+  if (disposed || getMuted() || masterVolume <= 0) return;
+  const audio = new Audio(scoopedUrl);
+  audio.volume = Math.max(0, Math.min(1, SCOOPED_VOLUME * masterVolume));
+  audio.play().catch(() => {});
+}
+
+/** No-op kept for API compatibility. */
+export function stopScooped(): void {}
+
+// ── Helper: pick random index, never the same as last ──
+
+function pickRandom(count: number, lastIndex: number): number {
+  if (count <= 1) return 0;
+  let idx: number;
+  do {
+    idx = Math.floor(Math.random() * count);
+  } while (idx === lastIndex);
+  return idx;
+}
+
+// ── Hello (runner wave greeting) sounds ──
+
+const HELLO_URLS = [hello1Url, hello2Url, hello3Url, hello4Url, hello5Url, hello6Url];
+const HELLO_VOLUME = 0.3;
+let lastHelloIndex = -1;
+
+/**
+ * Play a random hello sound when an NPC runner waves at the player.
+ * Never plays the same clip twice in a row.
+ */
+export function playHello(): void {
+  if (disposed || getMuted() || masterVolume <= 0) return;
+  lastHelloIndex = pickRandom(HELLO_URLS.length, lastHelloIndex);
+  const audio = new Audio(HELLO_URLS[lastHelloIndex]);
+  audio.volume = Math.max(0, Math.min(1, HELLO_VOLUME * masterVolume));
+  audio.play().catch(() => {});
+}
+
+// ── Huh (jump / double-jump) sounds ──
+
+const HUH_URLS = [huh1Url, huh2Url, huh3Url, huh4Url, huh5Url, huh6Url];
+const HUH_VOLUME = 0.4;
+let lastHuhIndex = -1;
+
+/**
+ * Play a random huh sound on jump/double-jump.
+ * Never plays the same clip twice in a row.
+ */
+export function playHuh(): void {
+  if (disposed || getMuted() || masterVolume <= 0) return;
+  lastHuhIndex = pickRandom(HUH_URLS.length, lastHuhIndex);
+  const audio = new Audio(HUH_URLS[lastHuhIndex]);
+  audio.volume = Math.max(0, Math.min(1, HUH_VOLUME * masterVolume));
   audio.play().catch(() => {});
 }
 
