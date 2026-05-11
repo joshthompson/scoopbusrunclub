@@ -8,1776 +8,2717 @@
  * - Drag polygon vertices to adjust shapes
  * - Export each data layer as JSON for copy-pasting into level files
  */
-import { loadLevel, levels } from './levels';
-import type { LevelData } from './levels/types';
+import { loadLevel, levels } from './levels'
+import type { LevelData } from './levels/types'
+import type { PathType } from './api'
 
 // ── Coordinate helpers ──────────────────────────────────────────────────
 
 function gpsToLocal(
-  lon: number,
-  lat: number,
-  origin: [number, number],
+	lon: number,
+	lat: number,
+	origin: [number, number],
 ): [number, number] {
-  const toRad = Math.PI / 180;
-  const R = 6_371_000;
-  const cosLat = Math.cos(origin[1] * toRad);
-  const x = (lon - origin[0]) * toRad * R * cosLat;
-  const z = (lat - origin[1]) * toRad * R;
-  return [x, z];
+	const toRad = Math.PI / 180
+	const R = 6_371_000
+	const cosLat = Math.cos(origin[1] * toRad)
+	const x = (lon - origin[0]) * toRad * R * cosLat
+	const z = (lat - origin[1]) * toRad * R
+	return [x, z]
 }
 
 function localToGps(
-  x: number,
-  z: number,
-  origin: [number, number],
+	x: number,
+	z: number,
+	origin: [number, number],
 ): [number, number] {
-  const toRad = Math.PI / 180;
-  const R = 6_371_000;
-  const cosLat = Math.cos(origin[1] * toRad);
-  const lon = x / (toRad * R * cosLat) + origin[0];
-  const lat = z / (toRad * R) + origin[1];
-  return [lat, lon];
+	const toRad = Math.PI / 180
+	const R = 6_371_000
+	const cosLat = Math.cos(origin[1] * toRad)
+	const lon = x / (toRad * R * cosLat) + origin[0]
+	const lat = z / (toRad * R) + origin[1]
+	return [lat, lon]
 }
 
 // ── SVG namespace helper ────────────────────────────────────────────────
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
+const SVG_NS = 'http://www.w3.org/2000/svg'
 
 function svgEl<K extends keyof SVGElementTagNameMap>(
-  tag: K,
-  attrs: Record<string, string | number> = {},
+	tag: K,
+	attrs: Record<string, string | number> = {},
 ): SVGElementTagNameMap[K] {
-  const el = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
-  return el;
+	const el = document.createElementNS(SVG_NS, tag)
+	for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v))
+	return el
 }
 
 // ── Colours ─────────────────────────────────────────────────────────────
 
 const COLORS = {
-  mainPath: '#e8a030',
-  footway: '#c89060',
-  cycleway: '#70b860',
-  path: '#b0a070',
-  track: '#a09060',
-  steps: '#d08888',
-  bridleway: '#90a040',
-  buildingGrey: '#8899aa',
-  buildingRed: '#c06050',
-  buildingGreen: '#8C9E7E',
-  buildingYellow: '#FFD021',
-  buildingKristineberg: '#4488cc',
-  water: '#4488cc',
-  river: '#3377bb',
-  fence: '#806040',
-  field: '#55aa44',
-  concrete: '#999999',
-  tree: '#228833',
-  bench: '#8B6914',
-  lamppost: '#888899',
-  tennisCourt: '#2d8a4e',
-  floodlight: '#ff9922',
-  goose: '#4a4a4a',
-  deer: '#8B4513',
-  bridge: '#777788',
-  selected: '#ffcc00',
-};
+	mainPath: '#e8a030',
+	footway: '#c89060',
+	cycleway: '#70b860',
+	path: '#b0a070',
+	track: '#a09060',
+	steps: '#d08888',
+	bridleway: '#90a040',
+	buildingGrey: '#8899aa',
+	buildingRed: '#c06050',
+	buildingBrick: '#c86045',
+	buildingGreen: '#8C9E7E',
+	buildingYellow: '#FFD021',
+	buildingKristineberg: '#4488cc',
+	water: '#4488cc',
+	river: '#3377bb',
+	fence: '#806040',
+	field: '#55aa44',
+	concrete: '#999999',
+	tree: '#228833',
+	bench: '#8B6914',
+	lamppost: '#888899',
+	tennisCourt: '#2d8a4e',
+	floodlight: '#ff9922',
+	goose: '#4a4a4a',
+	swan: '#e8e8f0',
+	deer: '#8B4513',
+	bridge: '#777788',
+	selected: '#ffcc00',
+}
 
 // ── Layer items (edited in-place) ───────────────────────────────────────
 
-type RegionType = 'field' | 'concrete';
-interface RegionItem { type: RegionType; points: [number, number][]; zIndex?: number; }
-type BuildingType = 'grey' | 'red' | 'green' | 'yellow' | 'kristineberg';
-interface BuildingItem { type: BuildingType; height?: number; points: [number, number][]; }
-interface WaterItem { type: 'water' | 'river'; points: [number, number][]; }
-interface FenceItem { points: [number, number][]; }
-interface TreeItem { pos: [number, number]; }
-interface BridgeItem { points: [[number, number], [number, number]]; }
-type ObjectKind = 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose' | 'deer';
-interface ObjectItem { kind: ObjectKind; pos: [number, number]; rotation: number; }
+type RegionType = 'field' | 'concrete'
+interface RegionItem {
+	type: RegionType
+	points: [number, number][]
+	zIndex?: number
+}
+type BuildingType =
+	| 'grey'
+	| 'red'
+	| 'green'
+	| 'yellow'
+	| 'kristineberg'
+	| 'brick'
+interface BuildingItem {
+	type: BuildingType
+	height?: number
+	points: [number, number][]
+}
+interface WaterItem {
+	type: 'water' | 'river'
+	points: [number, number][]
+}
+interface FenceItem {
+	points: [number, number][]
+}
+interface TreeItem {
+	pos: [number, number]
+}
+interface BridgeItem {
+	points: [[number, number], [number, number]]
+}
+type ObjectKind =
+	| 'bench'
+	| 'lamppost'
+	| 'tennisCourt'
+	| 'floodlight'
+	| 'goose'
+	| 'swan'
+	| 'deer'
+interface ObjectItem {
+	kind: ObjectKind
+	pos: [number, number]
+	rotation: number
+}
 
 // ── Main ────────────────────────────────────────────────────────────────
 
 async function main() {
-  const infoEl = document.getElementById('info')!;
-  const appEl = document.getElementById('app')!;
-  const sidebarEl = document.getElementById('sidebar')!;
-
-  const params = new URLSearchParams(window.location.search);
-  const levelId = params.get('event') ?? undefined;
-
-  if (!levelId || !levels[levelId]) {
-    // Hide default UI and show a centred event picker
-    infoEl.style.display = 'none';
-    sidebarEl.style.display = 'none';
-    appEl.style.left = '0';
-    appEl.style.width = '100%';
-
-    const picker = document.createElement('div');
-    picker.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:100;';
-
-    const card = document.createElement('div');
-    card.style.cssText = 'background:#222;border:1px solid #444;border-radius:12px;padding:28px 36px;min-width:280px;text-align:center;color:#ccc;font-family:system-ui,sans-serif;';
-
-    const title = document.createElement('h2');
-    title.textContent = 'Level Editor';
-    title.style.cssText = 'color:#fff;margin:0 0 4px;font-size:18px;';
-    card.appendChild(title);
-
-    const subtitle = document.createElement('p');
-    subtitle.textContent = 'Choose an event to edit';
-    subtitle.style.cssText = 'color:#888;margin:0 0 16px;font-size:13px;';
-    card.appendChild(subtitle);
-
-    const selectEl = document.createElement('select');
-    selectEl.style.cssText = 'width:100%;background:#333;color:#fff;border:1px solid #555;border-radius:6px;padding:8px 10px;font-size:14px;cursor:pointer;appearance:auto;';
-
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Select event…';
-    placeholder.disabled = true;
-    placeholder.selected = true;
-    selectEl.appendChild(placeholder);
-
-    for (const [id, meta] of Object.entries(levels)) {
-      const opt = document.createElement('option');
-      opt.value = id;
-      opt.textContent = meta.name + (meta.hide ? ' (hidden)' : '');
-      selectEl.appendChild(opt);
-    }
-
-    selectEl.addEventListener('change', () => {
-      if (!selectEl.value) return;
-      const url = new URL(window.location.href);
-      url.searchParams.set('event', selectEl.value);
-      window.location.href = url.toString();
-    });
-
-    card.appendChild(selectEl);
-    picker.appendChild(card);
-    document.body.appendChild(picker);
-    return;
-  }
-
-  infoEl.innerHTML = `Loading <strong>${levelId}</strong>…`;
-
-  const level = await loadLevel(levelId);
-  const origin: [number, number] = [
-    level.course.coordinates[0][0],
-    level.course.coordinates[0][1],
-  ];
-
-  // ── Convert all features to local coordinates (editable arrays) ─────
-
-  const mainPath = level.course.coordinates.map(([lon, lat]) =>
-    gpsToLocal(lon, lat, origin),
-  );
-
-  const otherPaths = (level.paths ?? []).map((p) => ({
-    type: p.type,
-    points: p.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
-  }));
-
-  const buildingItems: BuildingItem[] = (level.buildings ?? []).map((b) => ({
-    type: (b.type === 'red' || b.type === 'green' || b.type === 'yellow' || b.type === 'kristineberg') ? b.type as BuildingType : 'grey' as const,
-    height: b.height,
-    points: b.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
-  }));
-
-  const bridgeItems: BridgeItem[] = (level.bridges ?? []).map((b) => ({
-    points: [
-      gpsToLocal(b.points[0][1], b.points[0][0], origin),
-      gpsToLocal(b.points[1][1], b.points[1][0], origin),
-    ] as [[number, number], [number, number]],
-  }));
-
-  const waterItems: WaterItem[] = (level.water ?? []).map((w) => ({
-    type: w.type,
-    points: w.coords.map(([lon, lat]) => gpsToLocal(lon, lat, origin)) as [number, number][],
-  }));
-
-  const fenceItems: FenceItem[] = (level.customFences ?? []).map((f) => ({
-    points: f.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
-  }));
-
-  const regionItems: RegionItem[] = (level.regions ?? []).map((r): RegionItem => ({
-    type: r.type,
-    points: r.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
-    zIndex: r.zIndex,
-  }));
-
-  const treeItems: TreeItem[] = (level.manualTrees ?? []).map(([lat, lon]) => ({
-    pos: gpsToLocal(lon, lat, origin),
-  }));
-
-  const objectItems: ObjectItem[] = [
-    ...(level.objects?.benches ?? []).map(([lat, lon, rot]): ObjectItem => ({
-      kind: 'bench', pos: gpsToLocal(lon, lat, origin), rotation: rot,
-    })),
-    ...(level.objects?.lampposts ?? []).map(([lat, lon, rot]): ObjectItem => ({
-      kind: 'lamppost', pos: gpsToLocal(lon, lat, origin), rotation: rot,
-    })),
-    ...(level.objects?.tennisCourts ?? []).map(([lat, lon, rot]): ObjectItem => ({
-      kind: 'tennisCourt', pos: gpsToLocal(lon, lat, origin), rotation: rot,
-    })),
-    ...(level.objects?.floodlights ?? []).map(([lat, lon, rot]): ObjectItem => ({
-      kind: 'floodlight', pos: gpsToLocal(lon, lat, origin), rotation: rot,
-    })),
-    ...(level.objects?.geese ?? []).map(([lat, lon, rot]): ObjectItem => ({
-      kind: 'goose', pos: gpsToLocal(lon, lat, origin), rotation: rot,
-    })),
-    ...(level.objects?.deer ?? []).map(([lat, lon, rot]): ObjectItem => ({
-      kind: 'deer', pos: gpsToLocal(lon, lat, origin), rotation: rot,
-    })),
-  ];
-
-  // ── Compute bounding box ────────────────────────────────────────────
-
-  const allPoints = [
-    ...mainPath,
-    ...otherPaths.flatMap((p) => p.points),
-    ...buildingItems.flatMap((b) => b.points),
-    ...bridgeItems.flatMap((b) => b.points),
-    ...waterItems.flatMap((w) => w.points),
-    ...fenceItems.flatMap((f) => f.points),
-    ...regionItems.flatMap((r) => r.points),
-    ...treeItems.map((t) => t.pos),
-    ...objectItems.map((o) => o.pos),
-  ];
-
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-  for (const [x, z] of allPoints) {
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (z < minZ) minZ = z;
-    if (z > maxZ) maxZ = z;
-  }
-
-  const pad = Math.max(maxX - minX, maxZ - minZ) * 0.08;
-  minX -= pad; maxX += pad; minZ -= pad; maxZ += pad;
-  const baseWidth = maxX - minX;
-  const baseHeight = maxZ - minZ;
-
-  // ── State ───────────────────────────────────────────────────────────
-
-  type SelectionKind = 'building' | 'bridge' | 'water' | 'fence' | 'region' | 'tree' | 'object';
-  type DrawMode = 'none' | 'building' | 'bridge' | 'field' | 'concrete' | 'fence' | 'water' | 'river' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose' | 'deer';
-
-  let selectedKind: SelectionKind | null = null;
-  let selectedIndex: number = -1;
-  let selectedSubVertex: number = -1;  // sub-selected vertex within polygon (-1 = none)
-  let selectedSubEdge: number = -1;    // sub-selected edge within polygon (-1 = none)
-  let drawMode: DrawMode = 'none';
-  let drawingPoints: [number, number][] = [];
-  let dragVertexInfo: { kind: SelectionKind; itemIdx: number; vertIdx: number } | null = null;
-  let didDragVertex = false;  // true if mouse moved during a vertex drag
-
-  // ── Build SVG ───────────────────────────────────────────────────────
-
-  const svg = svgEl('svg', { viewBox: `${minX} ${-maxZ} ${baseWidth} ${baseHeight}` });
-  svg.style.background = '#2a3a2a';
-  const g = svgEl('g');
-  svg.appendChild(g);
-
-  const layerWater = svgEl('g', { 'data-layer': 'water' });
-  const layerRegions = svgEl('g', { 'data-layer': 'regions' });
-  const layerBuildings = svgEl('g', { 'data-layer': 'buildings' });
-  const layerBridges = svgEl('g', { 'data-layer': 'bridges' });
-  const layerPaths = svgEl('g', { 'data-layer': 'paths' });
-  const layerFences = svgEl('g', { 'data-layer': 'fences' });
-  const layerMainPath = svgEl('g', { 'data-layer': 'mainPath' });
-  const layerTrees = svgEl('g', { 'data-layer': 'trees' });
-  const layerObjects = svgEl('g', { 'data-layer': 'objects' });
-  const layerHandles = svgEl('g', { 'data-layer': 'handles' });
-  const layerDrawing = svgEl('g', { 'data-layer': 'drawing' });
-
-  g.appendChild(layerWater);
-  g.appendChild(layerRegions);
-  g.appendChild(layerBuildings);
-  g.appendChild(layerBridges);
-  g.appendChild(layerPaths);
-  g.appendChild(layerFences);
-  g.appendChild(layerMainPath);
-  g.appendChild(layerTrees);
-  g.appendChild(layerObjects);
-  g.appendChild(layerHandles);
-  g.appendChild(layerDrawing);
-
-  const pt = (_x: number, _z: number) => `${_x},${-_z}`;
-  const polyPoints = (pts: [number, number][]) => pts.map(([x, z]) => pt(x, z)).join(' ');
-  const pathD = (pts: [number, number][]) =>
-    pts.map(([x, z], i) => `${i === 0 ? 'M' : 'L'}${x},${-z}`).join(' ');
-
-  // ── Viewbox state ───────────────────────────────────────────────────
-
-  let vbX = minX, vbY = -maxZ, vbW = baseWidth, vbH = baseHeight;
-
-  function updateViewBox() {
-    svg.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
-    updateScaleBar();
-    updateHandleScale();
-  }
-
-  // ── SVG ↔ screen conversion ─────────────────────────────────────────
-
-  function clientToSvg(clientX: number, clientY: number): [number, number] {
-    const point = svg.createSVGPoint();
-    point.x = clientX;
-    point.y = clientY;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) {
-      // Fallback — shouldn't happen
-      const rect = svg.getBoundingClientRect();
-      const svgX = vbX + ((clientX - rect.left) / rect.width) * vbW;
-      const svgY = vbY + ((clientY - rect.top) / rect.height) * vbH;
-      return [svgX, -svgY];
-    }
-    const transformed = point.matrixTransform(ctm.inverse());
-    return [transformed.x, -transformed.y]; // un-flip Z back to [x, z]
-  }
-
-  // ── Handle (vertex) scale management ────────────────────────────────
-
-  let handleRadius = 3;
-
-  function updateHandleScale() {
-    handleRadius = Math.max(vbW, vbH) * 0.004;
-    const handles = layerHandles.querySelectorAll('circle');
-    handles.forEach((h) => h.setAttribute('r', String(handleRadius)));
-  }
-
-  // ── Render functions ────────────────────────────────────────────────
-
-  function renderWater() {
-    layerWater.innerHTML = '';
-    for (let i = 0; i < waterItems.length; i++) {
-      const w = waterItems[i];
-      if (w.points.length < 3) continue;
-      const isSel = selectedKind === 'water' && selectedIndex === i;
-      const poly = svgEl('polygon', {
-        points: polyPoints(w.points),
-        fill: w.type === 'river' ? COLORS.river : COLORS.water,
-        'fill-opacity': 0.6,
-        stroke: isSel ? COLORS.selected : (w.type === 'river' ? COLORS.river : COLORS.water),
-        'stroke-width': isSel ? 2 : 0.5,
-        'stroke-opacity': 0.8,
-        'data-kind': 'water',
-        'data-idx': i,
-      });
-      poly.style.cursor = 'pointer';
-      layerWater.appendChild(poly);
-    }
-  }
-
-  function renderRegions() {
-    layerRegions.innerHTML = '';
-    for (let i = 0; i < regionItems.length; i++) {
-      const r = regionItems[i];
-      if (r.points.length < 3) continue;
-      const isSel = selectedKind === 'region' && selectedIndex === i;
-      const color = r.type === 'concrete' ? COLORS.concrete : COLORS.field;
-      const poly = svgEl('polygon', {
-        points: polyPoints(r.points),
-        fill: color,
-        'fill-opacity': 0.35,
-        stroke: isSel ? COLORS.selected : color,
-        'stroke-width': isSel ? 2 : 0.8,
-        'stroke-opacity': 0.9,
-        'stroke-dasharray': '3,1.5',
-        'data-kind': 'region',
-        'data-idx': i,
-      });
-      poly.style.cursor = 'pointer';
-      layerRegions.appendChild(poly);
-    }
-  }
-
-  function renderBuildings() {
-    layerBuildings.innerHTML = '';
-    for (let i = 0; i < buildingItems.length; i++) {
-      const b = buildingItems[i];
-      if (b.points.length < 3) continue;
-      const fill = b.type === 'red' ? COLORS.buildingRed : b.type === 'green' ? COLORS.buildingGreen : b.type === 'yellow' ? COLORS.buildingYellow : b.type === 'kristineberg' ? COLORS.buildingKristineberg : COLORS.buildingGrey;
-      const isSel = selectedKind === 'building' && selectedIndex === i;
-      const poly = svgEl('polygon', {
-        points: polyPoints(b.points),
-        fill,
-        'fill-opacity': 0.7,
-        stroke: isSel ? COLORS.selected : fill,
-        'stroke-width': isSel ? 2 : 0.3,
-        'stroke-opacity': 1,
-        'data-kind': 'building',
-        'data-idx': i,
-      });
-      poly.style.cursor = 'pointer';
-      layerBuildings.appendChild(poly);
-    }
-  }
-
-  function renderBridges() {
-    layerBridges.innerHTML = '';
-    for (let i = 0; i < bridgeItems.length; i++) {
-      const b = bridgeItems[i];
-      const [p1, p2] = b.points;
-      const isSel = selectedKind === 'bridge' && selectedIndex === i;
-      // Render as a thick line between the two endpoints
-      const line = svgEl('line', {
-        x1: p1[0], y1: -p1[1],
-        x2: p2[0], y2: -p2[1],
-        stroke: isSel ? COLORS.selected : COLORS.bridge,
-        'stroke-width': 4,
-        'stroke-linecap': 'round',
-        'stroke-opacity': 0.9,
-        'data-kind': 'bridge',
-        'data-idx': i,
-      });
-      line.style.cursor = 'pointer';
-      layerBridges.appendChild(line);
-      // Endpoint circles
-      for (const pt of [p1, p2]) {
-        const dot = svgEl('circle', {
-          cx: pt[0], cy: -pt[1], r: 1.5,
-          fill: isSel ? COLORS.selected : '#aabbcc',
-          'stroke-width': 0,
-          'data-kind': 'bridge',
-          'data-idx': i,
-        });
-        dot.style.cursor = 'pointer';
-        layerBridges.appendChild(dot);
-      }
-    }
-  }
-
-  function renderFences() {
-    layerFences.innerHTML = '';
-    for (let i = 0; i < fenceItems.length; i++) {
-      const f = fenceItems[i];
-      if (f.points.length < 2) continue;
-      const isSel = selectedKind === 'fence' && selectedIndex === i;
-      const closed = pathD(f.points) + ' Z';
-      const p = svgEl('path', {
-        d: closed,
-        fill: 'none',
-        stroke: isSel ? COLORS.selected : COLORS.fence,
-        'stroke-width': isSel ? 2 : 1.5,
-        'stroke-dasharray': '4,2',
-        'stroke-opacity': 0.9,
-        'stroke-linecap': 'round',
-        'data-kind': 'fence',
-        'data-idx': i,
-      });
-      p.style.cursor = 'pointer';
-      layerFences.appendChild(p);
-    }
-  }
-
-  function renderTrees() {
-    layerTrees.innerHTML = '';
-    const r = Math.max(vbW, vbH) * 0.003;
-    for (let i = 0; i < treeItems.length; i++) {
-      const t = treeItems[i];
-      const isSel = selectedKind === 'tree' && selectedIndex === i;
-      const circle = svgEl('circle', {
-        cx: t.pos[0],
-        cy: -t.pos[1],
-        r,
-        fill: isSel ? COLORS.selected : COLORS.tree,
-        stroke: '#114411',
-        'stroke-width': r * 0.3,
-        'data-kind': 'tree',
-        'data-idx': i,
-      });
-      circle.style.cursor = 'pointer';
-      layerTrees.appendChild(circle);
-    }
-  }
-
-  const OBJECT_COLORS: Record<ObjectKind, string> = {
-    bench: COLORS.bench,
-    lamppost: COLORS.lamppost,
-    tennisCourt: COLORS.tennisCourt,
-    floodlight: COLORS.floodlight,
-    goose: COLORS.goose,
-    deer: COLORS.deer,
-  };
-
-  // Real-world sizes (metres) for each object kind
-  // Tennis court: 12m long (Z) × 5.5m wide (X)
-  // Bench: 1.5m wide (X) × 0.4m deep (Z)
-  // Lamppost: ~0.3m pole (renders as circle)
-  // Floodlight: 1.4m base diameter
-  const OBJECT_SIZES: Record<ObjectKind, { w: number; h: number }> = {
-    tennisCourt: { w: 5.5, h: 12 },
-    bench: { w: 1.5, h: 0.5 },
-    lamppost: { w: 0.6, h: 0.6 },
-    floodlight: { w: 1.4, h: 1.4 },
-    goose: { w: 0.5, h: 0.5 },
-    deer: { w: 1.0, h: 1.2 },
-  };
-
-  function renderObjects() {
-    layerObjects.innerHTML = '';
-    const minS = Math.max(vbW, vbH) * 0.005; // minimum visual size (zoom-adaptive)
-    for (let i = 0; i < objectItems.length; i++) {
-      const o = objectItems[i];
-      const isSel = selectedKind === 'object' && selectedIndex === i;
-      const cx = o.pos[0];
-      const cy = -o.pos[1];
-      const rot = -o.rotation;
-      const color = isSel ? COLORS.selected : OBJECT_COLORS[o.kind];
-      const realSize = OBJECT_SIZES[o.kind];
-      // Use real-world metres but enforce a minimum so things are visible when zoomed out
-      const hw = Math.max(realSize.w / 2, minS * 1.2); // half-width
-      const hh = Math.max(realSize.h / 2, minS * 1.2); // half-height
-
-      const group = svgEl('g', {
-        transform: `translate(${cx},${cy}) rotate(${rot})`,
-        'data-kind': 'object',
-        'data-idx': i,
-      });
-      group.style.cursor = 'pointer';
-
-      if (o.kind === 'bench') {
-        const rect = svgEl('rect', {
-          x: -hw, y: -hh, width: hw * 2, height: hh * 2,
-          fill: color, stroke: isSel ? '#fff' : '#5a4510',
-          'stroke-width': Math.max(hw * 0.08, 0.05), rx: Math.min(hw, hh) * 0.1,
-        });
-        group.appendChild(rect);
-        // Front indicator (backrest side)
-        const indicator = svgEl('line', {
-          x1: 0, y1: -hh, x2: 0, y2: -hh - Math.max(hh * 0.6, minS * 0.4),
-          stroke: isSel ? '#fff' : '#c8a020',
-          'stroke-width': Math.max(hw * 0.1, 0.05), 'stroke-linecap': 'round',
-        });
-        group.appendChild(indicator);
-      } else if (o.kind === 'lamppost') {
-        const r = Math.max(hw, hh);
-        const circle = svgEl('circle', {
-          cx: 0, cy: 0, r,
-          fill: color, stroke: isSel ? '#fff' : '#555566',
-          'stroke-width': Math.max(r * 0.15, 0.03),
-        });
-        group.appendChild(circle);
-        const dot = svgEl('circle', {
-          cx: 0, cy: 0, r: r * 0.35,
-          fill: isSel ? '#fff' : '#eeee88',
-        });
-        group.appendChild(dot);
-        const indicator = svgEl('line', {
-          x1: 0, y1: -r, x2: 0, y2: -r - Math.max(r * 0.6, minS * 0.4),
-          stroke: isSel ? '#fff' : '#aaaa77',
-          'stroke-width': Math.max(r * 0.15, 0.03), 'stroke-linecap': 'round',
-        });
-        group.appendChild(indicator);
-      } else if (o.kind === 'tennisCourt') {
-        // Width = X (short side), Height = Z (long side)
-        const rect = svgEl('rect', {
-          x: -hw, y: -hh, width: hw * 2, height: hh * 2,
-          fill: color, stroke: isSel ? '#fff' : '#1a6636',
-          'stroke-width': Math.max(Math.min(hw, hh) * 0.04, 0.05), rx: Math.min(hw, hh) * 0.02,
-        });
-        group.appendChild(rect);
-        // Court lines: service boxes
-        const lineW = Math.max(Math.min(hw, hh) * 0.02, 0.04);
-        const lineColor = 'rgba(255,255,255,0.6)';
-        // Net across the middle (width-wise)
-        group.appendChild(svgEl('line', {
-          x1: -hw, y1: 0, x2: hw, y2: 0,
-          stroke: '#ffffff', 'stroke-width': lineW * 2, 'stroke-opacity': '0.7',
-        }));
-        // Outer boundary
-        group.appendChild(svgEl('rect', {
-          x: -hw * 0.92, y: -hh * 0.95, width: hw * 1.84, height: hh * 1.9,
-          fill: 'none', stroke: lineColor, 'stroke-width': lineW,
-        }));
-        // Centre service line
-        group.appendChild(svgEl('line', {
-          x1: 0, y1: -hh * 0.6, x2: 0, y2: hh * 0.6,
-          stroke: lineColor, 'stroke-width': lineW,
-        }));
-        // Service lines
-        group.appendChild(svgEl('line', {
-          x1: -hw * 0.92, y1: -hh * 0.6, x2: hw * 0.92, y2: -hh * 0.6,
-          stroke: lineColor, 'stroke-width': lineW,
-        }));
-        group.appendChild(svgEl('line', {
-          x1: -hw * 0.92, y1: hh * 0.6, x2: hw * 0.92, y2: hh * 0.6,
-          stroke: lineColor, 'stroke-width': lineW,
-        }));
-        // Indicator (front direction)
-        const indicator = svgEl('line', {
-          x1: 0, y1: -hh, x2: 0, y2: -hh - Math.max(hh * 0.15, minS * 0.4),
-          stroke: isSel ? '#fff' : '#80cc80',
-          'stroke-width': Math.max(Math.min(hw, hh) * 0.06, 0.05), 'stroke-linecap': 'round',
-        });
-        group.appendChild(indicator);
-      } else if (o.kind === 'floodlight') {
-        const r = Math.max(hw, hh);
-        const outerRing = svgEl('circle', {
-          cx: 0, cy: 0, r,
-          fill: 'none', stroke: isSel ? '#fff' : color,
-          'stroke-width': Math.max(r * 0.15, 0.03),
-        });
-        group.appendChild(outerRing);
-        const innerDot = svgEl('circle', {
-          cx: 0, cy: 0, r: r * 0.4,
-          fill: isSel ? '#fff' : '#ffcc44',
-        });
-        group.appendChild(innerDot);
-        const indicator = svgEl('line', {
-          x1: 0, y1: -r, x2: 0, y2: -r - Math.max(r * 0.4, minS * 0.4),
-          stroke: isSel ? '#fff' : '#dd8811',
-          'stroke-width': Math.max(r * 0.1, 0.03), 'stroke-linecap': 'round',
-        });
-        group.appendChild(indicator);
-      } else if (o.kind === 'goose') {
-        // Goose icon: small circle body with a direction indicator
-        const r = Math.max(hw, hh);
-        const body = svgEl('circle', {
-          cx: 0, cy: 0, r,
-          fill: color, stroke: isSel ? '#fff' : '#222',
-          'stroke-width': Math.max(r * 0.15, 0.03),
-        });
-        group.appendChild(body);
-        // Neck/head indicator (forward direction)
-        const neckLine = svgEl('line', {
-          x1: 0, y1: 0, x2: 0, y2: -r - Math.max(r * 0.8, minS * 0.5),
-          stroke: isSel ? '#fff' : '#222',
-          'stroke-width': Math.max(r * 0.2, 0.04), 'stroke-linecap': 'round',
-        });
-        group.appendChild(neckLine);
-        // Small head dot
-        const headDot = svgEl('circle', {
-          cx: 0, cy: -r - Math.max(r * 0.8, minS * 0.5), r: Math.max(r * 0.3, minS * 0.15),
-          fill: isSel ? '#fff' : '#111',
-        });
-        group.appendChild(headDot);
-      } else if (o.kind === 'deer') {
-        // Deer icon: oval body with antler-like lines and direction indicator
-        const r = Math.max(hw, hh);
-        const body = svgEl('ellipse', {
-          cx: 0, cy: 0, rx: r * 0.7, ry: r,
-          fill: color, stroke: isSel ? '#fff' : '#3a2010',
-          'stroke-width': Math.max(r * 0.12, 0.03),
-        });
-        group.appendChild(body);
-        // Neck/head line (forward direction)
-        const neckLen = Math.max(r * 1.2, minS * 0.6);
-        const neckLine = svgEl('line', {
-          x1: 0, y1: 0, x2: 0, y2: -r - neckLen,
-          stroke: isSel ? '#fff' : '#3a2010',
-          'stroke-width': Math.max(r * 0.15, 0.03), 'stroke-linecap': 'round',
-        });
-        group.appendChild(neckLine);
-        // Head
-        const headY = -r - neckLen;
-        const headDot = svgEl('circle', {
-          cx: 0, cy: headY, r: Math.max(r * 0.35, minS * 0.18),
-          fill: isSel ? '#fff' : '#5a3a1a',
-        });
-        group.appendChild(headDot);
-        // Antlers (V shape)
-        const antlerH = Math.max(r * 0.5, minS * 0.3);
-        const antlerW = Math.max(r * 0.4, minS * 0.2);
-        for (const side of [-1, 1]) {
-          const antler = svgEl('line', {
-            x1: 0, y1: headY, x2: side * antlerW, y2: headY - antlerH,
-            stroke: isSel ? '#fff' : '#7a5a2a',
-            'stroke-width': Math.max(r * 0.08, 0.02), 'stroke-linecap': 'round',
-          });
-          group.appendChild(antler);
-        }
-      }
-
-      layerObjects.appendChild(group);
-    }
-  }
-
-  function renderOtherPaths() {
-    layerPaths.innerHTML = '';
-    for (const p of otherPaths) {
-      if (p.points.length < 2) continue;
-      const color = COLORS[p.type as keyof typeof COLORS] ?? COLORS.path;
-      const pathEl = svgEl('path', {
-        d: pathD(p.points),
-        fill: 'none',
-        stroke: color,
-        'stroke-width': 1.2,
-        'stroke-opacity': 0.7,
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
-      });
-      layerPaths.appendChild(pathEl);
-    }
-  }
-
-  function renderMainPath() {
-    layerMainPath.innerHTML = '';
-    if (mainPath.length < 2) return;
-    const outline = svgEl('path', {
-      d: pathD(mainPath),
-      fill: 'none',
-      stroke: '#000',
-      'stroke-width': 4,
-      'stroke-opacity': 0.3,
-      'stroke-linecap': 'round',
-      'stroke-linejoin': 'round',
-    });
-    layerMainPath.appendChild(outline);
-    const mainEl = svgEl('path', {
-      d: pathD(mainPath),
-      fill: 'none',
-      stroke: COLORS.mainPath,
-      'stroke-width': 2.5,
-      'stroke-opacity': 1,
-      'stroke-linecap': 'round',
-      'stroke-linejoin': 'round',
-    });
-    layerMainPath.appendChild(mainEl);
-    const [sx, sz] = mainPath[0];
-    layerMainPath.appendChild(svgEl('circle', {
-      cx: sx, cy: -sz, r: 3,
-      fill: '#40d040', stroke: '#fff', 'stroke-width': 1,
-    }));
-    const [ex, ez] = mainPath[mainPath.length - 1];
-    if (Math.hypot(ex - sx, ez - sz) > 5) {
-      layerMainPath.appendChild(svgEl('circle', {
-        cx: ex, cy: -ez, r: 3,
-        fill: '#d04040', stroke: '#fff', 'stroke-width': 1,
-      }));
-    }
-  }
-
-  function renderHandles() {
-    layerHandles.innerHTML = '';
-    if (selectedKind === null || selectedIndex < 0) return;
-    if (selectedKind === 'tree') return;
-
-    // Rotation handle for objects
-    if (selectedKind === 'object') {
-      const o = objectItems[selectedIndex];
-      if (!o) return;
-      const cx = o.pos[0];
-      const cy = -o.pos[1];
-      const realSize = OBJECT_SIZES[o.kind];
-      const minS = Math.max(vbW, vbH) * 0.005;
-      const extent = Math.max(realSize.w, realSize.h) / 2 + Math.max(minS * 2, 2);
-      const rotRad = (-o.rotation) * Math.PI / 180;
-      // Handle sits at the object's front (local -Y in SVG = forward direction)
-      const hx = cx + Math.sin(rotRad) * extent;
-      const hy = cy - Math.cos(rotRad) * extent;
-      // Dashed line from centre to handle
-      layerHandles.appendChild(svgEl('line', {
-        x1: cx, y1: cy, x2: hx, y2: hy,
-        stroke: '#ff8800', 'stroke-width': handleRadius * 0.4,
-        'stroke-dasharray': `${handleRadius * 0.8},${handleRadius * 0.5}`,
-        'stroke-opacity': '0.7',
-      }));
-      // Rotation handle circle
-      const rHandle = svgEl('circle', {
-        cx: hx, cy: hy, r: handleRadius * 1.8,
-        fill: '#ff8800', stroke: '#fff', 'stroke-width': handleRadius * 0.3,
-        'data-rot-handle': 'true',
-        'data-idx': selectedIndex,
-      });
-      rHandle.style.cursor = 'crosshair';
-      layerHandles.appendChild(rHandle);
-      // Small arc icon inside the handle
-      const arcR = handleRadius * 0.9;
-      const arcD = `M ${hx - arcR} ${hy} A ${arcR} ${arcR} 0 0 1 ${hx} ${hy - arcR}`;
-      layerHandles.appendChild(svgEl('path', {
-        d: arcD, fill: 'none', stroke: '#fff', 'stroke-width': handleRadius * 0.25,
-        'stroke-linecap': 'round', 'pointer-events': 'none',
-      }));
-      return;
-    }
-
-    let points: [number, number][] = [];
-    if (selectedKind === 'building') points = buildingItems[selectedIndex]?.points ?? [];
-    else if (selectedKind === 'bridge') points = bridgeItems[selectedIndex]?.points ?? [];
-    else if (selectedKind === 'water') points = waterItems[selectedIndex]?.points ?? [];
-    else if (selectedKind === 'fence') points = fenceItems[selectedIndex]?.points ?? [];
-    else if (selectedKind === 'region') points = regionItems[selectedIndex]?.points ?? [];
-    for (let vi = 0; vi < points.length; vi++) {
-      const [x, z] = points[vi];
-      const isSub = selectedSubVertex === vi;
-      const handle = svgEl('circle', {
-        cx: x,
-        cy: -z,
-        r: isSub ? handleRadius * 1.5 : handleRadius,
-        fill: isSub ? '#ff4444' : '#ffcc00',
-        stroke: isSub ? '#fff' : '#000',
-        'stroke-width': handleRadius * 0.25,
-        'data-handle': 'true',
-        'data-kind': selectedKind,
-        'data-item-idx': selectedIndex,
-        'data-vert-idx': vi,
-      });
-      handle.style.cursor = 'move';
-      layerHandles.appendChild(handle);
-    }
-
-    // Edge midpoint markers (clickable to add a vertex) — skip for bridges (fixed 2 points)
-    if (points.length >= 2 && selectedKind !== 'bridge') {
-      const edgeCount = points.length; // closed polygon: last→first too
-      for (let ei = 0; ei < edgeCount; ei++) {
-        const [x1, z1] = points[ei];
-        const [x2, z2] = points[(ei + 1) % points.length];
-        const mx = (x1 + x2) / 2;
-        const mz = (z1 + z2) / 2;
-        const isSub = selectedSubEdge === ei;
-        const markerSize = handleRadius * (isSub ? 1.4 : 1.0);
-        const marker = svgEl('rect', {
-          x: mx - markerSize,
-          y: -mz - markerSize,
-          width: markerSize * 2,
-          height: markerSize * 2,
-          fill: isSub ? '#44aaff' : 'rgba(255,255,255,0.35)',
-          stroke: isSub ? '#fff' : 'rgba(255,255,255,0.6)',
-          'stroke-width': handleRadius * 0.2,
-          rx: handleRadius * 0.2,
-          'data-edge': 'true',
-          'data-edge-idx': ei,
-        });
-        marker.style.cursor = 'pointer';
-        layerHandles.appendChild(marker);
-      }
-    }
-  }
-
-  function renderDrawing() {
-    layerDrawing.innerHTML = '';
-    if (drawMode === 'none' || drawingPoints.length === 0) return;
-    if (drawMode === 'bridge') {
-      // Show first point of the bridge being drawn
-      for (const [x, z] of drawingPoints) {
-        layerDrawing.appendChild(svgEl('circle', {
-          cx: x, cy: -z, r: handleRadius,
-          fill: COLORS.bridge, stroke: '#fff', 'stroke-width': handleRadius * 0.3,
-        }));
-      }
-      return;
-    }
-    if (drawMode !== 'building' && drawMode !== 'field' && drawMode !== 'concrete' && drawMode !== 'fence' && drawMode !== 'water' && drawMode !== 'river') return;
-    const color = drawMode === 'building' ? COLORS.buildingGrey : drawMode === 'concrete' ? COLORS.concrete : drawMode === 'fence' ? COLORS.fence : drawMode === 'water' ? COLORS.water : drawMode === 'river' ? COLORS.river : COLORS.field;
-    if (drawingPoints.length >= 2) {
-      const d = pathD(drawingPoints);
-      layerDrawing.appendChild(svgEl('path', {
-        d,
-        fill: 'none',
-        stroke: color,
-        'stroke-width': 1.5,
-        'stroke-dasharray': '5,3',
-        'stroke-opacity': 0.8,
-      }));
-    }
-    for (const [x, z] of drawingPoints) {
-      layerDrawing.appendChild(svgEl('circle', {
-        cx: x, cy: -z, r: handleRadius,
-        fill: color, stroke: '#fff', 'stroke-width': handleRadius * 0.3,
-      }));
-    }
-  }
-
-  function renderAll() {
-    renderWater();
-    renderRegions();
-    renderBuildings();
-    renderBridges();
-    renderFences();
-    renderOtherPaths();
-    renderMainPath();
-    renderTrees();
-    renderObjects();
-    renderHandles();
-    renderDrawing();
-  }
-
-  renderAll();
-  appEl.appendChild(svg);
-
-  // ── Selection & sidebar ─────────────────────────────────────────────
-
-  function select(kind: SelectionKind | null, idx: number) {
-    selectedKind = kind;
-    selectedIndex = idx;
-    selectedSubVertex = -1;
-    selectedSubEdge = -1;
-    renderAll();
-    renderSidebar();
-  }
-
-  function deleteSelected() {
-    if (selectedKind === null || selectedIndex < 0) return;
-    if (selectedKind === 'building') buildingItems.splice(selectedIndex, 1);
-    else if (selectedKind === 'bridge') bridgeItems.splice(selectedIndex, 1);
-    else if (selectedKind === 'water') waterItems.splice(selectedIndex, 1);
-    else if (selectedKind === 'fence') fenceItems.splice(selectedIndex, 1);
-    else if (selectedKind === 'region') regionItems.splice(selectedIndex, 1);
-    else if (selectedKind === 'tree') treeItems.splice(selectedIndex, 1);
-    else if (selectedKind === 'object') objectItems.splice(selectedIndex, 1);
-    select(null, -1);
-  }
-
-  function renderSidebar() {
-    sidebarEl.innerHTML = '';
-
-    // Title — level dropdown
-    const selectEl = document.createElement('select');
-    selectEl.style.cssText = 'width:100%;background:#333;color:#fff;border:1px solid #555;border-radius:4px;padding:4px 6px;font-size:12px;margin:0 0 8px;cursor:pointer;';
-    for (const [id, meta] of Object.entries(levels)) {
-      const opt = document.createElement('option');
-      opt.value = id;
-      opt.textContent = meta.name + (meta.hide ? ' (hidden)' : '');
-      if (id === levelId) opt.selected = true;
-      selectEl.appendChild(opt);
-    }
-    selectEl.addEventListener('change', () => {
-      const url = new URL(window.location.href);
-      url.searchParams.set('event', selectEl.value);
-      window.location.href = url.toString();
-    });
-    sidebarEl.appendChild(selectEl);
-
-    // ── Draw tools ──
-    const drawSection = document.createElement('div');
-    drawSection.className = 'sidebar-section';
-    const drawTitle = document.createElement('div');
-    drawTitle.className = 'sidebar-section-title';
-    drawTitle.textContent = 'Draw Tools';
-    drawSection.appendChild(drawTitle);
-
-    const drawTools: [string, DrawMode, string][] = [
-      ['Building', 'building', COLORS.buildingGrey],
-      ['Bridge', 'bridge', COLORS.bridge],
-      ['Field', 'field', COLORS.field],
-      ['Concrete', 'concrete', COLORS.concrete],
-      ['Fence', 'fence', COLORS.fence],
-      ['Water', 'water', COLORS.water],
-      ['River', 'river', COLORS.river],
-      ['Tree', 'tree', COLORS.tree],
-      ['Bench', 'bench', COLORS.bench],
-      ['Lamppost', 'lamppost', COLORS.lamppost],
-      ['Tennis Court', 'tennisCourt', COLORS.tennisCourt],
-      ['Floodlight', 'floodlight', COLORS.floodlight],
-      ['Goose', 'goose', COLORS.goose],
-      ['Deer', 'deer', COLORS.deer],
-    ];
-    for (const [label, mode, color] of drawTools) {
-      const btn = document.createElement('button');
-      btn.textContent = label;
-      btn.className = 'draw-btn' + (drawMode === mode ? ' active' : '');
-      btn.style.borderColor = drawMode === mode ? color : 'rgba(255,255,255,0.15)';
-      btn.addEventListener('click', () => {
-        if (drawMode === mode) {
-          drawMode = 'none';
-          drawingPoints = [];
-        } else {
-          drawMode = mode;
-          drawingPoints = [];
-          select(null, -1);
-          return; // select() already calls renderSidebar
-        }
-        renderDrawing();
-        renderSidebar();
-      });
-      drawSection.appendChild(btn);
-    }
-
-    const isPolygonDraw = drawMode === 'building' || drawMode === 'field' || drawMode === 'concrete' || drawMode === 'fence' || drawMode === 'water' || drawMode === 'river';
-    if (isPolygonDraw) {
-      const hint = document.createElement('div');
-      hint.className = 'sidebar-hint';
-      hint.textContent = 'Click to add points. Double-click to finish.';
-      drawSection.appendChild(hint);
-    }
-    if (drawMode === 'bridge') {
-      const hint = document.createElement('div');
-      hint.className = 'sidebar-hint';
-      hint.textContent = 'Click two points to define bridge endpoints.';
-      drawSection.appendChild(hint);
-    }
-    if (drawMode === 'tree') {
-      const hint = document.createElement('div');
-      hint.className = 'sidebar-hint';
-      hint.textContent = 'Click on map to place trees.';
-      drawSection.appendChild(hint);
-    }
-    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight' || drawMode === 'goose' || drawMode === 'deer') {
-      const hint = document.createElement('div');
-      hint.className = 'sidebar-hint';
-      hint.textContent = 'Click to place. Drag rotation handle to rotate.';
-      drawSection.appendChild(hint);
-    }
-    sidebarEl.appendChild(drawSection);
-    sidebarEl.appendChild(makeDivider());
-
-    // ── Layer toggles ──
-    const layerSection = document.createElement('div');
-    layerSection.className = 'sidebar-section';
-    const layerTitle2 = document.createElement('div');
-    layerTitle2.className = 'sidebar-section-title';
-    layerTitle2.textContent = 'Layers';
-    layerSection.appendChild(layerTitle2);
-
-    const layerToggles: [string, string, SVGGElement][] = [
-      ['Main path', COLORS.mainPath, layerMainPath],
-      ['Paths', COLORS.footway, layerPaths],
-      ['Buildings', COLORS.buildingGrey, layerBuildings],
-      ['Bridges', COLORS.bridge, layerBridges],
-      ['Water', COLORS.water, layerWater],
-      ['Regions', COLORS.field, layerRegions],
-      ['Fences', COLORS.fence, layerFences],
-      ['Trees', COLORS.tree, layerTrees],
-      ['Objects', COLORS.bench, layerObjects],
-    ];
-    for (const [label, color, layer] of layerToggles) {
-      const row = document.createElement('div');
-      row.className = 'sidebar-row';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = layer.style.display !== 'none';
-      cb.addEventListener('change', () => { layer.style.display = cb.checked ? '' : 'none'; });
-      const swatch = document.createElement('div');
-      swatch.className = 'sidebar-swatch';
-      swatch.style.background = color;
-      const lbl = document.createElement('label');
-      lbl.textContent = label;
-      lbl.addEventListener('click', () => { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); });
-      row.appendChild(cb);
-      row.appendChild(swatch);
-      row.appendChild(lbl);
-      layerSection.appendChild(row);
-    }
-    sidebarEl.appendChild(layerSection);
-    sidebarEl.appendChild(makeDivider());
-
-    // ── Selection info ──
-    if (selectedKind !== null && selectedIndex >= 0) {
-      const selSection = document.createElement('div');
-      selSection.className = 'sidebar-section';
-      const selTitle = document.createElement('div');
-      selTitle.className = 'sidebar-section-title';
-      selTitle.textContent = 'Selected';
-      selSection.appendChild(selTitle);
-
-      const info = document.createElement('div');
-      info.className = 'sidebar-info';
-      if (selectedKind === 'building') {
-        const b = buildingItems[selectedIndex];
-        info.textContent = `Building #${selectedIndex} — ${b.points.length} verts`;
-
-        const typeRow = document.createElement('div');
-        typeRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;align-items:center;';
-        const typeLabel = document.createElement('span');
-        typeLabel.style.cssText = 'color:#ccc;font-size:11px;';
-        typeLabel.textContent = 'Type:';
-        typeRow.appendChild(typeLabel);
-
-        const typeSelect = document.createElement('select');
-        typeSelect.style.cssText = 'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;';
-        const buildingTypes: { value: BuildingType; label: string; color: string }[] = [
-          { value: 'grey', label: 'Grey', color: COLORS.buildingGrey },
-          { value: 'red', label: 'Red', color: COLORS.buildingRed },
-          { value: 'green', label: 'Green', color: COLORS.buildingGreen },
-          { value: 'yellow', label: 'Yellow', color: COLORS.buildingYellow },
-          { value: 'kristineberg', label: 'Kristineberg', color: COLORS.buildingKristineberg },
-        ];
-        for (const bt of buildingTypes) {
-          const opt = document.createElement('option');
-          opt.value = bt.value;
-          opt.textContent = bt.label;
-          if (bt.value === b.type) opt.selected = true;
-          typeSelect.appendChild(opt);
-        }
-        typeSelect.addEventListener('change', () => {
-          b.type = typeSelect.value as BuildingType;
-          renderBuildings();
-          renderSidebar();
-        });
-        typeRow.appendChild(typeSelect);
-        selSection.appendChild(typeRow);
-
-        const heightRow = document.createElement('div');
-        heightRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;align-items:center;';
-        const heightLabel = document.createElement('span');
-        heightLabel.style.cssText = 'color:#ccc;font-size:11px;';
-        heightLabel.textContent = 'Height:';
-        heightRow.appendChild(heightLabel);
-
-        const heightInput = document.createElement('input');
-        heightInput.type = 'number';
-        heightInput.style.cssText = 'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;';
-        heightInput.placeholder = 'optional (meters)';
-        heightInput.value = b.height !== undefined ? b.height.toString() : '';
-        heightInput.addEventListener('change', () => {
-          const val = heightInput.value.trim();
-          b.height = val === '' ? undefined : parseFloat(val);
-          renderSidebar();
-        });
-        heightRow.appendChild(heightInput);
-        selSection.appendChild(heightRow);
-      } else if (selectedKind === 'bridge') {
-        info.textContent = `Bridge #${selectedIndex}`;
-      } else if (selectedKind === 'water') {
-        const w = waterItems[selectedIndex];
-        info.textContent = `Water #${selectedIndex} (${w.type}) — ${w.points.length} verts`;
-      } else if (selectedKind === 'fence') {
-        info.textContent = `Fence #${selectedIndex} — ${fenceItems[selectedIndex].points.length} verts`;
-      } else if (selectedKind === 'region') {
-        const r = regionItems[selectedIndex];
-        const labels: Record<RegionType, string> = { field: 'Field', concrete: 'Concrete' };
-        info.textContent = `${labels[r.type]} #${selectedIndex} — ${r.points.length} verts`;
-
-        // Type selector
-        const regionTypeRow = document.createElement('div');
-        regionTypeRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;align-items:center;';
-        const regionTypeLabel = document.createElement('span');
-        regionTypeLabel.style.cssText = 'color:#ccc;font-size:11px;';
-        regionTypeLabel.textContent = 'Type:';
-        regionTypeRow.appendChild(regionTypeLabel);
-        const regionTypeSelect = document.createElement('select');
-        regionTypeSelect.style.cssText = 'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;';
-        for (const t of ['field', 'concrete'] as RegionType[]) {
-          const opt = document.createElement('option');
-          opt.value = t;
-          opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
-          if (t === r.type) opt.selected = true;
-          regionTypeSelect.appendChild(opt);
-        }
-        regionTypeSelect.addEventListener('change', () => {
-          r.type = regionTypeSelect.value as RegionType;
-          renderAll();
-          renderSidebar();
-        });
-        regionTypeRow.appendChild(regionTypeSelect);
-        selSection.appendChild(regionTypeRow);
-
-        // Z-index input
-        const zRow = document.createElement('div');
-        zRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;align-items:center;';
-        const zLabel = document.createElement('span');
-        zLabel.style.cssText = 'color:#ccc;font-size:11px;';
-        zLabel.textContent = 'Z-Index:';
-        zRow.appendChild(zLabel);
-        const zInput = document.createElement('input');
-        zInput.type = 'number';
-        zInput.style.cssText = 'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;';
-        zInput.placeholder = '0';
-        zInput.value = r.zIndex != null ? r.zIndex.toString() : '';
-        zInput.addEventListener('change', () => {
-          const val = zInput.value.trim();
-          r.zIndex = val === '' ? undefined : parseInt(val, 10);
-          renderSidebar();
-        });
-        zRow.appendChild(zInput);
-        selSection.appendChild(zRow);
-      } else if (selectedKind === 'tree') {
-        const t = treeItems[selectedIndex];
-        info.textContent = `Tree #${selectedIndex} @ (${t.pos[0].toFixed(1)}, ${t.pos[1].toFixed(1)})`;
-      } else if (selectedKind === 'object') {
-        const o = objectItems[selectedIndex];
-        const labels: Record<ObjectKind, string> = { bench: 'Bench', lamppost: 'Lamppost', tennisCourt: 'Tennis Court', floodlight: 'Floodlight', goose: 'Goose', deer: 'Deer' };
-        info.textContent = `${labels[o.kind]} #${selectedIndex} rot=${o.rotation.toFixed(0)}°`;
-      }
-      selSection.appendChild(info);
-
-      // ── Vertex/edge sub-selection controls for polygons ──
-      const isPolygon = selectedKind === 'building' || selectedKind === 'water' || selectedKind === 'fence' || selectedKind === 'region';
-      if (isPolygon) {
-        let points: [number, number][] = [];
-        if (selectedKind === 'building') points = buildingItems[selectedIndex]?.points ?? [];
-        else if (selectedKind === 'water') points = waterItems[selectedIndex]?.points ?? [];
-        else if (selectedKind === 'fence') points = fenceItems[selectedIndex]?.points ?? [];
-        else if (selectedKind === 'region') points = regionItems[selectedIndex]?.points ?? [];
-
-        if (selectedSubVertex >= 0 && selectedSubVertex < points.length) {
-          const subInfo = document.createElement('div');
-          subInfo.className = 'sidebar-info';
-          subInfo.style.cssText = 'color:#ff8888;margin-top:4px;';
-          subInfo.textContent = `Vertex #${selectedSubVertex} selected`;
-          selSection.appendChild(subInfo);
-
-          const removeVertBtn = document.createElement('button');
-          removeVertBtn.textContent = 'Remove Vertex';
-          removeVertBtn.className = 'delete-btn';
-          removeVertBtn.style.cssText += 'margin-top:4px;display:block;width:100%;';
-          removeVertBtn.addEventListener('click', () => {
-            if (points.length <= 3) return; // minimum 3 for polygon
-            points.splice(selectedSubVertex, 1);
-            selectedSubVertex = -1;
-            renderAll();
-            renderSidebar();
-          });
-          selSection.appendChild(removeVertBtn);
-          if (points.length <= 3) {
-            removeVertBtn.disabled = true;
-            removeVertBtn.style.opacity = '0.4';
-            removeVertBtn.title = 'Polygon needs at least 3 vertices';
-          }
-        } else if (selectedSubEdge >= 0 && selectedSubEdge < points.length) {
-          const ei = selectedSubEdge;
-          const [x1, z1] = points[ei];
-          const [x2, z2] = points[(ei + 1) % points.length];
-          const subInfo = document.createElement('div');
-          subInfo.className = 'sidebar-info';
-          subInfo.style.cssText = 'color:#88aaff;margin-top:4px;';
-          subInfo.textContent = `Edge #${ei}→#${(ei + 1) % points.length} selected`;
-          selSection.appendChild(subInfo);
-
-          const addVertBtn = document.createElement('button');
-          addVertBtn.textContent = 'Add Vertex at Midpoint';
-          addVertBtn.style.cssText = 'margin-top:4px;display:block;width:100%;padding:5px 0;background:#2a3a5a;color:#88ccff;border:1px solid rgba(100,160,220,0.3);border-radius:4px;cursor:pointer;font-size:11px;text-align:center;';
-          addVertBtn.addEventListener('click', () => {
-            const mid: [number, number] = [(x1 + x2) / 2, (z1 + z2) / 2];
-            points.splice(ei + 1, 0, mid);
-            selectedSubEdge = -1;
-            selectedSubVertex = ei + 1; // auto-select the new vertex
-            renderAll();
-            renderSidebar();
-          });
-          selSection.appendChild(addVertBtn);
-        } else {
-          const subHint = document.createElement('div');
-          subHint.className = 'sidebar-hint';
-          subHint.textContent = 'Click a vertex (circle) to select it, or an edge midpoint (square) to add a point.';
-          selSection.appendChild(subHint);
-        }
-      }
-
-      const btnRow = document.createElement('div');
-      btnRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;';
-
-      const delBtn = document.createElement('button');
-      delBtn.textContent = 'Delete';
-      delBtn.className = 'delete-btn';
-      delBtn.addEventListener('click', deleteSelected);
-      btnRow.appendChild(delBtn);
-
-      const deselectBtn = document.createElement('button');
-      deselectBtn.textContent = 'Deselect';
-      deselectBtn.className = 'deselect-btn';
-      deselectBtn.addEventListener('click', () => select(null, -1));
-      btnRow.appendChild(deselectBtn);
-
-      // Rotation control for objects
-      if (selectedKind === 'object') {
-        const rotRow = document.createElement('div');
-        rotRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;align-items:center;';
-        const rotLabel = document.createElement('span');
-        rotLabel.style.cssText = 'color:#ccc;font-size:11px;';
-        rotLabel.textContent = 'Rotation:';
-        rotRow.appendChild(rotLabel);
-
-        const rotInput = document.createElement('input');
-        rotInput.type = 'number';
-        rotInput.min = '0';
-        rotInput.max = '359';
-        rotInput.step = '15';
-        rotInput.value = String(Math.round(objectItems[selectedIndex].rotation));
-        rotInput.style.cssText = 'width:60px;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;';
-        rotInput.addEventListener('input', () => {
-          const raw = parseFloat(rotInput.value) || 0;
-          objectItems[selectedIndex].rotation = ((raw % 360) + 360) % 360;
-          renderObjects();
-        });
-        rotRow.appendChild(rotInput);
-
-        const degLabel = document.createElement('span');
-        degLabel.style.cssText = 'color:#888;font-size:11px;';
-        degLabel.textContent = '°';
-        rotRow.appendChild(degLabel);
-        selSection.appendChild(rotRow);
-      }
-
-      selSection.appendChild(btnRow);
-      sidebarEl.appendChild(selSection);
-      sidebarEl.appendChild(makeDivider());
-    }
-
-    // ── Export section ──
-    const exportSection = document.createElement('div');
-    exportSection.className = 'sidebar-section';
-    const exportTitle = document.createElement('div');
-    exportTitle.className = 'sidebar-section-title';
-    exportTitle.textContent = 'Export JSON';
-    exportSection.appendChild(exportTitle);
-
-    const exportItems: [string, () => unknown][] = [
-      ['buildings.json', () => buildingItems.map((b) => {
-        const obj: Record<string, unknown> = {
-          type: b.type,
-          points: b.points.map(([x, z]) => localToGps(x, z, origin)),
-        };
-        if (b.height !== undefined) {
-          obj.height = b.height;
-        }
-        return obj;
-      })],
-      ['bridges.json', () => bridgeItems.map((b) => ({
-        points: b.points.map(([x, z]) => localToGps(x, z, origin)),
-      }))],
-      ['water.json', () => waterItems.map((w) => ({
-        type: w.type,
-        coords: w.points.map(([x, z]) => {
-          const [lat, lon] = localToGps(x, z, origin);
-          return [lon, lat];
-        }),
-      }))],
-      ['regions.json', () => {
-        return regionItems.map(r => {
-          const entry: Record<string, unknown> = {
-            type: r.type,
-            points: r.points.map(([x, z]) => localToGps(x, z, origin)),
-          };
-          if (r.zIndex != null && r.zIndex !== 0) entry.zIndex = r.zIndex;
-          return entry;
-        });
-      }],
-      ['fences.json', () => fenceItems.map((f) => ({
-        points: f.points.map(([x, z]) => localToGps(x, z, origin)),
-      }))],
-      ['trees.json', () => treeItems.map((t) => localToGps(t.pos[0], t.pos[1], origin))],
-      ['objects.json', () => {
-        const toGps = (items: ObjectItem[]) => items.map((o) => {
-          const [lat, lon] = localToGps(o.pos[0], o.pos[1], origin);
-          return [lat, lon, Math.round(o.rotation * 10) / 10];
-        });
-        const result: Record<string, unknown> = {};
-        const benches = objectItems.filter(o => o.kind === 'bench');
-        const lampposts = objectItems.filter(o => o.kind === 'lamppost');
-        const courts = objectItems.filter(o => o.kind === 'tennisCourt');
-        const floodlights = objectItems.filter(o => o.kind === 'floodlight');
-        const geese = objectItems.filter(o => o.kind === 'goose');
-        const deerObjs = objectItems.filter(o => o.kind === 'deer');
-        if (benches.length) result.benches = toGps(benches);
-        if (lampposts.length) result.lampposts = toGps(lampposts);
-        if (courts.length) result.tennisCourts = toGps(courts);
-        if (floodlights.length) result.floodlights = toGps(floodlights);
-        if (geese.length) result.geese = toGps(geese);
-        if (deerObjs.length) result.deer = toGps(deerObjs);
-        return result;
-      }],
-    ];
-
-    for (const [filename, getData] of exportItems) {
-      const btn = document.createElement('button');
-      btn.textContent = filename;
-      btn.className = 'export-btn';
-      btn.addEventListener('click', () => {
-        const data = getData();
-        const json = JSON.stringify(data, null, 2);
-        navigator.clipboard.writeText(json).then(() => {
-          btn.textContent = `✓ ${filename} copied!`;
-          setTimeout(() => { btn.textContent = filename; }, 2000);
-        }).catch(() => {
-          const w = window.open('', '_blank');
-          if (w) { w.document.write(`<pre>${json}</pre>`); }
-        });
-      });
-      exportSection.appendChild(btn);
-    }
-    sidebarEl.appendChild(exportSection);
-    sidebarEl.appendChild(makeDivider());
-
-    // ── Reframe ──
-    const reframeBtn = document.createElement('button');
-    reframeBtn.textContent = 'Reframe';
-    reframeBtn.className = 'reframe-btn';
-    reframeBtn.addEventListener('click', () => {
-      vbX = minX; vbY = -maxZ; vbW = baseWidth; vbH = baseHeight;
-      updateViewBox();
-    });
-    sidebarEl.appendChild(reframeBtn);
-
-    // Stats
-    const statsEl = document.createElement('div');
-    statsEl.className = 'sidebar-stats';
-    statsEl.innerHTML = `${Math.round(courseLen)}m · ${buildingItems.length} bldgs · ${waterItems.length} water · ${regionItems.length} regions · ${treeItems.length} trees · ${objectItems.length} objects`;
-    sidebarEl.appendChild(statsEl);
-  }
-
-  function makeDivider() {
-    const d = document.createElement('hr');
-    d.className = 'sidebar-divider';
-    return d;
-  }
-
-  const courseLen = mainPath.reduce((sum, [x, z], i) => {
-    if (i === 0) return 0;
-    const [px, pz] = mainPath[i - 1];
-    return sum + Math.hypot(x - px, z - pz);
-  }, 0);
-
-  renderSidebar();
-
-  // ── Info bar ────────────────────────────────────────────────────────
-
-  infoEl.innerHTML = `<strong>${level.name}</strong> — ${Math.round(courseLen)}m`;
-
-  // ── Scale bar ───────────────────────────────────────────────────────
-
-  const scaleLineEl = document.getElementById('scale-line')!;
-  const scaleLabelEl = document.getElementById('scale-label')!;
-
-  function updateScaleBar() {
-    const svgRect = svg.getBoundingClientRect();
-    if (svgRect.width === 0) return;
-    const metersPerPx = vbW / svgRect.width;
-    const targetPx = 100;
-    const rawMeters = metersPerPx * targetPx;
-    const niceSteps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
-    let niceMeters = niceSteps[niceSteps.length - 1];
-    for (const s of niceSteps) {
-      if (s >= rawMeters * 0.5) { niceMeters = s; break; }
-    }
-    const barPx = niceMeters / metersPerPx;
-    scaleLineEl.style.width = `${Math.round(barPx)}px`;
-    scaleLabelEl.textContent = niceMeters >= 1000 ? `${niceMeters / 1000} km` : `${niceMeters} m`;
-  }
-  updateScaleBar();
-
-  // ── Click handling (selection + drawing) ────────────────────────────
-
-  let justFinishedDraw = false;
-  let lastClickTime = 0;
-
-  svg.addEventListener('click', (e) => {
-    if (justFinishedDraw) { justFinishedDraw = false; return; }
-    const target = e.target as SVGElement;
-
-    // Handle click (vertex sub-selection) — only if we didn't drag
-    if (target.getAttribute('data-handle') === 'true' && !didDragVertex) {
-      const vertIdx = parseInt(target.getAttribute('data-vert-idx')!, 10);
-      selectedSubEdge = -1;
-      selectedSubVertex = selectedSubVertex === vertIdx ? -1 : vertIdx; // toggle
-      renderHandles();
-      renderSidebar();
-      return;
-    }
-    if (target.getAttribute('data-handle') === 'true') return; // was a drag, ignore click
-
-    // Edge midpoint click
-    if (target.getAttribute('data-edge') === 'true') {
-      const edgeIdx = parseInt(target.getAttribute('data-edge-idx')!, 10);
-      selectedSubVertex = -1;
-      selectedSubEdge = selectedSubEdge === edgeIdx ? -1 : edgeIdx; // toggle
-      renderHandles();
-      renderSidebar();
-      return;
-    }
-
-    const [x, z] = clientToSvg(e.clientX, e.clientY);
-
-    // Drawing mode
-    if (drawMode === 'tree') {
-      treeItems.push({ pos: [x, z] });
-      select('tree', treeItems.length - 1);
-      return;
-    }
-    if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight' || drawMode === 'goose' || drawMode === 'deer') {
-      objectItems.push({ kind: drawMode, pos: [x, z], rotation: 0 });
-      select('object', objectItems.length - 1);
-      return;
-    }
-    if (drawMode === 'bridge') {
-      drawingPoints.push([x, z]);
-      if (drawingPoints.length >= 2) {
-        bridgeItems.push({ points: [drawingPoints[0], drawingPoints[1]] as [[number, number], [number, number]] });
-        drawingPoints = [];
-        drawMode = 'none';
-        select('bridge', bridgeItems.length - 1);
-      } else {
-        renderDrawing();
-      }
-      return;
-    }
-    if (drawMode === 'building' || drawMode === 'field' || drawMode === 'concrete' || drawMode === 'fence' || drawMode === 'water' || drawMode === 'river') {
-      const now = performance.now();
-      if (now - lastClickTime < 400 && drawingPoints.length >= 3) {
-        // Second click of a double-click — close the polygon immediately
-        // (dblclick may not fire if renderDrawing replaced DOM elements)
-        lastClickTime = 0;
-
-        let newKind: SelectionKind;
-        let newIdx: number;
-        if (drawMode === 'water' || drawMode === 'river') {
-          waterItems.push({ type: drawMode, points: [...drawingPoints] });
-          newKind = 'water';
-          newIdx = waterItems.length - 1;
-        } else if (drawMode === 'fence') {
-          fenceItems.push({ points: [...drawingPoints] });
-          newKind = 'fence';
-          newIdx = fenceItems.length - 1;
-        } else if (drawMode === 'building') {
-          buildingItems.push({ type: 'grey', points: [...drawingPoints] });
-          newKind = 'building';
-          newIdx = buildingItems.length - 1;
-        } else {
-          const regionType: RegionType = drawMode === 'concrete' ? 'concrete' : 'field';
-          regionItems.push({ type: regionType, points: [...drawingPoints] });
-          newKind = 'region';
-          newIdx = regionItems.length - 1;
-        }
-        drawingPoints = [];
-        justFinishedDraw = true;
-        drawMode = 'none';
-        select(newKind, newIdx);
-        return;
-      }
-      lastClickTime = now;
-      drawingPoints.push([x, z]);
-      renderDrawing();
-      return;
-    }
-
-    // Selection mode
-    let kind = target.getAttribute('data-kind') as SelectionKind | null;
-    let idx = target.getAttribute('data-idx');
-    // Object elements are nested in <g> — walk up
-    if (!kind) {
-      const group = (target as Element).closest?.('[data-kind]') as SVGElement | null;
-      if (group) {
-        kind = group.getAttribute('data-kind') as SelectionKind;
-        idx = group.getAttribute('data-idx');
-      }
-    }
-    if (kind && idx !== null) {
-      select(kind, parseInt(idx, 10));
-    } else {
-      select(null, -1);
-    }
-  });
-
-  svg.addEventListener('dblclick', (e) => {
-    if (drawMode !== 'building' && drawMode !== 'field' && drawMode !== 'concrete' && drawMode !== 'fence' && drawMode !== 'water' && drawMode !== 'river') return;
-    if (drawingPoints.length < 3) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    let newKind: SelectionKind;
-    let newIdx: number;
-    if (drawMode === 'water' || drawMode === 'river') {
-      waterItems.push({ type: drawMode, points: [...drawingPoints] });
-      newKind = 'water';
-      newIdx = waterItems.length - 1;
-    } else if (drawMode === 'fence') {
-      fenceItems.push({ points: [...drawingPoints] });
-      newKind = 'fence';
-      newIdx = fenceItems.length - 1;
-    } else if (drawMode === 'building') {
-      buildingItems.push({ type: 'grey', points: [...drawingPoints] });
-      newKind = 'building';
-      newIdx = buildingItems.length - 1;
-    } else {
-      const regionType: RegionType = drawMode === 'concrete' ? 'concrete' : 'field';
-      regionItems.push({ type: regionType, points: [...drawingPoints] });
-      newKind = 'region';
-      newIdx = regionItems.length - 1;
-    }
-
-    drawingPoints = [];
-    justFinishedDraw = true;
-    drawMode = 'none';
-    select(newKind, newIdx);
-  });
-
-  // ── Vertex dragging ─────────────────────────────────────────────────
-
-  let panning = false;
-  let panDragStartX = 0, panDragStartY = 0;
-  let panVbX = 0, panVbY = 0;
-
-  svg.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
-    const target = e.target as SVGElement;
-
-    // Handle drag
-    if (target.getAttribute('data-handle') === 'true') {
-      const kind = target.getAttribute('data-kind') as SelectionKind;
-      const itemIdx = parseInt(target.getAttribute('data-item-idx')!, 10);
-      const vertIdx = parseInt(target.getAttribute('data-vert-idx')!, 10);
-      dragVertexInfo = { kind, itemIdx, vertIdx };
-      didDragVertex = false; // will be set to true on first mousemove
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-
-    // Rotation handle drag
-    if (target.getAttribute('data-rot-handle') === 'true') {
-      const idx = parseInt(target.getAttribute('data-idx')!, 10);
-      if (idx >= 0 && idx < objectItems.length) {
-        dragRotateIdx = idx;
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-    }
-
-    // Tree drag
-    if (target.getAttribute('data-kind') === 'tree' && drawMode !== 'tree') {
-      const idx = parseInt(target.getAttribute('data-idx')!, 10);
-      if (idx >= 0 && idx < treeItems.length) {
-        dragTreeIdx = idx;
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-    }
-
-    // Object drag
-    const objGroup = (target as Element).closest?.('[data-kind="object"]') as SVGElement | null;
-    if (objGroup && drawMode !== 'bench' && drawMode !== 'lamppost' && drawMode !== 'tennisCourt' && drawMode !== 'goose') {
-      const idx = parseInt(objGroup.getAttribute('data-idx')!, 10);
-      if (idx >= 0 && idx < objectItems.length) {
-        dragObjectIdx = idx;
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-    }
-
-    // Pan
-    panning = true;
-    panDragStartX = e.clientX;
-    panDragStartY = e.clientY;
-    panVbX = vbX;
-    panVbY = vbY;
-    svg.classList.add('dragging');
-  });
-
-  let dragTreeIdx = -1;
-  let dragObjectIdx = -1;
-  let dragRotateIdx = -1;
-
-  window.addEventListener('mousemove', (e) => {
-    // Vertex drag
-    if (dragVertexInfo) {
-      didDragVertex = true;
-      const { kind, itemIdx, vertIdx } = dragVertexInfo;
-      const [x, z] = clientToSvg(e.clientX, e.clientY);
-      let points: [number, number][] | null = null;
-      if (kind === 'building') points = buildingItems[itemIdx]?.points ?? null;
-      else if (kind === 'bridge') points = bridgeItems[itemIdx]?.points ?? null;
-      else if (kind === 'water') points = waterItems[itemIdx]?.points ?? null;
-      else if (kind === 'fence') points = fenceItems[itemIdx]?.points ?? null;
-      else if (kind === 'region') points = regionItems[itemIdx]?.points ?? null;
-      if (points && vertIdx < points.length) {
-        points[vertIdx] = [x, z];
-        renderAll();
-      }
-      return;
-    }
-    // Rotation handle drag
-    if (dragRotateIdx >= 0) {
-      const o = objectItems[dragRotateIdx];
-      if (o) {
-        const [mx, mz] = clientToSvg(e.clientX, e.clientY);
-        const dx = mx - o.pos[0];
-        const dz = mz - o.pos[1];
-        // Negate so that clockwise drag → clockwise visual rotation
-        // (object renders with rotate(-rotation), so stored value is inverted)
-        const angleDeg = -(Math.atan2(dx, dz) * 180 / Math.PI);
-        objectItems[dragRotateIdx].rotation = ((Math.round(angleDeg) % 360) + 360) % 360;
-        renderObjects();
-        renderHandles();
-      }
-      return;
-    }
-    // Tree drag
-    if (dragTreeIdx >= 0) {
-      const [x, z] = clientToSvg(e.clientX, e.clientY);
-      treeItems[dragTreeIdx].pos = [x, z];
-      renderTrees();
-      return;
-    }
-    // Object drag
-    if (dragObjectIdx >= 0) {
-      const [x, z] = clientToSvg(e.clientX, e.clientY);
-      objectItems[dragObjectIdx].pos = [x, z];
-      renderObjects();
-      return;
-    }
-    // Pan
-    if (!panning) return;
-    const rect = svg.getBoundingClientRect();
-    const scaleX = vbW / rect.width;
-    const scaleY = vbH / rect.height;
-    vbX = panVbX - (e.clientX - panDragStartX) * scaleX;
-    vbY = panVbY - (e.clientY - panDragStartY) * scaleY;
-    updateViewBox();
-  });
-
-  window.addEventListener('mouseup', () => {
-    if (dragVertexInfo) {
-      dragVertexInfo = null;
-      renderSidebar();
-      return;
-    }
-    if (dragTreeIdx >= 0) {
-      dragTreeIdx = -1;
-      renderSidebar();
-      return;
-    }
-    if (dragObjectIdx >= 0) {
-      dragObjectIdx = -1;
-      renderSidebar();
-      return;
-    }
-    if (dragRotateIdx >= 0) {
-      dragRotateIdx = -1;
-      renderSidebar();
-      return;
-    }
-    panning = false;
-    svg.classList.remove('dragging');
-  });
-
-  // ── Zoom ────────────────────────────────────────────────────────────
-
-  svg.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const rect = svg.getBoundingClientRect();
-    const mx = vbX + ((e.clientX - rect.left) / rect.width) * vbW;
-    const my = vbY + ((e.clientY - rect.top) / rect.height) * vbH;
-    const zoomFactor = e.deltaY > 0 ? 1.035 : 1 / 1.035;
-    const newW = vbW * zoomFactor;
-    const newH = vbH * zoomFactor;
-    vbX = mx - ((mx - vbX) / vbW) * newW;
-    vbY = my - ((my - vbY) / vbH) * newH;
-    vbW = newW;
-    vbH = newH;
-    updateViewBox();
-  }, { passive: false });
-
-  // ── Keyboard shortcuts ──────────────────────────────────────────────
-
-  window.addEventListener('keydown', (e) => {
-    // Don't intercept keys when typing in an input
-    const tag = (document.activeElement as HTMLElement)?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-
-    if (e.key === 'Escape') {
-      if (drawMode !== 'none') {
-        drawMode = 'none';
-        drawingPoints = [];
-        renderDrawing();
-        renderSidebar();
-      } else if (selectedKind !== null) {
-        select(null, -1);
-      }
-    }
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedKind !== null) {
-      e.preventDefault();
-      deleteSelected();
-    }
-  });
+	const infoEl = document.getElementById('info')!
+	const appEl = document.getElementById('app')!
+	const sidebarEl = document.getElementById('sidebar')!
+
+	const params = new URLSearchParams(window.location.search)
+	const levelId = params.get('event') ?? undefined
+
+	if (!levelId || !levels[levelId]) {
+		// Hide default UI and show a centred event picker
+		infoEl.style.display = 'none'
+		sidebarEl.style.display = 'none'
+		appEl.style.left = '0'
+		appEl.style.width = '100%'
+
+		const picker = document.createElement('div')
+		picker.style.cssText =
+			'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:100;'
+
+		const card = document.createElement('div')
+		card.style.cssText =
+			'background:#222;border:1px solid #444;border-radius:12px;padding:28px 36px;min-width:280px;text-align:center;color:#ccc;font-family:system-ui,sans-serif;'
+
+		const title = document.createElement('h2')
+		title.textContent = 'Level Editor'
+		title.style.cssText = 'color:#fff;margin:0 0 4px;font-size:18px;'
+		card.appendChild(title)
+
+		const subtitle = document.createElement('p')
+		subtitle.textContent = 'Choose an event to edit'
+		subtitle.style.cssText = 'color:#888;margin:0 0 16px;font-size:13px;'
+		card.appendChild(subtitle)
+
+		const selectEl = document.createElement('select')
+		selectEl.style.cssText =
+			'width:100%;background:#333;color:#fff;border:1px solid #555;border-radius:6px;padding:8px 10px;font-size:14px;cursor:pointer;appearance:auto;'
+
+		const placeholder = document.createElement('option')
+		placeholder.value = ''
+		placeholder.textContent = 'Select event…'
+		placeholder.disabled = true
+		placeholder.selected = true
+		selectEl.appendChild(placeholder)
+
+		for (const [id, meta] of Object.entries(levels)) {
+			const opt = document.createElement('option')
+			opt.value = id
+			opt.textContent = meta.name + (meta.hide ? ' (hidden)' : '')
+			selectEl.appendChild(opt)
+		}
+
+		selectEl.addEventListener('change', () => {
+			if (!selectEl.value) return
+			const url = new URL(window.location.href)
+			url.searchParams.set('event', selectEl.value)
+			window.location.href = url.toString()
+		})
+
+		card.appendChild(selectEl)
+		picker.appendChild(card)
+		document.body.appendChild(picker)
+		return
+	}
+
+	infoEl.innerHTML = `Loading <strong>${levelId}</strong>…`
+
+	const level = await loadLevel(levelId)
+	const origin: [number, number] = [
+		level.course.coordinates[0][0],
+		level.course.coordinates[0][1],
+	]
+
+	// ── Convert all features to local coordinates (editable arrays) ─────
+
+	interface CourseNode {
+		pos: [number, number]
+		pathType?: PathType
+		width?: number
+	}
+	const courseNodes: CourseNode[] = level.course.coordinates.map(
+		([lon, lat, pathType, width]) => ({
+			pos: gpsToLocal(lon, lat, origin),
+			pathType,
+			width,
+		}),
+	)
+
+	const otherPaths = (level.paths ?? []).map((p) => ({
+		type: p.type,
+		points: p.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [
+			number,
+			number,
+		][],
+	}))
+
+	const buildingItems: BuildingItem[] = (level.buildings ?? []).map((b) => ({
+		type:
+			b.type === 'red' ||
+			b.type === 'green' ||
+			b.type === 'yellow' ||
+			b.type === 'kristineberg' ||
+			b.type === 'brick'
+				? (b.type as BuildingType)
+				: ('grey' as const),
+		height: b.height,
+		points: b.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [
+			number,
+			number,
+		][],
+	}))
+
+	const bridgeItems: BridgeItem[] = (level.bridges ?? []).map((b) => ({
+		points: [
+			gpsToLocal(b.points[0][1], b.points[0][0], origin),
+			gpsToLocal(b.points[1][1], b.points[1][0], origin),
+		] as [[number, number], [number, number]],
+	}))
+
+	const waterItems: WaterItem[] = (level.water ?? []).map((w) => ({
+		type: w.type,
+		points: w.coords.map(([lon, lat]) => gpsToLocal(lon, lat, origin)) as [
+			number,
+			number,
+		][],
+	}))
+
+	const fenceItems: FenceItem[] = (level.customFences ?? []).map((f) => ({
+		points: f.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [
+			number,
+			number,
+		][],
+	}))
+
+	const regionItems: RegionItem[] = (level.regions ?? []).map(
+		(r): RegionItem => ({
+			type: r.type,
+			points: r.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [
+				number,
+				number,
+			][],
+			zIndex: r.zIndex,
+		}),
+	)
+
+	const treeItems: TreeItem[] = (level.manualTrees ?? []).map(([lat, lon]) => ({
+		pos: gpsToLocal(lon, lat, origin),
+	}))
+
+	const objectItems: ObjectItem[] = [
+		...(level.objects?.benches ?? []).map(
+			([lat, lon, rot]): ObjectItem => ({
+				kind: 'bench',
+				pos: gpsToLocal(lon, lat, origin),
+				rotation: rot,
+			}),
+		),
+		...(level.objects?.lampposts ?? []).map(
+			([lat, lon, rot]): ObjectItem => ({
+				kind: 'lamppost',
+				pos: gpsToLocal(lon, lat, origin),
+				rotation: rot,
+			}),
+		),
+		...(level.objects?.tennisCourts ?? []).map(
+			([lat, lon, rot]): ObjectItem => ({
+				kind: 'tennisCourt',
+				pos: gpsToLocal(lon, lat, origin),
+				rotation: rot,
+			}),
+		),
+		...(level.objects?.floodlights ?? []).map(
+			([lat, lon, rot]): ObjectItem => ({
+				kind: 'floodlight',
+				pos: gpsToLocal(lon, lat, origin),
+				rotation: rot,
+			}),
+		),
+		...(level.objects?.geese ?? []).map(
+			([lat, lon, rot]): ObjectItem => ({
+				kind: 'goose',
+				pos: gpsToLocal(lon, lat, origin),
+				rotation: rot,
+			}),
+		),
+		...(level.objects?.swans ?? []).map(
+			([lat, lon, rot]): ObjectItem => ({
+				kind: 'swan',
+				pos: gpsToLocal(lon, lat, origin),
+				rotation: rot,
+			}),
+		),
+		...(level.objects?.deer ?? []).map(
+			([lat, lon, rot]): ObjectItem => ({
+				kind: 'deer',
+				pos: gpsToLocal(lon, lat, origin),
+				rotation: rot,
+			}),
+		),
+	]
+
+	// ── Compute bounding box ────────────────────────────────────────────
+
+	const allPoints = [
+		...courseNodes.map((n) => n.pos),
+		...otherPaths.flatMap((p) => p.points),
+		...buildingItems.flatMap((b) => b.points),
+		...bridgeItems.flatMap((b) => b.points),
+		...waterItems.flatMap((w) => w.points),
+		...fenceItems.flatMap((f) => f.points),
+		...regionItems.flatMap((r) => r.points),
+		...treeItems.map((t) => t.pos),
+		...objectItems.map((o) => o.pos),
+	]
+
+	let minX = Number.POSITIVE_INFINITY,
+		maxX = Number.NEGATIVE_INFINITY,
+		minZ = Number.POSITIVE_INFINITY,
+		maxZ = Number.NEGATIVE_INFINITY
+	for (const [x, z] of allPoints) {
+		if (x < minX) minX = x
+		if (x > maxX) maxX = x
+		if (z < minZ) minZ = z
+		if (z > maxZ) maxZ = z
+	}
+
+	const pad = Math.max(maxX - minX, maxZ - minZ) * 0.08
+	minX -= pad
+	maxX += pad
+	minZ -= pad
+	maxZ += pad
+	const baseWidth = maxX - minX
+	const baseHeight = maxZ - minZ
+
+	// ── State ───────────────────────────────────────────────────────────
+
+	type SelectionKind =
+		| 'building'
+		| 'bridge'
+		| 'water'
+		| 'fence'
+		| 'region'
+		| 'tree'
+		| 'object'
+		| 'courseNode'
+	type DrawMode =
+		| 'none'
+		| 'building'
+		| 'bridge'
+		| 'field'
+		| 'concrete'
+		| 'fence'
+		| 'water'
+		| 'river'
+		| 'tree'
+		| 'bench'
+		| 'lamppost'
+		| 'tennisCourt'
+		| 'floodlight'
+		| 'goose'
+		| 'swan'
+		| 'deer'
+
+	let selectedKind: SelectionKind | null = null
+	let selectedIndex = -1
+	let selectedSubVertex = -1 // sub-selected vertex within polygon (-1 = none)
+	let selectedSubEdge = -1 // sub-selected edge within polygon (-1 = none)
+	let drawMode: DrawMode = 'none'
+	let drawingPoints: [number, number][] = []
+	let dragVertexInfo: {
+		kind: SelectionKind
+		itemIdx: number
+		vertIdx: number
+	} | null = null
+	let didDragVertex = false // true if mouse moved during a vertex drag
+
+	// ── Build SVG ───────────────────────────────────────────────────────
+
+	const svg = svgEl('svg', {
+		viewBox: `${minX} ${-maxZ} ${baseWidth} ${baseHeight}`,
+	})
+	svg.style.background = '#2a3a2a'
+	const g = svgEl('g')
+	svg.appendChild(g)
+
+	const layerWater = svgEl('g', { 'data-layer': 'water' })
+	const layerRegions = svgEl('g', { 'data-layer': 'regions' })
+	const layerBuildings = svgEl('g', { 'data-layer': 'buildings' })
+	const layerBridges = svgEl('g', { 'data-layer': 'bridges' })
+	const layerPaths = svgEl('g', { 'data-layer': 'paths' })
+	const layerFences = svgEl('g', { 'data-layer': 'fences' })
+	const layerMainPath = svgEl('g', { 'data-layer': 'mainPath' })
+	const layerCourseNodes = svgEl('g', { 'data-layer': 'courseNodes' })
+	const layerTrees = svgEl('g', { 'data-layer': 'trees' })
+	const layerObjects = svgEl('g', { 'data-layer': 'objects' })
+	const layerHandles = svgEl('g', { 'data-layer': 'handles' })
+	const layerDrawing = svgEl('g', { 'data-layer': 'drawing' })
+
+	g.appendChild(layerWater)
+	g.appendChild(layerRegions)
+	g.appendChild(layerBuildings)
+	g.appendChild(layerBridges)
+	g.appendChild(layerPaths)
+	g.appendChild(layerFences)
+	g.appendChild(layerMainPath)
+	g.appendChild(layerCourseNodes)
+	g.appendChild(layerTrees)
+	g.appendChild(layerObjects)
+	g.appendChild(layerHandles)
+	g.appendChild(layerDrawing)
+
+	const pt = (_x: number, _z: number) => `${_x},${-_z}`
+	const polyPoints = (pts: [number, number][]) =>
+		pts.map(([x, z]) => pt(x, z)).join(' ')
+	const pathD = (pts: [number, number][]) =>
+		pts.map(([x, z], i) => `${i === 0 ? 'M' : 'L'}${x},${-z}`).join(' ')
+
+	// ── Viewbox state ───────────────────────────────────────────────────
+
+	let vbX = minX,
+		vbY = -maxZ,
+		vbW = baseWidth,
+		vbH = baseHeight
+
+	function updateViewBox() {
+		svg.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`)
+		updateScaleBar()
+		updateHandleScale()
+	}
+
+	// ── SVG ↔ screen conversion ─────────────────────────────────────────
+
+	function clientToSvg(clientX: number, clientY: number): [number, number] {
+		const point = svg.createSVGPoint()
+		point.x = clientX
+		point.y = clientY
+		const ctm = svg.getScreenCTM()
+		if (!ctm) {
+			// Fallback — shouldn't happen
+			const rect = svg.getBoundingClientRect()
+			const svgX = vbX + ((clientX - rect.left) / rect.width) * vbW
+			const svgY = vbY + ((clientY - rect.top) / rect.height) * vbH
+			return [svgX, -svgY]
+		}
+		const transformed = point.matrixTransform(ctm.inverse())
+		return [transformed.x, -transformed.y] // un-flip Z back to [x, z]
+	}
+
+	// ── Handle (vertex) scale management ────────────────────────────────
+
+	let handleRadius = 3
+
+	function updateHandleScale() {
+		handleRadius = Math.max(vbW, vbH) * 0.004
+		const handles = layerHandles.querySelectorAll('circle')
+		handles.forEach((h) => h.setAttribute('r', String(handleRadius)))
+	}
+
+	// ── Render functions ────────────────────────────────────────────────
+
+	function renderWater() {
+		layerWater.innerHTML = ''
+		for (let i = 0; i < waterItems.length; i++) {
+			const w = waterItems[i]
+			if (w.points.length < 3) continue
+			const isSel = selectedKind === 'water' && selectedIndex === i
+			const poly = svgEl('polygon', {
+				points: polyPoints(w.points),
+				fill: w.type === 'river' ? COLORS.river : COLORS.water,
+				'fill-opacity': 0.6,
+				stroke: isSel
+					? COLORS.selected
+					: w.type === 'river'
+						? COLORS.river
+						: COLORS.water,
+				'stroke-width': isSel ? 2 : 0.5,
+				'stroke-opacity': 0.8,
+				'data-kind': 'water',
+				'data-idx': i,
+			})
+			poly.style.cursor = 'pointer'
+			layerWater.appendChild(poly)
+		}
+	}
+
+	function renderRegions() {
+		layerRegions.innerHTML = ''
+		for (let i = 0; i < regionItems.length; i++) {
+			const r = regionItems[i]
+			if (r.points.length < 3) continue
+			const isSel = selectedKind === 'region' && selectedIndex === i
+			const color = r.type === 'concrete' ? COLORS.concrete : COLORS.field
+			const poly = svgEl('polygon', {
+				points: polyPoints(r.points),
+				fill: color,
+				'fill-opacity': 0.35,
+				stroke: isSel ? COLORS.selected : color,
+				'stroke-width': isSel ? 2 : 0.8,
+				'stroke-opacity': 0.9,
+				'stroke-dasharray': '3,1.5',
+				'data-kind': 'region',
+				'data-idx': i,
+			})
+			poly.style.cursor = 'pointer'
+			layerRegions.appendChild(poly)
+		}
+	}
+
+	function renderBuildings() {
+		layerBuildings.innerHTML = ''
+		for (let i = 0; i < buildingItems.length; i++) {
+			const b = buildingItems[i]
+			if (b.points.length < 3) continue
+			const fill =
+				b.type === 'red'
+					? COLORS.buildingRed
+					: b.type === 'brick'
+						? COLORS.buildingBrick
+						: b.type === 'green'
+							? COLORS.buildingGreen
+							: b.type === 'yellow'
+								? COLORS.buildingYellow
+								: b.type === 'kristineberg'
+									? COLORS.buildingKristineberg
+									: COLORS.buildingGrey
+			const isSel = selectedKind === 'building' && selectedIndex === i
+			const poly = svgEl('polygon', {
+				points: polyPoints(b.points),
+				fill,
+				'fill-opacity': 0.7,
+				stroke: isSel ? COLORS.selected : fill,
+				'stroke-width': isSel ? 2 : 0.3,
+				'stroke-opacity': 1,
+				'data-kind': 'building',
+				'data-idx': i,
+			})
+			poly.style.cursor = 'pointer'
+			layerBuildings.appendChild(poly)
+		}
+	}
+
+	function renderBridges() {
+		layerBridges.innerHTML = ''
+		for (let i = 0; i < bridgeItems.length; i++) {
+			const b = bridgeItems[i]
+			const [p1, p2] = b.points
+			const isSel = selectedKind === 'bridge' && selectedIndex === i
+			// Render as a thick line between the two endpoints
+			const line = svgEl('line', {
+				x1: p1[0],
+				y1: -p1[1],
+				x2: p2[0],
+				y2: -p2[1],
+				stroke: isSel ? COLORS.selected : COLORS.bridge,
+				'stroke-width': 4,
+				'stroke-linecap': 'round',
+				'stroke-opacity': 0.9,
+				'data-kind': 'bridge',
+				'data-idx': i,
+			})
+			line.style.cursor = 'pointer'
+			layerBridges.appendChild(line)
+			// Endpoint circles
+			for (const pt of [p1, p2]) {
+				const dot = svgEl('circle', {
+					cx: pt[0],
+					cy: -pt[1],
+					r: 1.5,
+					fill: isSel ? COLORS.selected : '#aabbcc',
+					'stroke-width': 0,
+					'data-kind': 'bridge',
+					'data-idx': i,
+				})
+				dot.style.cursor = 'pointer'
+				layerBridges.appendChild(dot)
+			}
+		}
+	}
+
+	function renderFences() {
+		layerFences.innerHTML = ''
+		for (let i = 0; i < fenceItems.length; i++) {
+			const f = fenceItems[i]
+			if (f.points.length < 2) continue
+			const isSel = selectedKind === 'fence' && selectedIndex === i
+			const closed = pathD(f.points) + ' Z'
+			const p = svgEl('path', {
+				d: closed,
+				fill: 'none',
+				stroke: isSel ? COLORS.selected : COLORS.fence,
+				'stroke-width': isSel ? 2 : 1.5,
+				'stroke-dasharray': '4,2',
+				'stroke-opacity': 0.9,
+				'stroke-linecap': 'round',
+				'data-kind': 'fence',
+				'data-idx': i,
+			})
+			p.style.cursor = 'pointer'
+			layerFences.appendChild(p)
+		}
+	}
+
+	function renderTrees() {
+		layerTrees.innerHTML = ''
+		const r = Math.max(vbW, vbH) * 0.003
+		for (let i = 0; i < treeItems.length; i++) {
+			const t = treeItems[i]
+			const isSel = selectedKind === 'tree' && selectedIndex === i
+			const circle = svgEl('circle', {
+				cx: t.pos[0],
+				cy: -t.pos[1],
+				r,
+				fill: isSel ? COLORS.selected : COLORS.tree,
+				stroke: '#114411',
+				'stroke-width': r * 0.3,
+				'data-kind': 'tree',
+				'data-idx': i,
+			})
+			circle.style.cursor = 'pointer'
+			layerTrees.appendChild(circle)
+		}
+	}
+
+	const OBJECT_COLORS: Record<ObjectKind, string> = {
+		bench: COLORS.bench,
+		lamppost: COLORS.lamppost,
+		tennisCourt: COLORS.tennisCourt,
+		floodlight: COLORS.floodlight,
+		goose: COLORS.goose,
+		swan: COLORS.swan,
+		deer: COLORS.deer,
+	}
+
+	// Real-world sizes (metres) for each object kind
+	// Tennis court: 12m long (Z) × 5.5m wide (X)
+	// Bench: 1.5m wide (X) × 0.4m deep (Z)
+	// Lamppost: ~0.3m pole (renders as circle)
+	// Floodlight: 1.4m base diameter
+	const OBJECT_SIZES: Record<ObjectKind, { w: number; h: number }> = {
+		tennisCourt: { w: 5.5, h: 12 },
+		bench: { w: 1.5, h: 0.5 },
+		lamppost: { w: 0.6, h: 0.6 },
+		floodlight: { w: 1.4, h: 1.4 },
+		goose: { w: 0.5, h: 0.5 },
+		swan: { w: 0.6, h: 0.6 },
+		deer: { w: 1.0, h: 1.2 },
+	}
+
+	function renderObjects() {
+		layerObjects.innerHTML = ''
+		const minS = Math.max(vbW, vbH) * 0.005 // minimum visual size (zoom-adaptive)
+		for (let i = 0; i < objectItems.length; i++) {
+			const o = objectItems[i]
+			const isSel = selectedKind === 'object' && selectedIndex === i
+			const cx = o.pos[0]
+			const cy = -o.pos[1]
+			const rot = -o.rotation
+			const color = isSel ? COLORS.selected : OBJECT_COLORS[o.kind]
+			const realSize = OBJECT_SIZES[o.kind]
+			// Use real-world metres but enforce a minimum so things are visible when zoomed out
+			const hw = Math.max(realSize.w / 2, minS * 1.2) // half-width
+			const hh = Math.max(realSize.h / 2, minS * 1.2) // half-height
+
+			const group = svgEl('g', {
+				transform: `translate(${cx},${cy}) rotate(${rot})`,
+				'data-kind': 'object',
+				'data-idx': i,
+			})
+			group.style.cursor = 'pointer'
+
+			if (o.kind === 'bench') {
+				const rect = svgEl('rect', {
+					x: -hw,
+					y: -hh,
+					width: hw * 2,
+					height: hh * 2,
+					fill: color,
+					stroke: isSel ? '#fff' : '#5a4510',
+					'stroke-width': Math.max(hw * 0.08, 0.05),
+					rx: Math.min(hw, hh) * 0.1,
+				})
+				group.appendChild(rect)
+				// Front indicator (backrest side)
+				const indicator = svgEl('line', {
+					x1: 0,
+					y1: -hh,
+					x2: 0,
+					y2: -hh - Math.max(hh * 0.6, minS * 0.4),
+					stroke: isSel ? '#fff' : '#c8a020',
+					'stroke-width': Math.max(hw * 0.1, 0.05),
+					'stroke-linecap': 'round',
+				})
+				group.appendChild(indicator)
+			} else if (o.kind === 'lamppost') {
+				const r = Math.max(hw, hh)
+				const circle = svgEl('circle', {
+					cx: 0,
+					cy: 0,
+					r,
+					fill: color,
+					stroke: isSel ? '#fff' : '#555566',
+					'stroke-width': Math.max(r * 0.15, 0.03),
+				})
+				group.appendChild(circle)
+				const dot = svgEl('circle', {
+					cx: 0,
+					cy: 0,
+					r: r * 0.35,
+					fill: isSel ? '#fff' : '#eeee88',
+				})
+				group.appendChild(dot)
+				const indicator = svgEl('line', {
+					x1: 0,
+					y1: -r,
+					x2: 0,
+					y2: -r - Math.max(r * 0.6, minS * 0.4),
+					stroke: isSel ? '#fff' : '#aaaa77',
+					'stroke-width': Math.max(r * 0.15, 0.03),
+					'stroke-linecap': 'round',
+				})
+				group.appendChild(indicator)
+			} else if (o.kind === 'tennisCourt') {
+				// Width = X (short side), Height = Z (long side)
+				const rect = svgEl('rect', {
+					x: -hw,
+					y: -hh,
+					width: hw * 2,
+					height: hh * 2,
+					fill: color,
+					stroke: isSel ? '#fff' : '#1a6636',
+					'stroke-width': Math.max(Math.min(hw, hh) * 0.04, 0.05),
+					rx: Math.min(hw, hh) * 0.02,
+				})
+				group.appendChild(rect)
+				// Court lines: service boxes
+				const lineW = Math.max(Math.min(hw, hh) * 0.02, 0.04)
+				const lineColor = 'rgba(255,255,255,0.6)'
+				// Net across the middle (width-wise)
+				group.appendChild(
+					svgEl('line', {
+						x1: -hw,
+						y1: 0,
+						x2: hw,
+						y2: 0,
+						stroke: '#ffffff',
+						'stroke-width': lineW * 2,
+						'stroke-opacity': '0.7',
+					}),
+				)
+				// Outer boundary
+				group.appendChild(
+					svgEl('rect', {
+						x: -hw * 0.92,
+						y: -hh * 0.95,
+						width: hw * 1.84,
+						height: hh * 1.9,
+						fill: 'none',
+						stroke: lineColor,
+						'stroke-width': lineW,
+					}),
+				)
+				// Centre service line
+				group.appendChild(
+					svgEl('line', {
+						x1: 0,
+						y1: -hh * 0.6,
+						x2: 0,
+						y2: hh * 0.6,
+						stroke: lineColor,
+						'stroke-width': lineW,
+					}),
+				)
+				// Service lines
+				group.appendChild(
+					svgEl('line', {
+						x1: -hw * 0.92,
+						y1: -hh * 0.6,
+						x2: hw * 0.92,
+						y2: -hh * 0.6,
+						stroke: lineColor,
+						'stroke-width': lineW,
+					}),
+				)
+				group.appendChild(
+					svgEl('line', {
+						x1: -hw * 0.92,
+						y1: hh * 0.6,
+						x2: hw * 0.92,
+						y2: hh * 0.6,
+						stroke: lineColor,
+						'stroke-width': lineW,
+					}),
+				)
+				// Indicator (front direction)
+				const indicator = svgEl('line', {
+					x1: 0,
+					y1: -hh,
+					x2: 0,
+					y2: -hh - Math.max(hh * 0.15, minS * 0.4),
+					stroke: isSel ? '#fff' : '#80cc80',
+					'stroke-width': Math.max(Math.min(hw, hh) * 0.06, 0.05),
+					'stroke-linecap': 'round',
+				})
+				group.appendChild(indicator)
+			} else if (o.kind === 'floodlight') {
+				const r = Math.max(hw, hh)
+				const outerRing = svgEl('circle', {
+					cx: 0,
+					cy: 0,
+					r,
+					fill: 'none',
+					stroke: isSel ? '#fff' : color,
+					'stroke-width': Math.max(r * 0.15, 0.03),
+				})
+				group.appendChild(outerRing)
+				const innerDot = svgEl('circle', {
+					cx: 0,
+					cy: 0,
+					r: r * 0.4,
+					fill: isSel ? '#fff' : '#ffcc44',
+				})
+				group.appendChild(innerDot)
+				const indicator = svgEl('line', {
+					x1: 0,
+					y1: -r,
+					x2: 0,
+					y2: -r - Math.max(r * 0.4, minS * 0.4),
+					stroke: isSel ? '#fff' : '#dd8811',
+					'stroke-width': Math.max(r * 0.1, 0.03),
+					'stroke-linecap': 'round',
+				})
+				group.appendChild(indicator)
+			} else if (o.kind === 'goose') {
+				// Goose icon: small circle body with a direction indicator
+				const r = Math.max(hw, hh)
+				const body = svgEl('circle', {
+					cx: 0,
+					cy: 0,
+					r,
+					fill: color,
+					stroke: isSel ? '#fff' : '#222',
+					'stroke-width': Math.max(r * 0.15, 0.03),
+				})
+				group.appendChild(body)
+				// Neck/head indicator (forward direction)
+				const neckLine = svgEl('line', {
+					x1: 0,
+					y1: 0,
+					x2: 0,
+					y2: -r - Math.max(r * 0.8, minS * 0.5),
+					stroke: isSel ? '#fff' : '#222',
+					'stroke-width': Math.max(r * 0.2, 0.04),
+					'stroke-linecap': 'round',
+				})
+				group.appendChild(neckLine)
+				// Small head dot
+				const headDot = svgEl('circle', {
+					cx: 0,
+					cy: -r - Math.max(r * 0.8, minS * 0.5),
+					r: Math.max(r * 0.3, minS * 0.15),
+					fill: isSel ? '#fff' : '#111',
+				})
+				group.appendChild(headDot)
+			} else if (o.kind === 'swan') {
+				// Swan icon: white circle body with long neck indicator
+				const r = Math.max(hw, hh)
+				const body = svgEl('circle', {
+					cx: 0,
+					cy: 0,
+					r,
+					fill: color,
+					stroke: isSel ? '#fff' : '#999',
+					'stroke-width': Math.max(r * 0.15, 0.03),
+				})
+				group.appendChild(body)
+				// Long neck (swan has longer neck than goose)
+				const neckLen = Math.max(r * 1.2, minS * 0.6)
+				const neckLine = svgEl('line', {
+					x1: 0,
+					y1: 0,
+					x2: 0,
+					y2: -r - neckLen,
+					stroke: isSel ? '#fff' : '#ccc',
+					'stroke-width': Math.max(r * 0.18, 0.04),
+					'stroke-linecap': 'round',
+				})
+				group.appendChild(neckLine)
+				// Small head dot
+				const headDot = svgEl('circle', {
+					cx: 0,
+					cy: -r - neckLen,
+					r: Math.max(r * 0.28, minS * 0.14),
+					fill: isSel ? '#fff' : '#ddd',
+				})
+				group.appendChild(headDot)
+				// Orange beak indicator
+				const beakLine = svgEl('line', {
+					x1: 0,
+					y1: -r - neckLen,
+					x2: 0,
+					y2: -r - neckLen - Math.max(r * 0.3, minS * 0.15),
+					stroke: isSel ? '#fff' : '#e88020',
+					'stroke-width': Math.max(r * 0.12, 0.03),
+					'stroke-linecap': 'round',
+				})
+				group.appendChild(beakLine)
+			} else if (o.kind === 'deer') {
+				// Deer icon: oval body with antler-like lines and direction indicator
+				const r = Math.max(hw, hh)
+				const body = svgEl('ellipse', {
+					cx: 0,
+					cy: 0,
+					rx: r * 0.7,
+					ry: r,
+					fill: color,
+					stroke: isSel ? '#fff' : '#3a2010',
+					'stroke-width': Math.max(r * 0.12, 0.03),
+				})
+				group.appendChild(body)
+				// Neck/head line (forward direction)
+				const neckLen = Math.max(r * 1.2, minS * 0.6)
+				const neckLine = svgEl('line', {
+					x1: 0,
+					y1: 0,
+					x2: 0,
+					y2: -r - neckLen,
+					stroke: isSel ? '#fff' : '#3a2010',
+					'stroke-width': Math.max(r * 0.15, 0.03),
+					'stroke-linecap': 'round',
+				})
+				group.appendChild(neckLine)
+				// Head
+				const headY = -r - neckLen
+				const headDot = svgEl('circle', {
+					cx: 0,
+					cy: headY,
+					r: Math.max(r * 0.35, minS * 0.18),
+					fill: isSel ? '#fff' : '#5a3a1a',
+				})
+				group.appendChild(headDot)
+				// Antlers (V shape)
+				const antlerH = Math.max(r * 0.5, minS * 0.3)
+				const antlerW = Math.max(r * 0.4, minS * 0.2)
+				for (const side of [-1, 1]) {
+					const antler = svgEl('line', {
+						x1: 0,
+						y1: headY,
+						x2: side * antlerW,
+						y2: headY - antlerH,
+						stroke: isSel ? '#fff' : '#7a5a2a',
+						'stroke-width': Math.max(r * 0.08, 0.02),
+						'stroke-linecap': 'round',
+					})
+					group.appendChild(antler)
+				}
+			}
+
+			layerObjects.appendChild(group)
+		}
+	}
+
+	function renderOtherPaths() {
+		layerPaths.innerHTML = ''
+		for (const p of otherPaths) {
+			if (p.points.length < 2) continue
+			const color = COLORS[p.type as keyof typeof COLORS] ?? COLORS.path
+			const pathEl = svgEl('path', {
+				d: pathD(p.points),
+				fill: 'none',
+				stroke: color,
+				'stroke-width': 1.2,
+				'stroke-opacity': 0.7,
+				'stroke-linecap': 'round',
+				'stroke-linejoin': 'round',
+			})
+			layerPaths.appendChild(pathEl)
+		}
+	}
+
+	const PATH_TYPE_COLORS: Record<PathType, string> = {
+		dirt: '#e8a030',
+		gravel: '#b0a8a0',
+		pavement: '#888899',
+		grass: '#55aa44',
+	}
+
+	/** Determine the active path type for each segment based on node definitions */
+	function getSegmentPathTypes(): PathType[] {
+		const types: PathType[] = []
+		let current: PathType = 'dirt'
+		for (let i = 0; i < courseNodes.length - 1; i++) {
+			const node = courseNodes[i]
+			if (node.pathType) {
+				current = node.pathType
+			}
+			types.push(current)
+		}
+		return types
+	}
+
+	function renderMainPath() {
+		layerMainPath.innerHTML = ''
+		if (courseNodes.length < 2) return
+
+		const segTypes = getSegmentPathTypes()
+
+		// Render each segment with its path type color and width
+		for (let i = 0; i < courseNodes.length - 1; i++) {
+			const [x1, z1] = courseNodes[i].pos
+			const [x2, z2] = courseNodes[i + 1].pos
+			const segColor = PATH_TYPE_COLORS[segTypes[i]] ?? PATH_TYPE_COLORS.dirt
+			const w = courseNodes[i].width
+			const strokeW = w ? Math.max(w * 0.5, 2.5) : 2.5
+
+			// Outline
+			const outline = svgEl('line', {
+				x1,
+				y1: -z1,
+				x2,
+				y2: -z2,
+				stroke: '#000',
+				'stroke-width': strokeW + 1.5,
+				'stroke-opacity': 0.3,
+				'stroke-linecap': 'round',
+			})
+			layerMainPath.appendChild(outline)
+
+			// Colored segment
+			const seg = svgEl('line', {
+				x1,
+				y1: -z1,
+				x2,
+				y2: -z2,
+				stroke: segColor,
+				'stroke-width': strokeW,
+				'stroke-opacity': 1,
+				'stroke-linecap': 'round',
+			})
+			layerMainPath.appendChild(seg)
+		}
+
+		// Start marker
+		const [sx, sz] = courseNodes[0].pos
+		layerMainPath.appendChild(
+			svgEl('circle', {
+				cx: sx,
+				cy: -sz,
+				r: 3,
+				fill: '#40d040',
+				stroke: '#fff',
+				'stroke-width': 1,
+			}),
+		)
+		// End marker
+		const [ex, ez] = courseNodes[courseNodes.length - 1].pos
+		if (Math.hypot(ex - sx, ez - sz) > 5) {
+			layerMainPath.appendChild(
+				svgEl('circle', {
+					cx: ex,
+					cy: -ez,
+					r: 3,
+					fill: '#d04040',
+					stroke: '#fff',
+					'stroke-width': 1,
+				}),
+			)
+		}
+	}
+
+	function renderCourseNodes() {
+		layerCourseNodes.innerHTML = ''
+		const r = Math.max(vbW, vbH) * 0.003
+		const segTypes = getSegmentPathTypes()
+
+		for (let i = 0; i < courseNodes.length; i++) {
+			const node = courseNodes[i]
+			const [x, z] = node.pos
+			const isSel = selectedKind === 'courseNode' && selectedIndex === i
+			const pathType = segTypes[i] ?? segTypes[segTypes.length - 1] ?? 'dirt'
+			const nodeColor = isSel ? COLORS.selected : PATH_TYPE_COLORS[pathType]
+
+			const circle = svgEl('circle', {
+				cx: x,
+				cy: -z,
+				r: isSel ? r * 1.5 : r,
+				fill: nodeColor,
+				stroke: isSel ? '#fff' : '#000',
+				'stroke-width': r * 0.3,
+				'data-kind': 'courseNode',
+				'data-idx': i,
+			})
+			circle.style.cursor = 'pointer'
+			layerCourseNodes.appendChild(circle)
+
+			// Show pathType marker as a colored ring on nodes that have one
+			if (node.pathType) {
+				const ring = svgEl('circle', {
+					cx: x,
+					cy: -z,
+					r: r * 2,
+					fill: 'none',
+					stroke: '#fff',
+					'stroke-width': r * 0.4,
+					'stroke-dasharray': `${r * 1.5},${r * 0.8}`,
+					'pointer-events': 'none',
+				})
+				layerCourseNodes.appendChild(ring)
+			}
+		}
+
+		// Edge midpoints for inserting new nodes (shown when a course node is selected)
+		if (selectedKind === 'courseNode' && selectedIndex >= 0) {
+			const midR = r * 0.8
+			for (let i = 0; i < courseNodes.length - 1; i++) {
+				const [x1, z1] = courseNodes[i].pos
+				const [x2, z2] = courseNodes[i + 1].pos
+				const mx = (x1 + x2) / 2
+				const mz = (z1 + z2) / 2
+				const marker = svgEl('rect', {
+					x: mx - midR,
+					y: -mz - midR,
+					width: midR * 2,
+					height: midR * 2,
+					fill: 'rgba(255,255,255,0.35)',
+					stroke: 'rgba(255,255,255,0.6)',
+					'stroke-width': midR * 0.2,
+					rx: midR * 0.2,
+					'data-course-edge': 'true',
+					'data-edge-idx': i,
+				})
+				marker.style.cursor = 'pointer'
+				layerCourseNodes.appendChild(marker)
+			}
+		}
+	}
+
+	function renderHandles() {
+		layerHandles.innerHTML = ''
+		if (selectedKind === null || selectedIndex < 0) return
+		if (selectedKind === 'tree') return
+		if (selectedKind === 'courseNode') return // course nodes have their own rendering
+
+		// Rotation handle for objects
+		if (selectedKind === 'object') {
+			const o = objectItems[selectedIndex]
+			if (!o) return
+			const cx = o.pos[0]
+			const cy = -o.pos[1]
+			const realSize = OBJECT_SIZES[o.kind]
+			const minS = Math.max(vbW, vbH) * 0.005
+			const extent =
+				Math.max(realSize.w, realSize.h) / 2 + Math.max(minS * 2, 2)
+			const rotRad = (-o.rotation * Math.PI) / 180
+			// Handle sits at the object's front (local -Y in SVG = forward direction)
+			const hx = cx + Math.sin(rotRad) * extent
+			const hy = cy - Math.cos(rotRad) * extent
+			// Dashed line from centre to handle
+			layerHandles.appendChild(
+				svgEl('line', {
+					x1: cx,
+					y1: cy,
+					x2: hx,
+					y2: hy,
+					stroke: '#ff8800',
+					'stroke-width': handleRadius * 0.4,
+					'stroke-dasharray': `${handleRadius * 0.8},${handleRadius * 0.5}`,
+					'stroke-opacity': '0.7',
+				}),
+			)
+			// Rotation handle circle
+			const rHandle = svgEl('circle', {
+				cx: hx,
+				cy: hy,
+				r: handleRadius * 1.8,
+				fill: '#ff8800',
+				stroke: '#fff',
+				'stroke-width': handleRadius * 0.3,
+				'data-rot-handle': 'true',
+				'data-idx': selectedIndex,
+			})
+			rHandle.style.cursor = 'crosshair'
+			layerHandles.appendChild(rHandle)
+			// Small arc icon inside the handle
+			const arcR = handleRadius * 0.9
+			const arcD = `M ${hx - arcR} ${hy} A ${arcR} ${arcR} 0 0 1 ${hx} ${hy - arcR}`
+			layerHandles.appendChild(
+				svgEl('path', {
+					d: arcD,
+					fill: 'none',
+					stroke: '#fff',
+					'stroke-width': handleRadius * 0.25,
+					'stroke-linecap': 'round',
+					'pointer-events': 'none',
+				}),
+			)
+			return
+		}
+
+		let points: [number, number][] = []
+		if (selectedKind === 'building')
+			points = buildingItems[selectedIndex]?.points ?? []
+		else if (selectedKind === 'bridge')
+			points = bridgeItems[selectedIndex]?.points ?? []
+		else if (selectedKind === 'water')
+			points = waterItems[selectedIndex]?.points ?? []
+		else if (selectedKind === 'fence')
+			points = fenceItems[selectedIndex]?.points ?? []
+		else if (selectedKind === 'region')
+			points = regionItems[selectedIndex]?.points ?? []
+		for (let vi = 0; vi < points.length; vi++) {
+			const [x, z] = points[vi]
+			const isSub = selectedSubVertex === vi
+			const handle = svgEl('circle', {
+				cx: x,
+				cy: -z,
+				r: isSub ? handleRadius * 1.5 : handleRadius,
+				fill: isSub ? '#ff4444' : '#ffcc00',
+				stroke: isSub ? '#fff' : '#000',
+				'stroke-width': handleRadius * 0.25,
+				'data-handle': 'true',
+				'data-kind': selectedKind,
+				'data-item-idx': selectedIndex,
+				'data-vert-idx': vi,
+			})
+			handle.style.cursor = 'move'
+			layerHandles.appendChild(handle)
+		}
+
+		// Edge midpoint markers (clickable to add a vertex) — skip for bridges (fixed 2 points)
+		if (points.length >= 2 && selectedKind !== 'bridge') {
+			const edgeCount = points.length // closed polygon: last→first too
+			for (let ei = 0; ei < edgeCount; ei++) {
+				const [x1, z1] = points[ei]
+				const [x2, z2] = points[(ei + 1) % points.length]
+				const mx = (x1 + x2) / 2
+				const mz = (z1 + z2) / 2
+				const isSub = selectedSubEdge === ei
+				const markerSize = handleRadius * (isSub ? 1.4 : 1.0)
+				const marker = svgEl('rect', {
+					x: mx - markerSize,
+					y: -mz - markerSize,
+					width: markerSize * 2,
+					height: markerSize * 2,
+					fill: isSub ? '#44aaff' : 'rgba(255,255,255,0.35)',
+					stroke: isSub ? '#fff' : 'rgba(255,255,255,0.6)',
+					'stroke-width': handleRadius * 0.2,
+					rx: handleRadius * 0.2,
+					'data-edge': 'true',
+					'data-edge-idx': ei,
+				})
+				marker.style.cursor = 'pointer'
+				layerHandles.appendChild(marker)
+			}
+		}
+	}
+
+	function renderDrawing() {
+		layerDrawing.innerHTML = ''
+		if (drawMode === 'none' || drawingPoints.length === 0) return
+		if (drawMode === 'bridge') {
+			// Show first point of the bridge being drawn
+			for (const [x, z] of drawingPoints) {
+				layerDrawing.appendChild(
+					svgEl('circle', {
+						cx: x,
+						cy: -z,
+						r: handleRadius,
+						fill: COLORS.bridge,
+						stroke: '#fff',
+						'stroke-width': handleRadius * 0.3,
+					}),
+				)
+			}
+			return
+		}
+		if (
+			drawMode !== 'building' &&
+			drawMode !== 'field' &&
+			drawMode !== 'concrete' &&
+			drawMode !== 'fence' &&
+			drawMode !== 'water' &&
+			drawMode !== 'river'
+		)
+			return
+		const color =
+			drawMode === 'building'
+				? COLORS.buildingGrey
+				: drawMode === 'concrete'
+					? COLORS.concrete
+					: drawMode === 'fence'
+						? COLORS.fence
+						: drawMode === 'water'
+							? COLORS.water
+							: drawMode === 'river'
+								? COLORS.river
+								: COLORS.field
+		if (drawingPoints.length >= 2) {
+			const d = pathD(drawingPoints)
+			layerDrawing.appendChild(
+				svgEl('path', {
+					d,
+					fill: 'none',
+					stroke: color,
+					'stroke-width': 1.5,
+					'stroke-dasharray': '5,3',
+					'stroke-opacity': 0.8,
+				}),
+			)
+		}
+		for (const [x, z] of drawingPoints) {
+			layerDrawing.appendChild(
+				svgEl('circle', {
+					cx: x,
+					cy: -z,
+					r: handleRadius,
+					fill: color,
+					stroke: '#fff',
+					'stroke-width': handleRadius * 0.3,
+				}),
+			)
+		}
+	}
+
+	function renderAll() {
+		renderWater()
+		renderRegions()
+		renderBuildings()
+		renderBridges()
+		renderFences()
+		renderOtherPaths()
+		renderMainPath()
+		renderCourseNodes()
+		renderTrees()
+		renderObjects()
+		renderHandles()
+		renderDrawing()
+	}
+
+	renderAll()
+	appEl.appendChild(svg)
+
+	// ── Selection & sidebar ─────────────────────────────────────────────
+
+	function select(kind: SelectionKind | null, idx: number) {
+		selectedKind = kind
+		selectedIndex = idx
+		selectedSubVertex = -1
+		selectedSubEdge = -1
+		renderAll()
+		renderSidebar()
+	}
+
+	function deleteSelected() {
+		if (selectedKind === null || selectedIndex < 0) return
+		if (selectedKind === 'building') buildingItems.splice(selectedIndex, 1)
+		else if (selectedKind === 'bridge') bridgeItems.splice(selectedIndex, 1)
+		else if (selectedKind === 'water') waterItems.splice(selectedIndex, 1)
+		else if (selectedKind === 'fence') fenceItems.splice(selectedIndex, 1)
+		else if (selectedKind === 'region') regionItems.splice(selectedIndex, 1)
+		else if (selectedKind === 'tree') treeItems.splice(selectedIndex, 1)
+		else if (selectedKind === 'object') objectItems.splice(selectedIndex, 1)
+		else if (selectedKind === 'courseNode') {
+			if (courseNodes.length <= 2) return // need at least 2 nodes
+			courseNodes.splice(selectedIndex, 1)
+		}
+		select(null, -1)
+	}
+
+	function renderSidebar() {
+		sidebarEl.innerHTML = ''
+
+		// Title — level dropdown
+		const selectEl = document.createElement('select')
+		selectEl.style.cssText =
+			'width:100%;background:#333;color:#fff;border:1px solid #555;border-radius:4px;padding:4px 6px;font-size:12px;margin:0 0 8px;cursor:pointer;'
+		for (const [id, meta] of Object.entries(levels)) {
+			const opt = document.createElement('option')
+			opt.value = id
+			opt.textContent = meta.name + (meta.hide ? ' (hidden)' : '')
+			if (id === levelId) opt.selected = true
+			selectEl.appendChild(opt)
+		}
+		selectEl.addEventListener('change', () => {
+			const url = new URL(window.location.href)
+			url.searchParams.set('event', selectEl.value)
+			window.location.href = url.toString()
+		})
+		sidebarEl.appendChild(selectEl)
+
+		// ── Draw tools ──
+		const { section: drawSection, body: drawBody } = makeCollapsibleSection(
+			'draw',
+			'Draw Tools',
+		)
+		drawSection.setAttribute('data-section-id', 'draw')
+
+		// -- Regions sub-group --
+		const regionsLabel = document.createElement('div')
+		regionsLabel.className = 'sidebar-group-label'
+		regionsLabel.textContent = 'Regions'
+		drawBody.appendChild(regionsLabel)
+
+		const regionTools: [string, DrawMode, string][] = [
+			['Building', 'building', COLORS.buildingGrey],
+			['Bridge', 'bridge', COLORS.bridge],
+			['Field', 'field', COLORS.field],
+			['Concrete', 'concrete', COLORS.concrete],
+			['Fence', 'fence', COLORS.fence],
+			['Water', 'water', COLORS.water],
+			['River', 'river', COLORS.river],
+		]
+		for (const [label, mode, color] of regionTools) {
+			const btn = document.createElement('button')
+			btn.textContent = label
+			btn.className = 'draw-btn' + (drawMode === mode ? ' active' : '')
+			btn.style.borderColor =
+				drawMode === mode ? color : 'rgba(255,255,255,0.15)'
+			btn.addEventListener('click', () => {
+				if (drawMode === mode) {
+					drawMode = 'none'
+					drawingPoints = []
+				} else {
+					drawMode = mode
+					drawingPoints = []
+					select(null, -1)
+					return
+				}
+				renderDrawing()
+				renderSidebar()
+			})
+			drawBody.appendChild(btn)
+		}
+
+		// -- Objects sub-group --
+		const objectsLabel = document.createElement('div')
+		objectsLabel.className = 'sidebar-group-label'
+		objectsLabel.textContent = 'Objects'
+		drawBody.appendChild(objectsLabel)
+
+		const objectTools: [string, DrawMode, string][] = [
+			['Tree', 'tree', COLORS.tree],
+			['Bench', 'bench', COLORS.bench],
+			['Lamppost', 'lamppost', COLORS.lamppost],
+			['Tennis Court', 'tennisCourt', COLORS.tennisCourt],
+			['Floodlight', 'floodlight', COLORS.floodlight],
+			['Goose', 'goose', COLORS.goose],
+			['Swan', 'swan', COLORS.swan],
+			['Deer', 'deer', COLORS.deer],
+		]
+		for (const [label, mode, color] of objectTools) {
+			const btn = document.createElement('button')
+			btn.textContent = label
+			btn.className = 'draw-btn' + (drawMode === mode ? ' active' : '')
+			btn.style.borderColor =
+				drawMode === mode ? color : 'rgba(255,255,255,0.15)'
+			btn.addEventListener('click', () => {
+				if (drawMode === mode) {
+					drawMode = 'none'
+					drawingPoints = []
+				} else {
+					drawMode = mode
+					drawingPoints = []
+					select(null, -1)
+					return
+				}
+				renderDrawing()
+				renderSidebar()
+			})
+			drawBody.appendChild(btn)
+		}
+
+		const isPolygonDraw =
+			drawMode === 'building' ||
+			drawMode === 'field' ||
+			drawMode === 'concrete' ||
+			drawMode === 'fence' ||
+			drawMode === 'water' ||
+			drawMode === 'river'
+		if (isPolygonDraw) {
+			const hint = document.createElement('div')
+			hint.className = 'sidebar-hint'
+			hint.textContent = 'Click to add points. Double-click to finish.'
+			drawBody.appendChild(hint)
+		}
+		if (drawMode === 'bridge') {
+			const hint = document.createElement('div')
+			hint.className = 'sidebar-hint'
+			hint.textContent = 'Click two points to define bridge endpoints.'
+			drawBody.appendChild(hint)
+		}
+		if (drawMode === 'tree') {
+			const hint = document.createElement('div')
+			hint.className = 'sidebar-hint'
+			hint.textContent = 'Click on map to place trees.'
+			drawBody.appendChild(hint)
+		}
+		if (
+			drawMode === 'bench' ||
+			drawMode === 'lamppost' ||
+			drawMode === 'tennisCourt' ||
+			drawMode === 'floodlight' ||
+			drawMode === 'goose' ||
+			drawMode === 'swan' ||
+			drawMode === 'deer'
+		) {
+			const hint = document.createElement('div')
+			hint.className = 'sidebar-hint'
+			hint.textContent = 'Click to place. Drag rotation handle to rotate.'
+			drawBody.appendChild(hint)
+		}
+		sidebarEl.appendChild(drawSection)
+		sidebarEl.appendChild(makeDivider())
+
+		// ── Layer toggles ──
+		const { section: layerSection, body: layerBody } = makeCollapsibleSection(
+			'layers',
+			'Layers',
+		)
+		layerSection.setAttribute('data-section-id', 'layers')
+
+		const layerToggles: [string, string, SVGGElement][] = [
+			['Main path', COLORS.mainPath, layerMainPath],
+			['Course nodes', '#ffcc00', layerCourseNodes],
+			['Paths', COLORS.footway, layerPaths],
+			['Buildings', COLORS.buildingGrey, layerBuildings],
+			['Bridges', COLORS.bridge, layerBridges],
+			['Water', COLORS.water, layerWater],
+			['Regions', COLORS.field, layerRegions],
+			['Fences', COLORS.fence, layerFences],
+			['Trees', COLORS.tree, layerTrees],
+			['Objects', COLORS.bench, layerObjects],
+		]
+		for (const [label, color, layer] of layerToggles) {
+			const row = document.createElement('div')
+			row.className = 'sidebar-row'
+			const cb = document.createElement('input')
+			cb.type = 'checkbox'
+			cb.checked = layer.style.display !== 'none'
+			cb.addEventListener('change', () => {
+				layer.style.display = cb.checked ? '' : 'none'
+			})
+			const swatch = document.createElement('div')
+			swatch.className = 'sidebar-swatch'
+			swatch.style.background = color
+			const lbl = document.createElement('label')
+			lbl.textContent = label
+			lbl.addEventListener('click', () => {
+				cb.checked = !cb.checked
+				cb.dispatchEvent(new Event('change'))
+			})
+			row.appendChild(cb)
+			row.appendChild(swatch)
+			row.appendChild(lbl)
+			layerBody.appendChild(row)
+		}
+		sidebarEl.appendChild(layerSection)
+		sidebarEl.appendChild(makeDivider())
+
+		// ── Selection info ──
+		if (selectedKind !== null && selectedIndex >= 0) {
+			const selSection = document.createElement('div')
+			selSection.className = 'sidebar-section'
+			const selTitle = document.createElement('div')
+			selTitle.className = 'sidebar-section-title'
+			selTitle.textContent = 'Selected'
+			selSection.appendChild(selTitle)
+
+			const info = document.createElement('div')
+			info.className = 'sidebar-info'
+			if (selectedKind === 'building') {
+				const b = buildingItems[selectedIndex]
+				info.textContent = `Building #${selectedIndex} — ${b.points.length} verts`
+
+				const typeRow = document.createElement('div')
+				typeRow.style.cssText =
+					'display:flex;gap:4px;margin-top:6px;align-items:center;'
+				const typeLabel = document.createElement('span')
+				typeLabel.style.cssText = 'color:#ccc;font-size:11px;'
+				typeLabel.textContent = 'Type:'
+				typeRow.appendChild(typeLabel)
+
+				const typeSelect = document.createElement('select')
+				typeSelect.style.cssText =
+					'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;'
+				const buildingTypes: {
+					value: BuildingType
+					label: string
+					color: string
+				}[] = [
+					{ value: 'grey', label: 'Grey', color: COLORS.buildingGrey },
+					{ value: 'red', label: 'Red', color: COLORS.buildingRed },
+					{ value: 'brick', label: 'Brick', color: COLORS.buildingBrick },
+					{ value: 'green', label: 'Green', color: COLORS.buildingGreen },
+					{ value: 'yellow', label: 'Yellow', color: COLORS.buildingYellow },
+					{
+						value: 'kristineberg',
+						label: 'Kristineberg',
+						color: COLORS.buildingKristineberg,
+					},
+				]
+				for (const bt of buildingTypes) {
+					const opt = document.createElement('option')
+					opt.value = bt.value
+					opt.textContent = bt.label
+					if (bt.value === b.type) opt.selected = true
+					typeSelect.appendChild(opt)
+				}
+				typeSelect.addEventListener('change', () => {
+					b.type = typeSelect.value as BuildingType
+					renderBuildings()
+					renderSidebar()
+				})
+				typeRow.appendChild(typeSelect)
+				selSection.appendChild(typeRow)
+
+				const heightRow = document.createElement('div')
+				heightRow.style.cssText =
+					'display:flex;gap:4px;margin-top:6px;align-items:center;'
+				const heightLabel = document.createElement('span')
+				heightLabel.style.cssText = 'color:#ccc;font-size:11px;'
+				heightLabel.textContent = 'Height:'
+				heightRow.appendChild(heightLabel)
+
+				const heightInput = document.createElement('input')
+				heightInput.type = 'number'
+				heightInput.style.cssText =
+					'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;'
+				heightInput.placeholder = 'optional (meters)'
+				heightInput.value = b.height !== undefined ? b.height.toString() : ''
+				heightInput.addEventListener('change', () => {
+					const val = heightInput.value.trim()
+					b.height = val === '' ? undefined : Number.parseFloat(val)
+					renderSidebar()
+				})
+				heightRow.appendChild(heightInput)
+				selSection.appendChild(heightRow)
+			} else if (selectedKind === 'bridge') {
+				info.textContent = `Bridge #${selectedIndex}`
+			} else if (selectedKind === 'water') {
+				const w = waterItems[selectedIndex]
+				info.textContent = `Water #${selectedIndex} (${w.type}) — ${w.points.length} verts`
+			} else if (selectedKind === 'fence') {
+				info.textContent = `Fence #${selectedIndex} — ${fenceItems[selectedIndex].points.length} verts`
+			} else if (selectedKind === 'region') {
+				const r = regionItems[selectedIndex]
+				const labels: Record<RegionType, string> = {
+					field: 'Field',
+					concrete: 'Concrete',
+				}
+				info.textContent = `${labels[r.type]} #${selectedIndex} — ${r.points.length} verts`
+
+				// Type selector
+				const regionTypeRow = document.createElement('div')
+				regionTypeRow.style.cssText =
+					'display:flex;gap:4px;margin-top:6px;align-items:center;'
+				const regionTypeLabel = document.createElement('span')
+				regionTypeLabel.style.cssText = 'color:#ccc;font-size:11px;'
+				regionTypeLabel.textContent = 'Type:'
+				regionTypeRow.appendChild(regionTypeLabel)
+				const regionTypeSelect = document.createElement('select')
+				regionTypeSelect.style.cssText =
+					'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;'
+				for (const t of ['field', 'concrete'] as RegionType[]) {
+					const opt = document.createElement('option')
+					opt.value = t
+					opt.textContent = t.charAt(0).toUpperCase() + t.slice(1)
+					if (t === r.type) opt.selected = true
+					regionTypeSelect.appendChild(opt)
+				}
+				regionTypeSelect.addEventListener('change', () => {
+					r.type = regionTypeSelect.value as RegionType
+					renderAll()
+					renderSidebar()
+				})
+				regionTypeRow.appendChild(regionTypeSelect)
+				selSection.appendChild(regionTypeRow)
+
+				// Z-index input
+				const zRow = document.createElement('div')
+				zRow.style.cssText =
+					'display:flex;gap:4px;margin-top:6px;align-items:center;'
+				const zLabel = document.createElement('span')
+				zLabel.style.cssText = 'color:#ccc;font-size:11px;'
+				zLabel.textContent = 'Z-Index:'
+				zRow.appendChild(zLabel)
+				const zInput = document.createElement('input')
+				zInput.type = 'number'
+				zInput.style.cssText =
+					'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;'
+				zInput.placeholder = '0'
+				zInput.value = r.zIndex != null ? r.zIndex.toString() : ''
+				zInput.addEventListener('change', () => {
+					const val = zInput.value.trim()
+					r.zIndex = val === '' ? undefined : Number.parseInt(val, 10)
+					renderSidebar()
+				})
+				zRow.appendChild(zInput)
+				selSection.appendChild(zRow)
+			} else if (selectedKind === 'tree') {
+				const t = treeItems[selectedIndex]
+				info.textContent = `Tree #${selectedIndex} @ (${t.pos[0].toFixed(1)}, ${t.pos[1].toFixed(1)})`
+			} else if (selectedKind === 'object') {
+				const o = objectItems[selectedIndex]
+				const labels: Record<ObjectKind, string> = {
+					bench: 'Bench',
+					lamppost: 'Lamppost',
+					tennisCourt: 'Tennis Court',
+					floodlight: 'Floodlight',
+					goose: 'Goose',
+					swan: 'Swan',
+					deer: 'Deer',
+				}
+				info.textContent = `${labels[o.kind]} #${selectedIndex} rot=${o.rotation.toFixed(0)}°`
+			} else if (selectedKind === 'courseNode') {
+				const node = courseNodes[selectedIndex]
+				info.textContent = `Course Node #${selectedIndex} / ${courseNodes.length - 1}`
+				selSection.appendChild(info)
+
+				// PathType selector
+				const ptRow = document.createElement('div')
+				ptRow.style.cssText =
+					'display:flex;gap:4px;margin-top:6px;align-items:center;'
+				const ptLabel = document.createElement('span')
+				ptLabel.style.cssText = 'color:#ccc;font-size:11px;'
+				ptLabel.textContent = 'Path Type:'
+				ptRow.appendChild(ptLabel)
+
+				const ptSelect = document.createElement('select')
+				ptSelect.style.cssText =
+					'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;'
+				const ptOptions: { value: string; label: string }[] = [
+					{ value: '', label: '(none)' },
+					{ value: 'dirt', label: 'dirt' },
+					{ value: 'gravel', label: 'gravel' },
+					{ value: 'pavement', label: 'pavement' },
+					{ value: 'grass', label: 'grass' },
+				]
+				for (const pto of ptOptions) {
+					const opt = document.createElement('option')
+					opt.value = pto.value
+					opt.textContent = pto.label
+					if ((node.pathType ?? '') === pto.value) opt.selected = true
+					ptSelect.appendChild(opt)
+				}
+				ptSelect.addEventListener('change', () => {
+					node.pathType = ptSelect.value
+						? (ptSelect.value as PathType)
+						: undefined
+					renderAll()
+					renderSidebar()
+				})
+				ptRow.appendChild(ptSelect)
+				selSection.appendChild(ptRow)
+
+				// Width input
+				const wRow = document.createElement('div')
+				wRow.style.cssText =
+					'display:flex;gap:4px;margin-top:6px;align-items:center;'
+				const wLabel = document.createElement('span')
+				wLabel.style.cssText = 'color:#ccc;font-size:11px;'
+				wLabel.textContent = 'Width:'
+				wRow.appendChild(wLabel)
+
+				const wInput = document.createElement('input')
+				wInput.type = 'number'
+				wInput.step = '0.5'
+				wInput.style.cssText =
+					'flex:1;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;'
+				wInput.placeholder = 'default'
+				wInput.value = node.width != null ? node.width.toString() : ''
+				wInput.addEventListener('change', () => {
+					const val = wInput.value.trim()
+					node.width = val === '' ? undefined : Number.parseFloat(val)
+					renderAll()
+					renderSidebar()
+				})
+				wRow.appendChild(wInput)
+				selSection.appendChild(wRow)
+
+				// Navigation buttons
+				const navRow = document.createElement('div')
+				navRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;'
+				if (selectedIndex > 0) {
+					const prevBtn = document.createElement('button')
+					prevBtn.textContent = '← Prev'
+					prevBtn.className = 'draw-btn'
+					prevBtn.style.flex = '1'
+					prevBtn.addEventListener('click', () =>
+						select('courseNode', selectedIndex - 1),
+					)
+					navRow.appendChild(prevBtn)
+				}
+				if (selectedIndex < courseNodes.length - 1) {
+					const nextBtn = document.createElement('button')
+					nextBtn.textContent = 'Next →'
+					nextBtn.className = 'draw-btn'
+					nextBtn.style.flex = '1'
+					nextBtn.addEventListener('click', () =>
+						select('courseNode', selectedIndex + 1),
+					)
+					navRow.appendChild(nextBtn)
+				}
+				selSection.appendChild(navRow)
+
+				// Add node after
+				const addBtn = document.createElement('button')
+				addBtn.textContent = 'Add Node After'
+				addBtn.style.cssText =
+					'margin-top:4px;display:block;width:100%;padding:5px 0;background:#2a3a5a;color:#88ccff;border:1px solid rgba(100,160,220,0.3);border-radius:4px;cursor:pointer;font-size:11px;text-align:center;'
+				addBtn.addEventListener('click', () => {
+					if (selectedIndex < courseNodes.length - 1) {
+						const [x1, z1] = courseNodes[selectedIndex].pos
+						const [x2, z2] = courseNodes[selectedIndex + 1].pos
+						courseNodes.splice(selectedIndex + 1, 0, {
+							pos: [(x1 + x2) / 2, (z1 + z2) / 2],
+						})
+					} else {
+						// Add after last — extend in the same direction
+						const [x, z] = courseNodes[selectedIndex].pos
+						courseNodes.push({ pos: [x + 10, z] })
+					}
+					select('courseNode', selectedIndex + 1)
+				})
+				selSection.appendChild(addBtn)
+			}
+			if (selectedKind !== 'courseNode') {
+				selSection.appendChild(info)
+			}
+
+			// ── Vertex/edge sub-selection controls for polygons ──
+			const isPolygon =
+				selectedKind === 'building' ||
+				selectedKind === 'water' ||
+				selectedKind === 'fence' ||
+				selectedKind === 'region'
+			if (isPolygon) {
+				let points: [number, number][] = []
+				if (selectedKind === 'building')
+					points = buildingItems[selectedIndex]?.points ?? []
+				else if (selectedKind === 'water')
+					points = waterItems[selectedIndex]?.points ?? []
+				else if (selectedKind === 'fence')
+					points = fenceItems[selectedIndex]?.points ?? []
+				else if (selectedKind === 'region')
+					points = regionItems[selectedIndex]?.points ?? []
+
+				if (selectedSubVertex >= 0 && selectedSubVertex < points.length) {
+					const subInfo = document.createElement('div')
+					subInfo.className = 'sidebar-info'
+					subInfo.style.cssText = 'color:#ff8888;margin-top:4px;'
+					subInfo.textContent = `Vertex #${selectedSubVertex} selected`
+					selSection.appendChild(subInfo)
+
+					const removeVertBtn = document.createElement('button')
+					removeVertBtn.textContent = 'Remove Vertex'
+					removeVertBtn.className = 'delete-btn'
+					removeVertBtn.style.cssText +=
+						'margin-top:4px;display:block;width:100%;'
+					removeVertBtn.addEventListener('click', () => {
+						if (points.length <= 3) return // minimum 3 for polygon
+						points.splice(selectedSubVertex, 1)
+						selectedSubVertex = -1
+						renderAll()
+						renderSidebar()
+					})
+					selSection.appendChild(removeVertBtn)
+					if (points.length <= 3) {
+						removeVertBtn.disabled = true
+						removeVertBtn.style.opacity = '0.4'
+						removeVertBtn.title = 'Polygon needs at least 3 vertices'
+					}
+				} else if (selectedSubEdge >= 0 && selectedSubEdge < points.length) {
+					const ei = selectedSubEdge
+					const [x1, z1] = points[ei]
+					const [x2, z2] = points[(ei + 1) % points.length]
+					const subInfo = document.createElement('div')
+					subInfo.className = 'sidebar-info'
+					subInfo.style.cssText = 'color:#88aaff;margin-top:4px;'
+					subInfo.textContent = `Edge #${ei}→#${(ei + 1) % points.length} selected`
+					selSection.appendChild(subInfo)
+
+					const addVertBtn = document.createElement('button')
+					addVertBtn.textContent = 'Add Vertex at Midpoint'
+					addVertBtn.style.cssText =
+						'margin-top:4px;display:block;width:100%;padding:5px 0;background:#2a3a5a;color:#88ccff;border:1px solid rgba(100,160,220,0.3);border-radius:4px;cursor:pointer;font-size:11px;text-align:center;'
+					addVertBtn.addEventListener('click', () => {
+						const mid: [number, number] = [(x1 + x2) / 2, (z1 + z2) / 2]
+						points.splice(ei + 1, 0, mid)
+						selectedSubEdge = -1
+						selectedSubVertex = ei + 1 // auto-select the new vertex
+						renderAll()
+						renderSidebar()
+					})
+					selSection.appendChild(addVertBtn)
+				} else {
+					const subHint = document.createElement('div')
+					subHint.className = 'sidebar-hint'
+					subHint.textContent =
+						'Click a vertex (circle) to select it, or an edge midpoint (square) to add a point.'
+					selSection.appendChild(subHint)
+				}
+			}
+
+			const btnRow = document.createElement('div')
+			btnRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;'
+
+			const delBtn = document.createElement('button')
+			delBtn.textContent = 'Delete'
+			delBtn.className = 'delete-btn'
+			delBtn.addEventListener('click', deleteSelected)
+			btnRow.appendChild(delBtn)
+
+			const deselectBtn = document.createElement('button')
+			deselectBtn.textContent = 'Deselect'
+			deselectBtn.className = 'deselect-btn'
+			deselectBtn.addEventListener('click', () => select(null, -1))
+			btnRow.appendChild(deselectBtn)
+
+			// Rotation control for objects
+			if (selectedKind === 'object') {
+				const rotRow = document.createElement('div')
+				rotRow.style.cssText =
+					'display:flex;gap:4px;margin-top:6px;align-items:center;'
+				const rotLabel = document.createElement('span')
+				rotLabel.style.cssText = 'color:#ccc;font-size:11px;'
+				rotLabel.textContent = 'Rotation:'
+				rotRow.appendChild(rotLabel)
+
+				const rotInput = document.createElement('input')
+				rotInput.type = 'number'
+				rotInput.min = '0'
+				rotInput.max = '359'
+				rotInput.step = '15'
+				rotInput.value = String(Math.round(objectItems[selectedIndex].rotation))
+				rotInput.style.cssText =
+					'width:60px;background:#333;color:#fff;border:1px solid #555;border-radius:3px;padding:2px 4px;font-size:11px;'
+				rotInput.addEventListener('input', () => {
+					const raw = Number.parseFloat(rotInput.value) || 0
+					objectItems[selectedIndex].rotation = ((raw % 360) + 360) % 360
+					renderObjects()
+				})
+				rotRow.appendChild(rotInput)
+
+				const degLabel = document.createElement('span')
+				degLabel.style.cssText = 'color:#888;font-size:11px;'
+				degLabel.textContent = '°'
+				rotRow.appendChild(degLabel)
+				selSection.appendChild(rotRow)
+			}
+
+			selSection.appendChild(btnRow)
+			sidebarEl.appendChild(selSection)
+			sidebarEl.appendChild(makeDivider())
+		}
+
+		// ── Export section ──
+		const { section: exportSection, body: exportBody } = makeCollapsibleSection(
+			'export',
+			'Export .ts',
+		)
+		exportSection.setAttribute('data-section-id', 'export')
+
+		const exportItems: [string, string, string[], () => unknown][] = [
+			[
+				'course.ts',
+				'LevelCourse',
+				['LevelCourse'],
+				() => {
+					const coordinates = courseNodes.map((node) => {
+						const [lat, lon] = localToGps(node.pos[0], node.pos[1], origin)
+						const coord: (number | string)[] = [lon, lat]
+						if (node.pathType) coord.push(node.pathType)
+						else if (node.width != null)
+							coord.push(undefined as unknown as string) // placeholder
+						if (node.width != null) coord.push(node.width)
+						return coord
+					})
+					return {
+						eventId: level.course.eventId,
+						coordinates,
+						points: level.course.points,
+					}
+				},
+			],
+			[
+				'buildings.ts',
+				"LevelData['buildings']",
+				['LevelData'],
+				() =>
+					buildingItems.map((b) => {
+						const obj: Record<string, unknown> = {
+							type: b.type,
+							points: b.points.map(([x, z]) => localToGps(x, z, origin)),
+						}
+						if (b.height !== undefined) {
+							obj.height = b.height
+						}
+						return obj
+					}),
+			],
+			[
+				'bridges.ts',
+				"LevelData['bridges']",
+				['LevelData'],
+				() =>
+					bridgeItems.map((b) => ({
+						points: b.points.map(([x, z]) => localToGps(x, z, origin)),
+					})),
+			],
+			[
+				'water.ts',
+				'LevelWaterFeature[]',
+				['LevelWaterFeature'],
+				() =>
+					waterItems.map((w) => ({
+						type: w.type,
+						coords: w.points.map(([x, z]) => {
+							const [lat, lon] = localToGps(x, z, origin)
+							return [lon, lat]
+						}),
+					})),
+			],
+			[
+				'regions.ts',
+				'LevelRegions',
+				['LevelRegions'],
+				() => {
+					return regionItems.map((r) => {
+						const entry: Record<string, unknown> = {
+							type: r.type,
+							points: r.points.map(([x, z]) => localToGps(x, z, origin)),
+						}
+						if (r.zIndex != null && r.zIndex !== 0) entry.zIndex = r.zIndex
+						return entry
+					})
+				},
+			],
+			[
+				'fences.ts',
+				"LevelData['customFences']",
+				['LevelData'],
+				() =>
+					fenceItems.map((f) => ({
+						points: f.points.map(([x, z]) => localToGps(x, z, origin)),
+					})),
+			],
+			[
+				'trees.ts',
+				"LevelData['manualTrees']",
+				['LevelData'],
+				() => treeItems.map((t) => localToGps(t.pos[0], t.pos[1], origin)),
+			],
+			[
+				'objects.ts',
+				'LevelObjects',
+				['LevelObjects'],
+				() => {
+					const toGps = (items: ObjectItem[]) =>
+						items.map((o) => {
+							const [lat, lon] = localToGps(o.pos[0], o.pos[1], origin)
+							return [lat, lon, Math.round(o.rotation * 10) / 10]
+						})
+					const result: Record<string, unknown> = {}
+					const benches = objectItems.filter((o) => o.kind === 'bench')
+					const lampposts = objectItems.filter((o) => o.kind === 'lamppost')
+					const courts = objectItems.filter((o) => o.kind === 'tennisCourt')
+					const floodlights = objectItems.filter((o) => o.kind === 'floodlight')
+					const geese = objectItems.filter((o) => o.kind === 'goose')
+					const swans = objectItems.filter((o) => o.kind === 'swan')
+					const deerObjs = objectItems.filter((o) => o.kind === 'deer')
+					if (benches.length) result.benches = toGps(benches)
+					if (lampposts.length) result.lampposts = toGps(lampposts)
+					if (courts.length) result.tennisCourts = toGps(courts)
+					if (floodlights.length) result.floodlights = toGps(floodlights)
+					if (geese.length) result.geese = toGps(geese)
+					if (swans.length) result.swans = toGps(swans)
+					if (deerObjs.length) result.deer = toGps(deerObjs)
+					return result
+				},
+			],
+		]
+
+		for (const [filename, typeExpr, typeImports, getData] of exportItems) {
+			const btn = document.createElement('button')
+			btn.textContent = filename
+			btn.className = 'export-btn'
+			btn.addEventListener('click', () => {
+				const data = getData()
+				const json = JSON.stringify(
+					data,
+					(key, value) => {
+						return value === undefined ? '__UNDEFINED__' : value
+					},
+					2,
+				)
+				const tsCode = json.replace(/"__UNDEFINED__"/g, 'undefined')
+				const importLine = `import type { ${[...new Set(typeImports)].sort().join(', ')} } from '../types';`
+				const tsContent = `${importLine}\n\nexport default ${tsCode} satisfies ${typeExpr};\n`
+				navigator.clipboard
+					.writeText(tsContent)
+					.then(() => {
+						btn.textContent = `✓ ${filename} copied!`
+						setTimeout(() => {
+							btn.textContent = filename
+						}, 2000)
+					})
+					.catch(() => {
+						const w = window.open('', '_blank')
+						if (w) {
+							w.document.write(`<pre>${tsContent}</pre>`)
+						}
+					})
+			})
+			exportBody.appendChild(btn)
+		}
+		sidebarEl.appendChild(exportSection)
+		sidebarEl.appendChild(makeDivider())
+
+		// ── Reframe ──
+		const reframeBtn = document.createElement('button')
+		reframeBtn.textContent = 'Reframe'
+		reframeBtn.className = 'reframe-btn'
+		reframeBtn.addEventListener('click', () => {
+			vbX = minX
+			vbY = -maxZ
+			vbW = baseWidth
+			vbH = baseHeight
+			updateViewBox()
+		})
+		sidebarEl.appendChild(reframeBtn)
+
+		// Play test buttons
+		const playRow = document.createElement('div')
+		playRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;'
+
+		const parkrunBtn = document.createElement('button')
+		parkrunBtn.textContent = '🏃 Parkrun'
+		parkrunBtn.className = 'draw-btn'
+		parkrunBtn.style.flex = '1'
+		parkrunBtn.addEventListener('click', () => {
+			window.open(`/?test=parkrun,${levelId},josh`, '_blank')
+		})
+		playRow.appendChild(parkrunBtn)
+
+		const busBtn = document.createElement('button')
+		busBtn.textContent = '🚌 Bus Race'
+		busBtn.className = 'draw-btn'
+		busBtn.style.flex = '1'
+		busBtn.addEventListener('click', () => {
+			window.open(`/?test=busrace,${levelId},yellow`, '_blank')
+		})
+		playRow.appendChild(busBtn)
+
+		sidebarEl.appendChild(playRow)
+
+		// Stats
+		const statsEl = document.createElement('div')
+		statsEl.className = 'sidebar-stats'
+		statsEl.innerHTML = `${Math.round(courseLen)}m · ${courseNodes.length} nodes · ${buildingItems.length} bldgs · ${waterItems.length} water · ${regionItems.length} regions · ${treeItems.length} trees · ${objectItems.length} objects`
+		sidebarEl.appendChild(statsEl)
+
+		// Auto-collapse if sidebar overflows
+		autoCollapseSections()
+	}
+
+	function makeDivider() {
+		const d = document.createElement('hr')
+		d.className = 'sidebar-divider'
+		return d
+	}
+
+	// Track collapsed state across re-renders
+	const collapsedSections = new Set<string>()
+
+	function makeCollapsibleSection(
+		id: string,
+		title: string,
+	): { section: HTMLDivElement; body: HTMLDivElement } {
+		const section = document.createElement('div')
+		section.className =
+			'sidebar-section collapsible' +
+			(collapsedSections.has(id) ? ' collapsed' : '')
+
+		const titleEl = document.createElement('div')
+		titleEl.className = 'sidebar-section-title'
+		titleEl.textContent = title
+		titleEl.addEventListener('click', () => {
+			const isCollapsed = section.classList.toggle('collapsed')
+			if (isCollapsed) collapsedSections.add(id)
+			else collapsedSections.delete(id)
+		})
+		section.appendChild(titleEl)
+
+		const body = document.createElement('div')
+		body.className = 'sidebar-section-body'
+		section.appendChild(body)
+
+		return { section, body }
+	}
+
+	/** Auto-collapse sections if sidebar content overflows */
+	function autoCollapseSections() {
+		if (sidebarEl.scrollHeight <= sidebarEl.clientHeight) return
+		// Collapse in priority order (least important first)
+		const priorities = ['layers', 'export', 'draw']
+		for (const id of priorities) {
+			if (collapsedSections.has(id)) continue
+			collapsedSections.add(id)
+			const sec = sidebarEl.querySelector(`[data-section-id="${id}"]`)
+			if (sec) sec.classList.add('collapsed')
+			if (sidebarEl.scrollHeight <= sidebarEl.clientHeight) break
+		}
+	}
+
+	const courseLen = courseNodes.reduce((sum, node, i) => {
+		if (i === 0) return 0
+		const [x, z] = node.pos
+		const [px, pz] = courseNodes[i - 1].pos
+		return sum + Math.hypot(x - px, z - pz)
+	}, 0)
+
+	renderSidebar()
+
+	// ── Info bar ────────────────────────────────────────────────────────
+
+	infoEl.innerHTML = `<strong>${level.name}</strong> — ${Math.round(courseLen)}m`
+
+	// ── Scale bar ───────────────────────────────────────────────────────
+
+	const scaleLineEl = document.getElementById('scale-line')!
+	const scaleLabelEl = document.getElementById('scale-label')!
+
+	function updateScaleBar() {
+		const svgRect = svg.getBoundingClientRect()
+		if (svgRect.width === 0) return
+		const metersPerPx = vbW / svgRect.width
+		const targetPx = 100
+		const rawMeters = metersPerPx * targetPx
+		const niceSteps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
+		let niceMeters = niceSteps[niceSteps.length - 1]
+		for (const s of niceSteps) {
+			if (s >= rawMeters * 0.5) {
+				niceMeters = s
+				break
+			}
+		}
+		const barPx = niceMeters / metersPerPx
+		scaleLineEl.style.width = `${Math.round(barPx)}px`
+		scaleLabelEl.textContent =
+			niceMeters >= 1000 ? `${niceMeters / 1000} km` : `${niceMeters} m`
+	}
+	updateScaleBar()
+
+	// ── Click handling (selection + drawing) ────────────────────────────
+
+	let justFinishedDraw = false
+	let lastClickTime = 0
+
+	svg.addEventListener('click', (e) => {
+		if (justFinishedDraw) {
+			justFinishedDraw = false
+			return
+		}
+		const target = e.target as SVGElement
+
+		// Handle click (vertex sub-selection) — only if we didn't drag
+		if (target.getAttribute('data-handle') === 'true' && !didDragVertex) {
+			const vertIdx = Number.parseInt(target.getAttribute('data-vert-idx')!, 10)
+			selectedSubEdge = -1
+			selectedSubVertex = selectedSubVertex === vertIdx ? -1 : vertIdx // toggle
+			renderHandles()
+			renderSidebar()
+			return
+		}
+		if (target.getAttribute('data-handle') === 'true') return // was a drag, ignore click
+
+		// Edge midpoint click
+		if (target.getAttribute('data-edge') === 'true') {
+			const edgeIdx = Number.parseInt(target.getAttribute('data-edge-idx')!, 10)
+			selectedSubVertex = -1
+			selectedSubEdge = selectedSubEdge === edgeIdx ? -1 : edgeIdx // toggle
+			renderHandles()
+			renderSidebar()
+			return
+		}
+
+		// Course edge midpoint click — insert a new node
+		if (target.getAttribute('data-course-edge') === 'true') {
+			const edgeIdx = Number.parseInt(target.getAttribute('data-edge-idx')!, 10)
+			const [x1, z1] = courseNodes[edgeIdx].pos
+			const [x2, z2] = courseNodes[edgeIdx + 1].pos
+			courseNodes.splice(edgeIdx + 1, 0, {
+				pos: [(x1 + x2) / 2, (z1 + z2) / 2],
+			})
+			select('courseNode', edgeIdx + 1)
+			return
+		}
+
+		const [x, z] = clientToSvg(e.clientX, e.clientY)
+
+		// Drawing mode
+		if (drawMode === 'tree') {
+			treeItems.push({ pos: [x, z] })
+			select('tree', treeItems.length - 1)
+			return
+		}
+		if (
+			drawMode === 'bench' ||
+			drawMode === 'lamppost' ||
+			drawMode === 'tennisCourt' ||
+			drawMode === 'floodlight' ||
+			drawMode === 'goose' ||
+			drawMode === 'swan' ||
+			drawMode === 'deer'
+		) {
+			objectItems.push({ kind: drawMode, pos: [x, z], rotation: 0 })
+			select('object', objectItems.length - 1)
+			return
+		}
+		if (drawMode === 'bridge') {
+			drawingPoints.push([x, z])
+			if (drawingPoints.length >= 2) {
+				bridgeItems.push({
+					points: [drawingPoints[0], drawingPoints[1]] as [
+						[number, number],
+						[number, number],
+					],
+				})
+				drawingPoints = []
+				drawMode = 'none'
+				select('bridge', bridgeItems.length - 1)
+			} else {
+				renderDrawing()
+			}
+			return
+		}
+		if (
+			drawMode === 'building' ||
+			drawMode === 'field' ||
+			drawMode === 'concrete' ||
+			drawMode === 'fence' ||
+			drawMode === 'water' ||
+			drawMode === 'river'
+		) {
+			const now = performance.now()
+			if (now - lastClickTime < 400 && drawingPoints.length >= 3) {
+				// Second click of a double-click — close the polygon immediately
+				// (dblclick may not fire if renderDrawing replaced DOM elements)
+				lastClickTime = 0
+
+				let newKind: SelectionKind
+				let newIdx: number
+				if (drawMode === 'water' || drawMode === 'river') {
+					waterItems.push({ type: drawMode, points: [...drawingPoints] })
+					newKind = 'water'
+					newIdx = waterItems.length - 1
+				} else if (drawMode === 'fence') {
+					fenceItems.push({ points: [...drawingPoints] })
+					newKind = 'fence'
+					newIdx = fenceItems.length - 1
+				} else if (drawMode === 'building') {
+					buildingItems.push({ type: 'grey', points: [...drawingPoints] })
+					newKind = 'building'
+					newIdx = buildingItems.length - 1
+				} else {
+					const regionType: RegionType =
+						drawMode === 'concrete' ? 'concrete' : 'field'
+					regionItems.push({ type: regionType, points: [...drawingPoints] })
+					newKind = 'region'
+					newIdx = regionItems.length - 1
+				}
+				drawingPoints = []
+				justFinishedDraw = true
+				drawMode = 'none'
+				select(newKind, newIdx)
+				return
+			}
+			lastClickTime = now
+			drawingPoints.push([x, z])
+			renderDrawing()
+			return
+		}
+
+		// Selection mode
+		let kind = target.getAttribute('data-kind') as SelectionKind | null
+		let idx = target.getAttribute('data-idx')
+		// Object elements are nested in <g> — walk up
+		if (!kind) {
+			const group = (target as Element).closest?.(
+				'[data-kind]',
+			) as SVGElement | null
+			if (group) {
+				kind = group.getAttribute('data-kind') as SelectionKind
+				idx = group.getAttribute('data-idx')
+			}
+		}
+		if (kind && idx !== null) {
+			select(kind, Number.parseInt(idx, 10))
+		} else {
+			select(null, -1)
+		}
+	})
+
+	svg.addEventListener('dblclick', (e) => {
+		if (
+			drawMode !== 'building' &&
+			drawMode !== 'field' &&
+			drawMode !== 'concrete' &&
+			drawMode !== 'fence' &&
+			drawMode !== 'water' &&
+			drawMode !== 'river'
+		)
+			return
+		if (drawingPoints.length < 3) return
+
+		e.preventDefault()
+		e.stopPropagation()
+
+		let newKind: SelectionKind
+		let newIdx: number
+		if (drawMode === 'water' || drawMode === 'river') {
+			waterItems.push({ type: drawMode, points: [...drawingPoints] })
+			newKind = 'water'
+			newIdx = waterItems.length - 1
+		} else if (drawMode === 'fence') {
+			fenceItems.push({ points: [...drawingPoints] })
+			newKind = 'fence'
+			newIdx = fenceItems.length - 1
+		} else if (drawMode === 'building') {
+			buildingItems.push({ type: 'grey', points: [...drawingPoints] })
+			newKind = 'building'
+			newIdx = buildingItems.length - 1
+		} else {
+			const regionType: RegionType =
+				drawMode === 'concrete' ? 'concrete' : 'field'
+			regionItems.push({ type: regionType, points: [...drawingPoints] })
+			newKind = 'region'
+			newIdx = regionItems.length - 1
+		}
+
+		drawingPoints = []
+		justFinishedDraw = true
+		drawMode = 'none'
+		select(newKind, newIdx)
+	})
+
+	// ── Vertex dragging ─────────────────────────────────────────────────
+
+	let panning = false
+	let panDragStartX = 0,
+		panDragStartY = 0
+	let panVbX = 0,
+		panVbY = 0
+
+	svg.addEventListener('mousedown', (e) => {
+		if (e.button !== 0) return
+		const target = e.target as SVGElement
+
+		// Handle drag
+		if (target.getAttribute('data-handle') === 'true') {
+			const kind = target.getAttribute('data-kind') as SelectionKind
+			const itemIdx = Number.parseInt(target.getAttribute('data-item-idx')!, 10)
+			const vertIdx = Number.parseInt(target.getAttribute('data-vert-idx')!, 10)
+			dragVertexInfo = { kind, itemIdx, vertIdx }
+			didDragVertex = false // will be set to true on first mousemove
+			e.preventDefault()
+			e.stopPropagation()
+			return
+		}
+
+		// Rotation handle drag
+		if (target.getAttribute('data-rot-handle') === 'true') {
+			const idx = Number.parseInt(target.getAttribute('data-idx')!, 10)
+			if (idx >= 0 && idx < objectItems.length) {
+				dragRotateIdx = idx
+				e.preventDefault()
+				e.stopPropagation()
+				return
+			}
+		}
+
+		// Tree drag
+		if (target.getAttribute('data-kind') === 'tree' && drawMode !== 'tree') {
+			const idx = Number.parseInt(target.getAttribute('data-idx')!, 10)
+			if (idx >= 0 && idx < treeItems.length) {
+				dragTreeIdx = idx
+				e.preventDefault()
+				e.stopPropagation()
+				return
+			}
+		}
+
+		// Course node drag
+		if (target.getAttribute('data-kind') === 'courseNode') {
+			const idx = Number.parseInt(target.getAttribute('data-idx')!, 10)
+			if (idx >= 0 && idx < courseNodes.length) {
+				dragCourseNodeIdx = idx
+				e.preventDefault()
+				e.stopPropagation()
+				return
+			}
+		}
+
+		// Object drag
+		const objGroup = (target as Element).closest?.(
+			'[data-kind="object"]',
+		) as SVGElement | null
+		if (
+			objGroup &&
+			drawMode !== 'bench' &&
+			drawMode !== 'lamppost' &&
+			drawMode !== 'tennisCourt' &&
+			drawMode !== 'goose' &&
+			drawMode !== 'swan'
+		) {
+			const idx = Number.parseInt(objGroup.getAttribute('data-idx')!, 10)
+			if (idx >= 0 && idx < objectItems.length) {
+				dragObjectIdx = idx
+				e.preventDefault()
+				e.stopPropagation()
+				return
+			}
+		}
+
+		// Pan
+		panning = true
+		panDragStartX = e.clientX
+		panDragStartY = e.clientY
+		panVbX = vbX
+		panVbY = vbY
+		svg.classList.add('dragging')
+	})
+
+	let dragTreeIdx = -1
+	let dragObjectIdx = -1
+	let dragRotateIdx = -1
+	let dragCourseNodeIdx = -1
+
+	window.addEventListener('mousemove', (e) => {
+		// Vertex drag
+		if (dragVertexInfo) {
+			didDragVertex = true
+			const { kind, itemIdx, vertIdx } = dragVertexInfo
+			const [x, z] = clientToSvg(e.clientX, e.clientY)
+			let points: [number, number][] | null = null
+			if (kind === 'building') points = buildingItems[itemIdx]?.points ?? null
+			else if (kind === 'bridge') points = bridgeItems[itemIdx]?.points ?? null
+			else if (kind === 'water') points = waterItems[itemIdx]?.points ?? null
+			else if (kind === 'fence') points = fenceItems[itemIdx]?.points ?? null
+			else if (kind === 'region') points = regionItems[itemIdx]?.points ?? null
+			if (points && vertIdx < points.length) {
+				points[vertIdx] = [x, z]
+				renderAll()
+			}
+			return
+		}
+		// Rotation handle drag
+		if (dragRotateIdx >= 0) {
+			const o = objectItems[dragRotateIdx]
+			if (o) {
+				const [mx, mz] = clientToSvg(e.clientX, e.clientY)
+				const dx = mx - o.pos[0]
+				const dz = mz - o.pos[1]
+				// Negate so that clockwise drag → clockwise visual rotation
+				// (object renders with rotate(-rotation), so stored value is inverted)
+				const angleDeg = -((Math.atan2(dx, dz) * 180) / Math.PI)
+				objectItems[dragRotateIdx].rotation =
+					((Math.round(angleDeg) % 360) + 360) % 360
+				renderObjects()
+				renderHandles()
+			}
+			return
+		}
+		// Tree drag
+		if (dragTreeIdx >= 0) {
+			const [x, z] = clientToSvg(e.clientX, e.clientY)
+			treeItems[dragTreeIdx].pos = [x, z]
+			renderTrees()
+			return
+		}
+		// Course node drag
+		if (dragCourseNodeIdx >= 0) {
+			const [x, z] = clientToSvg(e.clientX, e.clientY)
+			courseNodes[dragCourseNodeIdx].pos = [x, z]
+			renderMainPath()
+			renderCourseNodes()
+			return
+		}
+		// Object drag
+		if (dragObjectIdx >= 0) {
+			const [x, z] = clientToSvg(e.clientX, e.clientY)
+			objectItems[dragObjectIdx].pos = [x, z]
+			renderObjects()
+			return
+		}
+		// Pan
+		if (!panning) return
+		const rect = svg.getBoundingClientRect()
+		const scaleX = vbW / rect.width
+		const scaleY = vbH / rect.height
+		vbX = panVbX - (e.clientX - panDragStartX) * scaleX
+		vbY = panVbY - (e.clientY - panDragStartY) * scaleY
+		updateViewBox()
+	})
+
+	window.addEventListener('mouseup', () => {
+		if (dragVertexInfo) {
+			dragVertexInfo = null
+			renderSidebar()
+			return
+		}
+		if (dragTreeIdx >= 0) {
+			dragTreeIdx = -1
+			renderSidebar()
+			return
+		}
+		if (dragCourseNodeIdx >= 0) {
+			dragCourseNodeIdx = -1
+			renderSidebar()
+			return
+		}
+		if (dragObjectIdx >= 0) {
+			dragObjectIdx = -1
+			renderSidebar()
+			return
+		}
+		if (dragRotateIdx >= 0) {
+			dragRotateIdx = -1
+			renderSidebar()
+			return
+		}
+		panning = false
+		svg.classList.remove('dragging')
+	})
+
+	// ── Zoom ────────────────────────────────────────────────────────────
+
+	svg.addEventListener(
+		'wheel',
+		(e) => {
+			e.preventDefault()
+			const rect = svg.getBoundingClientRect()
+			const mx = vbX + ((e.clientX - rect.left) / rect.width) * vbW
+			const my = vbY + ((e.clientY - rect.top) / rect.height) * vbH
+			const zoomFactor = e.deltaY > 0 ? 1.035 : 1 / 1.035
+			const newW = vbW * zoomFactor
+			const newH = vbH * zoomFactor
+			vbX = mx - ((mx - vbX) / vbW) * newW
+			vbY = my - ((my - vbY) / vbH) * newH
+			vbW = newW
+			vbH = newH
+			updateViewBox()
+		},
+		{ passive: false },
+	)
+
+	// ── Keyboard shortcuts ──────────────────────────────────────────────
+
+	window.addEventListener('keydown', (e) => {
+		// Don't intercept keys when typing in an input
+		const tag = (document.activeElement as HTMLElement)?.tagName
+		if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+
+		if (e.key === 'Escape') {
+			if (drawMode !== 'none') {
+				drawMode = 'none'
+				drawingPoints = []
+				renderDrawing()
+				renderSidebar()
+			} else if (selectedKind !== null) {
+				select(null, -1)
+			}
+		}
+		if (
+			(e.key === 'Delete' || e.key === 'Backspace') &&
+			selectedKind !== null
+		) {
+			e.preventDefault()
+			deleteSelected()
+		}
+	})
 }
 
 main().catch((err) => {
-  document.getElementById('info')!.innerHTML = `<strong>Error:</strong> ${err.message}`;
-  console.error(err);
-});
+	document.getElementById('info')!.innerHTML =
+		`<strong>Error:</strong> ${err.message}`
+	console.error(err)
+})

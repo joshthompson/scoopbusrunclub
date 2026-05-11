@@ -5,8 +5,8 @@
 // This file is kept as a placeholder. If you add Convex-native crons
 // in the future, define them here.
 
-import { cronJobs } from "convex/server";
+import { cronJobs } from 'convex/server'
 
-const crons = cronJobs();
+const crons = cronJobs()
 
-export default crons;
+export default crons

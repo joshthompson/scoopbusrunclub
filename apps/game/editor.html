@@ -16,6 +16,11 @@
       #sidebar h3 { color: #fff; font-size: 12px; margin: 0 0 8px; }
       .sidebar-section { margin-bottom: 6px; }
       .sidebar-section-title { color: #999; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+      .sidebar-section.collapsible .sidebar-section-title { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 4px; }
+      .sidebar-section.collapsible .sidebar-section-title::before { content: '▾'; font-size: 8px; transition: transform 0.15s; }
+      .sidebar-section.collapsible.collapsed .sidebar-section-title::before { transform: rotate(-90deg); }
+      .sidebar-section.collapsed .sidebar-section-body { display: none; }
+      .sidebar-group-label { color: #7a9; font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; margin: 8px 0 3px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.06); }
       .sidebar-row { display: flex; align-items: center; gap: 5px; padding: 2px 0; cursor: pointer; user-select: none; }
       .sidebar-row:hover { background: rgba(255,255,255,0.05); }
       .sidebar-swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; }

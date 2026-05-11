@@ -1,5 +1,5 @@
 import { generateFrames } from '@/utils'
-import { Accessor, createSignal, Setter } from 'solid-js'
+import { type Accessor, createSignal, type Setter } from 'solid-js'
 import * as assets from './runner-assets'
 
 export const RUNNER_SIZE = 2
@@ -9,354 +9,491 @@ type Digit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
 type Birthday = `${Digit}${Digit}/${Digit}${Digit}`
 
 export type RunnerName =
-  | 'josh'
-  | 'keith'
-  | 'claire'
-  | 'lyra'
-  | 'adam'
-  | 'anna'
-  | 'eline'
-  | 'rick'
-  | 'sophie'
-  | 'august'
-  | 'alisa'
-  | 'link'
-  | 'otherJosh'
-  | 'mikael'
+	| 'josh'
+	| 'keith'
+	| 'claire'
+	| 'lyra'
+	| 'adam'
+	| 'anna'
+	| 'eline'
+	| 'rick'
+	| 'sophie'
+	| 'august'
+	| 'alisa'
+	| 'link'
+	| 'otherJosh'
+	| 'mikael'
 
 export type RunnerState =
-  // Default
-  | 'run'
-  // Volunteer states
-  | 'tail-walker'
-  | 'scanner'
-  | 'photographer'
-  | 'run-director'
-  | 'marshal'
+	// Default
+	| 'run'
+	// Volunteer states
+	| 'tail-walker'
+	| 'scanner'
+	| 'photographer'
+	| 'run-director'
+	| 'marshal'
 
 export interface RunnerData {
-  name: string
-  altNames?: string[]
-  id: string
-  birthday: Birthday // Format: DD/MM
-  frames: {
-    run: string[]
-    sit: string[]
-    face: string[]
-    tailWalk: string[] | undefined // and Park Walker
-    tailSit: string[] | undefined
-    scanner: string[] | undefined // And Timekeeper
-    photographer: string[] | undefined
-    runDirector: string[] | undefined
-    marshal: string[] | undefined
-    volunteerGeneric: string[] | undefined // All other volunteer roles that don't have a specific sprite
-  }
-  runnerState?: RunnerState
-  width: number
-  height: number
-  speed: number
-  frameInterval: number
-  connectedTo?: string
-  latestTime?: string
-  volunteerRoles?: string[]
-  time?: string
+	name: string
+	altNames?: string[]
+	id: string
+	birthday: Birthday // Format: DD/MM
+	frames: {
+		run: string[]
+		sit: string[]
+		face: string[]
+		tailWalk: string[] | undefined // and Park Walker
+		tailSit: string[] | undefined
+		scanner: string[] | undefined // And Timekeeper
+		photographer: string[] | undefined
+		runDirector: string[] | undefined
+		marshal: string[] | undefined
+		volunteerGeneric: string[] | undefined // All other volunteer roles that don't have a specific sprite
+	}
+	runnerState?: RunnerState
+	width: number
+	height: number
+	speed: number
+	frameInterval: number
+	connectedTo?: string
+	latestTime?: string
+	volunteerRoles?: string[]
+	time?: string
 }
 
-export const runners: Record<RunnerName, [Accessor<RunnerData>, Setter<RunnerData>]> = {
-  josh: createSignal<RunnerData>({
-    name: 'Josh',
-    id: '8070821',
-    birthday: '15/12',
-    frames: {
-      run: generateFrames(assets.joshRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.joshSit],
-      face: [assets.joshFace],
-      tailWalk: undefined,
-      tailSit: undefined,
-      scanner: [assets.joshScanner],
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 4,
-    frameInterval: 62,
-  }),
-  keith: createSignal<RunnerData>({
-    name: 'Keith',
-    id: '5635044',
-    birthday: '01/08',
-    frames: {
-      run: generateFrames(assets.keithRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.keithSit],
-      face: [assets.keithFace],
-      tailWalk: undefined,
-      tailSit: undefined,
-      scanner: undefined,
-      photographer: [assets.keithPhotographer],
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 3,
-    frameInterval: 80,
-  }),
-  claire: createSignal<RunnerData>({
-    name: 'Claire',
-    id: '377595',
-    birthday: '06/06',
-    frames: {
-      run: generateFrames(assets.claireRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.claireSit],
-      tailWalk: generateFrames(assets.claireTailWalk, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      tailSit: [assets.claireTailSit],
-      face: [assets.claireFace],
-      scanner: [assets.claireScanner],
-      photographer: undefined,
-      runDirector: [assets.claireRunDirector],
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 2,
-    frameInterval: 125,
-  }),
-  lyra: createSignal<RunnerData>({
-    name: 'Lyra',
-    id: '8009111',
-    birthday: '00/00',
-    frames: {
-      run: generateFrames(assets.lyraRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.lyraSit],
-      face: [assets.lyraFace],
-      tailWalk: generateFrames(assets.lyraTailWalk, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      tailSit: [assets.lyraTailSit],
-      scanner: undefined,
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 1.5,
-    frameInterval: 80,
-  }),
-  adam: createSignal<RunnerData>({
-    name: 'Adam',
-    id: '7758658',
-    birthday: '12/05',
-    frames: {
-      run: generateFrames(assets.adamRun, 22 * FRAME_COUNT, 30, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.adamSit],
-      face: [assets.adamFace],
-      tailWalk: undefined,
-      tailSit: undefined,
-      scanner: undefined,
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 30,
-    speed: 3.9,
-    frameInterval: 65,
-  }),
-  anna: createSignal<RunnerData>({
-    name: 'Anna',
-    id: '850764',
-    birthday: '02/12',
-    frames: {
-      run: generateFrames(assets.annaRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.annaSit],
-      face: [assets.annaFace],
-      tailWalk: generateFrames(assets.annaTailWalk, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      tailSit: [assets.annaTailSit],
-      scanner: undefined,
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 1.5,
-    frameInterval: 120,
-  }),
-  eline: createSignal<RunnerData>({
-    name: 'Eline',
-    id: '8943925',
-    birthday: '06/12',
-    frames: {
-      run: generateFrames(assets.elineRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.elineSit],
-      face: [assets.elineFace],
-      tailWalk: undefined,
-      tailSit: undefined,
-      scanner: [assets.elineScanner],
-      runDirector: [assets.elineRunDirector],
-      photographer: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 3.2,
-    frameInterval: 75,
-  }),
-  rick: createSignal<RunnerData>({
-    name: 'Rick',
-    id: '9679233',
-    birthday: '10/08',
-    frames: {
-      run: generateFrames(assets.rickRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.rickSit],
-      face: [assets.rickFace],
-      tailWalk: undefined,
-      tailSit: undefined,
-      scanner: [assets.rickScanner],
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: [assets.rickMarshal],
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 3.2,
-    frameInterval: 75,
-  }),
-  sophie: createSignal<RunnerData>({
-    name: 'Sophie',
-    id: '6076813',
-    birthday: '28/11',
-    frames: {
-      run: generateFrames(assets.sophieRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.sophieSit],
-      face: [assets.sophieFace],
-      tailWalk: undefined,
-      tailSit: undefined,
-      scanner: undefined,
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 3.2,
-    frameInterval: 75,
-  }),
-  august: createSignal<RunnerData>({
-    name: 'August',
-    id: '545803',
-    birthday: '02/12',
-    frames: {
-      run: generateFrames(assets.augustRun, 50 * FRAME_COUNT, 30, 50 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.augustSit],
-      face: [assets.augustFace],
-      tailWalk: undefined,
-      tailSit: undefined,
-      scanner: [assets.augustScanner],
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 49,
-    height: 30,
-    speed: 3.2,
-    frameInterval: 100,
-  }),
-  alisa: createSignal<RunnerData>({
-    name: 'Alisa',
-    id: '10663604',
-    birthday: '22/11',
-    frames: {
-      run: generateFrames(assets.alisaRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.alisaSit],
-      tailWalk: generateFrames(assets.alisaTailWalk, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      tailSit: [assets.alisaTailSit],
-      face: [assets.alisaFace],
-      scanner: [assets.alisaScanner],
-      photographer: [assets.alisaPhotographer],
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 2.5,
-    frameInterval: 75,
-  }),
-  link: createSignal<RunnerData>({
-    name: 'Link',
-    id: '', // Uses Alisa's speed/data
-    birthday: '09/03',
-    frames: {
-      run: generateFrames(assets.linkRun, 20 * 2, 28, 20 * 2, 2, true),
-      sit: [assets.linkSit],
-      tailWalk: generateFrames(assets.linkTailWalk, 20 * 2, 28, 20 * 2, 2, true),
-      tailSit: [assets.linkTailSit],
-      face: [assets.linkFace],
-      scanner: [assets.linkScanner],
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 20,
-    height: 28,
-    speed: 2.5,
-    frameInterval: 75,
-    connectedTo: 'alisa',
-  }),
-  otherJosh: createSignal<RunnerData>({
-    name: 'Other Josh',
-    altNames: ['Other Josh', 'Josh 2', 'Joshua II', 'Cass', 'Josh Cass', 'Ozzy Josh', 'OJ'],
-    id: '5346109',
-    birthday: '02/07',
-    frames: {
-      run: generateFrames(assets.otherJoshRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.otherJoshSit],
-      face: [assets.otherJoshFace],
-      tailWalk: undefined,
-      tailSit: undefined,
-      scanner: [assets.otherJoshScanner],
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 2.5,
-    frameInterval: 80,
-  }),
-  mikael: createSignal<RunnerData>({
-    name: 'Mikael',
-    id: '9854274',
-    birthday: '01/01',
-    frames: {
-      run: generateFrames(assets.mikaelRun, 22 * FRAME_COUNT, 28, 22 * RUNNER_SIZE, FRAME_COUNT, true),
-      sit: [assets.mikaelSit],
-      face: [assets.mikaelFace],
-      tailWalk: undefined,
-      tailSit: undefined,
-      scanner: undefined,
-      photographer: undefined,
-      runDirector: undefined,
-      marshal: undefined,
-      volunteerGeneric: undefined,
-    },
-    width: 21,
-    height: 28,
-    speed: 3.2,
-    frameInterval: 75,
-  }),
+export const runners: Record<
+	RunnerName,
+	[Accessor<RunnerData>, Setter<RunnerData>]
+> = {
+	josh: createSignal<RunnerData>({
+		name: 'Josh',
+		id: '8070821',
+		birthday: '15/12',
+		frames: {
+			run: generateFrames(
+				assets.joshRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.joshSit],
+			face: [assets.joshFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: [assets.joshScanner],
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 4,
+		frameInterval: 62,
+	}),
+	keith: createSignal<RunnerData>({
+		name: 'Keith',
+		id: '5635044',
+		birthday: '01/08',
+		frames: {
+			run: generateFrames(
+				assets.keithRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.keithSit],
+			face: [assets.keithFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: undefined,
+			photographer: [assets.keithPhotographer],
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 3,
+		frameInterval: 80,
+	}),
+	claire: createSignal<RunnerData>({
+		name: 'Claire',
+		id: '377595',
+		birthday: '06/06',
+		frames: {
+			run: generateFrames(
+				assets.claireRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.claireSit],
+			tailWalk: generateFrames(
+				assets.claireTailWalk,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			tailSit: [assets.claireTailSit],
+			face: [assets.claireFace],
+			scanner: [assets.claireScanner],
+			photographer: undefined,
+			runDirector: [assets.claireRunDirector],
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 2,
+		frameInterval: 125,
+	}),
+	lyra: createSignal<RunnerData>({
+		name: 'Lyra',
+		id: '8009111',
+		birthday: '00/00',
+		frames: {
+			run: generateFrames(
+				assets.lyraRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.lyraSit],
+			face: [assets.lyraFace],
+			tailWalk: generateFrames(
+				assets.lyraTailWalk,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			tailSit: [assets.lyraTailSit],
+			scanner: undefined,
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 1.5,
+		frameInterval: 80,
+	}),
+	adam: createSignal<RunnerData>({
+		name: 'Adam',
+		id: '7758658',
+		birthday: '12/05',
+		frames: {
+			run: generateFrames(
+				assets.adamRun,
+				22 * FRAME_COUNT,
+				30,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.adamSit],
+			face: [assets.adamFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: undefined,
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 30,
+		speed: 3.9,
+		frameInterval: 65,
+	}),
+	anna: createSignal<RunnerData>({
+		name: 'Anna',
+		id: '850764',
+		birthday: '02/12',
+		frames: {
+			run: generateFrames(
+				assets.annaRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.annaSit],
+			face: [assets.annaFace],
+			tailWalk: generateFrames(
+				assets.annaTailWalk,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			tailSit: [assets.annaTailSit],
+			scanner: undefined,
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 1.5,
+		frameInterval: 120,
+	}),
+	eline: createSignal<RunnerData>({
+		name: 'Eline',
+		id: '8943925',
+		birthday: '06/12',
+		frames: {
+			run: generateFrames(
+				assets.elineRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.elineSit],
+			face: [assets.elineFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: [assets.elineScanner],
+			runDirector: [assets.elineRunDirector],
+			photographer: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 3.2,
+		frameInterval: 75,
+	}),
+	rick: createSignal<RunnerData>({
+		name: 'Rick',
+		id: '9679233',
+		birthday: '10/08',
+		frames: {
+			run: generateFrames(
+				assets.rickRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.rickSit],
+			face: [assets.rickFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: [assets.rickScanner],
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: [assets.rickMarshal],
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 3.2,
+		frameInterval: 75,
+	}),
+	sophie: createSignal<RunnerData>({
+		name: 'Sophie',
+		id: '6076813',
+		birthday: '28/11',
+		frames: {
+			run: generateFrames(
+				assets.sophieRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.sophieSit],
+			face: [assets.sophieFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: undefined,
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 3.2,
+		frameInterval: 75,
+	}),
+	august: createSignal<RunnerData>({
+		name: 'August',
+		id: '545803',
+		birthday: '02/12',
+		frames: {
+			run: generateFrames(
+				assets.augustRun,
+				50 * FRAME_COUNT,
+				30,
+				50 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.augustSit],
+			face: [assets.augustFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: [assets.augustScanner],
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 49,
+		height: 30,
+		speed: 3.2,
+		frameInterval: 100,
+	}),
+	alisa: createSignal<RunnerData>({
+		name: 'Alisa',
+		id: '10663604',
+		birthday: '22/11',
+		frames: {
+			run: generateFrames(
+				assets.alisaRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.alisaSit],
+			tailWalk: generateFrames(
+				assets.alisaTailWalk,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			tailSit: [assets.alisaTailSit],
+			face: [assets.alisaFace],
+			scanner: [assets.alisaScanner],
+			photographer: [assets.alisaPhotographer],
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 2.5,
+		frameInterval: 75,
+	}),
+	link: createSignal<RunnerData>({
+		name: 'Link',
+		id: '', // Uses Alisa's speed/data
+		birthday: '09/03',
+		frames: {
+			run: generateFrames(assets.linkRun, 20 * 2, 28, 20 * 2, 2, true),
+			sit: [assets.linkSit],
+			tailWalk: generateFrames(
+				assets.linkTailWalk,
+				20 * 2,
+				28,
+				20 * 2,
+				2,
+				true,
+			),
+			tailSit: [assets.linkTailSit],
+			face: [assets.linkFace],
+			scanner: [assets.linkScanner],
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 20,
+		height: 28,
+		speed: 2.5,
+		frameInterval: 75,
+		connectedTo: 'alisa',
+	}),
+	otherJosh: createSignal<RunnerData>({
+		name: 'Other Josh',
+		altNames: [
+			'Other Josh',
+			'Josh 2',
+			'Joshua II',
+			'Cass',
+			'Josh Cass',
+			'Ozzy Josh',
+			'OJ',
+		],
+		id: '5346109',
+		birthday: '02/07',
+		frames: {
+			run: generateFrames(
+				assets.otherJoshRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.otherJoshSit],
+			face: [assets.otherJoshFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: [assets.otherJoshScanner],
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 2.5,
+		frameInterval: 80,
+	}),
+	mikael: createSignal<RunnerData>({
+		name: 'Mikael',
+		id: '9854274',
+		birthday: '01/01',
+		frames: {
+			run: generateFrames(
+				assets.mikaelRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			sit: [assets.mikaelSit],
+			face: [assets.mikaelFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: undefined,
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 3.2,
+		frameInterval: 75,
+	}),
 }

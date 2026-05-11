@@ -7,15 +7,15 @@
  */
 
 export interface ParkrunEventConfig {
-  /** Lowercase event ID used in URLs and DB, e.g. "haga" */
-  eventId: string
-  /** parkrun domain for this event */
-  baseUrl: string
+	/** Lowercase event ID used in URLs and DB, e.g. "haga" */
+	eventId: string
+	/** parkrun domain for this event */
+	baseUrl: string
 }
 
 export const PARKRUN_EVENTS: ParkrunEventConfig[] = [
-  { eventId: "haga", baseUrl: "https://www.parkrun.se/haga" },
-  { eventId: "judarskogen", baseUrl: "https://www.parkrun.se/judarskogen" },
+	{ eventId: 'haga', baseUrl: 'https://www.parkrun.se/haga' },
+	{ eventId: 'judarskogen', baseUrl: 'https://www.parkrun.se/judarskogen' },
 ]
 
 /** Just the event IDs that have volunteer data */

@@ -1,23 +1,23 @@
 {
-  "name": "@scoopbus/web",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "start": "panda codegen --clean && panda cssgen && vite",
-    "dev": "panda codegen --clean && panda cssgen && vite",
-    "build": "panda codegen --clean && panda cssgen && vite build",
-    "serve": "vite preview"
-  },
-  "dependencies": {
-    "@solidjs/router": "^0.15.4",
-    "barcode-detector": "^3.1.1",
-    "leaflet": "^1.9.4",
-    "qr-scanner": "^1.4.2",
-    "suncalc": "^1.9.0"
-  },
-  "devDependencies": {
-    "@types/leaflet": "^1.9.21",
-    "@types/suncalc": "^1.9.2"
-  }
+	"name": "@scoopbus/web",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "panda codegen --clean && panda cssgen && vite",
+		"dev": "panda codegen --clean && panda cssgen && vite",
+		"build": "panda codegen --clean && panda cssgen && vite build",
+		"serve": "vite preview"
+	},
+	"dependencies": {
+		"@solidjs/router": "^0.15.4",
+		"barcode-detector": "^3.1.1",
+		"leaflet": "^1.9.4",
+		"qr-scanner": "^1.4.2",
+		"suncalc": "^1.9.0"
+	},
+	"devDependencies": {
+		"@types/leaflet": "^1.9.21",
+		"@types/suncalc": "^1.9.2"
+	}
 }

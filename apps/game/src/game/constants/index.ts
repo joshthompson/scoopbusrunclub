@@ -1,201 +1,164 @@
-import type { GameMode } from '../types';
-import { PASSENGER_TRAY_POSITION, PASSENGER_TRAY_SIZE } from '../objects/BusModel';
+import type { GameMode } from '../types'
+import {
+	PASSENGER_TRAY_POSITION,
+	PASSENGER_TRAY_SIZE,
+} from '../objects/BusModel'
 
-export const MODE: GameMode = 'SCOOP_THEN_RIDE';
+export const MODE: GameMode = 'SCOOP_THEN_RIDE'
 
-export const PATH_HALF_WIDTH = 5;
-export const COURSE_TARGET_LENGTH = 5000;
-export const ALTITUDE_EXAGGERATION = 2.5;
-export const BUS_MAX_SPEED = 12 * 3;
-export const BUS_ACCELERATION = 12;
-export const BUS_BRAKE = 20;
-export const BUS_FRICTION = 10;
-export const COUNTDOWN_DURATION = 3.0;
-export const BUS_TURN_SPEED = 1.12;
-export const BUS_TURN_SPEED_STANDSTILL = 0.4;
-export const RUNNER_COUNT = 30;
-export const RUNNER_MIN_SPEED = 2.5;
-export const RUNNER_MAX_SPEED = 4.5 * 2;
-export const RUNNER_PLAYER_SPEED = RUNNER_MAX_SPEED + 2;
-export const REVERSE_SPEED_MULTIPLIER = 0.8;
-export const RUNNER_PLAYER_ACCELERATION = 8;
-export const RUNNER_PLAYER_DECELERATION = 7;
-export const RUNNER_PLAYER_ANIM_SPEED_FACTOR = 0.5;
-export const RUNNER_PLAYER_TURN_SPEED = 2.6;
-export const RUNNER_JUMP_HEIGHT = 3;
-export const RUNNER_PLAYER_MAX_JUMPS = 2;
-export const RUNNER_PLAYER_JUMP_SIDE_VELOCITY = 5.5;
-export const RUNNER_COLLISION_RADIUS = 0.75;
-export const SCOOP_DISTANCE = 3.5;
+export const PATH_HALF_WIDTH = 5
+export const COURSE_TARGET_LENGTH = 5000
+export const ALTITUDE_EXAGGERATION = 2.5
+export const BUS_MAX_SPEED = 12 * 3
+export const BUS_ACCELERATION = 12
+export const BUS_BRAKE = 20
+export const BUS_FRICTION = 10
+export const COUNTDOWN_DURATION = 3.0
+export const BUS_TURN_SPEED = 1.12
+export const BUS_TURN_SPEED_STANDSTILL = 0.4
+export const RUNNER_COUNT = 30
+export const RUNNER_MIN_SPEED = 2.5
+export const RUNNER_MAX_SPEED = 4.5 * 2
+export const RUNNER_PLAYER_SPEED = RUNNER_MAX_SPEED + 2
+export const REVERSE_SPEED_MULTIPLIER = 0.8
+export const RUNNER_PLAYER_ACCELERATION = 8
+export const RUNNER_PLAYER_DECELERATION = 7
+export const RUNNER_PLAYER_ANIM_SPEED_FACTOR = 0.5
+export const RUNNER_PLAYER_TURN_SPEED = 2.6
+export const RUNNER_JUMP_HEIGHT = 3
+export const RUNNER_PLAYER_MAX_JUMPS = 2
+export const RUNNER_PLAYER_JUMP_SIDE_VELOCITY = 5.5
+export const RUNNER_COLLISION_RADIUS = 0.75
+export const SCOOP_DISTANCE = 3.5
 /** Time horizon (seconds) to predict if the bus will hit the runner */
-export const RUNNER_ESCAPE_LOOKAHEAD = 0.8;
+export const RUNNER_ESCAPE_LOOKAHEAD = 0.8
 /** Radius around runner (metres) that counts as a near-miss for triggering escape */
-export const RUNNER_ESCAPE_NEAR_MISS_RADIUS = 1.3;
+export const RUNNER_ESCAPE_NEAR_MISS_RADIUS = 1.3
 /** Speed (m/s) the runner moves laterally to escape the bus path */
-export const RUNNER_ESCAPE_SPEED = 8;
-export const SCOOP_UP_FACTOR = 0.75;
-export const SCOOP_MIN_UP = 10;
-export const SCOOP_FORWARD_FACTOR = 0.5;
-export const SCOOP_ANIM_DURATION = 0.35;
-export const SCOOP_BOOST_DURATION = 1;
-export const SCOOP_BOOST_EASE_DURATION = 0.5; // seconds to ease back from boosted max to base max
-export const SCOOP_BOOST_MULTIPLIER = 2;
-export const SCOOP_BOOST_ACCELERATION = 80; // rapid acceleration (m/s²) to reach max speed while boosting
-export const RUNNER_SIT_DURATION = 2.5;
-export const GRAVITY = 20;
-export const BUS_GRAVITY = 20;
-export const BUS_JUMP_PITCH_THRESHOLD = 0.03;
-export const BUS_CLIFF_SEPARATION_THRESHOLD = 0.3; // metres the bus must be above ground to count as cliff launch
-export const BUS_LAUNCH_VEL_CAP = 14;               // max vertical launch velocity
-export const BUS_LAUNCH_VEL_MIN = 1.0;               // minimum pop on any launch
-export const BUS_LANDING_IMPACT_SPEED_PENALTY = 0.04; // fraction of speed lost per m/s of downward velocity on landing
-export const BUS_LANDING_IMPACT_MAX_PENALTY = 0.25;   // cap on landing speed penalty fraction
-export const BUS_AIRBORNE_PITCH_LERP = 3;             // how fast pitch adjusts while airborne
-export const BUS_UPHILL_DRAG = 5;                     // extra drag (m/s²) when driving uphill, scaled by slope
-export const BUS_AIRBORNE_COLLISION_CLEARANCE = 1.5;  // metres above ground to skip obstacle collisions
-export const BUS_START_OFFSET = 15;
-export const START_CIRCLE_RADIUS = 15;
-export const BUS_ROOF_Y = PASSENGER_TRAY_POSITION[1];
-export const BUS_ROOF_W = PASSENGER_TRAY_SIZE[0];
-export const BUS_ROOF_L = PASSENGER_TRAY_SIZE[1];
-export const GATE_SPACING = 100;
-export const GATE_RADIUS = 10;
-export const POWER_UP_ITEM_SPACING = 250;
-export const POWER_UP_ITEM_RESPAWN_SECONDS = 20;
-export const POWER_UP_TOKEN_FLOAT_HEIGHT = 2.4;
-export const POWER_UP_TOKEN_FLOAT_AMPLITUDE = 0.35;
-export const POWER_UP_TOKEN_FLOAT_SPEED = 2.5;
-export const POWER_UP_TOKEN_PICKUP_RADIUS = 1.2;
-export const POWER_UP_TOKEN_RADIUS = 0.75;
-export const POWER_UP_MIN_TOKEN_SPACING_METRES = 100;
-export const POWER_UP_START_EXCLUSION_METRES = 100;
-export const POWER_UP_ROLL_DURATION_MS = 1200;
-export const POWER_UP_ROLL_STEP_MS = 90;
-export const POWER_UP_FIKA_DURATION_SECONDS = 15;
-export const POWER_UP_FIKA_SCALE_MULTIPLIER = 2;
-export const POWER_UP_FIKA_SCALE_TRANSITION_SPEED = 8;
-export const POWER_UP_FIKA_SPEED_MULTIPLIER = 1.5;
-export const POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER = 0.75;
-export const POWER_UP_SHOE_DURATION_SECONDS = 30;
-export const POWER_UP_SHOE_SPEED_MULTIPLIER = 2;
-export const POWER_UP_ICE_RADIUS_METRES = 25;
-export const POWER_UP_ICE_GROW_SECONDS = 0.5;
-export const POWER_UP_ICE_DURATION_SECONDS = 30;
-export const POWER_UP_ICE_FADE_SECONDS = 1;
-export const POWER_UP_ICE_BASE_ALPHA = 0.4;
-export const TREE_COUNT = 3000;
-export const TREE_SPREAD = 200;
-export const TREE_MIN_DIST_FROM_PATH = 8;
-export const TREE_HEIGHT_SCALE = 2;
-export const AUTO_DRIVE_SPEED = 10;
-export const DEMO_CAMERA_SPEED = 10; // metres/s — title screen flyover speed
+export const RUNNER_ESCAPE_SPEED = 8
+export const SCOOP_UP_FACTOR = 0.75
+export const SCOOP_MIN_UP = 10
+export const SCOOP_FORWARD_FACTOR = 0.5
+export const SCOOP_ANIM_DURATION = 0.35
+export const SCOOP_BOOST_DURATION = 1
+export const SCOOP_BOOST_EASE_DURATION = 0.5 // seconds to ease back from boosted max to base max
+export const SCOOP_BOOST_MULTIPLIER = 2
+export const SCOOP_BOOST_ACCELERATION = 80 // rapid acceleration (m/s²) to reach max speed while boosting
+export const RUNNER_SIT_DURATION = 2.5
+export const GRAVITY = 20
+export const BUS_GRAVITY = 20
+export const BUS_JUMP_PITCH_THRESHOLD = 0.03
+export const BUS_CLIFF_SEPARATION_THRESHOLD = 0.3 // metres the bus must be above ground to count as cliff launch
+export const BUS_LAUNCH_VEL_CAP = 14 // max vertical launch velocity
+export const BUS_LAUNCH_VEL_MIN = 1.0 // minimum pop on any launch
+export const BUS_LANDING_IMPACT_SPEED_PENALTY = 0.04 // fraction of speed lost per m/s of downward velocity on landing
+export const BUS_LANDING_IMPACT_MAX_PENALTY = 0.25 // cap on landing speed penalty fraction
+export const BUS_AIRBORNE_PITCH_LERP = 3 // how fast pitch adjusts while airborne
+export const BUS_UPHILL_DRAG = 5 // extra drag (m/s²) when driving uphill, scaled by slope
+export const BUS_AIRBORNE_COLLISION_CLEARANCE = 1.5 // metres above ground to skip obstacle collisions
+export const BUS_START_OFFSET = 15
+export const START_CIRCLE_RADIUS = 15
+export const BUS_ROOF_Y = PASSENGER_TRAY_POSITION[1]
+export const BUS_ROOF_W = PASSENGER_TRAY_SIZE[0]
+export const BUS_ROOF_L = PASSENGER_TRAY_SIZE[1]
+export const GATE_SPACING = 100
+export const GATE_RADIUS = 10
+export const POWER_UP_ITEM_SPACING = 250
+export const POWER_UP_ITEM_RESPAWN_SECONDS = 20
+export const POWER_UP_TOKEN_FLOAT_HEIGHT = 2.4
+export const POWER_UP_TOKEN_FLOAT_AMPLITUDE = 0.35
+export const POWER_UP_TOKEN_FLOAT_SPEED = 2.5
+export const POWER_UP_TOKEN_PICKUP_RADIUS = 1.2
+export const POWER_UP_TOKEN_RADIUS = 0.75
+export const POWER_UP_MIN_TOKEN_SPACING_METRES = 100
+export const POWER_UP_START_EXCLUSION_METRES = 100
+export const POWER_UP_ROLL_DURATION_MS = 1200
+export const POWER_UP_ROLL_STEP_MS = 90
+export const POWER_UP_FIKA_DURATION_SECONDS = 15
+export const POWER_UP_FIKA_SCALE_MULTIPLIER = 2
+export const POWER_UP_FIKA_SCALE_TRANSITION_SPEED = 8
+export const POWER_UP_FIKA_SPEED_MULTIPLIER = 1.5
+export const POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER = 0.75
+export const POWER_UP_SHOE_DURATION_SECONDS = 30
+export const POWER_UP_SHOE_SPEED_MULTIPLIER = 2
+export const POWER_UP_ICE_RADIUS_METRES = 25
+export const POWER_UP_ICE_GROW_SECONDS = 0.5
+export const POWER_UP_ICE_DURATION_SECONDS = 30
+export const POWER_UP_ICE_FADE_SECONDS = 1
+export const POWER_UP_ICE_BASE_ALPHA = 0.4
+export const TREE_COUNT = 3000
+export const TREE_SPREAD = 200
+export const TREE_MIN_DIST_FROM_PATH = 8
+export const TREE_HEIGHT_SCALE = 2
+export const AUTO_DRIVE_SPEED = 10
+export const DEMO_CAMERA_SPEED = 10 // metres/s — title screen flyover speed
+export const CONE_SPACING = 6
 
 // ---------- Camera ----------
 /** Base field-of-view (radians) when playing as bus driver */
-export const CAMERA_FOV_BUS = 0.8;
+export const CAMERA_FOV_BUS = 0.8
 /** Base field-of-view (radians) when playing as runner */
-export const CAMERA_FOV_RUNNER = 0.9;
+export const CAMERA_FOV_RUNNER = 0.9
 /** Extra FOV added per unit of speed (radians / (m/s)). FOV = base + speed * this */
-export const CAMERA_FOV_SPEED_FACTOR = 0.01;
+export const CAMERA_FOV_SPEED_FACTOR = 0.01
 /** How fast FOV tweens to target value (higher = snappier). Uses exponential smoothing. */
-export const CAMERA_FOV_LERP_SPEED = 4;
+export const CAMERA_FOV_LERP_SPEED = 4
 /** Camera elevation angle for chase cam (radians). Lower = closer to ground level */
-export const CAMERA_ANGLE_BUS = 0.4;
+export const CAMERA_ANGLE_BUS = 0.4
 /** Camera elevation angle for runner cam (radians) */
-export const CAMERA_ANGLE_RUNNER = 0.34;
+export const CAMERA_ANGLE_RUNNER = 0.34
 
-export const DRIFT_GRIP = 6;
-export const DRIFT_HIGH_SPEED_GRIP_FACTOR = 0.45;
-export const WATER_DRIFT_GRIP = 2.5;
-export const WATER_BOB_AMPLITUDE = 0.12;
-export const WATER_BOB_SPEED = 2.5;
-export const WATER_SINK = 1.0;
+export const DRIFT_GRIP = 6
+export const DRIFT_HIGH_SPEED_GRIP_FACTOR = 0.45
+export const WATER_DRIFT_GRIP = 2.5
+export const WATER_BOB_AMPLITUDE = 0.12
+export const WATER_BOB_SPEED = 2.5
+export const WATER_SINK = 1.0
+export const RUNNER_WATER_SINK = 0.45 // runners sink partway into water
+export const RUNNER_WATER_SINK_IDLE_EXTRA = 0.34 // extra sink when idle in water (~25% of runner height)
+export const RUNNER_SWIM_TILT = 1.22 // 70° forward tilt when swimming (radians)
+export const RUNNER_SWIM_TILT_SPEED = 3.0 // how fast to lerp toward swim tilt (per second)
 // ---------- Runner social interactions ----------
-export const WAVE_TRIGGER_DISTANCE = 12;       // metres – start waving when this close
-export const HIGH_FIVE_TRIGGER_DISTANCE = 1.8;  // metres – switch to high-five
-export const WAVE_DURATION = 2.0;               // seconds the wave animation plays
-export const HIGH_FIVE_DURATION = 0.6;          // seconds the high-five freeze plays
-export const INTERACTION_COOLDOWN = 4.0;         // seconds before same pair can interact again
-export const INTERACTION_CLOSING_SPEED = 0.5;    // must be closing at ≥ this m/s
+export const WAVE_TRIGGER_DISTANCE = 12 // metres – start waving when this close
+export const HIGH_FIVE_TRIGGER_DISTANCE = 1.8 // metres – switch to high-five
+export const WAVE_DURATION = 2.0 // seconds the wave animation plays
+export const HIGH_FIVE_DURATION = 0.6 // seconds the high-five freeze plays
+export const INTERACTION_COOLDOWN = 4.0 // seconds before same pair can interact again
+export const INTERACTION_CLOSING_SPEED = 0.5 // must be closing at ≥ this m/s
 
-export const ELASTIC_SPRING_K = 12;
-export const ELASTIC_DAMPING = 4;
-export const ELASTIC_MAX_TILT = 0.55;
-export const ELASTIC_SPEED_PENALTY = 0.4;
-export const BUS_DOWNHILL_ACCEL_BOOST = 8;
-export const BUS_DOWNHILL_SLOPE_THRESHOLD = -0.01;
-export const RUNNER_DOWNHILL_SPEED_BOOST = 1.5;
-export const RUNNER_DOWNHILL_SLOPE_THRESHOLD = -0.02;
-export const BUS_COLLISION_RADIUS = 2.0;
+export const ELASTIC_SPRING_K = 12
+export const ELASTIC_DAMPING = 4
+export const ELASTIC_MAX_TILT = 0.55
+export const ELASTIC_SPEED_PENALTY = 0.4
+export const BUS_DOWNHILL_ACCEL_BOOST = 8
+export const BUS_DOWNHILL_SLOPE_THRESHOLD = -0.01
+export const RUNNER_DOWNHILL_SPEED_BOOST = 1.5
+export const RUNNER_DOWNHILL_SLOPE_THRESHOLD = -0.02
+export const BUS_COLLISION_RADIUS = 2.0
 
 // Engine vibration (body oscillates on the wheels)
-export const ENGINE_VIBE_FREQUENCY = 3;   // Hz — fast idle-engine rumble
-export const ENGINE_VIBE_AMPLITUDE = 0.03; // metres — subtle vertical shake
+export const ENGINE_VIBE_FREQUENCY = 3 // Hz — fast idle-engine rumble
+export const ENGINE_VIBE_AMPLITUDE = 0.03 // metres — subtle vertical shake
 
 // ---------- Render / draw distance / LOD ----------
-export const RENDER_PATH_MASK_RESOLUTION = 8192;
-export const RENDER_TEXTURE_ANISOTROPY = 16;
-export const RENDER_BUILDING_LOD_DISTANCE = 500;
-export const RENDER_ANIMATION_CULL_DISTANCE = 500;
-export const RENDER_OBJECTS_MAX_DISTANCE = 500;
-export const RENDER_TREES_MAX_DISTANCE = 500;
+export const RENDER_PATH_MASK_RESOLUTION = 8192
+export const RENDER_TEXTURE_ANISOTROPY = 16
+export const RENDER_BUILDING_LOD_DISTANCE = 500
+export const RENDER_ANIMATION_CULL_DISTANCE = 500
+export const RENDER_OBJECTS_MAX_DISTANCE = 500
+export const RENDER_TREES_MAX_DISTANCE = 500
 
-// ---------- Goose constants ----------
-/** Metres — geese within this distance form a herd */
-export const GOOSE_HERD_RADIUS = 2;
-/** Metres — geese flee when bus/runner is within this distance */
-export const GOOSE_FLEE_RADIUS = 15;
-/** Metres — maximum wander distance from current position */
-export const GOOSE_WANDER_RADIUS = 15;
-/** m/s — walking speed */
-export const GOOSE_WALK_SPEED = 3;
-/** m/s — flee speed */
-export const GOOSE_FLEE_SPEED = 10;
-/** Seconds — max idle sitting time */
-export const GOOSE_IDLE_MAX = 20;
-/** Metres — minimum separation between geese in a herd */
-export const GOOSE_MIN_SEPARATION = 0.5;
-/** bus/runner scoop distance */
-export const GOOSE_SCOOP_DISTANCE = 3.5;
-/** Metres — merge herds within this radius */
-export const GOOSE_HERD_MERGE_RADIUS = 2;
-/** Seconds — how long a landed goose stays before getting up */
-export const GOOSE_LANDED_DURATION = 3;
-
-// ---------- Deer constants ----------
-/** Metres — deer within this distance form a herd (10× geese) */
-export const DEER_HERD_RADIUS = 40;
-/** Metres — deer flee when bus/runner is within this distance */
-export const DEER_FLEE_RADIUS = 20;
-/** Metres — deer start running (not fleeing) at this distance */
-export const DEER_RUN_TRIGGER_RADIUS = 20;
-/** Metres — maximum wander distance from current position */
-export const DEER_WANDER_RADIUS = 50;
-/** m/s — walking speed */
-export const DEER_WALK_SPEED = 5;
-/** m/s — running speed (alert but not panicked) */
-export const DEER_RUN_SPEED = 15;
-/** m/s — flee speed (much faster than geese) */
-export const DEER_FLEE_SPEED = 20;
-/** Seconds — max idle standing time */
-export const DEER_IDLE_MAX = 15;
-/** Metres — minimum separation between deer in a herd */
-export const DEER_MIN_SEPARATION = 6.0;
-/** bus/runner scoop distance */
-export const DEER_SCOOP_DISTANCE = 4.0;
-/** Metres — merge herds within this radius (10× geese) */
-export const DEER_HERD_MERGE_RADIUS = 20;
-/** Seconds — how long a landed deer stays before getting up */
-export const DEER_LANDED_DURATION = 4;
+// ---------- Animal constants ----------
+export * from './animals'
 
 // ---------- Terrain LOD distance thresholds (metres from camera) ----------
 /** Below this distance: ultra-high-res terrain masks (2× quality) */
-export const TERRAIN_LOD_NEAR_DIST = 50;
+export const TERRAIN_LOD_NEAR_DIST = 50
 /** Beyond this distance: low-res terrain masks */
-export const TERRAIN_LOD_FAR_DIST = 200;
+export const TERRAIN_LOD_FAR_DIST = 200
 
 // Re-export lighting constants so consumers can still import from './constants'
-export * from './lighting';
+export * from './lighting'
 
 // Re-export passenger-pickup constants
-export * from './passenger-pickup';
+export * from './passenger-pickup'

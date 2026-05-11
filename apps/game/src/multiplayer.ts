@@ -4,526 +4,612 @@
  * Players connect via a shared room code. One hosts, others join.
  * During gameplay each player broadcasts their player state ~15 times/sec.
  */
-import { joinRoom, selfId, type Room } from 'trystero';
-import type { GameType, TeamColor } from './game/modes/types';
-import type { CharacterSelection } from './game/characters';
+import { joinRoom, selfId, type Room } from 'trystero'
+import type { GameType, TeamColor } from './game/modes/types'
+import type { CharacterSelection } from './game/characters'
 
 // ---------- Shared types ----------
 
 /** Maximum number of players in a room */
-export const MAX_PLAYERS = 4;
+export const MAX_PLAYERS = 4
 
 /** Minimal player state broadcast each frame */
 export interface PlayerState {
-  x: number;
-  y: number;
-  z: number;
-  yaw: number;
-  pitch: number;
-  speed: number;
-  /** Cumulative distance for progress display */
-  dist: number;
-  /** Number of runners scooped */
-  scooped: number;
-  /** Race state of the sender */
-  raceState: 'countdown' | 'racing' | 'finished';
-  /** Race timer (seconds) */
-  raceTime: number;
-  /** Player index (1-based): 1=host, 2-4=joiners in order */
-  playerIndex: number;
-  /** Whether exhaust boost is currently active */
-  boosting: boolean;
-  /** Gate index for position tracking */
-  gateIdx: number;
-  /** Player role for gameplay interactions */
-  role: 'bus' | 'runner';
-  /** Whether the scoop plow animation is active */
-  scooping: boolean;
-  /** Game type for the current session */
-  gameType?: GameType;
-  /** Team assignment (for team-race mode) */
-  team?: TeamColor;
-  /** Arena: whether this runner is stuck */
-  stuck?: boolean;
-  /** Currently held power-up id, if any */
-  powerUp?: string;
-  /** Character selection (bus colour or runner preset). */
-  charSelection?: CharacterSelection;
+	x: number
+	y: number
+	z: number
+	yaw: number
+	pitch: number
+	speed: number
+	/** Cumulative distance for progress display */
+	dist: number
+	/** Number of runners scooped */
+	scooped: number
+	/** Race state of the sender */
+	raceState: 'countdown' | 'racing' | 'finished'
+	/** Race timer (seconds) */
+	raceTime: number
+	/** Player index (1-based): 1=host, 2-4=joiners in order */
+	playerIndex: number
+	/** Whether exhaust boost is currently active */
+	boosting: boolean
+	/** Gate index for position tracking */
+	gateIdx: number
+	/** Player role for gameplay interactions */
+	role: 'bus' | 'runner'
+	/** Whether the scoop plow animation is active */
+	scooping: boolean
+	/** Game type for the current session */
+	gameType?: GameType
+	/** Team assignment (for team-race mode) */
+	team?: TeamColor
+	/** Arena: whether this runner is stuck */
+	stuck?: boolean
+	/** Currently held power-up id, if any */
+	powerUp?: string
+	/** Character selection (bus colour or runner preset). */
+	charSelection?: CharacterSelection
 }
 
 /** @deprecated Use PlayerState */
-export type BusState = PlayerState;
+export type BusState = PlayerState
 
 /** Broadcast when a player scoops a runner (so all clients can sync) */
 export interface ScoopEvent {
-  /** Runner index (0-based into the shared runner list) */
-  runnerIndex: number;
-  /** Player index that scooped it */
-  playerIndex: number;
-  /** Scooped player index (for player-vs-player scoop), if applicable */
-  victimPlayerIndex?: number;
-  /** Scooper yaw at scoop time (for deterministic victim launch) */
-  scooperYaw?: number;
-  /** Scooper speed at scoop time (for deterministic victim launch) */
-  scooperSpeed?: number;
+	/** Runner index (0-based into the shared runner list) */
+	runnerIndex: number
+	/** Player index that scooped it */
+	playerIndex: number
+	/** Scooped player index (for player-vs-player scoop), if applicable */
+	victimPlayerIndex?: number
+	/** Scooper yaw at scoop time (for deterministic victim launch) */
+	scooperYaw?: number
+	/** Scooper speed at scoop time (for deterministic victim launch) */
+	scooperSpeed?: number
 }
 
 /** Broadcast when a collectible item is picked up (for synced despawn/respawn). */
 export interface ItemCollectEvent {
-  /** Item id in the shared deterministic item list */
-  itemId: number;
-  /** Player index that collected it */
-  playerIndex: number;
-  /** Unix ms timestamp when it was collected */
-  collectedAtMs: number;
-  /** Unix ms timestamp when the item should respawn */
-  respawnAtMs: number;
+	/** Item id in the shared deterministic item list */
+	itemId: number
+	/** Player index that collected it */
+	playerIndex: number
+	/** Unix ms timestamp when it was collected */
+	collectedAtMs: number
+	/** Unix ms timestamp when the item should respawn */
+	respawnAtMs: number
 }
 
 /** Lobby chat / coordination messages */
 export interface LobbyMessage {
-  type: 'ready' | 'start' | 'playerInfo' | 'gameReady' | 'startCountdown';
-  name?: string;
-  courseId?: string;
-  /** Assigned player index (1-based), sent by host to joiners */
-  playerIndex?: number;
-  /** Map of peerId → playerIndex, broadcast by host so all joiners know every player's index */
-  peerIndices?: Record<string, number>;
-  /** Game type for the session (set by host, sent to joiners) */
-  gameType?: GameType;
-  /** Driver index — which player is the bus (for scoop-race, arena) */
-  driverIndex?: number;
-  /** Team assignments for team-race (playerIndex → { team, role }) */
-  teamAssignments?: Record<number, { team: TeamColor; role: 'bus' | 'runner' }>;
-  /** Character selection for this player (bus colour or runner preset). */
-  charSelection?: CharacterSelection;
-  /** All character selections by playerIndex, broadcast by host. */
-  charSelections?: Record<number, CharacterSelection>;
-  /** Unix-ms timestamp when the countdown should begin (host-synced start). */
-  startAtMs?: number;
+	type: 'ready' | 'start' | 'playerInfo' | 'gameReady' | 'startCountdown'
+	name?: string
+	courseId?: string
+	/** Assigned player index (1-based), sent by host to joiners */
+	playerIndex?: number
+	/** Map of peerId → playerIndex, broadcast by host so all joiners know every player's index */
+	peerIndices?: Record<string, number>
+	/** Game type for the session (set by host, sent to joiners) */
+	gameType?: GameType
+	/** Driver index — which player is the bus (for scoop-race, arena) */
+	driverIndex?: number
+	/** Team assignments for team-race (playerIndex → { team, role }) */
+	teamAssignments?: Record<number, { team: TeamColor; role: 'bus' | 'runner' }>
+	/** Character selection for this player (bus colour or runner preset). */
+	charSelection?: CharacterSelection
+	/** All character selections by playerIndex, broadcast by host. */
+	charSelections?: Record<number, CharacterSelection>
+	/** Unix-ms timestamp when the countdown should begin (host-synced start). */
+	startAtMs?: number
 }
 
-export type OnRemoteState = (state: PlayerState, peerId: string) => void;
-export type OnPeerJoin = (peerId: string) => void;
-export type OnPeerLeave = (peerId: string) => void;
-export type OnLobbyMessage = (msg: LobbyMessage, peerId: string) => void;
+export type OnRemoteState = (state: PlayerState, peerId: string) => void
+export type OnPeerJoin = (peerId: string) => void
+export type OnPeerLeave = (peerId: string) => void
+export type OnLobbyMessage = (msg: LobbyMessage, peerId: string) => void
 
 // ---------- Multiplayer class ----------
 
-const APP_ID = 'scoopbus-run-club';
-const SEND_INTERVAL_MS = 66; // ~15 Hz
+const APP_ID = 'scoopbus-run-club'
+const SEND_INTERVAL_MS = 66 // ~15 Hz
 
 export class Multiplayer {
-  private room: Room | null = null;
-  private sendState: ((state: PlayerState) => void) | null = null;
-  private sendLobby: ((msg: LobbyMessage, targetPeers?: string | string[]) => void) | null = null;
-  private sendScoop: ((evt: ScoopEvent) => void) | null = null;
-  private sendItem: ((evt: ItemCollectEvent) => void) | null = null;
-  private _onRemoteState: OnRemoteState | null = null;
-  private _onScoopEvent: ((evt: ScoopEvent, peerId: string) => void) | null = null;
-  private _onItemEvent: ((evt: ItemCollectEvent, peerId: string) => void) | null = null;
-  private _onPeerJoin: OnPeerJoin | null = null;
-  private _onPeerLeave: OnPeerLeave | null = null;
-  private _onLobbyMessage: OnLobbyMessage | null = null;
+	private room: Room | null = null
+	private sendState: ((state: PlayerState) => void) | null = null
+	private sendLobby:
+		| ((msg: LobbyMessage, targetPeers?: string | string[]) => void)
+		| null = null
+	private sendScoop: ((evt: ScoopEvent) => void) | null = null
+	private sendItem: ((evt: ItemCollectEvent) => void) | null = null
+	private _onRemoteState: OnRemoteState | null = null
+	private _onScoopEvent: ((evt: ScoopEvent, peerId: string) => void) | null =
+		null
+	private _onItemEvent:
+		| ((evt: ItemCollectEvent, peerId: string) => void)
+		| null = null
+	private _onPeerJoin: OnPeerJoin | null = null
+	private _onPeerLeave: OnPeerLeave | null = null
+	private _onLobbyMessage: OnLobbyMessage | null = null
 
-  private lastSendTime = 0;
-  private _roomCode = '';
-  private _isHost = false;
-  private _peerId = '';
-  private _remotePeerIds: string[] = [];
-  /** Map peerId → player index (1-based). Host is always 1. */
-  private _peerPlayerIndex = new Map<string, number>();
-  /** This client's player index (1 for host, assigned by host for joiners) */
-  private _localPlayerIndex = 1;
-  /** Course ID for the room (set by host, received by joiner) */
-  private _courseId = '';
-  /** Game type for the room */
-  private _gameType: GameType = 'scoop-race';
-  /** Driver index — which player is the bus driver */
-  private _driverIndex = 1;
-  /** Team assignments for team-race mode */
-  private _teamAssignments = new Map<number, { team: TeamColor; role: 'bus' | 'runner' }>();
-  /** Character selections by playerIndex */
-  private _charSelections = new Map<number, CharacterSelection>();
+	private lastSendTime = 0
+	private _roomCode = ''
+	private _isHost = false
+	private _peerId = ''
+	private _remotePeerIds: string[] = []
+	/** Map peerId → player index (1-based). Host is always 1. */
+	private _peerPlayerIndex = new Map<string, number>()
+	/** This client's player index (1 for host, assigned by host for joiners) */
+	private _localPlayerIndex = 1
+	/** Course ID for the room (set by host, received by joiner) */
+	private _courseId = ''
+	/** Game type for the room */
+	private _gameType: GameType = 'scoop-race'
+	/** Driver index — which player is the bus driver */
+	private _driverIndex = 1
+	/** Team assignments for team-race mode */
+	private _teamAssignments = new Map<
+		number,
+		{ team: TeamColor; role: 'bus' | 'runner' }
+	>()
+	/** Character selections by playerIndex */
+	private _charSelections = new Map<number, CharacterSelection>()
 
-  get roomCode() { return this._roomCode; }
-  get isHost() { return this._isHost; }
-  get peerId() { return this._peerId; }
-  get remotePeerIds() { return this._remotePeerIds; }
-  get peerCount() { return this._remotePeerIds.length; }
-  get connected() { return this._remotePeerIds.length > 0; }
-  get localPlayerIndex() { return this._localPlayerIndex; }
-  /** Get the player index for a remote peer */
-  getPlayerIndex(peerId: string): number { return this._peerPlayerIndex.get(peerId) ?? 0; }
-  /** Course ID for the room */
-  get courseId() { return this._courseId; }
-  set courseId(id: string) { this._courseId = id; }
-  /** Game type for the room */
-  get gameType() { return this._gameType; }
-  set gameType(gt: GameType) { this._gameType = gt; }
-  /** Driver index */
-  get driverIndex() { return this._driverIndex; }
-  set driverIndex(idx: number) { this._driverIndex = idx; }
-  /** Team assignments */
-  get teamAssignments() { return this._teamAssignments; }
-  set teamAssignments(ta: Map<number, { team: TeamColor; role: 'bus' | 'runner' }>) { this._teamAssignments = ta; }
-  /** Character selections */
-  get charSelections() { return this._charSelections; }
-  set charSelections(cs: Map<number, CharacterSelection>) { this._charSelections = cs; }
-  /** Set this player's character selection */
-  setCharSelection(sel: CharacterSelection) {
-    this._charSelections.set(this._localPlayerIndex, sel);
-  }
-  /** Get character selection for a player index */
-  getCharSelection(playerIndex: number): CharacterSelection | undefined {
-    return this._charSelections.get(playerIndex);
-  }
+	get roomCode() {
+		return this._roomCode
+	}
+	get isHost() {
+		return this._isHost
+	}
+	get peerId() {
+		return this._peerId
+	}
+	get remotePeerIds() {
+		return this._remotePeerIds
+	}
+	get peerCount() {
+		return this._remotePeerIds.length
+	}
+	get connected() {
+		return this._remotePeerIds.length > 0
+	}
+	get localPlayerIndex() {
+		return this._localPlayerIndex
+	}
+	/** Get the player index for a remote peer */
+	getPlayerIndex(peerId: string): number {
+		return this._peerPlayerIndex.get(peerId) ?? 0
+	}
+	/** Course ID for the room */
+	get courseId() {
+		return this._courseId
+	}
+	set courseId(id: string) {
+		this._courseId = id
+	}
+	/** Game type for the room */
+	get gameType() {
+		return this._gameType
+	}
+	set gameType(gt: GameType) {
+		this._gameType = gt
+	}
+	/** Driver index */
+	get driverIndex() {
+		return this._driverIndex
+	}
+	set driverIndex(idx: number) {
+		this._driverIndex = idx
+	}
+	/** Team assignments */
+	get teamAssignments() {
+		return this._teamAssignments
+	}
+	set teamAssignments(ta: Map<
+		number,
+		{ team: TeamColor; role: 'bus' | 'runner' }
+	>) {
+		this._teamAssignments = ta
+	}
+	/** Character selections */
+	get charSelections() {
+		return this._charSelections
+	}
+	set charSelections(cs: Map<number, CharacterSelection>) {
+		this._charSelections = cs
+	}
+	/** Set this player's character selection */
+	setCharSelection(sel: CharacterSelection) {
+		this._charSelections.set(this._localPlayerIndex, sel)
+	}
+	/** Get character selection for a player index */
+	getCharSelection(playerIndex: number): CharacterSelection | undefined {
+		return this._charSelections.get(playerIndex)
+	}
 
-  // ---------- Event setters ----------
+	// ---------- Event setters ----------
 
-  set onRemoteState(fn: OnRemoteState | null) { this._onRemoteState = fn; }
-  set onPeerJoin(fn: OnPeerJoin | null) { this._onPeerJoin = fn; }
-  set onPeerLeave(fn: OnPeerLeave | null) { this._onPeerLeave = fn; }
-  set onLobbyMessage(fn: OnLobbyMessage | null) { this._onLobbyMessage = fn; }
-  set onScoopEvent(fn: ((evt: ScoopEvent, peerId: string) => void) | null) { this._onScoopEvent = fn; }
-  set onItemEvent(fn: ((evt: ItemCollectEvent, peerId: string) => void) | null) { this._onItemEvent = fn; }
+	set onRemoteState(fn: OnRemoteState | null) {
+		this._onRemoteState = fn
+	}
+	set onPeerJoin(fn: OnPeerJoin | null) {
+		this._onPeerJoin = fn
+	}
+	set onPeerLeave(fn: OnPeerLeave | null) {
+		this._onPeerLeave = fn
+	}
+	set onLobbyMessage(fn: OnLobbyMessage | null) {
+		this._onLobbyMessage = fn
+	}
+	set onScoopEvent(fn: ((evt: ScoopEvent, peerId: string) => void) | null) {
+		this._onScoopEvent = fn
+	}
+	set onItemEvent(fn:
+		| ((evt: ItemCollectEvent, peerId: string) => void)
+		| null) {
+		this._onItemEvent = fn
+	}
 
-  // ---------- Connect ----------
+	// ---------- Connect ----------
 
-  /**
-   * Join (or create) a room with the given code.
-   * @param roomCode  Short human-readable code (e.g. "ABC123")
-   * @param isHost    Whether this player is the host
-   */
-  connect(roomCode: string, isHost: boolean) {
-    this._roomCode = roomCode;
-    this._isHost = isHost;
-    this._localPlayerIndex = isHost ? 1 : 0; // joiners get assigned by host
-    this._peerPlayerIndex.clear();
+	/**
+	 * Join (or create) a room with the given code.
+	 * @param roomCode  Short human-readable code (e.g. "ABC123")
+	 * @param isHost    Whether this player is the host
+	 */
+	connect(roomCode: string, isHost: boolean) {
+		this._roomCode = roomCode
+		this._isHost = isHost
+		this._localPlayerIndex = isHost ? 1 : 0 // joiners get assigned by host
+		this._peerPlayerIndex.clear()
 
-    this.room = joinRoom({ appId: APP_ID }, roomCode);
+		this.room = joinRoom({ appId: APP_ID }, roomCode)
 
-    // Wire up actions
-    const [sendState, onState] = this.room.makeAction('playerState');
-    const [sendLobby, onLobby] = this.room.makeAction('lobby');
-    const [sendScoop, onScoop] = this.room.makeAction('scoop');
-    const [sendItem, onItem] = this.room.makeAction('itemCollect');
+		// Wire up actions
+		const [sendState, onState] = this.room.makeAction('playerState')
+		const [sendLobby, onLobby] = this.room.makeAction('lobby')
+		const [sendScoop, onScoop] = this.room.makeAction('scoop')
+		const [sendItem, onItem] = this.room.makeAction('itemCollect')
 
-    this.sendState = (state: PlayerState) => sendState(state as any);
-    this.sendLobby = (msg: LobbyMessage, targetPeers?: string | string[]) => sendLobby(msg as any, targetPeers);
-    this.sendScoop = (evt: ScoopEvent) => sendScoop(evt as any);
-    this.sendItem = (evt: ItemCollectEvent) => sendItem(evt as any);
+		this.sendState = (state: PlayerState) => sendState(state as any)
+		this.sendLobby = (msg: LobbyMessage, targetPeers?: string | string[]) =>
+			sendLobby(msg as any, targetPeers)
+		this.sendScoop = (evt: ScoopEvent) => sendScoop(evt as any)
+		this.sendItem = (evt: ItemCollectEvent) => sendItem(evt as any)
 
-    onState((data, peerId: string) => {
-      const state = data as unknown as PlayerState;
-      // Learn peer's player index from their broadcast if not already known
-      if (state.playerIndex && !this._peerPlayerIndex.has(peerId)) {
-        this._peerPlayerIndex.set(peerId, state.playerIndex);
-      }
-      this._onRemoteState?.(state, peerId);
-    });
+		onState((data, peerId: string) => {
+			const state = data as unknown as PlayerState
+			// Learn peer's player index from their broadcast if not already known
+			if (state.playerIndex && !this._peerPlayerIndex.has(peerId)) {
+				this._peerPlayerIndex.set(peerId, state.playerIndex)
+			}
+			this._onRemoteState?.(state, peerId)
+		})
 
-    onLobby((data, peerId: string) => {
-      const msg = data as unknown as LobbyMessage;
-      // Apply driverIndex from the start message so clients always have the
-      // latest driver assignment regardless of playerInfo timing.
-      if (!this._isHost && msg.type === 'start') {
-        if (msg.driverIndex !== undefined) {
-          this._driverIndex = msg.driverIndex;
-        }
-        if (msg.gameType) {
-          this._gameType = msg.gameType;
-        }
-        if (msg.teamAssignments) {
-          this._teamAssignments = new Map(Object.entries(msg.teamAssignments).map(
-            ([k, v]) => [Number(k), v]
-          ));
-        }
-        if (msg.charSelections) {
-          this._charSelections = new Map(Object.entries(msg.charSelections).map(
-            ([k, v]) => [Number(k), v]
-          ));
-        }
-      }
-      // If host sends us our player index and/or courseId, store them.
-      // Only accept playerInfo from the peer we know is the host (or the
-      // first peer we see, which in the join flow is always the host).
-      if (!this._isHost && msg.type === 'playerInfo') {
-        const knownHostIdx = this._peerPlayerIndex.get(peerId);
-        const senderIsHost = knownHostIdx === 1 || knownHostIdx === undefined;
-        if (senderIsHost) {
-          if (msg.playerIndex) {
-            this._localPlayerIndex = msg.playerIndex;
-          }
-          if (msg.courseId) {
-            this._courseId = msg.courseId;
-          }
-          if (msg.gameType) {
-            this._gameType = msg.gameType;
-          }
-          if (msg.driverIndex !== undefined) {
-            this._driverIndex = msg.driverIndex;
-          }
-          if (msg.teamAssignments) {
-            this._teamAssignments = new Map(Object.entries(msg.teamAssignments).map(
-              ([k, v]) => [Number(k), v]
-            ));
-          }
-          if (msg.charSelections) {
-            this._charSelections = new Map(Object.entries(msg.charSelections).map(
-              ([k, v]) => [Number(k), v]
-            ));
-          }
-          // Record the host's index
-          this._peerPlayerIndex.set(peerId, 1);
-        }
-        // Store all peer indices broadcast by the host
-        if (msg.peerIndices) {
-          for (const [pid, idx] of Object.entries(msg.peerIndices)) {
-            this._peerPlayerIndex.set(pid, idx);
-          }
-        }
-      }
-      // If we're host and joiner sends playerInfo, record their known index from PlayerState
-      // Also if a joiner sends a charSelection, store it for the host's selection map
-      if (this._isHost && msg.charSelection) {
-        const senderIdx = this._peerPlayerIndex.get(peerId);
-        if (senderIdx) {
-          this._charSelections.set(senderIdx, msg.charSelection);
-        }
-      }
-      this._onLobbyMessage?.(msg, peerId);
-    });
+		onLobby((data, peerId: string) => {
+			const msg = data as unknown as LobbyMessage
+			// Apply driverIndex from the start message so clients always have the
+			// latest driver assignment regardless of playerInfo timing.
+			if (!this._isHost && msg.type === 'start') {
+				if (msg.driverIndex !== undefined) {
+					this._driverIndex = msg.driverIndex
+				}
+				if (msg.gameType) {
+					this._gameType = msg.gameType
+				}
+				if (msg.teamAssignments) {
+					this._teamAssignments = new Map(
+						Object.entries(msg.teamAssignments).map(([k, v]) => [Number(k), v]),
+					)
+				}
+				if (msg.charSelections) {
+					this._charSelections = new Map(
+						Object.entries(msg.charSelections).map(([k, v]) => [Number(k), v]),
+					)
+				}
+			}
+			// If host sends us our player index and/or courseId, store them.
+			// Only accept playerInfo from the peer we know is the host (or the
+			// first peer we see, which in the join flow is always the host).
+			if (!this._isHost && msg.type === 'playerInfo') {
+				const knownHostIdx = this._peerPlayerIndex.get(peerId)
+				const senderIsHost = knownHostIdx === 1 || knownHostIdx === undefined
+				if (senderIsHost) {
+					if (msg.playerIndex) {
+						this._localPlayerIndex = msg.playerIndex
+					}
+					if (msg.courseId) {
+						this._courseId = msg.courseId
+					}
+					if (msg.gameType) {
+						this._gameType = msg.gameType
+					}
+					if (msg.driverIndex !== undefined) {
+						this._driverIndex = msg.driverIndex
+					}
+					if (msg.teamAssignments) {
+						this._teamAssignments = new Map(
+							Object.entries(msg.teamAssignments).map(([k, v]) => [
+								Number(k),
+								v,
+							]),
+						)
+					}
+					if (msg.charSelections) {
+						this._charSelections = new Map(
+							Object.entries(msg.charSelections).map(([k, v]) => [
+								Number(k),
+								v,
+							]),
+						)
+					}
+					// Record the host's index
+					this._peerPlayerIndex.set(peerId, 1)
+				}
+				// Store all peer indices broadcast by the host
+				if (msg.peerIndices) {
+					for (const [pid, idx] of Object.entries(msg.peerIndices)) {
+						this._peerPlayerIndex.set(pid, idx)
+					}
+				}
+			}
+			// If we're host and joiner sends playerInfo, record their known index from PlayerState
+			// Also if a joiner sends a charSelection, store it for the host's selection map
+			if (this._isHost && msg.charSelection) {
+				const senderIdx = this._peerPlayerIndex.get(peerId)
+				if (senderIdx) {
+					this._charSelections.set(senderIdx, msg.charSelection)
+				}
+			}
+			this._onLobbyMessage?.(msg, peerId)
+		})
 
-    onScoop((data, peerId: string) => {
-      this._onScoopEvent?.(data as unknown as ScoopEvent, peerId);
-    });
+		onScoop((data, peerId: string) => {
+			this._onScoopEvent?.(data as unknown as ScoopEvent, peerId)
+		})
 
-    onItem((data, peerId: string) => {
-      this._onItemEvent?.(data as unknown as ItemCollectEvent, peerId);
-    });
+		onItem((data, peerId: string) => {
+			this._onItemEvent?.(data as unknown as ItemCollectEvent, peerId)
+		})
 
-    this.room.onPeerJoin((peerId: string) => {
-      if (!this._remotePeerIds.includes(peerId)) {
-        this._remotePeerIds.push(peerId);
-      }
-      // Host assigns player indices: host=1, joiners get 2,3,4 in order
-      if (this._isHost) {
-        const nextIdx = this._remotePeerIds.indexOf(peerId) + 2; // +2 because host is 1
-        this._peerPlayerIndex.set(peerId, nextIdx);
-        // Build the full map of all peer→index assignments
-        const peerIndices: Record<string, number> = {};
-        for (const [pid, idx] of this._peerPlayerIndex) {
-          peerIndices[pid] = idx;
-        }
-        // Tell the new joiner their own index + all peer indices + game config
-        const teamAssignmentsObj: Record<number, { team: TeamColor; role: 'bus' | 'runner' }> = {};
-        for (const [k, v] of this._teamAssignments) teamAssignmentsObj[k] = v;
-        const charSelectionsObj: Record<number, CharacterSelection> = {};
-        for (const [k, v] of this._charSelections) charSelectionsObj[k] = v;
-        setTimeout(() => {
-          this.sendLobby?.({
-            type: 'playerInfo',
-            playerIndex: nextIdx,
-            courseId: this._courseId || undefined,
-            peerIndices,
-            gameType: this._gameType,
-            driverIndex: this._driverIndex,
-            teamAssignments: Object.keys(teamAssignmentsObj).length > 0 ? teamAssignmentsObj : undefined,
-            charSelections: Object.keys(charSelectionsObj).length > 0 ? charSelectionsObj : undefined,
-          }, peerId);
-          // Also broadcast updated indices to ALL existing peers
-          // so they learn about the new joiner's index
-          this.sendLobby?.({
-            type: 'playerInfo',
-            peerIndices,
-          });
-        }, 100);
-      }
-      this._onPeerJoin?.(peerId);
-    });
+		this.room.onPeerJoin((peerId: string) => {
+			if (!this._remotePeerIds.includes(peerId)) {
+				this._remotePeerIds.push(peerId)
+			}
+			// Host assigns player indices: host=1, joiners get 2,3,4 in order
+			if (this._isHost) {
+				const nextIdx = this._remotePeerIds.indexOf(peerId) + 2 // +2 because host is 1
+				this._peerPlayerIndex.set(peerId, nextIdx)
+				// Build the full map of all peer→index assignments
+				const peerIndices: Record<string, number> = {}
+				for (const [pid, idx] of this._peerPlayerIndex) {
+					peerIndices[pid] = idx
+				}
+				// Tell the new joiner their own index + all peer indices + game config
+				const teamAssignmentsObj: Record<
+					number,
+					{ team: TeamColor; role: 'bus' | 'runner' }
+				> = {}
+				for (const [k, v] of this._teamAssignments) teamAssignmentsObj[k] = v
+				const charSelectionsObj: Record<number, CharacterSelection> = {}
+				for (const [k, v] of this._charSelections) charSelectionsObj[k] = v
+				setTimeout(() => {
+					this.sendLobby?.(
+						{
+							type: 'playerInfo',
+							playerIndex: nextIdx,
+							courseId: this._courseId || undefined,
+							peerIndices,
+							gameType: this._gameType,
+							driverIndex: this._driverIndex,
+							teamAssignments:
+								Object.keys(teamAssignmentsObj).length > 0
+									? teamAssignmentsObj
+									: undefined,
+							charSelections:
+								Object.keys(charSelectionsObj).length > 0
+									? charSelectionsObj
+									: undefined,
+						},
+						peerId,
+					)
+					// Also broadcast updated indices to ALL existing peers
+					// so they learn about the new joiner's index
+					this.sendLobby?.({
+						type: 'playerInfo',
+						peerIndices,
+					})
+				}, 100)
+			}
+			this._onPeerJoin?.(peerId)
+		})
 
-    this.room.onPeerLeave((peerId: string) => {
-      this._remotePeerIds = this._remotePeerIds.filter(id => id !== peerId);
-      this._peerPlayerIndex.delete(peerId);
-      this._onPeerLeave?.(peerId);
-    });
-  }
+		this.room.onPeerLeave((peerId: string) => {
+			this._remotePeerIds = this._remotePeerIds.filter((id) => id !== peerId)
+			this._peerPlayerIndex.delete(peerId)
+			this._onPeerLeave?.(peerId)
+		})
+	}
 
-  // ---------- Send ----------
+	// ---------- Send ----------
 
-  /** Broadcast local player state. Call every frame; internally rate-limited. */
-  broadcastState(state: PlayerState) {
-    const now = performance.now();
-    if (now - this.lastSendTime < SEND_INTERVAL_MS) return;
-    this.lastSendTime = now;
-    this.sendState?.(state);
-  }
+	/** Broadcast local player state. Call every frame; internally rate-limited. */
+	broadcastState(state: PlayerState) {
+		const now = performance.now()
+		if (now - this.lastSendTime < SEND_INTERVAL_MS) return
+		this.lastSendTime = now
+		this.sendState?.(state)
+	}
 
-  /** Send a lobby coordination message to all peers. */
-  broadcastLobby(msg: LobbyMessage) {
-    this.sendLobby?.(msg);
-  }
+	/** Send a lobby coordination message to all peers. */
+	broadcastLobby(msg: LobbyMessage) {
+		this.sendLobby?.(msg)
+	}
 
-  /** Send a lobby message to a specific peer only. */
-  sendLobbyTo(msg: LobbyMessage, peerId: string) {
-    this.sendLobby?.(msg, peerId);
-  }
+	/** Send a lobby message to a specific peer only. */
+	sendLobbyTo(msg: LobbyMessage, peerId: string) {
+		this.sendLobby?.(msg, peerId)
+	}
 
-  /** Broadcast a scoop event to all peers (immediately, not rate-limited). */
-  broadcastScoop(evt: ScoopEvent) {
-    this.sendScoop?.(evt);
-  }
+	/** Broadcast a scoop event to all peers (immediately, not rate-limited). */
+	broadcastScoop(evt: ScoopEvent) {
+		this.sendScoop?.(evt)
+	}
 
-  /** Broadcast an item collection event (immediately, not rate-limited). */
-  broadcastItemCollect(evt: ItemCollectEvent) {
-    this.sendItem?.(evt);
-  }
+	/** Broadcast an item collection event (immediately, not rate-limited). */
+	broadcastItemCollect(evt: ItemCollectEvent) {
+		this.sendItem?.(evt)
+	}
 
-  // ---------- Disconnect ----------
+	// ---------- Disconnect ----------
 
-  disconnect() {
-    if (this.room) {
-      this.room.leave().catch(() => {});
-      this.room = null;
-    }
-    this.sendState = null;
-    this.sendLobby = null;
-    this.sendScoop = null;
-    this.sendItem = null;
-    this._remotePeerIds = [];
-    this._peerPlayerIndex.clear();
-    this._localPlayerIndex = 1;
-    this._roomCode = '';
-    this._courseId = '';
-    this._gameType = 'scoop-race';
-    this._driverIndex = 1;
-    this._teamAssignments = new Map();
-    this._charSelections = new Map();
-  }
+	disconnect() {
+		if (this.room) {
+			this.room.leave().catch(() => {})
+			this.room = null
+		}
+		this.sendState = null
+		this.sendLobby = null
+		this.sendScoop = null
+		this.sendItem = null
+		this._remotePeerIds = []
+		this._peerPlayerIndex.clear()
+		this._localPlayerIndex = 1
+		this._roomCode = ''
+		this._courseId = ''
+		this._gameType = 'scoop-race'
+		this._driverIndex = 1
+		this._teamAssignments = new Map()
+		this._charSelections = new Map()
+	}
 }
 
 // Singleton instance
-export const mp = new Multiplayer();
+export const mp = new Multiplayer()
 
 // ---------- Room code generator ----------
 
 /** Generate a random 4-char room code (uppercase letters). */
 export function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I/O to avoid confusion
-  let code = '';
-  for (let i = 0; i < 4; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
+	const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ' // no I/O to avoid confusion
+	let code = ''
+	for (let i = 0; i < 4; i++) {
+		code += chars[Math.floor(Math.random() * chars.length)]
+	}
+	return code
 }
 
 // ---------- Lobby discovery ----------
 
 /** Info about a hosted room, broadcast to the discovery lobby */
 export interface RoomInfo {
-  roomCode: string;
-  hostId: string;
-  courseId: string;
-  gameType: GameType;
-  playerCount: number;
-  maxPlayers: number;
-  started: boolean;
+	roomCode: string
+	hostId: string
+	courseId: string
+	gameType: GameType
+	playerCount: number
+	maxPlayers: number
+	started: boolean
 }
 
-const LOBBY_ROOM_ID = '__scoopbus_lobby__';
-const LOBBY_ANNOUNCE_INTERVAL_MS = 3000;
+const LOBBY_ROOM_ID = '__scoopbus_lobby__'
+const LOBBY_ANNOUNCE_INTERVAL_MS = 3000
 
 /**
  * Lobby discovery: joins a shared "lobby" room to discover hosted games.
  * Hosts announce their room info periodically; browsers collect it.
  */
 export class LobbyDiscovery {
-  private room: Room | null = null;
-  private announceInterval: ReturnType<typeof setInterval> | null = null;
-  private sendAnnounce: ((info: RoomInfo) => void) | null = null;
-  private sendRemove: ((hostId: string) => void) | null = null;
-  private _rooms = new Map<string, RoomInfo>();
-  private _onChange: (() => void) | null = null;
-  private _currentAnnouncement: RoomInfo | null = null;
+	private room: Room | null = null
+	private announceInterval: ReturnType<typeof setInterval> | null = null
+	private sendAnnounce: ((info: RoomInfo) => void) | null = null
+	private sendRemove: ((hostId: string) => void) | null = null
+	private _rooms = new Map<string, RoomInfo>()
+	private _onChange: (() => void) | null = null
+	private _currentAnnouncement: RoomInfo | null = null
 
-  get rooms(): RoomInfo[] {
-    return [...this._rooms.values()].filter(r => !r.started);
-  }
+	get rooms(): RoomInfo[] {
+		return [...this._rooms.values()].filter((r) => !r.started)
+	}
 
-  set onChange(fn: (() => void) | null) { this._onChange = fn; }
+	set onChange(fn: (() => void) | null) {
+		this._onChange = fn
+	}
 
-  /** Join the lobby room to listen for hosted games */
-  joinLobby() {
-    if (this.room) return;
-    this.room = joinRoom({ appId: APP_ID }, LOBBY_ROOM_ID);
+	/** Join the lobby room to listen for hosted games */
+	joinLobby() {
+		if (this.room) return
+		this.room = joinRoom({ appId: APP_ID }, LOBBY_ROOM_ID)
 
-    const [sendAnnounce, onAnnounce] = this.room.makeAction('roomAnnounce');
-    const [sendRemove, onRemove] = this.room.makeAction('roomRemove');
+		const [sendAnnounce, onAnnounce] = this.room.makeAction('roomAnnounce')
+		const [sendRemove, onRemove] = this.room.makeAction('roomRemove')
 
-    this.sendAnnounce = (info: RoomInfo) => sendAnnounce(info as any);
-    this.sendRemove = (hostId: string) => sendRemove(hostId as any);
+		this.sendAnnounce = (info: RoomInfo) => sendAnnounce(info as any)
+		this.sendRemove = (hostId: string) => sendRemove(hostId as any)
 
-    onAnnounce((data, _peerId: string) => {
-      const info = data as unknown as RoomInfo;
-      this._rooms.set(info.hostId, info);
-      this._onChange?.();
-    });
+		onAnnounce((data, _peerId: string) => {
+			const info = data as unknown as RoomInfo
+			this._rooms.set(info.hostId, info)
+			this._onChange?.()
+		})
 
-    onRemove((data, _peerId: string) => {
-      const hostId = data as unknown as string;
-      this._rooms.delete(hostId);
-      this._onChange?.();
-    });
+		onRemove((data, _peerId: string) => {
+			const hostId = data as unknown as string
+			this._rooms.delete(hostId)
+			this._onChange?.()
+		})
 
-    // Clean up peers that leave
-    this.room.onPeerLeave((peerId: string) => {
-      this._rooms.delete(peerId);
-      this._onChange?.();
-    });
-  }
+		// Clean up peers that leave
+		this.room.onPeerLeave((peerId: string) => {
+			this._rooms.delete(peerId)
+			this._onChange?.()
+		})
+	}
 
-  /** Start announcing a hosted room */
-  startAnnouncing(info: Omit<RoomInfo, 'hostId'>) {
-    this.joinLobby();
-    const fullInfo: RoomInfo = { ...info, hostId: selfId };
-    this._currentAnnouncement = fullInfo;
+	/** Start announcing a hosted room */
+	startAnnouncing(info: Omit<RoomInfo, 'hostId'>) {
+		this.joinLobby()
+		const fullInfo: RoomInfo = { ...info, hostId: selfId }
+		this._currentAnnouncement = fullInfo
 
-    // Announce immediately then periodically
-    const announce = () => this.sendAnnounce?.(this._currentAnnouncement!);
-    announce();
-    this.announceInterval = setInterval(announce, LOBBY_ANNOUNCE_INTERVAL_MS);
-  }
+		// Announce immediately then periodically
+		const announce = () => this.sendAnnounce?.(this._currentAnnouncement!)
+		announce()
+		this.announceInterval = setInterval(announce, LOBBY_ANNOUNCE_INTERVAL_MS)
+	}
 
-  /** Update the announced room info (e.g. player count changed) */
-  updateAnnouncement(info: Partial<RoomInfo>) {
-    if (!this._currentAnnouncement) return;
-    this._currentAnnouncement = { ...this._currentAnnouncement, ...info, hostId: selfId };
-    this.sendAnnounce?.(this._currentAnnouncement);
-  }
+	/** Update the announced room info (e.g. player count changed) */
+	updateAnnouncement(info: Partial<RoomInfo>) {
+		if (!this._currentAnnouncement) return
+		this._currentAnnouncement = {
+			...this._currentAnnouncement,
+			...info,
+			hostId: selfId,
+		}
+		this.sendAnnounce?.(this._currentAnnouncement)
+	}
 
-  /** Stop announcing (game started or host left) */
-  stopAnnouncing() {
-    if (this.announceInterval) {
-      clearInterval(this.announceInterval);
-      this.announceInterval = null;
-    }
-    this.sendRemove?.(selfId);
-  }
+	/** Stop announcing (game started or host left) */
+	stopAnnouncing() {
+		if (this.announceInterval) {
+			clearInterval(this.announceInterval)
+			this.announceInterval = null
+		}
+		this.sendRemove?.(selfId)
+	}
 
-  /** Leave the lobby room entirely */
-  leaveLobby() {
-    this.stopAnnouncing();
-    if (this.room) {
-      this.room.leave().catch(() => {});
-      this.room = null;
-    }
-    this.sendAnnounce = null;
-    this.sendRemove = null;
-    this._rooms.clear();
-    this._onChange = null;
-    this._currentAnnouncement = null;
-  }
+	/** Leave the lobby room entirely */
+	leaveLobby() {
+		this.stopAnnouncing()
+		if (this.room) {
+			this.room.leave().catch(() => {})
+			this.room = null
+		}
+		this.sendAnnounce = null
+		this.sendRemove = null
+		this._rooms.clear()
+		this._onChange = null
+		this._currentAnnouncement = null
+	}
 }
 
-export const lobby = new LobbyDiscovery();
+export const lobby = new LobbyDiscovery()

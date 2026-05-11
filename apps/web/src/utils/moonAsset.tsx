@@ -19,28 +19,32 @@ import moon15Asset from '@/assets/background/moon15.png'
 import { css } from '@style/css'
 
 const moons = [
-  moon15Asset, // Empty
-  moon0Asset,
-  moon1Asset,
-  moon2Asset,
-  moon3Asset,
-  moon4Asset,
-  moon5Asset,
-  moon6Asset,
-  moon7Asset, // Full
-  moon8Asset,
-  moon9Asset,
-  moon10Asset,
-  moon11Asset,
-  moon12Asset,
-  moon13Asset,
-  moon14Asset,
+	moon15Asset, // Empty
+	moon0Asset,
+	moon1Asset,
+	moon2Asset,
+	moon3Asset,
+	moon4Asset,
+	moon5Asset,
+	moon6Asset,
+	moon7Asset, // Full
+	moon8Asset,
+	moon9Asset,
+	moon10Asset,
+	moon11Asset,
+	moon12Asset,
+	moon13Asset,
+	moon14Asset,
 ]
 
 const moon = SunCalc.getMoonIllumination(new Date('2026-04-15'))
-export const moonAsset = moons[Math.floor(moon.phase * moons.length) % moons.length]
+export const moonAsset =
+	moons[Math.floor(moon.phase * moons.length) % moons.length]
 
-document.documentElement.style.setProperty('--moon-angle', `calc(${moon.angle - Math.PI / 2}rad)`)
+document.documentElement.style.setProperty(
+	'--moon-angle',
+	`calc(${moon.angle - Math.PI / 2}rad)`,
+)
 
 // --- SVG moon phase rendering ---
 // Renders the lit portion of the moon as an SVG path.
@@ -52,29 +56,29 @@ const R = SIZE / 2
 const C = SIZE / 2 // center x & y (square viewBox)
 
 function moonPhasePath(phase: number): string {
-  // phase: 0 = new moon, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter, 1 = new
-  if (phase < 0.001 || phase > 0.999) return '' // new moon — nothing lit
+	// phase: 0 = new moon, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter, 1 = new
+	if (phase < 0.001 || phase > 0.999) return '' // new moon — nothing lit
 
-  if (Math.abs(phase - 0.5) < 0.001) {
-    // full moon — entire circle lit
-    return `M ${C},${C - R} A ${R},${R} 0 1,1 ${C},${C + R} A ${R},${R} 0 1,1 ${C},${C - R} Z`
-  }
+	if (Math.abs(phase - 0.5) < 0.001) {
+		// full moon — entire circle lit
+		return `M ${C},${C - R} A ${R},${R} 0 1,1 ${C},${C + R} A ${R},${R} 0 1,1 ${C},${C - R} Z`
+	}
 
-  // How wide the terminator ellipse is (0 at quarters, R at new/full)
-  const tRx = Math.abs(Math.cos(phase * 2 * Math.PI)) * R
+	// How wide the terminator ellipse is (0 at quarters, R at new/full)
+	const tRx = Math.abs(Math.cos(phase * 2 * Math.PI)) * R
 
-  if (phase < 0.5) {
-    // Waxing — right limb is the lit edge
-    // Right semicircle: top→bottom clockwise
-    // Terminator: bottom→top; clockwise for crescent (<0.25), counter-clockwise for gibbous (>0.25)
-    const sw = phase < 0.25 ? 1 : 0
-    return `M ${C},${C - R} A ${R},${R} 0 0,1 ${C},${C + R} A ${tRx},${R} 0 0,${sw} ${C},${C - R} Z`
-  } else {
-    // Waning — left limb is the lit edge
-    // Left semicircle: top→bottom counter-clockwise
-    const sw = phase > 0.75 ? 0 : 1
-    return `M ${C},${C - R} A ${R},${R} 0 0,0 ${C},${C + R} A ${tRx},${R} 0 0,${sw} ${C},${C - R} Z`
-  }
+	if (phase < 0.5) {
+		// Waxing — right limb is the lit edge
+		// Right semicircle: top→bottom clockwise
+		// Terminator: bottom→top; clockwise for crescent (<0.25), counter-clockwise for gibbous (>0.25)
+		const sw = phase < 0.25 ? 1 : 0
+		return `M ${C},${C - R} A ${R},${R} 0 0,1 ${C},${C + R} A ${tRx},${R} 0 0,${sw} ${C},${C - R} Z`
+	} else {
+		// Waning — left limb is the lit edge
+		// Left semicircle: top→bottom counter-clockwise
+		const sw = phase > 0.75 ? 0 : 1
+		return `M ${C},${C - R} A ${R},${R} 0 0,0 ${C},${C + R} A ${tRx},${R} 0 0,${sw} ${C},${C - R} Z`
+	}
 }
 
 // const litPath = moonPhasePath(moon.phase)

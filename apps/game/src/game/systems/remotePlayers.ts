@@ -1,125 +1,144 @@
-import type { RemotePlayersMap } from '../types';
-import { poseRunning, poseStanding } from '../objects/RunnerModel';
-import { RENDER_ANIMATION_CULL_DISTANCE } from '../constants';
+import type { RemotePlayersMap } from '../types'
+import { poseRunning, poseStanding } from '../objects/RunnerModel'
+import { RENDER_ANIMATION_CULL_DISTANCE } from '../constants'
 
-const SCOOP_ANIM_DURATION = 0.35;
+const SCOOP_ANIM_DURATION = 0.35
 
 export interface UpdateRemotePlayersParams {
-  remotePlayers: RemotePlayersMap;
-  dt: number;
-  busRoofY: number;
-  /** Current engine vibration Y offset for body shell. */
-  engineVibeOffset: number;
-  observerX: number;
-  observerZ: number;
+	remotePlayers: RemotePlayersMap
+	dt: number
+	busRoofY: number
+	/** Current engine vibration Y offset for body shell. */
+	engineVibeOffset: number
+	observerX: number
+	observerZ: number
 }
 
-export function updateRemotePlayersSystem(params: UpdateRemotePlayersParams): void {
-  const { remotePlayers, dt, busRoofY, engineVibeOffset, observerX, observerZ } = params;
-  const animationCullDistanceSq = RENDER_ANIMATION_CULL_DISTANCE * RENDER_ANIMATION_CULL_DISTANCE;
+export function updateRemotePlayersSystem(
+	params: UpdateRemotePlayersParams,
+): void {
+	const {
+		remotePlayers,
+		dt,
+		busRoofY,
+		engineVibeOffset,
+		observerX,
+		observerZ,
+	} = params
+	const animationCullDistanceSq =
+		RENDER_ANIMATION_CULL_DISTANCE * RENDER_ANIMATION_CULL_DISTANCE
 
-  for (const [_peerId, remote] of remotePlayers) {
-    if (!remote.state) continue;
-    const mesh = remote.mesh;
-    const s = remote.state;
-    const lerp = Math.min(1, 10 * dt);
+	for (const [_peerId, remote] of remotePlayers) {
+		if (!remote.state) continue
+		const mesh = remote.mesh
+		const s = remote.state
+		const lerp = Math.min(1, 10 * dt)
 
-    remote.smoothPos.x += (s.x - remote.smoothPos.x) * lerp;
-    remote.smoothPos.y += (s.y - remote.smoothPos.y) * lerp;
-    remote.smoothPos.z += (s.z - remote.smoothPos.z) * lerp;
+		remote.smoothPos.x += (s.x - remote.smoothPos.x) * lerp
+		remote.smoothPos.y += (s.y - remote.smoothPos.y) * lerp
+		remote.smoothPos.z += (s.z - remote.smoothPos.z) * lerp
 
-    let yawDiff = s.yaw - remote.smoothYaw;
-    while (yawDiff > Math.PI) yawDiff -= 2 * Math.PI;
-    while (yawDiff < -Math.PI) yawDiff += 2 * Math.PI;
-    remote.smoothYaw += yawDiff * lerp;
+		let yawDiff = s.yaw - remote.smoothYaw
+		while (yawDiff > Math.PI) yawDiff -= 2 * Math.PI
+		while (yawDiff < -Math.PI) yawDiff += 2 * Math.PI
+		remote.smoothYaw += yawDiff * lerp
 
-    remote.smoothPitch += (s.pitch - remote.smoothPitch) * lerp;
+		remote.smoothPitch += (s.pitch - remote.smoothPitch) * lerp
 
-    const isRunner = s.role === 'runner';
+		const isRunner = s.role === 'runner'
 
-    mesh.position.copyFrom(remote.smoothPos);
-    mesh.rotation.y = remote.smoothYaw;
-    mesh.rotation.x = -remote.smoothPitch;
-    mesh.setEnabled(!isRunner);
+		mesh.position.copyFrom(remote.smoothPos)
+		mesh.rotation.y = remote.smoothYaw
+		mesh.rotation.x = -remote.smoothPitch
+		mesh.setEnabled(!isRunner)
 
-    // Engine vibration on remote bus body shell
-    if (!isRunner) {
-      remote.bodyShell.position.y = engineVibeOffset;
-    }
+		// Engine vibration on remote bus body shell
+		if (!isRunner) {
+			remote.bodyShell.position.y = engineVibeOffset
+		}
 
-    if (remote.runnerModel) {
-      remote.runnerModel.root.setEnabled(isRunner);
-      if (isRunner) {
-        remote.runnerModel.root.position.copyFrom(remote.smoothPos);
-        remote.runnerModel.root.rotation.x = 0;
-        remote.runnerModel.root.rotation.z = 0;
-        remote.runnerModel.root.rotation.y = remote.smoothYaw;
-        const dx = remote.smoothPos.x - observerX;
-        const dz = remote.smoothPos.z - observerZ;
-        const animateRunner = dx * dx + dz * dz <= animationCullDistanceSq;
-        if (animateRunner && Math.abs(s.speed) > 0.15) {
-          remote.runnerAnimPhase += dt * Math.abs(s.speed) * 3.2;
-          poseRunning(remote.runnerModel, remote.runnerAnimPhase);
-        } else {
-          poseStanding(remote.runnerModel);
-        }
-      }
-    }
+		if (remote.runnerModel) {
+			remote.runnerModel.root.setEnabled(isRunner)
+			if (isRunner) {
+				remote.runnerModel.root.position.copyFrom(remote.smoothPos)
+				remote.runnerModel.root.rotation.x = 0
+				remote.runnerModel.root.rotation.z = 0
+				remote.runnerModel.root.rotation.y = remote.smoothYaw
+				const dx = remote.smoothPos.x - observerX
+				const dz = remote.smoothPos.z - observerZ
+				const animateRunner = dx * dx + dz * dz <= animationCullDistanceSq
+				if (animateRunner && Math.abs(s.speed) > 0.15) {
+					remote.runnerAnimPhase += dt * Math.abs(s.speed) * 3.2
+					poseRunning(remote.runnerModel, remote.runnerAnimPhase)
+				} else {
+					poseStanding(remote.runnerModel)
+				}
+			}
+		}
 
-    // --- Scoop plow animation ---
-    if (s.scooping && remote.scoopAnimTimer <= 0) {
-      remote.scoopAnimTimer = SCOOP_ANIM_DURATION;
-    }
-    if (remote.scoopAnimTimer > 0) {
-      remote.scoopAnimTimer -= dt;
-      const t = 1 - remote.scoopAnimTimer / SCOOP_ANIM_DURATION;
-      const ease = Math.sin(t * Math.PI);
-      remote.scoopPivot.rotation.x = ease * -1.2;
-      remote.scoopPivot.position.y = (remote.scoopPivot as any).__restY + ease * 0.5;
-      remote.scoopPivot.position.z = (remote.scoopPivot as any).__restZ + ease * 0.35;
-    } else {
-      remote.scoopPivot.rotation.x = 0;
-      remote.scoopPivot.position.y = (remote.scoopPivot as any).__restY ?? remote.scoopPivot.position.y;
-      remote.scoopPivot.position.z = (remote.scoopPivot as any).__restZ ?? remote.scoopPivot.position.z;
-    }
+		// --- Scoop plow animation ---
+		if (s.scooping && remote.scoopAnimTimer <= 0) {
+			remote.scoopAnimTimer = SCOOP_ANIM_DURATION
+		}
+		if (remote.scoopAnimTimer > 0) {
+			remote.scoopAnimTimer -= dt
+			const t = 1 - remote.scoopAnimTimer / SCOOP_ANIM_DURATION
+			const ease = Math.sin(t * Math.PI)
+			remote.scoopPivot.rotation.x = ease * -1.2
+			remote.scoopPivot.position.y =
+				(remote.scoopPivot as any).__restY + ease * 0.5
+			remote.scoopPivot.position.z =
+				(remote.scoopPivot as any).__restZ + ease * 0.35
+		} else {
+			remote.scoopPivot.rotation.x = 0
+			remote.scoopPivot.position.y =
+				(remote.scoopPivot as any).__restY ?? remote.scoopPivot.position.y
+			remote.scoopPivot.position.z =
+				(remote.scoopPivot as any).__restZ ?? remote.scoopPivot.position.z
+		}
 
-    if (remote.exhaustFlames) {
-      if (!isRunner && s.boosting && !remote.exhaustFlames.isStarted()) {
-        remote.exhaustFlames.start();
-      } else if ((isRunner || !s.boosting) && remote.exhaustFlames.isStarted()) {
-        remote.exhaustFlames.stop();
-      }
-    }
+		if (remote.exhaustFlames) {
+			if (!isRunner && s.boosting && !remote.exhaustFlames.isStarted()) {
+				remote.exhaustFlames.start()
+			} else if (
+				(isRunner || !s.boosting) &&
+				remote.exhaustFlames.isStarted()
+			) {
+				remote.exhaustFlames.stop()
+			}
+		}
 
-    // Toggle reverse lights (soft red glow when reversing)
-    if (remote.reverseLights.length > 0) {
-      const reversing = !isRunner && s.speed < -0.5;
-      for (const rl of remote.reverseLights) {
-        rl.setEnabled(reversing);
-      }
-    }
+		// Toggle reverse lights (soft red glow when reversing)
+		if (remote.reverseLights.length > 0) {
+			const reversing = !isRunner && s.speed < -0.5
+			for (const rl of remote.reverseLights) {
+				rl.setEnabled(reversing)
+			}
+		}
 
-    const sinY = Math.sin(remote.smoothYaw);
-    const cosY = Math.cos(remote.smoothYaw);
-    const cosPitch = Math.cos(remote.smoothPitch);
-    const sinPitch = Math.sin(remote.smoothPitch);
-    for (const anchor of remote.riderAnchors) {
-      anchor.setEnabled(!isRunner);
-      const roofOffsetX = (anchor as MeshWithRoofOffset).__roofOffsetX ?? 0;
-      const roofOffsetZ = (anchor as MeshWithRoofOffset).__roofOffsetZ ?? 0;
-      const localY = busRoofY + engineVibeOffset;
-      const afterPitchY = localY * cosPitch + roofOffsetZ * sinPitch;
-      const afterPitchZ = -localY * sinPitch + roofOffsetZ * cosPitch;
-      anchor.position.x = remote.smoothPos.x + cosY * roofOffsetX + sinY * afterPitchZ;
-      anchor.position.z = remote.smoothPos.z - sinY * roofOffsetX + cosY * afterPitchZ;
-      anchor.position.y = remote.smoothPos.y + afterPitchY;
-      anchor.rotation.y = remote.smoothYaw;
-      anchor.rotation.x = -remote.smoothPitch;
-    }
-  }
+		const sinY = Math.sin(remote.smoothYaw)
+		const cosY = Math.cos(remote.smoothYaw)
+		const cosPitch = Math.cos(remote.smoothPitch)
+		const sinPitch = Math.sin(remote.smoothPitch)
+		for (const anchor of remote.riderAnchors) {
+			anchor.setEnabled(!isRunner)
+			const roofOffsetX = (anchor as MeshWithRoofOffset).__roofOffsetX ?? 0
+			const roofOffsetZ = (anchor as MeshWithRoofOffset).__roofOffsetZ ?? 0
+			const localY = busRoofY + engineVibeOffset
+			const afterPitchY = localY * cosPitch + roofOffsetZ * sinPitch
+			const afterPitchZ = -localY * sinPitch + roofOffsetZ * cosPitch
+			anchor.position.x =
+				remote.smoothPos.x + cosY * roofOffsetX + sinY * afterPitchZ
+			anchor.position.z =
+				remote.smoothPos.z - sinY * roofOffsetX + cosY * afterPitchZ
+			anchor.position.y = remote.smoothPos.y + afterPitchY
+			anchor.rotation.y = remote.smoothYaw
+			anchor.rotation.x = -remote.smoothPitch
+		}
+	}
 }
 
 type MeshWithRoofOffset = {
-  __roofOffsetX?: number;
-  __roofOffsetZ?: number;
-};
+	__roofOffsetX?: number
+	__roofOffsetZ?: number
+}

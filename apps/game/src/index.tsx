@@ -1,1092 +1,1325 @@
 /* @refresh reload */
-import { render } from 'solid-js/web';
-import { createSignal, onMount, onCleanup, Show, For } from 'solid-js';
-import earcut from 'earcut';
-import { Game } from './game/Game';
-import levels from './levels';
-import { TitleScreen } from './TitleScreen';
-import { LevelSelectScreen } from './LevelSelectScreen';
-import { GameModeSelectScreen } from './GameModeSelectScreen';
-import { CharacterSelectScreen } from './CharacterSelectScreen';
-import { GameTypeSelectScreen } from './GameTypeSelectScreen';
-import { LobbyScreen } from './LobbyScreen';
-import { RoomBrowserScreen } from './RoomBrowserScreen';
-import { LocalRoleSelectScreen } from './LocalRoleSelectScreen';
-import { LocalResultsScreen } from './LocalResultsScreen';
-import { mp, lobby, MAX_PLAYERS } from './multiplayer';
-import type { PlayerState, ScoopEvent } from './multiplayer';
-import { getGameModeConfig } from './game/modes';
-import type { GameType, TeamColor } from './game/modes';
-import type { ItemCollectEvent } from './multiplayer';
-import type { CharacterSelection } from './game/characters';
-import type { PowerUpId } from './game/systems/powerups';
-import { PASSENGER_PICKUP_INITIAL_TIME } from './game/constants/passenger-pickup';
-import powerUpFika from './assets/power-ups/fika.png';
-import powerUpFire from './assets/power-ups/fire.png';
-import powerUpIce from './assets/power-ups/ice.png';
-import powerUpMallet from './assets/power-ups/mallet.png';
-import powerUpShoe from './assets/power-ups/shoe.png';
-import { toggleMute, getMuted, getMusicVolume, setMusicVolume } from './music';
-import { getGameVolume, setGameVolume } from './game/systems/sounds';
-import { useMenuNav } from './useMenuNav';
+import { render } from 'solid-js/web'
+import { createSignal, onMount, onCleanup, Show, For } from 'solid-js'
+import earcut from 'earcut'
+import { Game } from './game/Game'
+import levels from './levels'
+import { TitleScreen } from './TitleScreen'
+import { LevelSelectScreen } from './LevelSelectScreen'
+import { GameModeSelectScreen } from './GameModeSelectScreen'
+import { CharacterSelectScreen } from './CharacterSelectScreen'
+import { GameTypeSelectScreen } from './GameTypeSelectScreen'
+import { LobbyScreen } from './LobbyScreen'
+import { RoomBrowserScreen } from './RoomBrowserScreen'
+import { LocalRoleSelectScreen } from './LocalRoleSelectScreen'
+import { LocalResultsScreen } from './LocalResultsScreen'
+import { mp, lobby, MAX_PLAYERS } from './multiplayer'
+import type { PlayerState, ScoopEvent } from './multiplayer'
+import { getGameModeConfig } from './game/modes'
+import type { GameType, TeamColor } from './game/modes'
+import type { ItemCollectEvent } from './multiplayer'
+import type { CharacterSelection } from './game/characters'
+import type { PowerUpId } from './game/systems/powerups'
+import { PASSENGER_PICKUP_INITIAL_TIME } from './game/constants/passenger-pickup'
+import powerUpFika from './assets/power-ups/fika.png'
+import powerUpFire from './assets/power-ups/fire.png'
+import powerUpIce from './assets/power-ups/ice.png'
+import powerUpMallet from './assets/power-ups/mallet.png'
+import powerUpShoe from './assets/power-ups/shoe.png'
+import { toggleMute, getMuted, getMusicVolume, setMusicVolume } from './music'
+import { getGameVolume, setGameVolume } from './game/systems/sounds'
+import { useMenuNav } from './useMenuNav'
 
 // Babylon.js needs earcut on window for CreatePolygon
-(window as any).earcut = earcut;
+;(window as any).earcut = earcut
 
 /** Player colour names & CSS colours (1-indexed) */
 const PLAYER_COLOR_INFO = [
-  { name: 'Yellow', css: '#f0c820' },
-  { name: 'Red', css: '#d94030' },
-  { name: 'Blue', css: '#3470d8' },
-  { name: 'Purple', css: '#9940cc' },
-];
+	{ name: 'Yellow', css: '#f0c820' },
+	{ name: 'Red', css: '#d94030' },
+	{ name: 'Blue', css: '#3470d8' },
+	{ name: 'Purple', css: '#9940cc' },
+]
 
-type GameMode = 'single' | 'local' | 'host' | 'join' | 'online';
-type PlayerRole = 'bus' | 'runner';
-type Screen = 'title' | 'room-browser' | 'level-select' | 'game-mode-select' | 'character-select' | 'game-type-select' | 'local-game-type-select' | 'local-role-select' | 'lobby' | 'loading' | 'playing';
+type GameMode = 'single' | 'local' | 'host' | 'join' | 'online'
+type PlayerRole = 'bus' | 'runner'
+type Screen =
+	| 'title'
+	| 'room-browser'
+	| 'level-select'
+	| 'game-mode-select'
+	| 'character-select'
+	| 'game-type-select'
+	| 'local-game-type-select'
+	| 'local-role-select'
+	| 'lobby'
+	| 'loading'
+	| 'playing'
 
 const POWER_UP_IMAGE_BY_ID: Record<PowerUpId, string> = {
-  fika: powerUpFika,
-  fire: powerUpFire,
-  ice: powerUpIce,
-  mallet: powerUpMallet,
-  shoe: powerUpShoe,
-};
+	fika: powerUpFika,
+	fire: powerUpFire,
+	ice: powerUpIce,
+	mallet: powerUpMallet,
+	shoe: powerUpShoe,
+}
 
 /** Format seconds as M:SS */
 function fmtTime(s: number): string {
-  const mins = Math.floor(s / 60);
-  const secs = Math.floor(s % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+	const mins = Math.floor(s / 60)
+	const secs = Math.floor(s % 60)
+	return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
 /** Format position as ordinal: 1st, 2nd, 3rd, 4th... */
 function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+	const s = ['th', 'st', 'nd', 'rd']
+	const v = n % 100
+	return n + (s[(v - 20) % 10] || s[v] || s[0])
 }
 
 function getRandomCourseId(): string {
-  const courseIds = Object.keys(levels).filter((id) => !levels[id]?.hide);
-  if (courseIds.length === 0) return 'haga';
-  return courseIds[Math.floor(Math.random() * courseIds.length)];
+	const courseIds = Object.keys(levels).filter((id) => !levels[id]?.hide)
+	if (courseIds.length === 0) return 'haga'
+	return courseIds[Math.floor(Math.random() * courseIds.length)]
 }
 
 /** Pause menu overlay — extracted so useMenuNav mounts/unmounts with Show */
 function PauseOverlay(props: {
-  isMultiplayer: boolean;
-  musicMuted: boolean;
-  onResume: () => void;
-  onToggleMute: () => void;
-  onExit: () => void;
+	isMultiplayer: boolean
+	musicMuted: boolean
+	onResume: () => void
+	onToggleMute: () => void
+	onExit: () => void
 }) {
-  const { isFocused } = useMenuNav(() => 3, { onBack: props.onResume });
-  const [musicVol, setMusicVol] = createSignal(getMusicVolume());
-  const [gameVol, setGameVol] = createSignal(getGameVolume());
+	const { isFocused } = useMenuNav(() => 3, { onBack: props.onResume })
+	const [musicVol, setMusicVol] = createSignal(getMusicVolume())
+	const [gameVol, setGameVol] = createSignal(getGameVolume())
 
-  function handleMusicVol(e: Event) {
-    const val = parseFloat((e.target as HTMLInputElement).value);
-    setMusicVol(val);
-    setMusicVolume(val);
-  }
+	function handleMusicVol(e: Event) {
+		const val = Number.parseFloat((e.target as HTMLInputElement).value)
+		setMusicVol(val)
+		setMusicVolume(val)
+	}
 
-  function handleGameVol(e: Event) {
-    const val = parseFloat((e.target as HTMLInputElement).value);
-    setGameVol(val);
-    setGameVolume(val);
-  }
+	function handleGameVol(e: Event) {
+		const val = Number.parseFloat((e.target as HTMLInputElement).value)
+		setGameVol(val)
+		setGameVolume(val)
+	}
 
-  return (
-    <div id="pause-overlay">
-      <div class="pause-card">
-        <h1>Paused</h1>
-        <Show when={props.isMultiplayer}>
-          <p class="pause-note">Game continues in multiplayer</p>
-        </Show>
-        <div class="pause-sliders">
-          <label class="volume-slider-row">
-            <span>🎵 Music</span>
-            <input type="range" min="0" max="1" step="0.05" value={musicVol()} onInput={handleMusicVol} />
-          </label>
-          <label class="volume-slider-row">
-            <span>🔊 Game</span>
-            <input type="range" min="0" max="1" step="0.05" value={gameVol()} onInput={handleGameVol} />
-          </label>
-        </div>
-        <div class="pause-buttons">
-          <button class="course-btn" classList={{ 'menu-focused': isFocused(0) }} onClick={props.onResume}>Resume</button>
-          <button class="course-btn mute-pause-btn" classList={{ 'menu-focused': isFocused(1) }} onClick={props.onToggleMute}>
-            {props.musicMuted ? '🔇 Unmute Music' : '🔇 Mute Music'}
-          </button>
-          <button class="course-btn finish-exit-btn" classList={{ 'menu-focused': isFocused(2) }} onClick={props.onExit}>Exit to Menu</button>
-        </div>
-      </div>
-    </div>
-  );
+	return (
+		<div id="pause-overlay">
+			<div class="pause-card">
+				<h1>Paused</h1>
+				<Show when={props.isMultiplayer}>
+					<p class="pause-note">Game continues in multiplayer</p>
+				</Show>
+				<div class="pause-sliders">
+					<label class="volume-slider-row">
+						<span>🎵 Music</span>
+						<input
+							type="range"
+							min="0"
+							max="1"
+							step="0.05"
+							value={musicVol()}
+							onInput={handleMusicVol}
+						/>
+					</label>
+					<label class="volume-slider-row">
+						<span>🔊 Game</span>
+						<input
+							type="range"
+							min="0"
+							max="1"
+							step="0.05"
+							value={gameVol()}
+							onInput={handleGameVol}
+						/>
+					</label>
+				</div>
+				<div class="pause-buttons">
+					<button
+						class="course-btn"
+						classList={{ 'menu-focused': isFocused(0) }}
+						onClick={props.onResume}
+					>
+						Resume
+					</button>
+					<button
+						class="course-btn mute-pause-btn"
+						classList={{ 'menu-focused': isFocused(1) }}
+						onClick={props.onToggleMute}
+					>
+						{props.musicMuted ? '🔇 Unmute Music' : '🔇 Mute Music'}
+					</button>
+					<button
+						class="course-btn finish-exit-btn"
+						classList={{ 'menu-focused': isFocused(2) }}
+						onClick={props.onExit}
+					>
+						Exit to Menu
+					</button>
+				</div>
+			</div>
+		</div>
+	)
 }
 
 /** Bus Mode game-over overlay with keyboard/gamepad nav */
-function BusModeFinishOverlay(props: { deliveries: number; onReplay: () => void; onExit: () => void }) {
-  const { isFocused } = useMenuNav(() => 2);
-  return (
-    <div id="finish-overlay">
-      <div class="finish-card">
-        <h1>⏰ Time's Up!</h1>
-        <p class="finish-time" style={{ 'font-size': 'clamp(20px, 3vw, 32px)', 'margin-top': '16px' }}>
-          Passengers delivered: <strong>{props.deliveries}</strong>
-        </p>
-        <div class="finish-buttons">
-          <button class="course-btn" classList={{ 'menu-focused': isFocused(0) }} onClick={props.onReplay}>Play Again</button>
-          <button class="course-btn finish-exit-btn" classList={{ 'menu-focused': isFocused(1) }} onClick={props.onExit}>Exit to Menu</button>
-        </div>
-      </div>
-    </div>
-  );
+function BusModeFinishOverlay(props: {
+	deliveries: number
+	onReplay: () => void
+	onExit: () => void
+}) {
+	const { isFocused } = useMenuNav(() => 2)
+	return (
+		<div id="finish-overlay">
+			<div class="finish-card">
+				<h1>⏰ Time's Up!</h1>
+				<p
+					class="finish-time"
+					style={{
+						'font-size': 'clamp(20px, 3vw, 32px)',
+						'margin-top': '16px',
+					}}
+				>
+					Passengers delivered: <strong>{props.deliveries}</strong>
+				</p>
+				<div class="finish-buttons">
+					<button
+						class="course-btn"
+						classList={{ 'menu-focused': isFocused(0) }}
+						onClick={props.onReplay}
+					>
+						Play Again
+					</button>
+					<button
+						class="course-btn finish-exit-btn"
+						classList={{ 'menu-focused': isFocused(1) }}
+						onClick={props.onExit}
+					>
+						Exit to Menu
+					</button>
+				</div>
+			</div>
+		</div>
+	)
 }
 
 /** Race finish overlay with keyboard/gamepad nav */
 function FinishOverlay(props: {
-  finishTime: number;
-  playerRole: PlayerRole;
-  scored: number;
-  isMultiplayer: boolean;
-  remoteStates: Map<string, PlayerState>;
-  localPlayerIndex: number;
-  onKeepDriving: () => void;
-  onReplay: () => void;
-  onExit: () => void;
+	finishTime: number
+	playerRole: PlayerRole
+	scored: number
+	isMultiplayer: boolean
+	remoteStates: Map<string, PlayerState>
+	localPlayerIndex: number
+	onKeepDriving: () => void
+	onReplay: () => void
+	onExit: () => void
 }) {
-  const { isFocused } = useMenuNav(() => 3);
-  return (
-    <div id="finish-overlay">
-      <div class="finish-card">
-        <h1>🏁 Finished!</h1>
-        <p class="finish-time">Finished in {fmtTime(props.finishTime)}</p>
-        <Show when={props.playerRole === 'bus'}>
-          <p class="finish-scooped">Runners scooped: {props.scored}</p>
-        </Show>
-        <Show when={props.isMultiplayer && props.remoteStates.size > 0}>
-          {(() => {
-            const states = props.remoteStates;
-            const players: { name: string; css: string; time: number; finished: boolean; index: number }[] = [];
-            const localIdx = props.localPlayerIndex;
-            const localInfo = PLAYER_COLOR_INFO[localIdx - 1] ?? PLAYER_COLOR_INFO[0];
-            players.push({ name: `${localInfo.name} Bus (You)`, css: localInfo.css, time: props.finishTime, finished: true, index: localIdx });
-            for (const [, rs] of states) {
-              const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
-              players.push({ name: `${info.name} Bus`, css: info.css, time: rs.raceTime, finished: rs.raceState === 'finished', index: rs.playerIndex });
-            }
-            players.sort((a, b) => {
-              if (a.finished && !b.finished) return -1;
-              if (!a.finished && b.finished) return 1;
-              if (a.finished && b.finished) return a.time - b.time;
-              return 0;
-            });
-            return (
-              <div style={{ 'margin-top': '12px' }}>
-                <For each={players}>{(p, i) => (
-                  <p style={{ color: p.css, margin: '4px 0', 'font-size': 'clamp(14px, 2vw, 20px)' }}>
-                    {ordinal(i() + 1)} — {p.name}{p.finished ? ` — ${fmtTime(p.time)}` : ' — still racing...'}
-                  </p>
-                )}</For>
-              </div>
-            );
-          })()}
-        </Show>
-        <div class="finish-buttons">
-          <button class="course-btn" classList={{ 'menu-focused': isFocused(0) }} onClick={props.onKeepDriving}>Keep Driving</button>
-          <button class="course-btn" classList={{ 'menu-focused': isFocused(1) }} onClick={props.onReplay}>Replay</button>
-          <button class="course-btn finish-exit-btn" classList={{ 'menu-focused': isFocused(2) }} onClick={props.onExit}>Exit to Menu</button>
-        </div>
-      </div>
-    </div>
-  );
+	const { isFocused } = useMenuNav(() => 3)
+	return (
+		<div id="finish-overlay">
+			<div class="finish-card">
+				<h1>🏁 Finished!</h1>
+				<p class="finish-time">Finished in {fmtTime(props.finishTime)}</p>
+				<Show when={props.playerRole === 'bus'}>
+					<p class="finish-scooped">Runners scooped: {props.scored}</p>
+				</Show>
+				<Show when={props.isMultiplayer && props.remoteStates.size > 0}>
+					{(() => {
+						const states = props.remoteStates
+						const players: {
+							name: string
+							css: string
+							time: number
+							finished: boolean
+							index: number
+						}[] = []
+						const localIdx = props.localPlayerIndex
+						const localInfo =
+							PLAYER_COLOR_INFO[localIdx - 1] ?? PLAYER_COLOR_INFO[0]
+						players.push({
+							name: `${localInfo.name} Bus (You)`,
+							css: localInfo.css,
+							time: props.finishTime,
+							finished: true,
+							index: localIdx,
+						})
+						for (const [, rs] of states) {
+							const info =
+								PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ??
+								PLAYER_COLOR_INFO[1]
+							players.push({
+								name: `${info.name} Bus`,
+								css: info.css,
+								time: rs.raceTime,
+								finished: rs.raceState === 'finished',
+								index: rs.playerIndex,
+							})
+						}
+						players.sort((a, b) => {
+							if (a.finished && !b.finished) return -1
+							if (!a.finished && b.finished) return 1
+							if (a.finished && b.finished) return a.time - b.time
+							return 0
+						})
+						return (
+							<div style={{ 'margin-top': '12px' }}>
+								<For each={players}>
+									{(p, i) => (
+										<p
+											style={{
+												color: p.css,
+												margin: '4px 0',
+												'font-size': 'clamp(14px, 2vw, 20px)',
+											}}
+										>
+											{ordinal(i() + 1)} — {p.name}
+											{p.finished
+												? ` — ${fmtTime(p.time)}`
+												: ' — still racing...'}
+										</p>
+									)}
+								</For>
+							</div>
+						)
+					})()}
+				</Show>
+				<div class="finish-buttons">
+					<button
+						class="course-btn"
+						classList={{ 'menu-focused': isFocused(0) }}
+						onClick={props.onKeepDriving}
+					>
+						Keep Driving
+					</button>
+					<button
+						class="course-btn"
+						classList={{ 'menu-focused': isFocused(1) }}
+						onClick={props.onReplay}
+					>
+						Replay
+					</button>
+					<button
+						class="course-btn finish-exit-btn"
+						classList={{ 'menu-focused': isFocused(2) }}
+						onClick={props.onExit}
+					>
+						Exit to Menu
+					</button>
+				</div>
+			</div>
+		</div>
+	)
 }
 
 function App() {
-  const [screen, setScreen] = createSignal<Screen>('title');
-  const [error, setError] = createSignal('');
-  const [scored, setScored] = createSignal(0);
-  const [speed, setSpeed] = createSignal(0);
-  const [distance, setDistance] = createSignal(0);
-  const [altitude, setAltitude] = createSignal(0);
-  const [gates, setGates] = createSignal({ passed: 0, total: 0 });
-  const [countdown, setCountdown] = createSignal('');
-  const [raceState, setRaceState] = createSignal<'countdown' | 'racing' | 'finished'>('countdown');
-  const [raceTime, setRaceTime] = createSignal(0);
-  const [courseProgress, setCourseProgress] = createSignal({ covered: 0, total: 5 });
-  const [finishTime, setFinishTime] = createSignal(0);
-  const [racePosition, setRacePosition] = createSignal({ position: 1, total: 1 });
-  const [keepDriving, setKeepDriving] = createSignal(false);
-  const [powerUpDisplay, setPowerUpDisplay] = createSignal<PowerUpId | null>(null);
-  const [powerUpRolling, setPowerUpRolling] = createSignal(false);
-
-  // Bus Mode state
-  const [busModeTimer, setBusModeTimer] = createSignal(0);
-  const [busModeDeliveries, setBusModeDeliveries] = createSignal(0);
-  const [busModeBonus, setBusModeBonus] = createSignal<{ seconds: number; key: number } | null>(null);
-  const [busModeGameOver, setBusModeGameOver] = createSignal(false);
-  let bonusKey = 0;
-  const isBusMode = () => gameType() === 'single-bus-mode';
-
-  // Pause menu
-  const [paused, setPaused] = createSignal(false);
-  const [musicMuted, setMusicMuted] = createSignal(getMuted());
-
-  function handleToggleMuteInPause() {
-    const nowMuted = toggleMute();
-    setMusicMuted(nowMuted);
-  }
-
-  // Multiplayer state
-  const [gameMode, setGameMode] = createSignal<GameMode>('single');
-  const [playerRole, setPlayerRole] = createSignal<PlayerRole>('bus');
-  const [gameType, setGameType] = createSignal<GameType>('single-bus');
-  const [charSelection, setCharSelection] = createSignal<CharacterSelection | null>(null);
-  const [remoteStates, setRemoteStates] = createSignal<Map<string, PlayerState>>(new Map());
-
-  // Local multiplayer state
-  const [localP2Role, setLocalP2Role] = createSignal<PlayerRole>('runner');
-  const [p2FinishTime, setP2FinishTime] = createSignal<number | null>(null);
-  const [p2Scored, setP2Scored] = createSignal(0);
-  const [p2CourseProgress, setP2CourseProgress] = createSignal({ covered: 0, total: 5 });
-  const isLocalMultiplayer = () => gameMode() === 'local';
-
-  const isMultiplayerMode = () => gameMode() === 'host' || gameMode() === 'join';
-
-  let canvasRef!: HTMLCanvasElement;
-  let minimapRef!: HTMLCanvasElement;
-  let p2MinimapRef!: HTMLCanvasElement;
-  let demoGame: Game | null = null;
-  let activeGame: Game | null = null;
-  let currentEventId = '';
-  let currentAltCourse = false;
-  let mpSendInterval: ReturnType<typeof setInterval> | null = null;
-
-  // --- Pause / resume toggle ---
-  function togglePause() {
-    if (screen() !== 'playing') return;
-    if (raceState() === 'finished' && !keepDriving()) return; // finish screen shown
-    const next = !paused();
-    setPaused(next);
-    const isSingle = !isMultiplayerMode();
-    if (activeGame) {
-      // Only freeze simulation in single-player
-      activeGame.setPaused(isSingle && next);
-    }
-  }
-
-  function handleResume() {
-    setPaused(false);
-    if (activeGame) activeGame.setPaused(false);
-  }
-
-  onMount(async () => {
-    // Global key listener for pause
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
-        togglePause();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    onCleanup(() => window.removeEventListener('keydown', onKey));
-
-    // Gamepad poll for pause (Options/Start = button 9)
-    let prevStart = false;
-    function pollPauseGamepad() {
-      if (screen() === 'playing') {
-        const gamepads = navigator.getGamepads();
-        for (let i = 0; i < gamepads.length; i++) {
-          const gp = gamepads[i];
-          if (!gp?.connected) continue;
-          const startPressed = gp.buttons[9]?.pressed ?? false;
-          if (startPressed && !prevStart) togglePause();
-          prevStart = startPressed;
-          break;
-        }
-      }
-      requestAnimationFrame(pollPauseGamepad);
-    }
-    requestAnimationFrame(pollPauseGamepad);
-
-    // Start background demo animation
-    demoGame = new Game(canvasRef, {
-      onScoopRunner: () => {},
-      onSpeedChange: () => {},
-      onDistanceChange: () => {},
-      onAltitudeChange: () => {},
-    });
-    await demoGame.initDemo(getRandomCourseId());
-  });
-
-  function handleSelectMode(mode: GameMode) {
-    setGameMode(mode);
-
-    if (mode === 'online') {
-      // Show room browser for discovering/hosting games
-      setScreen('room-browser');
-    } else if (mode === 'join') {
-      // Go straight to lobby for code entry
-      setScreen('lobby');
-    } else if (mode === 'host') {
-      // Host picks game type first
-      setScreen('game-type-select');
-    } else if (mode === 'local') {
-      // Local multiplayer: pick a level first
-      setScreen('level-select');
-    } else {
-      // Single player picks a level first
-      setScreen('level-select');
-    }
-  }
-
-  function handleGameTypeSelect(gt: GameType) {
-    setGameType(gt);
-    const config = getGameModeConfig(gt);
-    if (config.usesLevelSelect) {
-      // Pick a course, then go to lobby
-      setScreen('level-select');
-    } else {
-      // Arena etc — go straight to lobby (no level select)
-      // Set the default level for this mode
-      currentEventId = config.defaultLevelId ?? 'kristineberg';
-      setScreen('lobby');
-    }
-  }
-
-  function handleLevelSelect(levelId: string, opts?: { altCourse?: boolean }) {
-    currentEventId = levelId;
-    currentAltCourse = opts?.altCourse ?? false;
-    if (gameMode() === 'single') {
-      setScreen('game-mode-select');
-    } else if (gameMode() === 'local') {
-      // Local multiplayer: pick game type filtered to 2 players
-      setScreen('local-game-type-select');
-    } else {
-      // Host → go to lobby
-      setScreen('lobby');
-    }
-  }
-
-  /** Local multiplayer: user picked a game type */
-  function handleLocalGameTypeSelect(gt: GameType) {
-    setGameType(gt);
-    const config = getGameModeConfig(gt);
-    if (config.hasTeams || config.hostCanAssignDriver) {
-      // Modes with distinct roles need a role selection step
-      setScreen('local-role-select');
-    } else if (config.minPlayers >= 2 && gt === 'scoop-race') {
-      // Scoop race has 1 bus + 1 runner — pick roles
-      setScreen('local-role-select');
-    } else {
-      // Bus race: both players get the same role (bus) — skip role select
-      setPlayerRole('bus');
-      setLocalP2Role('bus');
-      startGame(currentEventId);
-    }
-  }
-
-  /** Local multiplayer: P1 picked their role */
-  function handleLocalRoleSelect(p1Role: 'bus' | 'runner') {
-    const p2Role: PlayerRole = p1Role === 'bus' ? 'runner' : 'bus';
-    setPlayerRole(p1Role);
-    setLocalP2Role(p2Role);
-    startGame(currentEventId);
-  }
-
-  /** Single-player: user picked a game mode → go to character select */
-  function handleSinglePlayerGameMode(mode: 'bus-race' | 'parkrun' | 'bus-mode') {
-    if (mode === 'bus-race') {
-      setPlayerRole('bus');
-      setGameType('single-bus');
-    } else if (mode === 'parkrun') {
-      setPlayerRole('runner');
-      setGameType('single-runner');
-    } else {
-      setPlayerRole('bus');
-      setGameType('single-bus-mode');
-    }
-    setScreen('character-select');
-  }
-
-  // Guard to prevent double-starting once all players are ready
-  let gameStarting = false;
-
-  /** Check if all multiplayer players have selected; if so, start the game. */
-  function checkAllReady() {
-    if (gameStarting) return;
-    if (!isMultiplayerMode()) return;
-    if (!charSelection()) return; // local player hasn't selected yet
-    const totalPlayers = mp.peerCount + 1;
-    if (mp.charSelections.size >= totalPlayers) {
-      gameStarting = true;
-      startGame(currentEventId);
-    }
-  }
-
-  /** Character select completed (single-player or multiplayer). */
-  function handleCharacterSelect(selection: CharacterSelection) {
-    setCharSelection(selection);
-
-    if (isMultiplayerMode()) {
-      // Store and broadcast selection, then wait for all players
-      mp.setCharSelection(selection);
-      mp.broadcastLobby({ type: 'ready', charSelection: selection });
-      checkAllReady();
-    } else {
-      startGame(currentEventId);
-    }
-  }
-
-  function handleLobbyStart(courseId: string) {
-    // Stop lobby announcing now that game is starting
-    lobby.stopAnnouncing();
-    // For modes without level select (e.g. arena), fall back to the mode's default level
-    let cid = courseId;
-    if (!cid) {
-      const gt = gameMode() === 'join' ? (mp.gameType ?? 'scoop-race') : gameType();
-      const config = getGameModeConfig(gt);
-      cid = config.defaultLevelId ?? 'haga';
-    }
-    currentEventId = cid;
-    // When joining, adopt the host's game type from the multiplayer layer
-    if (gameMode() === 'join' && mp.gameType) {
-      setGameType(mp.gameType);
-    }
-
-    // Determine this player's role so we know what to select
-    const gt = gameMode() === 'join' ? (mp.gameType ?? 'scoop-race') : gameType();
-    const resolvedRole = getGameModeConfig(gt).getRoleForPlayer(
-      mp.localPlayerIndex,
-      mp.peerCount + 1,
-      mp.driverIndex,
-    );
-    setPlayerRole(resolvedRole);
-
-    // For team-race buses, colours are pre-assigned by team — skip select
-    if (gt === 'team-race' && resolvedRole === 'bus') {
-      startGame(cid);
-      return;
-    }
-
-    // Reset ready guard for the new character-select phase
-    gameStarting = false;
-
-    // Listen for character selections from other players
-    mp.onLobbyMessage = (msg, peerId) => {
-      if (msg.type === 'ready' && msg.charSelection) {
-        const idx = mp.getPlayerIndex(peerId);
-        if (idx) {
-          mp.charSelections.set(idx, msg.charSelection);
-        }
-        checkAllReady();
-      }
-    };
-
-    // Otherwise go to character select
-    setScreen('character-select');
-  }
-
-  function handleLobbyCancel() {
-    mp.disconnect();
-    lobby.stopAnnouncing();
-    setScreen('room-browser');
-  }
-
-  /** Room browser: user wants to host a game */
-  function handleRoomBrowserHost() {
-    setGameMode('host');
-    setScreen('game-type-select');
-  }
-
-  /** Room browser: user wants to join a discovered game */
-  function handleRoomBrowserJoin(roomCode: string) {
-    setGameMode('join');
-    // Set the code before screen transition so LobbyScreen onMount can read it
-    (window as any).__pendingJoinCode = roomCode;
-    setScreen('lobby');
-  }
-
-  async function startGame(eventId: string) {
-    currentEventId = eventId;
-
-    setScreen('loading');
-
-    // Tear down any existing game
-    if (demoGame) {
-      demoGame.dispose();
-      demoGame = null;
-    }
-    if (activeGame) {
-      activeGame.dispose();
-      activeGame = null;
-    }
-
-    // Reset UI state
-    setScored(0);
-    setSpeed(0);
-    setDistance(0);
-    setAltitude(0);
-    setGates({ passed: 0, total: 0 });
-    setCountdown('3');
-    setRaceState('countdown');
-    setRaceTime(0);
-    setCourseProgress({ covered: 0, total: 5 });
-    setFinishTime(0);
-    setKeepDriving(false);
-    setRacePosition({ position: 1, total: 1 });
-    setRemoteStates(new Map());
-    setPowerUpDisplay(null);
-    setPowerUpRolling(false);
-    setBusModeTimer(gameType() === 'single-bus-mode' ? PASSENGER_PICKUP_INITIAL_TIME : 0);
-    setBusModeDeliveries(0);
-    setBusModeBonus(null);
-    setBusModeGameOver(false);
-    // Reset local multiplayer P2 state
-    setP2FinishTime(null);
-    setP2Scored(0);
-
-    // Validate
-    if (!levels[eventId]) {
-      const available = Object.keys(levels);
-      setError(
-        `Unknown level "${eventId}". Available: ${available.length ? available.join(', ') : '(none — run pnpm game:level <id>)'}`,
-      );
-      setScreen('title');
-      return;
-    }
-
-    const resolvedRole: PlayerRole = isMultiplayerMode()
-      ? getGameModeConfig(gameType()).getRoleForPlayer(
-          mp.localPlayerIndex,
-          mp.peerCount + 1,
-          mp.driverIndex,
-        )
-      : playerRole();
-    setPlayerRole(resolvedRole);
-
-    const game = new Game(canvasRef, {
-      onScoopRunner: () => setScored((s) => s + 1),
-      onSpeedChange: (s: number) => setSpeed(s),
-      onDistanceChange: (d: number) => setDistance(d),
-      onAltitudeChange: (a: number) => setAltitude(a),
-      onGatePass: (passed: number, total: number) => setGates({ passed, total }),
-      onCountdown: (text: string) => setCountdown(text),
-      onRaceStateChange: (state) => setRaceState(state),
-      onRaceTimer: (seconds: number) => setRaceTime(seconds),
-      onCourseProgress: (covered: number, total: number) => setCourseProgress({ covered, total }),
-      onFinish: (time: number) => setFinishTime(time),
-      onPositionChange: (pos: number, total: number) => setRacePosition({ position: pos, total }),
-      onPowerUpDisplayChange: (powerUp, rolling) => {
-        setPowerUpDisplay(powerUp);
-        setPowerUpRolling(rolling);
-      },
-      onBusModeTimer: (remaining) => setBusModeTimer(remaining),
-      onBusModeDelivery: (count) => setBusModeDeliveries(count),
-      onBusModeBonus: (seconds) => {
-        bonusKey++;
-        setBusModeBonus({ seconds, key: bonusKey });
-        setTimeout(() => setBusModeBonus(null), 1500);
-      },
-      onBusModeGameOver: (deliveries) => {
-        setBusModeGameOver(true);
-        setBusModeDeliveries(deliveries);
-      },
-      onP2Finish: (time: number) => setP2FinishTime(time),
-      onP2ScoopRunner: () => setP2Scored((s) => s + 1),
-      onP2CourseProgress: (covered: number, total: number) => setP2CourseProgress({ covered, total }),
-    }, minimapRef, {
-      localPlayerRole: resolvedRole,
-      gameType: gameType(),
-      items: getGameModeConfig(gameType()).items,
-      charSelection: charSelection(),
-      localMultiplayer: isLocalMultiplayer(),
-      p2Role: isLocalMultiplayer() ? localP2Role() : undefined,
-      p2MinimapCanvas: isLocalMultiplayer() ? p2MinimapRef : undefined,
-    });
-
-    activeGame = game;
-    game.useAltCourse = currentAltCourse;
-
-    // --- Multiplayer setup ---
-    const isMultiplayer = isMultiplayerMode();
-    if (isMultiplayer && mp.roomCode) {
-      // Set local player index (host=1, joiners get assigned by host)
-      game.setLocalPlayerIndex(mp.localPlayerIndex);
-      // Don't auto-start countdown — wait for host to sync all players
-      game.setWaitForCountdown();
-    }
-
-    // --- Register lobby message handler BEFORE init so we never miss early messages ---
-    // Messages received during init are buffered via readyPeers / countdownRequested
-    // and acted on AFTER init completes.
-    const readyPeers = new Set<string>();
-    let countdownTriggered = false;
-    let countdownRequested = false; // set true if host/joiner signal arrives during init
-    let initComplete = false;
-
-    function triggerSyncedCountdown() {
-      if (countdownTriggered) return; // guard against double-fire
-      if (!initComplete) {
-        // Init hasn't finished yet — defer until after init
-        countdownRequested = true;
-        return;
-      }
-      countdownTriggered = true;
-      game.startCountdown();
-    }
-
-    if (isMultiplayer && mp.roomCode) {
-      const totalPlayers = mp.peerCount + 1;
-
-      if (mp.isHost) {
-        mp.onLobbyMessage = (msg, peerId) => {
-          if (msg.type === 'gameReady') {
-            readyPeers.add(peerId);
-            if (readyPeers.size >= totalPlayers - 1) {
-              mp.broadcastLobby({ type: 'startCountdown' });
-              triggerSyncedCountdown();
-            }
-          }
-        };
-      } else {
-        mp.onLobbyMessage = (msg, _peerId) => {
-          if (msg.type === 'startCountdown') {
-            triggerSyncedCountdown();
-          }
-        };
-      }
-    }
-
-    await game.init(eventId);
-    // NOTE: useAltCourse is set on the game instance before init
-    // so initScene picks it up
-    initComplete = true;
-
-    // If a countdown signal arrived during init, fire it now
-    if (countdownRequested) {
-      triggerSyncedCountdown();
-    }
-
-    if (isMultiplayer && mp.roomCode) {
-      // Build a remote bus for each currently-connected peer
-      for (const peerId of mp.remotePeerIds) {
-        const idx = mp.getPlayerIndex(peerId) || 2;
-        const remoteCharSel = mp.getCharSelection(idx);
-        await game.buildRemoteBusForPeer(peerId, idx, remoteCharSel);
-      }
-
-      // Wait for the scene to actually render a frame so the player
-      // sees the 3D world before the countdown begins.
-      await game.waitUntilSceneRendered();
-
-      // --- Host-synced countdown start ---
-      const totalPlayers = mp.peerCount + 1;
-
-      if (mp.isHost) {
-        // Broadcast our own readiness to peers (so they see us if we're the last one)
-        mp.broadcastLobby({ type: 'gameReady' });
-
-        // Edge case: solo host (no joiners) — start immediately
-        if (totalPlayers <= 1) {
-          triggerSyncedCountdown();
-        }
-
-        // Check if all joiners already reported ready while we were loading
-        if (readyPeers.size >= totalPlayers - 1) {
-          mp.broadcastLobby({ type: 'startCountdown' });
-          triggerSyncedCountdown();
-        }
-      } else {
-        // Tell the host we're ready
-        mp.broadcastLobby({ type: 'gameReady' });
-      }
-
-      // Handle new peers joining mid-game
-      mp.onPeerJoin = async (peerId: string) => {
-        const idx = mp.getPlayerIndex(peerId) || (mp.remotePeerIds.indexOf(peerId) + 2);
-        const remoteCharSel = mp.getCharSelection(idx);
-        await game.buildRemoteBusForPeer(peerId, idx, remoteCharSel);
-      };
-
-      // Handle peers leaving
-      mp.onPeerLeave = (peerId: string) => {
-        game.removeRemoteBus(peerId);
-        setRemoteStates((prev) => {
-          const next = new Map(prev);
-          next.delete(peerId);
-          return next;
-        });
-      };
-
-      // Listen for remote state updates
-      mp.onRemoteState = (state: PlayerState, peerId: string) => {
-        setRemoteStates((prev) => {
-          const next = new Map(prev);
-          next.set(peerId, state);
-          return next;
-        });
-        game.updateRemoteState(state, peerId);
-        // Lazily build bus if not yet created (e.g. late joiner)
-        if (!game['remotePlayers'].has(peerId)) {
-          const idx = state.playerIndex || (mp.getPlayerIndex(peerId) || 2);
-          game.buildRemoteBusForPeer(peerId, idx);
-        }
-      };
-
-      // Listen for remote scoop events
-      mp.onScoopEvent = (evt: ScoopEvent, _peerId: string) => {
-        game.handleRemoteScoop(
-          evt.runnerIndex,
-          evt.playerIndex,
-          evt.victimPlayerIndex,
-          evt.scooperYaw,
-          evt.scooperSpeed,
-        );
-      };
-
-      // Listen for remote item collection events
-      mp.onItemEvent = (evt: ItemCollectEvent, _peerId: string) => {
-        game.handleRemoteItemCollect(evt);
-      };
-
-      // Start sending local state at ~15 Hz + flush scoop events
-      mpSendInterval = setInterval(() => {
-        if (activeGame) {
-          mp.broadcastState(activeGame.getLocalPlayerState());
-          // Flush and broadcast any scoop events from this frame
-          const scoops = activeGame.flushScoopEvents();
-          for (const evt of scoops) {
-            mp.broadcastScoop(evt);
-          }
-          const itemEvents = activeGame.flushItemCollectEvents();
-          for (const evt of itemEvents) {
-            mp.broadcastItemCollect(evt);
-          }
-        }
-      }, 66);
-
-      // Show "Waiting..." only if countdown hasn't already been triggered
-      if (!countdownTriggered) {
-        setCountdown('Waiting...');
-      }
-    }
-
-    setScreen('playing');
-    if (isLocalMultiplayer()) {
-      document.body.classList.add('local-mp');
-    }
-  }
-
-  function handleKeepDriving() {
-    if (activeGame) activeGame.setKeepDriving();
-    setKeepDriving(true);
-  }
-
-  function handleReplay() {
-    setPaused(false);
-    startGame(currentEventId);
-  }
-
-  function handleUsePowerUp() {
-    activeGame?.useHeldPowerUp();
-  }
-
-  function handleExitToMenu() {
-    setPaused(false);
-    document.body.classList.remove('local-mp');
-    // Clean up multiplayer
-    if (mpSendInterval) {
-      clearInterval(mpSendInterval);
-      mpSendInterval = null;
-    }
-    mp.disconnect();
-    setGameMode('single');
-    setPlayerRole('bus');
-    setGameType('single-bus');
-    setCharSelection(null);
-    setRemoteStates(new Map());
-    setBusModeTimer(0);
-    setBusModeDeliveries(0);
-    setBusModeBonus(null);
-    setBusModeGameOver(false);
-
-    if (activeGame) {
-      activeGame.dispose();
-      activeGame = null;
-    }
-    setScreen('title');
-    // Restart demo
-    demoGame = new Game(canvasRef, {
-      onScoopRunner: () => {},
-      onSpeedChange: () => {},
-      onDistanceChange: () => {},
-      onAltitudeChange: () => {},
-    });
-    demoGame.initDemo(getRandomCourseId());
-  }
-
-  return (
-    <>
-      <Show when={screen() === 'loading'}>
-        <div id="loading">Loading course data...</div>
-      </Show>
-      <Show when={error()}>
-        <div id="loading" style={{ color: 'red' }}>{error()}</div>
-      </Show>
-      <Show when={screen() === 'title'}>
-        <TitleScreen onSelectMode={handleSelectMode} />
-      </Show>
-      <Show when={screen() === 'level-select'}>
-        <LevelSelectScreen
-          onSelect={handleLevelSelect}
-          onBack={() => {
-            if (gameMode() === 'host') {
-              setScreen('game-type-select');
-            } else if (gameMode() === 'local') {
-              setScreen('title');
-            } else {
-              setScreen('title');
-            }
-          }}
-        />
-      </Show>
-      <Show when={screen() === 'local-game-type-select'}>
-        <GameTypeSelectScreen
-          maxPlayers={2}
-          heading="Local — Choose Game Type"
-          onSelect={handleLocalGameTypeSelect}
-          onBack={() => setScreen('level-select')}
-        />
-      </Show>
-      <Show when={screen() === 'local-role-select'}>
-        <LocalRoleSelectScreen
-          gameType={gameType()}
-          onSelect={handleLocalRoleSelect}
-          onBack={() => setScreen('local-game-type-select')}
-        />
-      </Show>
-      <Show when={screen() === 'game-mode-select'}>
-        <GameModeSelectScreen
-          courseName={levels[currentEventId]?.name ?? currentEventId}
-          onSelect={handleSinglePlayerGameMode}
-          onBack={() => setScreen('level-select')}
-        />
-      </Show>
-      <Show when={screen() === 'character-select'}>
-        <CharacterSelectScreen
-          role={playerRole()}
-          courseName={levels[currentEventId]?.name ?? currentEventId}
-          onSelect={handleCharacterSelect}
-          onBack={() => {
-            if (isMultiplayerMode()) {
-              setScreen('lobby');
-            } else {
-              setScreen('game-mode-select');
-            }
-          }}
-          waiting={isMultiplayerMode()}
-        />
-      </Show>
-      <Show when={screen() === 'game-type-select'}>
-        <GameTypeSelectScreen
-          onSelect={handleGameTypeSelect}
-          onBack={() => setScreen('room-browser')}
-        />
-      </Show>
-      <Show when={screen() === 'room-browser'}>
-        <RoomBrowserScreen
-          onHost={handleRoomBrowserHost}
-          onJoin={handleRoomBrowserJoin}
-          onBack={() => setScreen('title')}
-        />
-      </Show>
-      <Show when={screen() === 'lobby'}>
-        <LobbyScreen
-          mode={gameMode() as 'host' | 'join'}
-          courseId={gameMode() === 'host' ? currentEventId : undefined}
-          gameType={gameMode() === 'host' ? gameType() : undefined}
-          onStart={handleLobbyStart}
-          onCancel={handleLobbyCancel}
-        />
-      </Show>
-      <Show when={screen() === 'playing'}>
-        {/* Local multiplayer player labels — shown in each half of split screen */}
-        <Show when={isLocalMultiplayer()}>
-          <div class="local-player-label local-player-label-p1">
-            <span style={{ color: '#f0c820' }}>P1</span> 🚌 Yellow Bus
-          </div>
-          <div class="local-player-label local-player-label-p2">
-            <span style={{ color: '#d94030' }}>P2</span> 🚌 Red Bus
-          </div>
-          <div class="local-split-divider" />
-        </Show>
-        {/* Top-left HUD */}
-        <Show when={powerUpDisplay()}>
-          <div
-            id="powerup-hud"
-            classList={{ rolling: powerUpRolling() }}
-            onClick={handleUsePowerUp}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              handleUsePowerUp();
-            }}
-          >
-            <img src={POWER_UP_IMAGE_BY_ID[powerUpDisplay()!]} alt="Power-up" />
-          </div>
-        </Show>
-
-        {/* Bus mode: large timer at top center */}
-        <Show when={isBusMode()}>
-          <div style={{
-            position: 'fixed',
-            top: '16px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            'font-size': 'clamp(36px, 6vw, 64px)',
-            'font-weight': 'bold',
-            'font-family': 'sans-serif',
-            color: busModeTimer() < 15 ? '#ff3333' : '#ffc107',
-            'text-shadow': '0 0 8px rgba(255,200,0,0.6), 0 2px 4px rgba(0,0,0,0.5)',
-            'pointer-events': 'none',
-            'z-index': '20',
-          }}>
-            {fmtTime(busModeTimer())}
-          </div>
-        </Show>
-
-
-
-        {/* Top-right multiplayer HUD — show each opponent's status only when finished */}
-        <Show when={isMultiplayerMode() && remoteStates().size > 0 && raceState() === 'finished' && !keepDriving()}>
-          <div id="mp-hud">
-            <For each={[...remoteStates().entries()]}>{([_peerId, rs]) => {
-              const info = PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ?? PLAYER_COLOR_INFO[1];
-              return (
-                <div class="mp-player-block" style={{ 'border-left': `3px solid ${info.css}` }}>
-                  <p style={{ color: info.css }}>🚌 {info.name} Bus</p>
-                  <Show when={rs.raceState === 'finished'}>
-                    <p style={{ color: '#ffc107' }}>🏁 {fmtTime(rs.raceTime)}</p>
-                  </Show>
-                  <Show when={rs.raceState !== 'finished'}>
-                    <p>Still racing...</p>
-                  </Show>
-                </div>
-              );
-            }}</For>
-          </div>
-        </Show>
-
-        {/* Bottom-right course progress / bus mode delivered count */}
-        <Show when={!isBusMode()}>
-          <div id="course-progress" classList={{ 'course-progress-local': isLocalMultiplayer() }}>
-            {courseProgress().covered.toFixed(1)}/{courseProgress().total}km
-          </div>
-        </Show>
-        <Show when={isBusMode()}>
-          <div id="course-progress">
-            🚌 Delivered: {busModeDeliveries()}
-          </div>
-        </Show>
-
-        {/* P2 course progress (local multiplayer) */}
-        <Show when={isLocalMultiplayer() && !isBusMode()}>
-          <div id="course-progress-p2">
-            {p2CourseProgress().covered.toFixed(1)}/{p2CourseProgress().total}km
-          </div>
-        </Show>
-
-        {/* Bus Mode: +15 seconds bonus popup */}
-        <Show when={busModeBonus()}>
-          <div id="bonus-popup" style={{
-            position: 'fixed',
-            top: '35%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            'font-size': 'clamp(36px, 6vw, 56px)',
-            'font-weight': 'bold',
-            'font-family': 'sans-serif',
-            color: '#4cff4c',
-            'text-shadow': '0 0 6px #fff, 0 0 12px #fff, 0 2px 6px rgba(0,0,0,0.7)',
-            'pointer-events': 'none',
-            animation: 'bonus-float 1.5s ease-out forwards',
-            'z-index': '200',
-          }}>
-            +{busModeBonus()!.seconds}s
-          </div>
-        </Show>
-
-        {/* Centre countdown overlay */}
-        <Show when={countdown() !== ''}>
-          <div id="countdown-overlay">
-            <span class={countdown() === 'Go!' ? 'countdown-go' : 'countdown-num'}>
-              {countdown()}
-            </span>
-          </div>
-        </Show>
-
-        {/* Bus Mode game over screen */}
-        <Show when={busModeGameOver()}>
-          <BusModeFinishOverlay deliveries={busModeDeliveries()} onReplay={handleReplay} onExit={handleExitToMenu} />
-        </Show>
-
-        {/* Local multiplayer results screen */}
-        <Show when={isLocalMultiplayer() && !isBusMode() && raceState() === 'finished' && !keepDriving()}>
-          <LocalResultsScreen
-            p1Role={playerRole()}
-            p2Role={localP2Role()}
-            p1FinishTime={finishTime()}
-            p2FinishTime={p2FinishTime()}
-            p1Scored={scored()}
-            p2Scored={p2Scored()}
-            onReplay={handleReplay}
-            onExit={handleExitToMenu}
-          />
-        </Show>
-
-        {/* Finish screen (non-bus-mode, non-local-multiplayer) */}
-        <Show when={!isLocalMultiplayer() && !isBusMode() && raceState() === 'finished' && !keepDriving()}>
-          <FinishOverlay
-            finishTime={finishTime()}
-            playerRole={playerRole()}
-            scored={scored()}
-            isMultiplayer={isMultiplayerMode()}
-            remoteStates={remoteStates()}
-            localPlayerIndex={(activeGame as any)?.localPlayerIndex ?? 1}
-            onKeepDriving={handleKeepDriving}
-            onReplay={handleReplay}
-            onExit={handleExitToMenu}
-          />
-        </Show>
-
-        {/* Pause menu overlay */}
-        <Show when={paused() && (raceState() !== 'finished' || keepDriving())}>
-          <PauseOverlay
-            isMultiplayer={isMultiplayerMode()}
-            musicMuted={musicMuted()}
-            onResume={handleResume}
-            onToggleMute={handleToggleMuteInPause}
-            onExit={handleExitToMenu}
-          />
-        </Show>
-      </Show>
-      <canvas id="gameCanvas" ref={canvasRef} />
-      <canvas id="minimap" ref={minimapRef} style={{ display: screen() === 'playing' ? 'block' : 'none' }} />
-      <canvas id="minimap-p2" ref={p2MinimapRef} style={{ display: screen() === 'playing' ? 'block' : 'none' }} />
-    </>
-  );
+	const [screen, setScreen] = createSignal<Screen>('title')
+	const [error, setError] = createSignal('')
+	const [scored, setScored] = createSignal(0)
+	const [speed, setSpeed] = createSignal(0)
+	const [distance, setDistance] = createSignal(0)
+	const [altitude, setAltitude] = createSignal(0)
+	const [gates, setGates] = createSignal({ passed: 0, total: 0 })
+	const [countdown, setCountdown] = createSignal('')
+	const [raceState, setRaceState] = createSignal<
+		'countdown' | 'racing' | 'finished'
+	>('countdown')
+	const [raceTime, setRaceTime] = createSignal(0)
+	const [courseProgress, setCourseProgress] = createSignal({
+		covered: 0,
+		total: 5,
+	})
+	const [finishTime, setFinishTime] = createSignal(0)
+	const [racePosition, setRacePosition] = createSignal({
+		position: 1,
+		total: 1,
+	})
+	const [keepDriving, setKeepDriving] = createSignal(false)
+	const [powerUpDisplay, setPowerUpDisplay] = createSignal<PowerUpId | null>(
+		null,
+	)
+	const [powerUpRolling, setPowerUpRolling] = createSignal(false)
+
+	// Bus Mode state
+	const [busModeTimer, setBusModeTimer] = createSignal(0)
+	const [busModeDeliveries, setBusModeDeliveries] = createSignal(0)
+	const [busModeBonus, setBusModeBonus] = createSignal<{
+		seconds: number
+		key: number
+	} | null>(null)
+	const [busModeGameOver, setBusModeGameOver] = createSignal(false)
+	let bonusKey = 0
+	const isBusMode = () => gameType() === 'single-bus-mode'
+
+	// Pause menu
+	const [paused, setPaused] = createSignal(false)
+	const [musicMuted, setMusicMuted] = createSignal(getMuted())
+
+	function handleToggleMuteInPause() {
+		const nowMuted = toggleMute()
+		setMusicMuted(nowMuted)
+	}
+
+	// Multiplayer state
+	const [gameMode, setGameMode] = createSignal<GameMode>('single')
+	const [playerRole, setPlayerRole] = createSignal<PlayerRole>('bus')
+	const [gameType, setGameType] = createSignal<GameType>('single-bus')
+	const [charSelection, setCharSelection] =
+		createSignal<CharacterSelection | null>(null)
+	const [remoteStates, setRemoteStates] = createSignal<
+		Map<string, PlayerState>
+	>(new Map())
+
+	// Local multiplayer state
+	const [localP2Role, setLocalP2Role] = createSignal<PlayerRole>('runner')
+	const [p2FinishTime, setP2FinishTime] = createSignal<number | null>(null)
+	const [p2Scored, setP2Scored] = createSignal(0)
+	const [p2CourseProgress, setP2CourseProgress] = createSignal({
+		covered: 0,
+		total: 5,
+	})
+	const isLocalMultiplayer = () => gameMode() === 'local'
+
+	const isMultiplayerMode = () => gameMode() === 'host' || gameMode() === 'join'
+
+	let canvasRef!: HTMLCanvasElement
+	let minimapRef!: HTMLCanvasElement
+	let p2MinimapRef!: HTMLCanvasElement
+	let demoGame: Game | null = null
+	let activeGame: Game | null = null
+	let currentEventId = ''
+	let currentAltCourse = false
+	let mpSendInterval: ReturnType<typeof setInterval> | null = null
+
+	// --- Pause / resume toggle ---
+	function togglePause() {
+		if (screen() !== 'playing') return
+		if (raceState() === 'finished' && !keepDriving()) return // finish screen shown
+		const next = !paused()
+		setPaused(next)
+		const isSingle = !isMultiplayerMode()
+		if (activeGame) {
+			// Only freeze simulation in single-player
+			activeGame.setPaused(isSingle && next)
+		}
+	}
+
+	function handleResume() {
+		setPaused(false)
+		if (activeGame) activeGame.setPaused(false)
+	}
+
+	onMount(async () => {
+		// Global key listener for pause
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
+				togglePause()
+			}
+		}
+		window.addEventListener('keydown', onKey)
+		onCleanup(() => window.removeEventListener('keydown', onKey))
+
+		// Gamepad poll for pause (Options/Start = button 9)
+		let prevStart = false
+		function pollPauseGamepad() {
+			if (screen() === 'playing') {
+				const gamepads = navigator.getGamepads()
+				for (let i = 0; i < gamepads.length; i++) {
+					const gp = gamepads[i]
+					if (!gp?.connected) continue
+					const startPressed = gp.buttons[9]?.pressed ?? false
+					if (startPressed && !prevStart) togglePause()
+					prevStart = startPressed
+					break
+				}
+			}
+			requestAnimationFrame(pollPauseGamepad)
+		}
+		requestAnimationFrame(pollPauseGamepad)
+
+		// ── ?test= quick-launch: skip menus and start game directly ──
+		const testParam = new URLSearchParams(window.location.search).get('test')
+		if (testParam) {
+			const [mode, eventId, charId] = testParam.split(',')
+			if (mode && eventId) {
+				setGameMode('single')
+				currentEventId = eventId
+				if (mode === 'parkrun') {
+					setPlayerRole('runner')
+					setGameType('single-runner')
+					setCharSelection({ type: 'runner', runnerId: charId || 'josh' })
+				} else {
+					// busrace (default)
+					setPlayerRole('bus')
+					setGameType('single-bus')
+					setCharSelection({ type: 'bus', busColorId: charId || 'yellow' })
+				}
+				startGame(eventId)
+				return
+			}
+		}
+
+		// Start background demo animation
+		demoGame = new Game(canvasRef, {
+			onScoopRunner: () => {},
+			onSpeedChange: () => {},
+			onDistanceChange: () => {},
+			onAltitudeChange: () => {},
+		})
+		await demoGame.initDemo(getRandomCourseId())
+	})
+
+	function handleSelectMode(mode: GameMode) {
+		setGameMode(mode)
+
+		if (mode === 'online') {
+			// Show room browser for discovering/hosting games
+			setScreen('room-browser')
+		} else if (mode === 'join') {
+			// Go straight to lobby for code entry
+			setScreen('lobby')
+		} else if (mode === 'host') {
+			// Host picks game type first
+			setScreen('game-type-select')
+		} else if (mode === 'local') {
+			// Local multiplayer: pick a level first
+			setScreen('level-select')
+		} else {
+			// Single player picks a level first
+			setScreen('level-select')
+		}
+	}
+
+	function handleGameTypeSelect(gt: GameType) {
+		setGameType(gt)
+		const config = getGameModeConfig(gt)
+		if (config.usesLevelSelect) {
+			// Pick a course, then go to lobby
+			setScreen('level-select')
+		} else {
+			// Arena etc — go straight to lobby (no level select)
+			// Set the default level for this mode
+			currentEventId = config.defaultLevelId ?? 'kristineberg'
+			setScreen('lobby')
+		}
+	}
+
+	function handleLevelSelect(levelId: string, opts?: { altCourse?: boolean }) {
+		currentEventId = levelId
+		currentAltCourse = opts?.altCourse ?? false
+		if (gameMode() === 'single') {
+			setScreen('game-mode-select')
+		} else if (gameMode() === 'local') {
+			// Local multiplayer: pick game type filtered to 2 players
+			setScreen('local-game-type-select')
+		} else {
+			// Host → go to lobby
+			setScreen('lobby')
+		}
+	}
+
+	/** Local multiplayer: user picked a game type */
+	function handleLocalGameTypeSelect(gt: GameType) {
+		setGameType(gt)
+		const config = getGameModeConfig(gt)
+		if (config.hasTeams || config.hostCanAssignDriver) {
+			// Modes with distinct roles need a role selection step
+			setScreen('local-role-select')
+		} else if (config.minPlayers >= 2 && gt === 'scoop-race') {
+			// Scoop race has 1 bus + 1 runner — pick roles
+			setScreen('local-role-select')
+		} else {
+			// Bus race: both players get the same role (bus) — skip role select
+			setPlayerRole('bus')
+			setLocalP2Role('bus')
+			startGame(currentEventId)
+		}
+	}
+
+	/** Local multiplayer: P1 picked their role */
+	function handleLocalRoleSelect(p1Role: 'bus' | 'runner') {
+		const p2Role: PlayerRole = p1Role === 'bus' ? 'runner' : 'bus'
+		setPlayerRole(p1Role)
+		setLocalP2Role(p2Role)
+		startGame(currentEventId)
+	}
+
+	/** Single-player: user picked a game mode → go to character select */
+	function handleSinglePlayerGameMode(
+		mode: 'bus-race' | 'parkrun' | 'bus-mode',
+	) {
+		if (mode === 'bus-race') {
+			setPlayerRole('bus')
+			setGameType('single-bus')
+		} else if (mode === 'parkrun') {
+			setPlayerRole('runner')
+			setGameType('single-runner')
+		} else {
+			setPlayerRole('bus')
+			setGameType('single-bus-mode')
+		}
+		setScreen('character-select')
+	}
+
+	// Guard to prevent double-starting once all players are ready
+	let gameStarting = false
+
+	/** Check if all multiplayer players have selected; if so, start the game. */
+	function checkAllReady() {
+		if (gameStarting) return
+		if (!isMultiplayerMode()) return
+		if (!charSelection()) return // local player hasn't selected yet
+		const totalPlayers = mp.peerCount + 1
+		if (mp.charSelections.size >= totalPlayers) {
+			gameStarting = true
+			startGame(currentEventId)
+		}
+	}
+
+	/** Character select completed (single-player or multiplayer). */
+	function handleCharacterSelect(selection: CharacterSelection) {
+		setCharSelection(selection)
+
+		if (isMultiplayerMode()) {
+			// Store and broadcast selection, then wait for all players
+			mp.setCharSelection(selection)
+			mp.broadcastLobby({ type: 'ready', charSelection: selection })
+			checkAllReady()
+		} else {
+			startGame(currentEventId)
+		}
+	}
+
+	function handleLobbyStart(courseId: string) {
+		// Stop lobby announcing now that game is starting
+		lobby.stopAnnouncing()
+		// For modes without level select (e.g. arena), fall back to the mode's default level
+		let cid = courseId
+		if (!cid) {
+			const gt =
+				gameMode() === 'join' ? (mp.gameType ?? 'scoop-race') : gameType()
+			const config = getGameModeConfig(gt)
+			cid = config.defaultLevelId ?? 'haga'
+		}
+		currentEventId = cid
+		// When joining, adopt the host's game type from the multiplayer layer
+		if (gameMode() === 'join' && mp.gameType) {
+			setGameType(mp.gameType)
+		}
+
+		// Determine this player's role so we know what to select
+		const gt =
+			gameMode() === 'join' ? (mp.gameType ?? 'scoop-race') : gameType()
+		const resolvedRole = getGameModeConfig(gt).getRoleForPlayer(
+			mp.localPlayerIndex,
+			mp.peerCount + 1,
+			mp.driverIndex,
+		)
+		setPlayerRole(resolvedRole)
+
+		// For team-race buses, colours are pre-assigned by team — skip select
+		if (gt === 'team-race' && resolvedRole === 'bus') {
+			startGame(cid)
+			return
+		}
+
+		// Reset ready guard for the new character-select phase
+		gameStarting = false
+
+		// Listen for character selections from other players
+		mp.onLobbyMessage = (msg, peerId) => {
+			if (msg.type === 'ready' && msg.charSelection) {
+				const idx = mp.getPlayerIndex(peerId)
+				if (idx) {
+					mp.charSelections.set(idx, msg.charSelection)
+				}
+				checkAllReady()
+			}
+		}
+
+		// Otherwise go to character select
+		setScreen('character-select')
+	}
+
+	function handleLobbyCancel() {
+		mp.disconnect()
+		lobby.stopAnnouncing()
+		setScreen('room-browser')
+	}
+
+	/** Room browser: user wants to host a game */
+	function handleRoomBrowserHost() {
+		setGameMode('host')
+		setScreen('game-type-select')
+	}
+
+	/** Room browser: user wants to join a discovered game */
+	function handleRoomBrowserJoin(roomCode: string) {
+		setGameMode('join')
+		// Set the code before screen transition so LobbyScreen onMount can read it
+		;(window as any).__pendingJoinCode = roomCode
+		setScreen('lobby')
+	}
+
+	async function startGame(eventId: string) {
+		currentEventId = eventId
+
+		setScreen('loading')
+
+		// Tear down any existing game
+		if (demoGame) {
+			demoGame.dispose()
+			demoGame = null
+		}
+		if (activeGame) {
+			activeGame.dispose()
+			activeGame = null
+		}
+
+		// Reset UI state
+		setScored(0)
+		setSpeed(0)
+		setDistance(0)
+		setAltitude(0)
+		setGates({ passed: 0, total: 0 })
+		setCountdown('3')
+		setRaceState('countdown')
+		setRaceTime(0)
+		setCourseProgress({ covered: 0, total: 5 })
+		setFinishTime(0)
+		setKeepDriving(false)
+		setRacePosition({ position: 1, total: 1 })
+		setRemoteStates(new Map())
+		setPowerUpDisplay(null)
+		setPowerUpRolling(false)
+		setBusModeTimer(
+			gameType() === 'single-bus-mode' ? PASSENGER_PICKUP_INITIAL_TIME : 0,
+		)
+		setBusModeDeliveries(0)
+		setBusModeBonus(null)
+		setBusModeGameOver(false)
+		// Reset local multiplayer P2 state
+		setP2FinishTime(null)
+		setP2Scored(0)
+
+		// Validate
+		if (!levels[eventId]) {
+			const available = Object.keys(levels)
+			setError(
+				`Unknown level "${eventId}". Available: ${available.length ? available.join(', ') : '(none — run pnpm game:level <id>)'}`,
+			)
+			setScreen('title')
+			return
+		}
+
+		const resolvedRole: PlayerRole = isMultiplayerMode()
+			? getGameModeConfig(gameType()).getRoleForPlayer(
+					mp.localPlayerIndex,
+					mp.peerCount + 1,
+					mp.driverIndex,
+				)
+			: playerRole()
+		setPlayerRole(resolvedRole)
+
+		const game = new Game(
+			canvasRef,
+			{
+				onScoopRunner: () => setScored((s) => s + 1),
+				onSpeedChange: (s: number) => setSpeed(s),
+				onDistanceChange: (d: number) => setDistance(d),
+				onAltitudeChange: (a: number) => setAltitude(a),
+				onGatePass: (passed: number, total: number) =>
+					setGates({ passed, total }),
+				onCountdown: (text: string) => setCountdown(text),
+				onRaceStateChange: (state) => setRaceState(state),
+				onRaceTimer: (seconds: number) => setRaceTime(seconds),
+				onCourseProgress: (covered: number, total: number) =>
+					setCourseProgress({ covered, total }),
+				onFinish: (time: number) => setFinishTime(time),
+				onPositionChange: (pos: number, total: number) =>
+					setRacePosition({ position: pos, total }),
+				onPowerUpDisplayChange: (powerUp, rolling) => {
+					setPowerUpDisplay(powerUp)
+					setPowerUpRolling(rolling)
+				},
+				onBusModeTimer: (remaining) => setBusModeTimer(remaining),
+				onBusModeDelivery: (count) => setBusModeDeliveries(count),
+				onBusModeBonus: (seconds) => {
+					bonusKey++
+					setBusModeBonus({ seconds, key: bonusKey })
+					setTimeout(() => setBusModeBonus(null), 1500)
+				},
+				onBusModeGameOver: (deliveries) => {
+					setBusModeGameOver(true)
+					setBusModeDeliveries(deliveries)
+				},
+				onP2Finish: (time: number) => setP2FinishTime(time),
+				onP2ScoopRunner: () => setP2Scored((s) => s + 1),
+				onP2CourseProgress: (covered: number, total: number) =>
+					setP2CourseProgress({ covered, total }),
+			},
+			minimapRef,
+			{
+				localPlayerRole: resolvedRole,
+				gameType: gameType(),
+				items: getGameModeConfig(gameType()).items,
+				charSelection: charSelection(),
+				localMultiplayer: isLocalMultiplayer(),
+				p2Role: isLocalMultiplayer() ? localP2Role() : undefined,
+				p2MinimapCanvas: isLocalMultiplayer() ? p2MinimapRef : undefined,
+			},
+		)
+
+		activeGame = game
+		game.useAltCourse = currentAltCourse
+
+		// --- Multiplayer setup ---
+		const isMultiplayer = isMultiplayerMode()
+		if (isMultiplayer && mp.roomCode) {
+			// Set local player index (host=1, joiners get assigned by host)
+			game.setLocalPlayerIndex(mp.localPlayerIndex)
+			// Don't auto-start countdown — wait for host to sync all players
+			game.setWaitForCountdown()
+		}
+
+		// --- Register lobby message handler BEFORE init so we never miss early messages ---
+		// Messages received during init are buffered via readyPeers / countdownRequested
+		// and acted on AFTER init completes.
+		const readyPeers = new Set<string>()
+		let countdownTriggered = false
+		let countdownRequested = false // set true if host/joiner signal arrives during init
+		let initComplete = false
+
+		function triggerSyncedCountdown() {
+			if (countdownTriggered) return // guard against double-fire
+			if (!initComplete) {
+				// Init hasn't finished yet — defer until after init
+				countdownRequested = true
+				return
+			}
+			countdownTriggered = true
+			game.startCountdown()
+		}
+
+		if (isMultiplayer && mp.roomCode) {
+			const totalPlayers = mp.peerCount + 1
+
+			if (mp.isHost) {
+				mp.onLobbyMessage = (msg, peerId) => {
+					if (msg.type === 'gameReady') {
+						readyPeers.add(peerId)
+						if (readyPeers.size >= totalPlayers - 1) {
+							mp.broadcastLobby({ type: 'startCountdown' })
+							triggerSyncedCountdown()
+						}
+					}
+				}
+			} else {
+				mp.onLobbyMessage = (msg, _peerId) => {
+					if (msg.type === 'startCountdown') {
+						triggerSyncedCountdown()
+					}
+				}
+			}
+		}
+
+		await game.init(eventId)
+		// NOTE: useAltCourse is set on the game instance before init
+		// so initScene picks it up
+		initComplete = true
+
+		// If a countdown signal arrived during init, fire it now
+		if (countdownRequested) {
+			triggerSyncedCountdown()
+		}
+
+		if (isMultiplayer && mp.roomCode) {
+			// Build a remote bus for each currently-connected peer
+			for (const peerId of mp.remotePeerIds) {
+				const idx = mp.getPlayerIndex(peerId) || 2
+				const remoteCharSel = mp.getCharSelection(idx)
+				await game.buildRemoteBusForPeer(peerId, idx, remoteCharSel)
+			}
+
+			// Wait for the scene to actually render a frame so the player
+			// sees the 3D world before the countdown begins.
+			await game.waitUntilSceneRendered()
+
+			// --- Host-synced countdown start ---
+			const totalPlayers = mp.peerCount + 1
+
+			if (mp.isHost) {
+				// Broadcast our own readiness to peers (so they see us if we're the last one)
+				mp.broadcastLobby({ type: 'gameReady' })
+
+				// Edge case: solo host (no joiners) — start immediately
+				if (totalPlayers <= 1) {
+					triggerSyncedCountdown()
+				}
+
+				// Check if all joiners already reported ready while we were loading
+				if (readyPeers.size >= totalPlayers - 1) {
+					mp.broadcastLobby({ type: 'startCountdown' })
+					triggerSyncedCountdown()
+				}
+			} else {
+				// Tell the host we're ready
+				mp.broadcastLobby({ type: 'gameReady' })
+			}
+
+			// Handle new peers joining mid-game
+			mp.onPeerJoin = async (peerId: string) => {
+				const idx =
+					mp.getPlayerIndex(peerId) || mp.remotePeerIds.indexOf(peerId) + 2
+				const remoteCharSel = mp.getCharSelection(idx)
+				await game.buildRemoteBusForPeer(peerId, idx, remoteCharSel)
+			}
+
+			// Handle peers leaving
+			mp.onPeerLeave = (peerId: string) => {
+				game.removeRemoteBus(peerId)
+				setRemoteStates((prev) => {
+					const next = new Map(prev)
+					next.delete(peerId)
+					return next
+				})
+			}
+
+			// Listen for remote state updates
+			mp.onRemoteState = (state: PlayerState, peerId: string) => {
+				setRemoteStates((prev) => {
+					const next = new Map(prev)
+					next.set(peerId, state)
+					return next
+				})
+				game.updateRemoteState(state, peerId)
+				// Lazily build bus if not yet created (e.g. late joiner)
+				if (!game['remotePlayers'].has(peerId)) {
+					const idx = state.playerIndex || mp.getPlayerIndex(peerId) || 2
+					game.buildRemoteBusForPeer(peerId, idx)
+				}
+			}
+
+			// Listen for remote scoop events
+			mp.onScoopEvent = (evt: ScoopEvent, _peerId: string) => {
+				game.handleRemoteScoop(
+					evt.runnerIndex,
+					evt.playerIndex,
+					evt.victimPlayerIndex,
+					evt.scooperYaw,
+					evt.scooperSpeed,
+				)
+			}
+
+			// Listen for remote item collection events
+			mp.onItemEvent = (evt: ItemCollectEvent, _peerId: string) => {
+				game.handleRemoteItemCollect(evt)
+			}
+
+			// Start sending local state at ~15 Hz + flush scoop events
+			mpSendInterval = setInterval(() => {
+				if (activeGame) {
+					mp.broadcastState(activeGame.getLocalPlayerState())
+					// Flush and broadcast any scoop events from this frame
+					const scoops = activeGame.flushScoopEvents()
+					for (const evt of scoops) {
+						mp.broadcastScoop(evt)
+					}
+					const itemEvents = activeGame.flushItemCollectEvents()
+					for (const evt of itemEvents) {
+						mp.broadcastItemCollect(evt)
+					}
+				}
+			}, 66)
+
+			// Show "Waiting..." only if countdown hasn't already been triggered
+			if (!countdownTriggered) {
+				setCountdown('Waiting...')
+			}
+		}
+
+		setScreen('playing')
+		if (isLocalMultiplayer()) {
+			document.body.classList.add('local-mp')
+		}
+	}
+
+	function handleKeepDriving() {
+		if (activeGame) activeGame.setKeepDriving()
+		setKeepDriving(true)
+	}
+
+	function handleReplay() {
+		setPaused(false)
+		startGame(currentEventId)
+	}
+
+	function handleUsePowerUp() {
+		activeGame?.useHeldPowerUp()
+	}
+
+	function handleExitToMenu() {
+		setPaused(false)
+		document.body.classList.remove('local-mp')
+		// Clean up multiplayer
+		if (mpSendInterval) {
+			clearInterval(mpSendInterval)
+			mpSendInterval = null
+		}
+		mp.disconnect()
+		setGameMode('single')
+		setPlayerRole('bus')
+		setGameType('single-bus')
+		setCharSelection(null)
+		setRemoteStates(new Map())
+		setBusModeTimer(0)
+		setBusModeDeliveries(0)
+		setBusModeBonus(null)
+		setBusModeGameOver(false)
+
+		if (activeGame) {
+			activeGame.dispose()
+			activeGame = null
+		}
+		setScreen('title')
+		// Restart demo
+		demoGame = new Game(canvasRef, {
+			onScoopRunner: () => {},
+			onSpeedChange: () => {},
+			onDistanceChange: () => {},
+			onAltitudeChange: () => {},
+		})
+		demoGame.initDemo(getRandomCourseId())
+	}
+
+	return (
+		<>
+			<Show when={screen() === 'loading'}>
+				<div id="loading">
+					<div class="loading-text">Loading course data</div>
+					<div class="loading-bar-container">
+						<div class="loading-bar"></div>
+					</div>
+					<div class="loading-hint">Preparing terrain & textures…</div>
+				</div>
+			</Show>
+			<Show when={error()}>
+				<div id="loading" style={{ color: 'red' }}>
+					{error()}
+				</div>
+			</Show>
+			<Show when={screen() === 'title'}>
+				<TitleScreen onSelectMode={handleSelectMode} />
+			</Show>
+			<Show when={screen() === 'level-select'}>
+				<LevelSelectScreen
+					onSelect={handleLevelSelect}
+					onBack={() => {
+						if (gameMode() === 'host') {
+							setScreen('game-type-select')
+						} else if (gameMode() === 'local') {
+							setScreen('title')
+						} else {
+							setScreen('title')
+						}
+					}}
+				/>
+			</Show>
+			<Show when={screen() === 'local-game-type-select'}>
+				<GameTypeSelectScreen
+					maxPlayers={2}
+					heading="Local — Choose Game Type"
+					onSelect={handleLocalGameTypeSelect}
+					onBack={() => setScreen('level-select')}
+				/>
+			</Show>
+			<Show when={screen() === 'local-role-select'}>
+				<LocalRoleSelectScreen
+					gameType={gameType()}
+					onSelect={handleLocalRoleSelect}
+					onBack={() => setScreen('local-game-type-select')}
+				/>
+			</Show>
+			<Show when={screen() === 'game-mode-select'}>
+				<GameModeSelectScreen
+					courseName={levels[currentEventId]?.name ?? currentEventId}
+					onSelect={handleSinglePlayerGameMode}
+					onBack={() => setScreen('level-select')}
+				/>
+			</Show>
+			<Show when={screen() === 'character-select'}>
+				<CharacterSelectScreen
+					role={playerRole()}
+					courseName={levels[currentEventId]?.name ?? currentEventId}
+					onSelect={handleCharacterSelect}
+					onBack={() => {
+						if (isMultiplayerMode()) {
+							setScreen('lobby')
+						} else {
+							setScreen('game-mode-select')
+						}
+					}}
+					waiting={isMultiplayerMode()}
+				/>
+			</Show>
+			<Show when={screen() === 'game-type-select'}>
+				<GameTypeSelectScreen
+					onSelect={handleGameTypeSelect}
+					onBack={() => setScreen('room-browser')}
+				/>
+			</Show>
+			<Show when={screen() === 'room-browser'}>
+				<RoomBrowserScreen
+					onHost={handleRoomBrowserHost}
+					onJoin={handleRoomBrowserJoin}
+					onBack={() => setScreen('title')}
+				/>
+			</Show>
+			<Show when={screen() === 'lobby'}>
+				<LobbyScreen
+					mode={gameMode() as 'host' | 'join'}
+					courseId={gameMode() === 'host' ? currentEventId : undefined}
+					gameType={gameMode() === 'host' ? gameType() : undefined}
+					onStart={handleLobbyStart}
+					onCancel={handleLobbyCancel}
+				/>
+			</Show>
+			<Show when={screen() === 'playing'}>
+				{/* Local multiplayer player labels — shown in each half of split screen */}
+				<Show when={isLocalMultiplayer()}>
+					<div class="local-player-label local-player-label-p1">
+						<span style={{ color: '#f0c820' }}>P1</span> 🚌 Yellow Bus
+					</div>
+					<div class="local-player-label local-player-label-p2">
+						<span style={{ color: '#d94030' }}>P2</span> 🚌 Red Bus
+					</div>
+					<div class="local-split-divider" />
+				</Show>
+				{/* Top-left HUD */}
+				<Show when={powerUpDisplay()}>
+					<div
+						id="powerup-hud"
+						classList={{ rolling: powerUpRolling() }}
+						onClick={handleUsePowerUp}
+						onTouchStart={(e) => {
+							e.preventDefault()
+							handleUsePowerUp()
+						}}
+					>
+						<img src={POWER_UP_IMAGE_BY_ID[powerUpDisplay()!]} alt="Power-up" />
+					</div>
+				</Show>
+
+				{/* Bus mode: large timer at top center */}
+				<Show when={isBusMode()}>
+					<div
+						style={{
+							position: 'fixed',
+							top: '16px',
+							left: '50%',
+							transform: 'translateX(-50%)',
+							'font-size': 'clamp(36px, 6vw, 64px)',
+							'font-weight': 'bold',
+							'font-family': 'sans-serif',
+							color: busModeTimer() < 15 ? '#ff3333' : '#ffc107',
+							'text-shadow':
+								'0 0 8px rgba(255,200,0,0.6), 0 2px 4px rgba(0,0,0,0.5)',
+							'pointer-events': 'none',
+							'z-index': '20',
+						}}
+					>
+						{fmtTime(busModeTimer())}
+					</div>
+				</Show>
+
+				{/* Top-right multiplayer HUD — show each opponent's status only when finished */}
+				<Show
+					when={
+						isMultiplayerMode() &&
+						remoteStates().size > 0 &&
+						raceState() === 'finished' &&
+						!keepDriving()
+					}
+				>
+					<div id="mp-hud">
+						<For each={[...remoteStates().entries()]}>
+							{([_peerId, rs]) => {
+								const info =
+									PLAYER_COLOR_INFO[(rs.playerIndex || 2) - 1] ??
+									PLAYER_COLOR_INFO[1]
+								return (
+									<div
+										class="mp-player-block"
+										style={{ 'border-left': `3px solid ${info.css}` }}
+									>
+										<p style={{ color: info.css }}>🚌 {info.name} Bus</p>
+										<Show when={rs.raceState === 'finished'}>
+											<p style={{ color: '#ffc107' }}>
+												🏁 {fmtTime(rs.raceTime)}
+											</p>
+										</Show>
+										<Show when={rs.raceState !== 'finished'}>
+											<p>Still racing...</p>
+										</Show>
+									</div>
+								)
+							}}
+						</For>
+					</div>
+				</Show>
+
+				{/* Bottom-right course progress / bus mode delivered count */}
+				<Show when={!isBusMode()}>
+					<div
+						id="course-progress"
+						classList={{ 'course-progress-local': isLocalMultiplayer() }}
+					>
+						{courseProgress().covered.toFixed(1)}/{courseProgress().total}km
+					</div>
+				</Show>
+				<Show when={isBusMode()}>
+					<div id="course-progress">🚌 Delivered: {busModeDeliveries()}</div>
+				</Show>
+
+				{/* P2 course progress (local multiplayer) */}
+				<Show when={isLocalMultiplayer() && !isBusMode()}>
+					<div id="course-progress-p2">
+						{p2CourseProgress().covered.toFixed(1)}/{p2CourseProgress().total}km
+					</div>
+				</Show>
+
+				{/* Bus Mode: +15 seconds bonus popup */}
+				<Show when={busModeBonus()}>
+					<div
+						id="bonus-popup"
+						style={{
+							position: 'fixed',
+							top: '35%',
+							left: '50%',
+							transform: 'translateX(-50%)',
+							'font-size': 'clamp(36px, 6vw, 56px)',
+							'font-weight': 'bold',
+							'font-family': 'sans-serif',
+							color: '#4cff4c',
+							'text-shadow':
+								'0 0 6px #fff, 0 0 12px #fff, 0 2px 6px rgba(0,0,0,0.7)',
+							'pointer-events': 'none',
+							animation: 'bonus-float 1.5s ease-out forwards',
+							'z-index': '200',
+						}}
+					>
+						+{busModeBonus()!.seconds}s
+					</div>
+				</Show>
+
+				{/* Centre countdown overlay */}
+				<Show when={countdown() !== ''}>
+					<div id="countdown-overlay">
+						<span
+							class={countdown() === 'Go!' ? 'countdown-go' : 'countdown-num'}
+						>
+							{countdown()}
+						</span>
+					</div>
+				</Show>
+
+				{/* Bus Mode game over screen */}
+				<Show when={busModeGameOver()}>
+					<BusModeFinishOverlay
+						deliveries={busModeDeliveries()}
+						onReplay={handleReplay}
+						onExit={handleExitToMenu}
+					/>
+				</Show>
+
+				{/* Local multiplayer results screen */}
+				<Show
+					when={
+						isLocalMultiplayer() &&
+						!isBusMode() &&
+						raceState() === 'finished' &&
+						!keepDriving()
+					}
+				>
+					<LocalResultsScreen
+						p1Role={playerRole()}
+						p2Role={localP2Role()}
+						p1FinishTime={finishTime()}
+						p2FinishTime={p2FinishTime()}
+						p1Scored={scored()}
+						p2Scored={p2Scored()}
+						onReplay={handleReplay}
+						onExit={handleExitToMenu}
+					/>
+				</Show>
+
+				{/* Finish screen (non-bus-mode, non-local-multiplayer) */}
+				<Show
+					when={
+						!isLocalMultiplayer() &&
+						!isBusMode() &&
+						raceState() === 'finished' &&
+						!keepDriving()
+					}
+				>
+					<FinishOverlay
+						finishTime={finishTime()}
+						playerRole={playerRole()}
+						scored={scored()}
+						isMultiplayer={isMultiplayerMode()}
+						remoteStates={remoteStates()}
+						localPlayerIndex={(activeGame as any)?.localPlayerIndex ?? 1}
+						onKeepDriving={handleKeepDriving}
+						onReplay={handleReplay}
+						onExit={handleExitToMenu}
+					/>
+				</Show>
+
+				{/* Pause menu overlay */}
+				<Show when={paused() && (raceState() !== 'finished' || keepDriving())}>
+					<PauseOverlay
+						isMultiplayer={isMultiplayerMode()}
+						musicMuted={musicMuted()}
+						onResume={handleResume}
+						onToggleMute={handleToggleMuteInPause}
+						onExit={handleExitToMenu}
+					/>
+				</Show>
+			</Show>
+			<canvas id="gameCanvas" ref={canvasRef} />
+			<canvas
+				id="minimap"
+				ref={minimapRef}
+				style={{ display: screen() === 'playing' ? 'block' : 'none' }}
+			/>
+			<canvas
+				id="minimap-p2"
+				ref={p2MinimapRef}
+				style={{ display: screen() === 'playing' ? 'block' : 'none' }}
+			/>
+		</>
+	)
 }
 
 // --- Entry point: detect preview mode from URL params ---
-import { parsePreviewParams, PreviewMode } from './PreviewMode';
+import { parsePreviewParams, PreviewMode } from './PreviewMode'
 
-const previewParams = parsePreviewParams();
+const previewParams = parsePreviewParams()
 if (previewParams) {
-  render(
-    () => <PreviewMode courseId={previewParams.courseId} runners={previewParams.runners} />,
-    document.getElementById('app')!,
-  );
+	render(
+		() => (
+			<PreviewMode
+				courseId={previewParams.courseId}
+				runners={previewParams.runners}
+			/>
+		),
+		document.getElementById('app')!,
+	)
 } else {
-  render(() => <App />, document.getElementById('app')!);
+	render(() => <App />, document.getElementById('app')!)
 }

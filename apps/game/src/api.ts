@@ -1,30 +1,34 @@
-const CONVEX_URL = import.meta.env.VITE_CONVEX_URL as string || '';
+const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string) || ''
 
-import { cacheGet, cacheSet } from './cache';
+import { cacheGet, cacheSet } from './cache'
+
+export type PathType = 'dirt' | 'gravel' | 'pavement' | 'grass'
+
+export type CourseCoordinate = [number, number, PathType?, number?] // [lon, lat, pathType?, width?]
 
 export interface CourseData {
-  eventId: string;
-  coordinates: number[][]; // [[lon, lat, alt], ...]
-  points: { name: string; coordinates: number[] }[];
+	eventId: string
+	coordinates: CourseCoordinate[] // [[lon, lat, pathType?, width?], ...]
+	points: { name: string; coordinates: number[] }[]
 }
 
 /**
  * Fetch course data from the Convex HTTP API, with 1-day cache.
  */
 export async function fetchCourse(eventId: string): Promise<CourseData> {
-  const cached = cacheGet<CourseData>('course', eventId);
-  if (cached) return cached;
+	const cached = cacheGet<CourseData>('course', eventId)
+	if (cached) return cached
 
-  const url = `${CONVEX_URL}/api/course?eventId=${encodeURIComponent(eventId)}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch course "${eventId}": ${res.status}`);
-  }
-  const data: CourseData = await res.json();
+	const url = `${CONVEX_URL}/api/course?eventId=${encodeURIComponent(eventId)}`
+	const res = await fetch(url)
+	if (!res.ok) {
+		throw new Error(`Failed to fetch course "${eventId}": ${res.status}`)
+	}
+	const data: CourseData = await res.json()
 
-  cacheSet('course', eventId, data);
+	cacheSet('course', eventId, data)
 
-  return data;
+	return data
 }
 
 /**
@@ -37,51 +41,52 @@ export async function fetchCourse(eventId: string): Promise<CourseData> {
  * We use a simple equirectangular projection — fine for ≤5 km courses.
  */
 export function gpsToLocal(
-  coords: number[][],
-  elevations?: number[],
+	coords: [number, number, ...unknown[]][],
+	elevations?: number[],
 ): {
-  positions: [number, number][];
-  heights: number[];
-  totalDistance: number;
+	positions: [number, number][]
+	heights: number[]
+	totalDistance: number
 } {
-  if (coords.length === 0) return { positions: [], heights: [], totalDistance: 0 };
+	if (coords.length === 0)
+		return { positions: [], heights: [], totalDistance: 0 }
 
-  const toRad = Math.PI / 180;
-  const R = 6_371_000; // Earth radius in metres
+	const toRad = Math.PI / 180
+	const R = 6_371_000 // Earth radius in metres
 
-  const originLat = coords[0][1];
-  const originLon = coords[0][0];
-  const cosLat = Math.cos(originLat * toRad);
+	const originLat = coords[0][1]
+	const originLon = coords[0][0]
+	const cosLat = Math.cos(originLat * toRad)
 
-  const positions: [number, number][] = [];
-  let totalDistance = 0;
+	const positions: [number, number][] = []
+	let totalDistance = 0
 
-  for (let i = 0; i < coords.length; i++) {
-    const lon = coords[i][0];
-    const lat = coords[i][1];
+	for (let i = 0; i < coords.length; i++) {
+		const lon = coords[i][0]
+		const lat = coords[i][1]
 
-    const x = (lon - originLon) * toRad * R * cosLat;
-    const z = (lat - originLat) * toRad * R;
+		const x = (lon - originLon) * toRad * R * cosLat
+		const z = (lat - originLat) * toRad * R
 
-    positions.push([x, z]);
+		positions.push([x, z])
 
-    if (i > 0) {
-      const dx = positions[i][0] - positions[i - 1][0];
-      const dz = positions[i][1] - positions[i - 1][1];
-      totalDistance += Math.sqrt(dx * dx + dz * dz);
-    }
-  }
+		if (i > 0) {
+			const dx = positions[i][0] - positions[i - 1][0]
+			const dz = positions[i][1] - positions[i - 1][1]
+			totalDistance += Math.sqrt(dx * dx + dz * dz)
+		}
+	}
 
-  // Elevation: make relative to minimum so lowest point = 0
-  let heights: number[];
-  if (elevations && elevations.length === coords.length) {
-    const minElev = Math.min(...elevations);
-    heights = elevations.map((e) => e - minElev);
-  } else {
-    heights = new Array(coords.length).fill(0);
-  }
+	// Elevation: make relative to minimum so lowest point = 0
+	let heights: number[]
+	if (elevations && elevations.length === coords.length) {
+		const minElev = Math.min(...elevations)
+		heights = elevations.map((e) => e - minElev)
+	} else {
+		heights = new Array(coords.length).fill(0)
+	}
 
-  return { positions, heights, totalDistance };
+	return { positions, heights, totalDistance }
 }
 
 /**
@@ -89,14 +94,58 @@ export function gpsToLocal(
  * origin as gpsToLocal would produce for a given set of reference coords.
  */
 export function gpsPointToLocal(
-  lon: number,
-  lat: number,
-  originCoord: number[], // [lon, lat]
+	lon: number,
+	lat: number,
+	originCoord: number[], // [lon, lat]
 ): [number, number] {
-  const toRad = Math.PI / 180;
-  const R = 6_371_000;
-  const cosLat = Math.cos(originCoord[1] * toRad);
-  const x = (lon - originCoord[0]) * toRad * R * cosLat;
-  const z = (lat - originCoord[1]) * toRad * R;
-  return [x, z];
+	const toRad = Math.PI / 180
+	const R = 6_371_000
+	const cosLat = Math.cos(originCoord[1] * toRad)
+	const x = (lon - originCoord[0]) * toRad * R * cosLat
+	const z = (lat - originCoord[1]) * toRad * R
+	return [x, z]
+}
+
+/**
+ * Parse path type segments from course coordinates.
+ * Each coordinate can optionally specify a PathType ('dirt', 'gravel', 'pavement', 'grass').
+ * A type continues until the next PathType definition or the end of the course.
+ * Default is 'dirt'. Returns segments for non-dirt surface types.
+ */
+export function parsePathTypeSegments(coords: CourseCoordinate[]): {
+	startIndex: number
+	endIndex: number
+	type: 'gravel' | 'pavement' | 'grass'
+}[] {
+	const segments: {
+		startIndex: number
+		endIndex: number
+		type: 'gravel' | 'pavement' | 'grass'
+	}[] = []
+	let currentType: PathType = 'dirt'
+	let segStart = 0
+
+	for (let i = 0; i < coords.length; i++) {
+		const pt = coords[i][2]
+		if (typeof pt !== 'string' || pt === currentType) continue
+
+		// Close previous non-dirt segment
+		if (currentType !== 'dirt') {
+			segments.push({ startIndex: segStart, endIndex: i, type: currentType })
+		}
+
+		currentType = pt
+		segStart = i
+	}
+
+	// Close final segment if non-dirt
+	if (currentType !== 'dirt' && coords.length > 0) {
+		segments.push({
+			startIndex: segStart,
+			endIndex: coords.length - 1,
+			type: currentType,
+		})
+	}
+
+	return segments
 }

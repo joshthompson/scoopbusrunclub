@@ -1,15 +1,15 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
-    "types": ["vite/client"],
-    "paths": {
-      "@/*": ["./src/*"],
-      "@style/*": ["./styled-system/*"],
-      "@assets/*": ["./src/assets/*"],
-      "@shared/*": ["../../libs/shared/*"]
-    }
-  },
-  "include": ["src", "misc.d.ts"]
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"jsx": "preserve",
+		"jsxImportSource": "solid-js",
+		"types": ["vite/client"],
+		"paths": {
+			"@/*": ["./src/*"],
+			"@style/*": ["./styled-system/*"],
+			"@assets/*": ["./src/assets/*"],
+			"@shared/*": ["../../libs/shared/*"]
+		}
+	},
+	"include": ["src", "misc.d.ts"]
 }

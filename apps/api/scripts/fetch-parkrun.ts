@@ -20,45 +20,45 @@
  * * Requires: playwright (install chromium with `npx playwright install chromium`)
  */
 import {
-  parseEventHistory,
-  parseEventDate,
-  parseEventVolunteers,
-} from "../lib/parsers";
+	parseEventHistory,
+	parseEventDate,
+	parseEventVolunteers,
+} from '../lib/parsers'
 import {
-  TRACKED_IDS,
-  DELAY_BETWEEN_FETCHES_MS,
-  loadEnv,
-  requireEnvVars,
-  randomDelay,
-  sleep,
-  launchBrowser,
-  fetchPage,
-  getAppDataValue,
-} from "./shared";
-import { PARKRUN_EVENTS } from "../../../libs/shared/parkrun-events";
+	TRACKED_IDS,
+	DELAY_BETWEEN_FETCHES_MS,
+	loadEnv,
+	requireEnvVars,
+	randomDelay,
+	sleep,
+	launchBrowser,
+	fetchPage,
+	getAppDataValue,
+} from './shared'
+import { PARKRUN_EVENTS } from '../../../libs/shared/parkrun-events'
 
 /** Build the appData key for an event's watermark, e.g. "latestHagaEventNumber" */
 function watermarkKey(eventId: string): string {
-  const capitalised = eventId.charAt(0).toUpperCase() + eventId.slice(1);
-  return `latest${capitalised}EventNumber`;
+	const capitalised = eventId.charAt(0).toUpperCase() + eventId.slice(1)
+	return `latest${capitalised}EventNumber`
 }
 
 // --- Env file loading ---
 
-loadEnv(import.meta.url);
+loadEnv(import.meta.url)
 const { convexSiteUrl: CONVEX_SITE_URL, ingestSecret: INGEST_SECRET } =
-  requireEnvVars();
+	requireEnvVars()
 
 // --- CLI flags ---
 
-const isDryRun = process.argv.includes("--dry");
+const isDryRun = process.argv.includes('--dry')
 
 // --- CLI arg parsing ---
 
 interface EventRange {
-  eventId: string;
-  start: number;
-  end: number;
+	eventId: string
+	start: number
+	end: number
 }
 
 /**
@@ -73,143 +73,148 @@ interface EventRange {
  * Returns null when no --event arg is provided (= automatic mode).
  */
 function parseEventArg(): EventRange[] | null {
-  const eventArg = process.argv.find((a) => a.startsWith("--event="));
-  if (!eventArg) return null;
+	const eventArg = process.argv.find((a) => a.startsWith('--event='))
+	if (!eventArg) return null
 
-  const value = eventArg.split("=")[1];
-  const segments = value.split(",");
-  const ranges: EventRange[] = [];
+	const value = eventArg.split('=')[1]
+	const segments = value.split(',')
+	const ranges: EventRange[] = []
 
-  for (const segment of segments) {
-    const colonIdx = segment.indexOf(":");
-    if (colonIdx === -1) {
-      console.error(
-        `Invalid --event segment: "${segment}". Expected format: eventId:number or eventId:start-end`,
-      );
-      process.exit(1);
-    }
+	for (const segment of segments) {
+		const colonIdx = segment.indexOf(':')
+		if (colonIdx === -1) {
+			console.error(
+				`Invalid --event segment: "${segment}". Expected format: eventId:number or eventId:start-end`,
+			)
+			process.exit(1)
+		}
 
-    const eventId = segment.slice(0, colonIdx).trim();
-    const rangeStr = segment.slice(colonIdx + 1).trim();
+		const eventId = segment.slice(0, colonIdx).trim()
+		const rangeStr = segment.slice(colonIdx + 1).trim()
 
-    if (!eventId) {
-      console.error(`Missing event ID in segment: "${segment}"`);
-      process.exit(1);
-    }
+		if (!eventId) {
+			console.error(`Missing event ID in segment: "${segment}"`)
+			process.exit(1)
+		}
 
-    if (rangeStr.includes("-")) {
-      const [startStr, endStr] = rangeStr.split("-");
-      const start = parseInt(startStr, 10);
-      const end = parseInt(endStr, 10);
-      if (isNaN(start) || isNaN(end) || start > end) {
-        console.error(
-          `Invalid range in --event segment: "${segment}". Expected format: eventId:START-END`,
-        );
-        process.exit(1);
-      }
-      ranges.push({ eventId, start, end });
-    } else {
-      const single = parseInt(rangeStr, 10);
-      if (isNaN(single)) {
-        console.error(
-          `Invalid number in --event segment: "${segment}". Expected format: eventId:NUMBER`,
-        );
-        process.exit(1);
-      }
-      ranges.push({ eventId, start: single, end: single });
-    }
-  }
+		if (rangeStr.includes('-')) {
+			const [startStr, endStr] = rangeStr.split('-')
+			const start = Number.parseInt(startStr, 10)
+			const end = Number.parseInt(endStr, 10)
+			if (isNaN(start) || isNaN(end) || start > end) {
+				console.error(
+					`Invalid range in --event segment: "${segment}". Expected format: eventId:START-END`,
+				)
+				process.exit(1)
+			}
+			ranges.push({ eventId, start, end })
+		} else {
+			const single = Number.parseInt(rangeStr, 10)
+			if (isNaN(single)) {
+				console.error(
+					`Invalid number in --event segment: "${segment}". Expected format: eventId:NUMBER`,
+				)
+				process.exit(1)
+			}
+			ranges.push({ eventId, start: single, end: single })
+		}
+	}
 
-  return ranges;
+	return ranges
 }
 
 // --- Types ---
 
 interface VolunteerRecord {
-  date: string;
-  event: string;
-  eventNumber: number;
-  parkrunId: string;
-  roles: string[];
+	date: string
+	event: string
+	eventNumber: number
+	parkrunId: string
+	roles: string[]
 }
 
 // --- Scrape a single parkrun event ---
 
 async function scrapeEvent(
-  config: ParkrunEventConfig,
-  eventsToScrape: number[],
+	config: ParkrunEventConfig,
+	eventsToScrape: number[],
 ): Promise<{ volunteers: VolunteerRecord[]; highestEventNumber: number }> {
-  if (isDryRun) {
-    console.log(`\n  Would scrape ${eventsToScrape.length} event(s) for ${config.eventId}:`);
-    for (const eventNumber of eventsToScrape) {
-      console.log(`    GET ${config.baseUrl}/results/${eventNumber}/`);
-    }
-    return { volunteers: [], highestEventNumber: Math.max(...eventsToScrape, 0) };
-  }
+	if (isDryRun) {
+		console.log(
+			`\n  Would scrape ${eventsToScrape.length} event(s) for ${config.eventId}:`,
+		)
+		for (const eventNumber of eventsToScrape) {
+			console.log(`    GET ${config.baseUrl}/results/${eventNumber}/`)
+		}
+		return {
+			volunteers: [],
+			highestEventNumber: Math.max(...eventsToScrape, 0),
+		}
+	}
 
-  const { browser, context } = await launchBrowser();
-  const volunteers: VolunteerRecord[] = [];
-  let highestEventNumber = 0;
+	const { browser, context } = await launchBrowser()
+	const volunteers: VolunteerRecord[] = []
+	let highestEventNumber = 0
 
-  for (let i = 0; i < eventsToScrape.length; i++) {
-    const eventNumber = eventsToScrape[i];
-    const url = `${config.baseUrl}/results/${eventNumber}/`;
+	for (let i = 0; i < eventsToScrape.length; i++) {
+		const eventNumber = eventsToScrape[i]
+		const url = `${config.baseUrl}/results/${eventNumber}/`
 
-    console.log(
-      `\n  Scraping ${config.eventId} #${eventNumber} (${i + 1}/${eventsToScrape.length})...`,
-    );
-    console.log(`    URL: ${url}`);
+		console.log(
+			`\n  Scraping ${config.eventId} #${eventNumber} (${i + 1}/${eventsToScrape.length})...`,
+		)
+		console.log(`    URL: ${url}`)
 
-    try {
-      const html = await fetchPage(context, url);
+		try {
+			const html = await fetchPage(context, url)
 
-      // Parse date
-      const date = parseEventDate(html);
-      if (!date) {
-        console.warn(
-          `    ⚠ Could not extract date for ${config.eventId} #${eventNumber}, skipping.`,
-        );
-        continue;
-      }
-      console.log(`    Date: ${date}`);
+			// Parse date
+			const date = parseEventDate(html)
+			if (!date) {
+				console.warn(
+					`    ⚠ Could not extract date for ${config.eventId} #${eventNumber}, skipping.`,
+				)
+				continue
+			}
+			console.log(`    Date: ${date}`)
 
-      // Parse volunteers
-      const vols = parseEventVolunteers(html, TRACKED_IDS);
-      console.log(`    Found ${vols.length} tracked volunteer(s).`);
+			// Parse volunteers
+			const vols = parseEventVolunteers(html, TRACKED_IDS)
+			console.log(`    Found ${vols.length} tracked volunteer(s).`)
 
-      for (const vol of vols) {
-        console.log(`      • ${vol.parkrunId}: ${vol.roles.join(", ")}`);
-        volunteers.push({
-          date,
-          event: config.eventId,
-          eventNumber,
-          parkrunId: vol.parkrunId,
-          roles: vol.roles,
-        });
-      }
+			for (const vol of vols) {
+				console.log(`      • ${vol.parkrunId}: ${vol.roles.join(', ')}`)
+				volunteers.push({
+					date,
+					event: config.eventId,
+					eventNumber,
+					parkrunId: vol.parkrunId,
+					roles: vol.roles,
+				})
+			}
 
-      if (eventNumber > highestEventNumber) {
-        highestEventNumber = eventNumber;
-      }
-    } catch (error) {
-      console.error(
-        `    ✗ Error scraping ${config.eventId} #${eventNumber}:`,
-        error,
-      );
-    }
+			if (eventNumber > highestEventNumber) {
+				highestEventNumber = eventNumber
+			}
+		} catch (error) {
+			console.error(
+				`    ✗ Error scraping ${config.eventId} #${eventNumber}:`,
+				error,
+			)
+		}
 
-    // Pause between events
-    if (i < eventsToScrape.length - 1) {
-      const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS);
-      console.log(
-        `    Waiting ${(delay / 1000).toFixed(1)}s before next fetch...`,
-      );
-      await sleep(delay);
-    }
-  }
+		// Pause between events
+		if (i < eventsToScrape.length - 1) {
+			const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS)
+			console.log(
+				`    Waiting ${(delay / 1000).toFixed(1)}s before next fetch...`,
+			)
+			await sleep(delay)
+		}
+	}
 
-  await browser.close();
-  return { volunteers, highestEventNumber };
+	await browser.close()
+	return { volunteers, highestEventNumber }
 }
 
 /**
@@ -218,192 +223,202 @@ async function scrapeEvent(
  * the new event numbers to scrape. Returns empty array if nothing new.
  */
 async function resolveAutoEvents(
-  config: ParkrunEventConfig,
+	config: ParkrunEventConfig,
 ): Promise<number[]> {
-  const key = watermarkKey(config.eventId);
+	const key = watermarkKey(config.eventId)
 
-  if (isDryRun) {
-    console.log(`  ${config.eventId}: would read watermark "${key}" from DB`);
-    console.log(`  ${config.eventId}: would fetch ${config.baseUrl}/results/eventhistory/`);
-    console.log(`  ${config.eventId}: would scrape any events newer than watermark`);
-    return [];
-  }
+	if (isDryRun) {
+		console.log(`  ${config.eventId}: would read watermark "${key}" from DB`)
+		console.log(
+			`  ${config.eventId}: would fetch ${config.baseUrl}/results/eventhistory/`,
+		)
+		console.log(
+			`  ${config.eventId}: would scrape any events newer than watermark`,
+		)
+		return []
+	}
 
-  const latestScrapedStr = await getAppDataValue(
-    CONVEX_SITE_URL,
-    INGEST_SECRET,
-    key,
-  );
-  const latestScraped = latestScrapedStr ? parseInt(latestScrapedStr, 10) : 0;
-  console.log(
-    `  ${config.eventId}: latest scraped event number: ${latestScraped || "(none)"}`,
-  );
+	const latestScrapedStr = await getAppDataValue(
+		CONVEX_SITE_URL,
+		INGEST_SECRET,
+		key,
+	)
+	const latestScraped = latestScrapedStr
+		? Number.parseInt(latestScrapedStr, 10)
+		: 0
+	console.log(
+		`  ${config.eventId}: latest scraped event number: ${latestScraped || '(none)'}`,
+	)
 
-  // Fetch event history page
-  const { browser, context } = await launchBrowser();
-  console.log(`  ${config.eventId}: fetching event history...`);
-  const historyHtml = await fetchPage(
-    context,
-    `${config.baseUrl}/results/eventhistory/`,
-  );
-  await browser.close();
+	// Fetch event history page
+	const { browser, context } = await launchBrowser()
+	console.log(`  ${config.eventId}: fetching event history...`)
+	const historyHtml = await fetchPage(
+		context,
+		`${config.baseUrl}/results/eventhistory/`,
+	)
+	await browser.close()
 
-  const allEvents = parseEventHistory(historyHtml);
-  console.log(
-    `  ${config.eventId}: found ${allEvents.length} total events in history.`,
-  );
+	const allEvents = parseEventHistory(historyHtml)
+	console.log(
+		`  ${config.eventId}: found ${allEvents.length} total events in history.`,
+	)
 
-  if (allEvents.length === 0) return [];
+	if (allEvents.length === 0) return []
 
-  const newEvents = allEvents
-    .filter((e) => e.eventNumber > latestScraped)
-    .sort((a, b) => a.eventNumber - b.eventNumber);
+	const newEvents = allEvents
+		.filter((e) => e.eventNumber > latestScraped)
+		.sort((a, b) => a.eventNumber - b.eventNumber)
 
-  if (newEvents.length === 0) {
-    console.log(
-      `  ${config.eventId}: no new events (latest in DB: ${latestScraped}, latest available: ${allEvents[0].eventNumber}).`,
-    );
-    return [];
-  }
+	if (newEvents.length === 0) {
+		console.log(
+			`  ${config.eventId}: no new events (latest in DB: ${latestScraped}, latest available: ${allEvents[0].eventNumber}).`,
+		)
+		return []
+	}
 
-  const numbers = newEvents.map((e) => e.eventNumber);
-  console.log(`  ${config.eventId}: new events to scrape: ${numbers.join(", ")}`);
-  return numbers;
+	const numbers = newEvents.map((e) => e.eventNumber)
+	console.log(
+		`  ${config.eventId}: new events to scrape: ${numbers.join(', ')}`,
+	)
+	return numbers
 }
 
 // --- Main ---
 
 async function main() {
-  const manualRanges = parseEventArg();
-  const isManualMode = manualRanges !== null;
+	const manualRanges = parseEventArg()
+	const isManualMode = manualRanges !== null
 
-  if (isDryRun) console.log("[DRY RUN] No requests will be made.\n");
+	if (isDryRun) console.log('[DRY RUN] No requests will be made.\n')
 
-  const allVolunteers: VolunteerRecord[] = [];
-  const appDataUpdates: Record<string, string> = {};
+	const allVolunteers: VolunteerRecord[] = []
+	const appDataUpdates: Record<string, string> = {}
 
-  if (isManualMode) {
-    // --- Manual mode ---
-    console.log("Manual mode: scraping specified events.");
+	if (isManualMode) {
+		// --- Manual mode ---
+		console.log('Manual mode: scraping specified events.')
 
-    for (const range of manualRanges) {
-      const config = PARKRUN_EVENTS.find((e) => e.eventId === range.eventId);
-      if (!config) {
-        console.warn(
-          `Unknown event "${range.eventId}". Known events: ${PARKRUN_EVENTS.map((e) => e.eventId).join(", ")}`,
-        );
-        continue;
-      }
+		for (const range of manualRanges) {
+			const config = PARKRUN_EVENTS.find((e) => e.eventId === range.eventId)
+			if (!config) {
+				console.warn(
+					`Unknown event "${range.eventId}". Known events: ${PARKRUN_EVENTS.map((e) => e.eventId).join(', ')}`,
+				)
+				continue
+			}
 
-      const numbers: number[] = [];
-      for (let i = range.start; i <= range.end; i++) numbers.push(i);
+			const numbers: number[] = []
+			for (let i = range.start; i <= range.end; i++) numbers.push(i)
 
-      console.log(
-        `\n${config.eventId}: scraping event(s) ${range.start}${range.start !== range.end ? `-${range.end}` : ""}`,
-      );
+			console.log(
+				`\n${config.eventId}: scraping event(s) ${range.start}${range.start !== range.end ? `-${range.end}` : ''}`,
+			)
 
-      const { volunteers, highestEventNumber } = await scrapeEvent(
-        config,
-        numbers,
-      );
-      allVolunteers.push(...volunteers);
+			const { volunteers, highestEventNumber } = await scrapeEvent(
+				config,
+				numbers,
+			)
+			allVolunteers.push(...volunteers)
 
-      if (highestEventNumber > 0) {
-        appDataUpdates[watermarkKey(config.eventId)] =
-          String(highestEventNumber);
-      }
+			if (highestEventNumber > 0) {
+				appDataUpdates[watermarkKey(config.eventId)] =
+					String(highestEventNumber)
+			}
 
-      // Pause between different parkrun events
-      if (!isDryRun && range !== manualRanges[manualRanges.length - 1]) {
-        const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS);
-        console.log(
-          `\nPausing ${(delay / 1000).toFixed(1)}s before next parkrun event...`,
-        );
-        await sleep(delay);
-      }
-    }
-  } else {
-    // --- Automatic mode ---
-    console.log("Checking all configured parkruns for new events...\n");
+			// Pause between different parkrun events
+			if (!isDryRun && range !== manualRanges[manualRanges.length - 1]) {
+				const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS)
+				console.log(
+					`\nPausing ${(delay / 1000).toFixed(1)}s before next parkrun event...`,
+				)
+				await sleep(delay)
+			}
+		}
+	} else {
+		// --- Automatic mode ---
+		console.log('Checking all configured parkruns for new events...\n')
 
-    for (const config of PARKRUN_EVENTS) {
-      const eventsToScrape = await resolveAutoEvents(config);
+		for (const config of PARKRUN_EVENTS) {
+			const eventsToScrape = await resolveAutoEvents(config)
 
-      if (eventsToScrape.length === 0) continue;
+			if (eventsToScrape.length === 0) continue
 
-      const { volunteers, highestEventNumber } = await scrapeEvent(
-        config,
-        eventsToScrape,
-      );
-      allVolunteers.push(...volunteers);
+			const { volunteers, highestEventNumber } = await scrapeEvent(
+				config,
+				eventsToScrape,
+			)
+			allVolunteers.push(...volunteers)
 
-      if (highestEventNumber > 0) {
-        appDataUpdates[watermarkKey(config.eventId)] =
-          String(highestEventNumber);
-      }
+			if (highestEventNumber > 0) {
+				appDataUpdates[watermarkKey(config.eventId)] =
+					String(highestEventNumber)
+			}
 
-      // Pause between different parkrun events
-      if (!isDryRun && config !== PARKRUN_EVENTS[PARKRUN_EVENTS.length - 1]) {
-        const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS);
-        console.log(
-          `\nPausing ${(delay / 1000).toFixed(1)}s before next parkrun event...`,
-        );
-        await sleep(delay);
-      }
-    }
-  }
+			// Pause between different parkrun events
+			if (!isDryRun && config !== PARKRUN_EVENTS[PARKRUN_EVENTS.length - 1]) {
+				const delay = randomDelay(DELAY_BETWEEN_FETCHES_MS)
+				console.log(
+					`\nPausing ${(delay / 1000).toFixed(1)}s before next parkrun event...`,
+				)
+				await sleep(delay)
+			}
+		}
+	}
 
-  // --- Ingest results ---
+	// --- Ingest results ---
 
-  console.log(`\nTotal volunteer records: ${allVolunteers.length}`);
+	console.log(`\nTotal volunteer records: ${allVolunteers.length}`)
 
-  if (isDryRun) {
-    console.log(`Would POST volunteer data to: ${CONVEX_SITE_URL}/api/ingest-volunteers`);
-    return;
-  }
+	if (isDryRun) {
+		console.log(
+			`Would POST volunteer data to: ${CONVEX_SITE_URL}/api/ingest-volunteers`,
+		)
+		return
+	}
 
-  if (allVolunteers.length === 0 && Object.keys(appDataUpdates).length === 0) {
-    console.log("No volunteer data to ingest.");
-    return;
-  }
+	if (allVolunteers.length === 0 && Object.keys(appDataUpdates).length === 0) {
+		console.log('No volunteer data to ingest.')
+		return
+	}
 
-  const payload: {
-    volunteers: VolunteerRecord[];
-    appData?: Record<string, string>;
-  } = { volunteers: allVolunteers };
+	const payload: {
+		volunteers: VolunteerRecord[]
+		appData?: Record<string, string>
+	} = { volunteers: allVolunteers }
 
-  if (Object.keys(appDataUpdates).length > 0) {
-    payload.appData = appDataUpdates;
-    for (const [key, value] of Object.entries(appDataUpdates)) {
-      console.log(`  Updating ${key} to ${value}`);
-    }
-  }
+	if (Object.keys(appDataUpdates).length > 0) {
+		payload.appData = appDataUpdates
+		for (const [key, value] of Object.entries(appDataUpdates)) {
+			console.log(`  Updating ${key} to ${value}`)
+		}
+	}
 
-  console.log(
-    `\nIngesting ${allVolunteers.length} volunteer record(s) into Convex...`,
-  );
+	console.log(
+		`\nIngesting ${allVolunteers.length} volunteer record(s) into Convex...`,
+	)
 
-  const ingestUrl = `${CONVEX_SITE_URL}/api/ingest-volunteers`;
-  const response = await fetch(ingestUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${INGEST_SECRET}`,
-    },
-    body: JSON.stringify(payload),
-  });
+	const ingestUrl = `${CONVEX_SITE_URL}/api/ingest-volunteers`
+	const response = await fetch(ingestUrl, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${INGEST_SECRET}`,
+		},
+		body: JSON.stringify(payload),
+	})
 
-  if (!response.ok) {
-    const text = await response.text();
-    console.error(`Ingest failed (${response.status}): ${text}`);
-    process.exit(1);
-  }
+	if (!response.ok) {
+		const text = await response.text()
+		console.error(`Ingest failed (${response.status}): ${text}`)
+		process.exit(1)
+	}
 
-  const result = await response.json();
-  console.log("Ingest response:", result);
+	const result = await response.json()
+	console.log('Ingest response:', result)
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+	console.error('Fatal error:', error)
+	process.exit(1)
+})

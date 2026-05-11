@@ -1,98 +1,102 @@
-import { cva } from "@style/css";
-import { JSX } from "solid-js";
+import { cva } from '@style/css'
+import type { JSX } from 'solid-js'
 
 interface AdminSelectProps {
-  label?: string;
-  size?: "small" | "medium";
-  width?: string;
+	label?: string
+	size?: 'small' | 'medium'
+	width?: string
 }
 
-export function AdminSelect(props: JSX.SelectHTMLAttributes<HTMLSelectElement> & AdminSelectProps) {
-  return <label class={styles.label({ size: props.size })}>
-    {props.label}{props.required ? " *" : ""}
-    <select
-      class={styles.select({ size: props.size })}
-      style={{ width: props.width ?? undefined }}
-      {...props}
-    />
-  </label>
+export function AdminSelect(
+	props: JSX.SelectHTMLAttributes<HTMLSelectElement> & AdminSelectProps,
+) {
+	return (
+		<label class={styles.label({ size: props.size })}>
+			{props.label}
+			{props.required ? ' *' : ''}
+			<select
+				class={styles.select({ size: props.size })}
+				style={{ width: props.width ?? undefined }}
+				{...props}
+			/>
+		</label>
+	)
 }
-
 
 const styles = {
-  label: cva({
-      base: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "0.25rem",
-      fontSize: "0.8rem",
-      fontWeight: "bold",
-      textTransform: "uppercase",
-      letterSpacing: "0.05em",
-      position: "relative",
+	label: cva({
+		base: {
+			display: 'flex',
+			flexDirection: 'column',
+			gap: '0.25rem',
+			fontSize: '0.8rem',
+			fontWeight: 'bold',
+			textTransform: 'uppercase',
+			letterSpacing: '0.05em',
+			position: 'relative',
 
-      _after: {
-        content: '"▼"',
-        position: "absolute",
-        width: "10px",
-        height: "10px",
-        color: "var(--color-white)",
-        pointerEvents: "none",
-      },
-    },
-    variants: {
-      size: {
-        small: {
-          _after: {
-            transform: "translateY(50%) scaleX(1.7)",
-            fontSize: "0.4em",
-            right: "4px",
-            bottom: "12px",
-          },
-        },
-        medium: {
-          _after: {
-            transform: "translateY(50%) scaleX(1.7)",
-            fontSize: "0.5em",
-            right: "10px",
-            bottom: "20px",
-          },
-        },
-      },
-    },
-    defaultVariants: {
-      size: "medium",
-    },
-  }),
-  select: cva({
-    base: {
-      appearance: "none",
-      border: "2px solid var(--dirt-darker-brown)",
-      cornerShape: "notch",
-      borderRadius: "4px",
-      background: "var(--overlay-black-30)",
-      color: "var(--color-white)",
-      outline: "none",
-      _focus: { background: "var(--dirt-dark-brown)" },
-    },
-    variants: {
-      size: {
-        small: {
-          fontSize: "0.75rem",
-          padding: "0.2rem 2rem 0.2rem 0.5rem",
-          borderRadius: "2px",
-          borderWidth: "1px",
-        },
-        medium: {
-          fontSize: "0.875rem",
-          padding: "0.5rem 2rem 0.5rem 0.75rem",
-        },
-      },
-    },
-    defaultVariants: {
-      size: "medium",
-    },
-  }),
+			_after: {
+				content: '"▼"',
+				position: 'absolute',
+				width: '10px',
+				height: '10px',
+				color: 'var(--color-white)',
+				pointerEvents: 'none',
+			},
+		},
+		variants: {
+			size: {
+				small: {
+					_after: {
+						transform: 'translateY(50%) scaleX(1.7)',
+						fontSize: '0.4em',
+						right: '4px',
+						bottom: '12px',
+					},
+				},
+				medium: {
+					_after: {
+						transform: 'translateY(50%) scaleX(1.7)',
+						fontSize: '0.5em',
+						right: '10px',
+						bottom: '20px',
+					},
+				},
+			},
+		},
+		defaultVariants: {
+			size: 'medium',
+		},
+	}),
+	select: cva({
+		base: {
+			appearance: 'none',
+			border: '2px solid var(--dirt-darker-brown)',
+			cornerShape: 'notch',
+			borderRadius: '4px',
+			background: 'var(--overlay-black-30)',
+			color: 'var(--color-white)',
+			outline: 'none',
+			_focus: { background: 'var(--dirt-dark-brown)' },
+		},
+		variants: {
+			size: {
+				small: {
+					fontSize: '0.75rem',
+					padding: '0.2rem 2rem 0.2rem 0.5rem',
+					borderRadius: '2px',
+					borderWidth: '1px',
+				},
+				medium: {
+					fontSize: '0.875rem',
+					padding: '0.5rem 2rem 0.5rem 0.75rem',
+				},
+			},
+		},
+		defaultVariants: {
+			size: 'medium',
+		},
+	}),
 }
 
 /**

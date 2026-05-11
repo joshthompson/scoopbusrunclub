@@ -1,92 +1,131 @@
-import { For, createSignal, onMount, onCleanup } from 'solid-js';
-import levels from './levels';
-import logoSrc from './assets/logo.png';
-import { useMenuNav } from './useMenuNav';
-import { MuteButton } from './MuteButton';
+import { For, createSignal, onMount, onCleanup } from 'solid-js'
+import levels from './levels'
+import logoSrc from './assets/logo.png'
+import { useMenuNav } from './useMenuNav'
+import { MuteButton } from './MuteButton'
 
 interface LevelSelectScreenProps {
-  onSelect: (levelId: string, opts?: { altCourse?: boolean }) => void;
-  onBack: () => void;
+	onSelect: (levelId: string, opts?: { altCourse?: boolean }) => void
+	onBack: () => void
 }
 
 export function LevelSelectScreen(props: LevelSelectScreenProps) {
-  const [showHidden, setShowHidden] = createSignal(false);
-  const [shiftHeld, setShiftHeld] = createSignal(false);
+	const [showHidden, setShowHidden] = createSignal(false)
+	const [shiftHeld, setShiftHeld] = createSignal(false)
 
-  const courseIds = () =>
-    Object.keys(levels).filter((id) => showHidden() || !levels[id].hide);
+	const courseIds = () =>
+		Object.keys(levels).filter((id) => showHidden() || !levels[id].hide)
 
-  const { isFocused, setFocusedIndex } = useMenuNav(() => 1 + courseIds().length + 1, { onBack: props.onBack }); // mute + courses + back
-  setFocusedIndex(1);
+	// Detect grid columns from actual CSS grid layout
+	const [gridCols, setGridCols] = createSignal(3)
+	let gridRef: HTMLDivElement | undefined
+	function updateGridCols() {
+		if (!gridRef) return
+		const style = getComputedStyle(gridRef)
+		const cols = style.gridTemplateColumns.split(' ').length
+		if (cols > 0) setGridCols(cols)
+	}
 
-  // Tap space 5 times in a row to reveal hidden courses
-  let spaceCount = 0;
-  let lastSpaceTime = 0;
-  const SECRET_TAPS = 5;
-  const TAP_TIMEOUT = 800; // ms — reset if gap between taps exceeds this
+	const { isFocused, setFocusedIndex } = useMenuNav(
+		() => 1 + courseIds().length + 1,
+		{
+			onBack: props.onBack,
+			gridStart: 1,
+			gridCount: () => courseIds().length,
+			gridCols,
+		},
+	) // mute + courses + back
+	setFocusedIndex(1)
 
-  function onKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Shift') {
-      setShiftHeld(true);
-    }
-    if (e.code !== 'Space') {
-      spaceCount = 0;
-      return;
-    }
-    const now = Date.now();
-    if (now - lastSpaceTime > TAP_TIMEOUT) spaceCount = 0;
-    lastSpaceTime = now;
-    spaceCount++;
-    if (spaceCount >= SECRET_TAPS) {
-      setShowHidden(true);
-      spaceCount = 0;
-    }
-  }
+	// Tap space 5 times in a row to reveal hidden courses
+	let spaceCount = 0
+	let lastSpaceTime = 0
+	const SECRET_TAPS = 5
+	const TAP_TIMEOUT = 800 // ms — reset if gap between taps exceeds this
 
-  function onKeyUp(e: KeyboardEvent) {
-    if (e.key === 'Shift') {
-      setShiftHeld(false);
-    }
-  }
+	function onKeyDown(e: KeyboardEvent) {
+		if (e.key === 'Shift') {
+			setShiftHeld(true)
+		}
+		if (e.code !== 'Space') {
+			spaceCount = 0
+			return
+		}
+		const now = Date.now()
+		if (now - lastSpaceTime > TAP_TIMEOUT) spaceCount = 0
+		lastSpaceTime = now
+		spaceCount++
+		if (spaceCount >= SECRET_TAPS) {
+			setShowHidden(true)
+			spaceCount = 0
+		}
+	}
 
-  onMount(() => {
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-  });
-  onCleanup(() => {
-    window.removeEventListener('keydown', onKeyDown);
-    window.removeEventListener('keyup', onKeyUp);
-  });
+	function onKeyUp(e: KeyboardEvent) {
+		if (e.key === 'Shift') {
+			setShiftHeld(false)
+		}
+	}
 
-  return (
-    <div id="title-screen">
-      <MuteButton focused={isFocused(0)} />
-      <div class="title-content">
-        <img src={logoSrc} alt="Scoop Bus" class="title-logo" />
-        <h2 class="screen-heading">Select Course</h2>
-        <div class="level-grid">
-          <For each={courseIds()}>
-            {(id) => {
-              const level = levels[id];
-              const useAlt = () => shiftHeld() && !!level.altCourseName;
-              const displayName = () => useAlt() ? level.altCourseName! : level.name;
-              return (
-                <button
-                  class="level-tile"
-                  classList={{ 'menu-focused': isFocused(1 + courseIds().indexOf(id)) }}
-                  onClick={() => props.onSelect(id, useAlt() ? { altCourse: true } : undefined)}
-                >
-                  {level.image && <img class="level-tile-img" src={level.image} alt={level.name} />}
-                  <span class="level-tile-name">{displayName()}</span>
-                </button>
-              );
-            }}
-          </For>
-        </div>
-        <button class="course-btn cancel-btn back-btn" classList={{ 'menu-focused': isFocused(1 + courseIds().length) }} onClick={props.onBack}>
-          Back
-        </button>
-      </div>
-    </div>
-  );
+	onMount(() => {
+		window.addEventListener('keydown', onKeyDown)
+		window.addEventListener('keyup', onKeyUp)
+		updateGridCols()
+		window.addEventListener('resize', updateGridCols)
+	})
+	onCleanup(() => {
+		window.removeEventListener('keydown', onKeyDown)
+		window.removeEventListener('keyup', onKeyUp)
+		window.removeEventListener('resize', updateGridCols)
+	})
+
+	return (
+		<div id="title-screen">
+			<MuteButton focused={isFocused(0)} />
+			<div class="title-content">
+				<img src={logoSrc} alt="Scoop Bus" class="title-logo" />
+				<h2 class="screen-heading">Select Course</h2>
+				<div class="level-grid" ref={gridRef}>
+					<For each={courseIds()}>
+						{(id) => {
+							const level = levels[id]
+							const useAlt = () => shiftHeld() && !!level.altCourseName
+							const displayName = () =>
+								useAlt() ? level.altCourseName! : level.name
+							return (
+								<button
+									class="level-tile"
+									classList={{
+										'menu-focused': isFocused(1 + courseIds().indexOf(id)),
+									}}
+									onClick={() =>
+										props.onSelect(
+											id,
+											useAlt() ? { altCourse: true } : undefined,
+										)
+									}
+								>
+									{level.image && (
+										<img
+											class="level-tile-img"
+											src={level.image}
+											alt={level.name}
+										/>
+									)}
+									<span class="level-tile-name">{displayName()}</span>
+								</button>
+							)
+						}}
+					</For>
+				</div>
+				<button
+					class="course-btn cancel-btn back-btn"
+					classList={{ 'menu-focused': isFocused(1 + courseIds().length) }}
+					onClick={props.onBack}
+				>
+					Back
+				</button>
+			</div>
+		</div>
+	)
 }

@@ -10,15 +10,15 @@
  */
 
 import {
-  Scene,
-  ShaderMaterial,
-  Effect,
-  Color3,
-  Vector3,
-} from '@babylonjs/core';
+	type Scene,
+	ShaderMaterial,
+	Effect,
+	Color3,
+	Vector3,
+} from '@babylonjs/core'
 
 /** Global speed multiplier for all water animation (ripples, foam, waves). */
-export const WATER_SPEED = 10.0;
+export const WATER_SPEED = 10.0
 
 // ─── GLSL ──────────────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ void main() {
 
   gl_Position = worldViewProjection * vec4(pos, 1.0);
 }
-`;
+`
 
 const FRAGMENT = /* glsl */ `
 precision highp float;
@@ -164,23 +164,23 @@ void main() {
 
   gl_FragColor = vec4(baseColor, alpha);
 }
-`;
+`
 
 // ─── Public API ────────────────────────────────────────────────────
 
 export interface WaterShaderOptions {
-  isNight?: boolean;
+	isNight?: boolean
 }
 
-const SHADER_NAME = 'scoopWater';
+const SHADER_NAME = 'scoopWater'
 
-let _registered = false;
+let _registered = false
 
 function ensureRegistered() {
-  if (_registered) return;
-  Effect.ShadersStore[SHADER_NAME + 'VertexShader'] = VERTEX;
-  Effect.ShadersStore[SHADER_NAME + 'FragmentShader'] = FRAGMENT;
-  _registered = true;
+	if (_registered) return
+	Effect.ShadersStore[SHADER_NAME + 'VertexShader'] = VERTEX
+	Effect.ShadersStore[SHADER_NAME + 'FragmentShader'] = FRAGMENT
+	_registered = true
 }
 
 /**
@@ -191,67 +191,67 @@ function ensureRegistered() {
  * update is required.
  */
 export function createWaterShaderMaterial(
-  scene: Scene,
-  name: string,
-  opts: WaterShaderOptions = {},
+	scene: Scene,
+	name: string,
+	opts: WaterShaderOptions = {},
 ): ShaderMaterial {
-  ensureRegistered();
+	ensureRegistered()
 
-  const isNight = opts.isNight ?? false;
+	const isNight = opts.isNight ?? false
 
-  const mat = new ShaderMaterial(name, scene, SHADER_NAME, {
-    attributes: ['position', 'normal', 'uv', 'edgeDist'],
-    uniforms: [
-      'worldViewProjection',
-      'world',
-      'time',
-      'cameraPosition',
-      'waterDeepColor',
-      'waterShallowColor',
-      'foamColor',
-      'skyColor',
-      'sunIntensity',
-      'sunDirection',
-    ],
-    needAlphaBlending: true,
-  });
+	const mat = new ShaderMaterial(name, scene, SHADER_NAME, {
+		attributes: ['position', 'normal', 'uv', 'edgeDist'],
+		uniforms: [
+			'worldViewProjection',
+			'world',
+			'time',
+			'cameraPosition',
+			'waterDeepColor',
+			'waterShallowColor',
+			'foamColor',
+			'skyColor',
+			'sunIntensity',
+			'sunDirection',
+		],
+		needAlphaBlending: true,
+	})
 
-  mat.backFaceCulling = true;
-  mat.alphaMode = 2; // ALPHA_COMBINE
+	mat.backFaceCulling = true
+	mat.alphaMode = 2 // ALPHA_COMBINE
 
-  // Colour palette
-  if (isNight) {
-    mat.setColor3('waterDeepColor', new Color3(0.04, 0.12, 0.28));
-    mat.setColor3('waterShallowColor', new Color3(0.08, 0.22, 0.35));
-    mat.setColor3('foamColor', new Color3(0.55, 0.6, 0.65));
-    mat.setColor3('skyColor', new Color3(0.05, 0.08, 0.18));
-    mat.setFloat('sunIntensity', 0.15);
-    mat.setVector3('sunDirection', new Vector3(0.3, -0.8, 0.5));
-  } else {
-    mat.setColor3('waterDeepColor', new Color3(0.06, 0.28, 0.58));
-    mat.setColor3('waterShallowColor', new Color3(0.15, 0.48, 0.72));
-    mat.setColor3('foamColor', new Color3(0.9, 0.95, 1.0));
-    mat.setColor3('skyColor', new Color3(0.55, 0.75, 0.95));
-    mat.setFloat('sunIntensity', 0.8);
-    mat.setVector3('sunDirection', new Vector3(-0.4, -0.7, -0.5));
-  }
+	// Colour palette
+	if (isNight) {
+		mat.setColor3('waterDeepColor', new Color3(0.04, 0.12, 0.28))
+		mat.setColor3('waterShallowColor', new Color3(0.08, 0.22, 0.35))
+		mat.setColor3('foamColor', new Color3(0.55, 0.6, 0.65))
+		mat.setColor3('skyColor', new Color3(0.05, 0.08, 0.18))
+		mat.setFloat('sunIntensity', 0.15)
+		mat.setVector3('sunDirection', new Vector3(0.3, -0.8, 0.5))
+	} else {
+		mat.setColor3('waterDeepColor', new Color3(0.06, 0.28, 0.58))
+		mat.setColor3('waterShallowColor', new Color3(0.15, 0.48, 0.72))
+		mat.setColor3('foamColor', new Color3(0.9, 0.95, 1.0))
+		mat.setColor3('skyColor', new Color3(0.55, 0.75, 0.95))
+		mat.setFloat('sunIntensity', 0.8)
+		mat.setVector3('sunDirection', new Vector3(-0.4, -0.7, -0.5))
+	}
 
-  mat.setFloat('time', 0);
-  mat.setVector3('cameraPosition', Vector3.Zero());
+	mat.setFloat('time', 0)
+	mat.setVector3('cameraPosition', Vector3.Zero())
 
-  // ── Self-animating: push time + camera every bind (like the terrain shader) ──
-  const t0 = performance.now();
-  mat.onBind = () => {
-    const effect = mat.getEffect();
-    if (!effect) return;
-    const t = (performance.now() - t0) / 1000 * WATER_SPEED;
-    effect.setFloat('time', t);
-    const cam = scene.activeCamera;
-    if (cam) {
-      const pos = cam.globalPosition;
-      effect.setFloat3('cameraPosition', pos.x, pos.y, pos.z);
-    }
-  };
+	// ── Self-animating: push time + camera every bind (like the terrain shader) ──
+	const t0 = performance.now()
+	mat.onBind = () => {
+		const effect = mat.getEffect()
+		if (!effect) return
+		const t = ((performance.now() - t0) / 1000) * WATER_SPEED
+		effect.setFloat('time', t)
+		const cam = scene.activeCamera
+		if (cam) {
+			const pos = cam.globalPosition
+			effect.setFloat3('cameraPosition', pos.x, pos.y, pos.z)
+		}
+	}
 
-  return mat;
+	return mat
 }

@@ -1,11 +1,11 @@
 import {
-  Scene,
-  Vector3,
-  MeshBuilder,
-  StandardMaterial,
-  Color3,
-  Mesh,
-} from '@babylonjs/core';
+	type Scene,
+	Vector3,
+	MeshBuilder,
+	StandardMaterial,
+	Color3,
+	type Mesh,
+} from '@babylonjs/core'
 
 /**
  * A white start/finish line drawn across the path.
@@ -17,26 +17,26 @@ import {
  * @param width   Width of the line (should match path width)
  */
 export function createStartLine(
-  scene: Scene,
-  x: number,
-  z: number,
-  yaw: number,
-  width: number,
-  y = 0,
+	scene: Scene,
+	x: number,
+	z: number,
+	yaw: number,
+	width: number,
+	y = 0,
 ): Mesh {
-  const line = MeshBuilder.CreateBox(
-    'startLine',
-    { width, height: 0.05, depth: 0.4 },
-    scene,
-  );
+	const line = MeshBuilder.CreateBox(
+		'startLine',
+		{ width, height: 0.05, depth: 0.4 },
+		scene,
+	)
 
-  const mat = new StandardMaterial('startLineMat', scene);
-  mat.diffuseColor = Color3.White();
-  mat.specularColor = Color3.Black();
-  line.material = mat;
+	const mat = new StandardMaterial('startLineMat', scene)
+	mat.diffuseColor = Color3.White()
+	mat.specularColor = Color3.Black()
+	line.material = mat
 
-  line.position = new Vector3(x, y + 0.03, z);
-  line.rotation.y = -yaw + Math.PI / 2; // perpendicular to path direction
+	line.position = new Vector3(x, y + 0.03, z)
+	line.rotation.y = -yaw + Math.PI / 2 // perpendicular to path direction
 
-  return line;
+	return line
 }

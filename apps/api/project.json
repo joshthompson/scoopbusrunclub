@@ -1,32 +1,32 @@
 {
-  "name": "api",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "projectType": "application",
-  "sourceRoot": "apps/api/convex",
-  "targets": {
-    "dev": {
-      "command": "npx convex dev",
-      "options": {
-        "cwd": "apps/api"
-      }
-    },
-    "deploy": {
-      "command": "npx convex deploy",
-      "options": {
-        "cwd": "apps/api"
-      }
-    },
-    "deployDev": {
-      "command": "npx convex deploy --env-file .env.local",
-      "options": {
-        "cwd": "apps/api"
-      }
-    },
-    "deployProd": {
-      "command": "npx convex deploy --env-file .env.prod",
-      "options": {
-        "cwd": "apps/api"
-      }
-    }
-  }
+	"name": "api",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"projectType": "application",
+	"sourceRoot": "apps/api/convex",
+	"targets": {
+		"dev": {
+			"command": "npx convex dev",
+			"options": {
+				"cwd": "apps/api"
+			}
+		},
+		"deploy": {
+			"command": "npx convex deploy",
+			"options": {
+				"cwd": "apps/api"
+			}
+		},
+		"deployDev": {
+			"command": "npx convex deploy --env-file .env.local",
+			"options": {
+				"cwd": "apps/api"
+			}
+		},
+		"deployProd": {
+			"command": "npx convex deploy --env-file .env.prod",
+			"options": {
+				"cwd": "apps/api"
+			}
+		}
+	}
 }

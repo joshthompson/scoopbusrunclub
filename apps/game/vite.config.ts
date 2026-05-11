@@ -1,31 +1,28 @@
-import { defineConfig } from 'vite';
-import solidPlugin from 'vite-plugin-solid';
-import path from 'path';
+import { defineConfig } from 'vite'
+import solidPlugin from 'vite-plugin-solid'
+import path from 'path'
 
 export default defineConfig({
-  base: '/game/',
-  plugins: [
-    solidPlugin(),
-
-  ],
-  server: {
-    port: 3010,
-  },
-  build: {
-    target: 'esnext',
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html'),
-        editor: path.resolve(__dirname, 'editor.html'),
-        '3d-editor': path.resolve(__dirname, '3d-editor.html'),
-        bus: path.resolve(__dirname, 'bus.html'),
-      },
-    },
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
-      '@shared': path.resolve(__dirname, '../../libs/shared'),
-    },
-  },
-});
+	base: '/game/',
+	plugins: [solidPlugin()],
+	server: {
+		port: 3010,
+	},
+	build: {
+		target: 'esnext',
+		rollupOptions: {
+			input: {
+				main: path.resolve(__dirname, 'index.html'),
+				editor: path.resolve(__dirname, 'editor.html'),
+				'3d-editor': path.resolve(__dirname, '3d-editor.html'),
+				bus: path.resolve(__dirname, 'bus.html'),
+			},
+		},
+	},
+	resolve: {
+		alias: {
+			'@': path.resolve(__dirname, 'src'),
+			'@shared': path.resolve(__dirname, '../../libs/shared'),
+		},
+	},
+})

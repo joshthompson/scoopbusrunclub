@@ -1,62 +1,81 @@
 import {
-  Color3,
-  type Mesh,
-  MeshBuilder,
-  Scene,
-  StandardMaterial,
-  TransformNode,
-  Vector3,
-} from '@babylonjs/core';
-import { gpsPointToLocal } from '../../api';
-import type { LevelData } from '../../levels';
-import { createKmSign } from '../objects/KmSign';
-import { createMarshalModel, poseCheering } from '../objects/MarshalModel';
-import { createCopperTent } from '../objects/CopperTent';
-import { createHagaGate } from '../objects/HagaGate';
-import { createParkrunSign } from '../objects/ParkrunSign';
-import type { Marshal, Runner } from '../types';
-import type { BuildingCollider, BuildingFootprint, ElasticObject, SolidObstacle } from '../types';
+	Color3,
+	type Mesh,
+	MeshBuilder,
+	type Scene,
+	StandardMaterial,
+	TransformNode,
+	Vector3,
+} from '@babylonjs/core'
+import { gpsPointToLocal } from '../../api'
+import type { LevelData } from '../../levels'
+import { createKmSign } from '../objects/KmSign'
+import { createMarshalModel, poseCheering } from '../objects/MarshalModel'
+import { createCopperTent } from '../objects/CopperTent'
+import { createHagaGate } from '../objects/HagaGate'
+import { createParkrunSign } from '../objects/ParkrunSign'
+import type { Marshal, Runner } from '../types'
+import type {
+	BuildingCollider,
+	BuildingFootprint,
+	ElasticObject,
+	SolidObstacle,
+} from '../types'
+import type { PathTypeSegment } from '../PathShader'
 import {
-  PATH_HALF_WIDTH,
-  START_CIRCLE_RADIUS,
-  TREE_COUNT,
-  TREE_HEIGHT_SCALE,
-  TREE_MIN_DIST_FROM_PATH,
-  TREE_SPREAD,
-  GATE_SPACING,
-  GATE_RADIUS,
-} from '../constants';
-import { mulberry32, distToPath, isInWaterZone } from './terrain';
-import type { WaterZone } from '../types';
+	PATH_HALF_WIDTH,
+	START_CIRCLE_RADIUS,
+	TREE_COUNT,
+	TREE_HEIGHT_SCALE,
+	TREE_MIN_DIST_FROM_PATH,
+	TREE_SPREAD,
+	GATE_SPACING,
+	GATE_RADIUS,
+	CONE_SPACING,
+} from '../constants'
+import { mulberry32, distToPath, isInWaterZone } from './terrain'
+import type { WaterZone } from '../types'
 
 // ---------- Result types for methods that create physics objects ----------
 
 export interface PhysicsObjectResult {
-  elasticObjects: ElasticObject[];
-  solidObstacles: SolidObstacle[];
+	elasticObjects: ElasticObject[]
+	solidObstacles: SolidObstacle[]
+}
+
+export interface GrassPathConeResult extends PhysicsObjectResult {
+	coneRoots: TransformNode[]
 }
 
 // ---------- Polygon helpers ----------
 
 /** Ray-casting point-in-polygon test (works for any simple polygon). */
-function isInPolygon(px: number, pz: number, polygon: [number, number][]): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const [xi, zi] = polygon[i];
-    const [xj, zj] = polygon[j];
-    if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
+function isInPolygon(
+	px: number,
+	pz: number,
+	polygon: [number, number][],
+): boolean {
+	let inside = false
+	for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+		const [xi, zi] = polygon[i]
+		const [xj, zj] = polygon[j]
+		if (zi > pz !== zj > pz && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) {
+			inside = !inside
+		}
+	}
+	return inside
 }
 
 /** Check if a point falls inside any of the given polygons. */
-function isInAnyPolygon(px: number, pz: number, polygons: [number, number][][]): boolean {
-  for (const poly of polygons) {
-    if (isInPolygon(px, pz, poly)) return true;
-  }
-  return false;
+function isInAnyPolygon(
+	px: number,
+	pz: number,
+	polygons: [number, number][][],
+): boolean {
+	for (const poly of polygons) {
+		if (isInPolygon(px, pz, poly)) return true
+	}
+	return false
 }
 
 // ---------- Trees ----------
@@ -69,180 +88,218 @@ function isInAnyPolygon(px: number, pz: number, polygons: [number, number][][]):
  * Returns the elastic objects and solid obstacles created.
  */
 export function buildTrees(
-  scene: Scene,
-  pathPositions: [number, number][],
-  getGroundY: (x: number, z: number) => number,
-  waterZones: WaterZone[],
-  startCircleCenter: { x: number; z: number } | null,
-  roads: [number, number][][] = [],
-  trails: [number, number][][] = [],
-  treeCount = TREE_COUNT,
-  fields: [number, number][][] = [],
-  manualTrees: [number, number][] = [],
+	scene: Scene,
+	pathPositions: [number, number][],
+	getGroundY: (x: number, z: number) => number,
+	waterZones: WaterZone[],
+	startCircleCenter: { x: number; z: number } | null,
+	roads: [number, number][][] = [],
+	trails: [number, number][][] = [],
+	treeCount = TREE_COUNT,
+	fields: [number, number][][] = [],
+	manualTrees: [number, number][] = [],
 ): PhysicsObjectResult {
-  const result: PhysicsObjectResult = { elasticObjects: [], solidObstacles: [] };
-  if (pathPositions.length < 2) return result;
+	const result: PhysicsObjectResult = { elasticObjects: [], solidObstacles: [] }
+	if (pathPositions.length < 2) return result
 
-  const rand = mulberry32(42);
+	const rand = mulberry32(42)
 
-  const trunkMat = new StandardMaterial('trunkMat', scene);
-  trunkMat.diffuseColor = new Color3(0.4, 0.26, 0.13);
-  trunkMat.specularColor = Color3.Black();
+	const trunkMat = new StandardMaterial('trunkMat', scene)
+	trunkMat.diffuseColor = new Color3(0.4, 0.26, 0.13)
+	trunkMat.specularColor = Color3.Black()
 
-  // Generate a spectrum of foliage shades so every tree looks slightly different
-  const FOLIAGE_SHADE_COUNT = 12;
-  const foliageMats: StandardMaterial[] = [];
-  for (let i = 0; i < FOLIAGE_SHADE_COUNT; i++) {
-    const t = i / (FOLIAGE_SHADE_COUNT - 1); // 0 → 1
-    const r = 0.10 + 0.18 * (1 - t);
-    const g = 0.38 + 0.24 * Math.sin(t * Math.PI);
-    const b = 0.08 + 0.14 * t;
-    foliageMats.push(makeColor(scene, `foliage${i}`, new Color3(r, g, b)));
-  }
+	// Generate a spectrum of foliage shades so every tree looks slightly different
+	const FOLIAGE_SHADE_COUNT = 12
+	const foliageMats: StandardMaterial[] = []
+	for (let i = 0; i < FOLIAGE_SHADE_COUNT; i++) {
+		const t = i / (FOLIAGE_SHADE_COUNT - 1) // 0 → 1
+		const r = 0.1 + 0.18 * (1 - t)
+		const g = 0.38 + 0.24 * Math.sin(t * Math.PI)
+		const b = 0.08 + 0.14 * t
+		foliageMats.push(makeColor(scene, `foliage${i}`, new Color3(r, g, b)))
+	}
 
-  // ── Template meshes (invisible sources for instancing) ──
-  // One conifer trunk + one broadleaf trunk (same material → 2 draw calls)
-  const coniferTrunkTpl = MeshBuilder.CreateCylinder('tpl_ct', {
-    height: 3.75 * TREE_HEIGHT_SCALE, diameterTop: 0.3, diameterBottom: 0.45, tessellation: 6,
-  }, scene);
-  coniferTrunkTpl.material = trunkMat;
-  coniferTrunkTpl.isVisible = false;
+	// ── Template meshes (invisible sources for instancing) ──
+	// One conifer trunk + one broadleaf trunk (same material → 2 draw calls)
+	const coniferTrunkTpl = MeshBuilder.CreateCylinder(
+		'tpl_ct',
+		{
+			height: 3.75 * TREE_HEIGHT_SCALE,
+			diameterTop: 0.3,
+			diameterBottom: 0.45,
+			tessellation: 6,
+		},
+		scene,
+	)
+	coniferTrunkTpl.material = trunkMat
+	coniferTrunkTpl.isVisible = false
 
-  const broadleafTrunkTpl = MeshBuilder.CreateCylinder('tpl_bt', {
-    height: 3 * TREE_HEIGHT_SCALE, diameterTop: 0.35, diameterBottom: 0.5, tessellation: 6,
-  }, scene);
-  broadleafTrunkTpl.material = trunkMat;
-  broadleafTrunkTpl.isVisible = false;
+	const broadleafTrunkTpl = MeshBuilder.CreateCylinder(
+		'tpl_bt',
+		{
+			height: 3 * TREE_HEIGHT_SCALE,
+			diameterTop: 0.35,
+			diameterBottom: 0.5,
+			tessellation: 6,
+		},
+		scene,
+	)
+	broadleafTrunkTpl.material = trunkMat
+	broadleafTrunkTpl.isVisible = false
 
-  // Per-colour crown templates (12 colours × 2 variants = 24 draw calls)
-  const coniferCrownTpls: Mesh[] = foliageMats.map((mat, i) => {
-    const m = MeshBuilder.CreateCylinder(`tpl_cc_${i}`, {
-      height: 6 * TREE_HEIGHT_SCALE, diameterTop: 0, diameterBottom: 4.2, tessellation: 6,
-    }, scene);
-    m.material = mat;
-    m.isVisible = false;
-    return m;
-  });
+	// Per-colour crown templates (12 colours × 2 variants = 24 draw calls)
+	const coniferCrownTpls: Mesh[] = foliageMats.map((mat, i) => {
+		const m = MeshBuilder.CreateCylinder(
+			`tpl_cc_${i}`,
+			{
+				height: 6 * TREE_HEIGHT_SCALE,
+				diameterTop: 0,
+				diameterBottom: 4.2,
+				tessellation: 6,
+			},
+			scene,
+		)
+		m.material = mat
+		m.isVisible = false
+		return m
+	})
 
-  const broadleafCrownTpls: Mesh[] = foliageMats.map((mat, i) => {
-    const m = MeshBuilder.CreateSphere(`tpl_bc_${i}`, {
-      diameter: 4.5 * TREE_HEIGHT_SCALE, segments: 6,
-    }, scene);
-    m.material = mat;
-    m.isVisible = false;
-    return m;
-  });
+	const broadleafCrownTpls: Mesh[] = foliageMats.map((mat, i) => {
+		const m = MeshBuilder.CreateSphere(
+			`tpl_bc_${i}`,
+			{
+				diameter: 4.5 * TREE_HEIGHT_SCALE,
+				segments: 6,
+			},
+			scene,
+		)
+		m.material = mat
+		m.isVisible = false
+		return m
+	})
 
-  // ── Helper: stamp one tree using instances ──
-  function placeTree(
-    prefix: string,
-    idx: number,
-    x: number,
-    z: number,
-    groundY: number,
-    scale: number,
-    variantRoll: number,
-    colorIdx: number,
-  ) {
-    const treeRoot = new TransformNode(`${prefix}_${idx}`, scene);
-    treeRoot.position.set(x, groundY, z);
-    treeRoot.scaling.setAll(scale);
+	// ── Helper: stamp one tree using instances ──
+	function placeTree(
+		prefix: string,
+		idx: number,
+		x: number,
+		z: number,
+		groundY: number,
+		scale: number,
+		variantRoll: number,
+		colorIdx: number,
+	) {
+		const treeRoot = new TransformNode(`${prefix}_${idx}`, scene)
+		treeRoot.position.set(x, groundY, z)
+		treeRoot.scaling.setAll(scale)
 
-    if (variantRoll < 0.5) {
-      // Conifer
-      const trunk = coniferTrunkTpl.createInstance(`${prefix}_t_${idx}`);
-      trunk.position.set(0, 1.875 * TREE_HEIGHT_SCALE, 0);
-      trunk.parent = treeRoot;
+		if (variantRoll < 0.5) {
+			// Conifer
+			const trunk = coniferTrunkTpl.createInstance(`${prefix}_t_${idx}`)
+			trunk.position.set(0, 1.875 * TREE_HEIGHT_SCALE, 0)
+			trunk.parent = treeRoot
 
-      const crown = coniferCrownTpls[colorIdx].createInstance(`${prefix}_c_${idx}`);
-      crown.position.set(0, 5.25 * TREE_HEIGHT_SCALE, 0);
-      crown.parent = treeRoot;
-    } else {
-      // Broad-leaf
-      const trunk = broadleafTrunkTpl.createInstance(`${prefix}_t_${idx}`);
-      trunk.position.set(0, 1.5 * TREE_HEIGHT_SCALE, 0);
-      trunk.parent = treeRoot;
+			const crown = coniferCrownTpls[colorIdx].createInstance(
+				`${prefix}_c_${idx}`,
+			)
+			crown.position.set(0, 5.25 * TREE_HEIGHT_SCALE, 0)
+			crown.parent = treeRoot
+		} else {
+			// Broad-leaf
+			const trunk = broadleafTrunkTpl.createInstance(`${prefix}_t_${idx}`)
+			trunk.position.set(0, 1.5 * TREE_HEIGHT_SCALE, 0)
+			trunk.parent = treeRoot
 
-      const crown = broadleafCrownTpls[colorIdx].createInstance(`${prefix}_c_${idx}`);
-      crown.position.set(0, 4.8 * TREE_HEIGHT_SCALE, 0);
-      crown.parent = treeRoot;
-    }
+			const crown = broadleafCrownTpls[colorIdx].createInstance(
+				`${prefix}_c_${idx}`,
+			)
+			crown.position.set(0, 4.8 * TREE_HEIGHT_SCALE, 0)
+			crown.parent = treeRoot
+		}
 
-    const elasticIndex = result.elasticObjects.length;
-    result.elasticObjects.push({
-      root: treeRoot,
-      tiltX: 0,
-      tiltZ: 0,
-      tiltVelX: 0,
-      tiltVelZ: 0,
-    });
-    result.solidObstacles.push({ x, z, radius: 0.5 * scale, elasticIndex });
-  }
+		const elasticIndex = result.elasticObjects.length
+		result.elasticObjects.push({
+			root: treeRoot,
+			tiltX: 0,
+			tiltZ: 0,
+			tiltVelX: 0,
+			tiltVelZ: 0,
+		})
+		result.solidObstacles.push({ x, z, radius: 0.5 * scale, elasticIndex })
+	}
 
-  // ── Procedural tree placement ──
-  // Build combined source points from path + roads + trails so trees populate everywhere
-  const sourcePoints: [number, number][] = [...pathPositions];
-  for (const road of roads) {
-    for (const pt of road) sourcePoints.push(pt);
-  }
-  for (const trail of trails) {
-    for (const pt of trail) sourcePoints.push(pt);
-  }
+	// ── Procedural tree placement ──
+	// Build combined source points from path + roads + trails so trees populate everywhere
+	const sourcePoints: [number, number][] = [...pathPositions]
+	for (const road of roads) {
+		for (const pt of road) sourcePoints.push(pt)
+	}
+	for (const trail of trails) {
+		for (const pt of trail) sourcePoints.push(pt)
+	}
 
-  let placed = 0;
-  let attempts = 0;
+	let placed = 0
+	let attempts = 0
 
-  while (placed < treeCount && attempts < treeCount * 5) {
-    attempts++;
+	while (placed < treeCount && attempts < treeCount * 5) {
+		attempts++
 
-    const ptIdx = Math.floor(rand() * sourcePoints.length);
-    const [cx, cz] = sourcePoints[ptIdx];
+		const ptIdx = Math.floor(rand() * sourcePoints.length)
+		const [cx, cz] = sourcePoints[ptIdx]
 
-    const dist = TREE_MIN_DIST_FROM_PATH + rand() * (TREE_SPREAD - TREE_MIN_DIST_FROM_PATH);
-    const angle = rand() * Math.PI * 2;
-    const x = cx + Math.cos(angle) * dist;
-    const z = cz + Math.sin(angle) * dist;
+		const dist =
+			TREE_MIN_DIST_FROM_PATH + rand() * (TREE_SPREAD - TREE_MIN_DIST_FROM_PATH)
+		const angle = rand() * Math.PI * 2
+		const x = cx + Math.cos(angle) * dist
+		const z = cz + Math.sin(angle) * dist
 
-    if (distToPath(x, z, pathPositions) < TREE_MIN_DIST_FROM_PATH) continue;
-    let onRoadOrTrail = false;
-    for (const road of roads) {
-      if (distToPath(x, z, road) < TREE_MIN_DIST_FROM_PATH) { onRoadOrTrail = true; break; }
-    }
-    if (onRoadOrTrail) continue;
-    for (const trail of trails) {
-      if (distToPath(x, z, trail) < TREE_MIN_DIST_FROM_PATH) { onRoadOrTrail = true; break; }
-    }
-    if (onRoadOrTrail) continue;
-    if (isInWaterZone(x, z, waterZones)) continue;
-    if (isInAnyPolygon(x, z, fields)) continue;
+		if (distToPath(x, z, pathPositions) < TREE_MIN_DIST_FROM_PATH) continue
+		let onRoadOrTrail = false
+		for (const road of roads) {
+			if (distToPath(x, z, road) < TREE_MIN_DIST_FROM_PATH) {
+				onRoadOrTrail = true
+				break
+			}
+		}
+		if (onRoadOrTrail) continue
+		for (const trail of trails) {
+			if (distToPath(x, z, trail) < TREE_MIN_DIST_FROM_PATH) {
+				onRoadOrTrail = true
+				break
+			}
+		}
+		if (onRoadOrTrail) continue
+		if (isInWaterZone(x, z, waterZones)) continue
+		if (isInAnyPolygon(x, z, fields)) continue
 
-    if (startCircleCenter) {
-      const scDx = x - startCircleCenter.x;
-      const scDz = z - startCircleCenter.z;
-      if (scDx * scDx + scDz * scDz < START_CIRCLE_RADIUS * START_CIRCLE_RADIUS) continue;
-    }
+		if (startCircleCenter) {
+			const scDx = x - startCircleCenter.x
+			const scDz = z - startCircleCenter.z
+			if (scDx * scDx + scDz * scDz < START_CIRCLE_RADIUS * START_CIRCLE_RADIUS)
+				continue
+		}
 
-    const groundY = getGroundY(x, z);
-    const variantRoll = rand();
-    const scale = 0.7 + rand() * 0.8;
-    const colorIdx = Math.floor(rand() * FOLIAGE_SHADE_COUNT);
+		const groundY = getGroundY(x, z)
+		const variantRoll = rand()
+		const scale = 0.7 + rand() * 0.8
+		const colorIdx = Math.floor(rand() * FOLIAGE_SHADE_COUNT)
 
-    placeTree('tree_root', placed, x, z, groundY, scale, variantRoll, colorIdx);
-    placed++;
-  }
+		placeTree('tree_root', placed, x, z, groundY, scale, variantRoll, colorIdx)
+		placed++
+	}
 
-  // ── Manual trees (placed at exact positions) ──
-  for (let mi = 0; mi < manualTrees.length; mi++) {
-    const [mx, mz] = manualTrees[mi];
-    const groundY = getGroundY(mx, mz);
-    const variantRoll = rand();
-    const scale = 0.7 + rand() * 0.8;
-    const colorIdx = Math.floor(rand() * FOLIAGE_SHADE_COUNT);
+	// ── Manual trees (placed at exact positions) ──
+	for (let mi = 0; mi < manualTrees.length; mi++) {
+		const [mx, mz] = manualTrees[mi]
+		const groundY = getGroundY(mx, mz)
+		const variantRoll = rand()
+		const scale = 0.7 + rand() * 0.8
+		const colorIdx = Math.floor(rand() * FOLIAGE_SHADE_COUNT)
 
-    placeTree('tree_manual', mi, mx, mz, groundY, scale, variantRoll, colorIdx);
-  }
+		placeTree('tree_manual', mi, mx, mz, groundY, scale, variantRoll, colorIdx)
+	}
 
-  return result;
+	return result
 }
 
 // ---------- Km signs ----------
@@ -251,128 +308,306 @@ export function buildTrees(
  * Place yellow km marker signs at 1 km, 2 km, 3 km, 4 km along the path.
  */
 export function placeKmSigns(
-  scene: Scene,
-  pathPositions: [number, number][],
-  getGroundY: (x: number, z: number) => number,
+	scene: Scene,
+	pathPositions: [number, number][],
+	getGroundY: (x: number, z: number) => number,
 ): PhysicsObjectResult {
-  const result: PhysicsObjectResult = { elasticObjects: [], solidObstacles: [] };
-  if (pathPositions.length < 2) return result;
+	const result: PhysicsObjectResult = { elasticObjects: [], solidObstacles: [] }
+	if (pathPositions.length < 2) return result
 
-  const cumDist: number[] = [0];
-  for (let i = 1; i < pathPositions.length; i++) {
-    const dx = pathPositions[i][0] - pathPositions[i - 1][0];
-    const dz = pathPositions[i][1] - pathPositions[i - 1][1];
-    cumDist.push(cumDist[i - 1] + Math.sqrt(dx * dx + dz * dz));
-  }
+	const cumDist: number[] = [0]
+	for (let i = 1; i < pathPositions.length; i++) {
+		const dx = pathPositions[i][0] - pathPositions[i - 1][0]
+		const dz = pathPositions[i][1] - pathPositions[i - 1][1]
+		cumDist.push(cumDist[i - 1] + Math.sqrt(dx * dx + dz * dz))
+	}
 
-  const signOffset = PATH_HALF_WIDTH + 1.5;
+	const signOffset = PATH_HALF_WIDTH + 1.5
 
-  for (let km = 1; km <= 4; km++) {
-    const targetDist = km * 1000;
-    if (targetDist >= cumDist[cumDist.length - 1]) break;
+	for (let km = 1; km <= 4; km++) {
+		const targetDist = km * 1000
+		if (targetDist >= cumDist[cumDist.length - 1]) break
 
-    let segIdx = 0;
-    for (let i = 1; i < cumDist.length; i++) {
-      if (cumDist[i] >= targetDist) {
-        segIdx = i - 1;
-        break;
-      }
-    }
+		let segIdx = 0
+		for (let i = 1; i < cumDist.length; i++) {
+			if (cumDist[i] >= targetDist) {
+				segIdx = i - 1
+				break
+			}
+		}
 
-    const segLen = cumDist[segIdx + 1] - cumDist[segIdx];
-    const t = segLen > 0 ? (targetDist - cumDist[segIdx]) / segLen : 0;
-    const [ax, az] = pathPositions[segIdx];
-    const [bx, bz] = pathPositions[segIdx + 1];
-    const cx = ax + t * (bx - ax);
-    const cz = az + t * (bz - az);
+		const segLen = cumDist[segIdx + 1] - cumDist[segIdx]
+		const t = segLen > 0 ? (targetDist - cumDist[segIdx]) / segLen : 0
+		const [ax, az] = pathPositions[segIdx]
+		const [bx, bz] = pathPositions[segIdx + 1]
+		const cx = ax + t * (bx - ax)
+		const cz = az + t * (bz - az)
 
-    const dx = bx - ax;
-    const dz = bz - az;
-    const yaw = Math.atan2(dx, dz);
-    const rightX = Math.cos(yaw);
-    const rightZ = -Math.sin(yaw);
+		const dx = bx - ax
+		const dz = bz - az
+		const yaw = Math.atan2(dx, dz)
+		const rightX = Math.cos(yaw)
+		const rightZ = -Math.sin(yaw)
 
-    const side = km % 2 === 1 ? 1 : -1;
-    const signX = cx + rightX * signOffset * side;
-    const signZ = cz + rightZ * signOffset * side;
-    const signY = getGroundY(signX, signZ);
+		const side = km % 2 === 1 ? 1 : -1
+		const signX = cx + rightX * signOffset * side
+		const signZ = cz + rightZ * signOffset * side
+		const signY = getGroundY(signX, signZ)
 
-    const kmSignRoot = createKmSign(scene, km, signX, signZ, signY, yaw);
-    const kmPivot = new TransformNode(`kmSignPivot_${km}`, scene);
-    kmPivot.position.set(signX, signY, signZ);
-    kmSignRoot.parent = kmPivot;
-    kmSignRoot.position.set(0, 0, 0);
-    const kmElasticIdx = result.elasticObjects.length;
-    result.elasticObjects.push({ root: kmPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
-    result.solidObstacles.push({ x: signX, z: signZ, radius: 0.5, elasticIndex: kmElasticIdx });
-  }
+		const kmSignRoot = createKmSign(scene, km, signX, signZ, signY, yaw)
+		const kmPivot = new TransformNode(`kmSignPivot_${km}`, scene)
+		kmPivot.position.set(signX, signY, signZ)
+		kmSignRoot.parent = kmPivot
+		kmSignRoot.position.set(0, 0, 0)
+		const kmElasticIdx = result.elasticObjects.length
+		result.elasticObjects.push({
+			root: kmPivot,
+			tiltX: 0,
+			tiltZ: 0,
+			tiltVelX: 0,
+			tiltVelZ: 0,
+		})
+		result.solidObstacles.push({
+			x: signX,
+			z: signZ,
+			radius: 0.5,
+			elasticIndex: kmElasticIdx,
+		})
+	}
 
-  return result;
+	return result
+}
+
+// ---------- Grass path cones ----------
+
+/**
+ * Place orange guide cones along both edges of grass path segments.
+ * Cones are elastic obstacles so they wobble on impact like trees/signs.
+ * Respects minimum spacing (CONE_SPACING) from all other cones to prevent overlaps on overlapping track.
+ */
+export function placeGrassPathCones(
+	scene: Scene,
+	pathPositions: [number, number][],
+	pathTypeSegments: PathTypeSegment[],
+	pathWidths: number[],
+	getGroundY: (x: number, z: number) => number,
+): GrassPathConeResult {
+	const result: GrassPathConeResult = {
+		elasticObjects: [],
+		solidObstacles: [],
+		coneRoots: [],
+	}
+	if (pathPositions.length < 2 || pathTypeSegments.length === 0) return result
+
+	const grassSegments = pathTypeSegments.filter((s) => s.type === 'grass')
+	if (grassSegments.length === 0) return result
+
+	const cumDist: number[] = [0]
+	for (let i = 1; i < pathPositions.length; i++) {
+		const dx = pathPositions[i][0] - pathPositions[i - 1][0]
+		const dz = pathPositions[i][1] - pathPositions[i - 1][1]
+		cumDist.push(cumDist[i - 1] + Math.sqrt(dx * dx + dz * dz))
+	}
+
+	const coneMat = new StandardMaterial('grassConeMat', scene)
+	coneMat.diffuseColor = new Color3(1.0, 0.45, 0.05)
+	coneMat.specularColor = new Color3(0.08, 0.08, 0.08)
+
+	const coneHeight = 0.52
+	const coneTemplate = MeshBuilder.CreateCylinder(
+		'tpl_grass_path_cone',
+		{
+			height: coneHeight,
+			diameterTop: 0.04,
+			diameterBottom: 0.3,
+			tessellation: 10,
+		},
+		scene,
+	)
+	coneTemplate.material = coneMat
+	coneTemplate.isVisible = false
+
+	const baseSize = 0.35
+	const baseHeight = 0.08
+	const baseTemplate = MeshBuilder.CreateBox(
+		'tpl_grass_path_base',
+		{
+			width: baseSize,
+			height: baseHeight,
+			depth: baseSize,
+		},
+		scene,
+	)
+	baseTemplate.material = coneMat
+	baseTemplate.isVisible = false
+
+	const spacing = CONE_SPACING
+	const minSpacingSq = spacing * spacing
+	const edgeOffset = 0.65
+	const coneRadius = 0.22
+	let coneIndex = 0
+
+	// Track all placed cone positions for collision checking
+	const placedConePositions: [number, number][] = []
+
+	for (const seg of grassSegments) {
+		const startIdx = Math.max(0, seg.startIndex)
+		const endIdx = Math.min(pathPositions.length - 1, seg.endIndex)
+		if (startIdx >= endIdx) continue
+
+		const segStartDist = cumDist[startIdx]
+		const segEndDist = cumDist[endIdx]
+		if (segEndDist <= segStartDist) continue
+
+		let sampleDist = segStartDist
+		let segIdx = startIdx
+
+		while (sampleDist <= segEndDist) {
+			while (segIdx < endIdx && cumDist[segIdx + 1] < sampleDist) segIdx++
+			if (segIdx >= endIdx) break
+
+			const [ax, az] = pathPositions[segIdx]
+			const [bx, bz] = pathPositions[segIdx + 1]
+			const dx = bx - ax
+			const dz = bz - az
+			const segLen = Math.sqrt(dx * dx + dz * dz)
+			if (segLen < 1e-4) {
+				sampleDist += spacing
+				continue
+			}
+
+			const t = Math.max(
+				0,
+				Math.min(1, (sampleDist - cumDist[segIdx]) / segLen),
+			)
+			const cx = ax + dx * t
+			const cz = az + dz * t
+
+			const rightX = dz / segLen
+			const rightZ = -dx / segLen
+
+			const wA = pathWidths[segIdx] ?? 1
+			const wB = pathWidths[segIdx + 1] ?? wA
+			const widthScale = wA + (wB - wA) * t
+			const lateralOffset = PATH_HALF_WIDTH * widthScale + edgeOffset
+
+			for (const side of [-1, 1]) {
+				const x = cx + rightX * lateralOffset * side
+				const z = cz + rightZ * lateralOffset * side
+
+				// Check if this position is at least CONE_SPACING away from all existing cones
+				let tooClose = false
+				for (const [px, pz] of placedConePositions) {
+					const dx2 = x - px
+					const dz2 = z - pz
+					if (dx2 * dx2 + dz2 * dz2 < minSpacingSq) {
+						tooClose = true
+						break
+					}
+				}
+				if (tooClose) continue
+
+				const y = getGroundY(x, z)
+
+				const coneRoot = new TransformNode(`grassPathCone_${coneIndex}`, scene)
+				coneRoot.position.set(x, y, z)
+				coneRoot.rotation.y = Math.atan2(dx, dz)
+
+				const cone = coneTemplate.createInstance(
+					`grassPathConeMesh_${coneIndex}`,
+				)
+				cone.position.set(0, coneHeight * 0.5, 0)
+				cone.parent = coneRoot
+
+				const base = baseTemplate.createInstance(`grassPathBase_${coneIndex}`)
+				base.position.set(0, baseHeight * 0.5, 0)
+				base.parent = coneRoot
+
+				placedConePositions.push([x, z])
+
+				const elasticIndex = result.elasticObjects.length
+				result.elasticObjects.push({
+					root: coneRoot,
+					tiltX: 0,
+					tiltZ: 0,
+					tiltVelX: 0,
+					tiltVelZ: 0,
+				})
+				result.solidObstacles.push({ x, z, radius: coneRadius, elasticIndex })
+				result.coneRoots.push(coneRoot)
+				coneIndex++
+			}
+
+			sampleDist += spacing
+		}
+	}
+
+	return result
 }
 
 // ---------- Gates / Checkpoints ----------
 
 export interface GatePosition {
-  x: number;
-  z: number;
-  y: number;
-  pathDist: number;
-  yaw: number;
+	x: number
+	z: number
+	y: number
+	pathDist: number
+	yaw: number
 }
 
 /**
  * Generate checkpoint gates every GATE_SPACING metres along the path.
  */
 export function buildGates(
-  pathPositions: [number, number][],
-  pathCumDist: number[],
-  getGroundY: (x: number, z: number) => number,
+	pathPositions: [number, number][],
+	pathCumDist: number[],
+	getGroundY: (x: number, z: number) => number,
 ): GatePosition[] {
-  if (pathPositions.length < 2) return [];
-  const gates: GatePosition[] = [];
+	if (pathPositions.length < 2) return []
+	const gates: GatePosition[] = []
 
-  const totalDist = pathCumDist[pathCumDist.length - 1];
+	const totalDist = pathCumDist[pathCumDist.length - 1]
 
-  for (let dist = GATE_SPACING; dist < totalDist; dist += GATE_SPACING) {
-    let segIdx = 0;
-    for (let i = 1; i < pathCumDist.length; i++) {
-      if (pathCumDist[i] >= dist) {
-        segIdx = i - 1;
-        break;
-      }
-    }
+	for (let dist = GATE_SPACING; dist < totalDist; dist += GATE_SPACING) {
+		let segIdx = 0
+		for (let i = 1; i < pathCumDist.length; i++) {
+			if (pathCumDist[i] >= dist) {
+				segIdx = i - 1
+				break
+			}
+		}
 
-    const segLen = pathCumDist[segIdx + 1] - pathCumDist[segIdx];
-    const t = segLen > 0 ? (dist - pathCumDist[segIdx]) / segLen : 0;
-    const [ax, az] = pathPositions[segIdx];
-    const [bx, bz] = pathPositions[segIdx + 1];
-    const x = ax + t * (bx - ax);
-    const z = az + t * (bz - az);
-    const y = getGroundY(x, z);
-    const yaw = Math.atan2(bx - ax, bz - az);
+		const segLen = pathCumDist[segIdx + 1] - pathCumDist[segIdx]
+		const t = segLen > 0 ? (dist - pathCumDist[segIdx]) / segLen : 0
+		const [ax, az] = pathPositions[segIdx]
+		const [bx, bz] = pathPositions[segIdx + 1]
+		const x = ax + t * (bx - ax)
+		const z = az + t * (bz - az)
+		const y = getGroundY(x, z)
+		const yaw = Math.atan2(bx - ax, bz - az)
 
-    gates.push({ x, z, y, pathDist: dist, yaw });
-  }
+		gates.push({ x, z, y, pathDist: dist, yaw })
+	}
 
-  // Always place a final gate at the last path point so the race ends at the course end
-  const lastIdx = pathPositions.length - 1;
-  const [lx, lz] = pathPositions[lastIdx];
-  const [px, pz] = pathPositions[lastIdx - 1];
-  const lastYaw = Math.atan2(lx - px, lz - pz);
-  const lastY = getGroundY(lx, lz);
+	// Always place a final gate at the last path point so the race ends at the course end
+	const lastIdx = pathPositions.length - 1
+	const [lx, lz] = pathPositions[lastIdx]
+	const [px, pz] = pathPositions[lastIdx - 1]
+	const lastYaw = Math.atan2(lx - px, lz - pz)
+	const lastY = getGroundY(lx, lz)
 
-  // If the last regular gate is too close to the finish, remove it
-  if (gates.length > 0) {
-    const lastRegular = gates[gates.length - 1];
-    const distToEnd = totalDist - lastRegular.pathDist;
-    if (distToEnd < GATE_SPACING / 2) {
-      gates.pop();
-    }
-  }
+	// If the last regular gate is too close to the finish, remove it
+	if (gates.length > 0) {
+		const lastRegular = gates[gates.length - 1]
+		const distToEnd = totalDist - lastRegular.pathDist
+		if (distToEnd < GATE_SPACING / 2) {
+			gates.pop()
+		}
+	}
 
-  gates.push({ x: lx, z: lz, y: lastY, pathDist: totalDist, yaw: lastYaw });
+	gates.push({ x: lx, z: lz, y: lastY, pathDist: totalDist, yaw: lastYaw })
 
-  return gates;
+	return gates
 }
 
 /**
@@ -380,22 +615,22 @@ export function buildGates(
  * Returns the new gate index.
  */
 export function checkGatePass(
-  gates: GatePosition[],
-  currentGateIdx: number,
-  playerX: number,
-  playerZ: number,
+	gates: GatePosition[],
+	currentGateIdx: number,
+	playerX: number,
+	playerZ: number,
 ): number {
-  if (currentGateIdx >= gates.length) return currentGateIdx;
+	if (currentGateIdx >= gates.length) return currentGateIdx
 
-  const gate = gates[currentGateIdx];
-  const dx = playerX - gate.x;
-  const dz = playerZ - gate.z;
-  const dist = Math.sqrt(dx * dx + dz * dz);
+	const gate = gates[currentGateIdx]
+	const dx = playerX - gate.x
+	const dz = playerZ - gate.z
+	const dist = Math.sqrt(dx * dx + dz * dz)
 
-  if (dist < GATE_RADIUS) {
-    return currentGateIdx + 1;
-  }
-  return currentGateIdx;
+	if (dist < GATE_RADIUS) {
+		return currentGateIdx + 1
+	}
+	return currentGateIdx
 }
 
 // ---------- Marshals ----------
@@ -404,306 +639,370 @@ export function checkGatePass(
  * Spawn course marshals at GPS positions defined in the level data.
  */
 export function spawnMarshals(
-  scene: Scene,
-  level: LevelData,
-  pathPositions: [number, number][],
-  originCoord: number[],
-  scaleFactor: number,
-  getGroundY: (x: number, z: number) => number,
+	scene: Scene,
+	level: LevelData,
+	pathPositions: [number, number][],
+	originCoord: number[],
+	scaleFactor: number,
+	getGroundY: (x: number, z: number) => number,
 ): { marshals: Marshal[] } & PhysicsObjectResult {
-  const result: { marshals: Marshal[] } & PhysicsObjectResult = {
-    marshals: [],
-    elasticObjects: [],
-    solidObstacles: [],
-  };
-  if (!level.marshals || level.marshals.length === 0) return result;
+	const result: { marshals: Marshal[] } & PhysicsObjectResult = {
+		marshals: [],
+		elasticObjects: [],
+		solidObstacles: [],
+	}
+	if (!level.marshals || level.marshals.length === 0) return result
 
-  const MARSHAL_PATH_OFFSET = PATH_HALF_WIDTH + 1.5;
-  const INWARD_ANGLE = (30 * Math.PI) / 180;
+	const MARSHAL_PATH_OFFSET = PATH_HALF_WIDTH + 1.5
+	const INWARD_ANGLE = (30 * Math.PI) / 180
 
-  for (let i = 0; i < level.marshals.length; i++) {
-    const [lat, lon] = level.marshals[i];
-    const [rawX, rawZ] = gpsPointToLocal(lon, lat, originCoord);
-    const lx = rawX * scaleFactor;
-    const lz = rawZ * scaleFactor;
+	for (let i = 0; i < level.marshals.length; i++) {
+		const [lat, lon] = level.marshals[i]
+		const [rawX, rawZ] = gpsPointToLocal(lon, lat, originCoord)
+		const lx = rawX * scaleFactor
+		const lz = rawZ * scaleFactor
 
-    let bestDist = Infinity;
-    let bestIdx = 0;
-    for (let j = 0; j < pathPositions.length - 1; j++) {
-      const [px, pz] = pathPositions[j];
-      const dx = px - lx;
-      const dz = pz - lz;
-      const dist = dx * dx + dz * dz;
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestIdx = j;
-      }
-    }
+		let bestDist = Number.POSITIVE_INFINITY
+		let bestIdx = 0
+		for (let j = 0; j < pathPositions.length - 1; j++) {
+			const [px, pz] = pathPositions[j]
+			const dx = px - lx
+			const dz = pz - lz
+			const dist = dx * dx + dz * dz
+			if (dist < bestDist) {
+				bestDist = dist
+				bestIdx = j
+			}
+		}
 
-    const [px, pz] = pathPositions[bestIdx];
-    const [nx, nz] = pathPositions[bestIdx + 1];
+		const [px, pz] = pathPositions[bestIdx]
+		const [nx, nz] = pathPositions[bestIdx + 1]
 
-    const segDx = nx - px;
-    const segDz = nz - pz;
-    const segLen = Math.sqrt(segDx * segDx + segDz * segDz) || 1;
+		const segDx = nx - px
+		const segDz = nz - pz
+		const segLen = Math.sqrt(segDx * segDx + segDz * segDz) || 1
 
-    const perpX = -segDz / segLen;
-    const perpZ = segDx / segLen;
+		const perpX = -segDz / segLen
+		const perpZ = segDx / segLen
 
-    const toMarshalX = lx - px;
-    const toMarshalZ = lz - pz;
-    const side = perpX * toMarshalX + perpZ * toMarshalZ > 0 ? 1 : -1;
+		const toMarshalX = lx - px
+		const toMarshalZ = lz - pz
+		const side = perpX * toMarshalX + perpZ * toMarshalZ > 0 ? 1 : -1
 
-    const along = (toMarshalX * segDx + toMarshalZ * segDz) / (segLen * segLen);
-    const clampedAlong = Math.max(0, Math.min(1, along));
-    const baseX = px + segDx * clampedAlong + perpX * side * MARSHAL_PATH_OFFSET;
-    const baseZ = pz + segDz * clampedAlong + perpZ * side * MARSHAL_PATH_OFFSET;
-    const y = getGroundY(baseX, baseZ);
+		const along = (toMarshalX * segDx + toMarshalZ * segDz) / (segLen * segLen)
+		const clampedAlong = Math.max(0, Math.min(1, along))
+		const baseX = px + segDx * clampedAlong + perpX * side * MARSHAL_PATH_OFFSET
+		const baseZ = pz + segDz * clampedAlong + perpZ * side * MARSHAL_PATH_OFFSET
+		const y = getGroundY(baseX, baseZ)
 
-    const model = createMarshalModel(scene, i);
-    model.root.position = new Vector3(0, 0, 0);
+		const model = createMarshalModel(scene, i)
+		model.root.position = new Vector3(0, 0, 0)
 
-    const marshalPivot = new TransformNode(`marshalPivot_${i}`, scene);
-    marshalPivot.position.set(baseX, y, baseZ);
-    model.root.parent = marshalPivot;
+		const marshalPivot = new TransformNode(`marshalPivot_${i}`, scene)
+		marshalPivot.position.set(baseX, y, baseZ)
+		model.root.parent = marshalPivot
 
-    const runnerTravelYaw = Math.atan2(segDx, segDz);
-    const facingOncoming = runnerTravelYaw + Math.PI;
-    model.root.rotation.y = facingOncoming + side * INWARD_ANGLE;
+		const runnerTravelYaw = Math.atan2(segDx, segDz)
+		const facingOncoming = runnerTravelYaw + Math.PI
+		model.root.rotation.y = facingOncoming + side * INWARD_ANGLE
 
-    const marshalElasticIdx = result.elasticObjects.length;
-    result.elasticObjects.push({ root: marshalPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
-    result.solidObstacles.push({ x: baseX, z: baseZ, radius: 0.6, elasticIndex: marshalElasticIdx });
+		const marshalElasticIdx = result.elasticObjects.length
+		result.elasticObjects.push({
+			root: marshalPivot,
+			tiltX: 0,
+			tiltZ: 0,
+			tiltVelX: 0,
+			tiltVelZ: 0,
+		})
+		result.solidObstacles.push({
+			x: baseX,
+			z: baseZ,
+			radius: 0.6,
+			elasticIndex: marshalElasticIdx,
+		})
 
-    result.marshals.push({
-      model,
-      animPhase: Math.random() * Math.PI * 2,
-    });
-  }
+		result.marshals.push({
+			model,
+			animPhase: Math.random() * Math.PI * 2,
+		})
+	}
 
-  return result;
+	return result
 }
 
 export function updateMarshals(marshals: Marshal[], dt: number) {
-  for (const marshal of marshals) {
-    marshal.animPhase += dt;
-    poseCheering(marshal.model, marshal.animPhase);
-  }
+	for (const marshal of marshals) {
+		marshal.animPhase += dt
+		poseCheering(marshal.model, marshal.animPhase)
+	}
 }
 
 // ---------- Event-specific landmarks ----------
 
 export interface LandmarkResult extends PhysicsObjectResult {
-  buildingFootprints: BuildingFootprint[];
-  buildingColliders: BuildingCollider[];
+	buildingFootprints: BuildingFootprint[]
+	buildingColliders: BuildingCollider[]
 }
 
 /**
  * Place real-world landmarks that exist near specific parkrun courses.
  */
 export function placeEventLandmarks(
-  scene: Scene,
-  eventId: string,
-  originCoord: number[],
-  scaleFactor: number,
-  getGroundY: (x: number, z: number) => number,
+	scene: Scene,
+	eventId: string,
+	originCoord: number[],
+	scaleFactor: number,
+	getGroundY: (x: number, z: number) => number,
 ): LandmarkResult {
-  const result: LandmarkResult = {
-    elasticObjects: [],
-    solidObstacles: [],
-    buildingFootprints: [],
-    buildingColliders: [],
-  };
+	const result: LandmarkResult = {
+		elasticObjects: [],
+		solidObstacles: [],
+		buildingFootprints: [],
+		buildingColliders: [],
+	}
 
-  if (eventId === 'haga') {
-    // The Copper Tent (Koppartältet)
-    const [x1, z1] = gpsPointToLocal(18.030139, 59.364515, originCoord);
-    const [x2, z2] = gpsPointToLocal(18.030857, 59.364715, originCoord);
-    const lx1 = x1 * scaleFactor;
-    const lz1 = z1 * scaleFactor;
-    const lx2 = x2 * scaleFactor;
-    const lz2 = z2 * scaleFactor;
-    const tentY = getGroundY((lx1 + lx2) / 2, (lz1 + lz2) / 2);
-    void createCopperTent(scene, lx1, lz1, lx2, lz2, tentY);
+	if (eventId === 'haga') {
+		// The Copper Tent (Koppartältet)
+		const [x1, z1] = gpsPointToLocal(18.030139, 59.364515, originCoord)
+		const [x2, z2] = gpsPointToLocal(18.030857, 59.364715, originCoord)
+		const lx1 = x1 * scaleFactor
+		const lz1 = z1 * scaleFactor
+		const lx2 = x2 * scaleFactor
+		const lz2 = z2 * scaleFactor
+		const tentY = getGroundY((lx1 + lx2) / 2, (lz1 + lz2) / 2)
+		void createCopperTent(scene, lx1, lz1, lx2, lz2, tentY)
 
-    const tentCx = (lx1 + lx2) / 2;
-    const tentCz = (lz1 + lz2) / 2;
-    const tentLength = Math.sqrt((lx2 - lx1) ** 2 + (lz2 - lz1) ** 2);
+		const tentCx = (lx1 + lx2) / 2
+		const tentCz = (lz1 + lz2) / 2
+		const tentLength = Math.sqrt((lx2 - lx1) ** 2 + (lz2 - lz1) ** 2)
 
-    // Use an oriented bounding box collider matching the tent shape
-    // instead of a single oversized circle
-    const tentYaw = Math.atan2(lx2 - lx1, lz2 - lz1);
-    const tentHalfLength = tentLength * 0.48; // slightly inset from visual edges
-    const tentHalfWidth = tentLength * 0.2;   // tent is ~40% as wide as it is long
-    result.buildingColliders.push({
-      x: tentCx,
-      z: tentCz,
-      yaw: tentYaw,
-      halfWidth: tentHalfWidth,
-      halfDepth: tentHalfLength,
-    });
+		// Use an oriented bounding box collider matching the tent shape
+		// instead of a single oversized circle
+		const tentYaw = Math.atan2(lx2 - lx1, lz2 - lz1)
+		const tentHalfLength = tentLength * 0.48 // slightly inset from visual edges
+		const tentHalfWidth = tentLength * 0.2 // tent is ~40% as wide as it is long
+		result.buildingColliders.push({
+			x: tentCx,
+			z: tentCz,
+			yaw: tentYaw,
+			halfWidth: tentHalfWidth,
+			halfDepth: tentHalfLength,
+		})
 
-    // Minimap rectangle (slightly larger visual bounds than collision)
-    const tentRightX = Math.cos(tentYaw);
-    const tentRightZ = -Math.sin(tentYaw);
-    const tentFwdX = Math.sin(tentYaw);
-    const tentFwdZ = Math.cos(tentYaw);
-    const tentMapHalfLength = tentLength * 0.5;
-    const tentMapHalfWidth = tentLength * 0.24;
-    result.buildingFootprints.push({
-      type: 'blue',
-      points: [
-        [tentCx - tentFwdX * tentMapHalfLength - tentRightX * tentMapHalfWidth, tentCz - tentFwdZ * tentMapHalfLength - tentRightZ * tentMapHalfWidth],
-        [tentCx + tentFwdX * tentMapHalfLength - tentRightX * tentMapHalfWidth, tentCz + tentFwdZ * tentMapHalfLength - tentRightZ * tentMapHalfWidth],
-        [tentCx + tentFwdX * tentMapHalfLength + tentRightX * tentMapHalfWidth, tentCz + tentFwdZ * tentMapHalfLength + tentRightZ * tentMapHalfWidth],
-        [tentCx - tentFwdX * tentMapHalfLength + tentRightX * tentMapHalfWidth, tentCz - tentFwdZ * tentMapHalfLength + tentRightZ * tentMapHalfWidth],
-      ],
-    });
+		// Minimap rectangle (slightly larger visual bounds than collision)
+		const tentRightX = Math.cos(tentYaw)
+		const tentRightZ = -Math.sin(tentYaw)
+		const tentFwdX = Math.sin(tentYaw)
+		const tentFwdZ = Math.cos(tentYaw)
+		const tentMapHalfLength = tentLength * 0.5
+		const tentMapHalfWidth = tentLength * 0.24
+		result.buildingFootprints.push({
+			type: 'blue',
+			points: [
+				[
+					tentCx - tentFwdX * tentMapHalfLength - tentRightX * tentMapHalfWidth,
+					tentCz - tentFwdZ * tentMapHalfLength - tentRightZ * tentMapHalfWidth,
+				],
+				[
+					tentCx + tentFwdX * tentMapHalfLength - tentRightX * tentMapHalfWidth,
+					tentCz + tentFwdZ * tentMapHalfLength - tentRightZ * tentMapHalfWidth,
+				],
+				[
+					tentCx + tentFwdX * tentMapHalfLength + tentRightX * tentMapHalfWidth,
+					tentCz + tentFwdZ * tentMapHalfLength + tentRightZ * tentMapHalfWidth,
+				],
+				[
+					tentCx - tentFwdX * tentMapHalfLength + tentRightX * tentMapHalfWidth,
+					tentCz - tentFwdZ * tentMapHalfLength + tentRightZ * tentMapHalfWidth,
+				],
+			],
+		})
 
-    // The Royal Gate
-    const [gx1, gz1] = gpsPointToLocal(18.037956, 59.355194, originCoord);
-    const [gx2, gz2] = gpsPointToLocal(18.038218, 59.355216, originCoord);
-    const glx1 = gx1 * scaleFactor;
-    const glz1 = gz1 * scaleFactor;
-    const glx2 = gx2 * scaleFactor;
-    const glz2 = gz2 * scaleFactor;
-    const gateY = getGroundY((glx1 + glx2) / 2, (glz1 + glz2) / 2);
-    createHagaGate(scene, glx1, glz1, glx2, glz2, gateY);
+		// The Royal Gate
+		const [gx1, gz1] = gpsPointToLocal(18.037956, 59.355194, originCoord)
+		const [gx2, gz2] = gpsPointToLocal(18.038218, 59.355216, originCoord)
+		const glx1 = gx1 * scaleFactor
+		const glz1 = gz1 * scaleFactor
+		const glx2 = gx2 * scaleFactor
+		const glz2 = gz2 * scaleFactor
+		const gateY = getGroundY((glx1 + glx2) / 2, (glz1 + glz2) / 2)
+		createHagaGate(scene, glx1, glz1, glx2, glz2, gateY)
 
-    const gateCx = (glx1 + glx2) / 2;
-    const gateCz = (glz1 + glz2) / 2;
-    const gateSpan = Math.sqrt((glx2 - glx1) ** 2 + (glz2 - glz1) ** 2);
-    const gateScale = (gateSpan / 12) * 1.44 * 0.8;
-    const gateYaw = Math.atan2(glx2 - glx1, glz2 - glz1) + Math.PI / 2;
-    const gateHalfGap = 5.0 * gateScale * 2.25 / 2 + 3.5 * gateScale / 2;
-    const pillarRadius = Math.max(3.5, 3.0) * gateScale * 0.6;
+		const gateCx = (glx1 + glx2) / 2
+		const gateCz = (glz1 + glz2) / 2
+		const gateSpan = Math.sqrt((glx2 - glx1) ** 2 + (glz2 - glz1) ** 2)
+		const gateScale = (gateSpan / 12) * 1.44 * 0.8
+		const gateYaw = Math.atan2(glx2 - glx1, glz2 - glz1) + Math.PI / 2
+		const gateHalfGap = (5.0 * gateScale * 2.25) / 2 + (3.5 * gateScale) / 2
+		const pillarRadius = Math.max(3.5, 3.0) * gateScale * 0.6
 
-    result.solidObstacles.push({
-      x: gateCx + Math.sin(gateYaw + Math.PI / 2) * gateHalfGap,
-      z: gateCz + Math.cos(gateYaw + Math.PI / 2) * gateHalfGap,
-      radius: pillarRadius,
-    });
-    result.solidObstacles.push({
-      x: gateCx - Math.sin(gateYaw + Math.PI / 2) * gateHalfGap,
-      z: gateCz - Math.cos(gateYaw + Math.PI / 2) * gateHalfGap,
-      radius: pillarRadius,
-    });
-  }
+		result.solidObstacles.push({
+			x: gateCx + Math.sin(gateYaw + Math.PI / 2) * gateHalfGap,
+			z: gateCz + Math.cos(gateYaw + Math.PI / 2) * gateHalfGap,
+			radius: pillarRadius,
+		})
+		result.solidObstacles.push({
+			x: gateCx - Math.sin(gateYaw + Math.PI / 2) * gateHalfGap,
+			z: gateCz - Math.cos(gateYaw + Math.PI / 2) * gateHalfGap,
+			radius: pillarRadius,
+		})
+	}
 
-  return result;
+	return result
 }
 
 // ---------- Start line objects (parkrun sign + marshal) ----------
 
 export interface StartLineObjectsResult extends PhysicsObjectResult {
-  marshals: Marshal[];
+	marshals: Marshal[]
 }
 
 /**
  * Create the objects placed near the start line (parkrun sign + marshal).
  */
 export function buildStartLineObjects(
-  scene: Scene,
-  pathPositions: [number, number][],
-  eventId: string,
-  getGroundY: (x: number, z: number) => number,
+	scene: Scene,
+	pathPositions: [number, number][],
+	eventId: string,
+	getGroundY: (x: number, z: number) => number,
 ): StartLineObjectsResult {
-  const result: StartLineObjectsResult = {
-    elasticObjects: [],
-    solidObstacles: [],
-    marshals: [],
-  };
+	const result: StartLineObjectsResult = {
+		elasticObjects: [],
+		solidObstacles: [],
+		marshals: [],
+	}
 
-  if (pathPositions.length < 2) return result;
+	if (pathPositions.length < 2) return result
 
-  const [sx, sz] = pathPositions[0];
-  const [nx, nz] = pathPositions[1];
-  const yaw = Math.atan2(nx - sx, nz - sz);
+	const [sx, sz] = pathPositions[0]
+	const [nx, nz] = pathPositions[1]
+	const yaw = Math.atan2(nx - sx, nz - sz)
 
-  const forwardX = Math.sin(yaw);
-  const forwardZ = Math.cos(yaw);
-  const rightX = Math.cos(yaw);
-  const rightZ = -Math.sin(yaw);
+	const forwardX = Math.sin(yaw)
+	const forwardZ = Math.cos(yaw)
+	const rightX = Math.cos(yaw)
+	const rightZ = -Math.sin(yaw)
 
-  // Parkrun sign
-  const signX = sx + forwardX * 3 + rightX * (PATH_HALF_WIDTH + 1.5);
-  const signZ = sz + forwardZ * 3 + rightZ * (PATH_HALF_WIDTH + 1.5);
-  const signH = getGroundY(signX, signZ);
-  const displayName = eventId.charAt(0).toUpperCase() + eventId.slice(1);
-  const parkrunSignRoot = createParkrunSign(scene, signX, signZ, yaw, displayName, signH);
-  const parkrunPivot = new TransformNode('parkrunSignPivot', scene);
-  parkrunPivot.position.set(signX, signH, signZ);
-  parkrunSignRoot.parent = parkrunPivot;
-  parkrunSignRoot.position.set(0, 0, 0);
-  const parkrunElasticIdx = result.elasticObjects.length;
-  result.elasticObjects.push({ root: parkrunPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
-  result.solidObstacles.push({ x: signX, z: signZ, radius: 1.5, elasticIndex: parkrunElasticIdx });
+	// Parkrun sign
+	const signX = sx + forwardX * 3 + rightX * (PATH_HALF_WIDTH + 1.5)
+	const signZ = sz + forwardZ * 3 + rightZ * (PATH_HALF_WIDTH + 1.5)
+	const signH = getGroundY(signX, signZ)
+	const displayName = eventId.charAt(0).toUpperCase() + eventId.slice(1)
+	const parkrunSignRoot = createParkrunSign(
+		scene,
+		signX,
+		signZ,
+		yaw,
+		displayName,
+		signH,
+	)
+	const parkrunPivot = new TransformNode('parkrunSignPivot', scene)
+	parkrunPivot.position.set(signX, signH, signZ)
+	parkrunSignRoot.parent = parkrunPivot
+	parkrunSignRoot.position.set(0, 0, 0)
+	const parkrunElasticIdx = result.elasticObjects.length
+	result.elasticObjects.push({
+		root: parkrunPivot,
+		tiltX: 0,
+		tiltZ: 0,
+		tiltVelX: 0,
+		tiltVelZ: 0,
+	})
+	result.solidObstacles.push({
+		x: signX,
+		z: signZ,
+		radius: 1.5,
+		elasticIndex: parkrunElasticIdx,
+	})
 
-  // Marshal on the opposite (left) side
-  const marshalStartId = 9999;
-  const leftX = -rightX;
-  const leftZ = -rightZ;
-  const smX = sx + forwardX * 3 + leftX * (PATH_HALF_WIDTH + 5);
-  const smZ = sz + forwardZ * 3 + leftZ * (PATH_HALF_WIDTH + 5);
-  const smY = getGroundY(smX, smZ);
-  const startMarshal = createMarshalModel(scene, marshalStartId);
-  startMarshal.root.position.set(0, 0, 0);
-  const smPivot = new TransformNode('startMarshalPivot', scene);
-  smPivot.position.set(smX, smY, smZ);
-  startMarshal.root.parent = smPivot;
-  const INWARD_ANGLE = (30 * Math.PI) / 180;
-  startMarshal.root.rotation.y = yaw + Math.PI + (-1) * INWARD_ANGLE;
-  const smElasticIdx = result.elasticObjects.length;
-  result.elasticObjects.push({ root: smPivot, tiltX: 0, tiltZ: 0, tiltVelX: 0, tiltVelZ: 0 });
-  result.solidObstacles.push({ x: smX, z: smZ, radius: 0.6, elasticIndex: smElasticIdx });
-  result.marshals.push({ model: startMarshal, animPhase: Math.random() * Math.PI * 2 });
+	// Marshal on the opposite (left) side
+	const marshalStartId = 9999
+	const leftX = -rightX
+	const leftZ = -rightZ
+	const smX = sx + forwardX * 3 + leftX * (PATH_HALF_WIDTH + 5)
+	const smZ = sz + forwardZ * 3 + leftZ * (PATH_HALF_WIDTH + 5)
+	const smY = getGroundY(smX, smZ)
+	const startMarshal = createMarshalModel(scene, marshalStartId)
+	startMarshal.root.position.set(0, 0, 0)
+	const smPivot = new TransformNode('startMarshalPivot', scene)
+	smPivot.position.set(smX, smY, smZ)
+	startMarshal.root.parent = smPivot
+	const INWARD_ANGLE = (30 * Math.PI) / 180
+	startMarshal.root.rotation.y = yaw + Math.PI + -1 * INWARD_ANGLE
+	const smElasticIdx = result.elasticObjects.length
+	result.elasticObjects.push({
+		root: smPivot,
+		tiltX: 0,
+		tiltZ: 0,
+		tiltVelX: 0,
+		tiltVelZ: 0,
+	})
+	result.solidObstacles.push({
+		x: smX,
+		z: smZ,
+		radius: 0.6,
+		elasticIndex: smElasticIdx,
+	})
+	result.marshals.push({
+		model: startMarshal,
+		animPhase: Math.random() * Math.PI * 2,
+	})
 
-  return result;
+	return result
 }
 
 // ---------- Elastic object physics ----------
 
 import {
-  ELASTIC_SPRING_K,
-  ELASTIC_DAMPING,
-  ELASTIC_MAX_TILT,
-} from '../constants';
+	ELASTIC_SPRING_K,
+	ELASTIC_DAMPING,
+	ELASTIC_MAX_TILT,
+} from '../constants'
 
-export function updateElasticObjects(elasticObjects: ElasticObject[], dt: number) {
-  for (const obj of elasticObjects) {
-    const forceX = -ELASTIC_SPRING_K * obj.tiltX - ELASTIC_DAMPING * obj.tiltVelX;
-    const forceZ = -ELASTIC_SPRING_K * obj.tiltZ - ELASTIC_DAMPING * obj.tiltVelZ;
-    obj.tiltVelX += forceX * dt;
-    obj.tiltVelZ += forceZ * dt;
-    obj.tiltX += obj.tiltVelX * dt;
-    obj.tiltZ += obj.tiltVelZ * dt;
+export function updateElasticObjects(
+	elasticObjects: ElasticObject[],
+	dt: number,
+) {
+	for (const obj of elasticObjects) {
+		const forceX =
+			-ELASTIC_SPRING_K * obj.tiltX - ELASTIC_DAMPING * obj.tiltVelX
+		const forceZ =
+			-ELASTIC_SPRING_K * obj.tiltZ - ELASTIC_DAMPING * obj.tiltVelZ
+		obj.tiltVelX += forceX * dt
+		obj.tiltVelZ += forceZ * dt
+		obj.tiltX += obj.tiltVelX * dt
+		obj.tiltZ += obj.tiltVelZ * dt
 
-    const mag = Math.sqrt(obj.tiltX * obj.tiltX + obj.tiltZ * obj.tiltZ);
-    if (mag > ELASTIC_MAX_TILT) {
-      const s = ELASTIC_MAX_TILT / mag;
-      obj.tiltX *= s;
-      obj.tiltZ *= s;
-    }
+		const mag = Math.sqrt(obj.tiltX * obj.tiltX + obj.tiltZ * obj.tiltZ)
+		if (mag > ELASTIC_MAX_TILT) {
+			const s = ELASTIC_MAX_TILT / mag
+			obj.tiltX *= s
+			obj.tiltZ *= s
+		}
 
-    if (Math.abs(obj.tiltX) < 0.001 && Math.abs(obj.tiltVelX) < 0.001) {
-      obj.tiltX = 0;
-      obj.tiltVelX = 0;
-    }
-    if (Math.abs(obj.tiltZ) < 0.001 && Math.abs(obj.tiltVelZ) < 0.001) {
-      obj.tiltZ = 0;
-      obj.tiltVelZ = 0;
-    }
+		if (Math.abs(obj.tiltX) < 0.001 && Math.abs(obj.tiltVelX) < 0.001) {
+			obj.tiltX = 0
+			obj.tiltVelX = 0
+		}
+		if (Math.abs(obj.tiltZ) < 0.001 && Math.abs(obj.tiltVelZ) < 0.001) {
+			obj.tiltZ = 0
+			obj.tiltVelZ = 0
+		}
 
-    obj.root.rotation.x = obj.tiltZ;
-    obj.root.rotation.z = -obj.tiltX;
-  }
+		obj.root.rotation.x = obj.tiltZ
+		obj.root.rotation.z = -obj.tiltX
+	}
 }
 
 // ---------- Helpers ----------
 
-function makeColor(scene: Scene, name: string, color: Color3): StandardMaterial {
-  const mat = new StandardMaterial(name, scene);
-  mat.diffuseColor = color;
-  mat.specularColor = Color3.Black();
-  return mat;
+function makeColor(
+	scene: Scene,
+	name: string,
+	color: Color3,
+): StandardMaterial {
+	const mat = new StandardMaterial(name, scene)
+	mat.diffuseColor = color
+	mat.specularColor = Color3.Black()
+	return mat
 }

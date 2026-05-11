@@ -1,9 +1,6 @@
 {
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": {},
-  "references": [
-    { "path": "./apps/web" },
-    { "path": "./apps/api" }
-  ],
-  "files": []
+	"extends": "./tsconfig.base.json",
+	"compilerOptions": {},
+	"references": [{ "path": "./apps/web" }, { "path": "./apps/api" }],
+	"files": []
 }
