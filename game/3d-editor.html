@@ -58,11 +58,11 @@
       #level-picker button { margin-top: 12px; font-size: 14px; padding: 8px 24px; border-radius: 6px; cursor: pointer; }
       .stats { color: #777; font-size: 10px; margin-top: 8px; line-height: 1.5; }
     </style>
-    <script type="module" crossorigin src="/game/assets/3d-editor-CLCVWTBQ.js"></script>
+    <script type="module" crossorigin src="/game/assets/3d-editor-DRqJJx5F.js"></script>
     <link rel="modulepreload" crossorigin href="/game/assets/preload-helper-CeUGa9z8.js">
-    <link rel="modulepreload" crossorigin href="/game/assets/BusModel-Dvz4HLhR.js">
-    <link rel="modulepreload" crossorigin href="/game/assets/LevelObjects-BQPHTFGc.js">
-    <link rel="modulepreload" crossorigin href="/game/assets/index-Iig5s0y6.js">
+    <link rel="modulepreload" crossorigin href="/game/assets/BusModel-Cc13TXVt.js">
+    <link rel="modulepreload" crossorigin href="/game/assets/LevelObjects-BCPsZTzx.js">
+    <link rel="modulepreload" crossorigin href="/game/assets/index-muGDH0gh.js">
   </head>
   <body>
     <div id="level-picker">
@@ -80,6 +80,7 @@
         <div class="toggle-row"><input type="checkbox" id="tog-ground" checked><label for="tog-ground">Ground</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-wireframe"><label for="tog-wireframe">Wireframe</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-buildings" checked><label for="tog-buildings">Buildings</label></div>
+        <div class="toggle-row"><input type="checkbox" id="tog-bridges" checked><label for="tog-bridges">Bridges</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-objects" checked><label for="tog-objects">Objects</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-manual-trees" checked><label for="tog-manual-trees">Manual Trees</label></div>
         <div class="toggle-row"><input type="checkbox" id="tog-gen-trees"><label for="tog-gen-trees">Generated Trees</label></div>
@@ -104,7 +105,7 @@
       <div class="section">
         <div class="section-title">Actions</div>
         <button class="btn" id="btn-remesh" onclick="window.doRemesh();">Remesh Terrain</button>
-        <button class="btn btn-primary" id="btn-export">Copy altitude.json</button>
+        <button class="btn btn-primary" id="btn-export">Copy altitude.ts</button>
       </div>
 
       <hr class="divider">
