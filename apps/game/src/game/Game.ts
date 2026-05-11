@@ -161,6 +161,7 @@ import {
   BUS_REVERSE_LIGHT_COLOR_B,
 } from './constants';
 import {
+  type BridgeCollider,
   type BuildingCollider,
   type BuildingFootprint,
   type ElasticObject,
@@ -213,6 +214,12 @@ import {
   updateBuildingLod,
   type BuildingLodEntry,
 } from './systems/buildings';
+import {
+  buildBridgeMeshes,
+  resolvePositionAgainstBridges,
+  getBridgeDeckY,
+  type BridgeMeshEntry,
+} from './systems/bridges';
 import {
   createExhaustFlames,
   createExhaustFlamesForBus,
@@ -415,6 +422,8 @@ export class Game {
   private buildingFootprints: BuildingFootprint[] = [];
   private buildingColliders: BuildingCollider[] = [];
   private buildingLodEntries: BuildingLodEntry[] = [];
+  private bridgeColliders: BridgeCollider[] = [];
+  private bridgeEndpoints: { start: [number, number]; end: [number, number] }[] = [];
 
   // Ground mesh — stored for accurate height queries via getHeightAtCoordinates
   private groundMesh: GroundMesh | null = null;
@@ -1525,6 +1534,7 @@ export class Game {
     const roadFeatures = level.roads ?? [];
     const buildingFeatures = level.buildings ?? [];
     const pathFeatures = level.paths ?? [];
+    const bridgeFeatures = level.bridges ?? [];
 
     this.pathTextureUrl = level.pathTexture;
 
@@ -1674,6 +1684,18 @@ export class Game {
     this.buildingLodEntries = buildingResult.lodEntries;
     this.updateBuildingLodForPlayer();
     this.updateDistanceCulling();
+    // Build bridges (two-point definitions converted to world-space)
+    const bridgeWorldData = bridgeFeatures.map((b) => {
+      const [rawSx, rawSz] = gpsPointToLocal(b.points[0][1], b.points[0][0], this.originCoord);
+      const [rawEx, rawEz] = gpsPointToLocal(b.points[1][1], b.points[1][0], this.originCoord);
+      return {
+        start: [rawSx * this.scaleFactor, rawSz * this.scaleFactor] as [number, number],
+        end: [rawEx * this.scaleFactor, rawEz * this.scaleFactor] as [number, number],
+      };
+    });
+    const bridgeResult = buildBridgeMeshes(this.scene, bridgeWorldData, (x, z) => this.getGroundY(x, z));
+    this.bridgeColliders = bridgeResult.colliders;
+    this.bridgeEndpoints = bridgeWorldData.map((b) => ({ start: b.start, end: b.end }));
     if (level.trees !== false) {
       const manualTreePositions: [number, number][] = (level.manualTrees ?? []).map(
         ([lat, lon]): [number, number] => {
@@ -1739,7 +1761,13 @@ export class Game {
         toPlaced(objs?.lampposts),
         toPlaced(objs?.tennisCourts),
         toPlaced(objs?.floodlights),
-        (x, z) => this.getGroundY(x, z),
+        (x, z) => {
+          let y = this.getGroundY(x, z);
+          // Ensure objects don't sink below water surface
+          const waterY = this.getWaterSurfaceY(x, z);
+          if (waterY !== null && y < waterY) y = waterY;
+          return y;
+        },
         isNight,
       );
       // Offset elastic indices so they map into the global elasticObjects array
@@ -2019,6 +2047,7 @@ export class Game {
       this.minimap.setRoads(this.roadPolylines);
       this.minimap.setTrails(this.trailPolylines);
       this.minimap.setBuildings(this.buildingFootprints);
+      this.minimap.setBridges(this.bridgeEndpoints);
       if (this.level?.minimapZoom) {
         this.minimap.setZoom(this.level.minimapZoom);
       }
@@ -2029,6 +2058,7 @@ export class Game {
       this.p2Minimap.setRoads(this.roadPolylines);
       this.p2Minimap.setTrails(this.trailPolylines);
       this.p2Minimap.setBuildings(this.buildingFootprints);
+      this.p2Minimap.setBridges(this.bridgeEndpoints);
       if (this.level?.minimapZoom) {
         this.p2Minimap.setZoom(this.level.minimapZoom);
       }
@@ -2268,6 +2298,13 @@ export class Game {
    * Falls back to the spline-based getTerrainHeight if ground isn't built yet.
    */
   private getGroundY(x: number, z: number): number {
+    // Check if on a bridge deck first — overrides water dip
+    const bridgeY = getBridgeDeckY(x, z, this.bridgeColliders, (bx, bz) => {
+      if (this.groundMesh) return this.groundMesh.getHeightAtCoordinates(bx, bz);
+      return this.getTerrainHeight(bx, bz);
+    });
+    if (bridgeY !== null) return bridgeY;
+
     if (this.groundMesh) {
       return this.groundMesh.getHeightAtCoordinates(x, z);
     }
@@ -3177,6 +3214,7 @@ export class Game {
     }
 
     this.resolvePositionAgainstBuildingsLocal(this.busPos, br);
+    resolvePositionAgainstBridges(this.busPos, br, this.bridgeColliders);
 
     // Fence boundary collision
     resolvePositionAgainstFence(this.busPos, br, this.fenceCollider);
@@ -3394,6 +3432,7 @@ export class Game {
     }
 
     this.resolvePositionAgainstBuildingsLocal(this.p2Pos, radius);
+    resolvePositionAgainstBridges(this.p2Pos, radius, this.bridgeColliders);
     resolvePositionAgainstFence(this.p2Pos, radius, this.fenceCollider);
 
     if (!touchingElastic) {
@@ -4168,6 +4207,7 @@ export class Game {
         elasticObjects: this.elasticObjects,
         remotePlayers: this.remotePlayers,
         buildingColliders: this.buildingColliders,
+        bridgeColliders: this.bridgeColliders,
         engineVibeOffset,
         localMultiplayer: this.localMultiplayer,
       }, dt);
@@ -4362,6 +4402,7 @@ export class Game {
           elasticObjects: this.elasticObjects,
           remotePlayers: this.remotePlayers,
           buildingColliders: this.buildingColliders,
+          bridgeColliders: this.bridgeColliders,
           engineVibeOffset,
           localMultiplayer: this.localMultiplayer,
         }, dt);
@@ -4904,6 +4945,7 @@ export class Game {
       elasticObjects: this.elasticObjects,
       remotePlayers: this.remotePlayers,
       buildingColliders: this.buildingColliders,
+      bridgeColliders: this.bridgeColliders,
       engineVibeOffset,
       localMultiplayer: this.localMultiplayer,
     }, dt);

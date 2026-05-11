@@ -62,6 +62,7 @@ export class Minimap {
   private roads: [number, number][][] = [];
   private trails: [number, number][][] = [];
   private buildings: { type: 'grey' | 'red' | 'blue' | 'green' | 'yellow' | 'kristineberg'; points: [number, number][] }[] = [];
+  private bridges: { start: [number, number]; end: [number, number] }[] = [];
 
 
   private gapThresholdSq = Infinity; // adaptive gap detection
@@ -117,6 +118,10 @@ export class Minimap {
 
   setBuildings(buildings: { type: 'grey' | 'red' | 'blue' | 'green' | 'yellow' | 'kristineberg'; points: [number, number][] }[]) {
     this.buildings = buildings;
+  }
+
+  setBridges(bridges: { start: [number, number]; end: [number, number] }[]) {
+    this.bridges = bridges;
   }
 
 
@@ -227,6 +232,19 @@ export class Minimap {
       }
       ctx.closePath();
       ctx.fill();
+    }
+
+    // --- bridges (on top of water) ---
+    for (const bridge of this.bridges) {
+      const [sx, sy] = project(bridge.start[0], bridge.start[1]);
+      const [ex, ey] = project(bridge.end[0], bridge.end[1]);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.strokeStyle = COL_BUILDING_GREY;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.stroke();
     }
 
     // --- trails (under roads and main path) ---

@@ -79,6 +79,7 @@ const COLORS = {
   floodlight: '#ff9922',
   goose: '#4a4a4a',
   deer: '#8B4513',
+  bridge: '#777788',
   selected: '#ffcc00',
 };
 
@@ -91,6 +92,7 @@ interface BuildingItem { type: BuildingType; height?: number; points: [number, n
 interface WaterItem { type: 'water' | 'river'; points: [number, number][]; }
 interface FenceItem { points: [number, number][]; }
 interface TreeItem { pos: [number, number]; }
+interface BridgeItem { points: [[number, number], [number, number]]; }
 type ObjectKind = 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose' | 'deer';
 interface ObjectItem { kind: ObjectKind; pos: [number, number]; rotation: number; }
 
@@ -182,6 +184,13 @@ async function main() {
     points: b.points.map(([lat, lon]) => gpsToLocal(lon, lat, origin)) as [number, number][],
   }));
 
+  const bridgeItems: BridgeItem[] = (level.bridges ?? []).map((b) => ({
+    points: [
+      gpsToLocal(b.points[0][1], b.points[0][0], origin),
+      gpsToLocal(b.points[1][1], b.points[1][0], origin),
+    ] as [[number, number], [number, number]],
+  }));
+
   const waterItems: WaterItem[] = (level.water ?? []).map((w) => ({
     type: w.type,
     points: w.coords.map(([lon, lat]) => gpsToLocal(lon, lat, origin)) as [number, number][],
@@ -228,6 +237,7 @@ async function main() {
     ...mainPath,
     ...otherPaths.flatMap((p) => p.points),
     ...buildingItems.flatMap((b) => b.points),
+    ...bridgeItems.flatMap((b) => b.points),
     ...waterItems.flatMap((w) => w.points),
     ...fenceItems.flatMap((f) => f.points),
     ...regionItems.flatMap((r) => r.points),
@@ -250,8 +260,8 @@ async function main() {
 
   // ── State ───────────────────────────────────────────────────────────
 
-  type SelectionKind = 'building' | 'water' | 'fence' | 'region' | 'tree' | 'object';
-  type DrawMode = 'none' | 'building' | 'field' | 'concrete' | 'fence' | 'water' | 'river' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose' | 'deer';
+  type SelectionKind = 'building' | 'bridge' | 'water' | 'fence' | 'region' | 'tree' | 'object';
+  type DrawMode = 'none' | 'building' | 'bridge' | 'field' | 'concrete' | 'fence' | 'water' | 'river' | 'tree' | 'bench' | 'lamppost' | 'tennisCourt' | 'floodlight' | 'goose' | 'deer';
 
   let selectedKind: SelectionKind | null = null;
   let selectedIndex: number = -1;
@@ -272,6 +282,7 @@ async function main() {
   const layerWater = svgEl('g', { 'data-layer': 'water' });
   const layerRegions = svgEl('g', { 'data-layer': 'regions' });
   const layerBuildings = svgEl('g', { 'data-layer': 'buildings' });
+  const layerBridges = svgEl('g', { 'data-layer': 'bridges' });
   const layerPaths = svgEl('g', { 'data-layer': 'paths' });
   const layerFences = svgEl('g', { 'data-layer': 'fences' });
   const layerMainPath = svgEl('g', { 'data-layer': 'mainPath' });
@@ -283,6 +294,7 @@ async function main() {
   g.appendChild(layerWater);
   g.appendChild(layerRegions);
   g.appendChild(layerBuildings);
+  g.appendChild(layerBridges);
   g.appendChild(layerPaths);
   g.appendChild(layerFences);
   g.appendChild(layerMainPath);
@@ -399,6 +411,40 @@ async function main() {
       });
       poly.style.cursor = 'pointer';
       layerBuildings.appendChild(poly);
+    }
+  }
+
+  function renderBridges() {
+    layerBridges.innerHTML = '';
+    for (let i = 0; i < bridgeItems.length; i++) {
+      const b = bridgeItems[i];
+      const [p1, p2] = b.points;
+      const isSel = selectedKind === 'bridge' && selectedIndex === i;
+      // Render as a thick line between the two endpoints
+      const line = svgEl('line', {
+        x1: p1[0], y1: -p1[1],
+        x2: p2[0], y2: -p2[1],
+        stroke: isSel ? COLORS.selected : COLORS.bridge,
+        'stroke-width': 4,
+        'stroke-linecap': 'round',
+        'stroke-opacity': 0.9,
+        'data-kind': 'bridge',
+        'data-idx': i,
+      });
+      line.style.cursor = 'pointer';
+      layerBridges.appendChild(line);
+      // Endpoint circles
+      for (const pt of [p1, p2]) {
+        const dot = svgEl('circle', {
+          cx: pt[0], cy: -pt[1], r: 1.5,
+          fill: isSel ? COLORS.selected : '#aabbcc',
+          'stroke-width': 0,
+          'data-kind': 'bridge',
+          'data-idx': i,
+        });
+        dot.style.cursor = 'pointer';
+        layerBridges.appendChild(dot);
+      }
     }
   }
 
@@ -749,6 +795,7 @@ async function main() {
 
     let points: [number, number][] = [];
     if (selectedKind === 'building') points = buildingItems[selectedIndex]?.points ?? [];
+    else if (selectedKind === 'bridge') points = bridgeItems[selectedIndex]?.points ?? [];
     else if (selectedKind === 'water') points = waterItems[selectedIndex]?.points ?? [];
     else if (selectedKind === 'fence') points = fenceItems[selectedIndex]?.points ?? [];
     else if (selectedKind === 'region') points = regionItems[selectedIndex]?.points ?? [];
@@ -771,8 +818,8 @@ async function main() {
       layerHandles.appendChild(handle);
     }
 
-    // Edge midpoint markers (clickable to add a vertex)
-    if (points.length >= 2) {
+    // Edge midpoint markers (clickable to add a vertex) — skip for bridges (fixed 2 points)
+    if (points.length >= 2 && selectedKind !== 'bridge') {
       const edgeCount = points.length; // closed polygon: last→first too
       for (let ei = 0; ei < edgeCount; ei++) {
         const [x1, z1] = points[ei];
@@ -802,6 +849,16 @@ async function main() {
   function renderDrawing() {
     layerDrawing.innerHTML = '';
     if (drawMode === 'none' || drawingPoints.length === 0) return;
+    if (drawMode === 'bridge') {
+      // Show first point of the bridge being drawn
+      for (const [x, z] of drawingPoints) {
+        layerDrawing.appendChild(svgEl('circle', {
+          cx: x, cy: -z, r: handleRadius,
+          fill: COLORS.bridge, stroke: '#fff', 'stroke-width': handleRadius * 0.3,
+        }));
+      }
+      return;
+    }
     if (drawMode !== 'building' && drawMode !== 'field' && drawMode !== 'concrete' && drawMode !== 'fence' && drawMode !== 'water' && drawMode !== 'river') return;
     const color = drawMode === 'building' ? COLORS.buildingGrey : drawMode === 'concrete' ? COLORS.concrete : drawMode === 'fence' ? COLORS.fence : drawMode === 'water' ? COLORS.water : drawMode === 'river' ? COLORS.river : COLORS.field;
     if (drawingPoints.length >= 2) {
@@ -827,6 +884,7 @@ async function main() {
     renderWater();
     renderRegions();
     renderBuildings();
+    renderBridges();
     renderFences();
     renderOtherPaths();
     renderMainPath();
@@ -853,6 +911,7 @@ async function main() {
   function deleteSelected() {
     if (selectedKind === null || selectedIndex < 0) return;
     if (selectedKind === 'building') buildingItems.splice(selectedIndex, 1);
+    else if (selectedKind === 'bridge') bridgeItems.splice(selectedIndex, 1);
     else if (selectedKind === 'water') waterItems.splice(selectedIndex, 1);
     else if (selectedKind === 'fence') fenceItems.splice(selectedIndex, 1);
     else if (selectedKind === 'region') regionItems.splice(selectedIndex, 1);
@@ -891,6 +950,7 @@ async function main() {
 
     const drawTools: [string, DrawMode, string][] = [
       ['Building', 'building', COLORS.buildingGrey],
+      ['Bridge', 'bridge', COLORS.bridge],
       ['Field', 'field', COLORS.field],
       ['Concrete', 'concrete', COLORS.concrete],
       ['Fence', 'fence', COLORS.fence],
@@ -932,6 +992,12 @@ async function main() {
       hint.textContent = 'Click to add points. Double-click to finish.';
       drawSection.appendChild(hint);
     }
+    if (drawMode === 'bridge') {
+      const hint = document.createElement('div');
+      hint.className = 'sidebar-hint';
+      hint.textContent = 'Click two points to define bridge endpoints.';
+      drawSection.appendChild(hint);
+    }
     if (drawMode === 'tree') {
       const hint = document.createElement('div');
       hint.className = 'sidebar-hint';
@@ -959,6 +1025,7 @@ async function main() {
       ['Main path', COLORS.mainPath, layerMainPath],
       ['Paths', COLORS.footway, layerPaths],
       ['Buildings', COLORS.buildingGrey, layerBuildings],
+      ['Bridges', COLORS.bridge, layerBridges],
       ['Water', COLORS.water, layerWater],
       ['Regions', COLORS.field, layerRegions],
       ['Fences', COLORS.fence, layerFences],
@@ -1051,6 +1118,8 @@ async function main() {
         });
         heightRow.appendChild(heightInput);
         selSection.appendChild(heightRow);
+      } else if (selectedKind === 'bridge') {
+        info.textContent = `Bridge #${selectedIndex}`;
       } else if (selectedKind === 'water') {
         const w = waterItems[selectedIndex];
         info.textContent = `Water #${selectedIndex} (${w.type}) — ${w.points.length} verts`;
@@ -1246,6 +1315,9 @@ async function main() {
         }
         return obj;
       })],
+      ['bridges.json', () => bridgeItems.map((b) => ({
+        points: b.points.map(([x, z]) => localToGps(x, z, origin)),
+      }))],
       ['water.json', () => waterItems.map((w) => ({
         type: w.type,
         coords: w.points.map(([x, z]) => {
@@ -1407,6 +1479,18 @@ async function main() {
     if (drawMode === 'bench' || drawMode === 'lamppost' || drawMode === 'tennisCourt' || drawMode === 'floodlight' || drawMode === 'goose' || drawMode === 'deer') {
       objectItems.push({ kind: drawMode, pos: [x, z], rotation: 0 });
       select('object', objectItems.length - 1);
+      return;
+    }
+    if (drawMode === 'bridge') {
+      drawingPoints.push([x, z]);
+      if (drawingPoints.length >= 2) {
+        bridgeItems.push({ points: [drawingPoints[0], drawingPoints[1]] as [[number, number], [number, number]] });
+        drawingPoints = [];
+        drawMode = 'none';
+        select('bridge', bridgeItems.length - 1);
+      } else {
+        renderDrawing();
+      }
       return;
     }
     if (drawMode === 'building' || drawMode === 'field' || drawMode === 'concrete' || drawMode === 'fence' || drawMode === 'water' || drawMode === 'river') {
@@ -1577,6 +1661,7 @@ async function main() {
       const [x, z] = clientToSvg(e.clientX, e.clientY);
       let points: [number, number][] | null = null;
       if (kind === 'building') points = buildingItems[itemIdx]?.points ?? null;
+      else if (kind === 'bridge') points = bridgeItems[itemIdx]?.points ?? null;
       else if (kind === 'water') points = waterItems[itemIdx]?.points ?? null;
       else if (kind === 'fence') points = fenceItems[itemIdx]?.points ?? null;
       else if (kind === 'region') points = regionItems[itemIdx]?.points ?? null;

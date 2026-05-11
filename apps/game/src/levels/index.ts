@@ -5,6 +5,10 @@
  */
 import type { LevelData } from './types';
 import hagaLevel from './haga/index';
+import hagaImg from '../assets/levels/haga.png';
+import huddingeImg from '../assets/levels/huddinge.png';
+import judarskogenImg from '../assets/levels/judarskogen.png';
+import kristinebergImg from '../assets/levels/kristineberg.png';
 
 // ── Level metadata (always available, no heavy data) ─────────────────
 
@@ -14,14 +18,16 @@ export interface LevelMeta {
   hide?: boolean;
   /** Display name when alt course is selected (shift+click) */
   altCourseName?: string;
+  /** Optional preview image URL for the level select grid */
+  image?: string;
 }
 
 const levelMeta: LevelMeta[] = [
   { id: 'cheltenham', name: 'Cheltenham', hide: true },
-  { id: 'haga', name: 'Haga', altCourseName: 'Haga (alt course)' },
-  { id: 'huddinge', name: 'Huddinge' },
-  { id: 'judarskogen', name: 'Judarskogen' },
-  { id: 'kristineberg', name: 'Kristineberg' },
+  { id: 'haga', name: 'Haga', altCourseName: 'Haga (alt course)', image: hagaImg },
+  { id: 'huddinge', name: 'Huddinge', image: huddingeImg },
+  { id: 'judarskogen', name: 'Judarskogen', image: judarskogenImg },
+  { id: 'kristineberg', name: 'Kristineberg', image: kristinebergImg },
   { id: 'lillsjon', name: 'Lillsjön', hide: true },
   { id: 'uppsala', name: 'Uppsala', hide: true },
 ];

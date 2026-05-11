@@ -28,6 +28,10 @@ export interface LevelData {
     height?: number;
     points: [number, number][];
   }[];
+  /** Bridges defined by two endpoints [lat, lon] — always placed over water */
+  bridges?: {
+    points: [[number, number], [number, number]];
+  }[];
   /** Paths/trails as polylines of [lat, lon] points */
   paths?: {
     type: 'footway' | 'cycleway' | 'path' | 'track' | 'steps' | 'bridleway';

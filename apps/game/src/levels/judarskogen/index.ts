@@ -7,6 +7,7 @@ import buildings from './buildings.json';
 import paths from './paths.json';
 import roads from './roads.json';
 import objects from './objects.json';
+import regions from './regions.json';
 
 // Shift roads 50 m west and 15 m north (at ~59.35°N latitude)
 const LAT_PER_METRE = 1 / 111_000;
@@ -27,6 +28,7 @@ const level: LevelData = {
   paths: paths as LevelData['paths'],
   roads: shiftedRoads,
   objects: objects as LevelData['objects'],
+  regions: regions as LevelData['regions'],
 };
 
 export default level;

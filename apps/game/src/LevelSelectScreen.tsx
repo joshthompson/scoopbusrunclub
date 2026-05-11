@@ -64,7 +64,7 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
       <div class="title-content">
         <img src={logoSrc} alt="Scoop Bus" class="title-logo" />
         <h2 class="screen-heading">Select Course</h2>
-        <div class="course-buttons">
+        <div class="level-grid">
           <For each={courseIds()}>
             {(id) => {
               const level = levels[id];
@@ -72,11 +72,12 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
               const displayName = () => useAlt() ? level.altCourseName! : level.name;
               return (
                 <button
-                  class="course-btn"
+                  class="level-tile"
                   classList={{ 'menu-focused': isFocused(1 + courseIds().indexOf(id)) }}
                   onClick={() => props.onSelect(id, useAlt() ? { altCourse: true } : undefined)}
                 >
-                  {displayName()}
+                  {level.image && <img class="level-tile-img" src={level.image} alt={level.name} />}
+                  <span class="level-tile-name">{displayName()}</span>
                 </button>
               );
             }}

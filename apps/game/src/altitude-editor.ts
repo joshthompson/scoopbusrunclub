@@ -82,6 +82,7 @@ let waterZones: WaterZone[] = [];
 let groundMesh: Mesh | null = null;
 let groundWireframe: LinesMesh | null = null;
 let buildingRoot: TransformNode | null = null;
+let bridgeRoot: TransformNode | null = null;
 let objectRoot: TransformNode | null = null;
 let manualTreeRoot: TransformNode | null = null;
 let generatedTreeRoot: TransformNode | null = null;
@@ -256,6 +257,7 @@ async function initEditor(levelId: string) {
   buildGroundMesh(pathPositions, pathHeights);
   buildCoursePath(pathPositions, pathHeights);
   buildBuildingsSimple();
+  buildBridgesSimple();
   buildObjectsSimple();
   buildManualTrees();
   buildGeneratedTrees();
@@ -539,6 +541,64 @@ function buildBuildingsSimple() {
       building.parent = buildingRoot;
     } catch {
       // Skip buildings that fail earcut triangulation
+    }
+  }
+}
+
+// ── Bridges ──
+
+function buildBridgesSimple() {
+  if (bridgeRoot) bridgeRoot.dispose();
+  bridgeRoot = new TransformNode('bridges', scene);
+
+  const bridges = level.bridges ?? [];
+  if (bridges.length === 0) return;
+
+  const deckMat = new StandardMaterial('bridge_deck_mat', scene);
+  deckMat.diffuseColor = new Color3(0.55, 0.55, 0.55);
+  deckMat.specularColor = Color3.Black();
+
+  const railMat = new StandardMaterial('bridge_rail_mat', scene);
+  railMat.diffuseColor = new Color3(0.35, 0.38, 0.4);
+  railMat.specularColor = new Color3(0.1, 0.1, 0.1);
+
+  for (let i = 0; i < bridges.length; i++) {
+    const b = bridges[i];
+    const [sx, sz] = gpsToWorld(b.points[0][0], b.points[0][1]);
+    const [ex, ez] = gpsToWorld(b.points[1][0], b.points[1][1]);
+    const cx = (sx + ex) / 2;
+    const cz = (sz + ez) / 2;
+    const dx = ex - sx;
+    const dz = ez - sz;
+    const length = Math.sqrt(dx * dx + dz * dz);
+    if (length < 0.5) continue;
+
+    const yaw = Math.atan2(dx, dz);
+    const groundY = getTerrainHeight(cx, cz);
+    const deckY = groundY + 0.5;
+    const width = 3.36; // bus width * 1.2
+
+    const deck = MeshBuilder.CreateBox(`bridge_deck_${i}`, {
+      width, height: 0.35, depth: length,
+    }, scene);
+    deck.material = deckMat;
+    deck.position.set(cx, deckY, cz);
+    deck.rotation.y = -yaw;
+    deck.parent = bridgeRoot;
+
+    // Railings (simple boxes on each side)
+    for (const side of [-1, 1]) {
+      const rail = MeshBuilder.CreateBox(`bridge_rail_${i}_${side}`, {
+        width: 0.08, height: 1.2, depth: length,
+      }, scene);
+      rail.material = railMat;
+      rail.position.set(
+        cx + side * (width / 2) * Math.cos(yaw),
+        deckY + 0.35 / 2 + 0.6,
+        cz - side * (width / 2) * Math.sin(yaw),
+      );
+      rail.rotation.y = -yaw;
+      rail.parent = bridgeRoot;
     }
   }
 }
@@ -1089,6 +1149,7 @@ function setupToggles() {
     if (groundWireframe) groundWireframe.isVisible = checked;
   });
   bind('tog-buildings', () => buildingRoot);
+  bind('tog-bridges', () => bridgeRoot);
   bind('tog-objects', () => objectRoot);
   bind('tog-manual-trees', () => manualTreeRoot);
   bind('tog-gen-trees', () => generatedTreeRoot);

@@ -111,6 +111,18 @@ export type BuildingCollider = {
   halfDepth: number;
 };
 
+export type BridgeCollider = {
+  /** World-space centre of the bridge */
+  x: number;
+  z: number;
+  /** Rotation angle so that the bridge's "forward" axis runs between the two endpoints */
+  yaw: number;
+  /** Half the bridge width (bus width * 1.2 / 2) */
+  halfWidth: number;
+  /** Half the bridge length (distance between the two endpoints / 2) */
+  halfLength: number;
+};
+
 export type WaterZone = {
   points: [number, number][];
   y: number;

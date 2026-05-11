@@ -20,8 +20,9 @@ import {
 import { createCorgiModel } from '../objects/CorgiModel';
 import { applyRunnerInteractionPose } from './runnerInteractions';
 import { PLAYER_COLORS } from '../objects/BusModel';
-import type { Runner, RemotePlayersMap, ElasticObject, SolidObstacle, BuildingCollider } from '../types';
+import type { Runner, RemotePlayersMap, ElasticObject, SolidObstacle, BuildingCollider, BridgeCollider } from '../types';
 import { resolvePositionAgainstBuildings } from './buildings';
+import { resolvePositionAgainstBridges } from './bridges';
 import { mulberry32 } from './terrain';
 import {
   BUS_COLLISION_RADIUS,
@@ -140,6 +141,7 @@ export interface RunnerUpdateContext {
   elasticObjects: ElasticObject[];
   remotePlayers: RemotePlayersMap;
   buildingColliders: BuildingCollider[];
+  bridgeColliders: BridgeCollider[];
   /** Current engine vibration Y offset (applied to roof riders). */
   engineVibeOffset: number;
   /** When true, also simulate runners owned by other local players (P2). */
@@ -414,6 +416,7 @@ export function updateRunnersSystem(
               runner.velZ = 0;
             }
           }
+          resolvePositionAgainstBridges(pos, RUNNER_COLLISION_RADIUS, ctx.bridgeColliders);
 
           // Remote player collisions
           for (const [_peerId, remote] of ctx.remotePlayers) {

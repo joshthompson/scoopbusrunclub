@@ -142,6 +142,62 @@
         margin-bottom: 16px;
         filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
       }
+
+      /* ── Level grid ─────────────────────────────────── */
+      .level-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 200px));
+        gap: 16px;
+        justify-content: center;
+        width: 100%;
+        max-width: 700px;
+        margin: 0 auto 24px;
+      }
+      .level-tile {
+        aspect-ratio: 4 / 3;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 4px solid black;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #3a3a5c 0%, #1e1e2e 100%);
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        overflow: hidden;
+        position: relative;
+      }
+      .level-tile:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+      }
+      .level-tile:active {
+        transform: scale(0.97);
+      }
+      .level-tile.menu-focused {
+        transform: scale(1.05);
+        border-color: #ffc107;
+        box-shadow: 0 0 20px rgba(255, 193, 7, 0.6), 0 0 0 3px rgba(255, 193, 7, 0.8);
+      }
+      .level-tile-name {
+        font-family: 'Arial Black', 'Impact', sans-serif;
+        font-size: clamp(14px, 2.5vw, 20px);
+        color: #fff;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+        letter-spacing: 0.03em;
+        text-align: center;
+        padding: 8px;
+        position: relative;
+        z-index: 1;
+      }
+      .level-tile-img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
       .course-buttons {
         display: flex;
         flex-direction: column;
@@ -193,7 +249,8 @@
         content: '▸ ';
       }
       .char-tile.menu-focused::before,
-      .room-join-btn.menu-focused::before {
+      .room-join-btn.menu-focused::before,
+      .level-tile.menu-focused::before {
         content: none;
       }
 

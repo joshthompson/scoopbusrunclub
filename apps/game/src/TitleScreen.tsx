@@ -122,7 +122,7 @@ export function TitleScreen(props: TitleScreenProps) {
             ))}
 
             <h3>Special Thanks</h3>
-            <p>Keith Clark for providing GPS data for Huddinge</p>
+            <p>Keith Clark for providing GPS data for Huddinge and Lillsjön</p>
             <p>Roman Fadeev for engine optimisation tips</p>
             <p>Parkrun for running the events this game is inspired by</p>
 
