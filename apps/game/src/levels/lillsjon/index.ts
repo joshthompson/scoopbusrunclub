@@ -5,6 +5,10 @@ import altitude from './altitude.json';
 import water from './water.json';
 import roads from './roads.json';
 import objects from './objects.json';
+import buildings from './buildings.json';
+import paths from './paths.json';
+import regions from './regions.json';
+import trees from './trees.json';
 
 const level: LevelData = {
   id: 'lillsjon',
@@ -14,6 +18,10 @@ const level: LevelData = {
   water: water as LevelData['water'],
   roads: roads as LevelData['roads'],
   objects: objects as LevelData['objects'],
+  buildings: buildings as LevelData['buildings'],
+  paths: paths as LevelData['paths'],
+  regions: regions as LevelData['regions'],
+  manualTrees: trees as LevelData['manualTrees'],
   hide: true,
 };
 

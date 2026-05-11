@@ -28,14 +28,7 @@ export const COURSE_OVERRIDES: Record<string, CourseOverride> = {
       [1, 0], // Final stretch to the finish
     ],
   },
-  lillsjon: {
-    sections: [
-      [0, 18], // Start
-      [18, 768], // Lap 1
-      [18, 768], // Lap 2
-      [769, 797], // Final stretch to the finish
-    ],
-  },
+  lillsjon: {}, // Course data from GPX — no overrides needed
   uppsala: {
     sections: [
       [7, 41], [0, 6], // Lap 1

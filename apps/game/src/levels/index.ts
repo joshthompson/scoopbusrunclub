@@ -9,6 +9,7 @@ import hagaImg from '../assets/levels/haga.png';
 import huddingeImg from '../assets/levels/huddinge.png';
 import judarskogenImg from '../assets/levels/judarskogen.png';
 import kristinebergImg from '../assets/levels/kristineberg.png';
+import lillsjonImg from '../assets/levels/lillsjon.png';
 
 // ── Level metadata (always available, no heavy data) ─────────────────
 
@@ -28,7 +29,7 @@ const levelMeta: LevelMeta[] = [
   { id: 'huddinge', name: 'Huddinge', image: huddingeImg },
   { id: 'judarskogen', name: 'Judarskogen', image: judarskogenImg },
   { id: 'kristineberg', name: 'Kristineberg', image: kristinebergImg },
-  { id: 'lillsjon', name: 'Lillsjön', hide: true },
+  { id: 'lillsjon', name: 'Lillsjön', image: lillsjonImg },
   { id: 'uppsala', name: 'Uppsala', hide: true },
 ];
 
