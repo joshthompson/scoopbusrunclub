@@ -24,7 +24,9 @@ export interface BuildLevelObjectsResult {
 		x: number
 		z: number
 		radius: number
+		originalRadius?: number
 		elasticIndex?: number
+		root?: TransformNode
 		scoopable?: boolean
 	}[]
 	objectRoots: TransformNode[]
@@ -543,10 +545,113 @@ function placeTennisCourt(
 	return root
 }
 
+// ── Portaloo (portable toilet) templates ────────────────────────────────
+
+// Approx. real-world dimensions: ~1.1m wide × ~1.2m deep × ~2.2m tall
+const PT_W = 1.1
+const PT_D = 1.2
+const PT_H = 2.2
+const PT_ROOF_H = 0.15
+
+interface PortalooTemplates {
+	body: Mesh
+	roof: Mesh
+	door: Mesh
+	sign: Mesh
+}
+
+function createPortalooTemplates(scene: Scene): PortalooTemplates {
+	// Blue body
+	const bodyMat = new StandardMaterial('ptBody', scene)
+	bodyMat.diffuseColor = new Color3(0.18, 0.45, 0.78)
+	bodyMat.specularColor = new Color3(0.08, 0.08, 0.08)
+
+	const body = MeshBuilder.CreateBox(
+		'tpl_pt_body',
+		{ width: PT_W, height: PT_H, depth: PT_D },
+		scene,
+	)
+	body.material = bodyMat
+	body.isVisible = false
+
+	// Light grey rounded roof
+	const roofMat = new StandardMaterial('ptRoof', scene)
+	roofMat.diffuseColor = new Color3(0.82, 0.82, 0.82)
+	roofMat.specularColor = new Color3(0.05, 0.05, 0.05)
+
+	const roof = MeshBuilder.CreateBox(
+		'tpl_pt_roof',
+		{ width: PT_W + 0.04, height: PT_ROOF_H, depth: PT_D + 0.04 },
+		scene,
+	)
+	roof.material = roofMat
+	roof.isVisible = false
+
+	// Slightly darker blue door panel
+	const doorMat = new StandardMaterial('ptDoor', scene)
+	doorMat.diffuseColor = new Color3(0.14, 0.36, 0.65)
+	doorMat.specularColor = new Color3(0.05, 0.05, 0.05)
+
+	const door = MeshBuilder.CreateBox(
+		'tpl_pt_door',
+		{ width: PT_W * 0.55, height: PT_H * 0.72, depth: 0.03 },
+		scene,
+	)
+	door.material = doorMat
+	door.isVisible = false
+
+	// White sign panel on front
+	const signMat = new StandardMaterial('ptSign', scene)
+	signMat.diffuseColor = new Color3(0.95, 0.95, 0.95)
+	signMat.specularColor = Color3.Black()
+
+	const sign = MeshBuilder.CreateBox(
+		'tpl_pt_sign',
+		{ width: PT_W * 0.45, height: PT_H * 0.18, depth: 0.04 },
+		scene,
+	)
+	sign.material = signMat
+	sign.isVisible = false
+
+	return { body, roof, door, sign }
+}
+
+function placePortaloo(
+	tpl: PortalooTemplates,
+	scene: Scene,
+	i: number,
+	x: number,
+	y: number,
+	z: number,
+	rotation: number,
+): TransformNode {
+	const root = new TransformNode(`portaloo_${i}`, scene)
+	root.position.set(x, y, z)
+	root.rotation.y = rotation
+
+	const b = tpl.body.createInstance(`pt_${i}_body`)
+	b.position.y = PT_H / 2
+	b.parent = root
+
+	const r = tpl.roof.createInstance(`pt_${i}_roof`)
+	r.position.y = PT_H + PT_ROOF_H / 2
+	r.parent = root
+
+	const d = tpl.door.createInstance(`pt_${i}_door`)
+	d.position.set(0, PT_H * 0.38, PT_D / 2 + 0.015)
+	d.parent = root
+
+	const s = tpl.sign.createInstance(`pt_${i}_sign`)
+	s.position.set(0, PT_H * 0.78, PT_D / 2 + 0.02)
+	s.parent = root
+
+	return root
+}
+
 // ── Main builder ────────────────────────────────────────────────────────
 
 /**
- * Build all placed level objects (benches, lampposts, tennis courts, floodlights).
+ * Build all placed level objects (benches, lampposts, tennis courts, floodlights, portaloos).
  * Uses instanced meshes — one set of invisible template meshes per object type,
  * with lightweight instances stamped out per placement for minimal draw calls.
  */
@@ -556,6 +661,7 @@ export function buildLevelObjects(
 	lampposts: PlacedObjectData[],
 	tennisCourts: PlacedObjectData[],
 	floodlights: PlacedObjectData[],
+	portaloos: PlacedObjectData[],
 	getGroundY: (x: number, z: number) => number,
 	isNight = false,
 ): BuildLevelObjectsResult {
@@ -563,8 +669,11 @@ export function buildLevelObjects(
 		x: number
 		z: number
 		radius: number
+		originalRadius?: number
 		elasticIndex?: number
+		root?: TransformNode
 		scoopable?: boolean
+		scoopSound?: string
 	}[] = []
 	const objectRoots: TransformNode[] = []
 	const elasticObjects: ElasticObject[] = []
@@ -576,6 +685,8 @@ export function buildLevelObjects(
 		tennisCourts.length > 0 ? createTennisTemplates(scene) : null
 	const floodTpl =
 		floodlights.length > 0 ? createFloodlightTemplates(scene) : null
+	const portalooTpl =
+		portaloos.length > 0 ? createPortalooTemplates(scene) : null
 
 	for (let i = 0; i < benches.length; i++) {
 		const { x, z, rotation } = benches[i]
@@ -589,7 +700,14 @@ export function buildLevelObjects(
 			rotation,
 		)
 		objectRoots.push(root)
-		solidObstacles.push({ x, z, radius: 0.8, scoopable: true })
+		solidObstacles.push({
+			x,
+			z,
+			radius: 0.8,
+			originalRadius: 0.8,
+			root,
+			scoopable: true,
+		})
 	}
 
 	for (let i = 0; i < lampposts.length; i++) {
@@ -634,6 +752,29 @@ export function buildLevelObjects(
 		if (result.primaryLight) floodlightPrimaryLights.push(result.primaryLight)
 		// Floodlights are solid obstacles with a larger collision radius (thick base)
 		solidObstacles.push({ x, z, radius: 0.6 })
+	}
+
+	for (let i = 0; i < portaloos.length; i++) {
+		const { x, z, rotation } = portaloos[i]
+		const root = placePortaloo(
+			portalooTpl!,
+			scene,
+			i,
+			x,
+			getGroundY(x, z),
+			z,
+			rotation,
+		)
+		objectRoots.push(root)
+		solidObstacles.push({
+			x,
+			z,
+			radius: 0.75,
+			originalRadius: 0.75,
+			root,
+			scoopable: true,
+			scoopSound: 'toilet',
+		})
 	}
 
 	return {

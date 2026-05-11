@@ -82,6 +82,7 @@ const COLORS = {
 	goose: '#4a4a4a',
 	swan: '#e8e8f0',
 	deer: '#8B4513',
+	portaloo: '#2278cc',
 	bridge: '#777788',
 	selected: '#ffcc00',
 }
@@ -127,6 +128,7 @@ type ObjectKind =
 	| 'goose'
 	| 'swan'
 	| 'deer'
+	| 'portaloo'
 interface ObjectItem {
 	kind: ObjectKind
 	pos: [number, number]
@@ -333,6 +335,13 @@ async function main() {
 				rotation: rot,
 			}),
 		),
+		...(level.objects?.portaloos ?? []).map(
+			([lat, lon, rot]): ObjectItem => ({
+				kind: 'portaloo',
+				pos: gpsToLocal(lon, lat, origin),
+				rotation: rot,
+			}),
+		),
 	]
 
 	// ── Compute bounding box ────────────────────────────────────────────
@@ -396,6 +405,7 @@ async function main() {
 		| 'goose'
 		| 'swan'
 		| 'deer'
+		| 'portaloo'
 
 	let selectedKind: SelectionKind | null = null
 	let selectedIndex = -1
@@ -665,6 +675,7 @@ async function main() {
 		goose: COLORS.goose,
 		swan: COLORS.swan,
 		deer: COLORS.deer,
+		portaloo: COLORS.portaloo,
 	}
 
 	// Real-world sizes (metres) for each object kind
@@ -680,6 +691,7 @@ async function main() {
 		goose: { w: 0.5, h: 0.5 },
 		swan: { w: 0.6, h: 0.6 },
 		deer: { w: 1.0, h: 1.2 },
+		portaloo: { w: 1.1, h: 1.2 },
 	}
 
 	function renderObjects() {
@@ -989,6 +1001,44 @@ async function main() {
 					})
 					group.appendChild(antler)
 				}
+			} else if (o.kind === 'portaloo') {
+				// Portaloo icon: blue rectangle (body) with a lighter door panel and direction tick
+				const body = svgEl('rect', {
+					x: -hw,
+					y: -hh,
+					width: hw * 2,
+					height: hh * 2,
+					fill: color,
+					stroke: isSel ? '#fff' : '#0a4a99',
+					'stroke-width': Math.max(Math.min(hw, hh) * 0.1, 0.03),
+					rx: Math.min(hw, hh) * 0.08,
+				})
+				group.appendChild(body)
+				// Door panel (slightly darker rectangle in lower 70% of front face)
+				const doorW = hw * 0.55
+				const doorH = hh * 0.72
+				const door = svgEl('rect', {
+					x: -doorW,
+					y: hh - doorH - hh * 0.05,
+					width: doorW * 2,
+					height: doorH,
+					fill: isSel ? '#aaccff' : '#1255a0',
+					stroke: isSel ? '#fff' : '#0a3a80',
+					'stroke-width': Math.max(Math.min(hw, hh) * 0.06, 0.02),
+					rx: Math.min(hw, hh) * 0.04,
+				})
+				group.appendChild(door)
+				// Direction indicator (small tick above)
+				const indicator = svgEl('line', {
+					x1: 0,
+					y1: -hh,
+					x2: 0,
+					y2: -hh - Math.max(hh * 0.5, minS * 0.4),
+					stroke: isSel ? '#fff' : '#88bbff',
+					'stroke-width': Math.max(hw * 0.12, 0.03),
+					'stroke-linecap': 'round',
+				})
+				group.appendChild(indicator)
 			}
 
 			layerObjects.appendChild(group)
@@ -1482,6 +1532,7 @@ async function main() {
 			['Goose', 'goose', COLORS.goose],
 			['Swan', 'swan', COLORS.swan],
 			['Deer', 'deer', COLORS.deer],
+			['Portaloo', 'portaloo', COLORS.portaloo],
 		]
 		for (const [label, mode, color] of objectTools) {
 			const btn = document.createElement('button')
@@ -1537,7 +1588,8 @@ async function main() {
 			drawMode === 'floodlight' ||
 			drawMode === 'goose' ||
 			drawMode === 'swan' ||
-			drawMode === 'deer'
+			drawMode === 'deer' ||
+			drawMode === 'portaloo'
 		) {
 			const hint = document.createElement('div')
 			hint.className = 'sidebar-hint'
@@ -1745,6 +1797,7 @@ async function main() {
 					goose: 'Goose',
 					swan: 'Swan',
 					deer: 'Deer',
+					portaloo: 'Portaloo',
 				}
 				info.textContent = `${labels[o.kind]} #${selectedIndex} rot=${o.rotation.toFixed(0)}°`
 			} else if (selectedKind === 'courseNode') {
@@ -2104,6 +2157,7 @@ async function main() {
 					const geese = objectItems.filter((o) => o.kind === 'goose')
 					const swans = objectItems.filter((o) => o.kind === 'swan')
 					const deerObjs = objectItems.filter((o) => o.kind === 'deer')
+					const portalooObjs = objectItems.filter((o) => o.kind === 'portaloo')
 					if (benches.length) result.benches = toGps(benches)
 					if (lampposts.length) result.lampposts = toGps(lampposts)
 					if (courts.length) result.tennisCourts = toGps(courts)
@@ -2111,6 +2165,7 @@ async function main() {
 					if (geese.length) result.geese = toGps(geese)
 					if (swans.length) result.swans = toGps(swans)
 					if (deerObjs.length) result.deer = toGps(deerObjs)
+					if (portalooObjs.length) result.portaloos = toGps(portalooObjs)
 					return result
 				},
 			],
@@ -2347,7 +2402,8 @@ async function main() {
 			drawMode === 'floodlight' ||
 			drawMode === 'goose' ||
 			drawMode === 'swan' ||
-			drawMode === 'deer'
+			drawMode === 'deer' ||
+			drawMode === 'portaloo'
 		) {
 			objectItems.push({ kind: drawMode, pos: [x, z], rotation: 0 })
 			select('object', objectItems.length - 1)

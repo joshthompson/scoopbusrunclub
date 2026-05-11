@@ -8,6 +8,7 @@ import {
 	SpotLight,
 	Color3,
 	Color4,
+	Quaternion,
 	MeshBuilder,
 	StandardMaterial,
 	ShaderMaterial,
@@ -41,6 +42,8 @@ import {
 	PLAYER_COLORS,
 	WHEEL_ROLL_SPEED,
 	LIGHT_FRONT_POSITION,
+	SCOOP_POSITION,
+	SCOOP_WIDTH,
 } from './objects/BusModel'
 import type { BusColorPalette } from './objects/BusModel'
 import type { CharacterSelection, RunnerAppearance } from './characters'
@@ -314,6 +317,7 @@ import {
 	playScooped,
 	stopScooped,
 	playHuh,
+	playToiletFlush,
 	silenceAll,
 	type BusSoundSource,
 } from './systems/sounds'
@@ -2082,6 +2086,7 @@ export class Game {
 				toPlaced(objs?.lampposts),
 				toPlaced(objs?.tennisCourts),
 				toPlaced(objs?.floodlights),
+				toPlaced(objs?.portaloos),
 				(x, z) => {
 					let y = this.getGroundY(x, z)
 					// Ensure objects don't sink below water surface
@@ -3704,32 +3709,37 @@ export class Game {
 		const preCollZ = this.busPos.z
 
 		for (const obs of this.solidObstacles) {
-			const dx = this.busPos.x - obs.x
-			const dz = this.busPos.z - obs.z
-			const distSq = dx * dx + dz * dz
-			const minDist = br + obs.radius
-			if (distSq < minDist * minDist && distSq > 0) {
-				const dist = Math.sqrt(distSq)
-				const nx = dx / dist
-				const nz = dz / dist
+			if (obs.scoopable && this.localPlayerRole === 'bus') {
+				const fwdX = Math.sin(this.busYaw)
+				const fwdZ = Math.cos(this.busYaw)
+				const rightX = Math.cos(this.busYaw)
+				const rightZ = -Math.sin(this.busYaw)
+				const relX = obs.x - this.busPos.x
+				const relZ = obs.z - this.busPos.z
+				const forwardDist = relX * fwdX + relZ * fwdZ
+				const sideDist = Math.abs(relX * rightX + relZ * rightZ)
+				const scoopCenterForward = SCOOP_POSITION[2]
+				const scoopDepthHalf = 1.1
+				const scoopWidthHalf = SCOOP_WIDTH * 0.5
+				const inForwardBand =
+					forwardDist >= scoopCenterForward - scoopDepthHalf - obs.radius &&
+					forwardDist <= scoopCenterForward + scoopDepthHalf + obs.radius
+				const inWidthBand = sideDist <= scoopWidthHalf + obs.radius
 
-				if (
-					obs.scoopable &&
-					this.localPlayerRole === 'bus' &&
-					Math.abs(this.busSpeed) > 0.5
-				) {
+				if (inForwardBand && inWidthBand && Math.abs(this.busSpeed) > 0.5) {
 					// Scoopable collision: launch the object into the air
 					const absSpeed = Math.abs(this.busSpeed)
-					const fwdX = Math.sin(this.busYaw)
-					const fwdZ = Math.cos(this.busYaw)
-					// Find the matching objectRoot by position
-					let scoopedRoot: TransformNode | null = null
-					for (const root of this.objectRoots) {
-						const rdx = root.position.x - obs.x
-						const rdz = root.position.z - obs.z
-						if (rdx * rdx + rdz * rdz < 0.1) {
-							scoopedRoot = root
-							break
+					// Prefer direct linked root (robust), fallback to spatial lookup for legacy obstacles.
+					let scoopedRoot: TransformNode | null = obs.root ?? null
+					if (!scoopedRoot) {
+						const maxMatchDistSq = Math.max(0.25, (obs.radius + 0.2) ** 2)
+						for (const root of this.objectRoots) {
+							const rdx = root.position.x - obs.x
+							const rdz = root.position.z - obs.z
+							if (rdx * rdx + rdz * rdz <= maxMatchDistSq) {
+								scoopedRoot = root
+								break
+							}
 						}
 					}
 					if (scoopedRoot) {
@@ -3744,16 +3754,40 @@ export class Game {
 							velZ:
 								fwdZ * this.busSpeed * SCOOP_FORWARD_FACTOR +
 								(Math.random() - 0.5) * 3,
+							angVelX: 4 + Math.random() * 6,
+							angVelY: (Math.random() - 0.5) * 6,
+							angVelZ: 3 + Math.random() * 5,
+							bounceCount: 0,
+							faceSnapped: false,
 							landedTimer: 0,
 							state: 'launched',
 							obstacleIndex: this.solidObstacles.indexOf(obs),
 						})
-						// Remove from solid obstacles so it no longer blocks
+						this.scoopAnimTimer = SCOOP_ANIM_DURATION
+						// Remove from solid obstacles so it no longer blocks or re-triggers
 						obs.radius = 0
+						obs.scoopable = false
+						obs.root = scoopedRoot
+						// Play scoop sound based on object type
+						if (obs.scoopSound === 'toilet') {
+							playToiletFlush()
+						}
 					}
-					// Small speed penalty
-					this.busSpeed *= ELASTIC_SPEED_PENALTY
-				} else if (obs.elasticIndex != null) {
+				}
+				// Scoopables should only interact with the scoop zone, never the full bus body.
+				continue
+			}
+
+			const dx = this.busPos.x - obs.x
+			const dz = this.busPos.z - obs.z
+			const distSq = dx * dx + dz * dz
+			const minDist = br + obs.radius
+			if (distSq < minDist * minDist && distSq > 0) {
+				const dist = Math.sqrt(distSq)
+				const nx = dx / dist
+				const nz = dz / dist
+
+				if (obs.elasticIndex != null) {
 					touchingElastic = true
 					// Elastic collision: tilt the object and slow down, but DON'T block the bus
 					const elastic = this.elasticObjects[obs.elasticIndex]
@@ -6129,37 +6163,229 @@ export class Game {
 			)
 		}
 
+		const getTerrainNormal = (x: number, z: number) => {
+			const sample = 0.4
+			const hL = this.getGroundY(x - sample, z)
+			const hR = this.getGroundY(x + sample, z)
+			const hD = this.getGroundY(x, z - sample)
+			const hU = this.getGroundY(x, z + sample)
+			const n = new Vector3(hL - hR, 2 * sample, hD - hU)
+			if (n.lengthSquared() < 1e-8) return new Vector3(0, 1, 0)
+			return n.normalize()
+		}
+
+		const getAlignUpToNormalQuat = (normal: Vector3) => {
+			const up = new Vector3(0, 1, 0)
+			const axis = Vector3.Cross(up, normal)
+			const axisLenSq = axis.lengthSquared()
+			const dot = Math.max(-1, Math.min(1, Vector3.Dot(up, normal)))
+			if (axisLenSq < 1e-10) {
+				if (dot > 0) return Quaternion.Identity()
+				return Quaternion.RotationAxis(new Vector3(1, 0, 0), Math.PI)
+			}
+			axis.normalize()
+			const angle = Math.acos(dot)
+			return Quaternion.RotationAxis(axis, angle)
+		}
+
+		const getNearestCuboidFaceRotation = (
+			node: TransformNode,
+			groundNormal: Vector3,
+		) => {
+			const step = Math.PI / 2
+			const current = Quaternion.FromEulerAngles(
+				node.rotation.x,
+				node.rotation.y,
+				node.rotation.z,
+			)
+			const alignQuat = getAlignUpToNormalQuat(groundNormal)
+			let bestX = 0
+			let bestY = 0
+			let bestZ = 0
+			let bestDot = -1
+
+			for (let xi = 0; xi < 4; xi++) {
+				for (let yi = 0; yi < 4; yi++) {
+					for (let zi = 0; zi < 4; zi++) {
+						const rx = xi * step
+						const ry = yi * step
+						const rz = zi * step
+						const qBase = Quaternion.FromEulerAngles(rx, ry, rz)
+						const q = alignQuat.multiply(qBase)
+						const dot = Math.abs(Quaternion.Dot(current, q))
+						if (dot > bestDot) {
+							bestDot = dot
+							const euler = q.toEulerAngles()
+							bestX = euler.x
+							bestY = euler.y
+							bestZ = euler.z
+						}
+					}
+				}
+			}
+
+			return [bestX, bestY, bestZ] as const
+		}
+
+		const lerpAngle = (from: number, to: number, t: number) => {
+			const diff = Math.atan2(Math.sin(to - from), Math.cos(to - from))
+			return from + diff * t
+		}
+
 		// Update scooped objects (benches etc. flying through the air)
 		for (let i = this.scoopedObjects.length - 1; i >= 0; i--) {
 			const obj = this.scoopedObjects[i]
 			const pos = obj.root.position
+			const syncScoopedObstacle = () => {
+				if (!obj.obstacleReenabled || obj.obstacleIndex < 0) return
+				const obs = this.solidObstacles[obj.obstacleIndex]
+				if (!obs) return
+				obs.x = pos.x
+				obs.z = pos.z
+				obs.root = obj.root
+			}
+			const reenableScoopedObstacle = () => {
+				if (obj.obstacleReenabled || obj.obstacleIndex < 0) return
+				const obs = this.solidObstacles[obj.obstacleIndex]
+				if (!obs) return
+				obs.radius = obs.originalRadius ?? 0.8
+				obs.scoopable = true
+				obs.x = pos.x
+				obs.z = pos.z
+				obs.root = obj.root
+				obj.obstacleReenabled = true
+			}
 			if (obj.state === 'launched') {
 				obj.velY -= GRAVITY * dt
 				pos.x += obj.velX * dt
 				pos.y += obj.velY * dt
 				pos.z += obj.velZ * dt
-				obj.root.rotation.x += 6 * dt
-				obj.root.rotation.z += 4 * dt
+				obj.root.rotation.x += obj.angVelX * dt
+				obj.root.rotation.y += obj.angVelY * dt
+				obj.root.rotation.z += obj.angVelZ * dt
+				const airAngDamping = Math.exp(-0.45 * dt)
+				obj.angVelX *= airAngDamping
+				obj.angVelY *= airAngDamping
+				obj.angVelZ *= airAngDamping
 				const groundY = this.getGroundY(pos.x, pos.z)
 				if (pos.y <= groundY && obj.velY < 0) {
 					pos.y = groundY
-					obj.state = 'landed'
-					obj.landedTimer = 5
-					obj.root.rotation.x = 0
-					obj.root.rotation.z = 0
+					obj.root.computeWorldMatrix(true)
+					const bounds = obj.root.getHierarchyBoundingVectors()
+					const sinkDepth = groundY - bounds.min.y
+					if (sinkDepth > 0) {
+						pos.y += sinkDepth
+					}
+					reenableScoopedObstacle()
+					// Bounce and tumble a little, then settle quickly.
+					const canBounceAgain = obj.bounceCount < 2
+					if (canBounceAgain && Math.abs(obj.velY) > 2.2) {
+						obj.bounceCount += 1
+						obj.velY = -obj.velY * 0.12
+						obj.velX *= 0.62
+						obj.velZ *= 0.62
+						obj.angVelX = obj.angVelX * 0.7 + (Math.random() - 0.5) * 0.8
+						obj.angVelY = obj.angVelY * 0.7 + (Math.random() - 0.5) * 0.5
+						obj.angVelZ = obj.angVelZ * 0.7 + (Math.random() - 0.5) * 0.8
+					} else {
+						obj.state = 'landed'
+						obj.landedTimer = 5
+						obj.velY = 0
+					}
 				}
+				syncScoopedObstacle()
 			} else {
-				obj.landedTimer -= dt
-				if (obj.landedTimer <= 0) {
-					// Restore obstacle so it can be scooped again
-					if (obj.obstacleIndex >= 0) {
-						const obs = this.solidObstacles[obj.obstacleIndex]
-						if (obs) {
-							obs.radius = 0.8
-							obs.x = pos.x
-							obs.z = pos.z
+				// Grounded roll/wobble settle with friction.
+				pos.x += obj.velX * dt
+				pos.z += obj.velZ * dt
+				obj.root.rotation.x += obj.angVelX * dt
+				obj.root.rotation.y += obj.angVelY * dt
+				obj.root.rotation.z += obj.angVelZ * dt
+
+				const groundLinDamping = Math.exp(-4.8 * dt)
+				const groundAngDamping = Math.exp(-5.6 * dt)
+				obj.velX *= groundLinDamping
+				obj.velZ *= groundLinDamping
+				obj.angVelX *= groundAngDamping
+				obj.angVelY *= groundAngDamping
+				obj.angVelZ *= groundAngDamping
+
+				// Couple residual slide into a little roll so it doesn't look perfectly balanced.
+				obj.angVelX += obj.velZ * 0.015
+				obj.angVelZ += -obj.velX * 0.015
+
+				const groundY = this.getGroundY(pos.x, pos.z)
+				if (pos.y < groundY) pos.y = groundY
+				obj.root.computeWorldMatrix(true)
+				const bounds = obj.root.getHierarchyBoundingVectors()
+				const sinkDepth = groundY - bounds.min.y
+				if (sinkDepth > 0) {
+					pos.y += sinkDepth
+				}
+
+				if (
+					Math.abs(obj.velX) < 0.04 &&
+					Math.abs(obj.velZ) < 0.04 &&
+					Math.abs(obj.angVelX) < 0.08 &&
+					Math.abs(obj.angVelY) < 0.08 &&
+					Math.abs(obj.angVelZ) < 0.08
+				) {
+					obj.velX = 0
+					obj.velZ = 0
+					obj.angVelX = 0
+					obj.angVelY = 0
+					obj.angVelZ = 0
+
+					if (!obj.faceSnapped) {
+						if (obj.snapLerpT == null) {
+							const terrainNormal = getTerrainNormal(pos.x, pos.z)
+							const [targetX, targetY, targetZ] = getNearestCuboidFaceRotation(
+								obj.root,
+								terrainNormal,
+							)
+							obj.snapLerpT = 0
+							obj.snapFromX = obj.root.rotation.x
+							obj.snapFromY = obj.root.rotation.y
+							obj.snapFromZ = obj.root.rotation.z
+							obj.snapToX = targetX
+							obj.snapToY = targetY
+							obj.snapToZ = targetZ
+						}
+
+						obj.snapLerpT = Math.min(1, obj.snapLerpT + dt / 0.1)
+						const ease = 1 - (1 - obj.snapLerpT) ** 3
+						obj.root.rotation.x = lerpAngle(
+							obj.snapFromX ?? obj.root.rotation.x,
+							obj.snapToX ?? obj.root.rotation.x,
+							ease,
+						)
+						obj.root.rotation.y = lerpAngle(
+							obj.snapFromY ?? obj.root.rotation.y,
+							obj.snapToY ?? obj.root.rotation.y,
+							ease,
+						)
+						obj.root.rotation.z = lerpAngle(
+							obj.snapFromZ ?? obj.root.rotation.z,
+							obj.snapToZ ?? obj.root.rotation.z,
+							ease,
+						)
+
+						obj.root.computeWorldMatrix(true)
+						const snapBounds = obj.root.getHierarchyBoundingVectors()
+						const snapSinkDepth = groundY - snapBounds.min.y
+						if (snapSinkDepth > 0) {
+							pos.y += snapSinkDepth
+						}
+						if (obj.snapLerpT >= 1) {
+							obj.faceSnapped = true
 						}
 					}
+				}
+
+				syncScoopedObstacle()
+				obj.landedTimer -= dt
+				if (obj.landedTimer <= 0) {
+					reenableScoopedObstacle()
 					this.scoopedObjects.splice(i, 1)
 				}
 			}

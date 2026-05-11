@@ -142,9 +142,15 @@ export type SolidObstacle = {
 	x: number
 	z: number
 	radius: number
+	/** Original radius used when restoring after scoop */
+	originalRadius?: number
 	elasticIndex?: number
+	/** Optional linked object root for robust scoop detection */
+	root?: TransformNode
 	/** If true, this object can be scooped into the air by the bus */
 	scoopable?: boolean
+	/** Optional sound id to play when this object is scooped */
+	scoopSound?: string
 }
 
 export type ElasticObject = {
@@ -161,9 +167,23 @@ export interface ScoopedObject {
 	velX: number
 	velY: number
 	velZ: number
+	angVelX: number
+	angVelY: number
+	angVelZ: number
+	bounceCount: number
+	faceSnapped?: boolean
+	snapLerpT?: number
+	snapFromX?: number
+	snapFromY?: number
+	snapFromZ?: number
+	snapToX?: number
+	snapToY?: number
+	snapToZ?: number
 	/** Time remaining before despawn after landing */
 	landedTimer: number
 	state: 'launched' | 'landed'
+	/** True once the linked obstacle has been restored after first ground hit */
+	obstacleReenabled?: boolean
 	/** Index into solidObstacles — set to -1 once removed */
 	obstacleIndex: number
 }

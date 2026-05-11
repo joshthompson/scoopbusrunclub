@@ -129,4 +129,6 @@ export interface LevelObjects {
 	swans?: [number, number, number][]
 	/** Deer starting positions [lat, lon, rotation] */
 	deer?: [number, number, number][]
+	/** Portaloos (portable toilets) — scoopable */
+	portaloos?: [number, number, number][]
 }

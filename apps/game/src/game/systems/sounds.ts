@@ -11,6 +11,7 @@ import busEngineUrl from '../../assets/sounds/freesound_community-bus-engine-472
 import gooseUrl from '../../assets/sounds/freesound_community-goose-2-28880.mp3'
 import thudUrl from '../../assets/sounds/freesound_community-loud-thud-45719.m4a'
 import scoopedUrl from '../../assets/sounds/scooped1.mp3'
+import toiletFlushUrl from '../../assets/sounds/freesound_community-toilet-flushing-7059.m4a'
 import hello1Url from '../../assets/sounds/hello1.mp3'
 import hello2Url from '../../assets/sounds/hello2.mp3'
 import hello3Url from '../../assets/sounds/hello3.mp3'
@@ -276,6 +277,18 @@ export function playScooped(): void {
 
 /** No-op kept for API compatibility. */
 export function stopScooped(): void {}
+
+// ── Toilet flush sound ──
+
+const TOILET_FLUSH_VOLUME = 0.5
+
+/** Play the toilet flushing sound when a portaloo is scooped. */
+export function playToiletFlush(): void {
+	if (disposed || getMuted() || masterVolume <= 0) return
+	const audio = new Audio(toiletFlushUrl)
+	audio.volume = Math.max(0, Math.min(1, TOILET_FLUSH_VOLUME * masterVolume))
+	audio.play().catch(() => {})
+}
 
 // ── Helper: pick random index, never the same as last ──
 

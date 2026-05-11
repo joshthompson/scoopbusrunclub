@@ -732,6 +732,7 @@ function buildObjectsSimple() {
 		toPlaced(objects.lampposts),
 		toPlaced(objects.tennisCourts),
 		toPlaced(objects.floodlights),
+		toPlaced(objects.portaloos),
 		(x, z) => getTerrainHeight(x, z),
 		level.timeOfDay === 'night',
 	)
