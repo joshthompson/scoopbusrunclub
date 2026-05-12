@@ -346,7 +346,7 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 				{isXmas() && <Emoji emoji="🎄" />}
 			</h4>
 			<Show when={specialDay()}>
-				{(name) => <span class={styles.specialDayTag}>⭐ {name()}</span>}
+				{(name) => <span class={styles.specialDayTag}>⭐ {name()} Special Parkrun ⭐</span>}
 			</Show>
 		</>
 	)
@@ -730,8 +730,10 @@ const styles = {
 		background: 'var(--overlay-black-15)',
 		padding: '2px 10px',
 		borderRadius: '4px',
+		cornerShape: 'notch',
 		textDecoration: 'none',
 		margin: '4px auto 0',
+		border: '2px solid black',
 		_hover: { background: 'var(--overlay-black-30)' },
 	}),
 	specialDayTag: css({
@@ -739,8 +741,10 @@ const styles = {
 		fontSize: '0.75rem',
 		fontWeight: 'bold',
 		background: 'var(--overlay-black-15)',
-		padding: '2px 10px',
-		borderRadius: '999px',
+		border: '2px solid black',
+		padding: '4px 10px',
+		borderRadius: '4px',
+		cornerShape: 'notch',
 		margin: '0 auto',
 	}),
 }
