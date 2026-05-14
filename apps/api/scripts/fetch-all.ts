@@ -42,7 +42,7 @@ async function main() {
 
 	// --- Pause ---
 	if (!isDryRun) {
-		const delay = randomDelay({ min: 30_000, max: 60_000 })
+		const delay = randomDelay({ min: 15_000, max: 30_000 })
 		console.log(`\nPausing ${(delay / 1000).toFixed(1)}s between scripts...\n`)
 		await sleep(delay)
 	}

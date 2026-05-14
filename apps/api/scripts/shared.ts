@@ -31,7 +31,7 @@ export const TRACKED_IDS = new Set(TRACKED_ATHLETES.map((a) => a.parkrunId))
 // --- Constants ---
 
 /** Delay range (in ms) between fetches to avoid rate-limiting. */
-export const DELAY_BETWEEN_FETCHES_MS = { min: 30_000, max: 60_000 }
+export const DELAY_BETWEEN_FETCHES_MS = { min: 15_000, max: 30_000 }
 
 /** Number of times to retry a failed page load before giving up. */
 export const MAX_RETRIES = 4

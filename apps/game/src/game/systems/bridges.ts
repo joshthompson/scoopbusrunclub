@@ -12,8 +12,9 @@ import type { BridgeCollider } from '../types'
 import { BUS_HALF_WIDTH } from './busCollision'
 
 /** Bridge width = bus full width * 1.2 */
-const BRIDGE_WIDTH = BUS_HALF_WIDTH * 2 * 1.2
+const BRIDGE_WIDTH = BUS_HALF_WIDTH * 4 * 1.2
 const BRIDGE_HALF_WIDTH = BRIDGE_WIDTH / 2
+const BRIDGE_BASE_Y = 2
 
 /** Height of the side railings */
 const RAILING_HEIGHT = 1.2
@@ -80,7 +81,7 @@ export function buildBridgeMeshes(
 		const halfLength = length / 2
 
 		// Bridge deck sits slightly above the water level at its center
-		const groundY = getGroundY(cx, cz)
+		const groundY = getGroundY(cx, cz) + BRIDGE_BASE_Y
 		const deckY = groundY + DECK_THICKNESS / 2 + 0.15 // slightly elevated above ground/water
 
 		const root = new TransformNode(`bridge_${i}`, scene)
@@ -289,7 +290,7 @@ export function getBridgeDeckY(
 			Math.abs(localRight) <= collider.halfWidth
 		) {
 			// On the bridge — return elevated Y
-			const groundY = getGroundY(collider.x, collider.z)
+			const groundY = getGroundY(collider.x, collider.z) + BRIDGE_BASE_Y
 			return groundY + DECK_THICKNESS + 0.15
 		}
 	}

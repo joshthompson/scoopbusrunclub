@@ -100,9 +100,10 @@ async function main() {
 
 	/** Track the latest run result date across all athletes */
 	let latestResultDate = ''
+	let i = 0
 
 	for (const { parkrunId, name } of TRACKED_ATHLETES) {
-		console.log(`Fetching results for ${name} (${parkrunId})...`)
+		console.log(`${++i}/${TRACKED_ATHLETES.length}: Fetching results for ${name} (${parkrunId})...`)
 
 		try {
 			// Fetch all results page — runner info + full run history

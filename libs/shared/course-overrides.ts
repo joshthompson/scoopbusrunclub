@@ -45,6 +45,13 @@ export const COURSE_OVERRIDES: Record<string, CourseOverride> = {
 			[27, 41], // Loop point to finish
 		],
 	},
+	amager: {
+		sections: [
+			[0, 40], // Lap 1
+			[0, 40], // Lap 2
+			[0, 1], // Final strech to the Finish
+		],
+	}
 }
 
 /**
