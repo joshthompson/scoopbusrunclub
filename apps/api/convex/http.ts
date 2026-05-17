@@ -882,6 +882,7 @@ http.route({
 
 		const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'))
 		const pageSize = 10
+		const search = (url.searchParams.get('search') ?? '').trim().toLowerCase()
 
 		const results = await ctx.runQuery(api.queries.getRecentResults, {
 			sinceDate: '0000-00-00',
@@ -912,11 +913,21 @@ http.route({
 			eventMap.get(key)!.resultCount++
 		}
 
-		const allEvents = Array.from(eventMap.values()).sort((a, b) => {
+		let allEvents = Array.from(eventMap.values()).sort((a, b) => {
 			const dateCompare = b.date.localeCompare(a.date)
 			if (dateCompare !== 0) return dateCompare
 			return b.eventNumber - a.eventNumber
 		})
+
+		if (search) {
+			allEvents = allEvents.filter(
+				(e) =>
+					e.eventName.toLowerCase().includes(search) ||
+					e.event.toLowerCase().includes(search) ||
+					e.date.includes(search) ||
+					String(e.eventNumber).includes(search),
+			)
+		}
 
 		const total = allEvents.length
 		const totalPages = Math.ceil(total / pageSize)

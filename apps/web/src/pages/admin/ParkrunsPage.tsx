@@ -5,6 +5,7 @@ import {
 	For,
 	Show,
 	createMemo,
+	createEffect,
 } from 'solid-js'
 import { css } from '@style/css'
 import { DirtBlock } from '@/components/ui/DirtBlock'
@@ -23,11 +24,26 @@ const TIME_RE = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/
 
 export const ParkrunsPage: Component = () => {
 	const [page, setPage] = createSignal(1)
-	const [parkruns, { refetch }] = createResource(page, (p) =>
-		fetchAdminParkruns(p),
-	)
+	const [searchInput, setSearchInput] = createSignal('')
+	const [search, setSearch] = createSignal('')
 	const [editingParkrun, setEditingParkrun] =
 		createSignal<ParkrunEventItem | null>(null)
+
+	// Debounce search input — fire after 300 ms of no typing
+	let debounceTimer: ReturnType<typeof setTimeout>
+	const handleSearchInput = (value: string) => {
+		setSearchInput(value)
+		clearTimeout(debounceTimer)
+		debounceTimer = setTimeout(() => {
+			setPage(1)
+			setSearch(value.trim())
+		}, 300)
+	}
+
+	const [parkruns, { refetch }] = createResource(
+		() => ({ page: page(), search: search() }),
+		({ page: p, search: s }) => fetchAdminParkruns(p, s),
+	)
 
 	const handleCloseModal = () => {
 		setEditingParkrun(null)
@@ -38,6 +54,17 @@ export const ParkrunsPage: Component = () => {
 		<div class={styles.container}>
 			<DirtBlock>
 				<h2 class={styles.sectionTitle}>Parkruns</h2>
+
+				<div class={styles.searchRow}>
+					<input
+						class={styles.searchInput}
+						type="search"
+						placeholder="Search by event, # or date…"
+						value={searchInput()}
+						onInput={(e) => handleSearchInput(e.currentTarget.value)}
+					/>
+				</div>
+
 				<Show
 					when={!parkruns.loading}
 					fallback={<p class={styles.loading}>Loading...</p>}
@@ -50,6 +77,7 @@ export const ParkrunsPage: Component = () => {
 								<th>#</th>
 								<th>Members</th>
 								<th>Guests</th>
+								<th>Results</th>
 								<th>Actions</th>
 							</tr>
 						</thead>
@@ -62,6 +90,17 @@ export const ParkrunsPage: Component = () => {
 										<td>{item.eventNumber}</td>
 										<td>{item.resultCount}</td>
 										<td>{item.guestResults.length}</td>
+										<td class={styles.linkCell}>
+											<a
+												href={`https://www.parkrun.se/${item.event}/results/${item.eventNumber}/`}
+												target="_blank"
+												rel="noreferrer"
+												class={styles.externalLink}
+												title="Official results"
+											>
+												↗
+											</a>
+										</td>
 										<td>
 											<AdminButton
 												size="small"
@@ -338,6 +377,23 @@ const styles = {
 		m: 0,
 		marginBottom: '1rem',
 	}),
+	searchRow: css({
+		marginBottom: '0.75rem',
+	}),
+	searchInput: css({
+		width: '100%',
+		padding: '0.4rem 0.6rem',
+		fontSize: '0.875rem',
+		border: '1px solid var(--overlay-black-20)',
+		borderRadius: '4px',
+		background: 'var(--overlay-black-4, rgba(0,0,0,0.04))',
+		color: 'inherit',
+		outline: 'none',
+		boxSizing: 'border-box',
+		'&:focus': {
+			borderColor: 'var(--overlay-black-40)',
+		},
+	}),
 	table: css({
 		width: '100%',
 		borderCollapse: 'collapse',
@@ -351,6 +407,20 @@ const styles = {
 			fontSize: '0.75rem',
 			textTransform: 'uppercase',
 			letterSpacing: '0.05em',
+		},
+	}),
+	linkCell: css({
+		textAlign: 'center',
+		width: '2.5rem',
+	}),
+	externalLink: css({
+		display: 'inline-block',
+		fontSize: '1rem',
+		lineHeight: 1,
+		opacity: 0.7,
+		textDecoration: 'none',
+		'&:hover': {
+			opacity: 1,
 		},
 	}),
 	pagination: css({

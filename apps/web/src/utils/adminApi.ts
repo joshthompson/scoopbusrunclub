@@ -378,12 +378,16 @@ export interface ParkrunEventsResult {
 
 export async function fetchAdminParkruns(
 	page = 1,
+	search = '',
 ): Promise<ParkrunEventsResult> {
 	const token = getAuthToken()
 	if (!token) return { items: [], page: 1, totalPages: 0, total: 0 }
-	const res = await fetch(
-		`${CONVEX_URL}/api/admin/parkruns?token=${encodeURIComponent(token)}&page=${page}`,
-	)
+	const params = new URLSearchParams({
+		token,
+		page: String(page),
+		...(search ? { search } : {}),
+	})
+	const res = await fetch(`${CONVEX_URL}/api/admin/parkruns?${params}`)
 	if (!res.ok) return { items: [], page: 1, totalPages: 0, total: 0 }
 	return res.json()
 }
