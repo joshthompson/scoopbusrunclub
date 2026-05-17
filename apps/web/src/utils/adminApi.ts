@@ -253,3 +253,137 @@ export async function fetchAdminLogs(opts?: {
 	if (!res.ok) return { logs: [], hasMore: false }
 	return res.json()
 }
+
+// ── Guests API ──────────────────────────────────────────────────────
+
+export interface Guest {
+	_id: string
+	name: string
+	extra?: string
+	parkrunId?: string
+	avatar: Record<string, never>
+	createdAt: number
+	modifiedAt: number
+}
+
+export async function fetchAdminGuests(): Promise<Guest[]> {
+	const token = getAuthToken()
+	if (!token) return []
+	const res = await fetch(
+		`${CONVEX_URL}/api/admin/guests?token=${encodeURIComponent(token)}`,
+	)
+	if (!res.ok) return []
+	return res.json()
+}
+
+export async function createGuest(data: {
+	name: string
+	extra?: string
+	parkrunId?: string
+}): Promise<{ id?: string; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const res = await fetch(`${CONVEX_URL}/api/admin/guests`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token, ...data }),
+	})
+	return res.json()
+}
+
+export async function updateGuest(
+	guestId: string,
+	data: { name?: string; extra?: string; parkrunId?: string },
+): Promise<{ ok?: boolean; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const res = await fetch(`${CONVEX_URL}/api/admin/guests`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token, guestId, ...data }),
+	})
+	return res.json()
+}
+
+export async function deleteGuest(
+	guestId: string,
+): Promise<{ ok?: boolean; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const res = await fetch(
+		`${CONVEX_URL}/api/admin/guests?token=${encodeURIComponent(token)}&id=${encodeURIComponent(guestId)}`,
+		{ method: 'DELETE' },
+	)
+	return res.json()
+}
+
+// ── Guest Results API ───────────────────────────────────────────────
+
+export async function addGuestResult(data: {
+	guestId: string
+	event: string
+	eventNumber: number
+	position: number
+	time: string
+	date: string
+}): Promise<{ ok?: boolean; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const res = await fetch(`${CONVEX_URL}/api/admin/guest-result`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token, ...data }),
+	})
+	return res.json()
+}
+
+export async function deleteGuestResult(
+	resultId: string,
+): Promise<{ ok?: boolean; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const res = await fetch(
+		`${CONVEX_URL}/api/admin/guest-result?token=${encodeURIComponent(token)}&id=${encodeURIComponent(resultId)}`,
+		{ method: 'DELETE' },
+	)
+	return res.json()
+}
+
+// ── Admin Parkruns API ──────────────────────────────────────────────
+
+export interface ParkrunEventItem {
+	event: string
+	eventName: string
+	eventNumber: number
+	date: string
+	resultCount: number
+	guestResults: {
+		guestId: string
+		guestName: string
+		guestExtra?: string
+		event: string
+		eventNumber: number
+		position: number
+		time: string
+		date: string
+	}[]
+}
+
+export interface ParkrunEventsResult {
+	items: ParkrunEventItem[]
+	page: number
+	totalPages: number
+	total: number
+}
+
+export async function fetchAdminParkruns(
+	page = 1,
+): Promise<ParkrunEventsResult> {
+	const token = getAuthToken()
+	if (!token) return { items: [], page: 1, totalPages: 0, total: 0 }
+	const res = await fetch(
+		`${CONVEX_URL}/api/admin/parkruns?token=${encodeURIComponent(token)}&page=${page}`,
+	)
+	if (!res.ok) return { items: [], page: 1, totalPages: 0, total: 0 }
+	return res.json()
+}

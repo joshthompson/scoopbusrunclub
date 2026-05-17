@@ -8,31 +8,33 @@
  * @module
  */
 
-import type * as adminLogs from '../adminLogs.js'
-import type * as auth from '../auth.js'
-import type * as courses from '../courses.js'
-import type * as crons from '../crons.js'
-import type * as http from '../http.js'
-import type * as parkrun from '../parkrun.js'
-import type * as queries from '../queries.js'
-import type * as races from '../races.js'
+import type * as adminLogs from "../adminLogs.js";
+import type * as auth from "../auth.js";
+import type * as courses from "../courses.js";
+import type * as crons from "../crons.js";
+import type * as guests from "../guests.js";
+import type * as http from "../http.js";
+import type * as parkrun from "../parkrun.js";
+import type * as queries from "../queries.js";
+import type * as races from "../races.js";
 
 import type {
-	ApiFromModules,
-	FilterApi,
-	FunctionReference,
-} from 'convex/server'
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-	adminLogs: typeof adminLogs
-	auth: typeof auth
-	courses: typeof courses
-	crons: typeof crons
-	http: typeof http
-	parkrun: typeof parkrun
-	queries: typeof queries
-	races: typeof races
-}>
+  adminLogs: typeof adminLogs;
+  auth: typeof auth;
+  courses: typeof courses;
+  crons: typeof crons;
+  guests: typeof guests;
+  http: typeof http;
+  parkrun: typeof parkrun;
+  queries: typeof queries;
+  races: typeof races;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
@@ -43,9 +45,9 @@ declare const fullApi: ApiFromModules<{
  * ```
  */
 export declare const api: FilterApi<
-	typeof fullApi,
-	FunctionReference<any, 'public'>
->
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
 
 /**
  * A utility for referencing Convex functions in your app's internal API.
@@ -56,8 +58,8 @@ export declare const api: FilterApi<
  * ```
  */
 export declare const internal: FilterApi<
-	typeof fullApi,
-	FunctionReference<any, 'internal'>
->
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
 
-export declare const components: {}
+export declare const components: {};

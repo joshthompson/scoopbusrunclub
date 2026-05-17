@@ -660,6 +660,288 @@ http.route({
 	}),
 })
 
+// --- GET /api/guests (public) ---
+
+http.route({
+	path: '/api/guests',
+	method: 'GET',
+	handler: httpAction(async (ctx) => {
+		const guests = await ctx.runQuery(api.guests.listPublic)
+		return jsonResponse(guests)
+	}),
+})
+
+// --- GET /api/guest?id=<guestId> (public) ---
+
+http.route({
+	path: '/api/guest',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const id = url.searchParams.get('id')
+		const parkrunId = url.searchParams.get('parkrunId')
+
+		if (parkrunId) {
+			const guest = await ctx.runQuery(api.guests.getByParkrunId, { parkrunId })
+			if (!guest) return jsonResponse({ error: 'Guest not found' }, 404)
+			return jsonResponse(guest)
+		}
+
+		if (!id) {
+			return jsonResponse(
+				{ error: "Missing 'id' or 'parkrunId' query parameter" },
+				400,
+			)
+		}
+
+		const guest = await ctx.runQuery(api.guests.get, { guestId: id as any })
+		if (!guest) return jsonResponse({ error: 'Guest not found' }, 404)
+		return jsonResponse(guest)
+	}),
+})
+
+// --- GET /api/guest/results?id=<guestId> (public) ---
+
+http.route({
+	path: '/api/guest/results',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const id = url.searchParams.get('id')
+		if (!id) {
+			return jsonResponse({ error: "Missing 'id' query parameter" }, 400)
+		}
+		const results = await ctx.runQuery(api.guests.getGuestResults, {
+			guestId: id as any,
+		})
+		return jsonResponse(results)
+	}),
+})
+
+// --- GET /api/guest-results (public, all) ---
+
+http.route({
+	path: '/api/guest-results',
+	method: 'GET',
+	handler: httpAction(async (ctx) => {
+		const results = await ctx.runQuery(api.guests.getAllGuestResults)
+		return jsonResponse(results)
+	}),
+})
+
+// --- Admin: GET /api/admin/guests ---
+
+http.route({
+	path: '/api/admin/guests',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const token = url.searchParams.get('token') ?? ''
+		const guests = await ctx.runQuery(api.guests.list, { token })
+		return jsonResponse(guests)
+	}),
+})
+
+// --- Admin: POST /api/admin/guests ---
+
+http.route({
+	path: '/api/admin/guests',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.guests.create, {
+			token: body.token ?? '',
+			name: body.name ?? '',
+			extra: body.extra,
+			parkrunId: body.parkrunId,
+		})
+		if ('error' in result) {
+			return jsonResponse({ error: result.error }, 400)
+		}
+		await ctx.runMutation(internal.parkrun.setAppData, {
+			key: 'guestDataUpdatedAt',
+			value: Date.now().toString(),
+		})
+		return jsonResponse(result)
+	}),
+})
+
+// --- Admin: PUT /api/admin/guests ---
+
+http.route({
+	path: '/api/admin/guests',
+	method: 'PUT',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.guests.update, {
+			token: body.token ?? '',
+			guestId: body.guestId ?? '',
+			name: body.name,
+			extra: body.extra,
+			parkrunId: body.parkrunId,
+		})
+		if ('error' in result) {
+			return jsonResponse({ error: result.error }, 400)
+		}
+		await ctx.runMutation(internal.parkrun.setAppData, {
+			key: 'guestDataUpdatedAt',
+			value: Date.now().toString(),
+		})
+		return jsonResponse(result)
+	}),
+})
+
+// --- Admin: DELETE /api/admin/guests ---
+
+http.route({
+	path: '/api/admin/guests',
+	method: 'DELETE',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const token = url.searchParams.get('token') ?? ''
+		const guestId = url.searchParams.get('id') ?? ''
+		const result = await ctx.runMutation(api.guests.remove, {
+			token,
+			guestId: guestId as any,
+		})
+		if ('error' in result) {
+			return jsonResponse({ error: result.error }, 400)
+		}
+		await ctx.runMutation(internal.parkrun.setAppData, {
+			key: 'guestDataUpdatedAt',
+			value: Date.now().toString(),
+		})
+		return jsonResponse(result)
+	}),
+})
+
+// --- Admin: POST /api/admin/guest-result ---
+
+http.route({
+	path: '/api/admin/guest-result',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.guests.addGuestResult, {
+			token: body.token ?? '',
+			guestId: body.guestId ?? '',
+			event: body.event ?? '',
+			eventNumber: body.eventNumber ?? 0,
+			position: body.position ?? 0,
+			time: body.time ?? '',
+			date: body.date ?? '',
+		})
+		if ('error' in result) {
+			return jsonResponse({ error: result.error }, 400)
+		}
+		await ctx.runMutation(internal.parkrun.setAppData, {
+			key: 'guestDataUpdatedAt',
+			value: Date.now().toString(),
+		})
+		return jsonResponse(result)
+	}),
+})
+
+// --- Admin: DELETE /api/admin/guest-result ---
+
+http.route({
+	path: '/api/admin/guest-result',
+	method: 'DELETE',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const token = url.searchParams.get('token') ?? ''
+		const resultId = url.searchParams.get('id') ?? ''
+		const result = await ctx.runMutation(api.guests.removeGuestResult, {
+			token,
+			resultId: resultId as any,
+		})
+		if ('error' in result) {
+			return jsonResponse({ error: result.error }, 400)
+		}
+		await ctx.runMutation(internal.parkrun.setAppData, {
+			key: 'guestDataUpdatedAt',
+			value: Date.now().toString(),
+		})
+		return jsonResponse(result)
+	}),
+})
+
+// --- Admin: GET /api/admin/parkruns ---
+// Returns paginated parkrun events (distinct event+eventNumber combos from runResults)
+
+http.route({
+	path: '/api/admin/parkruns',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const token = url.searchParams.get('token') ?? ''
+
+		// Validate admin session
+		const session = await ctx.runQuery(api.auth.validateToken, { token })
+		if (!session) return jsonResponse({ error: 'Unauthorized' }, 401)
+
+		const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'))
+		const pageSize = 10
+
+		const results = await ctx.runQuery(api.queries.getRecentResults, {
+			sinceDate: '0000-00-00',
+		})
+
+		// Build distinct parkrun events
+		const eventMap = new Map<
+			string,
+			{
+				event: string
+				eventName: string
+				eventNumber: number
+				date: string
+				resultCount: number
+			}
+		>()
+		for (const r of results) {
+			const key = `${r.event}#${r.eventNumber}`
+			if (!eventMap.has(key)) {
+				eventMap.set(key, {
+					event: r.event,
+					eventName: r.eventName,
+					eventNumber: r.eventNumber,
+					date: r.date,
+					resultCount: 0,
+				})
+			}
+			eventMap.get(key)!.resultCount++
+		}
+
+		const allEvents = Array.from(eventMap.values()).sort((a, b) => {
+			const dateCompare = b.date.localeCompare(a.date)
+			if (dateCompare !== 0) return dateCompare
+			return b.eventNumber - a.eventNumber
+		})
+
+		const total = allEvents.length
+		const totalPages = Math.ceil(total / pageSize)
+		const start = (page - 1) * pageSize
+		const items = allEvents.slice(start, start + pageSize)
+
+		// Fetch guest results for these parkrun events
+		const guestResults = await ctx.runQuery(api.guests.getAllGuestResults)
+		const guestResultsByEvent = new Map<string, typeof guestResults>()
+		for (const gr of guestResults) {
+			const key = `${gr.event}#${gr.eventNumber}`
+			if (!guestResultsByEvent.has(key)) guestResultsByEvent.set(key, [])
+			guestResultsByEvent.get(key)!.push(gr)
+		}
+
+		const itemsWithGuests = items.map((item) => ({
+			...item,
+			guestResults:
+				guestResultsByEvent.get(`${item.event}#${item.eventNumber}`) ?? [],
+		}))
+
+		return jsonResponse({ items: itemsWithGuests, page, totalPages, total })
+	}),
+})
+
 // --- CORS preflight for all API routes ---
 
 for (const path of [
@@ -685,6 +967,13 @@ for (const path of [
 	'/api/cache-version',
 	'/api/admin/logs',
 	'/api/volunteers',
+	'/api/guests',
+	'/api/guest',
+	'/api/guest/results',
+	'/api/guest-results',
+	'/api/admin/guests',
+	'/api/admin/guest-result',
+	'/api/admin/parkruns',
 ]) {
 	http.route({
 		path,

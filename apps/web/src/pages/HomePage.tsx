@@ -11,6 +11,7 @@ import type {
 	Runner,
 	RaceItem,
 	VolunteerItem,
+	GuestResultItem,
 } from '../utils/api'
 import type { CelebrationData } from '../components/ResultCelebrations'
 import { isDecember, getWrappedBannerYear } from './WrappedPage'
@@ -23,6 +24,7 @@ export const HomePage: Component<{
 	runners: Runner[]
 	races: RaceItem[]
 	volunteers: VolunteerItem[]
+	guestResults: GuestResultItem[]
 	celebrationData?: CelebrationData
 }> = (props) => {
 	return (
@@ -47,6 +49,7 @@ export const HomePage: Component<{
 							runners={props.runners}
 							races={props.races}
 							volunteers={props.volunteers}
+							guestResults={props.guestResults}
 							celebrationData={props.celebrationData}
 						/>
 					</Show>

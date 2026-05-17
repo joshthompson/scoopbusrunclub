@@ -22,7 +22,7 @@ export interface EmojiProps {
 	emoji: string
 	shadow?: boolean
 	flipped?: boolean
-	noAnimation?: boolean
+	animation: 'default' | 'none' | 'wave'
 	class?: string
 }
 
@@ -35,7 +35,7 @@ export function Emoji(props: EmojiProps) {
 	})
 
 	const emoji = emojiSrc() ? (
-		<img src={emojiSrc()} class={styles.image} />
+		<img src={emojiSrc()} class={styles.image} alt={props.emoji} />
 	) : (
 		props.emoji
 	)
@@ -45,7 +45,7 @@ export function Emoji(props: EmojiProps) {
 			class={cx(
 				styles.emoji({
 					hasShadow: props.shadow,
-					noAnimation: props.noAnimation === true,
+					animation: props.animation ?? 'default',
 				}),
 				props.class,
 			)}
@@ -54,10 +54,11 @@ export function Emoji(props: EmojiProps) {
 				class={styles.inner({
 					hasShadow: props.shadow,
 					flipped: props.flipped,
-					noAnimation: props.noAnimation === true,
+					animation: props.animation ?? 'default',
 				})}
-				children={emoji}
-			/>
+			>
+				{emoji}
+			</div>
 		</div>
 	)
 }
@@ -153,8 +154,10 @@ const styles = {
 					},
 				},
 			},
-			noAnimation: {
-				true: {
+			animation: {
+				default: {},
+				wave: {},
+				none: {
 					_after: {
 						animation: 'none !important',
 					},
@@ -181,8 +184,13 @@ const styles = {
 					scale: '-1 1',
 				},
 			},
-			noAnimation: {
-				true: {
+			animation: {
+				default: {},
+				wave: {
+					animation: 'wave 2s ease-in-out infinite',
+					transformOrigin: 'center bottom',
+				},
+				none: {
 					animation: 'none !important',
 				},
 			},

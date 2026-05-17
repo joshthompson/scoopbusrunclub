@@ -16,6 +16,7 @@ import {
 	fetchAllResults,
 	fetchPublicRaces,
 	fetchVolunteers,
+	fetchGuestResults,
 	getCached,
 } from './utils/api'
 import { loadEvents } from './utils/events'
@@ -30,6 +31,8 @@ import {
 	AdminUsersPage,
 	AdminAccountPage,
 	AdminLogsPage,
+	AdminRunnersPage,
+	AdminParkrunsPage,
 } from './pages/AdminPage'
 import { MapPage } from './pages/MapPage'
 import { ComparePage } from './pages/ComparePage'
@@ -38,6 +41,7 @@ import { ConnectionsPage } from './pages/ConnectionsPage'
 import { WrappedPage } from './pages/WrappedPage'
 import { EventPage } from './pages/EventPage'
 import { ReplayPage } from './pages/ReplayPage'
+import { GuestPage } from './pages/GuestPage'
 import { SplashScreen, ALWAYS_SHOW_LOADER } from './components/SplashScreen'
 
 const App: Component = () => {
@@ -48,6 +52,7 @@ const App: Component = () => {
 	const [results] = createResource(fetchAllResults)
 	const [races] = createResource(fetchPublicRaces)
 	const [volunteers] = createResource(fetchVolunteers)
+	const [guestResults] = createResource(fetchGuestResults)
 
 	// Populate the event name lookup cache
 	createResource(loadEvents)
@@ -107,6 +112,7 @@ const App: Component = () => {
 							runners={runners() ?? []}
 							races={races() ?? []}
 							volunteers={volunteers() ?? []}
+							guestResults={guestResults() ?? []}
 							celebrationData={celebrationData()}
 						/>
 					)}
@@ -171,6 +177,8 @@ const App: Component = () => {
 				<Route path="/admin/users" component={AdminUsersPage} />
 				<Route path="/admin/logs" component={AdminLogsPage} />
 				<Route path="/admin/account" component={AdminAccountPage} />
+				<Route path="/admin/runners" component={AdminRunnersPage} />
+				<Route path="/admin/parkruns" component={AdminParkrunsPage} />
 				<Route
 					path="/everyone"
 					component={() => (
@@ -246,6 +254,7 @@ const App: Component = () => {
 						</Show>
 					)}
 				/>
+				<Route path="/guests/:parkrunId" component={() => <GuestPage />} />
 				<Route path="*404" component={NotFoundPage} />
 			</Router>
 		</>

@@ -6,6 +6,8 @@ import { ScanPage } from './admin/ScanPage'
 import { UsersPage } from './admin/UsersPage'
 import { AccountPage } from './admin/AccountPage'
 import { EventLogsPage } from './admin/EventLogsPage'
+import { RunnersPage } from './admin/RunnersPage'
+import { ParkrunsPage } from './admin/ParkrunsPage'
 
 export const AdminPage: Component = () => {
 	return (
@@ -52,6 +54,26 @@ export const AdminLogsPage: Component = () => {
 		<AuthGuard>
 			<AdminLayout>
 				<EventLogsPage />
+			</AdminLayout>
+		</AuthGuard>
+	)
+}
+
+export const AdminRunnersPage: Component = () => {
+	return (
+		<AuthGuard>
+			<AdminLayout>
+				<RunnersPage />
+			</AdminLayout>
+		</AuthGuard>
+	)
+}
+
+export const AdminParkrunsPage: Component = () => {
+	return (
+		<AuthGuard>
+			<AdminLayout>
+				<ParkrunsPage />
 			</AdminLayout>
 		</AuthGuard>
 	)

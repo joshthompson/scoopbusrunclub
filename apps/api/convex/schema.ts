@@ -111,6 +111,29 @@ export default defineSchema({
 		updatedAt: v.number(),
 	}).index('by_eventId', ['eventId']),
 
+	// --- Guest runners ---
+
+	guests: defineTable({
+		name: v.string(),
+		extra: v.optional(v.string()),
+		parkrunId: v.optional(v.string()),
+		avatar: v.object({}),
+		createdAt: v.number(),
+		modifiedAt: v.number(),
+	}).index('by_parkrunId', ['parkrunId']),
+
+	guestResults: defineTable({
+		guestId: v.id('guests'),
+		event: v.string(), // eventId, e.g. "haga"
+		eventNumber: v.number(),
+		position: v.number(),
+		time: v.string(),
+		date: v.string(), // YYYY-MM-DD
+		createdAt: v.number(),
+	})
+		.index('by_guestId', ['guestId'])
+		.index('by_unique_result', ['guestId', 'event', 'eventNumber']),
+
 	// --- App-level key/value store ---
 
 	appData: defineTable({

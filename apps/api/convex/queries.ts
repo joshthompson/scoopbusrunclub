@@ -108,6 +108,7 @@ export const getAllVolunteers = query({
  * Return the last-updated timestamps used by the client-side cache.
  * - parkrunDataUpdatedAt: set when parkrun data is ingested (runners, results, volunteers, courses, events)
  * - scoopBusDataUpdatedAt: set when our own data changes (races / event calendar)
+ * - guestDataUpdatedAt: set when guest data changes (guests, guest results)
  */
 export const getCacheVersion = query({
 	args: {},
@@ -120,9 +121,14 @@ export const getCacheVersion = query({
 			.query('appData')
 			.withIndex('by_key', (q) => q.eq('key', 'scoopBusDataUpdatedAt'))
 			.unique()
+		const guestRow = await ctx.db
+			.query('appData')
+			.withIndex('by_key', (q) => q.eq('key', 'guestDataUpdatedAt'))
+			.unique()
 		return {
 			parkrunDataUpdatedAt: parkrunRow?.value ?? null,
 			scoopBusDataUpdatedAt: scoopBusRow?.value ?? null,
+			guestDataUpdatedAt: guestRow?.value ?? null,
 		}
 	},
 })

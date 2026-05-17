@@ -6,6 +6,7 @@ import type {
 	Runner,
 	RaceItem,
 	VolunteerItem,
+	GuestResultItem,
 } from '../utils/api'
 import { formatDate, formatName, ordinal } from '@/utils/misc'
 import { MILESTONE_SET } from '../utils/milestones'
@@ -54,6 +55,7 @@ interface ParkrunEvent {
 	eventNumber: string
 	results: ParkrunResult[]
 	volunteers: ParkrunVolunteer[]
+	guestResults: GuestResultItem[]
 }
 
 interface DateGroup {
@@ -66,6 +68,7 @@ function groupResults(
 	items: RunResultItem[],
 	allRaces: RaceItem[],
 	volunteerItems: VolunteerItem[],
+	guestResultItems: GuestResultItem[],
 ): DateGroup[] {
 	const byDate = new Map<string, Map<string, ParkrunEvent>>()
 
@@ -80,6 +83,7 @@ function groupResults(
 				eventNumber: String(item.eventNumber),
 				results: [],
 				volunteers: [],
+				guestResults: [],
 			})
 		}
 		eventMap.get(key)!.results.push({
@@ -102,6 +106,7 @@ function groupResults(
 				eventNumber: String(vol.eventNumber),
 				results: [],
 				volunteers: [],
+				guestResults: [],
 			})
 		}
 		eventMap.get(key)!.volunteers.push({
@@ -109,6 +114,24 @@ function groupResults(
 			name: vol.volunteerName,
 			roles: vol.roles,
 		})
+	}
+
+	// Merge guest results into the same parkrun event groups
+	for (const gr of guestResultItems) {
+		if (!byDate.has(gr.date)) byDate.set(gr.date, new Map())
+		const eventMap = byDate.get(gr.date)!
+		const key = `${gr.event}#${gr.eventNumber}`
+		if (!eventMap.has(key)) {
+			eventMap.set(key, {
+				name: gr.eventName,
+				eventId: gr.event,
+				eventNumber: String(gr.eventNumber),
+				results: [],
+				volunteers: [],
+				guestResults: [],
+			})
+		}
+		eventMap.get(key)!.guestResults.push(gr)
 	}
 
 	const today = new Date().toISOString().split('T')[0]
@@ -137,6 +160,7 @@ interface LatestResultsProps {
 	runners: Runner[]
 	races: RaceItem[]
 	volunteers: VolunteerItem[]
+	guestResults?: GuestResultItem[]
 	celebrationData?: CelebrationData
 }
 
@@ -346,7 +370,11 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 				{isXmas() && <Emoji emoji="🎄" />}
 			</h4>
 			<Show when={specialDay()}>
-				{(name) => <span class={styles.specialDayTag}>⭐ {name()} Special Parkrun ⭐</span>}
+				{(name) => (
+					<span class={styles.specialDayTag}>
+						⭐ {name()} Special Parkrun ⭐
+					</span>
+				)}
 			</Show>
 		</>
 	)
@@ -466,7 +494,7 @@ function ParkrunFlag(props: { parkrun: ParkrunEvent }) {
 		<Show when={flag()}>
 			{(f) => (
 				<span class={styles.flag} onClick={() => navigate('/map')}>
-					<Emoji emoji={f()} noAnimation />
+					<Emoji emoji={f()} animation="none" />
 				</span>
 			)}
 		</Show>
@@ -481,7 +509,12 @@ export function LatestResults(props: LatestResultsProps) {
 	)
 
 	const grouped = createMemo(() =>
-		groupResults(props.results, props.races, props.volunteers),
+		groupResults(
+			props.results,
+			props.races,
+			props.volunteers,
+			props.guestResults ?? [],
+		),
 	)
 
 	const [showAll, setShowAll] = createSignal(false)
@@ -518,8 +551,48 @@ export function LatestResults(props: LatestResultsProps) {
 											<ParkrunFlag parkrun={parkrun} />
 											<ParkrunExternalLink parkrun={parkrun} />
 											<ol>
-												<For each={parkrun.results}>
-													{(res) => {
+												<For
+													each={[
+														...parkrun.results.map((r) => ({
+															type: 'member' as const,
+															position: r.position,
+															data: r,
+														})),
+														...parkrun.guestResults.map((gr) => ({
+															type: 'guest' as const,
+															position: gr.position,
+															data: gr,
+														})),
+													].sort((a, b) => a.position - b.position)}
+												>
+													{(entry) => {
+														if (entry.type === 'guest') {
+															const gr =
+																entry.data as (typeof parkrun.guestResults)[number]
+															return (
+																<li>
+																	<em>
+																		<A
+																			href={`/guests/${gr.guestParkrunId ?? gr.guestId}`}
+																			class={styles.memberLink}
+																		>
+																			{gr.guestName}
+																		</A>
+																	</em>
+																	<Show when={gr.guestExtra}>
+																		{' '}
+																		({gr.guestExtra})
+																	</Show>{' '}
+																	finished in <em>{ordinal(gr.position)}</em>{' '}
+																	place with a time of <em>{gr.time}</em>
+																	<span class={styles.guestTag}>
+																		Guest <Emoji emoji="👋" animation="wave" />
+																	</span>
+																</li>
+															)
+														}
+														const res =
+															entry.data as (typeof parkrun.results)[number]
 														const resultKey = `${res.parkrunId}:${result.date}:${parkrun.eventId}:${parkrun.eventNumber}`
 														const runnerDateKey = `${res.parkrunId}:${result.date}`
 														const memberRoute = getMemberRoute(
@@ -568,7 +641,12 @@ export function LatestResults(props: LatestResultsProps) {
 												</For>
 											</ol>
 											<Show when={parkrun.volunteers.length > 0}>
-												<Show when={parkrun.results.length > 0}>
+												<Show
+													when={
+														parkrun.results.length > 0 ||
+														parkrun.guestResults.length > 0
+													}
+												>
 													<hr class={styles.seperator} />
 												</Show>
 												<ul class={styles.volunteers}>
@@ -746,5 +824,17 @@ const styles = {
 		borderRadius: '4px',
 		cornerShape: 'notch',
 		margin: '0 auto',
+	}),
+	guestTag: css({
+		display: 'inline-block',
+		background: '#FFFC',
+		p: '0rem 0.3rem',
+		m: '2px 0 2px 4px',
+		borderRadius: '2px',
+		cornerShape: 'notch',
+		fontWeight: 'bold',
+		outline: '2px solid #8B5CF6',
+		outlineOffset: '-1px',
+		color: '#8B5CF6',
 	}),
 }

@@ -44,12 +44,32 @@ export const AdminLayout: Component<{
 									!isActive('/admin/scan') &&
 									!isActive('/admin/users') &&
 									!isActive('/admin/account') &&
-									!isActive('/admin/logs')
+									!isActive('/admin/logs') &&
+									!isActive('/admin/runners') &&
+									!isActive('/admin/parkruns')
 									? styles.navLinkActive
 									: '',
 							)}
 						>
 							Events
+						</A>
+						<A
+							href="/admin/runners"
+							class={cx(
+								styles.navLink,
+								isActive('/admin/runners') ? styles.navLinkActive : '',
+							)}
+						>
+							Runners
+						</A>
+						<A
+							href="/admin/parkruns"
+							class={cx(
+								styles.navLink,
+								isActive('/admin/parkruns') ? styles.navLinkActive : '',
+							)}
+						>
+							Parkruns
 						</A>
 						<A
 							href="/admin/scan"

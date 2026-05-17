@@ -54,6 +54,11 @@ export default defineConfig({
 				'0%, 100%': { transform: 'scale(1)' },
 				'50%': { transform: 'scale(1.3)' },
 			},
+			wave: {
+				'0%, 100%': { transform: 'scale(1)', rotate: '-10deg' },
+				'25%, 75%': { rotate: '10deg' },
+				'50%': { transform: 'scale(1.3)', rotate: '-10deg' },
+			},
 			floatShadow: {
 				'0%, 100%': { transform: 'scaleX(1)', opacity: 0.1 },
 				'50%': { transform: 'scaleX(1.3)', opacity: 0.06 },

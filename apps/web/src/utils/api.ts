@@ -12,6 +12,7 @@ interface CacheMeta {
 	version: number
 	parkrunDataUpdatedAt: string | null
 	scoopBusDataUpdatedAt: string | null
+	guestDataUpdatedAt: string | null
 }
 
 /** Cache keys that belong to parkrun-scraped data */
@@ -20,6 +21,9 @@ const PARKRUN_PREFIX_KEYS = ['results:', 'course:']
 
 /** Cache keys that belong to our own data */
 const SCOOPBUS_EXACT_KEYS = ['races']
+
+/** Cache keys that belong to guest data */
+const GUEST_EXACT_KEYS = ['guests', 'guest-results']
 
 // ---------- Cache meta read / write ----------
 
@@ -96,6 +100,13 @@ function purgeScoopBusCache(): void {
 	}
 }
 
+/** Remove specific cache entries related to guest data */
+function purgeGuestCache(): void {
+	for (const key of GUEST_EXACT_KEYS) {
+		localStorage.removeItem(CACHE_PREFIX + key)
+	}
+}
+
 /**
  * Wipe all sbrc: keys from localStorage EXCEPT the admin auth token.
  * Used when migrating from the old cache scheme or on version mismatch.
@@ -140,6 +151,7 @@ async function checkCacheValidity(): Promise<void> {
 		const server: {
 			parkrunDataUpdatedAt: string | null
 			scoopBusDataUpdatedAt: string | null
+			guestDataUpdatedAt: string | null
 		} = await response.json()
 
 		const meta = getCacheMeta()
@@ -151,6 +163,7 @@ async function checkCacheValidity(): Promise<void> {
 				version: CACHE_VERSION,
 				parkrunDataUpdatedAt: server.parkrunDataUpdatedAt,
 				scoopBusDataUpdatedAt: server.scoopBusDataUpdatedAt,
+				guestDataUpdatedAt: server.guestDataUpdatedAt,
 			})
 			return
 		}
@@ -172,6 +185,15 @@ async function checkCacheValidity(): Promise<void> {
 		if (serverScoopBus > clientScoopBus) {
 			purgeScoopBusCache()
 			meta.scoopBusDataUpdatedAt = server.scoopBusDataUpdatedAt
+			metaChanged = true
+		}
+
+		// Compare guest data timestamp
+		const serverGuest = Number(server.guestDataUpdatedAt ?? '0')
+		const clientGuest = Number(meta.guestDataUpdatedAt ?? '0')
+		if (serverGuest > clientGuest) {
+			purgeGuestCache()
+			meta.guestDataUpdatedAt = server.guestDataUpdatedAt
 			metaChanged = true
 		}
 
@@ -348,6 +370,59 @@ export async function fetchCourse(eventId: string): Promise<CourseData | null> {
 	if (response.status === 404) return null
 	if (!response.ok) throw new Error(`API error: ${response.status}`)
 	const data: CourseData = await response.json()
+	setCache(cacheKey, data)
+	return data
+}
+
+// ---------- Guests ----------
+
+export interface GuestItem {
+	_id: string
+	name: string
+	extra?: string
+	parkrunId?: string
+	avatar: Record<string, never>
+	createdAt: number
+	modifiedAt: number
+}
+
+export interface GuestResultItem {
+	guestId: string
+	guestName: string
+	guestExtra?: string
+	guestParkrunId?: string
+	event: string
+	eventName: string
+	eventNumber: number
+	position: number
+	time: string
+	date: string
+}
+
+export async function fetchGuests(): Promise<GuestItem[]> {
+	await ensureCacheValidity()
+	const cacheKey = 'guests'
+	const cached = getCached<GuestItem[]>(cacheKey)
+	if (cached) return cached
+
+	const url = `${CONVEX_URL}/api/guests`
+	const response = await fetch(url)
+	if (!response.ok) throw new Error(`API error: ${response.status}`)
+	const data: GuestItem[] = await response.json()
+	setCache(cacheKey, data)
+	return data
+}
+
+export async function fetchGuestResults(): Promise<GuestResultItem[]> {
+	await ensureCacheValidity()
+	const cacheKey = 'guest-results'
+	const cached = getCached<GuestResultItem[]>(cacheKey)
+	if (cached) return cached
+
+	const url = `${CONVEX_URL}/api/guest-results`
+	const response = await fetch(url)
+	if (!response.ok) throw new Error(`API error: ${response.status}`)
+	const data: GuestResultItem[] = await response.json()
 	setCache(cacheKey, data)
 	return data
 }
