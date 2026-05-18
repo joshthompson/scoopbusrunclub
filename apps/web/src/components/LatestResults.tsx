@@ -1,30 +1,30 @@
-import { createMemo, createSignal, For, Show, type JSX } from 'solid-js'
-import { css } from '@style/css'
+import extLinkAsset from '@/assets/misc/ext-link.png'
+import { runners } from '@/data/runners'
+import { RoleTranslations } from '@/data/volunteer-roles'
+import { getEvent } from '@/utils/events'
+import { getMemberRoute } from '@/utils/memberRoute'
+import { formatDate, formatName, ordinal } from '@/utils/misc'
+import { getSpecialDayName } from '@/utils/special-days'
 import { A, useNavigate } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, type JSX, Show, createMemo, createSignal } from 'solid-js'
 import type {
+	GuestResultItem,
+	RaceItem,
 	RunResultItem,
 	Runner,
-	RaceItem,
 	VolunteerItem,
-	GuestResultItem,
 } from '../utils/api'
-import { formatDate, formatName, ordinal } from '@/utils/misc'
 import { MILESTONE_SET } from '../utils/milestones'
-import { Emoji } from './ui/Emoji'
-import { DirtBlock } from './ui/DirtBlock'
 import {
+	type CelebrationData,
 	ResultCelebrations,
 	VolunteerCelebrations,
-	type CelebrationData,
 	getOrBuildCelebrationData,
 } from './ResultCelebrations'
 import { Button } from './ui/Button'
-import { getMemberRoute } from '@/utils/memberRoute'
-import { runners } from '@/data/runners'
-import { getEvent } from '@/utils/events'
-import { RoleTranslations } from '@/data/volunteer-roles'
-import { getSpecialDayName } from '@/utils/special-days'
-import extLinkAsset from '@/assets/misc/ext-link.png'
+import { DirtBlock } from './ui/DirtBlock'
+import { Emoji } from './ui/Emoji'
 
 const parkrunIdToRunnerName = new Map<string, string>()
 for (const [, [runner]] of Object.entries(runners)) {
@@ -74,6 +74,7 @@ function groupResults(
 
 	for (const item of items) {
 		if (!byDate.has(item.date)) byDate.set(item.date, new Map())
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const eventMap = byDate.get(item.date)!
 		const key = `${item.event}#${item.eventNumber}`
 		if (!eventMap.has(key)) {
@@ -86,7 +87,7 @@ function groupResults(
 				guestResults: [],
 			})
 		}
-		eventMap.get(key)!.results.push({
+		eventMap.get(key)?.results.push({
 			parkrunId: item.parkrunId,
 			name: item.runnerName,
 			time: item.time,
@@ -97,6 +98,7 @@ function groupResults(
 	// Merge volunteers into the same parkrun event groups
 	for (const vol of volunteerItems) {
 		if (!byDate.has(vol.date)) byDate.set(vol.date, new Map())
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const eventMap = byDate.get(vol.date)!
 		const key = `${vol.event}#${vol.eventNumber}`
 		if (!eventMap.has(key)) {
@@ -109,7 +111,7 @@ function groupResults(
 				guestResults: [],
 			})
 		}
-		eventMap.get(key)!.volunteers.push({
+		eventMap.get(key)?.volunteers.push({
 			parkrunId: vol.parkrunId,
 			name: vol.volunteerName,
 			roles: vol.roles,
@@ -119,6 +121,7 @@ function groupResults(
 	// Merge guest results into the same parkrun event groups
 	for (const gr of guestResultItems) {
 		if (!byDate.has(gr.date)) byDate.set(gr.date, new Map())
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const eventMap = byDate.get(gr.date)!
 		const key = `${gr.event}#${gr.eventNumber}`
 		if (!eventMap.has(key)) {
@@ -131,7 +134,7 @@ function groupResults(
 				guestResults: [],
 			})
 		}
-		eventMap.get(key)!.guestResults.push(gr)
+		eventMap.get(key)?.guestResults.push(gr)
 	}
 
 	const today = new Date().toISOString().split('T')[0]
@@ -166,7 +169,7 @@ interface LatestResultsProps {
 
 function isMilestoneEvent(eventNumber: string) {
 	const num = Number(eventNumber)
-	return !isNaN(num) && MILESTONE_SET.has(num)
+	return !Number.isNaN(num) && MILESTONE_SET.has(num)
 }
 
 function isChristmas(date: string) {
@@ -194,9 +197,10 @@ function renderBold(text: string): JSX.Element {
 	const parts = text.split(/(\*[^*]+\*)/)
 	return (
 		<>
-			{parts.map((part) =>
+			{parts.map((part, i) =>
 				part.startsWith('*') && part.endsWith('*') ? (
-					<em>{part.slice(1, -1)}</em>
+					// biome-ignore lint/suspicious/noArrayIndexKey: text parts have no stable identity
+					<em key={i}>{part.slice(1, -1)}</em>
 				) : (
 					part
 				),
@@ -251,7 +255,7 @@ function RaceBlock(props: { race: RaceItem }) {
 		for (const a of props.race.attendees) {
 			const key = attendeeSignature(a, today)
 			if (!map.has(key)) map.set(key, [])
-			map.get(key)!.push(a)
+			map.get(key)?.push(a)
 		}
 		return Array.from(map.values())
 	})
@@ -289,7 +293,9 @@ function RaceBlock(props: { race: RaceItem }) {
 
 		if (hasPosition || hasTime) {
 			let finished = 'finished'
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			if (hasPosition) finished += ` in *${ordinal(rep.position!)}* place`
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			if (hasTime) finished += ` with a time of *${formatRaceTime(rep.time!)}*`
 			parts.push(finished)
 		}
@@ -316,17 +322,17 @@ function RaceBlock(props: { race: RaceItem }) {
 			<div class={styles.parkrun}>
 				<h4 class={styles.parkrunName}>
 					<Show when={eventEmojis()}>
-						<Emoji emoji={eventEmojis()![0]} />{' '}
+						<Emoji emoji={eventEmojis()?.[0]} />{' '}
 					</Show>
 					{props.race.name}
 					<Show when={eventEmojis()}>
 						{' '}
-						<Emoji emoji={eventEmojis()![1]} />
+						<Emoji emoji={eventEmojis()?.[1]} />
 					</Show>
 				</h4>
 				{props.race.website && (
 					<A href={props.race.website} target="_blank">
-						<img src={extLinkAsset} class={styles.externalRaceLink} />
+						<img src={extLinkAsset} class={styles.externalRaceLink} alt="" />
 					</A>
 				)}
 				<ul style={{ 'list-style': 'none', padding: '0' }}>
@@ -422,7 +428,7 @@ function ParkrunExternalLink(props: { parkrun: ParkrunEvent }) {
 					href={`${ev().url}results/${props.parkrun.eventNumber}/`}
 					target="_blank"
 				>
-					<img src={extLinkAsset} class={styles.externalRaceLink} />
+					<img src={extLinkAsset} class={styles.externalRaceLink} alt="" />
 				</A>
 			)}
 		</Show>
@@ -449,7 +455,7 @@ function joinRoles(roles: string[]): JSX.Element {
 			{roles.slice(0, -1).map((r, i) => (
 				<>
 					{i > 0 && ', '}
-					<em>{r}</em>
+					<em key={r}>{r}</em>
 				</>
 			))}
 			{' and '}
@@ -493,7 +499,13 @@ function ParkrunFlag(props: { parkrun: ParkrunEvent }) {
 	return (
 		<Show when={flag()}>
 			{(f) => (
-				<span class={styles.flag} onClick={() => navigate('/map')}>
+				<span
+					class={styles.flag}
+					onClick={() => navigate('/map')}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') navigate('/map')
+					}}
+				>
 					<Emoji emoji={f()} animation="none" />
 				</span>
 			)}
@@ -538,7 +550,7 @@ export function LatestResults(props: LatestResultsProps) {
 				{(result) => (
 					<div class={styles.results}>
 						<h3 class={styles.date}>
-							{formatDate(new Date(result.date + 'T00:00:00'))}
+							{formatDate(new Date(`${result.date}T00:00:00`))}
 						</h3>
 						<For each={result.races}>{(race) => <RaceBlock race={race} />}</For>
 						<For each={result.parkruns}>

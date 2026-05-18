@@ -72,7 +72,7 @@ export function buildHeatmapData(
 		if (r.parkrunId !== parkrunId) continue
 		const sat = toSaturday(r.date)
 		if (!runDates.has(sat)) runDates.set(sat, [])
-		runDates.get(sat)!.push(`${r.eventName} #${r.eventNumber}`)
+		runDates.get(sat)?.push(`${r.eventName} #${r.eventNumber}`)
 	}
 
 	// Index volunteer dates
@@ -81,7 +81,7 @@ export function buildHeatmapData(
 		if (v.parkrunId !== parkrunId) continue
 		const sat = toSaturday(v.date)
 		if (!volDates.has(sat)) volDates.set(sat, [])
-		volDates.get(sat)!.push(`${v.eventName} #${v.eventNumber} (volunteer)`)
+		volDates.get(sat)?.push(`${v.eventName} #${v.eventNumber} (volunteer)`)
 	}
 
 	const weeks: WeekCell[] = allSaturdays.map((sat) => {

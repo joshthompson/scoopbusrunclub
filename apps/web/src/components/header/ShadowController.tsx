@@ -1,7 +1,7 @@
-import { createController } from '@/engine'
-import { RUNNER_SIZE, runners } from '@/data/runners'
 import shadowAsset from '@/assets/runners/shadow.png'
-import { isStandingState, type RunnerController } from './RunnerController'
+import { RUNNER_SIZE, runners } from '@/data/runners'
+import { createController } from '@/engine'
+import { type RunnerController, isStandingState } from './RunnerController'
 
 export function createShadowController(id: string, runner: RunnerController) {
 	const [runnerData] = runners[runner.data.runnerId]

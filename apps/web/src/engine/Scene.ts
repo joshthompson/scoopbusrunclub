@@ -1,8 +1,9 @@
 import type { Accessor, Component, JSX } from 'solid-js'
-import type { Canvas, CanvasControllers } from './components/Canvas'
-import { createObjectSignal, type ObjectSignal } from './utils'
 import type { Controller } from './Controller'
+import type { Canvas, CanvasControllers } from './components/Canvas'
+import { type ObjectSignal, createObjectSignal } from './utils'
 
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 export type SceneComponent<T extends {} = any> = Component<
 	{
 		setScene: (scene: string, mode?: string) => void
@@ -22,6 +23,7 @@ interface GameOptions {
 	assetOrder?: (string | string[])[]
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 export class Scene<C extends Controller<any> = Controller<any>> {
 	interval: number
 	loading = createObjectSignal(false)
@@ -42,9 +44,9 @@ export class Scene<C extends Controller<any> = Controller<any>> {
 		// Setup onEnterFrame functions for controllers
 		this.interval = window.setInterval(() => {
 			if (this.isActive()) {
-				this.controllers
-					.get()
-					.forEach(({ controller }) => controller.onEnterFrame(this))
+				for (const { controller } of this.controllers.get()) {
+					controller.onEnterFrame(this)
+				}
 			}
 			this.options.afterEnterFrames?.({ $scene: this })
 		}, this.options.frameRate ?? 40)
@@ -58,14 +60,14 @@ export class Scene<C extends Controller<any> = Controller<any>> {
 	}
 
 	addController(...controllers: (C | undefined)[]) {
-		controllers.forEach((controller) => {
-			if (!controller) return
+		for (const controller of controllers) {
+			if (!controller) continue
 			controller.setGame(this)
 			this.controllers.set([
 				...this.controllers.get(),
 				{ id: controller.id, controller },
 			])
-		})
+		}
 	}
 
 	removeController(id: string) {
@@ -81,10 +83,12 @@ export class Scene<C extends Controller<any> = Controller<any>> {
 		]
 	}
 
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	getControllerById<T = Controller<any>>(id: string) {
 		return this.getAllControllers().find((c) => c.id === id) as T | undefined
 	}
 
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	getControllersByType<T = Controller<any>>(type: string) {
 		return this.getAllControllers().filter((c) => c.type === type) as T[]
 	}
@@ -150,9 +154,9 @@ export class Scene<C extends Controller<any> = Controller<any>> {
 
 	async setup() {
 		this.options.setup?.(this)
-		this.controllers.get().forEach(({ controller }) => {
+		for (const { controller } of this.controllers.get()) {
 			controller.setGame(this)
-		})
+		}
 		this.load()
 	}
 

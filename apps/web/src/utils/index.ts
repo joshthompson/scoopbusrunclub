@@ -2,6 +2,7 @@ export function isTouchDevice() {
 	return (
 		'ontouchstart' in window ||
 		navigator.maxTouchPoints > 0 ||
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		(navigator as any).msMaxTouchPoints > 0
 	)
 }

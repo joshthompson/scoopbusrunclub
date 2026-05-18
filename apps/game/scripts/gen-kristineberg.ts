@@ -5,9 +5,9 @@
  *
  * Usage:  pnpm tsx scripts/gen-kristineberg.ts
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '..')
@@ -29,8 +29,7 @@ function parseGpx(path: string): GpxPoint[] {
 	const xml = readFileSync(path, 'utf-8')
 	const points: GpxPoint[] = []
 	const re = /<trkpt\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>([\s\S]*?)<\/trkpt>/g
-	let m: RegExpExecArray | null
-	while ((m = re.exec(xml)) !== null) {
+	for (const m of xml.matchAll(re)) {
 		const lat = Number.parseFloat(m[1])
 		const lon = Number.parseFloat(m[2])
 		const eleMatch = m[3].match(/<ele>([^<]+)<\/ele>/)
@@ -131,10 +130,10 @@ async function fetchBuildings(
 	coords: number[][],
 	paddingM = 600,
 ): Promise<BuildingPolygon[]> {
-	let minLat = Number.POSITIVE_INFINITY,
-		maxLat = Number.NEGATIVE_INFINITY,
-		minLon = Number.POSITIVE_INFINITY,
-		maxLon = Number.NEGATIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
+	let minLon = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
 	for (const c of coords) {
 		if (c[1] < minLat) minLat = c[1]
 		if (c[1] > maxLat) maxLat = c[1]
@@ -195,10 +194,10 @@ async function fetchBuildings(
 			const bldg: BuildingPolygon = { type, points: ring }
 			if (el.tags?.height) {
 				const h = Number.parseFloat(el.tags.height)
-				if (!isNaN(h) && h > 0) bldg.height = Math.round(h)
+				if (!Number.isNaN(h) && h > 0) bldg.height = Math.round(h)
 			} else if (el.tags?.['building:levels']) {
 				const l = Number.parseFloat(el.tags['building:levels'])
-				if (!isNaN(l) && l > 0) bldg.height = Math.round(l * 3)
+				if (!Number.isNaN(l) && l > 0) bldg.height = Math.round(l * 3)
 			}
 			results.push(bldg)
 		}
@@ -228,7 +227,7 @@ function filterBuildings(
 // ── Write helpers ────────────────────────────────────────────────────
 
 function writeJson(filePath: string, data: unknown) {
-	writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8')
+	writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf-8')
 }
 
 // ── Main ─────────────────────────────────────────────────────────────
@@ -266,10 +265,10 @@ async function main() {
 	console.log(`✅ course.json (${coordinates.length} points)`)
 
 	writeJson(resolve(LEVEL_DIR, 'altitude.json'), altitude)
-	console.log(`✅ altitude.json`)
+	console.log('✅ altitude.json')
 
 	writeJson(resolve(LEVEL_DIR, 'water.json'), [])
-	console.log(`✅ water.json (empty)`)
+	console.log('✅ water.json (empty)')
 
 	// Fetch buildings
 	const rawBuildings = await fetchBuildings(course.coordinates)
@@ -278,7 +277,7 @@ async function main() {
 	console.log(`✅ buildings.json (${buildings.length} buildings)`)
 
 	writeJson(resolve(LEVEL_DIR, 'paths.json'), [])
-	console.log(`✅ paths.json (empty)`)
+	console.log('✅ paths.json (empty)')
 
 	// Write index.ts
 	const indexTs = `import type { LevelData } from '../types';
@@ -303,7 +302,7 @@ const level: LevelData = {
 export default level;
 `
 	writeFileSync(resolve(LEVEL_DIR, 'index.ts'), indexTs, 'utf-8')
-	console.log(`✅ index.ts`)
+	console.log('✅ index.ts')
 
 	console.log('\nDone! Level written to src/levels/kristineberg/\n')
 }

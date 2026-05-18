@@ -8,10 +8,10 @@
  *      textures based on the mask - built-in, tested, no custom GLSL needed.
  */
 
-import { type Scene, Texture, Color3, DynamicTexture } from '@babylonjs/core'
+import { Color3, DynamicTexture, type Scene, Texture } from '@babylonjs/core'
 import { MixMaterial } from '@babylonjs/materials'
-import forestUrl from '../assets/forest.png'
 import dirtUrl from '../assets/dirt.png'
+import forestUrl from '../assets/forest.png'
 import { RENDER_TEXTURE_ANISOTROPY } from './constants'
 
 // ---------- Types ----------
@@ -615,6 +615,7 @@ function bakeMaskTexture(
 	const staticLineCtx = staticLineCanvas.getContext(
 		'2d',
 	) as CanvasRenderingContext2D
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	staticLineCtx.drawImage((lineCtx as any).canvas, 0, 0)
 
 	const setIcePatches = (patches: IcePatchOverlay[]) => {

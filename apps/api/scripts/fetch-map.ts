@@ -1,3 +1,4 @@
+import { scrapeCourseMap } from '../lib/map-scraper'
 /**
  * Fetch course map data for a parkrun event and store it in Convex.
  *
@@ -16,8 +17,7 @@
  *
  * Requires: playwright (install chromium with `npx playwright install chromium`)
  */
-import { loadEnv, requireEnvVars, launchBrowser } from './shared'
-import { scrapeCourseMap } from '../lib/map-scraper'
+import { launchBrowser, loadEnv, requireEnvVars } from './shared'
 
 // --- Env loading ---
 

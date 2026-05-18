@@ -1,11 +1,11 @@
+import { css } from '@style/css'
 import {
+	type JSX,
 	createEffect,
 	createSignal,
 	onCleanup,
 	onMount,
-	type JSX,
 } from 'solid-js'
-import { css } from '@style/css'
 
 /**
  * Custom masonry layout component.

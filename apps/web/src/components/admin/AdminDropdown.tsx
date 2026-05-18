@@ -1,6 +1,6 @@
-import { createSignal, type JSX, Show, onCleanup, onMount } from 'solid-js'
-import { Portal } from 'solid-js/web'
 import { css } from '@style/css'
+import { type JSX, Show, createSignal, onCleanup, onMount } from 'solid-js'
+import { Portal } from 'solid-js/web'
 
 interface AdminDropdownProps {
 	trigger?: string
@@ -39,6 +39,7 @@ export function AdminDropdown(props: AdminDropdownProps) {
 	return (
 		<span class={styles.wrapper}>
 			<button
+				type="button"
 				ref={triggerRef}
 				class={styles.trigger}
 				onClick={() => {
@@ -55,6 +56,7 @@ export function AdminDropdown(props: AdminDropdownProps) {
 						class={styles.menu}
 						style={{ top: `${pos().top}px`, left: `${pos().left}px` }}
 						onClick={() => setOpen(false)}
+						onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
 					>
 						{props.children}
 					</div>
@@ -71,7 +73,7 @@ interface AdminDropdownItemProps {
 
 export function AdminDropdownItem(props: AdminDropdownItemProps) {
 	return (
-		<button class={styles.item} onClick={props.onClick}>
+		<button type="button" class={styles.item} onClick={props.onClick}>
 			{props.children}
 		</button>
 	)

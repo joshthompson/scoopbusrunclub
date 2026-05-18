@@ -1,10 +1,10 @@
-import { createSignal, onMount, onCleanup, For, Show } from 'solid-js'
-import { lobby, type RoomInfo, MAX_PLAYERS } from './multiplayer'
+import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
+import { MuteButton } from './MuteButton'
+import logoSrc from './assets/logo.png'
 import { GAME_TYPE_LABELS } from './game/modes'
 import levels from './levels'
-import logoSrc from './assets/logo.png'
+import { MAX_PLAYERS, type RoomInfo, lobby } from './multiplayer'
 import { useMenuNav } from './useMenuNav'
-import { MuteButton } from './MuteButton'
 
 interface RoomBrowserScreenProps {
 	onHost: () => void
@@ -50,6 +50,7 @@ export function RoomBrowserScreen(props: RoomBrowserScreenProps) {
 				<h2 class="screen-heading">Online Multiplayer</h2>
 
 				<button
+					type="button"
 					class="course-btn host-btn"
 					classList={{ 'menu-focused': isFocused(1) }}
 					onClick={props.onHost}
@@ -72,7 +73,7 @@ export function RoomBrowserScreen(props: RoomBrowserScreenProps) {
 									<th>Level</th>
 									<th>Game Mode</th>
 									<th>Players</th>
-									<th></th>
+									<th />
 								</tr>
 							</thead>
 							<tbody>
@@ -86,6 +87,7 @@ export function RoomBrowserScreen(props: RoomBrowserScreenProps) {
 											</td>
 											<td>
 												<button
+													type="button"
 													class="room-join-btn"
 													classList={{ 'menu-focused': isFocused(2 + i()) }}
 													onClick={() => props.onJoin(room.roomCode)}
@@ -103,6 +105,7 @@ export function RoomBrowserScreen(props: RoomBrowserScreenProps) {
 				</div>
 
 				<button
+					type="button"
 					class="course-btn cancel-btn back-btn"
 					classList={{ 'menu-focused': isFocused(2 + rooms().length) }}
 					onClick={props.onBack}

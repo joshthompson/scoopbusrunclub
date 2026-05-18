@@ -1,6 +1,6 @@
-import type { RemotePlayersMap } from '../types'
-import { poseRunning, poseStanding } from '../objects/RunnerModel'
 import { RENDER_ANIMATION_CULL_DISTANCE } from '../constants'
+import { poseRunning, poseStanding } from '../objects/RunnerModel'
+import type { RemotePlayersMap } from '../types'
 
 const SCOOP_ANIM_DURATION = 0.35
 
@@ -86,14 +86,18 @@ export function updateRemotePlayersSystem(
 			const ease = Math.sin(t * Math.PI)
 			remote.scoopPivot.rotation.x = ease * -1.2
 			remote.scoopPivot.position.y =
+				// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 				(remote.scoopPivot as any).__restY + ease * 0.5
 			remote.scoopPivot.position.z =
+				// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 				(remote.scoopPivot as any).__restZ + ease * 0.35
 		} else {
 			remote.scoopPivot.rotation.x = 0
 			remote.scoopPivot.position.y =
+				// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 				(remote.scoopPivot as any).__restY ?? remote.scoopPivot.position.y
 			remote.scoopPivot.position.z =
+				// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 				(remote.scoopPivot as any).__restZ ?? remote.scoopPivot.position.z
 		}
 

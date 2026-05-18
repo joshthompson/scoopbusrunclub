@@ -1,6 +1,10 @@
-import { createMemo, For, Show } from 'solid-js'
-import { css } from '@style/css'
+import { DirtBlock } from '@/components/ui/DirtBlock'
+import { Emoji } from '@/components/ui/Emoji'
+import { getMemberRoute } from '@/utils/memberRoute'
+import { formatDate, formatName } from '@/utils/misc'
 import { A } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show, createMemo } from 'solid-js'
 import type { RunResultItem, Runner } from '../utils/api'
 import {
 	MILESTONE_SET,
@@ -8,10 +12,6 @@ import {
 	nextMilestone,
 	ordinalSuffix,
 } from '../utils/milestones'
-import { formatDate, formatName } from '@/utils/misc'
-import { Emoji } from '@/components/ui/Emoji'
-import { DirtBlock } from '@/components/ui/DirtBlock'
-import { getMemberRoute } from '@/utils/memberRoute'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

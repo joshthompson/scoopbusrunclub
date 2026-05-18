@@ -86,7 +86,7 @@ export function extractEvents(runResults: RunResult[]): EventInfo[] {
 		)
 		if (!urlMatch) continue
 
-		const baseUrl = urlMatch[1] + '/'
+		const baseUrl = `${urlMatch[1]}/`
 
 		seen.set(result.event, {
 			eventId: result.event,
@@ -118,8 +118,9 @@ export function parseRunnerData(html: string): RunnerInfo {
 		/<h3>\s*(\d+)\s*parkruns?\s*(?:&amp;|&)?\s*(?:(\d+)\s*junior\s*parkruns?\s*)?total/i,
 	)
 	const totalRuns = totalMatch ? Number.parseInt(totalMatch[1], 10) : 0
-	const totalJuniorRuns =
-		totalMatch && totalMatch[2] ? Number.parseInt(totalMatch[2], 10) : 0
+	const totalJuniorRuns = totalMatch?.[2]
+		? Number.parseInt(totalMatch[2], 10)
+		: 0
 
 	return { name, totalRuns, totalJuniorRuns }
 }
@@ -139,16 +140,14 @@ export function parseRunResults(html: string): RunResult[] {
 
 	// Match each row: <tr class="..."><td>...</td><td>...</td>...</tr>
 	const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
-	let rowMatch
 
-	while ((rowMatch = rowRegex.exec(tbody)) !== null) {
+	for (const rowMatch of tbody.matchAll(rowRegex)) {
 		const row = rowMatch[1]
 
 		// Extract cells
 		const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi
 		const cells: string[] = []
-		let cellMatch
-		while ((cellMatch = cellRegex.exec(row)) !== null) {
+		for (const cellMatch of row.matchAll(cellRegex)) {
 			cells.push(cellMatch[1])
 		}
 
@@ -226,9 +225,8 @@ export function parseEventHistory(html: string): EventHistoryEntry[] {
 
 	const rowRegex =
 		/<tr\s+class="Results-table-row"[^>]*data-parkrun="(\d+)"[^>]*data-date="(\d{4}-\d{2}-\d{2})"[^>]*>/gi
-	let match
 
-	while ((match = rowRegex.exec(html)) !== null) {
+	for (const match of html.matchAll(rowRegex)) {
 		entries.push({
 			eventNumber: Number.parseInt(match[1], 10),
 			date: match[2],
@@ -272,9 +270,8 @@ export function parseEventVolunteers(
 	// Match each volunteer row
 	const rowRegex =
 		/<tr\s+class="Volunteers-table-row"[^>]*data-role="([^"]*)"[^>]*>([\s\S]*?)<\/tr>/gi
-	let match
 
-	while ((match = rowRegex.exec(tbody)) !== null) {
+	for (const match of tbody.matchAll(rowRegex)) {
 		const dataRole = match[1]
 		const rowHtml = match[2]
 

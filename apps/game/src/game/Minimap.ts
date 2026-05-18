@@ -73,6 +73,7 @@ export class Minimap {
 	private viewRadius = DEFAULT_VIEW_RADIUS
 
 	constructor(private canvas: HTMLCanvasElement) {
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		this.ctx = canvas.getContext('2d')!
 		this.applyCssSize()
 		window.addEventListener('resize', () => this.applyCssSize())

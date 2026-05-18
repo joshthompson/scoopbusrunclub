@@ -27,7 +27,7 @@ export interface CourseData {
  */
 function parseCoordinate(coordStr: string): number[] {
 	const parts = coordStr.trim().split(',').map(Number)
-	if (parts.length < 2 || parts.some(isNaN)) {
+	if (parts.length < 2 || parts.some(Number.isNaN)) {
 		throw new Error(`Invalid coordinate: "${coordStr}"`)
 	}
 	return parts
@@ -60,9 +60,8 @@ export function parseKml(kmlContent: string): CourseData {
 
 	// Match all <Placemark>…</Placemark> blocks
 	const placemarkRegex = /<Placemark>([\s\S]*?)<\/Placemark>/g
-	let match
 
-	while ((match = placemarkRegex.exec(kmlContent)) !== null) {
+	for (const match of kmlContent.matchAll(placemarkRegex)) {
 		const placemark = match[1]
 
 		// Extract the <name> element
@@ -94,8 +93,7 @@ export function parseKml(kmlContent: string): CourseData {
 			// Inner boundaries (connecting segments, out-and-back paths, etc.)
 			const innerRegex =
 				/<innerBoundaryIs>[\s\S]*?<coordinates>([\s\S]*?)<\/coordinates>[\s\S]*?<\/innerBoundaryIs>/g
-			let innerMatch
-			while ((innerMatch = innerRegex.exec(polygonContent)) !== null) {
+			for (const innerMatch of polygonContent.matchAll(innerRegex)) {
 				coordinates.push(...parseCoordinatesBlock(innerMatch[1]))
 			}
 			continue

@@ -24,17 +24,6 @@ import {
 	VertexBuffer,
 } from '@babylonjs/core'
 import {
-	createRunnerModel,
-	poseCheering,
-	poseFlailing,
-	poseJump,
-	poseRunning,
-	poseSitting,
-	poseSittingAnimated,
-	poseStanding,
-} from '../objects/RunnerModel'
-import type { RunnerModelResult } from '../objects/RunnerModel'
-import {
 	BUS_ROOF_L,
 	BUS_ROOF_W,
 	BUS_ROOF_Y,
@@ -55,6 +44,17 @@ import {
 	SCOOP_MIN_UP,
 	SCOOP_UP_FACTOR,
 } from '../constants'
+import {
+	createRunnerModel,
+	poseCheering,
+	poseFlailing,
+	poseJump,
+	poseRunning,
+	poseSitting,
+	poseSittingAnimated,
+	poseStanding,
+} from '../objects/RunnerModel'
+import type { RunnerModelResult } from '../objects/RunnerModel'
 import { mulberry32 } from './terrain'
 
 /** Flag pole height */
@@ -868,8 +868,8 @@ export class PassengerSystem {
 
 		// Store rest positions for wind animation
 		const restPositions = banner
-			.getVerticesData(VertexBuffer.PositionKind)!
-			.slice()
+			.getVerticesData(VertexBuffer.PositionKind)
+			?.slice()
 		const bannerIdx = index
 		this.scene.registerBeforeRender(() => {
 			if (!banner.isEnabled() || banner.isDisposed()) return

@@ -4,9 +4,9 @@
  * Displays a leaderboard table of finish times, winner, and navigation buttons.
  */
 import { For } from 'solid-js'
+import { MuteButton } from './MuteButton'
 import logoSrc from './assets/logo.png'
 import { useMenuNav } from './useMenuNav'
-import { MuteButton } from './MuteButton'
 
 interface LocalResultsScreenProps {
 	p1Role: 'bus' | 'runner'
@@ -68,7 +68,9 @@ export function LocalResultsScreen(props: LocalResultsScreenProps) {
 
 	const winner = () => {
 		if (!bothFinished()) return null
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const t1 = props.p1FinishTime!
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const t2 = props.p2FinishTime!
 		if (Math.abs(t1 - t2) < 0.1) return 'tie'
 		return t1 < t2 ? 1 : 2
@@ -164,7 +166,7 @@ export function LocalResultsScreen(props: LocalResultsScreenProps) {
 													color: entry.css,
 													'font-weight': 'bold',
 													'font-size': 'clamp(16px, 2.5vw, 22px)',
-													'text-shadow': `0 1px 4px rgba(0,0,0,0.6)`,
+													'text-shadow': '0 1px 4px rgba(0,0,0,0.6)',
 												}}
 											>
 												{entry.emoji} {entry.name}
@@ -207,6 +209,7 @@ export function LocalResultsScreen(props: LocalResultsScreenProps) {
 
 				<div class="finish-buttons" style={{ 'margin-top': '24px' }}>
 					<button
+						type="button"
 						class="course-btn"
 						classList={{ 'menu-focused': isFocused(1) }}
 						onClick={props.onReplay}
@@ -214,6 +217,7 @@ export function LocalResultsScreen(props: LocalResultsScreenProps) {
 						Play Again
 					</button>
 					<button
+						type="button"
 						class="course-btn finish-exit-btn"
 						classList={{ 'menu-focused': isFocused(2) }}
 						onClick={props.onExit}

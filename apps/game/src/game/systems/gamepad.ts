@@ -84,7 +84,7 @@ export class GamepadManager {
 		const connected: Gamepad[] = []
 		for (let i = 0; i < gamepads.length && connected.length < 2; i++) {
 			const gp = gamepads[i]
-			if (gp && gp.connected) connected.push(gp)
+			if (gp?.connected) connected.push(gp)
 		}
 
 		for (let slot = 0; slot < 2; slot++) {

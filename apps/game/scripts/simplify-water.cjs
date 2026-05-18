@@ -1,5 +1,5 @@
 // Simplify judarskogen water: remove small polygons + decimate large ones
-const fs = require('fs')
+const fs = require('node:fs')
 const path = 'apps/game/src/levels/judarskogen.map.ts'
 const src = fs.readFileSync(path, 'utf8')
 
@@ -46,14 +46,14 @@ console.log('Before:', water.length, 'features,', totalCoordsBefore, 'coords')
 console.log('After:', filtered.length, 'features,', totalCoordsAfter, 'coords')
 console.log(
 	'Reduction:',
-	((1 - totalCoordsAfter / totalCoordsBefore) * 100).toFixed(1) + '%',
+	`${((1 - totalCoordsAfter / totalCoordsBefore) * 100).toFixed(1)}%`,
 )
 
 // Replace the water array in the file
 const waterJson = JSON.stringify(filtered)
 const newSrc = src.replace(
 	/"water":\s*\[[\s\S]*\]\s*\};\s*export/,
-	'"water": ' + waterJson + '\n};\n\nexport',
+	`"water": ${waterJson}\n};\n\nexport`,
 )
 fs.writeFileSync(path, newSrc)
 console.log('Written to', path)

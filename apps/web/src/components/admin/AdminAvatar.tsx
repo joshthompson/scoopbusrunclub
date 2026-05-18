@@ -42,7 +42,7 @@ export function AdminAvatar(props: {
 			title={props.title}
 		>
 			<Show when={face()} fallback={initial()}>
-				<img src={face()} class={styles.face} />
+				<img src={face()} class={styles.face} alt="" />
 			</Show>
 		</div>
 	)

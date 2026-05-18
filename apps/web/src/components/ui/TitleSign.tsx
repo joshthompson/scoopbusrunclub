@@ -1,7 +1,7 @@
+import purpleSign from '@/assets/misc/purple-sign.png'
+import woodenSign from '@/assets/misc/wooden-sign.png'
 import { cva } from '@style/css'
 import { createEffect, createSignal } from 'solid-js'
-import woodenSign from '@/assets/misc/wooden-sign.png'
-import purpleSign from '@/assets/misc/purple-sign.png'
 
 export type SignType = 'wooden' | 'purple'
 
@@ -48,7 +48,6 @@ export function TitleSign(props: {
 
 	return (
 		<div
-			aria-role="heading"
 			class={styles.sign({ type: type() })}
 			style={{ 'background-image': `url(${signImage()})` }}
 		>

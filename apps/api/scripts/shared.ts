@@ -1,12 +1,12 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 /**
  * Shared utilities for Parkrun scraping scripts.
  *
  * Used by fetch-results.ts, fetch-parkrun.ts, and fetch-all.ts.
  */
 import { chromium } from 'playwright'
-import { readFileSync, existsSync } from 'fs'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
 
 // --- Tracked athletes ---
 

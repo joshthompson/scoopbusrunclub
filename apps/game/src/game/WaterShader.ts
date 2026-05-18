@@ -10,10 +10,10 @@
  */
 
 import {
+	Color3,
+	Effect,
 	type Scene,
 	ShaderMaterial,
-	Effect,
-	Color3,
 	Vector3,
 } from '@babylonjs/core'
 
@@ -178,8 +178,8 @@ let _registered = false
 
 function ensureRegistered() {
 	if (_registered) return
-	Effect.ShadersStore[SHADER_NAME + 'VertexShader'] = VERTEX
-	Effect.ShadersStore[SHADER_NAME + 'FragmentShader'] = FRAGMENT
+	Effect.ShadersStore[`${SHADER_NAME}VertexShader`] = VERTEX
+	Effect.ShadersStore[`${SHADER_NAME}FragmentShader`] = FRAGMENT
 	_registered = true
 }
 

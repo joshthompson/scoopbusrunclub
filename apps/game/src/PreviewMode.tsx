@@ -8,14 +8,16 @@
  * - `runners`  — comma-separated list of runnerId:finishSeconds pairs
  */
 
-import { createSignal, onMount, onCleanup, Show, For } from 'solid-js'
 import earcut from 'earcut'
+import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
 import { Game } from './game/Game'
-import levels from './levels'
 import type { PreviewRunnerDef } from './game/systems/previewRunners'
 
 // Babylon.js needs earcut on window for CreatePolygon
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 ;(window as any).earcut = earcut
+
+import levels from './levels'
 
 const SPEED_OPTIONS = [1, 2, 5, 10, 25, 50, 100] as const
 
@@ -169,7 +171,7 @@ export function PreviewMode(props: {
 				<div id="loading">
 					<div class="loading-text">Loading course data</div>
 					<div class="loading-bar-container">
-						<div class="loading-bar"></div>
+						<div class="loading-bar" />
 					</div>
 					<div class="loading-hint">Preparing terrain & textures…</div>
 				</div>
@@ -199,10 +201,8 @@ export function PreviewMode(props: {
 						<For each={runnerNames()}>
 							{(r) => (
 								<button
-									class={
-										'preview-runner-btn' +
-										(followedIndex() === r.index ? ' active' : '')
-									}
+									type="button"
+									class={`preview-runner-btn${followedIndex() === r.index ? ' active' : ''}`}
 									onClick={() => handleFollowRunner(r.index)}
 								>
 									{r.name}
@@ -212,7 +212,7 @@ export function PreviewMode(props: {
 					</div>
 
 					{/* Play / pause */}
-					<button class="preview-play-btn" onClick={togglePlay}>
+					<button type="button" class="preview-play-btn" onClick={togglePlay}>
 						{playing() ? '⏸' : '▶'}
 					</button>
 
@@ -236,7 +236,8 @@ export function PreviewMode(props: {
 						<For each={[...SPEED_OPTIONS]}>
 							{(s) => (
 								<button
-									class={'preview-speed-btn' + (speed() === s ? ' active' : '')}
+									type="button"
+									class={`preview-speed-btn${speed() === s ? ' active' : ''}`}
 									onClick={() => handleSpeedChange(s)}
 								>
 									x{s}

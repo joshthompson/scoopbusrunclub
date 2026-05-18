@@ -1,23 +1,23 @@
-import { createSignal, Show, For, onMount, onCleanup } from 'solid-js'
+import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
+import { MuteButton } from './MuteButton'
+import {
+	getBusPreviewUrl,
+	getCorgiPreviewUrl,
+	getRunnerPreviewUrl,
+	startLiveWavePreview,
+} from './RunnerPreview3D'
 import logoSrc from './assets/logo.png'
 import {
 	BUS_COLOR_OPTIONS,
-	RUNNER_PRESETS,
-	RANDOM_RUNNER_ID,
+	type CharacterSelection,
 	RANDOM_BUS_ID,
+	RANDOM_RUNNER_ID,
+	RUNNER_PRESETS,
+	type RunnerPreset,
 	generateRandomBusColor,
 	isCorgiPreset,
-	type CharacterSelection,
-	type RunnerPreset,
 } from './game/characters'
-import {
-	getRunnerPreviewUrl,
-	getCorgiPreviewUrl,
-	getBusPreviewUrl,
-	startLiveWavePreview,
-} from './RunnerPreview3D'
 import { useMenuNav } from './useMenuNav'
-import { MuteButton } from './MuteButton'
 
 type PlayerRole = 'bus' | 'runner'
 
@@ -127,6 +127,7 @@ function RunnerTile(props: {
 
 	return (
 		<button
+			type="button"
 			class="char-tile"
 			classList={{
 				taken: props.taken,
@@ -226,7 +227,11 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
 					>
 						Game will start when the host is ready
 					</p>
-					<button class="course-btn cancel-btn back-btn" onClick={props.onBack}>
+					<button
+						type="button"
+						class="course-btn cancel-btn back-btn"
+						onClick={props.onBack}
+					>
 						Cancel
 					</button>
 				</Show>
@@ -238,9 +243,11 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
 						<For each={BUS_COLOR_OPTIONS}>
 							{(opt, i) => {
 								const taken = () => isBusTaken(opt.id)
+								// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 								const active = () => (selected() as any)?.busColorId === opt.id
 								return (
 									<button
+										type="button"
 										class="char-tile"
 										classList={{
 											taken: taken(),
@@ -264,8 +271,10 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
 						</For>
 						{/* Random bus option */}
 						<button
+							type="button"
 							class="char-tile"
 							classList={{
+								// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 								active: (selected() as any)?.busColorId?.startsWith(
 									RANDOM_BUS_ID,
 								),
@@ -279,6 +288,7 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
 						</button>
 					</div>
 					<button
+						type="button"
 						class="course-btn cancel-btn back-btn"
 						classList={{
 							'menu-focused': isFocused(1 + BUS_COLOR_OPTIONS.length + 1),
@@ -296,6 +306,7 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
 						<For each={sortedRunnerPresets()}>
 							{(preset, i) => {
 								const taken = () => isRunnerTaken(preset.id)
+								// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 								const active = () => (selected() as any)?.runnerId === preset.id
 								return (
 									<RunnerTile
@@ -310,8 +321,10 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
 						</For>
 						{/* Random option */}
 						<button
+							type="button"
 							class="char-tile"
 							classList={{
+								// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 								active: (selected() as any)?.runnerId === RANDOM_RUNNER_ID,
 								'menu-focused': isFocused(1 + sortedRunnerPresets().length),
 							}}
@@ -323,6 +336,7 @@ export function CharacterSelectScreen(props: CharacterSelectScreenProps) {
 						</button>
 					</div>
 					<button
+						type="button"
 						class="course-btn cancel-btn back-btn"
 						classList={{
 							'menu-focused': isFocused(1 + sortedRunnerPresets().length + 1),

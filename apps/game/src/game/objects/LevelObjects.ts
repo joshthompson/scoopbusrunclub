@@ -1,11 +1,11 @@
 import {
-	type Scene,
-	MeshBuilder,
-	StandardMaterial,
 	Color3,
-	TransformNode,
 	type Mesh,
+	MeshBuilder,
+	type Scene,
 	type SpotLight,
+	StandardMaterial,
+	TransformNode,
 } from '@babylonjs/core'
 import type { ElasticObject } from '../types'
 import { createFloodlightTemplates, placeFloodlight } from './Floodlight'
@@ -691,6 +691,7 @@ export function buildLevelObjects(
 	for (let i = 0; i < benches.length; i++) {
 		const { x, z, rotation } = benches[i]
 		const root = placeBench(
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			benchTpl!,
 			scene,
 			i,
@@ -713,6 +714,7 @@ export function buildLevelObjects(
 	for (let i = 0; i < lampposts.length; i++) {
 		const { x, z, rotation } = lampposts[i]
 		const root = placeLamppost(
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			lampTpl!,
 			scene,
 			i,
@@ -730,6 +732,7 @@ export function buildLevelObjects(
 	for (let i = 0; i < tennisCourts.length; i++) {
 		const { x, z, rotation } = tennisCourts[i]
 		objectRoots.push(
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			placeTennisCourt(tennisTpl!, scene, i, x, getGroundY(x, z), z, rotation),
 		)
 	}
@@ -739,6 +742,7 @@ export function buildLevelObjects(
 	for (let i = 0; i < floodlights.length; i++) {
 		const { x, z, rotation } = floodlights[i]
 		const result = placeFloodlight(
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			floodTpl!,
 			scene,
 			i,
@@ -757,6 +761,7 @@ export function buildLevelObjects(
 	for (let i = 0; i < portaloos.length; i++) {
 		const { x, z, rotation } = portaloos[i]
 		const root = placePortaloo(
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			portalooTpl!,
 			scene,
 			i,

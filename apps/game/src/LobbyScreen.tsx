@@ -1,13 +1,13 @@
-import { createSignal, Show, For } from 'solid-js'
-import { mp, lobby, generateRoomCode, MAX_PLAYERS } from './multiplayer'
-import levels from './levels'
+import { For, Show, createSignal } from 'solid-js'
 import logoSrc from './assets/logo.png'
 import {
-	GAME_TYPE_LABELS,
 	GAME_TYPE_DESCRIPTIONS,
+	GAME_TYPE_LABELS,
 	getGameModeConfig,
 } from './game/modes'
 import type { GameType, TeamColor } from './game/modes'
+import levels from './levels'
+import { MAX_PLAYERS, generateRoomCode, lobby, mp } from './multiplayer'
 
 /** Player colour CSS values (1-indexed) */
 const PLAYER_CSS_COLORS = ['#f0c820', '#d94030', '#3470d8', '#9940cc']
@@ -180,9 +180,11 @@ export function LobbyScreen(props: LobbyScreenProps) {
 
 	// Auto-join if coming from room browser with a pending code
 	const pendingCode =
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		props.mode === 'join' ? (window as any).__pendingJoinCode : undefined
 	if (pendingCode) {
-		delete (window as any).__pendingJoinCode
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
+		;(window as any).__pendingJoinCode = undefined
 		setInputCode(pendingCode)
 		setRoomCode(pendingCode)
 		setJoining(true)
@@ -326,7 +328,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
 							onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
 							ref={(el) => setTimeout(() => el.focus(), 0)}
 						/>
-						<button class="course-btn" onClick={handleJoin}>
+						<button type="button" class="course-btn" onClick={handleJoin}>
 							Connect
 						</button>
 					</div>
@@ -409,6 +411,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
 																<Show when={isHost}>
 																	<div class="team-badge-actions">
 																		<button
+																			type="button"
 																			class="lobby-inline-btn"
 																			onClick={() => toggleTeam(idx)}
 																			title="Move to other team"
@@ -417,6 +420,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
 																		</button>
 																		<Show when={role !== 'bus'}>
 																			<button
+																				type="button"
 																				class="lobby-inline-btn"
 																				onClick={() => setTeamDriver(idx)}
 																				title="Set as team driver"
@@ -492,6 +496,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
 											</span>
 											<Show when={showDriverBtn && role !== 'bus'}>
 												<button
+													type="button"
 													class="lobby-inline-btn"
 													onClick={() => setDriver(idx)}
 													title="Set as bus driver"
@@ -510,6 +515,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
 				<div class="lobby-buttons">
 					<Show when={connected() && props.mode === 'host'}>
 						<button
+							type="button"
 							class="course-btn start-btn"
 							onClick={handleStart}
 							disabled={!canStart()}
@@ -522,7 +528,11 @@ export function LobbyScreen(props: LobbyScreenProps) {
 					<Show when={connected() && props.mode === 'join'}>
 						<p class="waiting-text">Waiting for host to start...</p>
 					</Show>
-					<button class="course-btn cancel-btn" onClick={handleCancel}>
+					<button
+						type="button"
+						class="course-btn cancel-btn"
+						onClick={handleCancel}
+					>
 						Cancel
 					</button>
 				</div>

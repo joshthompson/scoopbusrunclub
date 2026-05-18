@@ -125,7 +125,7 @@ export function updateCountdownCameraSystem(
 	} = params
 
 	const t = Math.max(0, Math.min(1, 1 - countdownTimer / countdownDuration))
-	const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+	const ease = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
 
 	const camDist = 18
 	const camHeightStart = 10

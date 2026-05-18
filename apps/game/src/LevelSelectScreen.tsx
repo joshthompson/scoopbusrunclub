@@ -1,8 +1,8 @@
-import { For, createSignal, onMount, onCleanup } from 'solid-js'
-import levels from './levels'
-import logoSrc from './assets/logo.png'
-import { useMenuNav } from './useMenuNav'
+import { For, createSignal, onCleanup, onMount } from 'solid-js'
 import { MuteButton } from './MuteButton'
+import logoSrc from './assets/logo.png'
+import levels from './levels'
+import { useMenuNav } from './useMenuNav'
 
 interface LevelSelectScreenProps {
 	onSelect: (levelId: string, opts?: { altCourse?: boolean }) => void
@@ -91,9 +91,11 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
 							const level = levels[id]
 							const useAlt = () => shiftHeld() && !!level.altCourseName
 							const displayName = () =>
+								// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 								useAlt() ? level.altCourseName! : level.name
 							return (
 								<button
+									type="button"
 									class="level-tile"
 									classList={{
 										'menu-focused': isFocused(1 + courseIds().indexOf(id)),
@@ -119,6 +121,7 @@ export function LevelSelectScreen(props: LevelSelectScreenProps) {
 					</For>
 				</div>
 				<button
+					type="button"
 					class="course-btn cancel-btn back-btn"
 					classList={{ 'menu-focused': isFocused(1 + courseIds().length) }}
 					onClick={props.onBack}

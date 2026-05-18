@@ -1,14 +1,14 @@
-import type { Runner, RunResultItem } from '@/utils/api'
+import { BackSignButton } from '@/components/BackSignButton'
+import { GraphSVG } from '@/components/GraphSVG'
 import type { CelebrationData } from '@/components/ResultCelebrations'
+import { DirtBlock } from '@/components/ui/DirtBlock'
+import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import type { RunResultItem, Runner } from '@/utils/api'
 import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
 import { useParams } from '@solidjs/router'
 import { css } from '@style/css'
-import { createMemo, Show } from 'solid-js'
-import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { Show, createMemo } from 'solid-js'
 import { NotFoundPage } from './NotFoundPage'
-import { DirtBlock } from '@/components/ui/DirtBlock'
-import { GraphSVG } from '@/components/GraphSVG'
-import { BackSignButton } from '@/components/BackSignButton'
 
 interface MemberGraphProps {
 	results: RunResultItem[]
@@ -32,10 +32,9 @@ export function MemberGraphPage(props: MemberGraphProps) {
 				<DirtBlock title={`${runnerData()?.name}'s Graph`}>
 					<GraphSVG {...props} />
 				</DirtBlock>
-				<BackSignButton
-					children={`Back to ${runnerData()?.name}'s Page`}
-					to={`/member/${params.name}`}
-				/>
+				<BackSignButton to={`/member/${params.name}`}>
+					{`Back to ${runnerData()?.name}'s Page`}
+				</BackSignButton>
 			</div>
 		</Show>
 	)

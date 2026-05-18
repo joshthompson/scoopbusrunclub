@@ -78,7 +78,7 @@ export function getSpecialDayName(dateStr: string): string | null {
 
 	// Check dynamic dates for the year
 	const year = Number.parseInt(dateStr.slice(0, 4), 10)
-	if (isNaN(year)) return null
+	if (Number.isNaN(year)) return null
 
 	const dynamic = getDynamicSpecialDays(year)
 	return dynamic[mmdd] ?? null

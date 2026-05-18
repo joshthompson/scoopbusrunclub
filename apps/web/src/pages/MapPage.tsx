@@ -1,16 +1,16 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
-import { css } from '@style/css'
-import { A } from '@solidjs/router'
-import type { RunResultItem, VolunteerItem } from '../utils/api'
+import { BackSignButton } from '@/components/BackSignButton'
+import { COUNTRY_FLAGS, COUNTRY_NAMES } from '@/data/countries'
+import { COUNTRY_PIXELS, WORLD_PIXELS } from '@/data/map'
 import { runners as runnerSignals } from '@/data/runners'
 import { getEvent } from '@/utils/events'
+import { getMemberRoute } from '@/utils/memberRoute'
+import { A } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show, createMemo, createSignal } from 'solid-js'
 import { DirtBlock } from '../components/ui/DirtBlock'
 import { FieldBlock } from '../components/ui/FieldBlock'
 import { Masonry } from '../components/ui/Masonry'
-import { BackSignButton } from '@/components/BackSignButton'
-import { getMemberRoute } from '@/utils/memberRoute'
-import { COUNTRY_PIXELS, WORLD_PIXELS } from '@/data/map'
-import { COUNTRY_FLAGS, COUNTRY_NAMES } from '@/data/countries'
+import type { RunResultItem, VolunteerItem } from '../utils/api'
 
 // ─── Map colours & highlight ────────────────────────────────────────────────────
 
@@ -65,6 +65,7 @@ function buildMapData(results: RunResultItem[], volunteers: VolunteerItem[]) {
 				visits: new Set(),
 			})
 		}
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const stat = eventStats.get(r.event)!
 		stat.runners.add(r.parkrunId)
 		stat.visits.add(`${r.parkrunId}:${r.date}`)
@@ -82,6 +83,7 @@ function buildMapData(results: RunResultItem[], volunteers: VolunteerItem[]) {
 				visits: new Set(),
 			})
 		}
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const stat = eventStats.get(v.event)!
 		stat.runners.add(v.parkrunId)
 		stat.visits.add(`${v.parkrunId}:${v.date}`)
@@ -97,6 +99,7 @@ function buildMapData(results: RunResultItem[], volunteers: VolunteerItem[]) {
 			})
 		}
 		const count = stat.visits.size
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const cv = byCountry.get(stat.country)!
 		cv.events.push({ eventId, name: stat.name, runners: stat.runners, count })
 		cv.totalVisits += count
@@ -263,6 +266,8 @@ export function MapPage(props: MapPageProps) {
 					<svg
 						viewBox={`0 0 ${COLS * CELL} ${ROWS * CELL}`}
 						class={styles.map}
+						role="img"
+						aria-label="World parkrun map"
 						onMouseMove={handleMouseMove}
 						onMouseLeave={handleMouseLeave}
 					>
@@ -354,6 +359,7 @@ export function MapPage(props: MapPageProps) {
 																		when={name && route}
 																		fallback={<span>{name ?? parkrunId}</span>}
 																	>
+																		{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 																		<A href={route!} class={styles.link}>
 																			{name}
 																		</A>

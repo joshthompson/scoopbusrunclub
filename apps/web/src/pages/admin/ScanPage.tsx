@@ -1,25 +1,26 @@
-import {
-	type Component,
-	createSignal,
-	createResource,
-	Show,
-	For,
-	onCleanup,
-	onMount,
-	createMemo,
-} from 'solid-js'
+import { AdminButton } from '@/components/admin/AdminButton'
+import { Modal } from '@/components/ui/Modal'
+import { type RunnerName, runners } from '@/data/runners'
+import { fetchTodayRaces, updateRace } from '@/utils/adminApi'
 import { A } from '@solidjs/router'
 import { css } from '@style/css'
-import { fetchTodayRaces, updateRace } from '@/utils/adminApi'
-import { runners, type RunnerName } from '@/data/runners'
-import QrScanner from 'qr-scanner'
 import { BarcodeDetector as BarcodeDetectorPolyfill } from 'barcode-detector/pure'
-import { Modal } from '@/components/ui/Modal'
-import { AdminButton } from '@/components/admin/AdminButton'
+import QrScanner from 'qr-scanner'
+import {
+	type Component,
+	For,
+	Show,
+	createMemo,
+	createResource,
+	createSignal,
+	onCleanup,
+	onMount,
+} from 'solid-js'
 
 // Build a lookup: parkrunId → { key, name }
 const parkrunIdMap = new Map<string, { key: RunnerName; name: string }>()
 for (const [key, signal] of Object.entries(runners)) {
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	const data = (signal as any)[0]()
 	if (data.id) {
 		parkrunIdMap.set(data.id, { key: key as RunnerName, name: data.name })
@@ -43,6 +44,7 @@ export const ScanPage: Component = () => {
 	let overlayRef!: HTMLDivElement
 	let cameraAreaRef!: HTMLDivElement
 	let qrScanner: QrScanner | null = null
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	let barcodeDetector: any = null
 	let barcodeIntervalId: ReturnType<typeof setInterval> | null = null
 	let invertCanvas: HTMLCanvasElement | null = null
@@ -211,7 +213,7 @@ export const ScanPage: Component = () => {
 				return r && cid === r.key
 			})
 		) {
-			setToast(`Already checked in!`)
+			setToast('Already checked in!')
 			setTimeout(() => setToast(''), 2000)
 			return
 		}
@@ -384,7 +386,11 @@ export const ScanPage: Component = () => {
 						when={cameraActive()}
 						fallback={
 							<div class={styles.cameraPlaceholder}>
-								<button class={styles.startCameraBtn} onClick={startCamera}>
+								<button
+									type="button"
+									class={styles.startCameraBtn}
+									onClick={startCamera}
+								>
 									📷 Start Camera
 								</button>
 							</div>
@@ -397,7 +403,9 @@ export const ScanPage: Component = () => {
 								height: `${squareSize()}px`,
 							}}
 						>
+							{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 							<video ref={videoRef!} class={styles.video} playsinline muted />
+							{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 							<div ref={overlayRef!} class={styles.overlayScan} />
 							<div class={styles.scanRegionBorder} />
 						</div>

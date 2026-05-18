@@ -1,5 +1,5 @@
 import { generateFrames } from '@/utils'
-import { type Accessor, createSignal, type Setter } from 'solid-js'
+import { type Accessor, type Setter, createSignal } from 'solid-js'
 import * as assets from './runner-assets'
 
 export const RUNNER_SIZE = 2

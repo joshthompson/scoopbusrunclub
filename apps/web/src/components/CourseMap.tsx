@@ -1,7 +1,7 @@
-import { css } from '@style/css'
-import { onMount, onCleanup } from 'solid-js'
 import type { CourseData } from '@/utils/api'
+import { css } from '@style/css'
 import L from 'leaflet'
+import { onCleanup, onMount } from 'solid-js'
 import 'leaflet/dist/leaflet.css'
 
 // ---------------------------------------------------------------------------

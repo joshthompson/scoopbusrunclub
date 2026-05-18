@@ -16,14 +16,14 @@
  */
 
 import {
-	writeFileSync,
-	readFileSync,
-	readdirSync,
 	existsSync,
 	mkdirSync,
-} from 'fs'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
+	readFileSync,
+	readdirSync,
+	writeFileSync,
+} from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const LEVELS_DIR = resolve(__dirname, '../src/levels')
@@ -156,10 +156,11 @@ function filterBuildingsByDistance(
 
 	if (capped.length < before) {
 		console.log(
-			`  Filtered buildings: ${before} → ${withDist.length} (within ${maxDist}m)` +
-				(withDist.length > maxCount
+			`  Filtered buildings: ${before} → ${withDist.length} (within ${maxDist}m)${
+				withDist.length > maxCount
 					? ` → ${capped.length} (closest ${maxCount})`
-					: ''),
+					: ''
+			}`,
 		)
 	}
 	return capped
@@ -239,10 +240,10 @@ async function fetchWaterFeatures(
 ): Promise<WaterPolygon[]> {
 	if (coords.length === 0) return []
 
-	let minLat = Number.POSITIVE_INFINITY,
-		maxLat = Number.NEGATIVE_INFINITY
-	let minLon = Number.POSITIVE_INFINITY,
-		maxLon = Number.NEGATIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
+	let minLon = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
 	for (const c of coords) {
 		if (c[1] < minLat) minLat = c[1]
 		if (c[1] > maxLat) maxLat = c[1]
@@ -398,10 +399,10 @@ async function fetchPathFeatures(
 ): Promise<PathPolyline[]> {
 	if (coords.length === 0) return []
 
-	let minLat = Number.POSITIVE_INFINITY,
-		maxLat = Number.NEGATIVE_INFINITY
-	let minLon = Number.POSITIVE_INFINITY,
-		maxLon = Number.NEGATIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
+	let minLon = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
 	for (const c of coords) {
 		if (c[1] < minLat) minLat = c[1]
 		if (c[1] > maxLat) maxLat = c[1]
@@ -546,10 +547,10 @@ async function fetchRoadFeatures(
 ): Promise<RoadPolyline[]> {
 	if (coords.length === 0) return []
 
-	let minLat = Number.POSITIVE_INFINITY,
-		maxLat = Number.NEGATIVE_INFINITY
-	let minLon = Number.POSITIVE_INFINITY,
-		maxLon = Number.NEGATIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
+	let minLon = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
 	for (const c of coords) {
 		if (c[1] < minLat) minLat = c[1]
 		if (c[1] > maxLat) maxLat = c[1]
@@ -611,7 +612,7 @@ out skel qt;
 			}
 		}
 		if (!res || !res.ok) {
-			console.warn(`  ⚠ All Overpass endpoints failed`)
+			console.warn('  ⚠ All Overpass endpoints failed')
 			return results
 		}
 
@@ -696,10 +697,10 @@ async function fetchBuildingFeatures(
 ): Promise<BuildingPolygon[]> {
 	if (coords.length === 0) return []
 
-	let minLat = Number.POSITIVE_INFINITY,
-		maxLat = Number.NEGATIVE_INFINITY
-	let minLon = Number.POSITIVE_INFINITY,
-		maxLon = Number.NEGATIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
+	let minLon = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
 	for (const c of coords) {
 		if (c[1] < minLat) minLat = c[1]
 		if (c[1] > maxLat) maxLat = c[1]
@@ -780,10 +781,10 @@ out skel qt;
 					// Extract height from tags if available
 					if (el.tags?.height) {
 						const h = Number.parseFloat(el.tags.height)
-						if (!isNaN(h) && h > 0) bldg.height = Math.round(h)
+						if (!Number.isNaN(h) && h > 0) bldg.height = Math.round(h)
 					} else if (el.tags?.['building:levels']) {
 						const levels = Number.parseFloat(el.tags['building:levels'])
-						if (!isNaN(levels) && levels > 0)
+						if (!Number.isNaN(levels) && levels > 0)
 							bldg.height = Math.round(levels * 3)
 					}
 
@@ -815,8 +816,8 @@ function writeTypedData(
 	const importLine = `import type { ${[...new Set(imports)].sort().join(', ')} } from '../types';`
 	let dataStr: string
 	if (Array.isArray(data) && data.length > 0) {
-		const items = data.map((item: unknown) => '  ' + JSON.stringify(item))
-		dataStr = '[\n' + items.join(',\n') + ',\n]'
+		const items = data.map((item: unknown) => `  ${JSON.stringify(item)}`)
+		dataStr = `[\n${items.join(',\n')},\n]`
 	} else if (
 		typeof data === 'object' &&
 		data !== null &&
@@ -831,19 +832,19 @@ function writeTypedData(
 				(typeof value[0] !== 'object' || Array.isArray(value[0]))
 			) {
 				const items = (value as unknown[]).map(
-					(item) => '    ' + JSON.stringify(item),
+					(item) => `    ${JSON.stringify(item)}`,
 				)
 				entries.push(`  ${key}: [\n${items.join(',\n')},\n  ]`)
 			} else {
 				entries.push(
 					`  ${key}: ${JSON.stringify(value, null, 2)
 						.split('\n')
-						.map((l, i) => (i === 0 ? l : '  ' + l))
+						.map((l, i) => (i === 0 ? l : `  ${l}`))
 						.join('\n')}`,
 				)
 			}
 		}
-		dataStr = '{\n' + entries.join(',\n') + ',\n}'
+		dataStr = `{\n${entries.join(',\n')},\n}`
 	} else {
 		dataStr = JSON.stringify(data, null, 2)
 	}
@@ -922,7 +923,7 @@ function writeLevelFile(
 
 	// Generate the level's index.ts that imports typed data files
 	const imports: string[] = [
-		`// Auto-generated by scripts/fetch-level.ts — do not edit manually`,
+		'// Auto-generated by scripts/fetch-level.ts — do not edit manually',
 		`import type { LevelData } from '../types';`,
 		`import course from './course';`,
 		`import altitude from './altitude';`,
@@ -931,26 +932,26 @@ function writeLevelFile(
 	const fields: string[] = [
 		`  id: '${id}',`,
 		`  name: '${name}',`,
-		`  course,`,
-		`  altitude,`,
-		`  water,`,
+		'  course,',
+		'  altitude,',
+		'  water,',
 	]
 
 	if (buildings.length > 0) {
 		imports.push(`import buildings from './buildings';`)
-		fields.push(`  buildings,`)
+		fields.push('  buildings,')
 	}
 	if (paths.length > 0) {
 		imports.push(`import paths from './paths';`)
-		fields.push(`  paths,`)
+		fields.push('  paths,')
 	}
 	if (extras?.marshals && extras.marshals.length > 0) {
 		imports.push(`import marshals from './marshals';`)
-		fields.push(`  marshals,`)
+		fields.push('  marshals,')
 	}
 	if (extras?.roads && extras.roads.length > 0) {
 		imports.push(`import roads from './roads';`)
-		fields.push(`  roads,`)
+		fields.push('  roads,')
 	}
 	if (extras?.hide !== undefined) {
 		fields.push(`  hide: ${extras.hide},`)
@@ -958,13 +959,13 @@ function writeLevelFile(
 
 	const indexContent = [
 		...imports,
-		``,
-		`const level: LevelData = {`,
+		'',
+		'const level: LevelData = {',
 		...fields,
-		`};`,
-		``,
-		`export default level;`,
-		``,
+		'};',
+		'',
+		'export default level;',
+		'',
 	].join('\n')
 
 	writeFileSync(resolve(levelDir, 'index.ts'), indexContent, 'utf-8')
@@ -994,22 +995,22 @@ function regenerateIndex(levelNames: Record<string, string>) {
 	const allIds = [...subfolderIds, ...legacyIds].sort()
 
 	const lines: string[] = [
-		`/**`,
-		` * Level registry — provides metadata eagerly & full data lazily.`,
-		` *`,
-		` * Auto-generated by scripts/fetch-level.ts`,
-		` */`,
+		'/**',
+		' * Level registry — provides metadata eagerly & full data lazily.',
+		' *',
+		' * Auto-generated by scripts/fetch-level.ts',
+		' */',
 		`import type { LevelData } from './types';`,
-		``,
-		`// ── Level metadata (always available, no heavy data) ─────────────────`,
-		``,
-		`export interface LevelMeta {`,
-		`  id: string;`,
-		`  name: string;`,
-		`  hide?: boolean;`,
-		`}`,
-		``,
-		`const levelMeta: LevelMeta[] = [`,
+		'',
+		'// ── Level metadata (always available, no heavy data) ─────────────────',
+		'',
+		'export interface LevelMeta {',
+		'  id: string;',
+		'  name: string;',
+		'  hide?: boolean;',
+		'}',
+		'',
+		'const levelMeta: LevelMeta[] = [',
 	]
 
 	for (const id of allIds) {
@@ -1017,20 +1018,20 @@ function regenerateIndex(levelNames: Record<string, string>) {
 		lines.push(`  { id: '${id}', name: '${name}' },`)
 	}
 
-	lines.push(`];`)
-	lines.push(``)
+	lines.push('];')
+	lines.push('')
 	lines.push(
-		`export const levels: Record<string, LevelMeta> = Object.fromEntries(`,
+		'export const levels: Record<string, LevelMeta> = Object.fromEntries(',
 	)
-	lines.push(`  levelMeta.map((m) => [m.id, m]),`)
-	lines.push(`);`)
-	lines.push(``)
+	lines.push('  levelMeta.map((m) => [m.id, m]),')
+	lines.push(');')
+	lines.push('')
 	lines.push(
-		`// ── Lazy loader — resolves the full LevelData on demand ──────────────`,
+		'// ── Lazy loader — resolves the full LevelData on demand ──────────────',
 	)
-	lines.push(``)
+	lines.push('')
 	lines.push(
-		`const loaders: Record<string, () => Promise<{ default: LevelData }>> = {`,
+		'const loaders: Record<string, () => Promise<{ default: LevelData }>> = {',
 	)
 
 	if (subfolderIds.length > 0) {
@@ -1039,42 +1040,42 @@ function regenerateIndex(levelNames: Record<string, string>) {
 		}
 	}
 	if (legacyIds.length > 0) {
-		lines.push(`  // Legacy .map.ts files (not yet migrated to sub-folders)`)
+		lines.push('  // Legacy .map.ts files (not yet migrated to sub-folders)')
 		for (const id of legacyIds) {
 			lines.push(`  ${id}: () => import('./${id}.map'),`)
 		}
 	}
 
-	lines.push(`};`)
-	lines.push(``)
-	lines.push(`const cache = new Map<string, LevelData>();`)
-	lines.push(``)
+	lines.push('};')
+	lines.push('')
+	lines.push('const cache = new Map<string, LevelData>();')
+	lines.push('')
 	lines.push(
-		`export async function loadLevel(id: string): Promise<LevelData> {`,
+		'export async function loadLevel(id: string): Promise<LevelData> {',
 	)
-	lines.push(`  const cached = cache.get(id);`)
-	lines.push(`  if (cached) return cached;`)
-	lines.push(``)
-	lines.push(`  const loader = loaders[id];`)
-	lines.push(`  if (!loader) {`)
+	lines.push('  const cached = cache.get(id);')
+	lines.push('  if (cached) return cached;')
+	lines.push('')
+	lines.push('  const loader = loaders[id];')
+	lines.push('  if (!loader) {')
 	lines.push(`    const available = Object.keys(loaders).join(', ');`)
-	lines.push(`    throw new Error(`)
+	lines.push('    throw new Error(')
 	lines.push(
 		`      \`Unknown level "\${id}". Available levels: \${available || '(none — run pnpm game:level <id>)'}\`,`,
 	)
-	lines.push(`    );`)
-	lines.push(`  }`)
-	lines.push(``)
-	lines.push(`  const mod = await loader();`)
-	lines.push(`  cache.set(id, mod.default);`)
-	lines.push(`  return mod.default;`)
-	lines.push(`}`)
-	lines.push(``)
+	lines.push('    );')
+	lines.push('  }')
+	lines.push('')
+	lines.push('  const mod = await loader();')
+	lines.push('  cache.set(id, mod.default);')
+	lines.push('  return mod.default;')
+	lines.push('}')
+	lines.push('')
 	lines.push(`export type { LevelData } from './types';`)
-	lines.push(``)
-	lines.push(`// Default export for backward-compat: the metadata record`)
-	lines.push(`export default levels;`)
-	lines.push(``)
+	lines.push('')
+	lines.push('// Default export for backward-compat: the metadata record')
+	lines.push('export default levels;')
+	lines.push('')
 
 	const indexPath = resolve(LEVELS_DIR, 'index.ts')
 	writeFileSync(indexPath, lines.join('\n'), 'utf-8')
@@ -1202,7 +1203,7 @@ async function main() {
 		console.error(
 			`❌ Cannot do partial update: no existing level file for "${eventId}".`,
 		)
-		console.error(`   Run without --type first to fetch everything.`)
+		console.error('   Run without --type first to fetch everything.')
 		process.exit(1)
 	}
 
@@ -1224,7 +1225,7 @@ async function main() {
 	if (needCourse) {
 		course = await fetchCourse(eventId)
 	} else {
-		course = existing!.course
+		course = existing?.course
 	}
 
 	// Fetch only what's requested, reuse existing for the rest
@@ -1232,10 +1233,10 @@ async function main() {
 		await Promise.all([
 			needAltitude
 				? fetchElevations(course.coordinates)
-				: Promise.resolve(existing!.altitude),
+				: Promise.resolve(existing?.altitude),
 			needWater
 				? fetchWaterFeatures(course.coordinates, 600)
-				: Promise.resolve(existing!.water),
+				: Promise.resolve(existing?.water),
 			needBuildings
 				? fetchBuildingFeatures(course.coordinates, 600)
 				: Promise.resolve(existing?.buildings ?? []),

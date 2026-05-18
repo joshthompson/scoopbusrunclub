@@ -21,13 +21,13 @@ export {
 	type ArenaRunnerState,
 } from './arena'
 
-import type { GameModeConfig, GameType } from './types'
-import { singleBusMode, singleRunnerMode } from './single-player'
-import { singleBusModMode } from './single-bus-mode'
+import { arenaMode } from './arena'
 import { busRaceMode } from './bus-race'
 import { scoopRaceMode } from './scoop-race'
+import { singleBusModMode } from './single-bus-mode'
+import { singleBusMode, singleRunnerMode } from './single-player'
 import { teamRaceMode } from './team-race'
-import { arenaMode } from './arena'
+import type { GameModeConfig, GameType } from './types'
 
 /** Registry of all game mode configs keyed by GameType */
 export const GAME_MODES: Record<GameType, GameModeConfig> = {

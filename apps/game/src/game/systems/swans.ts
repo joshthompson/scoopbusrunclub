@@ -4,34 +4,34 @@
  * Identical behaviour to geese but uses SwanModel instead of GooseModel.
  * Swans wander, herd, flee, get scooped, and float on water just like geese.
  */
-import { Vector3, MeshBuilder } from '@babylonjs/core'
+import { MeshBuilder, Vector3 } from '@babylonjs/core'
 import type { Scene } from '@babylonjs/core'
 import {
-	createSwanModel,
-	poseSwanWalking,
-	poseSwanIdle,
-	poseSwanSitting,
-	poseSwanFleeing,
-	poseSwanSwimming,
-} from '../objects/SwanModel'
-import type { Swan, SolidObstacle, BuildingCollider, WaterZone } from '../types'
-import { resolvePositionAgainstBuildings } from './buildings'
-import { getWaterSurfaceYAt } from './terrain'
-import {
+	GRAVITY,
+	SCOOP_FORWARD_FACTOR,
+	SCOOP_MIN_UP,
+	SCOOP_UP_FACTOR,
 	SWAN_FLEE_RADIUS,
-	SWAN_WANDER_RADIUS,
-	SWAN_WALK_SPEED,
 	SWAN_FLEE_SPEED,
+	SWAN_HERD_MERGE_RADIUS,
 	SWAN_IDLE_MAX,
+	SWAN_LANDED_DURATION,
 	SWAN_MIN_SEPARATION,
 	SWAN_SCOOP_DISTANCE,
-	SWAN_HERD_MERGE_RADIUS,
-	SWAN_LANDED_DURATION,
-	GRAVITY,
-	SCOOP_UP_FACTOR,
-	SCOOP_MIN_UP,
-	SCOOP_FORWARD_FACTOR,
+	SWAN_WALK_SPEED,
+	SWAN_WANDER_RADIUS,
 } from '../constants'
+import {
+	createSwanModel,
+	poseSwanFleeing,
+	poseSwanIdle,
+	poseSwanSitting,
+	poseSwanSwimming,
+	poseSwanWalking,
+} from '../objects/SwanModel'
+import type { BuildingCollider, SolidObstacle, Swan, WaterZone } from '../types'
+import { resolvePositionAgainstBuildings } from './buildings'
+import { getWaterSurfaceYAt } from './terrain'
 
 // ── Seeded RNG ──
 

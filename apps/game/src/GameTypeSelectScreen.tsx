@@ -1,3 +1,4 @@
+import { MuteButton } from './MuteButton'
 /**
  * Game type selection screen — shown to the host after choosing "Host Game".
  *
@@ -9,14 +10,13 @@
  */
 import logoSrc from './assets/logo.png'
 import {
-	HOST_GAME_TYPES,
-	GAME_TYPE_LABELS,
 	GAME_TYPE_DESCRIPTIONS,
+	GAME_TYPE_LABELS,
+	HOST_GAME_TYPES,
 	getGameModeConfig,
 } from './game/modes'
 import type { GameType } from './game/modes'
 import { useMenuNav } from './useMenuNav'
-import { MuteButton } from './MuteButton'
 
 const GAME_TYPE_EMOJI: Record<string, string> = {
 	'bus-race': '🚌',
@@ -58,6 +58,8 @@ export function GameTypeSelectScreen(props: GameTypeSelectScreenProps) {
 				<div class="course-buttons">
 					{gameTypes().map((gt, i) => (
 						<button
+							key={gt}
+							type="button"
 							class="course-btn game-type-btn"
 							classList={{ 'menu-focused': isFocused(1 + i) }}
 							onClick={() => props.onSelect(gt)}
@@ -69,6 +71,7 @@ export function GameTypeSelectScreen(props: GameTypeSelectScreenProps) {
 					))}
 				</div>
 				<button
+					type="button"
 					class="course-btn cancel-btn back-btn"
 					classList={{ 'menu-focused': isFocused(1 + gameTypes().length) }}
 					onClick={props.onBack}

@@ -13,49 +13,49 @@
  */
 
 import {
-	type Scene,
-	Texture,
-	DynamicTexture,
-	ShaderMaterial,
-	Effect,
 	Color3,
+	DynamicTexture,
+	Effect,
+	Matrix,
+	type Scene,
+	ShaderMaterial,
 	SpotLight,
+	Texture,
 	type TransformNode,
 	Vector3,
-	Matrix,
 } from '@babylonjs/core'
 import type { RenderTargetTexture } from '@babylonjs/core'
-import forestUrl from '../assets/forest.png'
 import dirtUrl from '../assets/dirt.png'
+import forestUrl from '../assets/forest.png'
 import grassPathUrl from '../assets/grass-path.png'
 import gravelUrl from '../assets/gravel.png'
 import pavementUrl from '../assets/pavement.png'
+import type {
+	IcePatchOverlay,
+	PathShaderOptions,
+	PathTypeSegment,
+} from './PathShader'
 import {
-	RENDER_TEXTURE_ANISOTROPY,
-	TERRAIN_LOD_NEAR_DIST,
-	TERRAIN_LOD_FAR_DIST,
-	LIGHT_DAY_SUN_INTENSITY,
+	LIGHT_DAY_HEMI_GROUND_B,
+	LIGHT_DAY_HEMI_GROUND_G,
+	LIGHT_DAY_HEMI_GROUND_R,
+	LIGHT_DAY_HEMI_INTENSITY,
 	LIGHT_DAY_SUN_DIR_X,
 	LIGHT_DAY_SUN_DIR_Y,
 	LIGHT_DAY_SUN_DIR_Z,
-	LIGHT_DAY_HEMI_INTENSITY,
-	LIGHT_DAY_HEMI_GROUND_R,
-	LIGHT_DAY_HEMI_GROUND_G,
-	LIGHT_DAY_HEMI_GROUND_B,
-	LIGHT_NIGHT_TERRAIN_SUN_INTENSITY,
-	LIGHT_NIGHT_TERRAIN_HEMI_INTENSITY,
-	LIGHT_NIGHT_TERRAIN_HEMI_GROUND_R,
-	LIGHT_NIGHT_TERRAIN_HEMI_GROUND_G,
-	LIGHT_NIGHT_TERRAIN_HEMI_GROUND_B,
+	LIGHT_DAY_SUN_INTENSITY,
 	LIGHT_NIGHT_SUN_DIR_X,
 	LIGHT_NIGHT_SUN_DIR_Y,
 	LIGHT_NIGHT_SUN_DIR_Z,
+	LIGHT_NIGHT_TERRAIN_HEMI_GROUND_B,
+	LIGHT_NIGHT_TERRAIN_HEMI_GROUND_G,
+	LIGHT_NIGHT_TERRAIN_HEMI_GROUND_R,
+	LIGHT_NIGHT_TERRAIN_HEMI_INTENSITY,
+	LIGHT_NIGHT_TERRAIN_SUN_INTENSITY,
+	RENDER_TEXTURE_ANISOTROPY,
+	TERRAIN_LOD_FAR_DIST,
+	TERRAIN_LOD_NEAR_DIST,
 } from './constants'
-import type {
-	PathShaderOptions,
-	IcePatchOverlay,
-	PathTypeSegment,
-} from './PathShader'
 
 // ---------- Configuration ----------
 
@@ -573,8 +573,8 @@ export function createTiledPathGroundMaterial(
 
 	// --- 3. Register shader code ---
 	const shaderName = 'tiledPathGround'
-	Effect.ShadersStore[shaderName + 'VertexShader'] = VERTEX_SHADER
-	Effect.ShadersStore[shaderName + 'FragmentShader'] = FRAGMENT_SHADER
+	Effect.ShadersStore[`${shaderName}VertexShader`] = VERTEX_SHADER
+	Effect.ShadersStore[`${shaderName}FragmentShader`] = FRAGMENT_SHADER
 
 	// --- 4. Load diffuse textures ---
 	const forestTex = new Texture(forestUrl, scene)
@@ -663,6 +663,7 @@ export function createTiledPathGroundMaterial(
 	mat.setTexture('mixMap3Lo', loMask.zoneMaskTex)
 	mat.setTexture('mixMap3Mid', midMask.zoneMaskTex)
 	mat.setTexture('mixMap3Ultra', ultraMask.zoneMaskTex)
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	mat.setTexture('pathTypeMask', loMask.pathTypeMaskTex!)
 	mat.setTexture('forestTex', forestTex)
 	mat.setTexture('dirtTex', dirtTex)
@@ -684,6 +685,7 @@ export function createTiledPathGroundMaterial(
 
 	// Set inset bounds for both LOD levels
 	const vec4 = (x: number, y: number, z: number, w: number) =>
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		({ x, y, z, w }) as any
 	mat.setVector4(
 		'midBounds',
@@ -704,7 +706,9 @@ export function createTiledPathGroundMaterial(
 	mat.setFloat('lodFarDist', TERRAIN_LOD_FAR_DIST)
 
 	// Camera positions (updated per-frame in onBind)
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	mat.setVector3('cameraPosition', { x: 0, y: 0, z: 0 } as any)
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	mat.setVector3('cameraPosition2', { x: 0, y: 0, z: 0 } as any)
 	mat.setFloat('hasSecondCamera', 0.0)
 
@@ -724,6 +728,7 @@ export function createTiledPathGroundMaterial(
 		x: sunDir.r / sunLen,
 		y: sunDir.g / sunLen,
 		z: sunDir.b / sunLen,
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	} as any)
 	mat.setFloat(
 		'sunIntensity',
@@ -740,11 +745,13 @@ export function createTiledPathGroundMaterial(
 					x: LIGHT_NIGHT_TERRAIN_HEMI_GROUND_R,
 					y: LIGHT_NIGHT_TERRAIN_HEMI_GROUND_G,
 					z: LIGHT_NIGHT_TERRAIN_HEMI_GROUND_B,
+					// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 				} as any)
 			: ({
 					x: LIGHT_DAY_HEMI_GROUND_R,
 					y: LIGHT_DAY_HEMI_GROUND_G,
 					z: LIGHT_DAY_HEMI_GROUND_B,
+					// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 				} as any),
 	)
 
@@ -938,6 +945,7 @@ export function createTiledPathGroundMaterial(
 				y: midBounds[1],
 				z: midBounds[2],
 				w: midBounds[3],
+				// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 			} as any)
 		}
 
@@ -979,6 +987,7 @@ export function createTiledPathGroundMaterial(
 				y: ultraBoundsArr[1],
 				z: ultraBoundsArr[2],
 				w: ultraBoundsArr[3],
+				// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 			} as any)
 		}
 	}
@@ -1126,7 +1135,9 @@ function bakeMask(
 	const staticLineCanvas = document.createElement('canvas')
 	staticLineCanvas.width = size
 	staticLineCanvas.height = size
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const staticCtx = staticLineCanvas.getContext('2d')!
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	staticCtx.drawImage((lineCtx as any).canvas, 0, 0)
 
 	tex.update()
@@ -1234,8 +1245,10 @@ function rebakeMask(
 	)
 
 	// Update static line canvas backup
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const staticCtx = mask.staticLineCanvas.getContext('2d')!
 	staticCtx.clearRect(0, 0, size, size)
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	staticCtx.drawImage((lineCtx as any).canvas, 0, 0)
 
 	mask.maskTex.update()
@@ -1992,5 +2005,6 @@ function hexToVec3(hex: string): { x: number; y: number; z: number } {
 	const r = Number.parseInt(hex.slice(1, 3), 16) / 255
 	const g = Number.parseInt(hex.slice(3, 5), 16) / 255
 	const b = Number.parseInt(hex.slice(5, 7), 16) / 255
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	return { x: r, y: g, z: b } as any
 }

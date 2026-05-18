@@ -71,9 +71,9 @@ export function playTone(
 	volume = 1,
 	type: OscillatorType = 'sine',
 ) {
-	const audioCtx = new (
-		window.AudioContext || (window as any).webkitAudioContext
-	)()
+	const audioCtx =
+		new // biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
+		(window.AudioContext || (window as any).webkitAudioContext)()
 	const oscillator = audioCtx.createOscillator()
 	const gain = audioCtx.createGain()
 
@@ -95,6 +95,7 @@ export function isMobileBrowser() {
 	return (
 		'ontouchstart' in window ||
 		navigator.maxTouchPoints > 0 ||
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		(navigator as any).msMaxTouchPoints > 0
 	)
 }

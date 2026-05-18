@@ -1,4 +1,4 @@
-import { type Accessor, createSignal, type Setter } from 'solid-js'
+import { type Accessor, type Setter, createSignal } from 'solid-js'
 
 class KeyController {
 	#keys = new Map<string, [Accessor<boolean>, Setter<boolean>]>()
@@ -43,6 +43,7 @@ class KeyController {
 		if (!this.#keys.has(key)) {
 			this.#keys.set(key, createSignal(false))
 		}
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		return this.#keys.get(key)!
 	}
 

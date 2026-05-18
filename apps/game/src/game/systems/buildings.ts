@@ -1,17 +1,17 @@
 import {
-	type Scene,
-	MeshBuilder,
-	StandardMaterial,
 	Color3,
-	TransformNode,
 	Mesh,
+	MeshBuilder,
+	type Scene,
+	StandardMaterial,
+	TransformNode,
 	Vector3,
 	VertexData,
 } from '@babylonjs/core'
 import earcut from 'earcut'
-import { createStadiumStand } from '../objects/StadiumStand'
-import type { BuildingFootprint, BuildingCollider } from '../types'
 import { RENDER_BUILDING_LOD_DISTANCE } from '../constants'
+import { createStadiumStand } from '../objects/StadiumStand'
+import type { BuildingCollider, BuildingFootprint } from '../types'
 
 export interface BuildingLodEntry {
 	detailedRoot: TransformNode
@@ -280,10 +280,10 @@ export function buildBuildingMeshes(
 		}
 
 		if (
-			!isFinite(minRight) ||
-			!isFinite(maxRight) ||
-			!isFinite(minFwd) ||
-			!isFinite(maxFwd)
+			!Number.isFinite(minRight) ||
+			!Number.isFinite(maxRight) ||
+			!Number.isFinite(minFwd) ||
+			!Number.isFinite(maxFwd)
 		) {
 			continue
 		}

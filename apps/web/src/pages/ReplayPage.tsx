@@ -1,36 +1,36 @@
-import { css } from '@style/css'
+import shrub1Asset from '@/assets/misc/shrub1.png'
+import shrub2Asset from '@/assets/misc/shrub2.png'
+import tree1Asset from '@/assets/misc/tree1.png'
+import tree2Asset from '@/assets/misc/tree2.png'
+import { BackSignButton } from '@/components/BackSignButton'
+import { DirtBlock } from '@/components/ui/DirtBlock'
+import { FieldBlock } from '@/components/ui/FieldBlock'
+import { Table } from '@/components/ui/Table'
+import { COURSE_OVERRIDES } from '@/data/courses'
+import { runners as runnerSignals } from '@/data/runners'
+import { RoleTranslations } from '@/data/volunteer-roles'
 import {
-	createMemo,
-	createSignal,
-	createEffect,
-	For,
-	onCleanup,
-	onMount,
-	Show,
-} from 'solid-js'
-import { A, useParams } from '@solidjs/router'
-import {
+	type CourseData,
 	type RunResultItem,
 	type VolunteerItem,
-	type CourseData,
 	fetchCourse,
 } from '@/utils/api'
 import { getEventName } from '@/utils/events'
-import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
-import { FieldBlock } from '@/components/ui/FieldBlock'
-import { DirtBlock } from '@/components/ui/DirtBlock'
-import { Table } from '@/components/ui/Table'
-import { BackSignButton } from '@/components/BackSignButton'
-import { NotFoundPage } from './NotFoundPage'
-import { runners as runnerSignals } from '@/data/runners'
 import { getMemberRoute } from '@/utils/memberRoute'
+import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
 import { VOLUNTEER_EVENT_IDS } from '@shared/parkrun-events'
-import { RoleTranslations } from '@/data/volunteer-roles'
-import tree1Asset from '@/assets/misc/tree1.png'
-import tree2Asset from '@/assets/misc/tree2.png'
-import shrub1Asset from '@/assets/misc/shrub1.png'
-import shrub2Asset from '@/assets/misc/shrub2.png'
-import { COURSE_OVERRIDES } from '@/data/courses'
+import { A, useParams } from '@solidjs/router'
+import { css } from '@style/css'
+import {
+	For,
+	Show,
+	createEffect,
+	createMemo,
+	createSignal,
+	onCleanup,
+	onMount,
+} from 'solid-js'
+import { NotFoundPage } from './NotFoundPage'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -83,10 +83,10 @@ function projectCoordinates(
 	// Include both path coords and extra points (labelled markers) in bounding box
 	const allCoords = [...coords, ...extraCoords]
 
-	let minLon = Number.POSITIVE_INFINITY,
-		maxLon = Number.NEGATIVE_INFINITY
-	let minLat = Number.POSITIVE_INFINITY,
-		maxLat = Number.NEGATIVE_INFINITY
+	let minLon = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
 	for (const c of allCoords) {
 		if (c[0] < minLon) minLon = c[0]
 		if (c[0] > maxLon) maxLon = c[0]
@@ -190,10 +190,11 @@ const TREE_COUNT = 25
 
 /** Simple seeded PRNG so trees are deterministic per course. */
 function mulberry32(seed: number) {
+	let s = seed
 	return () => {
-		seed |= 0
-		seed = (seed + 0x6d2b79f5) | 0
-		let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+		s |= 0
+		s = (s + 0x6d2b79f5) | 0
+		let t = Math.imul(s ^ (s >>> 15), 1 | s)
 		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
 		return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 	}
@@ -477,17 +478,19 @@ export function ReplayPage(props: ReplayPageProps) {
 		const volRows = eventVolunteers().map((v) => {
 			const memberRoute = getMemberRoute(v.parkrunId)
 			const name = memberRoute ? (
-				<A href={memberRoute} class={styles.link}>
+				<A key={`${v.parkrunId}-name`} href={memberRoute} class={styles.link}>
 					{parkrunIdToFace.get(v.parkrunId)?.name ??
 						formatName(v.volunteerName)}
 				</A>
 			) : (
-				<span>{formatName(v.volunteerName)}</span>
+				<span key={`${v.parkrunId}-name`}>{formatName(v.volunteerName)}</span>
 			)
 			return [
-				<span class={styles.volunteerLabel}>🙌</span>,
+				<span key={`${v.parkrunId}-icon`} class={styles.volunteerLabel}>
+					🙌
+				</span>,
 				name,
-				<span class={styles.volunteerLabel}>
+				<span key={`${v.parkrunId}-roles`} class={styles.volunteerLabel}>
 					{v.roles.map(translateRole).join(', ')}
 				</span>,
 			] as import('solid-js').JSX.Element[]
@@ -495,16 +498,16 @@ export function ReplayPage(props: ReplayPageProps) {
 		const runRows = runners.map((r) => {
 			const memberRoute = getMemberRoute(r.parkrunId)
 			const name = memberRoute ? (
-				<A href={memberRoute} class={styles.link}>
+				<A key={`${r.parkrunId}-name`} href={memberRoute} class={styles.link}>
 					{r.name}
 				</A>
 			) : (
-				<span>{r.name}</span>
+				<span key={`${r.parkrunId}-name`}>{r.name}</span>
 			)
 			return [
-				<span>{r.position}</span>,
+				<span key={`${r.parkrunId}-pos`}>{r.position}</span>,
 				name,
-				<span>{formatSecs(r.finishSeconds)}</span>,
+				<span key={`${r.parkrunId}-time`}>{formatSecs(r.finishSeconds)}</span>,
 			] as import('solid-js').JSX.Element[]
 		})
 		return [...runRows, ...volRows]
@@ -587,13 +590,10 @@ export function ReplayPage(props: ReplayPageProps) {
 	const pathD = createMemo(() => {
 		const p = projected()
 		if (!p || p.path.length === 0) return ''
-		return (
-			`M ${p.path[0].x} ${p.path[0].y} ` +
-			p.path
-				.slice(1)
-				.map((pt) => `L ${pt.x} ${pt.y}`)
-				.join(' ')
-		)
+		return `M ${p.path[0].x} ${p.path[0].y} ${p.path
+			.slice(1)
+			.map((pt) => `L ${pt.x} ${pt.y}`)
+			.join(' ')}`
 	})
 	const labelledPoints = createMemo(() => {
 		const cd = courseData()
@@ -743,12 +743,14 @@ export function ReplayPage(props: ReplayPageProps) {
 			const movingLeft = pos.x < prevX - 0.01
 			prevXMap.set(runner.parkrunId, pos.x)
 			// facingRight: true = flip, false = normal. Sticky – keeps last direction when stationary.
+			// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 			const prevDir = (runner as any).__lastDir as boolean | undefined
 			const facingRight = movingRight
 				? true
 				: movingLeft
 					? false
 					: (prevDir ?? false)
+			// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 			;(runner as any).__lastDir = facingRight
 			return { ...runner, x: pos.x, y: pos.y, finished, fraction, facingRight }
 		})
@@ -808,6 +810,7 @@ export function ReplayPage(props: ReplayPageProps) {
 						<Show when={has3DLevel() && previewIframeSrc()}>
 							<div class={styles.viewToggle}>
 								<button
+									type="button"
 									class={
 										styles.toggleBtn +
 										(!show3D() ? ` ${styles.toggleBtnActive}` : '')
@@ -817,6 +820,7 @@ export function ReplayPage(props: ReplayPageProps) {
 									2D Replay
 								</button>
 								<button
+									type="button"
 									class={
 										styles.toggleBtn +
 										(show3D() ? ` ${styles.toggleBtnActive}` : '')
@@ -844,6 +848,7 @@ export function ReplayPage(props: ReplayPageProps) {
 											title="3D Race Preview"
 										/>
 										<button
+											type="button"
 											class={styles.fullscreenBtn}
 											onClick={() => {
 												if (document.fullscreenElement) {
@@ -853,8 +858,10 @@ export function ReplayPage(props: ReplayPageProps) {
 													if (wrapper?.requestFullscreen) {
 														wrapper.requestFullscreen()
 													} else if (
+														// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 														(wrapper as any)?.webkitRequestFullscreen
 													) {
+														// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 														;(wrapper as any).webkitRequestFullscreen()
 													}
 												}
@@ -874,6 +881,8 @@ export function ReplayPage(props: ReplayPageProps) {
 									viewBox={viewBox()}
 									class={styles.svg}
 									preserveAspectRatio="xMidYMid meet"
+									role="img"
+									aria-label="Course map"
 								>
 									{/* Decorative trees (behind the path) */}
 									<For each={trees()}>
@@ -954,6 +963,7 @@ export function ReplayPage(props: ReplayPageProps) {
 													}
 												>
 													<image
+														// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 														href={runner.face!}
 														x={runner.x - headSvgSize() / 2}
 														y={runner.y - headSvgSize() * 0.6}
@@ -974,7 +984,11 @@ export function ReplayPage(props: ReplayPageProps) {
 								{/* ---- Controls ---- */}
 								<div class={styles.controls}>
 									{/* Play / pause */}
-									<button class={styles.playBtn} onClick={togglePlay}>
+									<button
+										type="button"
+										class={styles.playBtn}
+										onClick={togglePlay}
+									>
 										{playing() ? '⏸' : '▶'}
 									</button>
 
@@ -1002,6 +1016,7 @@ export function ReplayPage(props: ReplayPageProps) {
 										<For each={[...SPEED_OPTIONS]}>
 											{(s) => (
 												<button
+													type="button"
 													class={
 														styles.speedBtn +
 														(speed() === s ? ` ${styles.speedBtnActive}` : '')

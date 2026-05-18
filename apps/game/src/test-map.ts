@@ -1,3 +1,4 @@
+import type { PathType } from './api'
 /**
  * /test/{level} — Interactive SVG map editor for level data.
  *
@@ -8,9 +9,8 @@
  * - Drag polygon vertices to adjust shapes
  * - Export each data layer as JSON for copy-pasting into level files
  */
-import { loadLevel, levels } from './levels'
+import { levels, loadLevel } from './levels'
 import type { LevelData } from './levels/types'
-import type { PathType } from './api'
 
 // ── Coordinate helpers ──────────────────────────────────────────────────
 
@@ -138,8 +138,11 @@ interface ObjectItem {
 // ── Main ────────────────────────────────────────────────────────────────
 
 async function main() {
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const infoEl = document.getElementById('info')!
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const appEl = document.getElementById('app')!
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const sidebarEl = document.getElementById('sidebar')!
 
 	const params = new URLSearchParams(window.location.search)
@@ -358,10 +361,10 @@ async function main() {
 		...objectItems.map((o) => o.pos),
 	]
 
-	let minX = Number.POSITIVE_INFINITY,
-		maxX = Number.NEGATIVE_INFINITY,
-		minZ = Number.POSITIVE_INFINITY,
-		maxZ = Number.NEGATIVE_INFINITY
+	let minX = Number.POSITIVE_INFINITY
+	let maxX = Number.NEGATIVE_INFINITY
+	let minZ = Number.POSITIVE_INFINITY
+	let maxZ = Number.NEGATIVE_INFINITY
 	for (const [x, z] of allPoints) {
 		if (x < minX) minX = x
 		if (x > maxX) maxX = x
@@ -463,10 +466,10 @@ async function main() {
 
 	// ── Viewbox state ───────────────────────────────────────────────────
 
-	let vbX = minX,
-		vbY = -maxZ,
-		vbW = baseWidth,
-		vbH = baseHeight
+	let vbX = minX
+	let vbY = -maxZ
+	let vbW = baseWidth
+	let vbH = baseHeight
 
 	function updateViewBox() {
 		svg.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`)
@@ -499,7 +502,9 @@ async function main() {
 	function updateHandleScale() {
 		handleRadius = Math.max(vbW, vbH) * 0.004
 		const handles = layerHandles.querySelectorAll('circle')
-		handles.forEach((h) => h.setAttribute('r', String(handleRadius)))
+		for (const h of handles) {
+			h.setAttribute('r', String(handleRadius))
+		}
 	}
 
 	// ── Render functions ────────────────────────────────────────────────
@@ -629,7 +634,7 @@ async function main() {
 			const f = fenceItems[i]
 			if (f.points.length < 2) continue
 			const isSel = selectedKind === 'fence' && selectedIndex === i
-			const closed = pathD(f.points) + ' Z'
+			const closed = `${pathD(f.points)} Z`
 			const p = svgEl('path', {
 				d: closed,
 				fill: 'none',
@@ -1498,7 +1503,7 @@ async function main() {
 		for (const [label, mode, color] of regionTools) {
 			const btn = document.createElement('button')
 			btn.textContent = label
-			btn.className = 'draw-btn' + (drawMode === mode ? ' active' : '')
+			btn.className = `draw-btn${drawMode === mode ? ' active' : ''}`
 			btn.style.borderColor =
 				drawMode === mode ? color : 'rgba(255,255,255,0.15)'
 			btn.addEventListener('click', () => {
@@ -1537,7 +1542,7 @@ async function main() {
 		for (const [label, mode, color] of objectTools) {
 			const btn = document.createElement('button')
 			btn.textContent = label
-			btn.className = 'draw-btn' + (drawMode === mode ? ' active' : '')
+			btn.className = `draw-btn${drawMode === mode ? ' active' : ''}`
 			btn.style.borderColor =
 				drawMode === mode ? color : 'rgba(255,255,255,0.15)'
 			btn.addEventListener('click', () => {
@@ -2268,9 +2273,7 @@ async function main() {
 		title: string,
 	): { section: HTMLDivElement; body: HTMLDivElement } {
 		const section = document.createElement('div')
-		section.className =
-			'sidebar-section collapsible' +
-			(collapsedSections.has(id) ? ' collapsed' : '')
+		section.className = `sidebar-section collapsible${collapsedSections.has(id) ? ' collapsed' : ''}`
 
 		const titleEl = document.createElement('div')
 		titleEl.className = 'sidebar-section-title'
@@ -2318,7 +2321,9 @@ async function main() {
 
 	// ── Scale bar ───────────────────────────────────────────────────────
 
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const scaleLineEl = document.getElementById('scale-line')!
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const scaleLabelEl = document.getElementById('scale-label')!
 
 	function updateScaleBar() {
@@ -2356,6 +2361,7 @@ async function main() {
 
 		// Handle click (vertex sub-selection) — only if we didn't drag
 		if (target.getAttribute('data-handle') === 'true' && !didDragVertex) {
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const vertIdx = Number.parseInt(target.getAttribute('data-vert-idx')!, 10)
 			selectedSubEdge = -1
 			selectedSubVertex = selectedSubVertex === vertIdx ? -1 : vertIdx // toggle
@@ -2367,6 +2373,7 @@ async function main() {
 
 		// Edge midpoint click
 		if (target.getAttribute('data-edge') === 'true') {
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const edgeIdx = Number.parseInt(target.getAttribute('data-edge-idx')!, 10)
 			selectedSubVertex = -1
 			selectedSubEdge = selectedSubEdge === edgeIdx ? -1 : edgeIdx // toggle
@@ -2377,6 +2384,7 @@ async function main() {
 
 		// Course edge midpoint click — insert a new node
 		if (target.getAttribute('data-course-edge') === 'true') {
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const edgeIdx = Number.parseInt(target.getAttribute('data-edge-idx')!, 10)
 			const [x1, z1] = courseNodes[edgeIdx].pos
 			const [x2, z2] = courseNodes[edgeIdx + 1].pos
@@ -2539,10 +2547,10 @@ async function main() {
 	// ── Vertex dragging ─────────────────────────────────────────────────
 
 	let panning = false
-	let panDragStartX = 0,
-		panDragStartY = 0
-	let panVbX = 0,
-		panVbY = 0
+	let panDragStartX = 0
+	let panDragStartY = 0
+	let panVbX = 0
+	let panVbY = 0
 
 	svg.addEventListener('mousedown', (e) => {
 		if (e.button !== 0) return
@@ -2551,7 +2559,9 @@ async function main() {
 		// Handle drag
 		if (target.getAttribute('data-handle') === 'true') {
 			const kind = target.getAttribute('data-kind') as SelectionKind
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const itemIdx = Number.parseInt(target.getAttribute('data-item-idx')!, 10)
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const vertIdx = Number.parseInt(target.getAttribute('data-vert-idx')!, 10)
 			dragVertexInfo = { kind, itemIdx, vertIdx }
 			didDragVertex = false // will be set to true on first mousemove
@@ -2562,6 +2572,7 @@ async function main() {
 
 		// Rotation handle drag
 		if (target.getAttribute('data-rot-handle') === 'true') {
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const idx = Number.parseInt(target.getAttribute('data-idx')!, 10)
 			if (idx >= 0 && idx < objectItems.length) {
 				dragRotateIdx = idx
@@ -2573,6 +2584,7 @@ async function main() {
 
 		// Tree drag
 		if (target.getAttribute('data-kind') === 'tree' && drawMode !== 'tree') {
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const idx = Number.parseInt(target.getAttribute('data-idx')!, 10)
 			if (idx >= 0 && idx < treeItems.length) {
 				dragTreeIdx = idx
@@ -2584,6 +2596,7 @@ async function main() {
 
 		// Course node drag
 		if (target.getAttribute('data-kind') === 'courseNode') {
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const idx = Number.parseInt(target.getAttribute('data-idx')!, 10)
 			if (idx >= 0 && idx < courseNodes.length) {
 				dragCourseNodeIdx = idx
@@ -2605,6 +2618,7 @@ async function main() {
 			drawMode !== 'goose' &&
 			drawMode !== 'swan'
 		) {
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const idx = Number.parseInt(objGroup.getAttribute('data-idx')!, 10)
 			if (idx >= 0 && idx < objectItems.length) {
 				dragObjectIdx = idx
@@ -2774,6 +2788,7 @@ async function main() {
 }
 
 main().catch((err) => {
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	document.getElementById('info')!.innerHTML =
 		`<strong>Error:</strong> ${err.message}`
 	console.error(err)

@@ -1,36 +1,37 @@
+import earcut from 'earcut'
+import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
 /* @refresh reload */
 import { render } from 'solid-js/web'
-import { createSignal, onMount, onCleanup, Show, For } from 'solid-js'
-import earcut from 'earcut'
-import { Game } from './game/Game'
-import levels from './levels'
-import { TitleScreen } from './TitleScreen'
-import { LevelSelectScreen } from './LevelSelectScreen'
-import { GameModeSelectScreen } from './GameModeSelectScreen'
 import { CharacterSelectScreen } from './CharacterSelectScreen'
+import { GameModeSelectScreen } from './GameModeSelectScreen'
 import { GameTypeSelectScreen } from './GameTypeSelectScreen'
+import { LevelSelectScreen } from './LevelSelectScreen'
 import { LobbyScreen } from './LobbyScreen'
-import { RoomBrowserScreen } from './RoomBrowserScreen'
-import { LocalRoleSelectScreen } from './LocalRoleSelectScreen'
 import { LocalResultsScreen } from './LocalResultsScreen'
-import { mp, lobby, MAX_PLAYERS } from './multiplayer'
-import type { PlayerState, ScoopEvent } from './multiplayer'
-import { getGameModeConfig } from './game/modes'
-import type { GameType, TeamColor } from './game/modes'
-import type { ItemCollectEvent } from './multiplayer'
-import type { CharacterSelection } from './game/characters'
-import type { PowerUpId } from './game/systems/powerups'
-import { PASSENGER_PICKUP_INITIAL_TIME } from './game/constants/passenger-pickup'
+import { LocalRoleSelectScreen } from './LocalRoleSelectScreen'
+import { RoomBrowserScreen } from './RoomBrowserScreen'
+import { TitleScreen } from './TitleScreen'
 import powerUpFika from './assets/power-ups/fika.png'
 import powerUpFire from './assets/power-ups/fire.png'
 import powerUpIce from './assets/power-ups/ice.png'
 import powerUpMallet from './assets/power-ups/mallet.png'
 import powerUpShoe from './assets/power-ups/shoe.png'
-import { toggleMute, getMuted, getMusicVolume, setMusicVolume } from './music'
+import { Game } from './game/Game'
+import type { CharacterSelection } from './game/characters'
+import { PASSENGER_PICKUP_INITIAL_TIME } from './game/constants/passenger-pickup'
+import { getGameModeConfig } from './game/modes'
+import type { GameType, TeamColor } from './game/modes'
+import type { PowerUpId } from './game/systems/powerups'
 import { getGameVolume, setGameVolume } from './game/systems/sounds'
+import levels from './levels'
+import { MAX_PLAYERS, lobby, mp } from './multiplayer'
+import type { PlayerState, ScoopEvent } from './multiplayer'
+import type { ItemCollectEvent } from './multiplayer'
+import { getMusicVolume, getMuted, setMusicVolume, toggleMute } from './music'
 import { useMenuNav } from './useMenuNav'
 
 // Babylon.js needs earcut on window for CreatePolygon
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 ;(window as any).earcut = earcut
 
 /** Player colour names & CSS colours (1-indexed) */
@@ -141,6 +142,7 @@ function PauseOverlay(props: {
 				</div>
 				<div class="pause-buttons">
 					<button
+						type="button"
 						class="course-btn"
 						classList={{ 'menu-focused': isFocused(0) }}
 						onClick={props.onResume}
@@ -148,6 +150,7 @@ function PauseOverlay(props: {
 						Resume
 					</button>
 					<button
+						type="button"
 						class="course-btn mute-pause-btn"
 						classList={{ 'menu-focused': isFocused(1) }}
 						onClick={props.onToggleMute}
@@ -155,6 +158,7 @@ function PauseOverlay(props: {
 						{props.musicMuted ? '🔇 Unmute Music' : '🔇 Mute Music'}
 					</button>
 					<button
+						type="button"
 						class="course-btn finish-exit-btn"
 						classList={{ 'menu-focused': isFocused(2) }}
 						onClick={props.onExit}
@@ -189,6 +193,7 @@ function BusModeFinishOverlay(props: {
 				</p>
 				<div class="finish-buttons">
 					<button
+						type="button"
 						class="course-btn"
 						classList={{ 'menu-focused': isFocused(0) }}
 						onClick={props.onReplay}
@@ -196,6 +201,7 @@ function BusModeFinishOverlay(props: {
 						Play Again
 					</button>
 					<button
+						type="button"
 						class="course-btn finish-exit-btn"
 						classList={{ 'menu-focused': isFocused(1) }}
 						onClick={props.onExit}
@@ -291,6 +297,7 @@ function FinishOverlay(props: {
 				</Show>
 				<div class="finish-buttons">
 					<button
+						type="button"
 						class="course-btn"
 						classList={{ 'menu-focused': isFocused(0) }}
 						onClick={props.onKeepDriving}
@@ -298,6 +305,7 @@ function FinishOverlay(props: {
 						Keep Driving
 					</button>
 					<button
+						type="button"
 						class="course-btn"
 						classList={{ 'menu-focused': isFocused(1) }}
 						onClick={props.onReplay}
@@ -305,6 +313,7 @@ function FinishOverlay(props: {
 						Replay
 					</button>
 					<button
+						type="button"
 						class="course-btn finish-exit-btn"
 						classList={{ 'menu-focused': isFocused(2) }}
 						onClick={props.onExit}
@@ -662,6 +671,7 @@ function App() {
 	function handleRoomBrowserJoin(roomCode: string) {
 		setGameMode('join')
 		// Set the code before screen transition so LobbyScreen onMount can read it
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		;(window as any).__pendingJoinCode = roomCode
 		setScreen('lobby')
 	}
@@ -899,7 +909,7 @@ function App() {
 				})
 				game.updateRemoteState(state, peerId)
 				// Lazily build bus if not yet created (e.g. late joiner)
-				if (!game['remotePlayers'].has(peerId)) {
+				if (!game.remotePlayers.has(peerId)) {
 					const idx = state.playerIndex || mp.getPlayerIndex(peerId) || 2
 					game.buildRemoteBusForPeer(peerId, idx)
 				}
@@ -1003,7 +1013,7 @@ function App() {
 				<div id="loading">
 					<div class="loading-text">Loading course data</div>
 					<div class="loading-bar-container">
-						<div class="loading-bar"></div>
+						<div class="loading-bar" />
 					</div>
 					<div class="loading-hint">Preparing terrain & textures…</div>
 				</div>
@@ -1106,11 +1116,15 @@ function App() {
 						id="powerup-hud"
 						classList={{ rolling: powerUpRolling() }}
 						onClick={handleUsePowerUp}
+						onKeyDown={(e) =>
+							(e.key === 'Enter' || e.key === ' ') && handleUsePowerUp()
+						}
 						onTouchStart={(e) => {
 							e.preventDefault()
 							handleUsePowerUp()
 						}}
 					>
+						{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 						<img src={POWER_UP_IMAGE_BY_ID[powerUpDisplay()!]} alt="Power-up" />
 					</div>
 				</Show>
@@ -1213,7 +1227,7 @@ function App() {
 							'z-index': '200',
 						}}
 					>
-						+{busModeBonus()!.seconds}s
+						+{busModeBonus()?.seconds}s
 					</div>
 				</Show>
 
@@ -1273,6 +1287,7 @@ function App() {
 						scored={scored()}
 						isMultiplayer={isMultiplayerMode()}
 						remoteStates={remoteStates()}
+						// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 						localPlayerIndex={(activeGame as any)?.localPlayerIndex ?? 1}
 						onKeepDriving={handleKeepDriving}
 						onReplay={handleReplay}
@@ -1307,7 +1322,7 @@ function App() {
 }
 
 // --- Entry point: detect preview mode from URL params ---
-import { parsePreviewParams, PreviewMode } from './PreviewMode'
+import { PreviewMode, parsePreviewParams } from './PreviewMode'
 
 const previewParams = parsePreviewParams()
 if (previewParams) {
@@ -1318,8 +1333,10 @@ if (previewParams) {
 				runners={previewParams.runners}
 			/>
 		),
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		document.getElementById('app')!,
 	)
 } else {
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	render(() => <App />, document.getElementById('app')!)
 }

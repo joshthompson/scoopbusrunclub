@@ -1,8 +1,8 @@
 import {
 	type Scene,
-	Vector3,
-	TransformNode,
 	SceneLoader,
+	TransformNode,
+	Vector3,
 } from '@babylonjs/core'
 import '@babylonjs/loaders/glTF'
 
@@ -50,15 +50,16 @@ export async function createCopperTent(
 	glbRoot.parent = root
 
 	// Measure bounding box of the loaded model
-	let minX = Number.POSITIVE_INFINITY,
-		maxX = Number.NEGATIVE_INFINITY
-	let minY = Number.POSITIVE_INFINITY,
-		maxY = Number.NEGATIVE_INFINITY
-	let minZ = Number.POSITIVE_INFINITY,
-		maxZ = Number.NEGATIVE_INFINITY
+	let minX = Number.POSITIVE_INFINITY
+	let maxX = Number.NEGATIVE_INFINITY
+	let minY = Number.POSITIVE_INFINITY
+	let maxY = Number.NEGATIVE_INFINITY
+	let minZ = Number.POSITIVE_INFINITY
+	let maxZ = Number.NEGATIVE_INFINITY
 
 	for (const mesh of result.meshes) {
 		if (mesh.isAnInstance || !mesh.getBoundingInfo) continue
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		;(mesh as any).refreshBoundingInfo()
 		const bounds = mesh.getBoundingInfo().boundingBox
 		const wMin = bounds.minimumWorld

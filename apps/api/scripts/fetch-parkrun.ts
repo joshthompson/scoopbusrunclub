@@ -1,3 +1,4 @@
+import { PARKRUN_EVENTS } from '../../../libs/shared/parkrun-events'
 /**
  * Playwright script to fetch parkrun event pages and extract volunteer data
  * for tracked club members.
@@ -20,22 +21,21 @@
  * * Requires: playwright (install chromium with `npx playwright install chromium`)
  */
 import {
-	parseEventHistory,
 	parseEventDate,
+	parseEventHistory,
 	parseEventVolunteers,
 } from '../lib/parsers'
 import {
-	TRACKED_IDS,
 	DELAY_BETWEEN_FETCHES_MS,
-	loadEnv,
-	requireEnvVars,
-	randomDelay,
-	sleep,
-	launchBrowser,
+	TRACKED_IDS,
 	fetchPage,
 	getAppDataValue,
+	launchBrowser,
+	loadEnv,
+	randomDelay,
+	requireEnvVars,
+	sleep,
 } from './shared'
-import { PARKRUN_EVENTS } from '../../../libs/shared/parkrun-events'
 
 /** Build the appData key for an event's watermark, e.g. "latestHagaEventNumber" */
 function watermarkKey(eventId: string): string {
@@ -101,7 +101,7 @@ function parseEventArg(): EventRange[] | null {
 			const [startStr, endStr] = rangeStr.split('-')
 			const start = Number.parseInt(startStr, 10)
 			const end = Number.parseInt(endStr, 10)
-			if (isNaN(start) || isNaN(end) || start > end) {
+			if (Number.isNaN(start) || Number.isNaN(end) || start > end) {
 				console.error(
 					`Invalid range in --event segment: "${segment}". Expected format: eventId:START-END`,
 				)
@@ -110,7 +110,7 @@ function parseEventArg(): EventRange[] | null {
 			ranges.push({ eventId, start, end })
 		} else {
 			const single = Number.parseInt(rangeStr, 10)
-			if (isNaN(single)) {
+			if (Number.isNaN(single)) {
 				console.error(
 					`Invalid number in --event segment: "${segment}". Expected format: eventId:NUMBER`,
 				)

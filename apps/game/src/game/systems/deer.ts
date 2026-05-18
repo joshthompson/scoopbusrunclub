@@ -11,37 +11,37 @@
  *   - Scoopable: bus impact launches them ragdoll.
  *   - Has a 'running' state for moderate-speed movement (between walk and flee).
  */
-import { type Scene, Vector3, MeshBuilder, Mesh } from '@babylonjs/core'
+import { Mesh, MeshBuilder, type Scene, Vector3 } from '@babylonjs/core'
+import {
+	DEER_FLEE_RADIUS,
+	DEER_FLEE_SPEED,
+	DEER_HERD_MERGE_RADIUS,
+	DEER_HERD_RADIUS,
+	DEER_IDLE_MAX,
+	DEER_LANDED_DURATION,
+	DEER_MIN_SEPARATION,
+	DEER_RUN_SPEED,
+	DEER_RUN_TRIGGER_RADIUS,
+	DEER_SCOOP_DISTANCE,
+	DEER_WALK_SPEED,
+	DEER_WANDER_RADIUS,
+	GRAVITY,
+	SCOOP_FORWARD_FACTOR,
+	SCOOP_MIN_UP,
+	SCOOP_UP_FACTOR,
+} from '../constants'
 import {
 	createDeerModel,
-	poseDeerWalking,
-	poseDeerIdle,
-	poseDeerSitting,
 	poseDeerFleeing,
+	poseDeerIdle,
 	poseDeerRunning,
+	poseDeerSitting,
+	poseDeerWalking,
 } from '../objects/DeerModel'
 import type { DeerModelResult } from '../objects/DeerModel'
-import type { Deer, SolidObstacle, BuildingCollider, WaterZone } from '../types'
+import type { BuildingCollider, Deer, SolidObstacle, WaterZone } from '../types'
 import { resolvePositionAgainstBuildings } from './buildings'
 import { isInWaterZone } from './terrain'
-import {
-	DEER_HERD_RADIUS,
-	DEER_FLEE_RADIUS,
-	DEER_WANDER_RADIUS,
-	DEER_WALK_SPEED,
-	DEER_RUN_SPEED,
-	DEER_FLEE_SPEED,
-	DEER_IDLE_MAX,
-	DEER_MIN_SEPARATION,
-	DEER_SCOOP_DISTANCE,
-	DEER_HERD_MERGE_RADIUS,
-	DEER_LANDED_DURATION,
-	DEER_RUN_TRIGGER_RADIUS,
-	GRAVITY,
-	SCOOP_UP_FACTOR,
-	SCOOP_MIN_UP,
-	SCOOP_FORWARD_FACTOR,
-} from '../constants'
 
 // ── Seeded RNG ──
 

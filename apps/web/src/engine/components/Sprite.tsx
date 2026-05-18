@@ -1,18 +1,18 @@
+import { SceneContext } from '@/utils/SceneContext'
+import { css, cx } from '@style/css'
 import {
 	type Accessor,
 	type Component,
-	createEffect,
-	createMemo,
-	createSignal,
 	For,
 	Index,
 	type JSX,
+	createEffect,
+	createMemo,
+	createSignal,
 	onCleanup,
 	onMount,
 	useContext,
 } from 'solid-js'
-import { css, cx } from '@style/css'
-import { SceneContext } from '@/utils/SceneContext'
 import type { Controller } from '../Controller'
 
 export interface Sprite {
@@ -42,6 +42,7 @@ export interface Sprite {
 	onClick?: () => void
 	onChangeFrame?: (frameIndex: number) => void
 	onMount?: (data: { $ref: HTMLDivElement | undefined }) => void
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	controllers?: Accessor<Controller<any>[]>
 }
 
@@ -91,7 +92,7 @@ export const Sprite: Component<Sprite & SpriteExtendedProps> = (props) => {
 			'background-image': `url(${frame.image})`,
 			'background-position': `${frame.left}px ${frame.top}px`,
 			'background-size':
-				frame.width && frame.height ? `auto 100%` : '100% 100%',
+				frame.width && frame.height ? 'auto 100%' : '100% 100%',
 		}
 	})
 
@@ -118,13 +119,13 @@ export const Sprite: Component<Sprite & SpriteExtendedProps> = (props) => {
 	onCleanup(() => clearTimeout(enterFrameTimeout))
 
 	const top = createMemo(() => {
-		if (props.fixed) return props.y + 'px'
-		return props.y - 0 * (props.parallax ?? 1) + 'px'
+		if (props.fixed) return `${props.y}px`
+		return `${props.y - 0 * (props.parallax ?? 1)}px`
 	})
 
 	const left = createMemo(() => {
-		if (props.fixed) return props.x + 'px'
-		return props.x - scene.canvas.get().x() * (props.parallax ?? 1) + 'px'
+		if (props.fixed) return `${props.x}px`
+		return `${props.x - scene.canvas.get().x() * (props.parallax ?? 1)}px`
 	})
 
 	return (
@@ -140,31 +141,33 @@ export const Sprite: Component<Sprite & SpriteExtendedProps> = (props) => {
 				top: top(),
 				left: left(),
 				transform: `scale(${(props.xScale ?? 1).toString()}, ${(props.yScale ?? 1).toString()})`,
-				width: props.width + 'px',
-				height: props.height + 'px',
+				width: `${props.width}px`,
+				height: `${props.height}px`,
 				'pointer-events': props.onClick ? 'auto' : 'none',
-				rotate: props.rotation + 'deg',
+				rotate: `${props.rotation}deg`,
 				'transform-origin': props.origin
 					? `${props.origin.x}px ${props.origin.y}px`
 					: 'center',
 				...props.style,
 			}}
 			onClick={props.onClick}
+			onKeyDown={props.onClick}
 			onTouchStart={props.onClick}
 		>
 			<div
-				children={props.children}
 				style={{
 					width: '100%',
 					height: '100%',
-					rotate: props.inner?.rotation + 'deg',
+					rotate: `${props.inner?.rotation}deg`,
 					'transform-origin': props.inner?.origin
 						? `${props.inner.origin.x}px ${props.inner.origin.y}px`
 						: 'center',
 					...(props.inner?.style ?? {}),
 					...frameStyle(),
 				}}
-			/>
+			>
+				{props.children}
+			</div>
 			<Index each={props.controllers?.() ?? []}>
 				{(controller) => (
 					<Sprite

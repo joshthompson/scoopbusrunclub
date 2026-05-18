@@ -1,23 +1,23 @@
-import {
-	type Component,
-	createSignal,
-	createResource,
-	Show,
-	For,
-} from 'solid-js'
-import { css, cva, cx } from '@style/css'
-import { DirtBlock } from '@/components/ui/DirtBlock'
-import {
-	fetchAdminLogs,
-	fetchAdminUsers,
-	type AdminEventLog,
-} from '@/utils/adminApi'
-import { Table as AdminTable } from '@/components/ui/Table'
-import { AdminToolbar } from '@/components/admin/AdminToolbar'
+import { AdminAvatar } from '@/components/admin/AdminAvatar'
 import { AdminButton } from '@/components/admin/AdminButton'
 import { AdminSelect } from '@/components/admin/AdminSelect'
-import { AdminAvatar } from '@/components/admin/AdminAvatar'
+import { AdminToolbar } from '@/components/admin/AdminToolbar'
 import { useAuth } from '@/components/admin/AuthGuard'
+import { DirtBlock } from '@/components/ui/DirtBlock'
+import { Table as AdminTable } from '@/components/ui/Table'
+import {
+	type AdminEventLog,
+	fetchAdminLogs,
+	fetchAdminUsers,
+} from '@/utils/adminApi'
+import { css, cva, cx } from '@style/css'
+import {
+	type Component,
+	For,
+	Show,
+	createResource,
+	createSignal,
+} from 'solid-js'
 
 const ACTION_LABELS: Record<string, string> = {
 	created_event: 'Created Event',
@@ -176,21 +176,24 @@ export const EventLogsPage: Component = () => {
 								{ id: 'detail', title: 'Detail' },
 							]}
 							data={allLogs().map((log) => [
-								<span class={styles.timestamp}>
+								<span key={`${log.timestamp}-time`} class={styles.timestamp}>
 									{formatTimestamp(log.timestamp)}
 								</span>,
-								<span class={styles.username}>
+								<span key={`${log.timestamp}-user`} class={styles.username}>
 									<AdminAvatar user={log.username} size="small" />
 									{log.username}
 								</span>,
 								<span
+									key={`${log.timestamp}-action`}
 									class={styles.badge({
 										variant: actionBadgeVariant(log.action),
 									})}
 								>
 									{formatAction(log.action)}
 								</span>,
-								<span class={styles.detail}>{log.detail ?? '—'}</span>,
+								<span key={`${log.timestamp}-detail`} class={styles.detail}>
+									{log.detail ?? '—'}
+								</span>,
 							])}
 							empty="No event logs found."
 						/>

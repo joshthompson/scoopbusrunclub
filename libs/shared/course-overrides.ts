@@ -51,7 +51,7 @@ export const COURSE_OVERRIDES: Record<string, CourseOverride> = {
 			[0, 40], // Lap 2
 			[0, 1], // Final strech to the Finish
 		],
-	}
+	},
 }
 
 /**

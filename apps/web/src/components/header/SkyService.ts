@@ -134,6 +134,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 /** Interpolate sky colours for a given CET hour. */
 function skyColoursAtHour(h: number): { top: string; bottom: string } {
 	// Wrap h into [0, 24)
+	// biome-ignore lint/style/noParameterAssign: hour normalization
 	h = ((h % 24) + 24) % 24
 
 	// Find the surrounding stops
@@ -168,6 +169,7 @@ function skyColoursAtHour(h: number): { top: string; bottom: string } {
  * The sun follows a sine-like arc from sunrise to sunset.
  */
 function sunPositionAtHour(h: number): number {
+	// biome-ignore lint/style/noParameterAssign: hour normalization
 	h = ((h % 24) + 24) % 24
 
 	const PRE_RISE = SUNRISE - 0.5 // sun starts rising from below horizon
@@ -208,6 +210,7 @@ function sunPositionAtHour(h: number): number {
  * Rises after sunset, arcs through the night, sets before sunrise.
  */
 function moonPositionAtHour(h: number): number {
+	// biome-ignore lint/style/noParameterAssign: hour normalization
 	h = ((h % 24) + 24) % 24
 
 	const MOON_RISE = SUNSET + 0.5 // 18:30
@@ -236,6 +239,7 @@ function moonPositionAtHour(h: number): number {
  * Compute moon opacity. Fades in after sunset, fades out before sunrise.
  */
 function moonOpacityAtHour(h: number): number {
+	// biome-ignore lint/style/noParameterAssign: hour normalization
 	h = ((h % 24) + 24) % 24
 
 	const FADE_IN_START = SUNSET // 18:00
@@ -264,6 +268,7 @@ function moonOpacityAtHour(h: number): number {
  * Compute stars opacity. Similar to moon but fades in/out slightly faster.
  */
 function starsOpacityAtHour(h: number): number {
+	// biome-ignore lint/style/noParameterAssign: hour normalization
 	h = ((h % 24) + 24) % 24
 
 	const FADE_IN_START = SUNSET + 0.5
@@ -291,6 +296,7 @@ function starsOpacityAtHour(h: number): number {
  * Night: 0.1, fades up to 1.0 during sunrise/sunset and stays 1.0 during the day.
  */
 function cloudOpacityAtHour(h: number): number {
+	// biome-ignore lint/style/noParameterAssign: hour normalization
 	h = ((h % 24) + 24) % 24
 
 	const NIGHT_OPACITY = 0.1
@@ -334,6 +340,7 @@ function cloudOpacityAtHour(h: number): number {
  * sunset-start → sunset-end   : 0.8 → 0
  */
 function lightLevelAtHour(h: number): number {
+	// biome-ignore lint/style/noParameterAssign: hour normalization
 	h = ((h % 24) + 24) % 24
 
 	const SUNRISE_START = SUNRISE - 0.5
@@ -422,11 +429,15 @@ async function testDay(): Promise<void> {
 	pauseSkyService = false
 }
 // Expose on window for console access
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 ;(window as any).testSkyTime = testSkyTime
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 ;(window as any).testDay = testDay
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 ;(window as any).pauseSkyService = () => {
 	pauseSkyService = true
 }
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 ;(window as any).resumeSkyService = () => {
 	pauseSkyService = false
 }

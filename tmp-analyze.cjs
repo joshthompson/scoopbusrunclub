@@ -1,4 +1,4 @@
-const fs = require('fs')
+const fs = require('node:fs')
 const txt = fs.readFileSync('apps/game/src/levels/judarskogen.map.ts', 'utf-8')
 const waterMatch = txt.match(/"water":\s*(\[[\s\S]*\])\s*\};/)
 if (!waterMatch) {

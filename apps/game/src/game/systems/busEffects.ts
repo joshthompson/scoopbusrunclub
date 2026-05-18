@@ -20,9 +20,9 @@ export function createExhaustFlames(
 
 	const flameTex = new DynamicTexture('flameTex', 64, scene, false)
 	const ctx = flameTex.getContext() as unknown as CanvasRenderingContext2D
-	const cx = 32,
-		cy = 32,
-		r = 30
+	const cx = 32
+	const cy = 32
+	const r = 30
 	const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
 	grad.addColorStop(0, 'rgba(255,255,255,1)')
 	grad.addColorStop(0.4, 'rgba(255,180,50,0.8)')
@@ -76,9 +76,9 @@ export function createExhaustFlamesForBus(
 
 	const flameTex = new DynamicTexture('flameTex_r', 64, scene, false)
 	const ctx = flameTex.getContext() as unknown as CanvasRenderingContext2D
-	const cx = 32,
-		cy = 32,
-		r = 30
+	const cx = 32
+	const cy = 32
+	const r = 30
 	const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
 	grad.addColorStop(0, 'rgba(255,255,255,1)')
 	grad.addColorStop(0.4, 'rgba(255,180,50,0.8)')
@@ -133,9 +133,9 @@ export function createWaterWake(
 	// Shared circle texture for spray droplets
 	const tex = new DynamicTexture('wakeTex', 64, scene, false)
 	const ctx = tex.getContext() as unknown as CanvasRenderingContext2D
-	const cx = 32,
-		cy = 32,
-		r = 30
+	const cx = 32
+	const cy = 32
+	const r = 30
 	const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
 	grad.addColorStop(0, 'rgba(255,255,255,1)')
 	grad.addColorStop(0.5, 'rgba(245,248,255,0.7)')
@@ -269,9 +269,9 @@ export function createDirtSpray(
 ): ParticleSystem[] {
 	const tex = new DynamicTexture('dirtTex', 64, scene, false)
 	const ctx = tex.getContext() as unknown as CanvasRenderingContext2D
-	const cx = 32,
-		cy = 32,
-		r = 30
+	const cx = 32
+	const cy = 32
+	const r = 30
 	const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
 	grad.addColorStop(0, 'rgba(200,170,120,0.45)')
 	grad.addColorStop(0.5, 'rgba(190,160,110,0.3)')

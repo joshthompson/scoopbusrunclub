@@ -1,22 +1,22 @@
-import { css } from '@style/css'
 import {
-	createMemo,
-	createSignal,
-	For,
-	onCleanup,
-	onMount,
-	Show,
-} from 'solid-js'
-import { useParams } from '@solidjs/router'
-import type { RunResultItem, Runner } from '@/utils/api'
-import { parseTimeToSeconds } from '@/utils/misc'
-import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
-import { type RunnerName, runners as runnerSignals } from '@/data/runners'
-import {
-	getCelebrationTags,
 	type CelebrationData,
+	getCelebrationTags,
 	getOrBuildCelebrationData,
 } from '@/components/ResultCelebrations'
+import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import type { RunResultItem, Runner } from '@/utils/api'
+import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
+import { parseTimeToSeconds } from '@/utils/misc'
+import { useParams } from '@solidjs/router'
+import { css } from '@style/css'
+import {
+	For,
+	Show,
+	createMemo,
+	createSignal,
+	onCleanup,
+	onMount,
+} from 'solid-js'
 
 /** Category of celebration for filtering */
 export type GraphMarkerCategory = 'pb' | 'coursePb' | 'other'
@@ -390,15 +390,15 @@ export function GraphSVG(props: GraphProps) {
 			// Check if there's enough space above the point
 			const spaceAbove = point.y - MARGIN.top
 			const totalNeeded =
+				// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 				BASE_OFFSET + (countByIndex.get(marker.index)! - 1) * STEP + EMOJI_SIZE
 
 			if (spaceAbove >= totalNeeded) {
 				// Stack upward above the point
 				return { marker, y: point.y - BASE_OFFSET - slot * STEP }
-			} else {
-				// Not enough space above — stack downward below the point
-				return { marker, y: point.y + BASE_OFFSET + EMOJI_SIZE + slot * STEP }
 			}
+			// Not enough space above — stack downward below the point
+			return { marker, y: point.y + BASE_OFFSET + EMOJI_SIZE + slot * STEP }
 		})
 	})
 
@@ -468,26 +468,26 @@ export function GraphSVG(props: GraphProps) {
 				lineWidth: 3,
 				pointSize: 8,
 			}
-		else if (rpp < 20)
+		if (rpp < 20)
 			return {
 				...base,
 				lineWidth: 2,
 				pointSize: 6,
 			}
-		else if (rpp < 30)
+		if (rpp < 30)
 			return {
 				...base,
 				lineWidth: 1,
 				pointSize: 4,
 			}
-		else
-			return {
-				...base,
-				lineWidth: 1,
-				pointSize: 1,
-				outerLineColor: 'transparent',
-				innerLineColor: 'var(--dirt-darker-brown)',
-			}
+
+		return {
+			...base,
+			lineWidth: 1,
+			pointSize: 1,
+			outerLineColor: 'transparent',
+			innerLineColor: 'var(--dirt-darker-brown)',
+		}
 	})
 
 	const lineWidth = createMemo(() => lineSizeProps().lineWidth)
@@ -502,6 +502,8 @@ export function GraphSVG(props: GraphProps) {
 						width={data().width}
 						height={HEIGHT}
 						class={styles.graph}
+						role="img"
+						aria-label="Run time graph"
 						onMouseMove={(e) => {
 							const rect = svgRef.getBoundingClientRect()
 							setMouseX(e.clientX - rect.left)
@@ -669,6 +671,7 @@ export function GraphSVG(props: GraphProps) {
 					const pad = 8
 					const style = () => {
 						const svgRect = svgRef.getBoundingClientRect()
+						// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 						const cx = cursorLineX()!
 						let left = svgRect.left + cx - tooltipWidth / 2
 						left = Math.max(

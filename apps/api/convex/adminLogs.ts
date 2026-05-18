@@ -1,5 +1,5 @@
-import { query } from './_generated/server'
 import { v } from 'convex/values'
+import { query } from './_generated/server'
 import { validateSession } from './auth'
 
 export const list = query({
@@ -34,7 +34,7 @@ export const list = query({
 
 		// Apply cursor (pagination)
 		if (args.cursor) {
-			allLogs = allLogs.filter((l) => l.timestamp < args.cursor!)
+			allLogs = allLogs.filter((l) => l.timestamp < (args.cursor as number))
 		}
 
 		const page = allLogs.slice(0, pageSize)

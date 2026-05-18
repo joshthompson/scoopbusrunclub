@@ -1,3 +1,4 @@
+import { scrapeCourseMap } from '../lib/map-scraper'
 /**
  * Fetch course map data for ALL events in the database.
  *
@@ -9,13 +10,12 @@
  * to parkrun servers.
  */
 import {
-	loadEnv,
-	requireEnvVars,
 	launchBrowser,
+	loadEnv,
 	randomDelay,
+	requireEnvVars,
 	sleep,
 } from './shared'
-import { scrapeCourseMap } from '../lib/map-scraper'
 
 // --- Env loading ---
 
@@ -75,7 +75,7 @@ async function main() {
 				const result = await scrapeCourseMap(context, baseUrl)
 
 				if (!result) {
-					console.log(`  ⚠ No course map found — skipping.`)
+					console.log('  ⚠ No course map found — skipping.')
 					results.push({ eventId, status: 'no-map' })
 				} else {
 					const { courseData } = result
@@ -110,7 +110,7 @@ async function main() {
 						results.push({ eventId, status: 'ok' })
 					}
 				}
-			} catch (err: any) {
+			} catch (err) {
 				console.error(`  ✗ Error: ${err.message ?? err}`)
 				results.push({
 					eventId,
@@ -137,7 +137,7 @@ async function main() {
 	const noMap = results.filter((r) => r.status === 'no-map')
 	const errors = results.filter((r) => r.status === 'error')
 
-	console.log('\n' + '='.repeat(50))
+	console.log(`\n${'='.repeat(50)}`)
 	console.log('SUMMARY')
 	console.log('='.repeat(50))
 	console.log(`  ✓ Stored:  ${ok.length}`)

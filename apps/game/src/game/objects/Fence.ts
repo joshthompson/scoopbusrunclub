@@ -1,13 +1,13 @@
 import {
-	type Scene,
-	Vector3,
-	MeshBuilder,
-	StandardMaterial,
 	Color3,
-	Mesh,
-	TransformNode,
-	Quaternion,
 	Matrix,
+	Mesh,
+	MeshBuilder,
+	Quaternion,
+	type Scene,
+	StandardMaterial,
+	TransformNode,
+	Vector3,
 } from '@babylonjs/core'
 
 // ---------- Types ----------
@@ -286,12 +286,12 @@ function circleFrom3(
 	b: [number, number],
 	c: [number, number],
 ): Circle {
-	const ax = a[0],
-		az = a[1]
-	const bx = b[0],
-		bz = b[1]
-	const cpx = c[0],
-		cpz = c[1]
+	const ax = a[0]
+	const az = a[1]
+	const bx = b[0]
+	const bz = b[1]
+	const cpx = c[0]
+	const cpz = c[1]
 
 	const D = 2 * (ax * (bz - cpz) + bx * (cpz - az) + cpx * (az - bz))
 	if (Math.abs(D) < 1e-10) {

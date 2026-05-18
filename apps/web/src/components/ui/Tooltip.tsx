@@ -1,5 +1,5 @@
 import { css } from '@style/css'
-import { type JSX, createSignal, Show } from 'solid-js'
+import { type JSX, Show, createSignal } from 'solid-js'
 import { Portal } from 'solid-js/web'
 
 export function Tooltip(props: {

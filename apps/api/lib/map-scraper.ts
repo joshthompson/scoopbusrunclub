@@ -9,8 +9,8 @@
  * 5. Parse the KML for coordinates and named points
  */
 import JSZip from 'jszip'
-import { parseKml, type CourseData } from './kml-parser'
 import type { BrowserContext } from '../scripts/shared'
+import { type CourseData, parseKml } from './kml-parser'
 
 /**
  * Extract the Google Maps embed `mid` from a parkrun course page HTML.
@@ -101,7 +101,7 @@ export async function scrapeCourseMap(
 	context: BrowserContext,
 	eventBaseUrl: string,
 ): Promise<{ courseData: CourseData; kmlContent: string } | null> {
-	const courseUrl = eventBaseUrl.replace(/\/$/, '') + '/course/'
+	const courseUrl = `${eventBaseUrl.replace(/\/$/, '')}/course/`
 	console.log(`  Fetching course page: ${courseUrl}`)
 
 	// We need the raw HTML response (before cookie consent scripts strip the iframe).
@@ -133,7 +133,7 @@ export async function scrapeCourseMap(
 	const mid = extractMapMid(rawHtml)
 
 	if (!mid) {
-		console.log(`  ⚠ No Google Maps embed found on course page`)
+		console.log('  ⚠ No Google Maps embed found on course page')
 		return null
 	}
 
@@ -146,7 +146,7 @@ export async function scrapeCourseMap(
 	} catch {
 		// KMZ download failed — try resolving via embed redirect (legacy map IDs)
 		console.log(
-			`  KMZ download failed, attempting to resolve mid via embed redirect...`,
+			'  KMZ download failed, attempting to resolve mid via embed redirect...',
 		)
 		resolvedMid = await resolveMapMid(context, mid)
 		kmlContent = await downloadAndExtractKml(context, resolvedMid)

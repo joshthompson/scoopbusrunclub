@@ -1,19 +1,19 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
-import { css } from '@style/css'
-import { A, useParams, useNavigate } from '@solidjs/router'
-import { runners as runnerSignals, type RunnerName } from '@/data/runners'
-import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
-import { parseTimeToSeconds } from '@/utils/misc'
-import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
-import { CharacterImage } from '@/components/CharacterImage'
-import { FieldBlock } from '@/components/ui/FieldBlock'
-import { DirtBlock } from '@/components/ui/DirtBlock'
 import { BackSignButton } from '@/components/BackSignButton'
+import { CharacterImage } from '@/components/CharacterImage'
+import { Button } from '@/components/ui/Button'
+import { DirtBlock } from '@/components/ui/DirtBlock'
+import { FieldBlock } from '@/components/ui/FieldBlock'
+import { Modal } from '@/components/ui/Modal'
+import { Table } from '@/components/ui/Table'
+import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
+import { parseTimeToSeconds } from '@/utils/misc'
+import { A, useNavigate, useParams } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show, createMemo, createSignal } from 'solid-js'
+import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
 import { NotFoundPage } from './NotFoundPage'
 import { RunnerSummaryStat } from './RunnerSummaryStat'
-import { Table } from '@/components/ui/Table'
-import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
 
 interface ComparePageProps {
 	results: RunResultItem[]
@@ -127,7 +127,7 @@ export function ComparePage(props: ComparePageProps) {
 			if (!ids.includes(v.parkrunId)) continue
 			const key = `${v.date}:${v.event}`
 			if (!volMap.has(key)) volMap.set(key, new Set())
-			volMap.get(key)!.add(v.parkrunId)
+			volMap.get(key)?.add(v.parkrunId)
 		}
 		let count = 0
 		for (const runners of volMap.values()) {
@@ -229,18 +229,25 @@ export function ComparePage(props: ComparePageProps) {
 				{ day: 'numeric', month: 'short', year: '2-digit' },
 			)
 			return [
-				<div class={styles.raceEvent}>
+				<div
+					key={`${ev.event}-${ev.eventNumber}-event`}
+					class={styles.raceEvent}
+				>
 					<span>
 						{ev.eventName} #{ev.eventNumber}
 					</span>
 					<span class={styles.raceDate}>{formatted}</span>
 				</div>,
 				...ev.entries.map((e) => (
-					<span class={e === 'Volunteer' ? styles.volunteerLabel : undefined}>
+					<span
+						key={e}
+						class={e === 'Volunteer' ? styles.volunteerLabel : undefined}
+					>
 						{e}
 					</span>
 				)),
 				<A
+					key={`${ev.event}-${ev.eventNumber}-replay`}
 					href={`/replay/${ev.event}/${ev.eventNumber}`}
 					class={styles.replayBtn}
 					title="Replay"
@@ -257,6 +264,7 @@ export function ComparePage(props: ComparePageProps) {
 				<FieldBlock>
 					{/* Add runner button */}
 					<button
+						type="button"
 						class={styles.addButton}
 						onClick={() => setShowAddModal(true)}
 						title="Add runner"
@@ -277,6 +285,7 @@ export function ComparePage(props: ComparePageProps) {
 											}
 										>
 											<CharacterImage
+												// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 												runner={runnerDataList()[i()]!}
 												pose="sitting"
 											/>
@@ -331,6 +340,7 @@ export function ComparePage(props: ComparePageProps) {
 								<For each={availableRunners()}>
 									{(runner) => (
 										<button
+											type="button"
 											class={styles.addRunnerBtn}
 											onClick={() => addRunner(runner.key)}
 										>
@@ -355,6 +365,7 @@ export function ComparePage(props: ComparePageProps) {
 									const canRemove = () => runnerKeys().length > 2
 									return (
 										<button
+											type="button"
 											class={
 												canRemove()
 													? styles.removeRunnerBtn
@@ -365,7 +376,7 @@ export function ComparePage(props: ComparePageProps) {
 										>
 											<div class={styles.removeRunnerFaceWrap}>
 												<img
-													src={runnerDataList()[i()]!.frames.face[0]}
+													src={runnerDataList()[i()]?.frames.face[0]}
 													class={styles.addRunnerFace}
 													alt={names()[i()]}
 												/>

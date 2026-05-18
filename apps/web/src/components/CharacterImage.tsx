@@ -1,6 +1,6 @@
-import { css } from '@style/css'
-import { type RunnerData, runners } from '@/data/runners'
 import shadowAsset from '@/assets/runners/shadow.png'
+import { type RunnerData, runners } from '@/data/runners'
+import { css } from '@style/css'
 
 export function CharacterImage(props: {
 	runner: RunnerData
@@ -14,7 +14,7 @@ export function CharacterImage(props: {
 			role="img"
 			aria-label={`Image of ${runner().name}`}
 		>
-			<img src={runner().frames.sit[0]} class={styles.sitting} />
+			<img src={runner().frames.sit[0]} class={styles.sitting} alt="" />
 			{runner().name === 'Alisa' && (
 				<img
 					src={runners.link[0]().frames.sit[0]}
@@ -23,9 +23,9 @@ export function CharacterImage(props: {
 				/>
 			)}
 			<div class={styles.shadows}>
-				<img src={shadowAsset} class={styles.shadow} />
+				<img src={shadowAsset} class={styles.shadow} alt="" />
 				{runner().name === 'Alisa' && (
-					<img src={shadowAsset} class={styles.linkShadow} />
+					<img src={shadowAsset} class={styles.linkShadow} alt="" />
 				)}
 			</div>
 		</div>

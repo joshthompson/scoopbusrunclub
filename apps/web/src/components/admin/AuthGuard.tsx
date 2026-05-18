@@ -1,12 +1,12 @@
+import { adminLogout, validateToken } from '@/utils/adminApi'
 import {
-	createContext,
-	useContext,
 	type JSX,
-	createSignal,
-	createResource,
 	Show,
+	createContext,
+	createResource,
+	createSignal,
+	useContext,
 } from 'solid-js'
-import { validateToken, adminLogout } from '@/utils/adminApi'
 import { LoginForm } from './LoginForm'
 
 interface AuthContextValue {
@@ -64,8 +64,8 @@ export function AuthGuard(props: { children: JSX.Element }) {
 		>
 			<AuthContext.Provider
 				value={{
-					username: () => user()!.username,
-					isSuperAdmin: () => !!user()!.isSuperAdmin,
+					username: () => user()?.username,
+					isSuperAdmin: () => !!user()?.isSuperAdmin,
 					logout: handleLogout,
 				}}
 			>

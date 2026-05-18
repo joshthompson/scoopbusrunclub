@@ -1,9 +1,9 @@
-import { type Accessor, createSignal, type JSX, type Setter } from 'solid-js'
 import type { Sprite } from '@/engine/components/Sprite'
-import type { Scene } from './Scene'
-import { isOverlapping, type SolidRect } from '@/utils/game'
 import { blockBySolidsRectPlayer } from '@/utils/blockBySolids'
+import { type SolidRect, isOverlapping } from '@/utils/game'
 import { cx } from '@style/css'
+import { type Accessor, type JSX, type Setter, createSignal } from 'solid-js'
+import type { Scene } from './Scene'
 
 type Accessorise<T> = {
 	[K in keyof T]: Accessor<T[K]>
@@ -33,14 +33,17 @@ export interface Controller<CP extends ControllerBaseType> {
 	solid: SolidRect
 	onEnterFrame: (scene: Scene) => void
 	destroy: () => void
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	hitTest: (other: Controller<any>) => boolean
 	distanceTo: (x: number, y: number) => number
 	direction: (x: number, y: number) => number
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	attach: (controller: Controller<any>) => void
 	setGame: (scene: Scene) => void
 	data: CP
 	sprite: Accessor<Sprite>
 	age: Accessor<number>
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	childControllers: Accessor<Controller<any>[]>
 }
 
@@ -81,11 +84,15 @@ export function createController<CP extends ControllerBaseType>(
 	const onEnterFrame = options.onEnterFrame
 	const [currentFrame, setCurrentFrame] = createSignal<number>(0)
 	const [childControllers, setChildControllers] = createSignal<
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		Controller<any>[]
 	>([])
 	const data: CP = options.init()
 	const destroy = () => {}
-	const setGame = (scene: Scene) => (data.scene = scene)
+	const setGame = (scene: Scene) => {
+		data.scene = scene
+	}
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	const hitTest = (other: Controller<any>) => {
 		const ref1 = document.querySelector(
 			`[data-controller-id="${data.id}"]`,
@@ -102,6 +109,7 @@ export function createController<CP extends ControllerBaseType>(
 	const direction = (x: number, y: number) => {
 		return Math.atan2(y - data.y(), x - data.x())
 	}
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	const attach = (controller: Controller<any>) => {
 		setChildControllers([...childControllers(), controller])
 	}
@@ -128,7 +136,9 @@ export function createController<CP extends ControllerBaseType>(
 			}
 			setAge(age() + 1)
 
-			childControllers().forEach((child) => child.onEnterFrame($scene))
+			for (const child of childControllers()) {
+				child.onEnterFrame($scene)
+			}
 		},
 		destroy,
 		hitTest,
@@ -163,14 +173,14 @@ export function createController<CP extends ControllerBaseType>(
 			},
 			onChangeFrame: (frame) => setCurrentFrame(frame),
 			onMount: ({ $ref }) => {
-				options.onMount &&
-					options.onMount({
-						$: data,
-						$scene: data.scene!,
-						$controller: controller,
-						$currentFrame: currentFrame(),
-						$ref: $ref,
-					})
+				options.onMount?.({
+					$: data,
+					// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+					$scene: data.scene!,
+					$controller: controller,
+					$currentFrame: currentFrame(),
+					$ref: $ref,
+				})
 			},
 			controllers: childControllers,
 		}),
@@ -180,6 +190,7 @@ export function createController<CP extends ControllerBaseType>(
 }
 
 export function createConnectedController<
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	C extends Controller<any>,
 	T extends {} = ControllerBaseType,
 >(options: {
@@ -206,6 +217,7 @@ export function createConnectedController<
 	randomStartFrame?: boolean
 	init?: ($: ExtractControllerType<C>, $age: number) => T
 }): Controller<T & ControllerBaseType> {
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	return createController<any>({
 		frames: options.frames,
 		randomStartFrame: options.randomStartFrame ?? false,

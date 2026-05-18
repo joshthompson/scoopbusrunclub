@@ -1,18 +1,19 @@
+import { css } from '@style/css'
 import {
 	type Accessor,
 	type Component,
 	For,
 	type JSX,
-	onCleanup,
 	type Setter,
+	onCleanup,
 } from 'solid-js'
-import { css } from '@style/css'
-import { Sprite } from './Sprite'
-import { Modal } from './Modal'
-import type { Scene } from '../Scene'
-import type { Controller } from '../Controller'
 import { SceneContext } from '../../utils/SceneContext'
+import type { Controller } from '../Controller'
+import type { Scene } from '../Scene'
+import { Modal } from './Modal'
+import { Sprite } from './Sprite'
 
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 export type CanvasControllers = { id: string; controller: Controller<any> }[]
 
 export interface CanvasProps {
@@ -45,9 +46,9 @@ export function Canvas<T extends CanvasControllers = CanvasControllers>(
 	props: CanvasProps,
 ) {
 	onCleanup(() => {
-		props.scene.controllers
-			.get()
-			.forEach(({ controller }) => controller.destroy())
+		for (const { controller } of props.scene.controllers.get()) {
+			controller.destroy()
+		}
 	})
 
 	const sprites = () => {
@@ -101,6 +102,7 @@ export function Canvas<T extends CanvasControllers = CanvasControllers>(
 					...props.style,
 				}}
 				onClick={handleClick}
+				onKeyDown={handleClick}
 				onTouchStart={handleTouchStart}
 				onTouchEnd={handleTouchEnd}
 				onMouseDown={handleMouseDown}

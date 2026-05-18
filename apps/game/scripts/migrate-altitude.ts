@@ -14,9 +14,9 @@
  *   pnpm tsx scripts/migrate-altitude.ts
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '..')
@@ -54,8 +54,7 @@ function parseGpx(gpxPath: string): GpxPoint[] {
 	const points: GpxPoint[] = []
 	const trkptRegex =
 		/<trkpt\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>([\s\S]*?)<\/trkpt>/g
-	let m: RegExpExecArray | null
-	while ((m = trkptRegex.exec(xml)) !== null) {
+	for (const m of xml.matchAll(trkptRegex)) {
 		const lat = Number.parseFloat(m[1])
 		const lon = Number.parseFloat(m[2])
 		const eleMatch = m[3].match(/<ele>([^<]+)<\/ele>/)
@@ -103,7 +102,7 @@ function readJson<T>(path: string): T {
 }
 
 function writeJson(path: string, data: unknown): void {
-	writeFileSync(path, JSON.stringify(data, null, 2) + '\n', 'utf-8')
+	writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`, 'utf-8')
 }
 
 // ── Check min distance from a point to a set of points ──────────────
@@ -185,11 +184,11 @@ function generateHagaAltCourse(
 ): void {
 	const gpxPath = resolve(GPX_DIR, 'haga-alt.gpx')
 	if (!existsSync(gpxPath)) {
-		console.log(`  ⏭ haga-alt.gpx not found — skipping alt course generation`)
+		console.log('  ⏭ haga-alt.gpx not found — skipping alt course generation')
 		return
 	}
 
-	console.log(`\n📍 Generating haga alt course from haga-alt.gpx...`)
+	console.log('\n📍 Generating haga alt course from haga-alt.gpx...')
 	const allPoints = parseGpx(gpxPath)
 	console.log(`  Total GPX track points: ${allPoints.length}`)
 

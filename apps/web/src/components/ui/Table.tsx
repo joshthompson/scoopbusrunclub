@@ -39,6 +39,19 @@ export function Table(props: {
 													: 'asc'
 											props.onSortChange(column.id || column.title, newDir)
 										}}
+										onKeyDown={(e) => {
+											if (
+												(e.key === 'Enter' || e.key === ' ') &&
+												column.sortable &&
+												props.onSortChange
+											) {
+												const newDir =
+													props.sortKey === column.id && props.sortDir === 'asc'
+														? 'desc'
+														: 'asc'
+												props.onSortChange(column.id || column.title, newDir)
+											}
+										}}
 									>
 										{column.title}
 										{column.sortable &&

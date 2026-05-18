@@ -115,11 +115,7 @@ function wipeAllCache(): void {
 	const keysToRemove: string[] = []
 	for (let i = 0; i < localStorage.length; i++) {
 		const key = localStorage.key(i)
-		if (
-			key &&
-			key.startsWith(CACHE_PREFIX) &&
-			key !== `${CACHE_PREFIX}admin_token`
-		) {
+		if (key?.startsWith(CACHE_PREFIX) && key !== `${CACHE_PREFIX}admin_token`) {
 			keysToRemove.push(key)
 		}
 	}

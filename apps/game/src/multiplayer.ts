@@ -4,9 +4,9 @@
  * Players connect via a shared room code. One hosts, others join.
  * During gameplay each player broadcasts their player state ~15 times/sec.
  */
-import { joinRoom, selfId, type Room } from 'trystero'
-import type { GameType, TeamColor } from './game/modes/types'
+import { type Room, joinRoom, selfId } from 'trystero'
 import type { CharacterSelection } from './game/characters'
+import type { GameType, TeamColor } from './game/modes/types'
 
 // ---------- Shared types ----------
 
@@ -270,10 +270,14 @@ export class Multiplayer {
 		const [sendScoop, onScoop] = this.room.makeAction('scoop')
 		const [sendItem, onItem] = this.room.makeAction('itemCollect')
 
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		this.sendState = (state: PlayerState) => sendState(state as any)
 		this.sendLobby = (msg: LobbyMessage, targetPeers?: string | string[]) =>
+			// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 			sendLobby(msg as any, targetPeers)
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		this.sendScoop = (evt: ScoopEvent) => sendScoop(evt as any)
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		this.sendItem = (evt: ItemCollectEvent) => sendItem(evt as any)
 
 		onState((data, peerId: string) => {
@@ -543,7 +547,9 @@ export class LobbyDiscovery {
 		const [sendAnnounce, onAnnounce] = this.room.makeAction('roomAnnounce')
 		const [sendRemove, onRemove] = this.room.makeAction('roomRemove')
 
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		this.sendAnnounce = (info: RoomInfo) => sendAnnounce(info as any)
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		this.sendRemove = (hostId: string) => sendRemove(hostId as any)
 
 		onAnnounce((data, _peerId: string) => {
@@ -572,6 +578,7 @@ export class LobbyDiscovery {
 		this._currentAnnouncement = fullInfo
 
 		// Announce immediately then periodically
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const announce = () => this.sendAnnounce?.(this._currentAnnouncement!)
 		announce()
 		this.announceInterval = setInterval(announce, LOBBY_ANNOUNCE_INTERVAL_MS)

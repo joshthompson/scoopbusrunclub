@@ -1,15 +1,15 @@
 import { createController, createObjectSignal } from '@/engine'
 
-import tree1Asset from '@/assets/misc/tree1.png'
-import tree2Asset from '@/assets/misc/tree2.png'
+import cloud1Asset from '@/assets/misc/cloud1.png'
+import cloud2Asset from '@/assets/misc/cloud2.png'
 import flower1Asset from '@/assets/misc/flower1.png'
 import flower2Asset from '@/assets/misc/flower2.png'
 import flower3Asset from '@/assets/misc/flower3.png'
 import flower4Asset from '@/assets/misc/flower4.png'
-import shrub1Asset from '@/assets/misc/shrub1.png'
-import cloud1Asset from '@/assets/misc/cloud1.png'
-import cloud2Asset from '@/assets/misc/cloud2.png'
 import signAsset from '@/assets/misc/pr-sign.png'
+import shrub1Asset from '@/assets/misc/shrub1.png'
+import tree1Asset from '@/assets/misc/tree1.png'
+import tree2Asset from '@/assets/misc/tree2.png'
 import { css } from '@style/css'
 
 const trees = [

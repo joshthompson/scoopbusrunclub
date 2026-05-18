@@ -1,6 +1,6 @@
 import { httpRouter } from 'convex/server'
-import { httpAction } from './_generated/server'
 import { api, internal } from './_generated/api'
+import { httpAction } from './_generated/server'
 
 const http = httpRouter()
 
@@ -611,6 +611,7 @@ http.route({
 		const raceId = url.searchParams.get('id') ?? ''
 		const result = await ctx.runMutation(api.races.remove, {
 			token,
+			// biome-ignore lint/suspicious/noExplicitAny: Convex ID cast from URL param
 			raceId: raceId as any,
 		})
 		if ('error' in result) {
@@ -694,6 +695,7 @@ http.route({
 			)
 		}
 
+		// biome-ignore lint/suspicious/noExplicitAny: Convex ID cast from URL param
 		const guest = await ctx.runQuery(api.guests.get, { guestId: id as any })
 		if (!guest) return jsonResponse({ error: 'Guest not found' }, 404)
 		return jsonResponse(guest)
@@ -712,6 +714,7 @@ http.route({
 			return jsonResponse({ error: "Missing 'id' query parameter" }, 400)
 		}
 		const results = await ctx.runQuery(api.guests.getGuestResults, {
+			// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 			guestId: id as any,
 		})
 		return jsonResponse(results)
@@ -802,6 +805,7 @@ http.route({
 		const guestId = url.searchParams.get('id') ?? ''
 		const result = await ctx.runMutation(api.guests.remove, {
 			token,
+			// biome-ignore lint/suspicious/noExplicitAny: Convex ID cast from URL param
 			guestId: guestId as any,
 		})
 		if ('error' in result) {
@@ -853,6 +857,7 @@ http.route({
 		const resultId = url.searchParams.get('id') ?? ''
 		const result = await ctx.runMutation(api.guests.removeGuestResult, {
 			token,
+			// biome-ignore lint/suspicious/noExplicitAny: Convex ID cast from URL param
 			resultId: resultId as any,
 		})
 		if ('error' in result) {
@@ -910,6 +915,7 @@ http.route({
 					resultCount: 0,
 				})
 			}
+			// biome-ignore lint/style/noNonNullAssertion: map.set above guarantees key exists
 			eventMap.get(key)!.resultCount++
 		}
 
@@ -940,7 +946,7 @@ http.route({
 		for (const gr of guestResults) {
 			const key = `${gr.event}#${gr.eventNumber}`
 			if (!guestResultsByEvent.has(key)) guestResultsByEvent.set(key, [])
-			guestResultsByEvent.get(key)!.push(gr)
+			guestResultsByEvent.get(key)?.push(gr)
 		}
 
 		const itemsWithGuests = items.map((item) => ({

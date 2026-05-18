@@ -5,27 +5,27 @@
  * A second engine powers the live hover animation.
  */
 import {
-	Engine,
-	Scene,
-	FreeCamera,
-	Vector3,
-	HemisphericLight,
 	Color3,
 	Color4,
+	Engine,
+	FreeCamera,
+	HemisphericLight,
+	Scene,
+	Vector3,
 } from '@babylonjs/core'
+import type { RunnerAppearance } from './game/characters'
+import {
+	busColorPaletteFromOption,
+	createBusModel,
+	tintBusModel,
+} from './game/objects/BusModel'
+import { createCorgiModel } from './game/objects/CorgiModel'
 import {
 	createRunnerModel,
 	poseStanding,
 	poseWaving,
 } from './game/objects/RunnerModel'
 import type { RunnerModelResult } from './game/objects/RunnerModel'
-import { createCorgiModel } from './game/objects/CorgiModel'
-import {
-	createBusModel,
-	tintBusModel,
-	busColorPaletteFromOption,
-} from './game/objects/BusModel'
-import type { RunnerAppearance } from './game/characters'
 
 const PREVIEW_WIDTH = 160
 const PREVIEW_HEIGHT = 200

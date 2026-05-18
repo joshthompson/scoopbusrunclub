@@ -1,36 +1,36 @@
-import { Scene } from '../../engine'
-import { Canvas } from '../../engine/components'
-import { createBusController } from './BusController'
 import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
-import sunAsset from '@/assets/misc/sun.png'
-import starsAsset from '@/assets/misc/stars.png'
 import house1Asset from '@/assets/misc/house1.png'
 import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
-import {
-	createRunnerController,
-	isStandingState,
-	RUNNER_LABEL_RENDER_DISTANCE,
-} from './RunnerController'
-import type { RunnerController } from './RunnerController'
-import { type RunnerName, runners, type RunnerState } from '@/data/runners'
-import { createSignal, onCleanup, onMount } from 'solid-js'
-import { useNavigate } from '@solidjs/router'
-import { createShadowController } from './ShadowController'
-import { startSkyService } from './SkyService'
+import starsAsset from '@/assets/misc/stars.png'
+import sunAsset from '@/assets/misc/sun.png'
+import { type RunnerName, type RunnerState, runners } from '@/data/runners'
+import { RoleTranslations } from '@/data/volunteer-roles'
 import type { RunResultItem, VolunteerItem } from '@/utils/api'
 import { parseTimeToSeconds } from '@/utils/misc'
+import { moonAsset } from '@/utils/moonAsset'
+import { useNavigate } from '@solidjs/router'
+import { css } from '@style/css'
+import { createSignal, onCleanup, onMount } from 'solid-js'
+import { Scene } from '../../engine'
+import { Canvas } from '../../engine/components'
+import { createBusController } from './BusController'
+import {
+	RUNNER_LABEL_RENDER_DISTANCE,
+	createRunnerController,
+	isStandingState,
+} from './RunnerController'
+import type { RunnerController } from './RunnerController'
 import {
 	createCloudController,
 	createPlantController,
 	createSignController,
 	createTreeController,
 } from './SceneryControllers'
-import { css } from '@style/css'
-import { moonAsset } from '@/utils/moonAsset'
-import { RoleTranslations } from '@/data/volunteer-roles'
+import { createShadowController } from './ShadowController'
+import { startSkyService } from './SkyService'
 
 export const HEADER_HEIGHT = 240
 
@@ -347,7 +347,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	})
 
 	return (
-		<div aria-role="heading" aria-label="Welcome to the Scoop Bus Run Club!">
+		<div aria-label="Welcome to the Scoop Bus Run Club!">
 			<div aria-hidden="true">
 				<div class={styles.underlay}>
 					<div class={styles.path} style={{ '--image': `url(${pathAsset})` }} />

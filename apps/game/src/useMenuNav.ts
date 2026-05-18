@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup, type Accessor } from 'solid-js'
+import { type Accessor, createSignal, onCleanup, onMount } from 'solid-js'
 
 interface MenuNavOpts {
 	onBack?: () => void

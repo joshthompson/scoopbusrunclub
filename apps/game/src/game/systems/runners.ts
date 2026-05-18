@@ -7,33 +7,6 @@ import {
 } from '@babylonjs/core'
 import type { ParticleSystem, TransformNode } from '@babylonjs/core'
 import {
-	createRunnerModel,
-	type RunnerModelResult,
-	poseRunning,
-	poseFlailing,
-	poseSitting,
-	poseSittingAnimated,
-	poseStanding,
-	poseSwimming,
-	poseJump,
-	poseTuck,
-} from '../objects/RunnerModel'
-import { createCorgiModel } from '../objects/CorgiModel'
-import { applyRunnerInteractionPose } from './runnerInteractions'
-import { PLAYER_COLORS } from '../objects/BusModel'
-import type {
-	Runner,
-	RemotePlayersMap,
-	ElasticObject,
-	SolidObstacle,
-	BuildingCollider,
-	BridgeCollider,
-	WaterZone,
-} from '../types'
-import { resolvePositionAgainstBuildings } from './buildings'
-import { resolvePositionAgainstBridges } from './bridges'
-import { mulberry32, getWaterSurfaceYAt } from './terrain'
-import {
 	BUS_COLLISION_RADIUS,
 	BUS_ROOF_L,
 	BUS_ROOF_W,
@@ -41,6 +14,7 @@ import {
 	GRAVITY,
 	MODE,
 	PATH_HALF_WIDTH,
+	RENDER_ANIMATION_CULL_DISTANCE,
 	RUNNER_COLLISION_RADIUS,
 	RUNNER_COUNT,
 	RUNNER_DOWNHILL_SLOPE_THRESHOLD,
@@ -52,19 +26,45 @@ import {
 	RUNNER_MAX_SPEED,
 	RUNNER_MIN_SPEED,
 	RUNNER_PLAYER_ANIM_SPEED_FACTOR,
-	RENDER_ANIMATION_CULL_DISTANCE,
 	RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
 	RUNNER_SIT_DURATION,
-	RUNNER_WATER_SINK,
-	RUNNER_WATER_SINK_IDLE_EXTRA,
 	RUNNER_SWIM_TILT,
 	RUNNER_SWIM_TILT_SPEED,
+	RUNNER_WATER_SINK,
+	RUNNER_WATER_SINK_IDLE_EXTRA,
 	SCOOP_BOOST_DURATION,
 	SCOOP_DISTANCE,
 	SCOOP_FORWARD_FACTOR,
 	SCOOP_MIN_UP,
 	SCOOP_UP_FACTOR,
 } from '../constants'
+import { PLAYER_COLORS } from '../objects/BusModel'
+import { createCorgiModel } from '../objects/CorgiModel'
+import {
+	type RunnerModelResult,
+	createRunnerModel,
+	poseFlailing,
+	poseJump,
+	poseRunning,
+	poseSitting,
+	poseSittingAnimated,
+	poseStanding,
+	poseSwimming,
+	poseTuck,
+} from '../objects/RunnerModel'
+import type {
+	BridgeCollider,
+	BuildingCollider,
+	ElasticObject,
+	RemotePlayersMap,
+	Runner,
+	SolidObstacle,
+	WaterZone,
+} from '../types'
+import { resolvePositionAgainstBridges } from './bridges'
+import { resolvePositionAgainstBuildings } from './buildings'
+import { applyRunnerInteractionPose } from './runnerInteractions'
+import { getWaterSurfaceYAt, mulberry32 } from './terrain'
 
 // ---------- Runner spawning ----------
 
@@ -764,7 +764,9 @@ export function packRemoteRiders(remote: {
 		const row = Math.floor(i / cols)
 		const ox = cols > 1 ? -BUS_ROOF_W / 2 + col * spacingX : 0
 		const oz = rows > 1 ? -BUS_ROOF_L / 2 + row * spacingZ : 0
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		;(remote.riderAnchors[i] as any).__roofOffsetX = ox
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		;(remote.riderAnchors[i] as any).__roofOffsetZ = oz
 	}
 }
@@ -811,22 +813,23 @@ export function updateLocalRunnerVisual(
 	dt: number,
 	animPhase: number,
 ): number {
+	let phase = animPhase
 	ctx.model.root.position.set(ctx.busPos.x, ctx.busPos.y, ctx.busPos.z)
 	ctx.model.root.rotation.y = ctx.busYaw
 
 	if (ctx.scoopState === 'launched') {
 		ctx.model.root.rotation.x += 8 * dt
 		ctx.model.root.rotation.z += 5 * dt
-		animPhase += dt * 12
-		poseFlailing(ctx.model, animPhase)
-		return animPhase
+		phase += dt * 12
+		poseFlailing(ctx.model, phase)
+		return phase
 	}
 
 	if (ctx.scoopState === 'sitting') {
 		ctx.model.root.rotation.x = 0
 		ctx.model.root.rotation.z = 0
 		poseSitting(ctx.model)
-		return animPhase
+		return phase
 	}
 
 	if (ctx.busAirborne) {
@@ -839,8 +842,8 @@ export function updateLocalRunnerVisual(
 			// Rotate around torso center (~0.8m above feet) instead of foot origin
 			const TORSO_MID_Y = 0.8
 			const flipSpeed = (2 * Math.PI) / 0.55 // one full rotation in ~0.55s
-			animPhase += dt * flipSpeed
-			const flipAngle = Math.min(animPhase, 2 * Math.PI)
+			phase += dt * flipSpeed
+			const flipAngle = Math.min(phase, 2 * Math.PI)
 			const flipDone = flipAngle >= 2 * Math.PI
 
 			if (flipDone) {
@@ -905,7 +908,7 @@ export function updateLocalRunnerVisual(
 				ctx.model.root.rotation.y = ctx.busYaw
 				poseTuck(ctx.model)
 			}
-			return animPhase
+			return phase
 		}
 
 		ctx.model.root.rotation.x = -0.2
@@ -934,25 +937,25 @@ export function updateLocalRunnerVisual(
 	if (moving) {
 		if (ctx.inWater) {
 			const phaseSpeed = Math.abs(ctx.busSpeed) * 1
-			animPhase += dt * phaseSpeed
-			poseSwimming(ctx.model, animPhase)
+			phase += dt * phaseSpeed
+			poseSwimming(ctx.model, phase)
 		} else {
 			const phaseSpeed =
 				Math.abs(ctx.busSpeed) * 3.2 * RUNNER_PLAYER_ANIM_SPEED_FACTOR
-			animPhase += dt * phaseSpeed
-			poseRunning(ctx.model, animPhase)
+			phase += dt * phaseSpeed
+			poseRunning(ctx.model, phase)
 		}
 	} else {
 		if (ctx.inWater) {
 			// Idle in water: body upright, gentle treading motion — sink extra
 			ctx.model.root.position.y -= RUNNER_WATER_SINK_IDLE_EXTRA
-			animPhase += dt * 0.8
-			ctx.model.leftArm.rotation.x = Math.sin(animPhase) * 0.3
-			ctx.model.rightArm.rotation.x = Math.sin(animPhase + Math.PI) * 0.3
+			phase += dt * 0.8
+			ctx.model.leftArm.rotation.x = Math.sin(phase) * 0.3
+			ctx.model.rightArm.rotation.x = Math.sin(phase + Math.PI) * 0.3
 			ctx.model.leftArm.rotation.z = -0.4
 			ctx.model.rightArm.rotation.z = 0.4
-			ctx.model.leftLeg.rotation.x = Math.sin(animPhase * 1.5) * 0.2
-			ctx.model.rightLeg.rotation.x = -Math.sin(animPhase * 1.5) * 0.2
+			ctx.model.leftLeg.rotation.x = Math.sin(phase * 1.5) * 0.2
+			ctx.model.rightLeg.rotation.x = -Math.sin(phase * 1.5) * 0.2
 			ctx.model.leftLeg.rotation.z = 0
 			ctx.model.rightLeg.rotation.z = 0
 		} else {
@@ -960,5 +963,5 @@ export function updateLocalRunnerVisual(
 		}
 	}
 
-	return animPhase
+	return phase
 }

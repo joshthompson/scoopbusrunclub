@@ -1,6 +1,6 @@
+import { MuteButton } from './MuteButton'
 import logoSrc from './assets/logo.png'
 import { useMenuNav } from './useMenuNav'
-import { MuteButton } from './MuteButton'
 
 type SinglePlayerGameMode = 'bus-race' | 'parkrun' | 'bus-mode'
 
@@ -25,6 +25,7 @@ export function GameModeSelectScreen(props: GameModeSelectScreenProps) {
 				<h2 class="screen-heading">Game Mode</h2>
 				<div class="course-buttons">
 					<button
+						type="button"
 						class="course-btn"
 						classList={{ 'menu-focused': isFocused(1) }}
 						onClick={() => props.onSelect('bus-race')}
@@ -32,6 +33,7 @@ export function GameModeSelectScreen(props: GameModeSelectScreenProps) {
 						🚌 Bus Race
 					</button>
 					<button
+						type="button"
 						class="course-btn runner-btn"
 						classList={{ 'menu-focused': isFocused(2) }}
 						onClick={() => props.onSelect('parkrun')}
@@ -39,6 +41,7 @@ export function GameModeSelectScreen(props: GameModeSelectScreenProps) {
 						🏃 Parkrun
 					</button>
 					<button
+						type="button"
 						class="course-btn pickup-btn"
 						classList={{ 'menu-focused': isFocused(3) }}
 						onClick={() => props.onSelect('bus-mode')}
@@ -47,6 +50,7 @@ export function GameModeSelectScreen(props: GameModeSelectScreenProps) {
 					</button>
 				</div>
 				<button
+					type="button"
 					class="course-btn cancel-btn back-btn"
 					classList={{ 'menu-focused': isFocused(4) }}
 					onClick={props.onBack}

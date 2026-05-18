@@ -73,12 +73,11 @@ function moonPhasePath(phase: number): string {
 		// Terminator: bottom→top; clockwise for crescent (<0.25), counter-clockwise for gibbous (>0.25)
 		const sw = phase < 0.25 ? 1 : 0
 		return `M ${C},${C - R} A ${R},${R} 0 0,1 ${C},${C + R} A ${tRx},${R} 0 0,${sw} ${C},${C - R} Z`
-	} else {
-		// Waning — left limb is the lit edge
-		// Left semicircle: top→bottom counter-clockwise
-		const sw = phase > 0.75 ? 0 : 1
-		return `M ${C},${C - R} A ${R},${R} 0 0,0 ${C},${C + R} A ${tRx},${R} 0 0,${sw} ${C},${C - R} Z`
 	}
+	// Waning — left limb is the lit edge
+	// Left semicircle: top→bottom counter-clockwise
+	const sw = phase > 0.75 ? 0 : 1
+	return `M ${C},${C - R} A ${R},${R} 0 0,0 ${C},${C + R} A ${tRx},${R} 0 0,${sw} ${C},${C - R} Z`
 }
 
 // const litPath = moonPhasePath(moon.phase)

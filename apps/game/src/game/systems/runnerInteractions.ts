@@ -6,16 +6,16 @@
  */
 
 import type { Vector3 } from '@babylonjs/core'
-import { poseWaving, poseHighFive } from '../objects/RunnerModel'
-import type { Runner, RunnerInteraction } from '../types'
 import {
-	WAVE_TRIGGER_DISTANCE,
-	HIGH_FIVE_TRIGGER_DISTANCE,
-	WAVE_DURATION,
 	HIGH_FIVE_DURATION,
-	INTERACTION_COOLDOWN,
+	HIGH_FIVE_TRIGGER_DISTANCE,
 	INTERACTION_CLOSING_SPEED,
+	INTERACTION_COOLDOWN,
+	WAVE_DURATION,
+	WAVE_TRIGGER_DISTANCE,
 } from '../constants'
+import { poseHighFive, poseWaving } from '../objects/RunnerModel'
+import type { Runner, RunnerInteraction } from '../types'
 import { playHello } from './sounds'
 
 // ── Per-pair cooldown tracker ──
@@ -162,7 +162,7 @@ export function updateRunnerInteractions(
 	}
 
 	// 3. Detect new interactions — player ↔ NPC
-	if (player && player.canInteract && player.interaction === 'none') {
+	if (player?.canInteract && player.interaction === 'none') {
 		const pVx = Math.sin(player.yaw) * player.speed
 		const pVz = Math.cos(player.yaw) * player.speed
 

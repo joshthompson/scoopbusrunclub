@@ -1,20 +1,20 @@
 import {
-	type Scene,
-	Vector3,
-	MeshBuilder,
-	StandardMaterial,
-	PBRMaterial,
-	DynamicTexture,
 	Color3,
-	TransformNode,
+	DynamicTexture,
+	MeshBuilder,
+	PBRMaterial,
+	type Scene,
 	SceneLoader,
+	StandardMaterial,
+	TransformNode,
+	Vector3,
 } from '@babylonjs/core'
 import '@babylonjs/loaders/glTF'
 
-import { BUS_COLOR_OPTIONS } from '../characters'
-import scoopModelUrl from '../../assets/models/scoop.glb?url'
 import busModelUrl from '../../assets/models/bus.glb?url'
+import scoopModelUrl from '../../assets/models/scoop.glb?url'
 import wheelModelUrl from '../../assets/models/wheel.glb?url'
+import { BUS_COLOR_OPTIONS } from '../characters'
 
 // ═══════════════════════════════════════
 // Position constants (relative to bus body origin)
@@ -100,15 +100,16 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
 	busRoot.parent = bodyShell
 
 	// Measure the bounding box to determine scale
-	let minX = Number.POSITIVE_INFINITY,
-		maxX = Number.NEGATIVE_INFINITY
-	let minY = Number.POSITIVE_INFINITY,
-		maxY = Number.NEGATIVE_INFINITY
-	let minZ = Number.POSITIVE_INFINITY,
-		maxZ = Number.NEGATIVE_INFINITY
+	let minX = Number.POSITIVE_INFINITY
+	let maxX = Number.NEGATIVE_INFINITY
+	let minY = Number.POSITIVE_INFINITY
+	let maxY = Number.NEGATIVE_INFINITY
+	let minZ = Number.POSITIVE_INFINITY
+	let maxZ = Number.NEGATIVE_INFINITY
 
 	for (const mesh of busResult.meshes) {
 		if (mesh.isAnInstance || !mesh.getBoundingInfo) continue
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		const bi = (mesh as any).refreshBoundingInfo()
 		const bounds = mesh.getBoundingInfo().boundingBox
 		const worldMin = bounds.minimumWorld
@@ -187,15 +188,16 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
 		)
 
 		// Measure wheel model to scale appropriately
-		let wheelMinX = Number.POSITIVE_INFINITY,
-			wheelMaxX = Number.NEGATIVE_INFINITY
-		let wheelMinY = Number.POSITIVE_INFINITY,
-			wheelMaxY = Number.NEGATIVE_INFINITY
-		let wheelMinZ = Number.POSITIVE_INFINITY,
-			wheelMaxZ = Number.NEGATIVE_INFINITY
+		let wheelMinX = Number.POSITIVE_INFINITY
+		let wheelMaxX = Number.NEGATIVE_INFINITY
+		let wheelMinY = Number.POSITIVE_INFINITY
+		let wheelMaxY = Number.NEGATIVE_INFINITY
+		let wheelMinZ = Number.POSITIVE_INFINITY
+		let wheelMaxZ = Number.NEGATIVE_INFINITY
 
 		for (const mesh of wheelResult.meshes) {
 			if (mesh.isAnInstance || !mesh.getBoundingInfo) continue
+			// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 			const bi = (mesh as any).refreshBoundingInfo()
 			const bounds = mesh.getBoundingInfo().boundingBox
 			const worldMin = bounds.minimumWorld
@@ -282,14 +284,15 @@ export async function createBusModel(scene: Scene): Promise<BusModelResult> {
 	scoopRoot.parent = scoopPivot
 
 	// Measure the raw bounding extent to compute the scale factor
-	let scoopMinX = Number.POSITIVE_INFINITY,
-		scoopMaxX = Number.NEGATIVE_INFINITY
-	let scoopMinY = Number.POSITIVE_INFINITY,
-		scoopMaxY = Number.NEGATIVE_INFINITY
-	let scoopMinZ = Number.POSITIVE_INFINITY,
-		scoopMaxZ = Number.NEGATIVE_INFINITY
+	let scoopMinX = Number.POSITIVE_INFINITY
+	let scoopMaxX = Number.NEGATIVE_INFINITY
+	let scoopMinY = Number.POSITIVE_INFINITY
+	let scoopMaxY = Number.NEGATIVE_INFINITY
+	let scoopMinZ = Number.POSITIVE_INFINITY
+	let scoopMaxZ = Number.NEGATIVE_INFINITY
 	for (const mesh of scoopResult.meshes) {
 		if (mesh.isAnInstance || !mesh.getBoundingInfo) continue
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		const bi = (mesh as any).refreshBoundingInfo()
 		const bounds = mesh.getBoundingInfo().boundingBox
 		const worldMin = bounds.minimumWorld
@@ -370,6 +373,7 @@ export function tintBusModel(
 	suffix: string,
 ) {
 	// Find scoop meshes (under scoopPivot > scoopGlbRoot)
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	const scoopMeshes = new Set<any>()
 	const scoopPivotNode = root
 		.getChildren(undefined, false)
@@ -385,8 +389,8 @@ export function tintBusModel(
 		}
 	}
 
-	root.getChildMeshes().forEach((m) => {
-		if (!m.material) return
+	for (const m of root.getChildMeshes()) {
+		if (!m.material) continue
 
 		// Handle scoop meshes first (may be PBR from GLB)
 		if (scoopMeshes.has(m)) {
@@ -396,7 +400,7 @@ export function tintBusModel(
 			) {
 				const scene = m.getScene()
 				const tinted = new StandardMaterial(
-					m.material.name + '_' + suffix,
+					`${m.material.name}_${suffix}`,
 					scene,
 				)
 				tinted.diffuseColor = palette.scoop.clone()
@@ -404,14 +408,14 @@ export function tintBusModel(
 				tinted.specularPower = 64
 				m.material = tinted
 			}
-			return
+			continue
 		}
 
 		// Handle PBR materials (GLB models) — or StandardMaterial if already tinted once
 		const busMaterialsToTint = ['Material.001']
 		const matName = m.material.name
 		const isTargetMaterial = busMaterialsToTint.some(
-			(n) => matName === n || matName.startsWith(n + '_'),
+			(n) => matName === n || matName.startsWith(`${n}_`),
 		)
 
 		if (
@@ -420,14 +424,13 @@ export function tintBusModel(
 				m.material instanceof StandardMaterial)
 		) {
 			const scene = m.getScene()
-			const tinted = new StandardMaterial('Material.001_' + suffix, scene)
+			const tinted = new StandardMaterial(`Material.001_${suffix}`, scene)
 			tinted.diffuseColor = palette.body.clone()
 			tinted.specularColor = new Color3(0.4, 0.4, 0.4)
 			tinted.specularPower = 64
 			m.material = tinted
-			return
 		}
-	})
+	}
 }
 
 // ── Helper ──

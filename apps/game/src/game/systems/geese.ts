@@ -11,40 +11,40 @@
  *   - Geese avoid water and solid obstacles.
  *   - Scoopable: bus impact launches them like runners but they ragdoll (no riding).
  */
-import { type Scene, Vector3, MeshBuilder, Mesh } from '@babylonjs/core'
+import { Mesh, MeshBuilder, type Scene, Vector3 } from '@babylonjs/core'
+import {
+	GOOSE_FLEE_RADIUS,
+	GOOSE_FLEE_SPEED,
+	GOOSE_HERD_MERGE_RADIUS,
+	GOOSE_HERD_RADIUS,
+	GOOSE_IDLE_MAX,
+	GOOSE_LANDED_DURATION,
+	GOOSE_MIN_SEPARATION,
+	GOOSE_SCOOP_DISTANCE,
+	GOOSE_WALK_SPEED,
+	GOOSE_WANDER_RADIUS,
+	GRAVITY,
+	SCOOP_FORWARD_FACTOR,
+	SCOOP_MIN_UP,
+	SCOOP_UP_FACTOR,
+} from '../constants'
 import {
 	createGooseModel,
-	poseGooseWalking,
+	poseGooseFleeing,
 	poseGooseIdle,
 	poseGooseSitting,
-	poseGooseFleeing,
 	poseGooseSwimming,
+	poseGooseWalking,
 } from '../objects/GooseModel'
 import type { GooseModelResult } from '../objects/GooseModel'
 import type {
+	BuildingCollider,
 	Goose,
 	SolidObstacle,
-	BuildingCollider,
 	WaterZone,
 } from '../types'
 import { resolvePositionAgainstBuildings } from './buildings'
-import { isInWaterZone, getWaterSurfaceYAt } from './terrain'
-import {
-	GOOSE_HERD_RADIUS,
-	GOOSE_FLEE_RADIUS,
-	GOOSE_WANDER_RADIUS,
-	GOOSE_WALK_SPEED,
-	GOOSE_FLEE_SPEED,
-	GOOSE_IDLE_MAX,
-	GOOSE_MIN_SEPARATION,
-	GOOSE_SCOOP_DISTANCE,
-	GOOSE_HERD_MERGE_RADIUS,
-	GOOSE_LANDED_DURATION,
-	GRAVITY,
-	SCOOP_UP_FACTOR,
-	SCOOP_MIN_UP,
-	SCOOP_FORWARD_FACTOR,
-} from '../constants'
+import { getWaterSurfaceYAt, isInWaterZone } from './terrain'
 
 // ── Seeded RNG (same as terrain.ts) ──
 

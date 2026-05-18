@@ -1,5 +1,5 @@
-import { internalMutation, internalQuery } from './_generated/server'
 import { v } from 'convex/values'
+import { internalMutation, internalQuery } from './_generated/server'
 
 /**
  * Internal mutations and queries for storing/retrieving course map data.

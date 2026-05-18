@@ -1,24 +1,24 @@
-import {
-	type Component,
-	createSignal,
-	createResource,
-	For,
-	Show,
-	createMemo,
-	createEffect,
-} from 'solid-js'
-import { css } from '@style/css'
-import { DirtBlock } from '@/components/ui/DirtBlock'
 import { AdminButton } from '@/components/admin/AdminButton'
+import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Modal } from '@/components/ui/Modal'
 import {
-	fetchAdminParkruns,
-	fetchAdminGuests,
+	type Guest,
+	type ParkrunEventItem,
 	addGuestResult,
 	deleteGuestResult,
-	type ParkrunEventItem,
-	type Guest,
+	fetchAdminGuests,
+	fetchAdminParkruns,
 } from '@/utils/adminApi'
+import { css } from '@style/css'
+import {
+	type Component,
+	For,
+	Show,
+	createEffect,
+	createMemo,
+	createResource,
+	createSignal,
+} from 'solid-js'
 
 const TIME_RE = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/
 
@@ -296,9 +296,7 @@ function ParkrunModal(props: {
 					</table>
 				</Show>
 
-				<Show
-					when={(guests() ?? []).length === 0 && !guests.loading}
-				>
+				<Show when={(guests() ?? []).length === 0 && !guests.loading}>
 					<p class={styles.emptyState}>
 						No guests created yet. Add guests in the Runners section first.
 					</p>

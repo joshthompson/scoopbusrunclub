@@ -13,4 +13,5 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 	)
 }
 
+// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 render(() => <App />, root!)

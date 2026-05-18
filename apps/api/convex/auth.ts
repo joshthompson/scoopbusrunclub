@@ -1,5 +1,5 @@
-import { mutation, query, type MutationCtx } from './_generated/server'
 import { v } from 'convex/values'
+import { type MutationCtx, mutation, query } from './_generated/server'
 
 // ── Seed admin toggle ──────────────────────────────────────────────
 // When true, username "admin" / password "admin" is accepted even if
@@ -34,13 +34,19 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 // ── Internal session validator (reused by other modules) ────────────
 export async function validateSession(
+	// biome-ignore lint/suspicious/noExplicitAny: Convex ctx typing
 	ctx: { db: any },
 	token: string,
 	/** Set to true only from mutation handlers (queries are read-only). */
 	trackActivity = false,
-): Promise<{ userId: any; username: string; isSuperAdmin: boolean } | null> {
+): Promise<{
+	userId: unknown
+	username: string
+	isSuperAdmin: boolean
+} | null> {
 	const session = await ctx.db
 		.query('sessions')
+		// biome-ignore lint/suspicious/noExplicitAny: Convex query builder typing
 		.withIndex('by_token', (q: any) => q.eq('token', token))
 		.unique()
 
@@ -63,9 +69,10 @@ export async function validateSession(
 
 // ── Admin event logger (reused by other modules) ────────────────────
 export async function logAdminEvent(
+	// biome-ignore lint/suspicious/noExplicitAny: Convex ctx typing
 	ctx: { db: any },
 	opts: {
-		userId: any
+		userId: unknown
 		username: string
 		action: string
 		detail?: string
@@ -118,18 +125,18 @@ export const login = mutation({
 
 			const token = randomHex(32)
 			await ctx.db.insert('sessions', {
-				userId: adminUser!._id,
+				userId: adminUser?._id,
 				token,
 				expiresAt: Date.now() + SESSION_TTL_MS,
 			})
 
 			// Track lastLogin
-			await ctx.db.patch(adminUser!._id, {
+			await ctx.db.patch(adminUser?._id, {
 				lastLogin: Date.now(),
 				lastActivity: Date.now(),
 			})
 
-			return { token, username: adminUser!.username }
+			return { token, username: adminUser?.username }
 		}
 
 		// 2. Normal DB lookup
@@ -275,7 +282,7 @@ export const changePassword = mutation({
 			userId: session.userId,
 			username: session.username,
 			action: 'changed_password',
-			detail: `Changed own password`,
+			detail: 'Changed own password',
 			targetType: 'user',
 			targetId: user._id,
 		})
@@ -301,13 +308,16 @@ export const updateUser = mutation({
 		const existing = await ctx.db.get(args.userId)
 		if (!existing) return { error: 'User not found' }
 
+		// biome-ignore lint/suspicious/noExplicitAny: dynamic patch object for Convex
 		const patch: Record<string, any> = {}
 
 		if (args.username !== undefined && args.username !== existing.username) {
 			// Check for duplicates
 			const dup = await ctx.db
 				.query('adminUsers')
-				.withIndex('by_username', (q) => q.eq('username', args.username!))
+				.withIndex('by_username', (q) =>
+					q.eq('username', args.username as string),
+				)
 				.unique()
 			if (dup && dup._id !== args.userId)
 				return { error: 'Username already exists' }

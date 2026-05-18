@@ -1,3 +1,4 @@
+import { MuteButton } from './MuteButton'
 /**
  * Local Role Select Screen — shown before a local multiplayer game.
  *
@@ -9,7 +10,6 @@
 import logoSrc from './assets/logo.png'
 import type { GameType } from './game/modes'
 import { useMenuNav } from './useMenuNav'
-import { MuteButton } from './MuteButton'
 
 interface LocalRoleSelectScreenProps {
 	gameType: GameType
@@ -38,6 +38,7 @@ export function LocalRoleSelectScreen(props: LocalRoleSelectScreenProps) {
 				<p class="lobby-course">Who is Player 1?</p>
 				<div class="course-buttons">
 					<button
+						type="button"
 						class="course-btn host-btn"
 						classList={{ 'menu-focused': isFocused(1) }}
 						onClick={() => props.onSelect('bus')}
@@ -49,6 +50,7 @@ export function LocalRoleSelectScreen(props: LocalRoleSelectScreenProps) {
 						<small>P2 = Runner</small>
 					</button>
 					<button
+						type="button"
 						class="course-btn runner-btn"
 						classList={{ 'menu-focused': isFocused(2) }}
 						onClick={() => props.onSelect('runner')}
@@ -61,6 +63,7 @@ export function LocalRoleSelectScreen(props: LocalRoleSelectScreenProps) {
 					</button>
 				</div>
 				<button
+					type="button"
 					class="course-btn cancel-btn back-btn"
 					classList={{ 'menu-focused': isFocused(3) }}
 					onClick={props.onBack}

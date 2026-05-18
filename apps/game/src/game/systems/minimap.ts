@@ -1,13 +1,13 @@
 import type { Vector3 } from '@babylonjs/core'
-import { PLAYER_COLORS } from '../objects/BusModel'
 import type { MinimapPlayer } from '../Minimap'
-import type { RemotePlayersMap } from '../types'
 import type { CharacterSelection } from '../characters'
 import {
-	resolveRunnerAppearance,
-	resolveColor,
 	resolveBusColor,
+	resolveColor,
+	resolveRunnerAppearance,
 } from '../characters'
+import { PLAYER_COLORS } from '../objects/BusModel'
+import type { RemotePlayersMap } from '../types'
 
 function color3ToHex(c: { r: number; g: number; b: number }): string {
 	const r = Math.round(c.r * 255)

@@ -11,20 +11,20 @@ import {
 	Vector3,
 } from '@babylonjs/core'
 import {
+	RUNNER_PRESETS,
+	generateRandomAppearance,
+	isCorgiPreset,
+	resolveRunnerAppearance,
+} from '../characters'
+import type { RunnerAppearance } from '../characters'
+import { createCorgiModel } from '../objects/CorgiModel'
+import {
 	createRunnerModel,
 	poseCheering,
 	poseRunning,
 	poseStanding,
 } from '../objects/RunnerModel'
 import type { RunnerModelResult } from '../objects/RunnerModel'
-import {
-	resolveRunnerAppearance,
-	RUNNER_PRESETS,
-	generateRandomAppearance,
-	isCorgiPreset,
-} from '../characters'
-import type { RunnerAppearance } from '../characters'
-import { createCorgiModel } from '../objects/CorgiModel'
 import { applyVolunteerVest } from '../objects/RunnerModel'
 
 export type PreviewRunnerRole = 'parkwalker' | 'tailwalker'

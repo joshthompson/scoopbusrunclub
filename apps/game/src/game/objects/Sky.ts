@@ -1,11 +1,11 @@
 import {
-	type Scene,
-	MeshBuilder,
+	Color3,
+	DynamicTexture,
 	Mesh,
+	MeshBuilder,
+	type Scene,
 	StandardMaterial,
 	Texture,
-	DynamicTexture,
-	Color3,
 	Vector3,
 } from '@babylonjs/core'
 import { SkyMaterial } from '@babylonjs/materials'

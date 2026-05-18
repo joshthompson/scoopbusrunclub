@@ -1,6 +1,6 @@
+import track3Url from './assets/music/desifreemusic-driving-bass-neon-city-vibes-cinematic-build-up-328498.mp3'
 import track1Url from './assets/music/monume-cyberpunk-519219.mp3'
 import track2Url from './assets/music/the_mountain-retro-143303.mp3'
-import track3Url from './assets/music/desifreemusic-driving-bass-neon-city-vibes-cinematic-build-up-328498.mp3'
 import track4Url from './assets/music/universfield-motivational-electronic-background-226021.mp3'
 
 const STORAGE_KEY = 'sbrc-music-muted'
@@ -29,7 +29,7 @@ function getStoredVolume(): number {
 	const v = localStorage.getItem(VOLUME_KEY)
 	if (v === null) return DEFAULT_MUSIC_VOLUME
 	const n = Number.parseFloat(v)
-	return isNaN(n) ? DEFAULT_MUSIC_VOLUME : Math.max(0, Math.min(1, n))
+	return Number.isNaN(n) ? DEFAULT_MUSIC_VOLUME : Math.max(0, Math.min(1, n))
 }
 
 function playNext() {

@@ -1,8 +1,8 @@
-import { createSignal, createEffect, onCleanup } from 'solid-js'
-import logoSrc from './assets/logo.png'
-import { useMenuNav } from './useMenuNav'
-import { startMusic } from './music'
+import { createEffect, createSignal, onCleanup } from 'solid-js'
 import { MuteButton } from './MuteButton'
+import logoSrc from './assets/logo.png'
+import { startMusic } from './music'
+import { useMenuNav } from './useMenuNav'
 
 type GameMode = 'single' | 'local' | 'host' | 'join' | 'online'
 
@@ -96,12 +96,19 @@ export function TitleScreen(props: TitleScreenProps) {
 	]
 
 	return (
-		<div id="title-screen" onClick={() => startMusic()}>
+		<div
+			id="title-screen"
+			onClick={() => startMusic()}
+			onKeyDown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') startMusic()
+			}}
+		>
 			<MuteButton focused={isFocused(0)} />
 			<div class="title-content">
 				<img src={logoSrc} alt="Scoop Bus" class="title-logo" />
 				<div class="course-buttons">
 					<button
+						type="button"
 						class="course-btn"
 						classList={{ 'menu-focused': isFocused(1) }}
 						onClick={() => handleModeSelect('single')}
@@ -109,6 +116,7 @@ export function TitleScreen(props: TitleScreenProps) {
 						Single Player
 					</button>
 					<button
+						type="button"
 						class="course-btn local-btn"
 						classList={{ 'menu-focused': isFocused(2) }}
 						onClick={() => handleModeSelect('local')}
@@ -116,6 +124,7 @@ export function TitleScreen(props: TitleScreenProps) {
 						Local Multiplayer
 					</button>
 					<button
+						type="button"
 						class="course-btn online-btn"
 						classList={{ 'menu-focused': isFocused(3) }}
 						onClick={() => handleModeSelect('online')}
@@ -124,6 +133,7 @@ export function TitleScreen(props: TitleScreenProps) {
 					</button>
 				</div>
 				<button
+					type="button"
 					class="credits-btn"
 					classList={{ 'menu-focused': isFocused(4) }}
 					onClick={() => setShowCredits(true)}
@@ -133,8 +143,18 @@ export function TitleScreen(props: TitleScreenProps) {
 			</div>
 
 			{showCredits() && (
-				<div class="credits-overlay" onClick={() => setShowCredits(false)}>
-					<div class="credits-panel" onClick={(e) => e.stopPropagation()}>
+				<div
+					class="credits-overlay"
+					onClick={() => setShowCredits(false)}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') setShowCredits(false)
+					}}
+				>
+					<div
+						class="credits-panel"
+						onClick={(e) => e.stopPropagation()}
+						onKeyDown={(e) => e.stopPropagation()}
+					>
 						<h2>Credits</h2>
 						<p>
 							<strong>Developer:</strong> Josh Thompson
@@ -151,7 +171,7 @@ export function TitleScreen(props: TitleScreenProps) {
 
 						<h3>Music</h3>
 						{music.map((track) => (
-							<p>
+							<p key={track.userLink}>
 								<a
 									href={track.userLink}
 									target="_blank"
@@ -182,6 +202,7 @@ export function TitleScreen(props: TitleScreenProps) {
 						</p>
 
 						<button
+							type="button"
 							class="course-btn menu-focused"
 							onClick={() => setShowCredits(false)}
 						>

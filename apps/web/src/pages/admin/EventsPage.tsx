@@ -1,36 +1,36 @@
-import {
-	type Component,
-	createSignal,
-	createResource,
-	Show,
-	createMemo,
-	For,
-} from 'solid-js'
-import { css } from '@style/css'
-import { DirtBlock } from '@/components/ui/DirtBlock'
-import {
-	fetchRaces,
-	createRace,
-	updateRace,
-	deleteRace,
-	type Race,
-	type RaceAttendee,
-} from '@/utils/adminApi'
-import { runners, type RunnerName } from '@/data/runners'
-import { Table as AdminTable } from '@/components/ui/Table'
-import { AdminToolbar } from '@/components/admin/AdminToolbar'
+import { AdminAvatar } from '@/components/admin/AdminAvatar'
 import { AdminButton } from '@/components/admin/AdminButton'
 import {
 	AdminDropdown,
 	AdminDropdownItem,
 } from '@/components/admin/AdminDropdown'
-import { Checkbox } from '@/components/ui/Checkbox'
-import { EventModal } from './EventModal'
-import { AdminAvatar } from '@/components/admin/AdminAvatar'
-import { Tooltip } from '@/components/ui/Tooltip'
-import { AdminSelect } from '@/components/admin/AdminSelect'
 import { AdminInput } from '@/components/admin/AdminInput'
+import { AdminSelect } from '@/components/admin/AdminSelect'
+import { AdminToolbar } from '@/components/admin/AdminToolbar'
+import { Checkbox } from '@/components/ui/Checkbox'
+import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Icon } from '@/components/ui/Icon'
+import { Table as AdminTable } from '@/components/ui/Table'
+import { Tooltip } from '@/components/ui/Tooltip'
+import { type RunnerName, runners } from '@/data/runners'
+import {
+	type Race,
+	type RaceAttendee,
+	createRace,
+	deleteRace,
+	fetchRaces,
+	updateRace,
+} from '@/utils/adminApi'
+import { css } from '@style/css'
+import {
+	type Component,
+	For,
+	Show,
+	createMemo,
+	createResource,
+	createSignal,
+} from 'solid-js'
+import { EventModal } from './EventModal'
 
 export const EVENT_TYPES = [
 	{
@@ -195,7 +195,7 @@ export const EventsPage: Component = () => {
 
 	const formatDate = (dateStr: string) => {
 		try {
-			return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', {
+			return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-GB', {
 				weekday: 'short',
 				year: 'numeric',
 				month: 'short',
@@ -312,7 +312,7 @@ export const EventsPage: Component = () => {
 							formatDate(race.date),
 							<>
 								{race.name}
-								<Show when={race.website}>
+								<Show key={race.name} when={race.website}>
 									&nbsp;&nbsp;
 									<a
 										href={race.website}
@@ -330,6 +330,7 @@ export const EventsPage: Component = () => {
 
 							race.type ?? '—',
 							<span
+								key={`${race.date}-attendees`}
 								title={race.attendees
 									.map((a) => runnerDisplayName(a.runnerId))
 									.join(', ')}
@@ -348,7 +349,7 @@ export const EventsPage: Component = () => {
 							</span>,
 							race.public ? '✓' : '✗',
 							race.majorEvent ? '✓' : '✗',
-							<AdminDropdown>
+							<AdminDropdown key={`${race.date}-actions`}>
 								<AdminDropdownItem onClick={() => handleEdit(race)}>
 									Edit
 								</AdminDropdownItem>

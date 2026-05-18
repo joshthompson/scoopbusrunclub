@@ -1,6 +1,6 @@
-import { css } from '@style/css'
-import { createMemo, For, Show } from 'solid-js'
 import type { CourseData } from '@/utils/api'
+import { css } from '@style/css'
+import { For, Show, createMemo } from 'solid-js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,10 +28,10 @@ function projectCoordinates(coords: number[][], padding: number) {
 	if (coords.length === 0) return empty
 
 	// lon = index 0, lat = index 1
-	let minLon = Number.POSITIVE_INFINITY,
-		maxLon = Number.NEGATIVE_INFINITY
-	let minLat = Number.POSITIVE_INFINITY,
-		maxLat = Number.NEGATIVE_INFINITY
+	let minLon = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
 	for (const c of coords) {
 		if (c[0] < minLon) minLon = c[0]
 		if (c[0] > maxLon) maxLon = c[0]
@@ -99,13 +99,10 @@ export function CourseSVG(props: { course: CourseData }) {
 	const pathD = createMemo(() => {
 		const pts = projected().path
 		if (pts.length === 0) return ''
-		return (
-			`M ${pts[0].x} ${pts[0].y} ` +
-			pts
-				.slice(1)
-				.map((p) => `L ${p.x} ${p.y}`)
-				.join(' ')
-		)
+		return `M ${pts[0].x} ${pts[0].y} ${pts
+			.slice(1)
+			.map((p) => `L ${p.x} ${p.y}`)
+			.join(' ')}`
 	})
 
 	const labelledPoints = createMemo(() => {
@@ -122,6 +119,8 @@ export function CourseSVG(props: { course: CourseData }) {
 				viewBox={viewBox()}
 				class={styles.svg}
 				preserveAspectRatio="xMidYMid meet"
+				role="img"
+				aria-label="Course map"
 			>
 				{/* Route path */}
 				<Show when={pathD()}>

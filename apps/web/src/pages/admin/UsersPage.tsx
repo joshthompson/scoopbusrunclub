@@ -1,24 +1,24 @@
-import { type Component, createSignal, createResource, Show } from 'solid-js'
-import { css } from '@style/css'
-import { DirtBlock } from '@/components/ui/DirtBlock'
-import {
-	fetchAdminUsers,
-	createAdminUser,
-	updateAdminUser,
-	type AdminUser,
-} from '@/utils/adminApi'
+import { AdminAvatar } from '@/components/admin/AdminAvatar'
 import { AdminButton } from '@/components/admin/AdminButton'
-import { Table as AdminTable } from '@/components/ui/Table'
-import { Modal } from '@/components/ui/Modal'
-import { AdminInput } from '@/components/admin/AdminInput'
-import { AdminToolbar } from '@/components/admin/AdminToolbar'
-import { Checkbox } from '@/components/ui/Checkbox'
-import { useAuth } from '@/components/admin/AuthGuard'
 import {
 	AdminDropdown,
 	AdminDropdownItem,
 } from '@/components/admin/AdminDropdown'
-import { AdminAvatar } from '@/components/admin/AdminAvatar'
+import { AdminInput } from '@/components/admin/AdminInput'
+import { AdminToolbar } from '@/components/admin/AdminToolbar'
+import { useAuth } from '@/components/admin/AuthGuard'
+import { Checkbox } from '@/components/ui/Checkbox'
+import { DirtBlock } from '@/components/ui/DirtBlock'
+import { Modal } from '@/components/ui/Modal'
+import { Table as AdminTable } from '@/components/ui/Table'
+import {
+	type AdminUser,
+	createAdminUser,
+	fetchAdminUsers,
+	updateAdminUser,
+} from '@/utils/adminApi'
+import { css } from '@style/css'
+import { type Component, Show, createResource, createSignal } from 'solid-js'
 
 export const UsersPage: Component = () => {
 	const auth = useAuth()
@@ -148,14 +148,18 @@ export const UsersPage: Component = () => {
 							{ title: 'Actions', width: '10px' },
 						]}
 						data={(users() ?? []).map((user) => [
-							<AdminAvatar user={user.username} size="large" />,
+							<AdminAvatar
+								key={`${user.username}-avatar`}
+								user={user.username}
+								size="large"
+							/>,
 							user.username,
 							user.isSuperAdmin ? 'Super Admin' : 'Admin',
 							formatDate(user.createdAt),
 							user.createdBy ?? '—',
 							user.lastLogin ? formatDate(user.lastLogin) : '—',
 							user.lastActivity ? formatDate(user.lastActivity) : '—',
-							<AdminDropdown>
+							<AdminDropdown key={`${user.username}-actions`}>
 								<AdminDropdownItem onClick={() => openEdit(user)}>
 									Edit
 								</AdminDropdownItem>

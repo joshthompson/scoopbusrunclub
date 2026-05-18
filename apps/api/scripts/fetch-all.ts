@@ -9,9 +9,9 @@
  *   # Dry run (passes --dry to both scripts, no pauses):
  *   npx tsx scripts/fetch-all.ts --dry
  */
-import { execSync } from 'child_process'
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
+import { execSync } from 'node:child_process'
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { randomDelay, sleep } from './shared'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))

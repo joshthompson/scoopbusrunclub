@@ -1,10 +1,10 @@
-import { For, Show } from 'solid-js'
-import { css } from '@style/css'
-import { A } from '@solidjs/router'
-import { formatDate } from '@/utils/misc'
-import type { RaceItem } from '@/utils/api'
 import { runners } from '@/data/runners'
 import type { RunnerName } from '@/data/runners'
+import type { RaceItem } from '@/utils/api'
+import { formatDate } from '@/utils/misc'
+import { A } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show } from 'solid-js'
 import { DirtBlock } from './ui/DirtBlock'
 
 export function RaceCalendar(props: { races: RaceItem[] }) {
@@ -18,7 +18,7 @@ export function RaceCalendar(props: { races: RaceItem[] }) {
 						{(race) => (
 							<div>
 								<h4 class={styles.raceName}>{race.name}</h4>
-								<p>{formatDate(new Date(race.date + 'T00:00:00'))}</p>
+								<p>{formatDate(new Date(`${race.date}T00:00:00`))}</p>
 								<p>
 									{race.attendees.map((r, i) => {
 										const runner = runners[r.runnerId as RunnerName]
@@ -26,7 +26,11 @@ export function RaceCalendar(props: { races: RaceItem[] }) {
 										return (
 											<>
 												{i > 0 && ', '}
-												<A href={`/member/${r.runnerId}`} class={styles.link}>
+												<A
+													key={r.runnerId}
+													href={`/member/${r.runnerId}`}
+													class={styles.link}
+												>
 													{name}
 												</A>
 											</>

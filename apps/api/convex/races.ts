@@ -1,6 +1,6 @@
-import { mutation, query } from './_generated/server'
 import { v } from 'convex/values'
-import { validateSession, logAdminEvent } from './auth'
+import { mutation, query } from './_generated/server'
+import { logAdminEvent, validateSession } from './auth'
 
 const attendeeValidator = v.object({
 	runnerId: v.string(),
@@ -127,6 +127,7 @@ export const update = mutation({
 		const existing = await ctx.db.get(args.raceId)
 		if (!existing) return { error: 'Race not found' }
 
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		const patch: Record<string, any> = {
 			modifiedAt: Date.now(),
 			modifiedBy: session.username,

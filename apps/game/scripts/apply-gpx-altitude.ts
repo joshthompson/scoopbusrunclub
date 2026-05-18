@@ -12,9 +12,9 @@
  *   pnpm tsx scripts/apply-gpx-altitude.ts gpx/haga.gpx   # infers eventId from filename
  */
 
-import { readFileSync, writeFileSync } from 'fs'
-import { resolve, dirname, basename } from 'path'
-import { fileURLToPath } from 'url'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { basename, dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '..')
@@ -37,8 +37,7 @@ function parseGpx(gpxPath: string): GpxPoint[] {
 	// Match each <trkpt> block
 	const trkptRegex =
 		/<trkpt\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>([\s\S]*?)<\/trkpt>/g
-	let m: RegExpExecArray | null
-	while ((m = trkptRegex.exec(xml)) !== null) {
+	for (const m of xml.matchAll(trkptRegex)) {
 		const lat = Number.parseFloat(m[1])
 		const lon = Number.parseFloat(m[2])
 		const eleMatch = m[3].match(/<ele>([^<]+)<\/ele>/)
@@ -161,7 +160,7 @@ function updateAltitudeInFile(eventId: string, altitudes: number[]): void {
 
 	const altJson = JSON.stringify(altitudes, null, 2)
 		.split('\n')
-		.map((line, i) => (i === 0 ? line : '  ' + line))
+		.map((line, i) => (i === 0 ? line : `  ${line}`))
 		.join('\n')
 
 	// Replace "altitude": [ ... ] block

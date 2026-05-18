@@ -1,6 +1,6 @@
+import { MuteButton } from './MuteButton'
 import logoSrc from './assets/logo.png'
 import { useMenuNav } from './useMenuNav'
-import { MuteButton } from './MuteButton'
 
 type PlayerRole = 'bus' | 'runner'
 
@@ -25,6 +25,7 @@ export function RoleSelectScreen(props: RoleSelectScreenProps) {
 				<h2 class="screen-heading">Choose Your Role</h2>
 				<div class="course-buttons">
 					<button
+						type="button"
 						class="course-btn"
 						classList={{ 'menu-focused': isFocused(1) }}
 						onClick={() => props.onSelect('bus')}
@@ -32,6 +33,7 @@ export function RoleSelectScreen(props: RoleSelectScreenProps) {
 						🚌 Bus Driver
 					</button>
 					<button
+						type="button"
 						class="course-btn runner-btn"
 						classList={{ 'menu-focused': isFocused(2) }}
 						onClick={() => props.onSelect('runner')}
@@ -40,6 +42,7 @@ export function RoleSelectScreen(props: RoleSelectScreenProps) {
 					</button>
 				</div>
 				<button
+					type="button"
 					class="course-btn cancel-btn back-btn"
 					classList={{ 'menu-focused': isFocused(3) }}
 					onClick={props.onBack}

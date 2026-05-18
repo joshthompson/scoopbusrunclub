@@ -1,20 +1,20 @@
 import {
-	type Scene,
-	Vector3,
-	MeshBuilder,
-	StandardMaterial,
 	Color3,
 	type Mesh,
+	MeshBuilder,
+	type Scene,
+	StandardMaterial,
 	TransformNode,
+	Vector3,
 } from '@babylonjs/core'
 import type { RunnerAppearance } from '../characters'
-import type { PreviewRunnerRole } from '../systems/previewRunners'
 import {
+	HAIR_COLOR_HEX,
+	SKIN_TONE_HEX,
 	hexToColor3,
 	resolveColor,
-	SKIN_TONE_HEX,
-	HAIR_COLOR_HEX,
 } from '../characters'
+import type { PreviewRunnerRole } from '../systems/previewRunners'
 
 // ---------- Skin tones (legacy fallback for NPC runners) ----------
 const SKIN_TONES: Color3[] = [
@@ -135,7 +135,8 @@ export function createRunnerModel(
 	// --- Hat (baseball cap) ---
 	const hasHat = !!appearance?.hat
 	if (hasHat) {
-		const hatHex = resolveColor(appearance!.hat!)
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+		const hatHex = resolveColor(appearance?.hat!)
 		const hatMat = makeMat(`rHat_${id}`, hexToColor3(hatHex), scene)
 		const hatDarkMat = makeMat(
 			`rHatDark_${id}`,
@@ -813,6 +814,7 @@ export function createRunnerModel(
 		root.scaling = new Vector3(hs, hs, hs)
 	}
 	// Store base scale so power-ups can multiply on top of it
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	;(root as any).__baseScale = hs < 1 ? hs : 1
 
 	return {

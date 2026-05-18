@@ -1,10 +1,10 @@
 import {
-	type Scene,
-	Vector3,
-	MeshBuilder,
-	StandardMaterial,
 	Color3,
 	type Mesh,
+	MeshBuilder,
+	type Scene,
+	StandardMaterial,
+	Vector3,
 } from '@babylonjs/core'
 
 /**

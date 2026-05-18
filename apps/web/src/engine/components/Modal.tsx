@@ -4,7 +4,7 @@ import type { Component, JSX } from 'solid-js'
 export const Modal: Component<{ children: JSX.Element }> = (props) => {
 	return (
 		<div class={styles.background}>
-			<div class={styles.modal} children={props.children} />
+			<div class={styles.modal}>{props.children}</div>
 		</div>
 	)
 }

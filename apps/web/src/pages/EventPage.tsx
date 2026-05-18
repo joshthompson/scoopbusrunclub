@@ -1,30 +1,30 @@
-import { css } from '@style/css'
-import { createMemo, createSignal, For, onMount, Show } from 'solid-js'
+import extLinkAsset from '@/assets/misc/ext-link.png'
+import { BackSignButton } from '@/components/BackSignButton'
+import { CourseMap } from '@/components/CourseMap'
+import { CourseSVG } from '@/components/CourseSVG'
+import { FieldBlock } from '@/components/ui/FieldBlock'
+import { Table } from '@/components/ui/Table'
+import { Tooltip } from '@/components/ui/Tooltip'
+import { COUNTRY_FLAGS } from '@/data/countries'
+import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { RoleTranslations } from '@/data/volunteer-roles'
+import { getEvent, getEventName } from '@/utils/events'
+import { getMemberRoute } from '@/utils/memberRoute'
+import { formatDate, formatName } from '@/utils/misc'
+import { VOLUNTEER_EVENT_IDS } from '@shared/parkrun-events'
 import { A, useParams } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show, createMemo, createSignal, onMount } from 'solid-js'
+import { DirtBlock } from '../components/ui/DirtBlock'
 import {
+	type CourseData,
 	type RunResultItem,
 	type Runner,
 	type VolunteerItem,
-	type CourseData,
 	fetchCourse,
 } from '../utils/api'
-import { CourseMap } from '@/components/CourseMap'
-import { getEvent, getEventName } from '@/utils/events'
-import { formatDate, formatName } from '@/utils/misc'
-import { DirtBlock } from '../components/ui/DirtBlock'
-import { Table } from '@/components/ui/Table'
-import { RunnerSummaryStat } from './RunnerSummaryStat'
-import { BackSignButton } from '@/components/BackSignButton'
 import { NotFoundPage } from './NotFoundPage'
-import { runners as runnerSignals, type RunnerName } from '@/data/runners'
-import { getMemberRoute } from '@/utils/memberRoute'
-import { VOLUNTEER_EVENT_IDS } from '@shared/parkrun-events'
-import { RoleTranslations } from '@/data/volunteer-roles'
-import { FieldBlock } from '@/components/ui/FieldBlock'
-import { Tooltip } from '@/components/ui/Tooltip'
-import extLinkAsset from '@/assets/misc/ext-link.png'
-import { COUNTRY_FLAGS } from '@/data/countries'
-import { CourseSVG } from '@/components/CourseSVG'
+import { RunnerSummaryStat } from './RunnerSummaryStat'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -190,12 +190,12 @@ export function EventPage(props: EventPageProps) {
 		for (const r of eventResults()) {
 			if (!participantDates.has(r.parkrunId))
 				participantDates.set(r.parkrunId, [])
-			participantDates.get(r.parkrunId)!.push(r.date)
+			participantDates.get(r.parkrunId)?.push(r.date)
 		}
 		for (const v of eventVolunteers()) {
 			if (!participantDates.has(v.parkrunId))
 				participantDates.set(v.parkrunId, [])
-			participantDates.get(v.parkrunId)!.push(v.date)
+			participantDates.get(v.parkrunId)?.push(v.date)
 		}
 
 		let bestStreak = 0
@@ -244,7 +244,7 @@ export function EventPage(props: EventPageProps) {
 					date: r.date,
 					ids: new Set(),
 				})
-			counts.get(r.eventNumber)!.ids.add(r.parkrunId)
+			counts.get(r.eventNumber)?.ids.add(r.parkrunId)
 		}
 		for (const v of eventVolunteers()) {
 			if (!counts.has(v.eventNumber))
@@ -253,7 +253,7 @@ export function EventPage(props: EventPageProps) {
 					date: v.date,
 					ids: new Set(),
 				})
-			counts.get(v.eventNumber)!.ids.add(v.parkrunId)
+			counts.get(v.eventNumber)?.ids.add(v.parkrunId)
 		}
 		let best: { eventNumber: number; date: string; count: number } | null = null
 		for (const entry of counts.values()) {
@@ -351,12 +351,12 @@ export function EventPage(props: EventPageProps) {
 		for (const r of eventResults()) {
 			const key = `${r.date}:${r.eventNumber}`
 			if (!grouped.has(key)) grouped.set(key, new Set())
-			grouped.get(key)!.add(r.parkrunId)
+			grouped.get(key)?.add(r.parkrunId)
 		}
 		for (const v of eventVolunteers()) {
 			const key = `${v.date}:${v.eventNumber}`
 			if (!grouped.has(key)) grouped.set(key, new Set())
-			grouped.get(key)!.add(v.parkrunId)
+			grouped.get(key)?.add(v.parkrunId)
 		}
 
 		const pairCounts = new Map<
@@ -443,7 +443,7 @@ export function EventPage(props: EventPageProps) {
 					runners: [],
 					vols: [],
 				})
-			groups.get(r.eventNumber)!.runners.push(r)
+			groups.get(r.eventNumber)?.runners.push(r)
 		}
 		for (const v of eventVolunteers()) {
 			if (!groups.has(v.eventNumber))
@@ -453,7 +453,7 @@ export function EventPage(props: EventPageProps) {
 					runners: [],
 					vols: [],
 				})
-			groups.get(v.eventNumber)!.vols.push(v)
+			groups.get(v.eventNumber)?.vols.push(v)
 		}
 		return [...groups.values()].sort((a, b) => b.eventNumber - a.eventNumber)
 	})
@@ -507,15 +507,15 @@ export function EventPage(props: EventPageProps) {
 				{/* Header */}
 				<FieldBlock class={styles.header} title={eventName()} signType="purple">
 					<Show
-						when={eventInfo()?.country && COUNTRY_FLAGS[eventInfo()!.country]}
+						when={eventInfo()?.country && COUNTRY_FLAGS[eventInfo()?.country]}
 					>
 						<A href="/map" class={styles.headerFlag}>
-							{COUNTRY_FLAGS[eventInfo()!.country]}
+							{COUNTRY_FLAGS[eventInfo()?.country]}
 						</A>
 					</Show>
 					<Show when={eventInfo()?.url}>
 						<a
-							href={eventInfo()!.url}
+							href={eventInfo()?.url}
 							target="_blank"
 							rel="noopener noreferrer"
 							class={styles.headerExtLink}
@@ -602,17 +602,17 @@ export function EventPage(props: EventPageProps) {
 							})()}
 						</Show>
 
-						<Show when={bestBuddies() && bestBuddies()!.count > 1}>
+						<Show when={bestBuddies() && bestBuddies()?.count > 1}>
 							<div class={styles.awardCard}>
 								<div class={styles.awardEmoji}>🤝</div>
 								<div class={styles.awardTitle}>Best Buddies</div>
 								<div class={styles.awardValue}>
-									{bestBuddies()!.count}× together
+									{bestBuddies()?.count}× together
 								</div>
 								<div class={styles.awardDetail}>
 									<span class={styles.buddyFaces}>
-										{runnerFaceTooltip(bestBuddies()!.idA, bestBuddies()!.idA)}
-										{runnerFaceTooltip(bestBuddies()!.idB, bestBuddies()!.idB)}
+										{runnerFaceTooltip(bestBuddies()?.idA, bestBuddies()?.idA)}
+										{runnerFaceTooltip(bestBuddies()?.idB, bestBuddies()?.idB)}
 									</span>
 								</div>
 							</div>
@@ -717,9 +717,9 @@ export function EventPage(props: EventPageProps) {
 								<span class={styles.factEmoji}>🎉</span>
 								<span>
 									Biggest squad:{' '}
-									<strong>{biggestCrowd()!.count} members</strong> rocked up to
-									#{biggestCrowd()!.eventNumber} on{' '}
-									{formatDate(new Date(`${biggestCrowd()!.date}T00:00:00`))}
+									<strong>{biggestCrowd()?.count} members</strong> rocked up to
+									#{biggestCrowd()?.eventNumber} on{' '}
+									{formatDate(new Date(`${biggestCrowd()?.date}T00:00:00`))}
 								</span>
 							</div>
 						</Show>
@@ -849,9 +849,16 @@ export function EventPage(props: EventPageProps) {
 								{ title: '', width: '40px' },
 							]}
 							data={timeline().map((entry) => [
-								<strong>#{entry.eventNumber}</strong>,
-								<span>{formatDate(new Date(`${entry.date}T00:00:00`))}</span>,
-								<div class={styles.membersCell}>
+								<strong key={`${entry.eventNumber}-num`}>
+									#{entry.eventNumber}
+								</strong>,
+								<span key={`${entry.eventNumber}-date`}>
+									{formatDate(new Date(`${entry.date}T00:00:00`))}
+								</span>,
+								<div
+									key={`${entry.eventNumber}-members`}
+									class={styles.membersCell}
+								>
 									<For each={entry.runners}>
 										{(r) => (
 											<span class={styles.memberChip}>
@@ -874,6 +881,7 @@ export function EventPage(props: EventPageProps) {
 									</For>
 								</div>,
 								<A
+									key={`${entry.eventNumber}-replay`}
 									href={`/replay/${eventId()}/${entry.eventNumber}`}
 									class={styles.replayBtn}
 									title="Replay"

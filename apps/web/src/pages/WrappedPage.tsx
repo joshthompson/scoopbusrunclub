@@ -1,16 +1,16 @@
-import { createMemo, For, Show } from 'solid-js'
-import { css } from '@style/css'
-import { A, useParams, useNavigate } from '@solidjs/router'
-import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
-import { runners as runnerSignals } from '@/data/runners'
-import { getEvent, getEventName } from '@/utils/events'
-import { formatName, parseTimeToSeconds } from '@/utils/misc'
-import { getMemberRoute } from '@/utils/memberRoute'
-import { FieldBlock } from '../components/ui/FieldBlock'
-import { DirtBlock } from '../components/ui/DirtBlock'
 import { BackSignButton } from '@/components/BackSignButton'
 import { CharacterImage } from '@/components/CharacterImage'
 import { COUNTRY_FLAGS, COUNTRY_NAMES } from '@/data/countries'
+import { runners as runnerSignals } from '@/data/runners'
+import { getEvent, getEventName } from '@/utils/events'
+import { getMemberRoute } from '@/utils/memberRoute'
+import { formatName, parseTimeToSeconds } from '@/utils/misc'
+import { A, useNavigate, useParams } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show, createMemo } from 'solid-js'
+import { DirtBlock } from '../components/ui/DirtBlock'
+import { FieldBlock } from '../components/ui/FieldBlock'
+import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -220,15 +220,15 @@ function computeWrappedStats(
 	const dateEvents = new Map<string, Map<string, number>>() // date -> eventId -> eventNumber
 	for (const r of results) {
 		if (!dateMembers.has(r.date)) dateMembers.set(r.date, new Set())
-		dateMembers.get(r.date)!.add(r.parkrunId)
+		dateMembers.get(r.date)?.add(r.parkrunId)
 		if (!dateEvents.has(r.date)) dateEvents.set(r.date, new Map())
-		dateEvents.get(r.date)!.set(r.event, r.eventNumber)
+		dateEvents.get(r.date)?.set(r.event, r.eventNumber)
 	}
 	for (const v of volunteers) {
 		if (!dateMembers.has(v.date)) dateMembers.set(v.date, new Set())
-		dateMembers.get(v.date)!.add(v.parkrunId)
+		dateMembers.get(v.date)?.add(v.parkrunId)
 		if (!dateEvents.has(v.date)) dateEvents.set(v.date, new Map())
-		dateEvents.get(v.date)!.set(v.event, v.eventNumber)
+		dateEvents.get(v.date)?.set(v.event, v.eventNumber)
 	}
 
 	let busiestSaturday: WrappedStats['busiestSaturday'] = null
@@ -257,7 +257,7 @@ function computeWrappedStats(
 		)
 		if (!memberEventSets.has(r.parkrunId))
 			memberEventSets.set(r.parkrunId, new Set())
-		memberEventSets.get(r.parkrunId)!.add(r.event)
+		memberEventSets.get(r.parkrunId)?.add(r.event)
 	}
 	for (const v of volunteers) {
 		memberVolCounts.set(
@@ -271,7 +271,7 @@ function computeWrappedStats(
 	for (const r of allResultsPriorYears) {
 		if (r.date >= yearStr) continue
 		if (!priorEvents.has(r.parkrunId)) priorEvents.set(r.parkrunId, new Set())
-		priorEvents.get(r.parkrunId)!.add(r.event)
+		priorEvents.get(r.parkrunId)?.add(r.event)
 	}
 
 	const globalPriorEvents = new Set<string>()
@@ -345,7 +345,7 @@ function computeWrappedStats(
 	for (const r of results) {
 		const key = `${r.date}:${r.event}:${r.eventNumber}`
 		if (!eventResultsMap.has(key)) eventResultsMap.set(key, [])
-		eventResultsMap.get(key)!.push(r)
+		eventResultsMap.get(key)?.push(r)
 	}
 
 	let closeFinishes = 0
@@ -496,7 +496,7 @@ function computeWrappedStats(
 				members: new Set(),
 			})
 		}
-		eventInstanceMembers.get(key)!.members.add(r.parkrunId)
+		eventInstanceMembers.get(key)?.members.add(r.parkrunId)
 	}
 	for (const v of volunteers) {
 		if (!parkrunIdToMeta.has(v.parkrunId)) continue
@@ -509,7 +509,7 @@ function computeWrappedStats(
 				members: new Set(),
 			})
 		}
-		eventInstanceMembers.get(key)!.members.add(v.parkrunId)
+		eventInstanceMembers.get(key)?.members.add(v.parkrunId)
 	}
 
 	let biggestTrip: WrappedStats['biggestTrip'] = null
@@ -611,6 +611,7 @@ function formatDateDisplay(dateStr: string): string {
 // Wrapped Card Component
 // ---------------------------------------------------------------------------
 
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 function WrappedCard(props: { emoji: string; children: any; color?: string }) {
 	return (
 		<div
@@ -663,7 +664,8 @@ export function WrappedPage(props: WrappedPageProps) {
 
 	const parsedYear = createMemo(() => {
 		const y = Number.parseInt(params.year, 10)
-		if (isNaN(y) || y < FIRST_YEAR || y > getLatestAvailableYear()) return null
+		if (Number.isNaN(y) || y < FIRST_YEAR || y > getLatestAvailableYear())
+			return null
 		return y
 	})
 
@@ -744,7 +746,7 @@ export function WrappedPage(props: WrappedPageProps) {
 												<div class={pageStyles.debutMember}>
 													<Show when={runnerSig}>
 														<CharacterImage
-															runner={runnerSig![0]()}
+															runner={runnerSig?.[0]()}
 															pose="sitting"
 														/>
 													</Show>
@@ -752,6 +754,7 @@ export function WrappedPage(props: WrappedPageProps) {
 														when={route}
 														fallback={<strong>{m.name}</strong>}
 													>
+														{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 														<A href={route!} class={pageStyles.memberLink}>
 															<strong>{m.name}</strong>
 														</A>
@@ -811,6 +814,7 @@ export function WrappedPage(props: WrappedPageProps) {
 						{/* Busiest day */}
 						<Show when={stats().busiestSaturday}>
 							{(() => {
+								// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 								const b = stats().busiestSaturday!
 								const eventLabel = b.events
 									.map((e) => `${e.name} #${e.eventNumber}`)
@@ -836,9 +840,9 @@ export function WrappedPage(props: WrappedPageProps) {
 									<Show when={stats().mostVolunteeredMember}>
 										. Thank you{' '}
 										<strong>
-											{joinNames(stats().mostVolunteeredMember!.names)}
+											{joinNames(stats().mostVolunteeredMember?.names)}
 										</strong>{' '}
-										for leading with {stats().mostVolunteeredMember!.count}{' '}
+										for leading with {stats().mostVolunteeredMember?.count}{' '}
 										sessions!
 									</Show>
 								</div>
@@ -854,9 +858,9 @@ export function WrappedPage(props: WrappedPageProps) {
 									<Show when={stats().mostExploredMember}>
 										.{' '}
 										<strong>
-											{joinNames(stats().mostExploredMember!.names)}
+											{joinNames(stats().mostExploredMember?.names)}
 										</strong>{' '}
-										visited the most with {stats().mostExploredMember!.events}{' '}
+										visited the most with {stats().mostExploredMember?.events}{' '}
 										events
 									</Show>
 								</div>
@@ -871,11 +875,11 @@ export function WrappedPage(props: WrappedPageProps) {
 									10 seconds of each other
 									<Show when={stats().mostCommonCloseFinishPair}>
 										.{' '}
-										<strong>{stats().mostCommonCloseFinishPair!.nameA}</strong>{' '}
+										<strong>{stats().mostCommonCloseFinishPair?.nameA}</strong>{' '}
 										&{' '}
-										<strong>{stats().mostCommonCloseFinishPair!.nameB}</strong>{' '}
+										<strong>{stats().mostCommonCloseFinishPair?.nameB}</strong>{' '}
 										were the closest pair (
-										{stats().mostCommonCloseFinishPair!.count} times)
+										{stats().mostCommonCloseFinishPair?.count} times)
 									</Show>
 								</div>
 							</WrappedCard>
@@ -888,13 +892,13 @@ export function WrappedPage(props: WrappedPageProps) {
 									<strong>{stats().totalPBs} personal bests</strong> were set
 									this year
 									<Show when={stats().biggestPBImprover}>
-										. <strong>{stats().biggestPBImprover!.name}</strong> knocked
+										. <strong>{stats().biggestPBImprover?.name}</strong> knocked
 										the most time off —{' '}
 										<strong>
-											{Math.floor(stats().biggestPBImprover!.secondsSaved / 60)}
+											{Math.floor(stats().biggestPBImprover?.secondsSaved / 60)}
 											:
 											{String(
-												stats().biggestPBImprover!.secondsSaved % 60,
+												stats().biggestPBImprover?.secondsSaved % 60,
 											).padStart(2, '0')}
 										</strong>{' '}
 										faster!
@@ -908,11 +912,11 @@ export function WrappedPage(props: WrappedPageProps) {
 							<WrappedCard emoji="🏠" color="var(--blue-indigo-500)">
 								<div>
 									The biggest Haga turnout was{' '}
-									<strong>Haga #{stats().biggestHaga!.eventNumber}</strong> on{' '}
+									<strong>Haga #{stats().biggestHaga?.eventNumber}</strong> on{' '}
 									<strong>
-										{formatDateDisplay(stats().biggestHaga!.date)}
+										{formatDateDisplay(stats().biggestHaga?.date)}
 									</strong>{' '}
-									with <strong>{stats().biggestHaga!.count} members</strong>
+									with <strong>{stats().biggestHaga?.count} members</strong>
 								</div>
 							</WrappedCard>
 						</Show>
@@ -923,14 +927,14 @@ export function WrappedPage(props: WrappedPageProps) {
 								<div>
 									The biggest Scoop Bus trip was to{' '}
 									<strong>
-										{stats().biggestTrip!.eventName} #
-										{stats().biggestTrip!.eventNumber}
+										{stats().biggestTrip?.eventName} #
+										{stats().biggestTrip?.eventNumber}
 									</strong>{' '}
 									on{' '}
 									<strong>
-										{formatDateDisplay(stats().biggestTrip!.date)}
+										{formatDateDisplay(stats().biggestTrip?.date)}
 									</strong>{' '}
-									with <strong>{stats().biggestTrip!.count} members</strong>
+									with <strong>{stats().biggestTrip?.count} members</strong>
 								</div>
 							</WrappedCard>
 						</Show>
@@ -983,11 +987,12 @@ export function WrappedPage(props: WrappedPageProps) {
 									<div class={pageStyles.memberCard}>
 										<Show when={runnerSig}>
 											<CharacterImage
-												runner={runnerSig![1][0]()}
+												runner={runnerSig?.[1][0]()}
 												pose="sitting"
 											/>
 										</Show>
 										<Show when={route} fallback={<strong>{m.name}</strong>}>
+											{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 											<A href={route!} class={pageStyles.memberLink}>
 												<strong>{m.name}</strong>
 											</A>

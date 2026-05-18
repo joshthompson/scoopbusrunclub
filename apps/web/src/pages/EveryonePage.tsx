@@ -1,16 +1,16 @@
-import { createMemo, For, Show } from 'solid-js'
-import { css } from '@style/css'
-import { A } from '@solidjs/router'
-import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
-import type { CelebrationData } from '../components/ResultCelebrations'
-import { runners as runnerSignals, type RunnerName } from '@/data/runners'
+import { BackSignButton } from '@/components/BackSignButton'
+import { type RunnerName, runners as runnerSignals } from '@/data/runners'
 import { getEvent, getEventName } from '@/utils/events'
-import { formatName, parseTimeToSeconds } from '@/utils/misc'
 import { getMemberRoute } from '@/utils/memberRoute'
+import { formatName, parseTimeToSeconds } from '@/utils/misc'
+import { A } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show, createMemo } from 'solid-js'
+import type { CelebrationData } from '../components/ResultCelebrations'
 import { DirtBlock } from '../components/ui/DirtBlock'
 import { FieldBlock } from '../components/ui/FieldBlock'
+import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
 import { RunnerSummaryStat } from './RunnerSummaryStat'
-import { BackSignButton } from '@/components/BackSignButton'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -152,11 +152,11 @@ function computeGroupStats(
 	const dateMemberCounts = new Map<string, Set<string>>()
 	for (const r of results) {
 		if (!dateMemberCounts.has(r.date)) dateMemberCounts.set(r.date, new Set())
-		dateMemberCounts.get(r.date)!.add(r.parkrunId)
+		dateMemberCounts.get(r.date)?.add(r.parkrunId)
 	}
 	for (const v of volunteers) {
 		if (!dateMemberCounts.has(v.date)) dateMemberCounts.set(v.date, new Set())
-		dateMemberCounts.get(v.date)!.add(v.parkrunId)
+		dateMemberCounts.get(v.date)?.add(v.parkrunId)
 	}
 	let busiestDate = ''
 	let busiestCount = 0
@@ -192,7 +192,7 @@ function computeGroupStats(
 	for (const r of results) {
 		const key = dateEventKey(r)
 		if (!resultsByEvent.has(key)) resultsByEvent.set(key, [])
-		resultsByEvent.get(key)!.push(r)
+		resultsByEvent.get(key)?.push(r)
 	}
 	let closeFinishes = 0
 	for (const eventResults of resultsByEvent.values()) {
@@ -220,7 +220,7 @@ function computeGroupStats(
 			countryVisits.set(ev.country, (countryVisits.get(ev.country) ?? 0) + 1)
 			if (!countryEvents.has(ev.country))
 				countryEvents.set(ev.country, new Set())
-			countryEvents.get(ev.country)!.add(r.event)
+			countryEvents.get(ev.country)?.add(r.event)
 		}
 	}
 	for (const v of volunteers) {
@@ -229,7 +229,7 @@ function computeGroupStats(
 			countryVisits.set(ev.country, (countryVisits.get(ev.country) ?? 0) + 1)
 			if (!countryEvents.has(ev.country))
 				countryEvents.set(ev.country, new Set())
-			countryEvents.get(ev.country)!.add(v.event)
+			countryEvents.get(ev.country)?.add(v.event)
 		}
 	}
 
@@ -583,6 +583,7 @@ export function EveryonePage(props: EveryonePageProps) {
 											<span class={styles.memberName}>{member.name}</span>
 										}
 									>
+										{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 										<A href={route!} class={styles.memberNameLink}>
 											{member.name}
 										</A>

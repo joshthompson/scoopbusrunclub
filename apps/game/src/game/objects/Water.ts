@@ -1,10 +1,10 @@
 import {
-	type Scene,
-	Vector3,
-	MeshBuilder,
-	StandardMaterial,
 	Color3,
 	Mesh,
+	MeshBuilder,
+	type Scene,
+	StandardMaterial,
+	Vector3,
 } from '@babylonjs/core'
 import earcut from 'earcut'
 
@@ -65,7 +65,8 @@ export function createWaterRibbon(
 		const [cx, cz] = points[i]
 
 		// Compute tangent
-		let tx: number, tz: number
+		let tx: number
+		let tz: number
 		if (i === 0) {
 			tx = points[1][0] - cx
 			tz = points[1][1] - cz

@@ -1,14 +1,14 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
-import { css } from '@style/css'
-import { A } from '@solidjs/router'
-import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
-import { runners as runnerSignals, type RunnerName } from '@/data/runners'
-import { parseTimeToSeconds } from '@/utils/misc'
+import { BackSignButton } from '@/components/BackSignButton'
+import { type RunnerName, runners as runnerSignals } from '@/data/runners'
 import { getMemberRoute } from '@/utils/memberRoute'
+import { parseTimeToSeconds } from '@/utils/misc'
+import { A } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show, createMemo, createSignal } from 'solid-js'
 import { DirtBlock } from '../components/ui/DirtBlock'
 import { FieldBlock } from '../components/ui/FieldBlock'
 import { Table } from '../components/ui/Table'
-import { BackSignButton } from '@/components/BackSignButton'
+import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -59,7 +59,7 @@ function computeConnections(
 		if (!memberIds.includes(r.parkrunId)) continue
 		const key = `${r.date}:${r.event}:${r.eventNumber}`
 		if (!eventAttendance.has(key)) eventAttendance.set(key, new Set())
-		eventAttendance.get(key)!.add(r.parkrunId)
+		eventAttendance.get(key)?.add(r.parkrunId)
 	}
 
 	// Build volunteer presence: "date:event" -> set of parkrunIds
@@ -68,7 +68,7 @@ function computeConnections(
 		if (!memberIds.includes(v.parkrunId)) continue
 		const key = `${v.date}:${v.event}`
 		if (!volAttendance.has(key)) volAttendance.set(key, new Set())
-		volAttendance.get(key)!.add(v.parkrunId)
+		volAttendance.get(key)?.add(v.parkrunId)
 	}
 
 	// Also add volunteers to event attendance
@@ -76,7 +76,7 @@ function computeConnections(
 		if (!memberIds.includes(v.parkrunId)) continue
 		const key = `${v.date}:${v.event}:${v.eventNumber}`
 		if (!eventAttendance.has(key)) eventAttendance.set(key, new Set())
-		eventAttendance.get(key)!.add(v.parkrunId)
+		eventAttendance.get(key)?.add(v.parkrunId)
 	}
 
 	// Compute close finishes per event
@@ -85,7 +85,7 @@ function computeConnections(
 		if (!memberIds.includes(r.parkrunId)) continue
 		const key = `${r.date}:${r.event}:${r.eventNumber}`
 		if (!eventResults.has(key)) eventResults.set(key, [])
-		eventResults.get(key)!.push(r)
+		eventResults.get(key)?.push(r)
 	}
 
 	// Pairwise stats
@@ -103,7 +103,7 @@ function computeConnections(
 				const pk = pairKey(arr[i], arr[j])
 				sharedMap.set(pk, (sharedMap.get(pk) ?? 0) + 1)
 				if (!uniqueEventsMap.has(pk)) uniqueEventsMap.set(pk, new Set())
-				uniqueEventsMap.get(pk)!.add(eventName)
+				uniqueEventsMap.get(pk)?.add(eventName)
 			}
 		}
 	}
@@ -203,6 +203,7 @@ function layoutNodes(edges: ConnectionEdge[]): NodeInfo[] {
 		const angle = (2 * Math.PI * i) / ids.length - Math.PI / 2
 		const x = cx + radius * Math.cos(angle)
 		const y = cy + radius * Math.sin(angle)
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const meta = parkrunIdToMeta.get(id)!
 		return {
 			id,
@@ -312,7 +313,12 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 				</div>
 
 				<div class={pageStyles.svgContainer}>
-					<svg viewBox="-30 -30 580 560" class={pageStyles.svg}>
+					<svg
+						viewBox="-30 -30 580 560"
+						class={pageStyles.svg}
+						role="img"
+						aria-label="Runner connections network"
+					>
 						{/* Edges */}
 						<For each={edges()}>
 							{(e) => {
@@ -321,16 +327,22 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 								return (
 									<Show when={a() && b()}>
 										<line
-											x1={a()!.x}
-											y1={a()!.y}
-											x2={b()!.x}
-											y2={b()!.y}
+											x1={a()?.x}
+											y1={a()?.y}
+											x2={b()?.x}
+											y2={b()?.y}
 											stroke="#000000"
 											stroke-width={edgeWidth(e)}
 											stroke-opacity={edgeOpacity(e)}
 											stroke-linecap="round"
 											class={pageStyles.edge}
 											onClick={() => setSelectedEdge(e)}
+											onKeyDown={(ev) => {
+												if (ev.key === 'Enter' || ev.key === ' ')
+													setSelectedEdge(e)
+											}}
+											tabIndex={0}
+											role="button"
 										/>
 									</Show>
 								)
@@ -360,6 +372,8 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 									<g
 										opacity={nodeOpacity(node)}
 										class={pageStyles.node}
+										aria-label={`View ${node.name}'s connections`}
+										tabIndex={0}
 										onMouseEnter={() => {
 											if (!pinnedNode()) setHoveredNode(node.id)
 										}}
@@ -371,6 +385,14 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 												prev === node.id ? null : node.id,
 											)
 											setHoveredNode(null)
+										}}
+										onKeyDown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												setPinnedNode((prev) =>
+													prev === node.id ? null : node.id,
+												)
+												setHoveredNode(null)
+											}
 										}}
 										style={{ cursor: 'pointer' }}
 									>
@@ -426,8 +448,8 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 				{/* Active node info */}
 				<Show when={activeStats()}>
 					<div class={pageStyles.hoverCard}>
-						<strong>{activeStats()!.name}'s strongest connections:</strong>
-						<For each={activeStats()!.edges}>
+						<strong>{activeStats()?.name}'s strongest connections:</strong>
+						<For each={activeStats()?.edges}>
 							{(e) => {
 								const otherName = e.idA === activeNode() ? e.nameB : e.nameA
 								return (
@@ -451,37 +473,37 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 					<div class={pageStyles.edgeDetail}>
 						<div class={pageStyles.edgeNames}>
 							<A
-								href={getMemberRoute(selectedEdge()!.idA) ?? '#'}
+								href={getMemberRoute(selectedEdge()?.idA) ?? '#'}
 								class={pageStyles.nameLink}
 							>
-								{selectedEdge()!.nameA}
+								{selectedEdge()?.nameA}
 							</A>
 							<span> & </span>
 							<A
-								href={getMemberRoute(selectedEdge()!.idB) ?? '#'}
+								href={getMemberRoute(selectedEdge()?.idB) ?? '#'}
 								class={pageStyles.nameLink}
 							>
-								{selectedEdge()!.nameB}
+								{selectedEdge()?.nameB}
 							</A>
 						</div>
 						<div class={pageStyles.edgeStats}>
-							<div>📍 {selectedEdge()!.sharedEvents} shared events</div>
+							<div>📍 {selectedEdge()?.sharedEvents} shared events</div>
 							<div>
-								🦺 {selectedEdge()!.volunteeredTogether} volunteered together
+								🦺 {selectedEdge()?.volunteeredTogether} volunteered together
 							</div>
 							<div>
-								🤝 {selectedEdge()!.closeFinishes} close finishes (≤10s)
+								🤝 {selectedEdge()?.closeFinishes} close finishes (≤10s)
 							</div>
-							<div>🗺️ {selectedEdge()!.uniqueEvents} unique events</div>
+							<div>🗺️ {selectedEdge()?.uniqueEvents} unique events</div>
 							<div class={pageStyles.formulaText}>
-								Connection Score: ({selectedEdge()!.sharedEvents} +{' '}
-								{selectedEdge()!.volunteeredTogether} +{' '}
-								{selectedEdge()!.closeFinishes}) ×{' '}
-								{selectedEdge()!.uniqueEvents} = {selectedEdge()!.strength}
+								Connection Score: ({selectedEdge()?.sharedEvents} +{' '}
+								{selectedEdge()?.volunteeredTogether} +{' '}
+								{selectedEdge()?.closeFinishes}) ×{' '}
+								{selectedEdge()?.uniqueEvents} = {selectedEdge()?.strength}
 							</div>
 						</div>
 						<A
-							href={`/compare/${parkrunIdToMeta.get(selectedEdge()!.idA)?.key.toLowerCase() ?? ''}/${parkrunIdToMeta.get(selectedEdge()!.idB)?.key.toLowerCase() ?? ''}`}
+							href={`/compare/${parkrunIdToMeta.get(selectedEdge()?.idA)?.key.toLowerCase() ?? ''}/${parkrunIdToMeta.get(selectedEdge()?.idB)?.key.toLowerCase() ?? ''}`}
 							class={pageStyles.compareLink}
 						>
 							View full comparison →
@@ -502,20 +524,21 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 						{ title: 'Score', width: '100px' },
 					]}
 					data={edges().map((e) => [
-						<span
+						<button
+							key={`${e.idA}-${e.idB}-cell`}
+							type="button"
 							class={pageStyles.pairCell}
 							onClick={() => setSelectedEdge(e)}
 						>
 							{e.nameA} & {e.nameB}
-						</span>,
+						</button>,
+						// biome-ignore lint/correctness/useJsxKeyInIterable: key not applicable to Fragment shorthand
 						<>
 							({e.sharedEvents} + {e.volunteeredTogether} + {e.closeFinishes}) ×{' '}
 							{e.uniqueEvents}
 						</>,
-						<>
-							{(e.sharedEvents + e.volunteeredTogether + e.closeFinishes) *
-								e.uniqueEvents}
-						</>,
+						(e.sharedEvents + e.volunteeredTogether + e.closeFinishes) *
+							e.uniqueEvents,
 					])}
 				/>
 			</DirtBlock>

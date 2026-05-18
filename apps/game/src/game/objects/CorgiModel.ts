@@ -13,13 +13,13 @@
  * runner (~1.6 m).
  */
 import {
-	type Scene,
-	Vector3,
-	MeshBuilder,
-	StandardMaterial,
 	Color3,
 	Mesh,
+	MeshBuilder,
+	type Scene,
+	StandardMaterial,
 	TransformNode,
+	Vector3,
 } from '@babylonjs/core'
 import type { RunnerModelResult } from './RunnerModel'
 
@@ -392,6 +392,7 @@ export function createCorgiModel(scene: Scene, id: number): RunnerModelResult {
 	root.scaling = new Vector3(1.25, 1.25, 1.25)
 
 	// Base scale for power-up compatibility
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	;(root as any).__baseScale = 1.25
 
 	return {

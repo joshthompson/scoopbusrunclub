@@ -10,34 +10,35 @@
  */
 
 import {
-	Engine,
-	Scene,
-	FreeCamera,
-	Vector3,
 	Color3,
 	Color4,
-	HemisphericLight,
 	DirectionalLight,
+	DynamicTexture,
+	Engine,
+	FreeCamera,
+	HemisphericLight,
 	MeshBuilder,
+	Scene,
 	StandardMaterial,
 	TransformNode,
-	DynamicTexture,
+	Vector3,
 } from '@babylonjs/core'
 import '@babylonjs/loaders/glTF'
 
+import { BUS_ROOF_Y } from './game/constants'
 import { createBusModel } from './game/objects/BusModel'
 import {
-	SCOOP_POSITION,
-	SCOOP_WIDTH,
-	WHEEL_FRONT_LEFT_POSITION,
-	WHEEL_FRONT_RIGHT_POSITION,
-	WHEEL_BACK_LEFT_POSITION,
-	WHEEL_BACK_RIGHT_POSITION,
-	LIGHT_FRONT_POSITION,
 	LIGHT_BACK_LEFT_POSITION,
 	LIGHT_BACK_RIGHT_POSITION,
+	LIGHT_FRONT_POSITION,
 	PASSENGER_TRAY_POSITION,
 	PASSENGER_TRAY_SIZE,
+	SCOOP_POSITION,
+	SCOOP_WIDTH,
+	WHEEL_BACK_LEFT_POSITION,
+	WHEEL_BACK_RIGHT_POSITION,
+	WHEEL_FRONT_LEFT_POSITION,
+	WHEEL_FRONT_RIGHT_POSITION,
 	WHEEL_ROLL_SPEED,
 } from './game/objects/BusModel'
 import {
@@ -46,7 +47,6 @@ import {
 	poseSittingAnimated,
 } from './game/objects/RunnerModel'
 import type { RunnerModelResult } from './game/objects/RunnerModel'
-import { BUS_ROOF_Y } from './game/constants'
 
 // ── Camera state ──
 let camera: FreeCamera
@@ -73,6 +73,7 @@ let bodyShell: TransformNode
 let scoopPivot: TransformNode
 let frontWheelLeft: TransformNode
 let frontWheelRight: TransformNode
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 let gridMesh: any
 let axesRoot: TransformNode
 let passengers: {
@@ -91,6 +92,7 @@ let lightBackLeftMarker: TransformNode
 let lightBackRightMarker: TransformNode
 
 // ── Passenger tray visualization ──
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 let passengerTrayMarker: any
 
 // ── Init ──
@@ -159,12 +161,12 @@ async function init() {
 
 	// Debug: log all mesh/material names so we know what to match for tinting
 	console.group('🚌 Bus model materials')
-	busRoot.getChildMeshes().forEach((m) => {
+	for (const m of busRoot.getChildMeshes()) {
 		const matType = m.material?.constructor?.name ?? 'none'
 		console.log(
 			`mesh: "${m.name}" | material: "${m.material?.name}" (${matType})`,
 		)
-	})
+	}
 	console.groupEnd()
 
 	// ── Light markers (small spheres to visualize positions) ──
@@ -186,6 +188,7 @@ async function init() {
 	lfMesh.material = lightMat
 	lfMesh.parent = busRoot
 	lfMesh.position = new Vector3(...LIGHT_FRONT_POSITION)
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	lightFrontMarker = lfMesh as any
 
 	const lblMesh = MeshBuilder.CreateSphere(
@@ -196,6 +199,7 @@ async function init() {
 	lblMesh.material = lightBackMat
 	lblMesh.parent = busRoot
 	lblMesh.position = new Vector3(...LIGHT_BACK_LEFT_POSITION)
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	lightBackLeftMarker = lblMesh as any
 
 	const lbrMesh = MeshBuilder.CreateSphere(
@@ -206,6 +210,7 @@ async function init() {
 	lbrMesh.material = lightBackMat
 	lbrMesh.parent = busRoot
 	lbrMesh.position = new Vector3(...LIGHT_BACK_RIGHT_POSITION)
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	lightBackRightMarker = lbrMesh as any
 
 	// ── Passenger tray visualization ──
@@ -407,26 +412,26 @@ function updateCamera(dt: number) {
 	const rightX = Math.cos(cameraYaw)
 	const rightZ = -Math.sin(cameraYaw)
 
-	if (keys['w'] || keys['arrowup']) {
+	if (keys.w || keys.arrowup) {
 		cameraTarget.x -= fwdX * speed
 		cameraTarget.z -= fwdZ * speed
 	}
-	if (keys['s'] || keys['arrowdown']) {
+	if (keys.s || keys.arrowdown) {
 		cameraTarget.x += fwdX * speed
 		cameraTarget.z += fwdZ * speed
 	}
-	if (keys['a'] || keys['arrowleft']) {
+	if (keys.a || keys.arrowleft) {
 		cameraTarget.x += rightX * speed
 		cameraTarget.z += rightZ * speed
 	}
-	if (keys['d'] || keys['arrowright']) {
+	if (keys.d || keys.arrowright) {
 		cameraTarget.x -= rightX * speed
 		cameraTarget.z -= rightZ * speed
 	}
-	if (keys['q']) {
+	if (keys.q) {
 		cameraTarget.y -= speed
 	}
-	if (keys['e']) {
+	if (keys.e) {
 		cameraTarget.y += speed
 	}
 
@@ -525,6 +530,7 @@ function setupInput(canvas: HTMLCanvasElement) {
 // ── UI ──
 function setupUI() {
 	// Visibility toggles
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	const toggles: [string, () => any][] = [
 		['tog-bus', () => bodyShell],
 		[
@@ -563,17 +569,18 @@ function setupUI() {
 	const wireEl = document.getElementById('tog-wireframe') as HTMLInputElement
 	wireEl?.addEventListener('change', () => {
 		wireframeEnabled = wireEl.checked
-		busRoot.getChildMeshes().forEach((m) => {
+		for (const m of busRoot.getChildMeshes()) {
 			if (m.material && 'wireframe' in m.material) {
 				;(m.material as StandardMaterial).wireframe = wireframeEnabled
 			}
-		})
+		}
 	})
 
 	// Passenger count slider
 	const countSlider = document.getElementById(
 		'passenger-count',
 	) as HTMLInputElement
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const countVal = document.getElementById('passenger-count-val')!
 	countSlider?.addEventListener('input', () => {
 		const count = Number.parseInt(countSlider.value, 10)
@@ -591,6 +598,7 @@ function setupUI() {
 	const wheelSpeedSlider = document.getElementById(
 		'wheel-speed',
 	) as HTMLInputElement
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const wheelSpeedVal = document.getElementById('wheel-speed-val')!
 	wheelSpeedSlider?.addEventListener('input', () => {
 		wheelRollSpeedOverride = Number.parseFloat(wheelSpeedSlider.value)
@@ -615,6 +623,7 @@ function setupUI() {
 
 	// Scoop angle slider
 	const scoopSlider = document.getElementById('scoop-angle') as HTMLInputElement
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const scoopVal = document.getElementById('scoop-angle-val')!
 	scoopSlider?.addEventListener('input', () => {
 		const angle = Number.parseInt(scoopSlider.value, 10)
@@ -755,16 +764,19 @@ function applyPositions() {
 			)
 	}
 	// Light markers
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	;(lightFrontMarker as any).position.set(
 		getNumVal('pos-lf-x'),
 		getNumVal('pos-lf-y'),
 		getNumVal('pos-lf-z'),
 	)
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	;(lightBackLeftMarker as any).position.set(
 		getNumVal('pos-lbl-x'),
 		getNumVal('pos-lbl-y'),
 		getNumVal('pos-lbl-z'),
 	)
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	;(lightBackRightMarker as any).position.set(
 		getNumVal('pos-lbr-x'),
 		getNumVal('pos-lbr-y'),

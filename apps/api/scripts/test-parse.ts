@@ -1,5 +1,5 @@
 import { chromium } from 'playwright'
-import { parseRunnerData, parseRunResults } from '../lib/parsers'
+import { parseRunResults, parseRunnerData } from '../lib/parsers'
 
 const ATHLETE_ID = process.argv[2] || '8070821'
 

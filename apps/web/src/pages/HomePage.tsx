@@ -1,21 +1,21 @@
-import { type Component, Show } from 'solid-js'
 import { A } from '@solidjs/router'
+import { css } from '@style/css'
+import { type Component, Show } from 'solid-js'
+import { LatestResults } from '../components/LatestResults'
+import { Milestones } from '../components/Milestones'
+import { RaceCalendar } from '../components/RaceCalendar'
+import type { CelebrationData } from '../components/ResultCelebrations'
 import { StravaWidget } from '../components/StravaWidget'
 import { DirtBlock } from '../components/ui/DirtBlock'
-import { LatestResults } from '../components/LatestResults'
-import { RaceCalendar } from '../components/RaceCalendar'
-import { Milestones } from '../components/Milestones'
 import { FieldBlock } from '../components/ui/FieldBlock'
 import type {
+	GuestResultItem,
+	RaceItem,
 	RunResultItem,
 	Runner,
-	RaceItem,
 	VolunteerItem,
-	GuestResultItem,
 } from '../utils/api'
-import type { CelebrationData } from '../components/ResultCelebrations'
-import { isDecember, getWrappedBannerYear } from './WrappedPage'
-import { css } from '@style/css'
+import { getWrappedBannerYear, isDecember } from './WrappedPage'
 
 export const HomePage: Component<{
 	resultsLoading: boolean

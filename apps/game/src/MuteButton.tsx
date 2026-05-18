@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { toggleMute, getMuted } from './music'
+import { getMuted, toggleMute } from './music'
 
 export function MuteButton(props: { focused: boolean }) {
 	const [muted, setMuted] = createSignal(getMuted())
@@ -11,6 +11,7 @@ export function MuteButton(props: { focused: boolean }) {
 
 	return (
 		<button
+			type="button"
 			class="mute-btn"
 			classList={{ 'menu-focused': props.focused }}
 			onClick={handleToggle}

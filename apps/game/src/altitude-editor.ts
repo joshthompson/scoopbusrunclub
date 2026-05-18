@@ -13,39 +13,26 @@
  */
 
 import {
-	Engine,
-	Scene,
-	FreeCamera,
-	Vector3,
-	HemisphericLight,
-	DirectionalLight,
 	Color3,
 	Color4,
-	MeshBuilder,
-	StandardMaterial,
+	DirectionalLight,
+	Engine,
+	FreeCamera,
+	HemisphericLight,
+	type LinesMesh,
 	type Mesh,
+	MeshBuilder,
+	PickingInfo,
+	PointerEventTypes,
+	Scene,
+	StandardMaterial,
+	TransformNode,
+	Vector3,
 	VertexBuffer,
 	VertexData,
-	TransformNode,
-	PointerEventTypes,
-	type LinesMesh,
-	PickingInfo,
 } from '@babylonjs/core'
 import earcut from 'earcut'
-import { gpsToLocal, gpsPointToLocal } from './api'
-import { loadLevel, levels } from './levels'
-import type { LevelData } from './levels'
-import {
-	altitudeToLocal,
-	computeTerrainHeightIDW,
-	computeBuildingFootprintData,
-	computeWaterZones,
-	computeRoadPolylines,
-	buildWaterMeshes,
-	getWaterDepressionAt,
-} from './game/systems/terrain'
-import type { LocalAltitudePoint } from './game/systems/terrain'
-import type { WaterZone } from './game/types'
+import { gpsPointToLocal, gpsToLocal } from './api'
 import { createTiledPathGroundMaterial } from './game/PathShaderTiled'
 import {
 	ALTITUDE_EXAGGERATION,
@@ -54,6 +41,19 @@ import {
 } from './game/constants'
 import { buildLevelObjects } from './game/objects/LevelObjects'
 import type { PlacedObjectData } from './game/objects/LevelObjects'
+import {
+	altitudeToLocal,
+	buildWaterMeshes,
+	computeBuildingFootprintData,
+	computeRoadPolylines,
+	computeTerrainHeightIDW,
+	computeWaterZones,
+	getWaterDepressionAt,
+} from './game/systems/terrain'
+import type { LocalAltitudePoint } from './game/systems/terrain'
+import type { WaterZone } from './game/types'
+import { levels, loadLevel } from './levels'
+import type { LevelData } from './levels'
 
 // ── Global state ──
 
@@ -144,6 +144,7 @@ function populateLevelPicker() {
 		initEditor(preselect)
 	}
 }
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 ;(window as any).startEditor = () => {
 	const select = document.getElementById(
 		'level-select',
@@ -180,6 +181,7 @@ function getTerrainHeight(x: number, z: number): number {
 // ── Main init ──
 
 async function initEditor(levelId: string) {
+	// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 	const info = document.getElementById('info')!
 	info.textContent = `Loading ${levelId}…`
 
@@ -283,8 +285,8 @@ async function initEditor(levelId: string) {
 
 	// Center camera on path centroid
 	if (pathPositions.length > 0) {
-		let cx = 0,
-			cz = 0
+		let cx = 0
+		let cz = 0
 		for (const [x, z] of pathPositions) {
 			cx += x
 			cz += z
@@ -599,8 +601,8 @@ function buildBuildingsSimple() {
 		wallMat.specularColor = Color3.Black()
 
 		// Compute centroid + ground Y
-		let cx = 0,
-			cz = 0
+		let cx = 0
+		let cz = 0
 		for (const [x, z] of fp.points) {
 			cx += x
 			cz += z
@@ -798,11 +800,11 @@ function buildManualTrees() {
 		const [wx, wz] = gpsToWorld(lat, lon)
 		const gy = getTerrainHeight(wx, wz)
 
-		const trunk = _trunkTpl!.createInstance(`mtrunk_${i}`)
+		const trunk = _trunkTpl?.createInstance(`mtrunk_${i}`)
 		trunk.position.set(wx, gy + 1.75, wz)
 		trunk.parent = manualTreeRoot
 
-		const crown = _crownTpl!.createInstance(`mcrown_${i}`)
+		const crown = _crownTpl?.createInstance(`mcrown_${i}`)
 		crown.position.set(wx, gy + 5.75, wz)
 		crown.parent = manualTreeRoot
 	})
@@ -843,14 +845,14 @@ function buildGeneratedTrees() {
 		const x = sx + Math.cos(angle) * dist
 		const z = sz + Math.sin(angle) * dist
 
-		const trunk = _trunkTpl!.createInstance(`ptrunk_${placed}`)
+		const trunk = _trunkTpl?.createInstance(`ptrunk_${placed}`)
 		const gy = getTerrainHeight(x, z)
 		const scale = 0.7 + rand() * 0.6
 		trunk.position.set(x, gy + 1.75 * scale, z)
 		trunk.scaling.setAll(scale)
 		trunk.parent = generatedTreeRoot
 
-		const crown = _crownTpl!.createInstance(`pcrown_${placed}`)
+		const crown = _crownTpl?.createInstance(`pcrown_${placed}`)
 		crown.position.set(x, gy + 5.75 * scale, z)
 		crown.scaling.setAll(scale)
 		crown.parent = generatedTreeRoot
@@ -931,6 +933,7 @@ function rebuildTerrain() {
 			if (wireframeVisible && groundMesh) {
 				if (groundWireframe) groundWireframe.dispose()
 				buildGroundWireframe(groundMesh)
+				// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 				groundWireframe!.isVisible = true
 			}
 		})
@@ -966,19 +969,19 @@ function updateCamera(dt: number) {
 	const rightX = Math.cos(cameraYaw)
 	const rightZ = -Math.sin(cameraYaw)
 
-	if (keys['w'] || keys['arrowup']) {
+	if (keys.w || keys.arrowup) {
 		cameraTarget.x -= fwdX * speed
 		cameraTarget.z -= fwdZ * speed
 	}
-	if (keys['s'] || keys['arrowdown']) {
+	if (keys.s || keys.arrowdown) {
 		cameraTarget.x += fwdX * speed
 		cameraTarget.z += fwdZ * speed
 	}
-	if (keys['a'] || keys['arrowleft']) {
+	if (keys.a || keys.arrowleft) {
 		cameraTarget.x += rightX * speed
 		cameraTarget.z += rightZ * speed
 	}
-	if (keys['d'] || keys['arrowright']) {
+	if (keys.d || keys.arrowright) {
 		cameraTarget.x -= rightX * speed
 		cameraTarget.z -= rightZ * speed
 	}
@@ -1199,7 +1202,7 @@ function selectPoint(index: number) {
 	}
 
 	updatePointEditorUI()
-	document.getElementById('point-editor')!.classList.add('visible')
+	document.getElementById('point-editor')?.classList.add('visible')
 }
 
 function deselectPoint() {
@@ -1210,7 +1213,7 @@ function deselectPoint() {
 	selectedPointIndex = null
 	selectedMesh = null
 	updatePointEditorUI()
-	document.getElementById('point-editor')!.classList.remove('visible')
+	document.getElementById('point-editor')?.classList.remove('visible')
 }
 
 function updatePointEditorUI() {
@@ -1223,12 +1226,12 @@ function updatePointEditorUI() {
 		latInput.value = lat.toFixed(6)
 		lonInput.value = lon.toFixed(6)
 		altInput.value = alt.toFixed(2)
-		document.getElementById('point-editor')!.classList.add('visible')
+		document.getElementById('point-editor')?.classList.add('visible')
 	} else {
 		latInput.value = ''
 		lonInput.value = ''
 		altInput.value = ''
-		document.getElementById('point-editor')!.classList.remove('visible')
+		document.getElementById('point-editor')?.classList.remove('visible')
 	}
 	;(document.getElementById('stats') as HTMLElement).textContent =
 		`Level: ${level.name}\nPoints: ${altitudeData.length}\nScale: ${scaleFactor.toFixed(2)}`
@@ -1269,6 +1272,7 @@ function doRemesh() {
 			if (wireframeVisible && groundMesh) {
 				if (groundWireframe) groundWireframe.dispose()
 				buildGroundWireframe(groundMesh)
+				// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 				groundWireframe!.isVisible = true
 			}
 		})
@@ -1285,6 +1289,7 @@ function doRemesh() {
 	}
 }
 // Expose for the sidebar button
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 ;(window as any).doRemesh = () => doRemesh()
 
 function rebuildTerrainKeepSelection() {
@@ -1338,7 +1343,7 @@ function setupPointEditor() {
 		const lat = Number.parseFloat(latInput.value)
 		const lon = Number.parseFloat(lonInput.value)
 		const alt = Number.parseFloat(altInput.value)
-		if (isNaN(lat) || isNaN(lon) || isNaN(alt)) return
+		if (Number.isNaN(lat) || Number.isNaN(lon) || Number.isNaN(alt)) return
 
 		altitudeData[selectedPointIndex] = [lat, lon, alt]
 		rebuildTerrainKeepSelection()
@@ -1349,7 +1354,7 @@ function setupPointEditor() {
 	altInput.addEventListener('change', applyField)
 
 	// Delete point
-	document.getElementById('btn-delete-point')!.addEventListener('click', () => {
+	document.getElementById('btn-delete-point')?.addEventListener('click', () => {
 		if (selectedPointIndex === null) return
 		altitudeData.splice(selectedPointIndex, 1)
 		deselectPoint()
@@ -1361,16 +1366,17 @@ function setupPointEditor() {
 
 function formatAltitudeTs(data: [number, number, number][]): string {
 	const importLine = `import type { LevelData } from '../types';`
-	const items = data.map((item) => '  ' + JSON.stringify(item))
-	const dataStr = '[\n' + items.join(',\n') + ',\n]'
+	const items = data.map((item) => `  ${JSON.stringify(item)}`)
+	const dataStr = `[\n${items.join(',\n')},\n]`
 	return `${importLine}\n\nexport default ${dataStr} satisfies LevelData['altitude'];\n`
 }
 
 function setupExport() {
-	document.getElementById('btn-export')!.addEventListener('click', async () => {
+	document.getElementById('btn-export')?.addEventListener('click', async () => {
 		const tsContent = formatAltitudeTs(altitudeData)
 		try {
 			await navigator.clipboard.writeText(tsContent)
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			const btn = document.getElementById('btn-export')!
 			const orig = btn.textContent
 			btn.textContent = 'Copied!'

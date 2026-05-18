@@ -6,7 +6,7 @@
  * Usage: node apps/web/scripts/gen-map.mjs
  */
 
-import https from 'https'
+import https from 'node:https'
 
 // ── Config ──────────────────────────────────────────────────────────────────────
 
@@ -54,7 +54,9 @@ function httpGet(url) {
 				if (res.statusCode !== 200)
 					return reject(new Error(`HTTP ${res.statusCode}`))
 				let data = ''
-				res.on('data', (chunk) => (data += chunk))
+				res.on('data', (chunk) => {
+					data += chunk
+				})
 				res.on('end', () => resolve(data))
 			})
 			.on('error', reject)
@@ -71,8 +73,8 @@ function decodeArcs(topology) {
 	const ty = tf ? tf.translate[1] : 0
 
 	return topology.arcs.map((arc) => {
-		let x = 0,
-			y = 0
+		let x = 0
+		let y = 0
 		return arc.map(([dx, dy]) => {
 			x += dx
 			y += dy
@@ -209,8 +211,8 @@ async function main() {
 
 	// ── Manual touch-ups for tiny countries / islands missing at 110m ─────────
 	// Singapore
-	const sgC = Math.floor((103.8 + 180) / 2),
-		sgR = Math.floor((90 - 1.3) / 2)
+	const sgC = Math.floor((103.8 + 180) / 2)
+	const sgR = Math.floor((90 - 1.3) / 2)
 	grid[sgR][sgC] = 1
 	countryGrid[sgR][sgC] = 'SG'
 
@@ -220,8 +222,8 @@ async function main() {
 		[81, 7],
 		[80, 9],
 	]) {
-		const cc = Math.floor((lon + 180) / 2),
-			rr = Math.floor((90 - lat) / 2)
+		const cc = Math.floor((lon + 180) / 2)
+		const rr = Math.floor((90 - lat) / 2)
 		grid[rr][cc] = 1
 	}
 
@@ -230,8 +232,8 @@ async function main() {
 		[121, 24],
 		[121, 23],
 	]) {
-		const cc = Math.floor((lon + 180) / 2),
-			rr = Math.floor((90 - lat) / 2)
+		const cc = Math.floor((lon + 180) / 2)
+		const rr = Math.floor((90 - lat) / 2)
 		grid[rr][cc] = 1
 	}
 

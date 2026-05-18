@@ -9,10 +9,22 @@ import {
 } from '@babylonjs/core'
 import { gpsPointToLocal } from '../../api'
 import type { LevelData } from '../../levels'
-import { createKmSign } from '../objects/KmSign'
-import { createMarshalModel, poseCheering } from '../objects/MarshalModel'
+import type { PathTypeSegment } from '../PathShader'
+import {
+	CONE_SPACING,
+	GATE_RADIUS,
+	GATE_SPACING,
+	PATH_HALF_WIDTH,
+	START_CIRCLE_RADIUS,
+	TREE_COUNT,
+	TREE_HEIGHT_SCALE,
+	TREE_MIN_DIST_FROM_PATH,
+	TREE_SPREAD,
+} from '../constants'
 import { createCopperTent } from '../objects/CopperTent'
 import { createHagaGate } from '../objects/HagaGate'
+import { createKmSign } from '../objects/KmSign'
+import { createMarshalModel, poseCheering } from '../objects/MarshalModel'
 import { createParkrunSign } from '../objects/ParkrunSign'
 import type { Marshal, Runner } from '../types'
 import type {
@@ -21,20 +33,8 @@ import type {
 	ElasticObject,
 	SolidObstacle,
 } from '../types'
-import type { PathTypeSegment } from '../PathShader'
-import {
-	PATH_HALF_WIDTH,
-	START_CIRCLE_RADIUS,
-	TREE_COUNT,
-	TREE_HEIGHT_SCALE,
-	TREE_MIN_DIST_FROM_PATH,
-	TREE_SPREAD,
-	GATE_SPACING,
-	GATE_RADIUS,
-	CONE_SPACING,
-} from '../constants'
-import { mulberry32, distToPath, isInWaterZone } from './terrain'
 import type { WaterZone } from '../types'
+import { distToPath, isInWaterZone, mulberry32 } from './terrain'
 
 // ---------- Result types for methods that create physics objects ----------
 
@@ -954,9 +954,9 @@ export function buildStartLineObjects(
 // ---------- Elastic object physics ----------
 
 import {
-	ELASTIC_SPRING_K,
 	ELASTIC_DAMPING,
 	ELASTIC_MAX_TILT,
+	ELASTIC_SPRING_K,
 } from '../constants'
 
 export function updateElasticObjects(

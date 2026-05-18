@@ -9,13 +9,13 @@
  * Forward direction is +Z (beak faces +Z).
  */
 import {
-	type Scene,
-	Vector3,
-	MeshBuilder,
-	StandardMaterial,
 	Color3,
 	Mesh,
+	MeshBuilder,
+	type Scene,
+	StandardMaterial,
 	TransformNode,
+	Vector3,
 } from '@babylonjs/core'
 
 // ── Canada Goose colour palette ────────────────────────────

@@ -1,15 +1,15 @@
-import { css, cva, cx } from '@style/css'
-import type { JSX } from 'solid-js/jsx-runtime'
-import topLeft from '@/assets/dirt-block/top-left.png'
-import top from '@/assets/dirt-block/top.png'
-import topRight from '@/assets/dirt-block/top-right.png'
 import bottomLeft from '@/assets/dirt-block/bottom-left.png'
-import bottom from '@/assets/dirt-block/bottom.png'
 import bottomRight from '@/assets/dirt-block/bottom-right.png'
+import bottom from '@/assets/dirt-block/bottom.png'
 import center from '@/assets/dirt-block/center.png'
 import left from '@/assets/dirt-block/left.png'
 import right from '@/assets/dirt-block/right.png'
+import topLeft from '@/assets/dirt-block/top-left.png'
+import topRight from '@/assets/dirt-block/top-right.png'
+import top from '@/assets/dirt-block/top.png'
+import { css, cva, cx } from '@style/css'
 import { Show } from 'solid-js'
+import type { JSX } from 'solid-js/jsx-runtime'
 import { type SignType, TitleSign } from './TitleSign'
 
 export function DirtBlock(props: {
@@ -21,6 +21,7 @@ export function DirtBlock(props: {
 	return (
 		<div class={cx(styles.dirtBlock, props.class)}>
 			<Show when={props.title}>
+				{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 				<TitleSign title={props.title!} type={props.signType} />
 			</Show>
 			<div class={styles.top} style={{ 'background-image': `url(${top})` }} />

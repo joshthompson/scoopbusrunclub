@@ -1,13 +1,13 @@
-import type { Component } from 'solid-js'
-import { AuthGuard } from '@/components/admin/AuthGuard'
 import { AdminLayout } from '@/components/admin/AdminLayout'
-import { EventsPage } from './admin/EventsPage'
-import { ScanPage } from './admin/ScanPage'
-import { UsersPage } from './admin/UsersPage'
+import { AuthGuard } from '@/components/admin/AuthGuard'
+import type { Component } from 'solid-js'
 import { AccountPage } from './admin/AccountPage'
 import { EventLogsPage } from './admin/EventLogsPage'
-import { RunnersPage } from './admin/RunnersPage'
+import { EventsPage } from './admin/EventsPage'
 import { ParkrunsPage } from './admin/ParkrunsPage'
+import { RunnersPage } from './admin/RunnersPage'
+import { ScanPage } from './admin/ScanPage'
+import { UsersPage } from './admin/UsersPage'
 
 export const AdminPage: Component = () => {
 	return (

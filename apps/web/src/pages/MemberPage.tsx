@@ -1,28 +1,28 @@
-import { css } from '@style/css'
-import { createMemo, createSignal, For, Show } from 'solid-js'
-import { A, useParams } from '@solidjs/router'
-import { DirtBlock } from '../components/ui/DirtBlock'
-import { type RunnerName, runners as runnerSignals } from '@/data/runners'
-import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
-import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
-import {
-	buildCelebrationData,
-	CelebrationPill,
-	getCelebrationTags,
-	getVolunteerCelebrationTags,
-	type CelebrationData,
-	getOrBuildCelebrationData,
-} from '../components/ResultCelebrations'
-import { getMemberRoute, getRunnerKeyFromRouteName } from '@/utils/memberRoute'
-import { CharacterImage } from '@/components/CharacterImage'
-import { FieldBlock } from '@/components/ui/FieldBlock'
-import { RunnerSummaryStat } from './RunnerSummaryStat'
-import { NotFoundPage } from './NotFoundPage'
-import { BackSignButton } from '@/components/BackSignButton'
-import rock1Asset from '@/assets/misc/rock1.png'
 import graphIcon from '@/assets/misc/graph-icon.png'
-import { Icon } from '@/components/ui/Icon'
+import rock1Asset from '@/assets/misc/rock1.png'
+import { BackSignButton } from '@/components/BackSignButton'
+import { CharacterImage } from '@/components/CharacterImage'
 import { ParkrunHeatmap } from '@/components/ParkrunHeatmap'
+import { FieldBlock } from '@/components/ui/FieldBlock'
+import { Icon } from '@/components/ui/Icon'
+import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { getMemberRoute, getRunnerKeyFromRouteName } from '@/utils/memberRoute'
+import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
+import { A, useParams } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show, createMemo, createSignal } from 'solid-js'
+import {
+	type CelebrationData,
+	CelebrationPill,
+	buildCelebrationData,
+	getCelebrationTags,
+	getOrBuildCelebrationData,
+	getVolunteerCelebrationTags,
+} from '../components/ResultCelebrations'
+import { DirtBlock } from '../components/ui/DirtBlock'
+import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
+import { NotFoundPage } from './NotFoundPage'
+import { RunnerSummaryStat } from './RunnerSummaryStat'
 
 interface MemberPageProps {
 	results: RunResultItem[]
@@ -194,7 +194,7 @@ export function MemberPage(props: MemberPageProps) {
 		for (const result of props.results) {
 			const eventKey = `${result.date}:${result.event}:${result.eventNumber}`
 			if (!map.has(eventKey)) map.set(eventKey, [])
-			map.get(eventKey)!.push(result)
+			map.get(eventKey)?.push(result)
 		}
 		return map
 	})
@@ -419,8 +419,12 @@ export function MemberPage(props: MemberPageProps) {
 				<div class={styles.container}>
 					<FieldBlock title={name()} signType="purple">
 						<A href="./graph" class={styles.rockButton}>
-							<img src={rock1Asset} width={59} />
-							<img src={graphIcon} class={styles.rockButtonIcon} />
+							<img src={rock1Asset} width={59} alt="" />
+							<img
+								src={graphIcon}
+								class={styles.rockButtonIcon}
+								alt="View graph"
+							/>
 							<span class={styles.rockButtonText}>View graph</span>
 						</A>
 

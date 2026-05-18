@@ -1,8 +1,8 @@
-import { type Component, type JSX, onCleanup, onMount, Show } from 'solid-js'
 import { A, useLocation, useNavigate } from '@solidjs/router'
 import { css, cva, cx } from '@style/css'
-import { useAuth } from './AuthGuard'
+import { type Component, type JSX, Show, onCleanup, onMount } from 'solid-js'
 import { AdminAvatar } from './AdminAvatar'
+import { useAuth } from './AuthGuard'
 
 export const AdminLayout: Component<{
 	children: JSX.Element
@@ -103,6 +103,7 @@ export const AdminLayout: Component<{
 					</div>
 					<div class={styles.navRight}>
 						<button
+							type="button"
 							class={styles.toolbarOutlineBtn}
 							onClick={() => navigate('/admin/account')}
 						>
@@ -110,12 +111,14 @@ export const AdminLayout: Component<{
 							{auth.username()}
 						</button>
 						<button
+							type="button"
 							class={styles.toolbarOutlineBtn}
 							onClick={() => auth.logout()}
 						>
 							Logout
 						</button>
 						<button
+							type="button"
 							class={styles.toolbarOutlineBtn}
 							onClick={() => window.open('/', '_blank')}
 						>

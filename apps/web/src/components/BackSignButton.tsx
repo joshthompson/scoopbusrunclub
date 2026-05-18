@@ -11,6 +11,7 @@ export function BackSignButton(props: {
 
 	return (
 		<button
+			type="button"
 			class={cx(styles.button, props.class)}
 			onClick={() => navigate(props.to ?? '/')}
 		>

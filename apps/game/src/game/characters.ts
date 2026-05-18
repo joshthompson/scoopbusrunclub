@@ -64,6 +64,7 @@ export interface RunnerPresetBase {
 export function isCorgiPreset(
 	preset: RunnerPreset,
 ): preset is RunnerPresetBase & { corgi: true } {
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	return 'corgi' in preset && (preset as any).corgi === true
 }
 
@@ -439,6 +440,7 @@ export function generateRandomBusColor(): BusColorOption {
 	const scoopHue = (hue + 120 + Math.floor(Math.random() * 120)) % 360
 	// Convert HSL to hex for the 3D model
 	const toHex = (h: number, s: number, l: number) => {
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const c = document.createElement('canvas').getContext('2d')!
 		c.fillStyle = `hsl(${h}, ${s}%, ${l}%)`
 		return c.fillStyle // returns '#rrggbb'

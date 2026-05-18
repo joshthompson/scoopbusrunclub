@@ -1,8 +1,8 @@
-import type { GameMode } from '../types'
 import {
 	PASSENGER_TRAY_POSITION,
 	PASSENGER_TRAY_SIZE,
 } from '../objects/BusModel'
+import type { GameMode } from '../types'
 
 export const MODE: GameMode = 'SCOOP_THEN_RIDE'
 

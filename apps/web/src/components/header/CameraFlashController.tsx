@@ -1,6 +1,6 @@
-import { createSignal } from 'solid-js'
-import { createController } from '@/engine'
 import flashAsset from '@/assets/misc/flash.png'
+import { createController } from '@/engine'
+import { createSignal } from 'solid-js'
 
 const FLASH_DURATION = 12 // frames (~480ms at 40ms/frame)
 const FLASH_SIZE = 100

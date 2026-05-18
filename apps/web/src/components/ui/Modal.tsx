@@ -1,6 +1,6 @@
-import type { JSX } from 'solid-js'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { css } from '@style/css/css'
+import type { JSX } from 'solid-js'
 
 export function Modal(props: {
 	title: string
@@ -13,6 +13,7 @@ export function Modal(props: {
 		<div
 			class={styles.overlay}
 			onClick={(e) => e.target === e.currentTarget && props.onClose?.()}
+			onKeyDown={(e) => e.key === 'Escape' && props.onClose?.()}
 		>
 			<div class={styles.modal} style={{ 'max-width': maxWidth() }}>
 				<DirtBlock title={props.title}>

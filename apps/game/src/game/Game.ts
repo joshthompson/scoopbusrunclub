@@ -1,94 +1,88 @@
 import {
-	Engine,
-	Scene,
-	FreeCamera,
-	Vector3,
-	HemisphericLight,
-	DirectionalLight,
-	SpotLight,
 	Color3,
 	Color4,
-	Quaternion,
-	MeshBuilder,
-	StandardMaterial,
-	ShaderMaterial,
+	Constants,
+	DirectionalLight,
+	DynamicTexture,
+	Effect,
+	Engine,
+	FreeCamera,
+	type GroundMesh,
+	HemisphericLight,
 	Mesh,
+	MeshBuilder,
+	ParticleSystem,
+	Quaternion,
+	RenderTargetTexture,
+	Scene,
+	SceneLoader,
+	ShaderMaterial,
+	SpotLight,
+	StandardMaterial,
+	TransformNode,
+	Vector3,
 	VertexBuffer,
 	VertexData,
-	TransformNode,
-	type GroundMesh,
-	ParticleSystem,
-	SceneLoader,
-	DynamicTexture,
 	Viewport,
-	Effect,
-	RenderTargetTexture,
-	Constants,
 } from '@babylonjs/core'
 import '@babylonjs/loaders/glTF'
-import arrowModelUrl from '../assets/models/arrow.glb?url'
-import { gpsToLocal, gpsPointToLocal, parsePathTypeSegments } from '../api'
-import { Minimap } from './Minimap'
 import { COURSE_OVERRIDES, buildCourseIndices } from '@shared/course-overrides'
+import { gpsPointToLocal, gpsToLocal, parsePathTypeSegments } from '../api'
+import arrowModelUrl from '../assets/models/arrow.glb?url'
 import { loadLevel } from '../levels'
 import type { LevelData } from '../levels'
 import type { ItemCollectEvent, PlayerState } from '../multiplayer'
 import { MAX_PLAYERS } from '../multiplayer'
-import type { GameType } from './modes/types'
-import {
-	createBusModel,
-	tintBusModel,
-	busColorPaletteFromOption,
-	PLAYER_COLORS,
-	WHEEL_ROLL_SPEED,
-	LIGHT_FRONT_POSITION,
-	SCOOP_POSITION,
-	SCOOP_WIDTH,
-} from './objects/BusModel'
-import type { BusColorPalette } from './objects/BusModel'
-import type { CharacterSelection, RunnerAppearance } from './characters'
-import {
-	resolveBusColor,
-	resolveRunnerAppearance,
-	isCorgiRunnerId,
-	resolveColor,
-	hexToColor3,
-} from './characters'
-import { createSky } from './objects/Sky'
+import { Minimap } from './Minimap'
 import type { IcePatchOverlay, PathTypeSegment } from './PathShader'
 import { createTiledPathGroundMaterial } from './PathShaderTiled'
+import type { CharacterSelection, RunnerAppearance } from './characters'
 import {
-	createRunnerModel,
-	poseStanding,
-	poseRunning,
-} from './objects/RunnerModel'
-import { createCorgiModel } from './objects/CorgiModel'
-import type { RunnerModelResult } from './objects/RunnerModel'
+	hexToColor3,
+	isCorgiRunnerId,
+	resolveBusColor,
+	resolveColor,
+	resolveRunnerAppearance,
+} from './characters'
 import {
 	ALTITUDE_EXAGGERATION,
 	BUS_ACCELERATION,
+	BUS_AIRBORNE_COLLISION_CLEARANCE,
+	BUS_AIRBORNE_PITCH_LERP,
 	BUS_BRAKE,
+	BUS_CLIFF_SEPARATION_THRESHOLD,
 	BUS_COLLISION_RADIUS,
 	BUS_DOWNHILL_ACCEL_BOOST,
 	BUS_DOWNHILL_SLOPE_THRESHOLD,
 	BUS_FRICTION,
 	BUS_GRAVITY,
+	BUS_HEADLIGHT_ANGLE,
+	BUS_HEADLIGHT_COLOR_B,
+	BUS_HEADLIGHT_COLOR_G,
+	BUS_HEADLIGHT_COLOR_R,
+	BUS_HEADLIGHT_EXPONENT,
+	BUS_HEADLIGHT_INTENSITY,
+	BUS_HEADLIGHT_RANGE,
 	BUS_JUMP_PITCH_THRESHOLD,
-	BUS_CLIFF_SEPARATION_THRESHOLD,
+	BUS_LANDING_IMPACT_MAX_PENALTY,
+	BUS_LANDING_IMPACT_SPEED_PENALTY,
 	BUS_LAUNCH_VEL_CAP,
 	BUS_LAUNCH_VEL_MIN,
-	BUS_LANDING_IMPACT_SPEED_PENALTY,
-	BUS_LANDING_IMPACT_MAX_PENALTY,
-	BUS_AIRBORNE_PITCH_LERP,
-	BUS_UPHILL_DRAG,
-	BUS_AIRBORNE_COLLISION_CLEARANCE,
 	BUS_MAX_SPEED,
+	BUS_REVERSE_LIGHT_ANGLE,
+	BUS_REVERSE_LIGHT_COLOR_B,
+	BUS_REVERSE_LIGHT_COLOR_G,
+	BUS_REVERSE_LIGHT_COLOR_R,
+	BUS_REVERSE_LIGHT_EXPONENT,
+	BUS_REVERSE_LIGHT_INTENSITY,
+	BUS_REVERSE_LIGHT_RANGE,
 	BUS_ROOF_Y,
 	BUS_START_OFFSET,
-	CAMERA_FOV_BUS,
-	CAMERA_FOV_RUNNER,
 	BUS_TURN_SPEED,
 	BUS_TURN_SPEED_STANDSTILL,
+	BUS_UPHILL_DRAG,
+	CAMERA_FOV_BUS,
+	CAMERA_FOV_RUNNER,
 	COUNTDOWN_DURATION,
 	COURSE_TARGET_LENGTH,
 	DRIFT_GRIP,
@@ -97,41 +91,31 @@ import {
 	ENGINE_VIBE_AMPLITUDE,
 	ENGINE_VIBE_FREQUENCY,
 	GRAVITY,
+	HIGH_FIVE_DURATION,
+	LIGHT_DAY_HEMI_GROUND_B,
+	LIGHT_DAY_HEMI_GROUND_G,
+	LIGHT_DAY_HEMI_GROUND_R,
+	LIGHT_DAY_HEMI_INTENSITY,
+	LIGHT_DAY_SUN_DIR_X,
+	LIGHT_DAY_SUN_DIR_Y,
+	LIGHT_DAY_SUN_DIR_Z,
+	LIGHT_DAY_SUN_INTENSITY,
+	LIGHT_NIGHT_HEMI_DIFFUSE_B,
+	LIGHT_NIGHT_HEMI_DIFFUSE_G,
+	LIGHT_NIGHT_HEMI_DIFFUSE_R,
+	LIGHT_NIGHT_HEMI_GROUND_B,
+	LIGHT_NIGHT_HEMI_GROUND_G,
+	LIGHT_NIGHT_HEMI_GROUND_R,
+	LIGHT_NIGHT_HEMI_INTENSITY,
+	LIGHT_NIGHT_SUN_DIFFUSE_B,
+	LIGHT_NIGHT_SUN_DIFFUSE_G,
+	LIGHT_NIGHT_SUN_DIFFUSE_R,
+	LIGHT_NIGHT_SUN_DIR_X,
+	LIGHT_NIGHT_SUN_DIR_Y,
+	LIGHT_NIGHT_SUN_DIR_Z,
+	LIGHT_NIGHT_SUN_INTENSITY,
 	MODE,
 	PATH_HALF_WIDTH,
-	RENDER_PATH_MASK_RESOLUTION,
-	RENDER_OBJECTS_MAX_DISTANCE,
-	RENDER_TREES_MAX_DISTANCE,
-	TREE_COUNT,
-	RUNNER_COLLISION_RADIUS,
-	RUNNER_DOWNHILL_SLOPE_THRESHOLD,
-	RUNNER_DOWNHILL_SPEED_BOOST,
-	RUNNER_PLAYER_ACCELERATION,
-	RUNNER_PLAYER_DECELERATION,
-	RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
-	RUNNER_PLAYER_MAX_JUMPS,
-	RUNNER_PLAYER_SPEED,
-	REVERSE_SPEED_MULTIPLIER,
-	RUNNER_PLAYER_TURN_SPEED,
-	RUNNER_JUMP_HEIGHT,
-	RUNNER_SIT_DURATION,
-	SCOOP_ANIM_DURATION,
-	SCOOP_BOOST_ACCELERATION,
-	SCOOP_BOOST_DURATION,
-	SCOOP_BOOST_EASE_DURATION,
-	SCOOP_BOOST_MULTIPLIER,
-	SCOOP_DISTANCE,
-	SCOOP_FORWARD_FACTOR,
-	SCOOP_MIN_UP,
-	SCOOP_UP_FACTOR,
-	START_CIRCLE_RADIUS,
-	WATER_BOB_AMPLITUDE,
-	WATER_BOB_SPEED,
-	WATER_DRIFT_GRIP,
-	WATER_SINK,
-	RUNNER_WATER_SINK,
-	WAVE_DURATION,
-	HIGH_FIVE_DURATION,
 	POWER_UP_FIKA_ANIM_SPEED_MULTIPLIER,
 	POWER_UP_FIKA_DURATION_SECONDS,
 	POWER_UP_FIKA_SCALE_MULTIPLIER,
@@ -144,199 +128,215 @@ import {
 	POWER_UP_ICE_RADIUS_METRES,
 	POWER_UP_SHOE_DURATION_SECONDS,
 	POWER_UP_SHOE_SPEED_MULTIPLIER,
-	LIGHT_DAY_HEMI_INTENSITY,
-	LIGHT_DAY_HEMI_GROUND_R,
-	LIGHT_DAY_HEMI_GROUND_G,
-	LIGHT_DAY_HEMI_GROUND_B,
-	LIGHT_DAY_SUN_INTENSITY,
-	LIGHT_DAY_SUN_DIR_X,
-	LIGHT_DAY_SUN_DIR_Y,
-	LIGHT_DAY_SUN_DIR_Z,
-	LIGHT_NIGHT_HEMI_INTENSITY,
-	LIGHT_NIGHT_HEMI_DIFFUSE_R,
-	LIGHT_NIGHT_HEMI_DIFFUSE_G,
-	LIGHT_NIGHT_HEMI_DIFFUSE_B,
-	LIGHT_NIGHT_HEMI_GROUND_R,
-	LIGHT_NIGHT_HEMI_GROUND_G,
-	LIGHT_NIGHT_HEMI_GROUND_B,
-	LIGHT_NIGHT_SUN_INTENSITY,
-	LIGHT_NIGHT_SUN_DIR_X,
-	LIGHT_NIGHT_SUN_DIR_Y,
-	LIGHT_NIGHT_SUN_DIR_Z,
-	LIGHT_NIGHT_SUN_DIFFUSE_R,
-	LIGHT_NIGHT_SUN_DIFFUSE_G,
-	LIGHT_NIGHT_SUN_DIFFUSE_B,
-	BUS_HEADLIGHT_INTENSITY,
-	BUS_HEADLIGHT_RANGE,
-	BUS_HEADLIGHT_ANGLE,
-	BUS_HEADLIGHT_EXPONENT,
-	BUS_HEADLIGHT_COLOR_R,
-	BUS_HEADLIGHT_COLOR_G,
-	BUS_HEADLIGHT_COLOR_B,
-	BUS_REVERSE_LIGHT_INTENSITY,
-	BUS_REVERSE_LIGHT_RANGE,
-	BUS_REVERSE_LIGHT_ANGLE,
-	BUS_REVERSE_LIGHT_EXPONENT,
-	BUS_REVERSE_LIGHT_COLOR_R,
-	BUS_REVERSE_LIGHT_COLOR_G,
-	BUS_REVERSE_LIGHT_COLOR_B,
+	RENDER_OBJECTS_MAX_DISTANCE,
+	RENDER_PATH_MASK_RESOLUTION,
+	RENDER_TREES_MAX_DISTANCE,
+	REVERSE_SPEED_MULTIPLIER,
+	RUNNER_COLLISION_RADIUS,
+	RUNNER_DOWNHILL_SLOPE_THRESHOLD,
+	RUNNER_DOWNHILL_SPEED_BOOST,
+	RUNNER_JUMP_HEIGHT,
+	RUNNER_PLAYER_ACCELERATION,
+	RUNNER_PLAYER_DECELERATION,
+	RUNNER_PLAYER_JUMP_SIDE_VELOCITY,
+	RUNNER_PLAYER_MAX_JUMPS,
+	RUNNER_PLAYER_SPEED,
+	RUNNER_PLAYER_TURN_SPEED,
+	RUNNER_SIT_DURATION,
+	RUNNER_WATER_SINK,
+	SCOOP_ANIM_DURATION,
+	SCOOP_BOOST_ACCELERATION,
+	SCOOP_BOOST_DURATION,
+	SCOOP_BOOST_EASE_DURATION,
+	SCOOP_BOOST_MULTIPLIER,
+	SCOOP_DISTANCE,
+	SCOOP_FORWARD_FACTOR,
+	SCOOP_MIN_UP,
+	SCOOP_UP_FACTOR,
+	START_CIRCLE_RADIUS,
+	TREE_COUNT,
+	WATER_BOB_AMPLITUDE,
+	WATER_BOB_SPEED,
+	WATER_DRIFT_GRIP,
+	WATER_SINK,
+	WAVE_DURATION,
 } from './constants'
-import type {
-	BridgeCollider,
-	BuildingCollider,
-	BuildingFootprint,
-	ElasticObject,
-	GameCallbacks,
-	Goose,
-	Swan,
-	Deer,
-	InitSceneOptions,
-	Marshal,
-	RaceState,
-	RemotePlayersMap,
-	Runner,
-	SolidObstacle,
-	WaterZone,
-} from './types'
-import { buildMinimapPlayers } from './systems/minimap'
+import type { GameType } from './modes/types'
+import {
+	LIGHT_FRONT_POSITION,
+	PLAYER_COLORS,
+	SCOOP_POSITION,
+	SCOOP_WIDTH,
+	WHEEL_ROLL_SPEED,
+	busColorPaletteFromOption,
+	createBusModel,
+	tintBusModel,
+} from './objects/BusModel'
+import type { BusColorPalette } from './objects/BusModel'
+import { createCorgiModel } from './objects/CorgiModel'
+import {
+	createRunnerModel,
+	poseRunning,
+	poseStanding,
+} from './objects/RunnerModel'
+import type { RunnerModelResult } from './objects/RunnerModel'
+import { createSky } from './objects/Sky'
+import {
+	type BusCollisionState,
+	type RemoteBusNudge,
+	type RemoteBusSnapshot,
+	applyBusYawRate,
+	resolveBusToBusCollisions,
+} from './systems/busCollision'
 import {
 	updateChaseCameraSystem,
 	updateCountdownCameraSystem,
 	updateDemoCameraSystem,
 	updateRunnerCameraSystem,
 } from './systems/camera'
+import { buildMinimapPlayers } from './systems/minimap'
 import { updateRemotePlayersSystem } from './systems/remotePlayers'
-import { computeViewCenterXZ } from './systems/viewCenter'
 import {
-	resolveBusToBusCollisions,
-	applyBusYawRate,
-	type BusCollisionState,
-	type RemoteBusSnapshot,
-	type RemoteBusNudge,
-} from './systems/busCollision'
-import {
+	altitudeToLocal,
+	buildWaterMeshes,
+	computeBuildingFootprintData,
+	computeRoadPolylines,
 	computeTerrainHeight,
 	computeTerrainHeightIDW,
-	altitudeToLocal,
 	computeWaterZones,
-	buildWaterMeshes,
-	computeRoadPolylines,
-	computeBuildingFootprintData,
-	isInWaterZone,
-	getWaterSurfaceYAt,
-	getWaterDepressionAt,
 	distToPath,
+	getWaterDepressionAt,
+	getWaterSurfaceYAt,
+	isInWaterZone,
 	pointInPolygon,
 } from './systems/terrain'
 import type { LocalAltitudePoint } from './systems/terrain'
+import { computeViewCenterXZ } from './systems/viewCenter'
+import type {
+	BridgeCollider,
+	BuildingCollider,
+	BuildingFootprint,
+	Deer,
+	ElasticObject,
+	GameCallbacks,
+	Goose,
+	InitSceneOptions,
+	Marshal,
+	RaceState,
+	RemotePlayersMap,
+	Runner,
+	SolidObstacle,
+	Swan,
+	WaterZone,
+} from './types'
 
 import {
-	buildBuildingMeshes,
-	resolvePositionAgainstBuildings,
-	updateBuildingLod,
-	type BuildingLodEntry,
-} from './systems/buildings'
-import {
-	buildBridgeMeshes,
-	resolvePositionAgainstBridges,
-	getBridgeDeckY,
-	type BridgeMeshEntry,
-} from './systems/bridges'
-import {
-	createExhaustFlames,
-	createExhaustFlamesForBus,
-	createWaterWake,
-	setWaterWakeActive,
-	updateWakeIntensity,
-	createDirtSpray,
-	setDirtSprayActive,
-	updateDirtSprayIntensity,
-} from './systems/busEffects'
-import {
-	createBoostEffects,
-	type BoostEffectsInstance,
-} from './systems/boostEffects'
-import {
-	spawnRunners as spawnRunnersSystem,
-	updateRunnersSystem,
-	buildLocalRunner as buildLocalRunnerFn,
-	updateLocalRunnerVisual as updateLocalRunnerVisualFn,
-	packRemoteRiders,
-	assignRoofSeat,
-} from './systems/runners'
-import {
-	updateRunnerInteractions,
-	type PlayerRunnerState,
-} from './systems/runnerInteractions'
-import { poseWaving, poseHighFive } from './objects/RunnerModel'
-import {
-	buildTrees,
-	placeGrassPathCones,
-	placeKmSigns,
-	buildGates as buildGatesSystem,
-	checkGatePass,
-	spawnMarshals as spawnMarshalsSystem,
-	updateMarshals,
-	placeEventLandmarks as placeEventLandmarksSystem,
-	buildStartLineObjects,
-	updateElasticObjects,
-	type GatePosition,
-} from './systems/environment'
-import {
+	DEFAULT_FENCE_DISTANCE,
+	type FenceCollider,
 	buildFenceMesh,
 	generateFencePolygon,
 	minBoundingCircle,
 	resolvePositionAgainstFence,
-	DEFAULT_FENCE_DISTANCE,
-	type FenceCollider,
 } from './objects/Fence'
 import {
-	buildLevelObjects,
 	type PlacedObjectData,
+	buildLevelObjects,
 } from './objects/LevelObjects'
+import { poseHighFive, poseWaving } from './objects/RunnerModel'
 import {
-	spawnGeese,
-	updateGeeseSystem,
-	type GooseSpawnPoint,
-} from './systems/geese'
+	type BoostEffectsInstance,
+	createBoostEffects,
+} from './systems/boostEffects'
 import {
-	spawnSwans,
-	updateSwansSystem,
-	type SwanSpawnPoint,
-} from './systems/swans'
+	type BridgeMeshEntry,
+	buildBridgeMeshes,
+	getBridgeDeckY,
+	resolvePositionAgainstBridges,
+} from './systems/bridges'
 import {
+	type BuildingLodEntry,
+	buildBuildingMeshes,
+	resolvePositionAgainstBuildings,
+	updateBuildingLod,
+} from './systems/buildings'
+import {
+	createDirtSpray,
+	createExhaustFlames,
+	createExhaustFlamesForBus,
+	createWaterWake,
+	setDirtSprayActive,
+	setWaterWakeActive,
+	updateDirtSprayIntensity,
+	updateWakeIntensity,
+} from './systems/busEffects'
+import {
+	type DeerSpawnPoint,
 	spawnDeer,
 	updateDeerSystem,
-	type DeerSpawnPoint,
 } from './systems/deer'
 import {
-	updateGameSounds,
-	resetGameSounds,
-	disposeGameSounds,
-	playThud,
-	playScooped,
-	stopScooped,
-	playHuh,
-	playToiletFlush,
-	silenceAll,
-	type BusSoundSource,
-} from './systems/sounds'
-import { PowerUpSystem, type PowerUpId } from './systems/powerups'
+	type GatePosition,
+	buildGates as buildGatesSystem,
+	buildStartLineObjects,
+	buildTrees,
+	checkGatePass,
+	placeEventLandmarks as placeEventLandmarksSystem,
+	placeGrassPathCones,
+	placeKmSigns,
+	spawnMarshals as spawnMarshalsSystem,
+	updateElasticObjects,
+	updateMarshals,
+} from './systems/environment'
+import { GamepadManager } from './systems/gamepad'
+import {
+	type GooseSpawnPoint,
+	spawnGeese,
+	updateGeeseSystem,
+} from './systems/geese'
 import { PassengerSystem } from './systems/passengers'
+import { type PowerUpId, PowerUpSystem } from './systems/powerups'
 import {
-	spawnPreviewRunners,
-	updatePreviewRunners,
-	disposePreviewRunners,
-	type PreviewRunner,
-	type PreviewRunnerDef,
-} from './systems/previewRunners'
-import {
+	type PreviewOrbitState,
 	createPreviewOrbitState,
 	setupPreviewOrbitInput,
 	updatePreviewOrbitCamera,
-	type PreviewOrbitState,
 } from './systems/previewCamera'
-import { GamepadManager } from './systems/gamepad'
+import {
+	type PreviewRunner,
+	type PreviewRunnerDef,
+	disposePreviewRunners,
+	spawnPreviewRunners,
+	updatePreviewRunners,
+} from './systems/previewRunners'
+import {
+	type PlayerRunnerState,
+	updateRunnerInteractions,
+} from './systems/runnerInteractions'
+import {
+	assignRoofSeat,
+	buildLocalRunner as buildLocalRunnerFn,
+	packRemoteRiders,
+	spawnRunners as spawnRunnersSystem,
+	updateLocalRunnerVisual as updateLocalRunnerVisualFn,
+	updateRunnersSystem,
+} from './systems/runners'
+import {
+	type BusSoundSource,
+	disposeGameSounds,
+	playHuh,
+	playScooped,
+	playThud,
+	playToiletFlush,
+	resetGameSounds,
+	silenceAll,
+	stopScooped,
+	updateGameSounds,
+} from './systems/sounds'
+import {
+	type SwanSpawnPoint,
+	spawnSwans,
+	updateSwansSystem,
+} from './systems/swans'
 
 // Module-level engine cache: reuse the same WebGL context per canvas
 // to avoid context-loss issues when creating/destroying engines rapidly.
@@ -933,7 +933,9 @@ export class Game {
 
 		// Store scoop pivot rest position for animation
 		const scoopPivot = result.scoopPivot
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		;(scoopPivot as any).__restY = scoopPivot.position.y
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		;(scoopPivot as any).__restZ = scoopPivot.position.z
 
 		// --- Night headlight + reverse lights (same config as local bus) ---
@@ -1036,7 +1038,7 @@ export class Game {
 			// Re-tint the runner model's shirt
 			if (remote.runnerModel) {
 				for (const m of remote.runnerModel.root.getChildMeshes()) {
-					if (m.material && m.material.name.startsWith('rShirt_')) {
+					if (m.material?.name.startsWith('rShirt_')) {
 						;(m.material as StandardMaterial).diffuseColor =
 							newPalette.body.clone()
 					}
@@ -1168,6 +1170,7 @@ export class Game {
 		if (this.localRunnerModel) {
 			const targetScale =
 				this.runnerFikaTimer > 0 ? POWER_UP_FIKA_SCALE_MULTIPLIER : 1
+			// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 			const baseScale = (this.localRunnerModel.root as any).__baseScale ?? 1
 			const currentFika = this.localRunnerModel.root.scaling.x / baseScale
 			const blend = Math.min(1, POWER_UP_FIKA_SCALE_TRANSITION_SPEED * dt)
@@ -1194,7 +1197,7 @@ export class Game {
 			const overlays: IcePatchOverlay[] = []
 			for (const patch of this.icePatches) {
 				const growT = Math.min(1, patch.age / POWER_UP_ICE_GROW_SECONDS)
-				const easedGrow = 1 - Math.pow(1 - growT, 3)
+				const easedGrow = 1 - (1 - growT) ** 3
 				const radius = Math.max(0.01, POWER_UP_ICE_RADIUS_METRES * easedGrow)
 
 				const fadeStart =
@@ -2322,8 +2325,9 @@ export class Game {
 		if (isNight && this.shadowRTT && this.shadowDepthMat && this.busHeadlight) {
 			const addShadowCaster = (node: TransformNode) => {
 				for (const m of node.getChildMeshes(false)) {
-					this.shadowRTT!.renderList!.push(m)
-					this.shadowRTT!.setMaterialForRendering(m, this.shadowDepthMat!)
+					this.shadowRTT?.renderList?.push(m)
+					// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+					this.shadowRTT?.setMaterialForRendering(m, this.shadowDepthMat!)
 				}
 			}
 			for (const runner of this.runners) {
@@ -2334,6 +2338,7 @@ export class Game {
 			}
 			this.setShadowMapOnGround?.(
 				this.shadowRTT,
+				// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 				this.shadowCamera!,
 				this.busHeadlight,
 			)
@@ -2876,8 +2881,8 @@ export class Game {
 
 		// Wind flapping animation
 		const restPositions = banner
-			.getVerticesData(VertexBuffer.PositionKind)!
-			.slice()
+			.getVerticesData(VertexBuffer.PositionKind)
+			?.slice()
 		this.scene.registerBeforeRender(() => {
 			if (!banner.isEnabled() || banner.isDisposed()) return
 			const positions = banner.getVerticesData(VertexBuffer.PositionKind)
@@ -2969,8 +2974,8 @@ export class Game {
 
 		// Wind flapping animation
 		const restPositions2 = banner
-			.getVerticesData(VertexBuffer.PositionKind)!
-			.slice()
+			.getVerticesData(VertexBuffer.PositionKind)
+			?.slice()
 		this.scene.registerBeforeRender(() => {
 			if (!banner.isEnabled() || banner.isDisposed()) return
 			const positions = banner.getVerticesData(VertexBuffer.PositionKind)
@@ -3112,8 +3117,8 @@ export class Game {
 
 		// Wind flapping animation
 		const finishRestPositions = banner
-			.getVerticesData(VertexBuffer.PositionKind)!
-			.slice()
+			.getVerticesData(VertexBuffer.PositionKind)
+			?.slice()
 		this.scene.registerBeforeRender(() => {
 			if (!banner.isEnabled() || banner.isDisposed()) return
 			const positions = banner.getVerticesData(VertexBuffer.PositionKind)
@@ -3198,12 +3203,12 @@ export class Game {
 		for (const m of result.meshes) m.computeWorldMatrix(true)
 
 		// Measure world-space bounding extent
-		let minX = Number.POSITIVE_INFINITY,
-			maxX = Number.NEGATIVE_INFINITY
-		let minY = Number.POSITIVE_INFINITY,
-			maxY = Number.NEGATIVE_INFINITY
-		let minZ = Number.POSITIVE_INFINITY,
-			maxZ = Number.NEGATIVE_INFINITY
+		let minX = Number.POSITIVE_INFINITY
+		let maxX = Number.NEGATIVE_INFINITY
+		let minY = Number.POSITIVE_INFINITY
+		let maxY = Number.NEGATIVE_INFINITY
+		let minZ = Number.POSITIVE_INFINITY
+		let maxZ = Number.NEGATIVE_INFINITY
 		for (const mesh of result.meshes) {
 			if (mesh === glbRoot || mesh.isAnInstance || !mesh.getBoundingInfo)
 				continue
@@ -3223,12 +3228,12 @@ export class Game {
 
 		// Re-compute after scaling so we can read the true centre
 		for (const m of result.meshes) m.computeWorldMatrix(true)
-		let sMinX = Number.POSITIVE_INFINITY,
-			sMaxX = Number.NEGATIVE_INFINITY
-		let sMinY = Number.POSITIVE_INFINITY,
-			sMaxY = Number.NEGATIVE_INFINITY
-		let sMinZ = Number.POSITIVE_INFINITY,
-			sMaxZ = Number.NEGATIVE_INFINITY
+		let sMinX = Number.POSITIVE_INFINITY
+		let sMaxX = Number.NEGATIVE_INFINITY
+		let sMinY = Number.POSITIVE_INFINITY
+		let sMaxY = Number.NEGATIVE_INFINITY
+		let sMinZ = Number.POSITIVE_INFINITY
+		let sMaxZ = Number.NEGATIVE_INFINITY
 		for (const mesh of result.meshes) {
 			if (mesh === glbRoot || mesh.isAnInstance || !mesh.getBoundingInfo)
 				continue
@@ -3409,18 +3414,23 @@ export class Game {
 		this.busMesh.setEnabled(true)
 
 		// Store rest position for scoop animation offsets
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		;(this.scoopPivot as any).__restY = this.scoopPivot.position.y
+		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		;(this.scoopPivot as any).__restZ = this.scoopPivot.position.z
 		this.frontWheelLeft = result.frontWheelLeft
 		this.frontWheelRight = result.frontWheelRight
 
 		// --- Exhaust flame particle system (initially stopped) ---
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		this.exhaustFlames = createExhaustFlames(this.scene, this.busMesh!)
 
 		// --- Water wake particle systems (initially stopped) ---
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		this.waterWake = createWaterWake(this.scene, this.busMesh!)
 
 		// --- Dirt spray particle systems (initially stopped) ---
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		this.dirtSpray = createDirtSpray(this.scene, this.busMesh!)
 
 		// --- Headlight at night (single centred beam) ---
@@ -3444,17 +3454,18 @@ export class Game {
 			)
 			headlight.intensity = BUS_HEADLIGHT_INTENSITY
 			headlight.range = BUS_HEADLIGHT_RANGE
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			headlight.parent = this.busMesh!
 			this.busHeadlight = headlight
 
 			// --- Shadow map for headlight ---
-			if (!Effect.ShadersStore['shadowDepthVertexShader']) {
-				Effect.ShadersStore['shadowDepthVertexShader'] =
+			if (!Effect.ShadersStore.shadowDepthVertexShader) {
+				Effect.ShadersStore.shadowDepthVertexShader =
 					'precision highp float;\n' +
 					'attribute vec3 position;\n' +
 					'uniform mat4 worldViewProjection;\n' +
 					'void main(){gl_Position=worldViewProjection*vec4(position,1.0);}'
-				Effect.ShadersStore['shadowDepthFragmentShader'] =
+				Effect.ShadersStore.shadowDepthFragmentShader =
 					'precision highp float;\n' +
 					'void main(){gl_FragColor=vec4(gl_FragCoord.z,0.,0.,1.);}'
 			}
@@ -3471,6 +3482,7 @@ export class Game {
 			shadowCam.fov = headlight.angle
 			shadowCam.minZ = 0.5
 			shadowCam.maxZ = headlight.range
+			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			shadowCam.parent = this.busMesh!
 			// Match headlight direction: (0, -0.15, 1) → pitch slightly down
 			shadowCam.rotation.x = Math.atan2(0.15, 1)
@@ -3523,6 +3535,7 @@ export class Game {
 				)
 				rl.intensity = BUS_REVERSE_LIGHT_INTENSITY
 				rl.range = BUS_REVERSE_LIGHT_RANGE
+				// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 				rl.parent = this.busMesh!
 				rl.setEnabled(false)
 				this.busReverseLights.push(rl)
@@ -5032,6 +5045,7 @@ export class Game {
 			if (this.localPlayerRole === 'runner') {
 				this.localRunnerAnimPhase = updateLocalRunnerVisualFn(
 					{
+						// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 						model: this.localRunnerModel!,
 						busPos: this.busPos,
 						busYaw: this.busYaw,
@@ -5213,6 +5227,7 @@ export class Game {
 				if (this.localPlayerRole === 'runner') {
 					this.localRunnerAnimPhase = updateLocalRunnerVisualFn(
 						{
+							// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 							model: this.localRunnerModel!,
 							busPos: this.busPos,
 							busYaw: this.busYaw,
@@ -5390,6 +5405,7 @@ export class Game {
 				}
 				this.localRunnerAnimPhase = updateLocalRunnerVisualFn(
 					{
+						// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 						model: this.localRunnerModel!,
 						busPos: this.busPos,
 						busYaw: this.busYaw,
@@ -5581,6 +5597,7 @@ export class Game {
 				}
 				this.localRunnerAnimPhase = updateLocalRunnerVisualFn(
 					{
+						// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 						model: this.localRunnerModel!,
 						busPos: this.busPos,
 						busYaw: this.busYaw,
@@ -5641,11 +5658,13 @@ export class Game {
 
 			// --- Roll all wheels based on bus speed ---
 			const rollDelta = this.busSpeed * WHEEL_ROLL_SPEED * dt
-			const allWheelPivots = this.busMesh!.getChildren().filter(
-				(c) =>
-					c.name.startsWith('frontWheel') ||
-					c.name.startsWith('rearWheelPivot'),
-			)
+			const allWheelPivots = this.busMesh
+				?.getChildren()
+				.filter(
+					(c) =>
+						c.name.startsWith('frontWheel') ||
+						c.name.startsWith('rearWheelPivot'),
+				)
 			for (const pivot of allWheelPivots) {
 				const wheelRoot = pivot
 					.getChildren()
@@ -5934,14 +5953,18 @@ export class Game {
 					this.scoopPivot.rotation.x = ease * -1.2
 					// Translate slightly forward and up for a scooping motion
 					this.scoopPivot.position.y =
+						// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 						(this.scoopPivot as any).__restY + ease * 0.5
 					this.scoopPivot.position.z =
+						// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 						(this.scoopPivot as any).__restZ + ease * 0.35
 				} else {
 					this.scoopPivot.rotation.x = 0
 					this.scoopPivot.position.y =
+						// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 						(this.scoopPivot as any).__restY ?? this.scoopPivot.position.y
 					this.scoopPivot.position.z =
+						// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 						(this.scoopPivot as any).__restZ ?? this.scoopPivot.position.z
 				}
 			}

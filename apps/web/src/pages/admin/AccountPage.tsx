@@ -1,11 +1,11 @@
-import { type Component, createSignal, Show } from 'solid-js'
-import { css } from '@style/css'
-import { DirtBlock } from '@/components/ui/DirtBlock'
-import { changeOwnPassword } from '@/utils/adminApi'
+import { AdminAvatar } from '@/components/admin/AdminAvatar'
 import { AdminButton } from '@/components/admin/AdminButton'
 import { AdminInput } from '@/components/admin/AdminInput'
 import { useAuth } from '@/components/admin/AuthGuard'
-import { AdminAvatar } from '@/components/admin/AdminAvatar'
+import { DirtBlock } from '@/components/ui/DirtBlock'
+import { changeOwnPassword } from '@/utils/adminApi'
+import { css } from '@style/css'
+import { type Component, Show, createSignal } from 'solid-js'
 
 export const AccountPage: Component = () => {
 	const auth = useAuth()

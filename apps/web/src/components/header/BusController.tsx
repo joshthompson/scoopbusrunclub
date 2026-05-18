@@ -1,20 +1,20 @@
 import {
+	type Scene,
 	createConnectedController,
 	createController,
-	type Scene,
 } from '@/engine'
 import { createObjectSignal } from '@/engine'
-import { createSignal, type JSX } from 'solid-js'
+import { type JSX, createSignal } from 'solid-js'
 
 import busBackAsset from '@/assets/bus/bus-back.png'
 import busAsset from '@/assets/bus/bus.png'
+import scoopAsset from '@/assets/bus/scoop.png'
+import shadowAsset from '@/assets/bus/shadow.png'
 import wheel1Asset from '@/assets/bus/wheel1.png'
 import wheel2Asset from '@/assets/bus/wheel2.png'
 import wheel3Asset from '@/assets/bus/wheel3.png'
 import wheel4Asset from '@/assets/bus/wheel4.png'
-import scoopAsset from '@/assets/bus/scoop.png'
 import windowAsset from '@/assets/bus/windows.png'
-import shadowAsset from '@/assets/bus/shadow.png'
 import type { RunnerController } from './RunnerController'
 
 const BUS_SPEED = 10
@@ -140,11 +140,14 @@ function StormCloud(props: { wispFrame: number }) {
 			height={h}
 			viewBox={`0 0 ${w} ${h}`}
 			style={{ 'image-rendering': 'pixelated', 'pointer-events': 'none' }}
+			role="img"
+			aria-label="Cloud"
 		>
 			{/* Main body */}
 			{baseSpans.map(([y, segs]) =>
 				segs.map(([x0, x1]) => (
 					<rect
+						key={`${y}-${x0}`}
 						x={x0 * CX}
 						y={y * CX}
 						width={(x1 - x0) * CX}
@@ -156,6 +159,7 @@ function StormCloud(props: { wispFrame: number }) {
 			{/* Animated wisps — row 16 */}
 			{wispVariants[wf()].map(([x0, x1]) => (
 				<rect
+					key={`16-${x0}`}
 					x={x0 * CX}
 					y={16 * CX}
 					width={(x1 - x0) * CX}
@@ -166,6 +170,7 @@ function StormCloud(props: { wispFrame: number }) {
 			{/* Animated wisps — row 17 */}
 			{wispVariants2[wf()].map(([x0, x1]) => (
 				<rect
+					key={`17-${x0}`}
 					x={x0 * CX}
 					y={17 * CX}
 					width={(x1 - x0) * CX}
@@ -262,6 +267,8 @@ function LightningBolt(props: {
 				'pointer-events': 'none',
 				overflow: 'hidden',
 			}}
+			role="img"
+			aria-label="Lightning bolt"
 		>
 			<defs>
 				<clipPath id={`bolt-clip-${props.seed}`}>
@@ -318,23 +325,23 @@ export function createBusController(
 				const scoopXStart = $.x()
 				const scoopXEnd = scoopXStart + 88
 
-				$scene
-					.getControllersByType<RunnerController>('runner')
-					.forEach((controller) => {
-						const x = controller.data.x() + controller.data.width()
-						if (
-							!controller.data.scooped() &&
-							x >= scoopXStart &&
-							x <= scoopXEnd
-						) {
-							controller.data.setScooped(true)
-							controller.data.setYSpeed(
-								SCOOP_SPEED * -1 * (1 + Math.random() * 0.6),
-							)
-							$.setScooping(true)
-							setTimeout(() => $.setScooping(false), SCOOP_DURATION)
-						}
-					})
+				for (const controller of $scene.getControllersByType<RunnerController>(
+					'runner',
+				)) {
+					const x = controller.data.x() + controller.data.width()
+					if (
+						!controller.data.scooped() &&
+						x >= scoopXStart &&
+						x <= scoopXEnd
+					) {
+						controller.data.setScooped(true)
+						controller.data.setYSpeed(
+							SCOOP_SPEED * -1 * (1 + Math.random() * 0.6),
+						)
+						$.setScooping(true)
+						setTimeout(() => $.setScooping(false), SCOOP_DURATION)
+					}
+				}
 			}
 		},
 	})
@@ -450,6 +457,7 @@ export function createBusController(
 				init: () =>
 					({
 						children: () => <StormCloud wispFrame={wispFrame()} />,
+						// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 					}) as any,
 				style: () => ({
 					'pointer-events': 'none',
@@ -531,6 +539,7 @@ export function createBusController(
 									</div>
 								)
 							},
+							// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 						}) as any,
 					style: () => ({
 						'pointer-events': 'none',

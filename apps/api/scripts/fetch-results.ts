@@ -1,3 +1,4 @@
+import { scrapeCourseMap } from '../lib/map-scraper'
 /**
  * Playwright script to fetch Parkrun athlete pages and POST parsed data to Convex.
  *
@@ -20,24 +21,23 @@
  * Requires: playwright (install chromium with `npx playwright install chromium`)
  */
 import {
-	parseRunnerData,
-	parseRunResults,
-	extractEvents,
-	type RunnerInfo,
-	type RunResult,
 	type EventInfo,
+	type RunResult,
+	type RunnerInfo,
+	extractEvents,
+	parseRunResults,
+	parseRunnerData,
 } from '../lib/parsers'
 import {
-	TRACKED_ATHLETES,
 	DELAY_BETWEEN_FETCHES_MS,
-	loadEnv,
-	requireEnvVars,
-	randomDelay,
-	sleep,
-	launchBrowser,
+	TRACKED_ATHLETES,
 	fetchPage,
+	launchBrowser,
+	loadEnv,
+	randomDelay,
+	requireEnvVars,
+	sleep,
 } from './shared'
-import { scrapeCourseMap } from '../lib/map-scraper'
 
 // --- Env file loading ---
 
@@ -103,7 +103,9 @@ async function main() {
 	let i = 0
 
 	for (const { parkrunId, name } of TRACKED_ATHLETES) {
-		console.log(`${++i}/${TRACKED_ATHLETES.length}: Fetching results for ${name} (${parkrunId})...`)
+		console.log(
+			`${++i}/${TRACKED_ATHLETES.length}: Fetching results for ${name} (${parkrunId})...`,
+		)
 
 		try {
 			// Fetch all results page — runner info + full run history

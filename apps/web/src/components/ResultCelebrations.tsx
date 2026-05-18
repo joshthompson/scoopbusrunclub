@@ -1,7 +1,9 @@
-import { css } from '@style/css'
-import { createSignal, Show } from 'solid-js'
 import { Emoji } from '@/components/ui/Emoji'
-import { MILESTONE_SET, ordinalSuffix } from '../utils/milestones'
+import { runners as runnerSignals } from '@/data/runners'
+import { getEvent, getEventName } from '@/utils/events'
+import { formatName, parseTimeToSeconds } from '@/utils/misc'
+import { css } from '@style/css'
+import { Show, createSignal } from 'solid-js'
 import {
 	type RunResultItem,
 	type Runner,
@@ -9,9 +11,7 @@ import {
 	getCached,
 	setCache,
 } from '../utils/api'
-import { formatName, parseTimeToSeconds } from '@/utils/misc'
-import { getEvent, getEventName } from '@/utils/events'
-import { runners as runnerSignals } from '@/data/runners'
+import { MILESTONE_SET, ordinalSuffix } from '../utils/milestones'
 
 // ---------------------------------------------------------------------------
 // PB map
@@ -35,7 +35,7 @@ function buildPBMap(results: RunResultItem[]): Map<string, PBStatus> {
 	const byRunner = new Map<string, RunResultItem[]>()
 	for (const item of results) {
 		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-		byRunner.get(item.parkrunId)!.push(item)
+		byRunner.get(item.parkrunId)?.push(item)
 	}
 
 	for (const runs of byRunner.values()) {
@@ -110,7 +110,7 @@ function buildMilestoneMap(
 	const byRunner = new Map<string, RunResultItem[]>()
 	for (const item of results) {
 		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-		byRunner.get(item.parkrunId)!.push(item)
+		byRunner.get(item.parkrunId)?.push(item)
 	}
 
 	const map = new Map<string, number>()
@@ -261,7 +261,7 @@ function buildEventListMap(
 	const byRunner = new Map<string, RunResultItem[]>()
 	for (const item of results) {
 		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-		byRunner.get(item.parkrunId)!.push(item)
+		byRunner.get(item.parkrunId)?.push(item)
 	}
 
 	for (const runs of byRunner.values()) {
@@ -330,7 +330,7 @@ function buildSpellingMap(
 	const byRunner = new Map<string, RunResultItem[]>()
 	for (const item of results) {
 		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-		byRunner.get(item.parkrunId)!.push(item)
+		byRunner.get(item.parkrunId)?.push(item)
 	}
 
 	for (const runs of byRunner.values()) {
@@ -421,9 +421,12 @@ function buildPalindromeMap(results: RunResultItem[]): Set<string> {
 
 /**
  * Set of "parkrunId:date:eventName:eventNumber" keys where a runner was the
- * only club member at a Haga event.
+ * only club member at a Haga event, including no club volunteers present.
  */
-function buildAloneAtHagaMap(results: RunResultItem[]): Set<string> {
+function buildAloneAtHagaMap(
+	results: RunResultItem[],
+	volunteers: VolunteerItem[],
+): Set<string> {
 	const set = new Set<string>()
 
 	// Group Haga results by date+eventNumber
@@ -432,7 +435,15 @@ function buildAloneAtHagaMap(results: RunResultItem[]): Set<string> {
 		if (r.event !== 'haga') continue
 		const evKey = `${r.date}:${r.eventNumber}`
 		if (!hagaByEvent.has(evKey)) hagaByEvent.set(evKey, [])
-		hagaByEvent.get(evKey)!.push(r)
+		hagaByEvent.get(evKey)?.push(r)
+	}
+
+	// Collect Haga event keys where any club volunteer was present
+	const hagaVolunteerEvents = new Set<string>()
+	for (const v of volunteers) {
+		if (v.event === 'haga') {
+			hagaVolunteerEvents.add(`${v.date}:${v.eventNumber}`)
+		}
 	}
 
 	// Sort events chronologically for deterministic output
@@ -440,8 +451,8 @@ function buildAloneAtHagaMap(results: RunResultItem[]): Set<string> {
 		a[0].localeCompare(b[0]),
 	)
 
-	for (const [, runners] of sortedEvents) {
-		if (runners.length === 1) {
+	for (const [evKey, runners] of sortedEvents) {
+		if (runners.length === 1 && !hagaVolunteerEvents.has(evKey)) {
 			const r = runners[0]
 			set.add(`${r.parkrunId}:${r.date}:${r.event}:${r.eventNumber}`)
 		}
@@ -557,7 +568,7 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
 			byEvent.set(eventKey, [])
 			eventInstances.push({ eventKey, date: r.date })
 		}
-		byEvent.get(eventKey)!.push(r)
+		byEvent.get(eventKey)?.push(r)
 	}
 
 	// Process events in chronological order
@@ -569,6 +580,7 @@ function buildRunBuddyAndBFFMaps(results: RunResultItem[]): PairAchievements {
 	const earnedBFF = new Set<string>()
 
 	for (const { eventKey } of eventInstances) {
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const eventResults = byEvent.get(eventKey)!
 
 		for (let i = 0; i < eventResults.length; i++) {
@@ -659,7 +671,7 @@ function buildParkrunPalMap(
 			byEvent.set(eventKey, [])
 			eventInstances.push({ eventKey, date: r.date })
 		}
-		byEvent.get(eventKey)!.push(r)
+		byEvent.get(eventKey)?.push(r)
 	}
 
 	eventInstances.sort((a, b) => a.date.localeCompare(b.date))
@@ -668,6 +680,7 @@ function buildParkrunPalMap(
 	const earnedPal = new Set<string>()
 
 	for (const { eventKey } of eventInstances) {
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		const eventResults = byEvent.get(eventKey)!
 		// Deduplicate runners (one result per runner per event)
 		const runners = new Map<string, RunResultItem>()
@@ -722,7 +735,7 @@ function buildHagaMap(
 	const byRunner = new Map<string, RunResultItem[]>()
 	for (const item of results) {
 		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-		byRunner.get(item.parkrunId)!.push(item)
+		byRunner.get(item.parkrunId)?.push(item)
 	}
 
 	for (const runs of byRunner.values()) {
@@ -778,7 +791,7 @@ function buildPalindromePalMap(
 	for (const r of results) {
 		const eventKey = `${r.event}\0${r.date}\0${r.eventNumber}`
 		if (!byEvent.has(eventKey)) byEvent.set(eventKey, [])
-		byEvent.get(eventKey)!.push(r)
+		byEvent.get(eventKey)?.push(r)
 	}
 
 	for (const eventResults of byEvent.values()) {
@@ -798,7 +811,7 @@ function buildPalindromePalMap(
 		const digitLookup = new Map<string, typeof digitEntries>()
 		for (const entry of digitEntries) {
 			if (!digitLookup.has(entry.digits)) digitLookup.set(entry.digits, [])
-			digitLookup.get(entry.digits)!.push(entry)
+			digitLookup.get(entry.digits)?.push(entry)
 		}
 
 		for (const entry of digitEntries) {
@@ -858,7 +871,7 @@ function buildHagaStreakMap(results: RunResultItem[]): Set<string> {
 	const byRunner = new Map<string, RunResultItem[]>()
 	for (const item of results) {
 		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-		byRunner.get(item.parkrunId)!.push(item)
+		byRunner.get(item.parkrunId)?.push(item)
 	}
 
 	for (const runs of byRunner.values()) {
@@ -911,7 +924,7 @@ function buildVikingMap(results: RunResultItem[]): Set<string> {
 	const byRunner = new Map<string, RunResultItem[]>()
 	for (const item of results) {
 		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-		byRunner.get(item.parkrunId)!.push(item)
+		byRunner.get(item.parkrunId)?.push(item)
 	}
 
 	for (const runs of byRunner.values()) {
@@ -979,7 +992,7 @@ export function buildCelebrationData(
 		eventListMap: buildEventListMap(results),
 		birthdayMap: buildBirthdayMap(),
 		spellingMap: buildSpellingMap(results),
-		aloneAtHagaMap: buildAloneAtHagaMap(results),
+		aloneAtHagaMap: buildAloneAtHagaMap(results, volunteers ?? []),
 		hagaCancelledMap: buildHagaCancelledMap(results),
 		uppsalaCancelledMap: buildUppsalaCancelledMap(results),
 		palindromeMap: buildPalindromeMap(results),
@@ -1009,7 +1022,7 @@ function buildVolunteerMilestoneMap(
 	const byRunner = new Map<string, VolunteerItem[]>()
 	for (const v of volunteers) {
 		if (!byRunner.has(v.parkrunId)) byRunner.set(v.parkrunId, [])
-		byRunner.get(v.parkrunId)!.push(v)
+		byRunner.get(v.parkrunId)?.push(v)
 	}
 
 	const map = new Map<string, number>()
@@ -1252,7 +1265,7 @@ const celebrationRules: ((
 		data.aloneAtHagaMap.has(resultKey)
 			? {
 					label: 'Alone At Haga!',
-					description: 'Was the only club member to run at Haga that event',
+					description: 'Was the only club member at Haga that event',
 					emoji: TAG_EMOJIS.aloneHaga,
 					color: TAG_COLORS.aloneHaga,
 				}
@@ -1409,7 +1422,7 @@ export function ResultCelebrations(props: ResultCelebrationsProps) {
 	return (
 		<>
 			{tags().map((tag) => (
-				<CelebrationPill tag={tag} showTooltip />
+				<CelebrationPill key={tag.label} tag={tag} showTooltip />
 			))}
 		</>
 	)
@@ -1479,7 +1492,7 @@ export function VolunteerCelebrations(props: VolunteerCelebrationsProps) {
 	return (
 		<>
 			{tags().map((tag) => (
-				<CelebrationPill tag={tag} showTooltip />
+				<CelebrationPill key={tag.label} tag={tag} showTooltip />
 			))}
 		</>
 	)

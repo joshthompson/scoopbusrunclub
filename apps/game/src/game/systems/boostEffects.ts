@@ -14,12 +14,12 @@
 import {
 	Color4,
 	DynamicTexture,
+	Effect,
 	type FreeCamera,
 	MeshBuilder,
 	ParticleSystem,
 	PostProcess,
 	type Scene,
-	Effect,
 	TransformNode,
 	Vector3,
 } from '@babylonjs/core'
@@ -321,10 +321,10 @@ function createRadialBlurPostProcess(
 	scene: Scene,
 	camera: FreeCamera,
 ): RadialBlurHandle {
-	const shaderName = 'boostRadialBlur_' + camera.name
+	const shaderName = `boostRadialBlur_${camera.name}`
 
 	// Register shader inline
-	Effect.ShadersStore[shaderName + 'FragmentShader'] = RADIAL_BLUR_FRAGMENT
+	Effect.ShadersStore[`${shaderName}FragmentShader`] = RADIAL_BLUR_FRAGMENT
 
 	const pp = new PostProcess(
 		shaderName,
@@ -370,9 +370,9 @@ interface DofHandle {
 }
 
 function createDofPostProcess(scene: Scene, camera: FreeCamera): DofHandle {
-	const shaderName = 'boostDof_' + camera.name
+	const shaderName = `boostDof_${camera.name}`
 
-	Effect.ShadersStore[shaderName + 'FragmentShader'] = DOF_FRAGMENT
+	Effect.ShadersStore[`${shaderName}FragmentShader`] = DOF_FRAGMENT
 
 	const pp = new PostProcess(
 		shaderName,

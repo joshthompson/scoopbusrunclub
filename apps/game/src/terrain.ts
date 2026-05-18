@@ -73,10 +73,10 @@ export async function fetchWaterFeatures(
 	if (coords.length === 0) return []
 
 	// Compute bounding box
-	let minLat = Number.POSITIVE_INFINITY,
-		maxLat = Number.NEGATIVE_INFINITY
-	let minLon = Number.POSITIVE_INFINITY,
-		maxLon = Number.NEGATIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
+	let minLon = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
 	for (const c of coords) {
 		if (c[1] < minLat) minLat = c[1]
 		if (c[1] > maxLat) maxLat = c[1]

@@ -1,16 +1,6 @@
-/**
- * Proximity-based game sound system.
- *
- * Manages bus engine and goose ambient sounds with volume based on
- * distance from the listener (camera/player) and, for buses, speed.
- *
- * Respects the global mute setting — when muted, no audio is loaded or played.
- */
-import { getMuted } from '../../music'
 import busEngineUrl from '../../assets/sounds/freesound_community-bus-engine-47297.mp3'
 import gooseUrl from '../../assets/sounds/freesound_community-goose-2-28880.mp3'
 import thudUrl from '../../assets/sounds/freesound_community-loud-thud-45719.m4a'
-import scoopedUrl from '../../assets/sounds/scooped1.mp3'
 import toiletFlushUrl from '../../assets/sounds/freesound_community-toilet-flushing-7059.m4a'
 import hello1Url from '../../assets/sounds/hello1.mp3'
 import hello2Url from '../../assets/sounds/hello2.mp3'
@@ -24,6 +14,16 @@ import huh3Url from '../../assets/sounds/huh3.mp3'
 import huh4Url from '../../assets/sounds/huh4.mp3'
 import huh5Url from '../../assets/sounds/huh5.mp3'
 import huh6Url from '../../assets/sounds/huh6.mp3'
+import scoopedUrl from '../../assets/sounds/scooped1.mp3'
+/**
+ * Proximity-based game sound system.
+ *
+ * Manages bus engine and goose ambient sounds with volume based on
+ * distance from the listener (camera/player) and, for buses, speed.
+ *
+ * Respects the global mute setting — when muted, no audio is loaded or played.
+ */
+import { getMuted } from '../../music'
 
 // ── Volume control ──
 
@@ -34,7 +34,7 @@ function getStoredGameVolume(): number {
 	const v = localStorage.getItem(GAME_VOLUME_KEY)
 	if (v === null) return DEFAULT_GAME_VOLUME
 	const n = Number.parseFloat(v)
-	return isNaN(n) ? DEFAULT_GAME_VOLUME : Math.max(0, Math.min(1, n))
+	return Number.isNaN(n) ? DEFAULT_GAME_VOLUME : Math.max(0, Math.min(1, n))
 }
 
 let masterVolume = getStoredGameVolume()
@@ -199,7 +199,7 @@ function updateBusPairVolume(
 	// If duration is known and we're near the end, crossfade
 	if (
 		duration &&
-		isFinite(duration) &&
+		Number.isFinite(duration) &&
 		currentTime > duration - CROSSFADE_DURATION
 	) {
 		const fadeProgress =
@@ -269,6 +269,7 @@ const SCOOPED_VOLUME = 0.3
  */
 export function playScooped(): void {
 	return
+	// biome-ignore lint/correctness/noUnreachable: intentionally disabled
 	if (disposed || getMuted() || masterVolume <= 0) return
 	const audio = new Audio(scoopedUrl)
 	audio.volume = Math.max(0, Math.min(1, SCOOPED_VOLUME * masterVolume))

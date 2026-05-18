@@ -1,11 +1,11 @@
-import { createSignal, onMount, onCleanup, Show } from 'solid-js'
-import { css } from '@style/css'
 import {
-	runners as runnerSignals,
-	type RunnerName,
 	RUNNER_SIZE,
+	type RunnerName,
+	runners as runnerSignals,
 } from '@/data/runners'
 import { randomItem } from '@/utils'
+import { css } from '@style/css'
+import { Show, createSignal, onCleanup, onMount } from 'solid-js'
 
 // ---------------------------------------------------------------------------
 // Constants

@@ -1,5 +1,5 @@
-import { createController, createObjectSignal, type Scene } from '@/engine'
-import { RUNNER_SIZE, runners, type RunnerState } from '@/data/runners'
+import { RUNNER_SIZE, type RunnerState, runners } from '@/data/runners'
+import { type Scene, createController, createObjectSignal } from '@/engine'
 import { css } from '@style/css'
 import type { Accessor } from 'solid-js'
 import { createCameraFlashController } from './CameraFlashController'
@@ -151,8 +151,10 @@ export function createRunnerController(
 					const name = runner().name
 					const parts: string[] = []
 					if (runner().latestTime && runnerId !== 'link')
+						// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 						parts.push(runner().latestTime!)
 					if (runner().volunteerRoles?.length)
+						// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 						parts.push(...runner().volunteerRoles!)
 					const suffix = parts.length ? ` - ${parts.join(', ')}` : ''
 
@@ -177,8 +179,9 @@ export function createRunnerController(
 								borderRadius: '3px',
 								cornerShape: 'notch',
 							})}
-							children={name + suffix}
-						/>
+						>
+							{name + suffix}
+						</div>
 					)
 				},
 			}
@@ -242,7 +245,7 @@ export function createRunnerController(
 				if (!frames) frames = runner().frames.volunteerGeneric
 				if (!frames) frames = runner().frames.sit
 
-				if (frames) $.setFrames(runner().frames.run.map(() => frames![0]))
+				if (frames) $.setFrames(runner().frames.run.map(() => frames?.[0]))
 				// No movement, no scooping — just render in place
 				return
 			}
@@ -270,7 +273,8 @@ export function createRunnerController(
 				$.setSitting($.sitting() - 1)
 				const sitFrames =
 					isTailWalker && runner().frames.tailSit
-						? runner().frames.tailSit!
+						? // biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+							runner().frames.tailSit!
 						: runner().frames.sit
 				$.setFrames(runner().frames.run.map(() => sitFrames[0]))
 			}
@@ -278,6 +282,7 @@ export function createRunnerController(
 			// Running
 			else if (!$.scooped()) {
 				if (isTailWalker && runner().frames.tailWalk) {
+					// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 					$.setFrames(runner().frames.tailWalk!)
 				} else {
 					$.setFrames(runner().frames.run)

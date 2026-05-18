@@ -1,4 +1,4 @@
-import { type Accessor, createSignal, type Setter } from 'solid-js'
+import { type Accessor, type Setter, createSignal } from 'solid-js'
 
 // Type definition
 export type ObjectSignal<

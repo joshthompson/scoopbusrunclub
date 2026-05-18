@@ -1,48 +1,48 @@
-import { type Component, createMemo, createResource, Show } from 'solid-js'
 import {
-	Router,
 	Route,
 	type RouteSectionProps,
+	Router,
 	useLocation,
 } from '@solidjs/router'
+import { type Component, Show, createMemo, createResource } from 'solid-js'
 import {
-	ScoopBusHeader,
 	HEADER_HEIGHT,
+	ScoopBusHeader,
 } from './components/header/ScoopBusHeader'
 import './styles.css'
 import { css } from '@style/css'
+import { getOrBuildCelebrationData } from './components/ResultCelebrations'
+import { ALWAYS_SHOW_LOADER, SplashScreen } from './components/SplashScreen'
 import {
-	fetchRunners,
+	AdminAccountPage,
+	AdminLogsPage,
+	AdminPage,
+	AdminParkrunsPage,
+	AdminRunnersPage,
+	AdminScanPage,
+	AdminUsersPage,
+} from './pages/AdminPage'
+import { ComparePage } from './pages/ComparePage'
+import { ConnectionsPage } from './pages/ConnectionsPage'
+import { EventPage } from './pages/EventPage'
+import { EveryonePage } from './pages/EveryonePage'
+import { GuestPage } from './pages/GuestPage'
+import { HomePage } from './pages/HomePage'
+import { MapPage } from './pages/MapPage'
+import { MemberGraphPage } from './pages/MemberGraphPage'
+import { MemberPage } from './pages/MemberPage'
+import { NotFoundPage } from './pages/NotFoundPage'
+import { ReplayPage } from './pages/ReplayPage'
+import { WrappedPage } from './pages/WrappedPage'
+import {
 	fetchAllResults,
-	fetchPublicRaces,
-	fetchVolunteers,
 	fetchGuestResults,
+	fetchPublicRaces,
+	fetchRunners,
+	fetchVolunteers,
 	getCached,
 } from './utils/api'
 import { loadEvents } from './utils/events'
-import { getOrBuildCelebrationData } from './components/ResultCelebrations'
-import { MemberPage } from './pages/MemberPage'
-import { HomePage } from './pages/HomePage'
-import { NotFoundPage } from './pages/NotFoundPage'
-import { MemberGraphPage } from './pages/MemberGraphPage'
-import {
-	AdminPage,
-	AdminScanPage,
-	AdminUsersPage,
-	AdminAccountPage,
-	AdminLogsPage,
-	AdminRunnersPage,
-	AdminParkrunsPage,
-} from './pages/AdminPage'
-import { MapPage } from './pages/MapPage'
-import { ComparePage } from './pages/ComparePage'
-import { EveryonePage } from './pages/EveryonePage'
-import { ConnectionsPage } from './pages/ConnectionsPage'
-import { WrappedPage } from './pages/WrappedPage'
-import { EventPage } from './pages/EventPage'
-import { ReplayPage } from './pages/ReplayPage'
-import { GuestPage } from './pages/GuestPage'
-import { SplashScreen, ALWAYS_SHOW_LOADER } from './components/SplashScreen'
 
 const App: Component = () => {
 	// Detect if cache is cold (no cached results) to show splash screen
@@ -76,6 +76,7 @@ const App: Component = () => {
 						when={results() && runners() && volunteers()}
 						fallback={<div style={{ height: `${HEADER_HEIGHT}px` }} />}
 					>
+						{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 						<ScoopBusHeader results={results()!} volunteers={volunteers()!} />
 					</Show>
 				</Show>
