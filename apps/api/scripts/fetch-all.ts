@@ -16,11 +16,15 @@ import { randomDelay, sleep } from './shared'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// Pass through --env and --dry args
+// Pass through --env, --dry, --all, and --all-for args
 const envArg = process.argv.find((a) => a.startsWith('--env='))
 const envFlag = envArg ? ` ${envArg}` : ''
 const isDryRun = process.argv.includes('--dry')
 const dryFlag = isDryRun ? ' --dry' : ''
+const hasAll = process.argv.includes('--all')
+const allFlag = hasAll ? ' --all' : ''
+const allForArg = process.argv.find((a) => a.startsWith('--all-for='))
+const allForFlag = allForArg ? ` ${allForArg}` : ''
 
 async function main() {
 	// --- Step 1: fetch-results (athlete run results) ---
@@ -29,10 +33,13 @@ async function main() {
 	console.log('='.repeat(60))
 
 	try {
-		execSync(`npx tsx scripts/fetch-results.ts${envFlag}${dryFlag}`, {
-			cwd: dirname(__dirname), // api package root
-			stdio: 'inherit',
-		})
+		execSync(
+			`npx tsx scripts/fetch-results.ts${envFlag}${dryFlag}${allFlag}${allForFlag}`,
+			{
+				cwd: dirname(__dirname), // api package root
+				stdio: 'inherit',
+			},
+		)
 	} catch (error) {
 		console.error(
 			'\n✗ fetch-results exited with an error. See output above for details.',

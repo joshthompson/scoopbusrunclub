@@ -1,6 +1,6 @@
 import { css } from '@style/css'
 import { For, Show, createMemo } from 'solid-js'
-import type { RunResultItem, VolunteerItem } from '../utils/api'
+import type { RaceItem, RunResultItem, VolunteerItem } from '../utils/api'
 import {
 	type WeekActivity,
 	type WeekCell,
@@ -34,11 +34,12 @@ function formatHeatmapDate(dateStr: string): string {
 
 function tooltipContent(week: WeekCell) {
 	const date = formatHeatmapDate(week.date)
+	const dateLabel = week.isSpecial ? `${date} - ${week.specialName}` : date
 	const detail =
 		week.activity !== 'none' ? week.label : ACTIVITY_LABELS[week.activity]
 	return (
 		<>
-			<div>{date}</div>
+			<div>{dateLabel}</div>
 			<div>{detail}</div>
 		</>
 	)
@@ -48,11 +49,17 @@ interface Props {
 	parkrunId: string
 	results: RunResultItem[]
 	volunteers: VolunteerItem[]
+	races?: RaceItem[]
 }
 
 export function ParkrunHeatmap(props: Props) {
 	const data = createMemo(() =>
-		buildHeatmapData(props.parkrunId, props.results, props.volunteers),
+		buildHeatmapData(
+			props.parkrunId,
+			props.results,
+			props.volunteers,
+			props.races ?? [],
+		),
 	)
 
 	return (
@@ -64,7 +71,11 @@ export function ParkrunHeatmap(props: Props) {
 						{(week: WeekCell) => (
 							<Tooltip content={tooltipContent(week)}>
 								<div
-									class={styles.cell}
+									class={
+										week.isSpecial
+											? `${styles.cell} ${styles.specialCell}`
+											: styles.cell
+									}
 									style={{ 'background-color': ACTIVITY_COLORS[week.activity] }}
 								/>
 							</Tooltip>
@@ -151,6 +162,14 @@ const styles = {
 			transform: 'scale(1.4)',
 			filter: 'brightness(1.3)',
 			zIndex: 10,
+		},
+	}),
+	specialCell: css({
+		_before: {
+			content: '"✨"',
+			fontSize: '0.7rem',
+			filter: 'brightness(10)',
+			display: 'block',
 		},
 	}),
 	legend: css({

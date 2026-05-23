@@ -6,7 +6,12 @@ import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
 import starsAsset from '@/assets/misc/stars.png'
 import sunAsset from '@/assets/misc/sun.png'
-import { type RunnerName, type RunnerState, runners } from '@/data/runners'
+import {
+	hasHeaderArtwork,
+	type RunnerName,
+	type RunnerState,
+	runners,
+} from '@/data/runners'
 import { RoleTranslations } from '@/data/volunteer-roles'
 import type { RunResultItem, VolunteerItem } from '@/utils/api'
 import { parseTimeToSeconds } from '@/utils/misc'
@@ -245,7 +250,9 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		images: [],
 		setup($scene) {
 			// Create Runners
-			const runnerIds = Object.keys(runners) as (keyof typeof runners)[]
+			const runnerIds = (
+				Object.keys(runners) as (keyof typeof runners)[]
+			).filter((key) => hasHeaderArtwork(runners[key][0]()))
 			const runnerControllers = Array(runnerIds.length * 1)
 				.fill(0)
 				.map((_, i) =>

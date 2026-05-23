@@ -62,6 +62,10 @@ interface IngestPayload {
 const ingestAll = process.argv.includes('--all')
 const isDryRun = process.argv.includes('--dry')
 
+/** --all-for=Name1,Name2 fetches full history for specific athletes only */
+const allForArg = process.argv.find((a) => a.startsWith('--all-for='))
+const allForNames = new Set(allForArg ? allForArg.split('=')[1].split(',') : [])
+
 /** Cutoff date: only ingest results from the last 6 weeks (unless --all) */
 function getCutoffDate(): string {
 	const d = new Date()
@@ -74,6 +78,10 @@ async function main() {
 
 	if (ingestAll) {
 		console.log('Running with --all: ingesting full run history.')
+	} else if (allForNames.size > 0) {
+		console.log(
+			`Ingesting full history for: ${[...allForNames].join(', ')}. Others: last 6 weeks.`,
+		)
 	} else {
 		console.log(
 			`Ingesting results from the last 6 weeks (since ${getCutoffDate()}). Use --all for full history.`,
@@ -140,11 +148,12 @@ async function main() {
 				}
 			}
 
-			const filteredResults = ingestAll
+			const shouldIngestAll = ingestAll || allForNames.has(name)
+			const filteredResults = shouldIngestAll
 				? runResults
 				: runResults.filter((r) => r.date >= getCutoffDate())
 
-			if (!ingestAll && filteredResults.length < runResults.length) {
+			if (!shouldIngestAll && filteredResults.length < runResults.length) {
 				console.log(
 					`    ${filteredResults.length} of ${runResults.length} results within 6-week window`,
 				)

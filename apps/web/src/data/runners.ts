@@ -23,6 +23,8 @@ export type RunnerName =
 	| 'link'
 	| 'otherJosh'
 	| 'mikael'
+	| 'mia'
+	| 'david'
 
 export type RunnerState =
 	// Default
@@ -40,9 +42,9 @@ export interface RunnerData {
 	id: string
 	birthday: Birthday // Format: DD/MM
 	frames: {
-		run: string[]
-		sit: string[]
-		face: string[]
+		run: string[] | undefined
+		sit: string[] | undefined
+		face: string[] | undefined
 		tailWalk: string[] | undefined // and Park Walker
 		tailSit: string[] | undefined
 		scanner: string[] | undefined // And Timekeeper
@@ -60,6 +62,10 @@ export interface RunnerData {
 	latestTime?: string
 	volunteerRoles?: string[]
 	time?: string
+}
+
+export function hasHeaderArtwork(runner: RunnerData): boolean {
+	return Boolean(runner.frames.run?.length && runner.frames.sit?.length)
 }
 
 export const runners: Record<
@@ -483,6 +489,48 @@ export const runners: Record<
 			),
 			sit: [assets.mikaelSit],
 			face: [assets.mikaelFace],
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: undefined,
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 3.2,
+		frameInterval: 75,
+	}),
+	mia: createSignal<RunnerData>({
+		name: 'Mia',
+		id: '8398883',
+		birthday: '00/00',
+		frames: {
+			run: undefined,
+			sit: undefined,
+			face: undefined,
+			tailWalk: undefined,
+			tailSit: undefined,
+			scanner: undefined,
+			photographer: undefined,
+			runDirector: undefined,
+			marshal: undefined,
+			volunteerGeneric: undefined,
+		},
+		width: 21,
+		height: 28,
+		speed: 3.2,
+		frameInterval: 75,
+	}),
+	david: createSignal<RunnerData>({
+		name: 'David',
+		id: '3710502',
+		birthday: '00/00',
+		frames: {
+			run: undefined,
+			sit: undefined,
+			face: undefined,
 			tailWalk: undefined,
 			tailSit: undefined,
 			scanner: undefined,

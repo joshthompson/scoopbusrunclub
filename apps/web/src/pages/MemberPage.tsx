@@ -20,7 +20,12 @@ import {
 	getVolunteerCelebrationTags,
 } from '../components/ResultCelebrations'
 import { DirtBlock } from '../components/ui/DirtBlock'
-import type { RunResultItem, Runner, VolunteerItem } from '../utils/api'
+import type {
+	RaceItem,
+	RunResultItem,
+	Runner,
+	VolunteerItem,
+} from '../utils/api'
 import { NotFoundPage } from './NotFoundPage'
 import { RunnerSummaryStat } from './RunnerSummaryStat'
 
@@ -28,6 +33,7 @@ interface MemberPageProps {
 	results: RunResultItem[]
 	runners: Runner[]
 	volunteers: VolunteerItem[]
+	races?: RaceItem[]
 	celebrationData?: CelebrationData
 }
 
@@ -478,6 +484,7 @@ export function MemberPage(props: MemberPageProps) {
 						parkrunId={runnerId()}
 						results={props.results}
 						volunteers={props.volunteers}
+						races={props.races}
 					/>
 
 					{/* Compare with another runner */}
@@ -485,7 +492,10 @@ export function MemberPage(props: MemberPageProps) {
 						<div class={styles.compareGrid}>
 							<For
 								each={Object.entries(runnerSignals).filter(
-									([key]) => key !== runnerKey() && key !== 'link',
+									([key, [signal]]) =>
+										key !== runnerKey() &&
+										key !== 'link' &&
+										Boolean(signal().frames.face?.[0]),
 								)}
 							>
 								{([key, [signal]]) => {

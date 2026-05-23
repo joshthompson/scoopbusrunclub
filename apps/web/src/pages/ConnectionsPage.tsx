@@ -44,7 +44,7 @@ const faceByKey = new Map<string, string>()
 for (const [key, [runner]] of Object.entries(runnerSignals)) {
 	const data = runner()
 	if (data.id) parkrunIdToMeta.set(data.id, { name: data.name, key })
-	if (data.frames.face[0]) faceByKey.set(key, data.frames.face[0])
+	if (data.frames.face?.[0]) faceByKey.set(key, data.frames.face[0])
 }
 
 function computeConnections(

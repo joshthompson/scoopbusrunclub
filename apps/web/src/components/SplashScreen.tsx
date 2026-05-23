@@ -33,12 +33,14 @@ export function SplashScreen(props: SplashScreenProps) {
 
 	// Pick a random runner (excluding "link" the dog)
 	const runnerKeys = Object.keys(runnerSignals).filter(
-		(k) => k !== 'link',
+		(k) =>
+			k !== 'link' &&
+			(runnerSignals[k as RunnerName][0]().frames.run?.length ?? 0) > 0,
 	) as RunnerName[]
 	const chosenKey = randomItem(runnerKeys)
 	const [runnerSig] = runnerSignals[chosenKey]
 	const runner = runnerSig()
-	const frames = [...runner.frames.run].reverse()
+	const frames = [...(runner.frames.run ?? [])].reverse()
 
 	// Sprite animation
 	const [frameIndex, setFrameIndex] = createSignal(0)

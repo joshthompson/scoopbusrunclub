@@ -129,6 +129,7 @@ const App: Component = () => {
 								results={results() ?? []}
 								runners={runners() ?? []}
 								volunteers={volunteers() ?? []}
+								races={races() ?? []}
 								celebrationData={celebrationData()}
 							/>
 						</Show>

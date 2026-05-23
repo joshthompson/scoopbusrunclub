@@ -100,13 +100,14 @@ export function createRunnerController(
 	mousePosition: Accessor<{ x: number; y: number }>,
 ) {
 	const [runner] = runners[runnerId]
+	const runFrames = () => runner().frames.run ?? []
 	const baseY = 124 + yShift
 	let flashTriggered = false
 	let flashCounter = 0
 	const FLASH_PROXIMITY = 60
 
 	return createController({
-		frames: [...runner().frames.run],
+		frames: [...runFrames()],
 		randomStartFrame: true,
 		init() {
 			const { x, setX } = createObjectSignal(
@@ -130,7 +131,7 @@ export function createRunnerController(
 				...createObjectSignal(0, 'rotation'),
 				...createObjectSignal(0, 'ySpeed'),
 				...createObjectSignal(false, 'scooped'),
-				...createObjectSignal(runner().frames.run, 'frames'),
+				...createObjectSignal(runFrames(), 'frames'),
 				...createObjectSignal(0, 'sitting'),
 				...createObjectSignal('run' as RunnerState, 'activeState'),
 				width,
@@ -245,7 +246,7 @@ export function createRunnerController(
 				if (!frames) frames = runner().frames.volunteerGeneric
 				if (!frames) frames = runner().frames.sit
 
-				if (frames) $.setFrames(runner().frames.run.map(() => frames?.[0]))
+				if (frames?.length) $.setFrames(runFrames().map(() => frames[0]))
 				// No movement, no scooping — just render in place
 				return
 			}
@@ -276,7 +277,7 @@ export function createRunnerController(
 						? // biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 							runner().frames.tailSit!
 						: runner().frames.sit
-				$.setFrames(runner().frames.run.map(() => sitFrames[0]))
+				if (sitFrames?.length) $.setFrames(runFrames().map(() => sitFrames[0]))
 			}
 
 			// Running
@@ -285,7 +286,7 @@ export function createRunnerController(
 					// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 					$.setFrames(runner().frames.tailWalk!)
 				} else {
-					$.setFrames(runner().frames.run)
+					$.setFrames(runFrames())
 				}
 				$.setX($.x() - runner().speed * (1 + Math.random() * 0.4))
 				$.setRotation(Math.random() * 3 - 0.5)

@@ -14,7 +14,9 @@ export function CharacterImage(props: {
 			role="img"
 			aria-label={`Image of ${runner().name}`}
 		>
-			<img src={runner().frames.sit[0]} class={styles.sitting} alt="" />
+			{runner().frames.sit?.[0] && (
+				<img src={runner().frames.sit?.[0]} class={styles.sitting} alt="" />
+			)}
 			{runner().name === 'Alisa' && (
 				<img
 					src={runners.link[0]().frames.sit[0]}

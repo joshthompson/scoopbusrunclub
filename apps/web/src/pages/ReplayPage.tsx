@@ -287,7 +287,7 @@ function distToSegment(px: number, py: number, a: Point2D, b: Point2D): number {
 const parkrunIdToFace = new Map<string, { face: string; name: string }>()
 for (const [, [accessor]] of Object.entries(runnerSignals)) {
 	const data = accessor()
-	if (data.id && data.frames.face[0]) {
+	if (data.id && data.frames.face?.[0]) {
 		parkrunIdToFace.set(data.id, { face: data.frames.face[0], name: data.name })
 	}
 }
@@ -296,7 +296,7 @@ for (const [, [accessor]] of Object.entries(runnerSignals)) {
 const nameToFace = new Map<string, { face: string; name: string }>()
 for (const [key, [accessor]] of Object.entries(runnerSignals)) {
 	const data = accessor()
-	if (data.frames.face[0]) {
+	if (data.frames.face?.[0]) {
 		nameToFace.set(key.toLowerCase(), {
 			face: data.frames.face[0],
 			name: data.name,

@@ -1502,7 +1502,7 @@ export function VolunteerCelebrations(props: VolunteerCelebrationsProps) {
 function getRunnerFace(parkrunId: string): string | undefined {
 	for (const [, [accessor]] of Object.entries(runnerSignals)) {
 		const data = accessor()
-		if (data.id === parkrunId && data.frames.face.length > 0) {
+		if (data.id === parkrunId && (data.frames.face?.length ?? 0) > 0) {
 			return data.frames.face[0]
 		}
 	}

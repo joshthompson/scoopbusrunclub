@@ -24,6 +24,8 @@ export const TRACKED_ATHLETES: { parkrunId: string; name: string }[] = [
 	{ parkrunId: '9679233', name: 'Rick' },
 	{ parkrunId: '5346109', name: 'Other Josh' },
 	{ parkrunId: '9854274', name: 'Mikael' },
+	{ parkrunId: '8398883', name: 'Mia' },
+	{ parkrunId: '3710502', name: 'David' },
 ]
 
 export const TRACKED_IDS = new Set(TRACKED_ATHLETES.map((a) => a.parkrunId))
