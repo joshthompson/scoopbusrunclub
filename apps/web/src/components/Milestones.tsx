@@ -1,5 +1,6 @@
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Emoji } from '@/components/ui/Emoji'
+import { runners as runnerSignals } from '@/data/runners'
 import { getMemberRoute } from '@/utils/memberRoute'
 import { formatDate, formatName } from '@/utils/misc'
 import { A } from '@solidjs/router'
@@ -12,6 +13,16 @@ import {
 	nextMilestone,
 	ordinalSuffix,
 } from '../utils/milestones'
+
+const parkrunIdToShortName = new Map<string, string>()
+for (const [, [runner]] of Object.entries(runnerSignals)) {
+	const data = runner()
+	if (data.id) parkrunIdToShortName.set(data.id, data.name)
+}
+
+function displayName(parkrunId: string, fallbackName: string): string {
+	return parkrunIdToShortName.get(parkrunId) ?? formatName(fallbackName)
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -130,11 +141,11 @@ export function Milestones(props: Props) {
 								<li class={styles.celebRow}>
 									<Show
 										when={getMemberRoute(row.parkrunId, row.name)}
-										fallback={<span>{formatName(row.name)}</span>}
-									>
-										{(href) => (
-											<A href={href()} class={styles.memberLink}>
-												{formatName(row.name)}
+									fallback={<span>{displayName(row.parkrunId, row.name)}</span>}
+								>
+									{(href) => (
+										<A href={href()} class={styles.memberLink}>
+											{displayName(row.parkrunId, row.name)}
 											</A>
 										)}
 									</Show>{' '}
@@ -155,11 +166,11 @@ export function Milestones(props: Props) {
 									<em>
 										<Show
 											when={getMemberRoute(row.parkrunId, row.name)}
-											fallback={<span>{formatName(row.name)}</span>}
-										>
-											{(href) => (
-												<A href={href()} class={styles.memberLink}>
-													{formatName(row.name)}
+										fallback={<span>{displayName(row.parkrunId, row.name)}</span>}
+									>
+										{(href) => (
+											<A href={href()} class={styles.memberLink}>
+												{displayName(row.parkrunId, row.name)}
 												</A>
 											)}
 										</Show>
