@@ -52,6 +52,12 @@ export const COURSE_OVERRIDES: Record<string, CourseOverride> = {
 			[0, 1], // Final strech to the Finish
 		],
 	},
+	boulognerskogen: {
+		sections: [
+			[0, 909], // Lap 1
+			[0, 909], // Lap 2
+		],
+	},
 }
 
 /**

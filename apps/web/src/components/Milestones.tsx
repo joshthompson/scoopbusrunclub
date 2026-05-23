@@ -141,11 +141,13 @@ export function Milestones(props: Props) {
 								<li class={styles.celebRow}>
 									<Show
 										when={getMemberRoute(row.parkrunId, row.name)}
-									fallback={<span>{displayName(row.parkrunId, row.name)}</span>}
-								>
-									{(href) => (
-										<A href={href()} class={styles.memberLink}>
-											{displayName(row.parkrunId, row.name)}
+										fallback={
+											<span>{displayName(row.parkrunId, row.name)}</span>
+										}
+									>
+										{(href) => (
+											<A href={href()} class={styles.memberLink}>
+												{displayName(row.parkrunId, row.name)}
 											</A>
 										)}
 									</Show>{' '}
@@ -166,11 +168,13 @@ export function Milestones(props: Props) {
 									<em>
 										<Show
 											when={getMemberRoute(row.parkrunId, row.name)}
-										fallback={<span>{displayName(row.parkrunId, row.name)}</span>}
-									>
-										{(href) => (
-											<A href={href()} class={styles.memberLink}>
-												{displayName(row.parkrunId, row.name)}
+											fallback={
+												<span>{displayName(row.parkrunId, row.name)}</span>
+											}
+										>
+											{(href) => (
+												<A href={href()} class={styles.memberLink}>
+													{displayName(row.parkrunId, row.name)}
 												</A>
 											)}
 										</Show>

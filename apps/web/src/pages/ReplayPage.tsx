@@ -283,7 +283,14 @@ function distToSegment(px: number, py: number, a: Point2D, b: Point2D): number {
 	return Math.sqrt((px - closestX) ** 2 + (py - closestY) ** 2)
 }
 
-/** Build a lookup: parkrunId → face image URL (only for our club members). */
+/** Build a lookup: parkrunId → short name (all club members, regardless of artwork). */
+const parkrunIdToShortName = new Map<string, string>()
+for (const [, [accessor]] of Object.entries(runnerSignals)) {
+	const data = accessor()
+	if (data.id) parkrunIdToShortName.set(data.id, data.name)
+}
+
+/** Build a lookup: parkrunId → face image URL (only for our club members with artwork). */
 const parkrunIdToFace = new Map<string, { face: string; name: string }>()
 for (const [, [accessor]] of Object.entries(runnerSignals)) {
 	const data = accessor()
@@ -389,7 +396,10 @@ export function ReplayPage(props: ReplayPageProps) {
 				const entry = parkrunIdToFace.get(r.parkrunId)
 				return {
 					parkrunId: r.parkrunId,
-					name: entry?.name ?? r.runnerName,
+					name:
+						parkrunIdToShortName.get(r.parkrunId) ??
+						entry?.name ??
+						formatName(r.runnerName),
 					finishSeconds: secs,
 					position: r.position,
 					face: entry?.face ?? null,
@@ -479,7 +489,8 @@ export function ReplayPage(props: ReplayPageProps) {
 			const memberRoute = getMemberRoute(v.parkrunId)
 			const name = memberRoute ? (
 				<A key={`${v.parkrunId}-name`} href={memberRoute} class={styles.link}>
-					{parkrunIdToFace.get(v.parkrunId)?.name ??
+					{parkrunIdToShortName.get(v.parkrunId) ??
+						parkrunIdToFace.get(v.parkrunId)?.name ??
 						formatName(v.volunteerName)}
 				</A>
 			) : (
