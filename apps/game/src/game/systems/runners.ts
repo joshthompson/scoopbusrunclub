@@ -62,6 +62,7 @@ import type {
 	WaterZone,
 } from '../types'
 import { resolvePositionAgainstBridges } from './bridges'
+import { generateRandomAppearance } from '../characters'
 import { resolvePositionAgainstBuildings } from './buildings'
 import { applyRunnerInteractionPose } from './runnerInteractions'
 import { getWaterSurfaceYAt, mulberry32 } from './terrain'
@@ -94,7 +95,8 @@ export function spawnRunners(
 			0.3 + rand() * 0.7,
 		)
 
-		const model = createRunnerModel(scene, i, tshirtColor)
+		const appearance = generateRandomAppearance()
+		const model = createRunnerModel(scene, i, tshirtColor, appearance)
 		const runnerGroundY = getGroundY(px + lateralOffset, pz)
 		model.root.position = new Vector3(px + lateralOffset, runnerGroundY, pz)
 

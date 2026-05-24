@@ -43,6 +43,7 @@ import {
 } from './game/objects/BusModel'
 import {
 	createRunnerModel,
+	preloadRunnerModel,
 	poseSitting,
 	poseSittingAnimated,
 } from './game/objects/RunnerModel'
@@ -151,6 +152,7 @@ async function init() {
 	createAxes(scene, axesRoot)
 
 	// ── Load bus model ──
+	await preloadRunnerModel(scene)
 	const busResult = await createBusModel(scene)
 	busRoot = busResult.root
 	bodyShell = busResult.bodyShell

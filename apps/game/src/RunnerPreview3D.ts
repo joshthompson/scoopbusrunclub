@@ -22,6 +22,7 @@ import {
 import { createCorgiModel } from './game/objects/CorgiModel'
 import {
 	createRunnerModel,
+	preloadRunnerModel,
 	poseStanding,
 	poseWaving,
 } from './game/objects/RunnerModel'
@@ -59,7 +60,7 @@ function getSharedEngine(): { canvas: HTMLCanvasElement; engine: Engine } {
  * Render a runner model with the given appearance to a data URL image.
  * Camera is positioned to show head and shoulders.
  */
-export function renderRunnerPreview(
+export async function renderRunnerPreview(
 	appearance: RunnerAppearance,
 ): Promise<string> {
 	const { canvas, engine } = getSharedEngine()
@@ -81,6 +82,9 @@ export function renderRunnerPreview(
 	)
 	light.intensity = 1.2
 	light.groundColor = new Color3(0.3, 0.3, 0.35)
+
+	// Preload runner model for this scene
+	await preloadRunnerModel(scene)
 
 	// Build runner
 	const model = createRunnerModel(
@@ -278,17 +282,19 @@ function getLiveEngine(): { canvas: HTMLCanvasElement; engine: Engine } {
 }
 
 function liveLoop() {
-	if (!liveEngine || !liveScene || !liveModel) return
-	const elapsed = (performance.now() - liveStartTime) / 1000
+	if (!liveEngine || !liveScene) return
+	if (liveModel) {
+		const elapsed = (performance.now() - liveStartTime) / 1000
 
-	// Smoothly ramp wave t from 0→1 over 0.4 s, then hold at a cycling mid-wave
-	const rampT = Math.min(elapsed / 0.4, 1)
-	// Wave oscillation (t stays in 0.3–0.7 range = fully raised region)
-	const waveT = 0.3 + 0.2 * Math.sin(elapsed * 3) * rampT + 0.2 * rampT
-	// Run-phase drives the oscillation on the waving arm
-	const runPhase = elapsed * 6
+		// Smoothly ramp wave t from 0→1 over 0.4 s, then hold at a cycling mid-wave
+		const rampT = Math.min(elapsed / 0.4, 1)
+		// Wave oscillation (t stays in 0.3–0.7 range = fully raised region)
+		const waveT = 0.3 + 0.2 * Math.sin(elapsed * 3) * rampT + 0.2 * rampT
+		// Run-phase drives the oscillation on the waving arm
+		const runPhase = elapsed * 6
 
-	poseWaving(liveModel, runPhase, Math.min(rampT, waveT), 1)
+		poseWaving(liveModel, runPhase, Math.min(rampT, waveT), 1)
+	}
 
 	liveEngine.beginFrame()
 	liveScene.render()
@@ -341,15 +347,22 @@ export function startLiveWavePreview(
 	light.intensity = 1.2
 	light.groundColor = new Color3(0.3, 0.3, 0.35)
 
-	const model = appearance
-		? createRunnerModel(scene, 997, new Color3(0.5, 0.5, 0.5), appearance)
-		: createCorgiModel(scene, 997)
-	poseStanding(model)
-	model.root.rotation.y = 0.3
-
 	liveScene = scene
-	liveModel = model
 	liveStartTime = performance.now()
+
+	// Load runner model async, then start animating
+	const buildModel = async () => {
+		await preloadRunnerModel(scene)
+		// Check scene wasn't disposed during load
+		if (liveScene !== scene) return
+		const model = appearance
+			? createRunnerModel(scene, 997, new Color3(0.5, 0.5, 0.5), appearance)
+			: createCorgiModel(scene, 997)
+		poseStanding(model)
+		model.root.rotation.y = 0.3
+		liveModel = model
+	}
+	buildModel()
 
 	// Start render loop
 	liveRafId = requestAnimationFrame(liveLoop)

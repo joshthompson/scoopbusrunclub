@@ -50,6 +50,8 @@ export interface RunnerAppearance {
 	bottomColor: string
 	socks?: string // optional sock colour (CSS name or hex); renders on lower 1/4 of leg
 	heightScale?: number // optional height multiplier (default 1); e.g. 0.5 = half height, 1.2 = 20% taller
+	model?: 'standard' | 'kid'
+	shoeColor?: string // optional shoe colour (CSS name or hex); defaults to black if not set
 }
 
 export type RunnerPreset = RunnerPresetBase &
@@ -229,10 +231,10 @@ export const RUNNER_PRESETS: RunnerPreset[] = [
 			skin: 'light',
 			top: 'longSleeve',
 			topColor: '#9D79B8',
-			bottom: 'shorts',
+			bottom: 'trousers',
 			bottomColor: '#9D79B8',
-			heightScale: 0.5,
 			socks: '#E39CE4',
+			model: 'kid',
 		},
 	},
 	{
@@ -391,7 +393,7 @@ export const NAMED_COLORS: Record<string, string> = {
 	Black: '#111111',
 	White: '#f0f0f0',
 	DarkGrey: '#444444',
-	LightGrey: '#bbbbbb',
+	LightGrey: '#c4c4c4',
 	Green: '#30a040',
 	Yellow: '#f0c820',
 	Orange: '#e08020',
@@ -530,6 +532,15 @@ const HAT_COLORS = [
 	'Purple',
 ]
 const SOCK_COLORS = ['#ffffff', '#000000', '#dd3030', '#3060d0']
+const SHOE_COLORS = [
+	'#ffffff',
+	'#000000',
+	'#333333',
+	'#dd3030',
+	'#3060d0',
+	'#30a040',
+	'#e08020',
+]
 
 /** Generate a completely random runner appearance. */
 export function generateRandomAppearance(): RunnerAppearance {
@@ -542,8 +553,12 @@ export function generateRandomAppearance(): RunnerAppearance {
 		bottom: pick(BOTTOM_STYLES),
 		bottomColor: pick(ALL_BOTTOM_COLORS),
 	}
-	// 30% chance of facial hair
-	if (Math.random() < 0.3) {
+	// 15% chance of kid model
+	if (Math.random() < 0.15) {
+		appearance.model = 'kid'
+	}
+	// 30% chance of facial hair (only for non-kid)
+	if (appearance.model !== 'kid' && Math.random() < 0.3) {
 		appearance.facialHair = pick(FACIAL_HAIRS)
 	}
 	// 30% chance of hat
@@ -553,6 +568,10 @@ export function generateRandomAppearance(): RunnerAppearance {
 	// 40% chance of socks
 	if (Math.random() < 0.4) {
 		appearance.socks = pick(SOCK_COLORS)
+	}
+	// 50% chance of coloured shoes (otherwise default white)
+	if (Math.random() < 0.5) {
+		appearance.shoeColor = pick(SHOE_COLORS)
 	}
 	return appearance
 }

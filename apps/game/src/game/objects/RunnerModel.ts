@@ -1,12 +1,15 @@
 import {
+	AbstractMesh,
 	Color3,
 	type Mesh,
 	MeshBuilder,
 	type Scene,
+	SceneLoader,
 	StandardMaterial,
 	TransformNode,
 	Vector3,
 } from '@babylonjs/core'
+import '@babylonjs/loaders/glTF'
 import type { RunnerAppearance } from '../characters'
 import {
 	HAIR_COLOR_HEX,
@@ -16,14 +19,37 @@ import {
 } from '../characters'
 import type { PreviewRunnerRole } from '../systems/previewRunners'
 
-// ---------- Skin tones (legacy fallback for NPC runners) ----------
-const SKIN_TONES: Color3[] = [
-	new Color3(0.96, 0.84, 0.72), // light
-	new Color3(0.87, 0.72, 0.53), // medium-light
-	new Color3(0.76, 0.57, 0.38), // medium
-	new Color3(0.55, 0.38, 0.24), // medium-dark
-	new Color3(0.38, 0.25, 0.16), // dark
-]
+import runnerModelUrl from '../../assets/models/runner.glb?url'
+
+// ═══════════════════════════════════════
+// GLB-based runner model
+// ═══════════════════════════════════════
+
+/** Target height for the "standart" (standard) model variant in metres. */
+const TARGET_HEIGHT = 1.7
+
+/**
+ * Cached containers per scene. We load once per scene and instantiate clones
+ * so that createRunnerModel can remain synchronous after preloading.
+ */
+const containerCache = new WeakMap<
+	Scene,
+	Awaited<ReturnType<typeof SceneLoader.LoadAssetContainerAsync>>
+>()
+
+/**
+ * Preload the runner GLB. Call once during scene setup before any
+ * createRunnerModel calls. Safe to call multiple times (no-ops after first).
+ */
+export async function preloadRunnerModel(scene: Scene): Promise<void> {
+	if (containerCache.has(scene)) return
+	const container = await SceneLoader.LoadAssetContainerAsync(
+		'',
+		runnerModelUrl,
+		scene,
+	)
+	containerCache.set(scene, container)
+}
 
 export interface RunnerModelResult {
 	/** Root node – position/rotate this to move the runner */
@@ -38,784 +64,383 @@ export interface RunnerModelResult {
 }
 
 /**
- * Create a blocky runner character.
+ * Create a runner from the preloaded runner.glb model.
  *
- * Body proportions (Minecraft-ish, total ~1.6 m):
- *   Head:  0.3 × 0.3 × 0.3
- *   Torso: 0.4 × 0.5 × 0.25
- *   Arm:   0.15 × 0.55 × 0.15  (upper = sleeve, lower = skin)
- *   Leg:   0.18 × 0.55 × 0.18  (upper = shorts/trousers, lower = skin)
+ * Conditionally renders body variant, hair, facial hair, cap, and applies
+ * colours based on RunnerAppearance.
  *
- * The root origin is at foot level (y = 0).
- *
- * @param appearance  If provided, the model is built from the preset config.
- *                    When omitted, legacy random NPC behaviour is used.
+ * Call `preloadRunnerModel(scene)` once before using this function.
  */
 export function createRunnerModel(
 	scene: Scene,
 	id: number,
-	tshirtColor: Color3,
+	_tshirtColor: Color3,
 	appearance?: RunnerAppearance,
 ): RunnerModelResult {
 	const root = new TransformNode(`runner_${id}`, scene)
 
-	// --- Resolve colours from appearance (or fall back to legacy random) ---
-	const skinColor: Color3 = appearance
-		? hexToColor3(SKIN_TONE_HEX[appearance.skin])
-		: SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)]
-
-	const hairColor: Color3 = appearance
-		? hexToColor3(HAIR_COLOR_HEX[appearance.hairColor])
-		: new Color3(
-				0.15 + Math.random() * 0.25,
-				0.1 + Math.random() * 0.15,
-				0.05 + Math.random() * 0.1,
-			)
-
-	const topColor: Color3 = appearance
-		? hexToColor3(resolveColor(appearance.topColor))
-		: tshirtColor
-
-	const bottomColor: Color3 = appearance
-		? hexToColor3(resolveColor(appearance.bottomColor))
-		: new Color3(0.08, 0.08, 0.08)
-
-	// --- Materials ---
-	const shirtMat = makeMat(`rShirt_${id}`, topColor, scene)
-	const skinMat = makeMat(`rSkin_${id}`, skinColor, scene)
-	const bottomMat = makeMat(`rShorts_${id}`, bottomColor, scene)
-	const shoeMat = makeMat(`rShoe_${id}`, new Color3(1, 1, 1), scene)
-	const hairMat = makeMat(`rHair_${id}`, hairColor, scene)
-
-	// Height scale: >1 stretches legs + torso, <1 shrinks whole model uniformly
-	const hs = appearance?.heightScale ?? 1
-	const stretch = hs > 1 ? hs : 1
-
-	// ═══════════════════════════════════════
-	// Torso
-	// ═══════════════════════════════════════
-	const torsoH = 0.5 * stretch
-	const torsoW = 0.4
-	const torsoD = 0.25
-	const baseLegH = 0.55 * stretch // used for torsoY before legs section
-	const torsoY = baseLegH + torsoH / 2
-
-	const torso = MeshBuilder.CreateBox(
-		`rTorso_${id}`,
-		{
-			width: torsoW,
-			height: torsoH,
-			depth: torsoD,
-		},
-		scene,
-	)
-	torso.material = shirtMat
-	torso.position.y = torsoY
-	torso.parent = root
-
-	// ═══════════════════════════════════════
-	// Head
-	// ═══════════════════════════════════════
-	const headSize = 0.3
-	const headY = torsoY + torsoH / 2 + headSize / 2 + 0.02
-
-	const head = MeshBuilder.CreateBox(
-		`rHead_${id}`,
-		{
-			width: headSize,
-			height: headSize,
-			depth: headSize,
-		},
-		scene,
-	)
-	head.material = skinMat
-	head.position.y = headY
-	head.parent = root
-
-	// --- Hat (baseball cap) ---
-	const hasHat = !!appearance?.hat
-	if (hasHat) {
-		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-		const hatHex = resolveColor(appearance?.hat!)
-		const hatMat = makeMat(`rHat_${id}`, hexToColor3(hatHex), scene)
-		const hatDarkMat = makeMat(
-			`rHatDark_${id}`,
-			hexToColor3(hatHex).scale(0.7),
-			scene,
+	const cachedContainer = containerCache.get(scene)
+	if (cachedContainer) {
+		// Instantiate a clone from the cached container
+		const instance = cachedContainer.instantiateModelsToScene(
+			(name) => `${name}_${id}`,
 		)
 
-		// Crown — sits on top of the head (wider than hair so it renders over it)
-		const crownH = 0.1
-		const crown = MeshBuilder.CreateBox(
-			`rHatCrown_${id}`,
-			{
-				width: headSize + 0.1,
-				height: crownH,
-				depth: headSize + 0.1,
-			},
-			scene,
-		)
-		crown.material = hatMat
-		crown.position.y = headY + headSize / 2 + crownH / 2
-		crown.parent = root
+		// Wrapper node that ALL instantiated content goes under.
+		// This ensures scale/position affects everything regardless of GLB structure.
+		const glbWrapper = new TransformNode(`glbWrap_${id}`, scene)
+		glbWrapper.parent = root
 
-		// Visor / bill — extends forward from the front of the crown
-		const visorDepth = 0.16
-		const visor = MeshBuilder.CreateBox(
-			`rHatVisor_${id}`,
-			{
-				width: headSize + 0.08,
-				height: 0.025,
-				depth: visorDepth,
-			},
-			scene,
-		)
-		visor.material = hatDarkMat
-		visor.position.set(
-			0,
-			headY + headSize / 2 + 0.01,
-			headSize / 2 + visorDepth / 2 - 0.02,
-		)
-		visor.parent = root
-	}
-
-	// --- Hair (always rendered, hat sits on top) ---
-	const hairStyle = appearance?.hair ?? 'short'
-	if (hairStyle !== 'bald') {
-		if (hairStyle === 'short') {
-			// Short: just a cap on top
-			const hairTop = MeshBuilder.CreateBox(
-				`rHairTop_${id}`,
-				{
-					width: headSize + 0.02,
-					height: 0.06,
-					depth: headSize + 0.02,
-				},
-				scene,
-			)
-			hairTop.material = hairMat
-			hairTop.position.y = headY + headSize / 2 + 0.03
-			hairTop.parent = root
-		} else if (hairStyle === 'medium') {
-			// Medium: shoulder-length continuous helmet — top, sides, and back as one visual mass
-			// Top
-			const mTop = MeshBuilder.CreateBox(
-				`rHairMedTop_${id}`,
-				{
-					width: headSize + 0.04,
-					height: 0.08,
-					depth: headSize + 0.04,
-				},
-				scene,
-			)
-			mTop.material = hairMat
-			mTop.position.y = headY + headSize / 2 + 0.04
-			mTop.parent = root
-			// Sides (run from top of head down to shoulders)
-			const sideH = headSize + 0.15 // extends below head to shoulder level
-			for (const side of [-1, 1]) {
-				const sideBlock = MeshBuilder.CreateBox(
-					`rHairMedSide${side > 0 ? 'R' : 'L'}_${id}`,
-					{
-						width: 0.05,
-						height: sideH,
-						depth: headSize + 0.04,
-					},
-					scene,
-				)
-				sideBlock.material = hairMat
-				sideBlock.position.set(
-					side * (headSize / 2 + 0.015),
-					headY + headSize / 2 - sideH / 2 + 0.04,
-					0,
-				)
-				sideBlock.parent = root
-			}
-			// Back (runs from top of head down to shoulders)
-			const backH = headSize + 0.15
-			const mBack = MeshBuilder.CreateBox(
-				`rHairMedBack_${id}`,
-				{
-					width: headSize + 0.04,
-					height: backH,
-					depth: 0.05,
-				},
-				scene,
-			)
-			mBack.material = hairMat
-			mBack.position.set(
-				0,
-				headY + headSize / 2 - backH / 2 + 0.04,
-				-(headSize / 2 + 0.015),
-			)
-			mBack.parent = root
-		} else if (hairStyle === 'ponytail') {
-			// Ponytail: continuous hair shell (like medium) + tail from the back
-			// Top — single slab covering the head
-			const ptTop = MeshBuilder.CreateBox(
-				`rHairPTTop_${id}`,
-				{
-					width: headSize + 0.04,
-					height: 0.07,
-					depth: headSize + 0.04,
-				},
-				scene,
-			)
-			ptTop.material = hairMat
-			ptTop.position.y = headY + headSize / 2 + 0.035
-			ptTop.parent = root
-
-			// Sides — continuous shell from top-of-head down past ear level
-			const ptSideH = headSize * 0.6
-			for (const side of [-1, 1]) {
-				const sideBlock = MeshBuilder.CreateBox(
-					`rHairPTSide${side > 0 ? 'R' : 'L'}_${id}`,
-					{
-						width: 0.05,
-						height: ptSideH,
-						depth: headSize + 0.04,
-					},
-					scene,
-				)
-				sideBlock.material = hairMat
-				sideBlock.position.set(
-					side * (headSize / 2 + 0.015),
-					headY + headSize / 2 - ptSideH / 2 + 0.035,
-					0,
-				)
-				sideBlock.parent = root
-			}
-
-			// Back — continuous from top-of-head down
-			const ptBackH = headSize * 0.6
-			const ptBack = MeshBuilder.CreateBox(
-				`rHairPTBack_${id}`,
-				{
-					width: headSize + 0.04,
-					height: ptBackH,
-					depth: 0.05,
-				},
-				scene,
-			)
-			ptBack.material = hairMat
-			ptBack.position.set(
-				0,
-				headY + headSize / 2 - ptBackH / 2 + 0.035,
-				-(headSize / 2 + 0.015),
-			)
-			ptBack.parent = root
-
-			// Tie / gather point at upper-back of the head
-			const tie = MeshBuilder.CreateBox(
-				`rHairPTTie_${id}`,
-				{
-					width: 0.1,
-					height: 0.08,
-					depth: 0.07,
-				},
-				scene,
-			)
-			tie.material = hairMat
-			tie.position.set(0, headY + 0.02, -(headSize / 2 + 0.04))
-			tie.parent = root
-
-			// Tail — flows down from the tie point
-			const tail = MeshBuilder.CreateBox(
-				`rHairPTTail_${id}`,
-				{
-					width: 0.08,
-					height: 0.25,
-					depth: 0.06,
-				},
-				scene,
-			)
-			tail.material = hairMat
-			tail.position.set(0, headY - 0.13, -(headSize / 2 + 0.05))
-			tail.parent = root
-
-			// Tail tip — tapers slightly
-			const tailTip = MeshBuilder.CreateBox(
-				`rHairPTTip_${id}`,
-				{
-					width: 0.06,
-					height: 0.1,
-					depth: 0.05,
-				},
-				scene,
-			)
-			tailTip.material = hairMat
-			tailTip.position.set(0, headY - 0.3, -(headSize / 2 + 0.05))
-			tailTip.parent = root
-		} else {
-			// Long: top cap + sides + back hanging down
-			const hairTop = MeshBuilder.CreateBox(
-				`rHairTop_${id}`,
-				{
-					width: headSize + 0.02,
-					height: 0.1,
-					depth: headSize + 0.02,
-				},
-				scene,
-			)
-			hairTop.material = hairMat
-			hairTop.position.y = headY + headSize / 2 + 0.05
-			hairTop.parent = root
-
-			// Sides
-			for (const side of [-1, 1]) {
-				const sideBlock = MeshBuilder.CreateBox(
-					`rHairSide${side > 0 ? 'R' : 'L'}_${id}`,
-					{
-						width: 0.04,
-						height: headSize * 0.6,
-						depth: headSize,
-					},
-					scene,
-				)
-				sideBlock.material = hairMat
-				sideBlock.position.set(side * (headSize / 2 + 0.01), headY, 0)
-				sideBlock.parent = root
-			}
-
-			// Back hangs down well below head
-			const backH = MeshBuilder.CreateBox(
-				`rHairBack_${id}`,
-				{
-					width: headSize,
-					height: headSize * 0.8,
-					depth: 0.04,
-				},
-				scene,
-			)
-			backH.material = hairMat
-			backH.position.set(0, headY - headSize * 0.15, -(headSize / 2 + 0.01))
-			backH.parent = root
+		// Parent ALL instance root nodes under the wrapper
+		for (const node of instance.rootNodes) {
+			node.parent = glbWrapper
 		}
-	}
 
-	// --- Facial hair ---
-	const facialHair = appearance?.facialHair
-	if (facialHair) {
-		const fhMat = makeMat(`rFacialHair_${id}`, hairColor.scale(0.85), scene)
-		const chinZ = headSize / 2 + 0.005 // slightly in front of face
-
-		// --- Non-overlapping facial hair layout ---
-		// Sideburns sit at the outer edges of the face (x = ±faceEdge).
-		// Central pieces (moustache, chin) span only the gap between the
-		// inner edges of the sideburns so nothing overlaps.
-		const sbW = 0.05 // sideburn width
-		const faceEdge = headSize / 2 - sbW / 2 // x-centre of each sideburn
-		const centralW = (faceEdge - sbW / 2) * 2 // gap between inner sideburn edges
-		const hairlineY = headY + headSize / 2 - 0.02 // top of sideburns
-
-		/**
-		 * Build two sideburn strips from hairline down to `bottomY`.
-		 * They sit at the true left/right edges of the face.
-		 */
-		const addSideburns = (tag: string, bottomY: number, mat: typeof fhMat) => {
-			const sbH = hairlineY - bottomY
-			for (const side of [-1, 1]) {
-				const sb = MeshBuilder.CreateBox(
-					`r${tag}SB${side > 0 ? 'R' : 'L'}_${id}`,
-					{
-						width: sbW,
-						height: sbH,
-						depth: 0.03,
-					},
-					scene,
-				)
-				sb.material = mat
-				sb.position.set(side * faceEdge, hairlineY - sbH / 2, chinZ)
-				sb.parent = root
+		// Find the __root__ node (parent of all variants)
+		let glbRoot: TransformNode | undefined
+		for (const child of glbWrapper.getChildren()) {
+			if (child instanceof TransformNode) {
+				glbRoot = child
+				break
 			}
 		}
 
-		if (facialHair === 'stubble') {
-			const stubbleMat = fhMat.clone(`rStubbleMat_${id}`)
-			stubbleMat.alpha = 0.5
+		if (glbRoot) {
+			// Determine which body variant to show
+			const modelVariant = appearance?.model ?? 'standard'
+			const bodyName = modelVariant === 'kid' ? 'kid' : 'standart'
 
-			// Sideburns — full face-edge, hairline to jaw
-			const jawY = headY - headSize * 0.35
-			addSideburns('Stub', jawY, stubbleMat)
+			// Body variant prefix for sub-mesh lookups
+			// Meshes are named: standart_primitive0, standart_primitive1, ... standart_primitive7
+			const bodyMeshPrefix = `${bodyName}_primitive`
 
-			// Moustache area (central, between sideburns)
-			const moH = 0.04
-			const moY = headY - headSize * 0.12
-			const mo = MeshBuilder.CreateBox(
-				`rStubMo_${id}`,
-				{
-					width: centralW,
-					height: moH,
-					depth: 0.02,
-				},
-				scene,
-			)
-			mo.material = stubbleMat
-			mo.position.set(0, moY, chinZ)
-			mo.parent = root
+			// All top-level children that are togglable parts
+			const allVariants = ['high', 'kid', 'standart']
+			const allHair = ['short', 'medium', 'long ', 'ponytail']
+			const allFacialHair = ['beard', 'long_beard', 'moustache', 'stubble']
+			const allAccessories = ['cap', 'color']
 
-			// Chin area (central, below moustache to jaw — no overlap with mo)
-			const chinTop = moY - moH / 2
-			const chinH = chinTop - jawY
-			const chin = MeshBuilder.CreateBox(
-				`rStubChin_${id}`,
-				{
-					width: centralW,
-					height: chinH,
-					depth: 0.02,
-				},
-				scene,
-			)
-			chin.material = stubbleMat
-			chin.position.set(0, chinTop - chinH / 2, chinZ)
-			chin.parent = root
-		} else if (facialHair === 'moustache') {
-			const mo = MeshBuilder.CreateBox(
-				`rMoustache_${id}`,
-				{
-					width: headSize * 0.4,
-					height: 0.04,
-					depth: 0.025,
-				},
-				scene,
-			)
-			mo.material = fhMat
-			mo.position.set(0, headY - headSize * 0.12, chinZ)
-			mo.parent = root
-		} else if (facialHair === 'beard') {
-			// Sideburns — hairline to below chin
-			const beardBottom = headY - headSize * 0.48
-			addSideburns('Brd', beardBottom, fhMat)
+			// Hide everything first, then selectively show
+			for (const child of glbRoot.getChildren()) {
+				if (child instanceof TransformNode) {
+					setNodeEnabled(child, false)
+				}
+			}
 
-			// Moustache strip (central)
-			const moH = 0.04
-			const moY = headY - headSize * 0.12
-			const mo = MeshBuilder.CreateBox(
-				`rBrdMo_${id}`,
-				{
-					width: centralW,
-					height: moH,
-					depth: 0.03,
-				},
-				scene,
-			)
-			mo.material = fhMat
-			mo.position.set(0, moY, chinZ)
-			mo.parent = root
+			// --- Show body variant ---
+			const bodyNode = findDirectChild(glbRoot, bodyName, id)
+			if (bodyNode) {
+				setNodeEnabled(bodyNode, true)
 
-			// Chin block (central, below moustache — no overlap)
-			const chinTop = moY - moH / 2
-			const chinH = chinTop - beardBottom
-			const chin = MeshBuilder.CreateBox(
-				`rBrdChin_${id}`,
-				{
-					width: centralW,
-					height: chinH,
-					depth: 0.04,
-				},
-				scene,
-			)
-			chin.material = fhMat
-			chin.position.set(0, chinTop - chinH / 2, chinZ)
-			chin.parent = root
-		} else if (facialHair === 'longBeard') {
-			// Sideburns — hairline to well below chin
-			const lbBottom = headY - headSize * 0.7
-			addSideburns('LB', lbBottom, fhMat)
+				// Apply top colour based on top style
+				// primitive0 = head/neck/hands (always skin)
+				// primitive1 = upper arm (varies by top style)
+				// primitive2 = torso (always top colour)
+				// primitive3 = lower arm/wrist
+				if (appearance) {
+					const topColor = hexToColor3(resolveColor(appearance.topColor))
+					const skinColor = hexToColor3(SKIN_TONE_HEX[appearance.skin])
 
-			// Moustache strip (central)
-			const moH = 0.04
-			const moY = headY - headSize * 0.1
-			const lbMo = MeshBuilder.CreateBox(
-				`rLBMo_${id}`,
-				{
-					width: centralW,
-					height: moH,
-					depth: 0.03,
-				},
-				scene,
-			)
-			lbMo.material = fhMat
-			lbMo.position.set(0, moY, chinZ)
-			lbMo.parent = root
+					// primitive0 is always skin (head, neck, hands)
+					applyColorToMeshByName(
+						bodyNode,
+						`${bodyMeshPrefix}0`,
+						skinColor,
+						scene,
+						id,
+					)
+					// primitive2 is always top colour (torso)
+					applyColorToMeshByName(
+						bodyNode,
+						`${bodyMeshPrefix}2`,
+						topColor,
+						scene,
+						id,
+					)
 
-			// Chin + long beard block (central, below moustache — no overlap)
-			const chinTop = moY - moH / 2
-			const chinH = chinTop - lbBottom
-			const lbChin = MeshBuilder.CreateBox(
-				`rLBChin_${id}`,
-				{
-					width: centralW,
-					height: chinH,
-					depth: 0.05,
-				},
-				scene,
-			)
-			lbChin.material = fhMat
-			lbChin.position.set(0, chinTop - chinH / 2, chinZ)
-			lbChin.parent = root
+					if (appearance.top === 'vest') {
+						// Vest: primitive1 and primitive3 are skin (bare arms)
+						applyColorToMeshByName(
+							bodyNode,
+							`${bodyMeshPrefix}1`,
+							skinColor,
+							scene,
+							id,
+						)
+						applyColorToMeshByName(
+							bodyNode,
+							`${bodyMeshPrefix}3`,
+							skinColor,
+							scene,
+							id,
+						)
+					} else if (appearance.top === 'tshirt') {
+						// T-shirt: primitive1 is top colour (upper arm), primitive3 is skin (lower arm)
+						applyColorToMeshByName(
+							bodyNode,
+							`${bodyMeshPrefix}1`,
+							topColor,
+							scene,
+							id,
+						)
+						applyColorToMeshByName(
+							bodyNode,
+							`${bodyMeshPrefix}3`,
+							skinColor,
+							scene,
+							id,
+						)
+					} else {
+						// Long sleeve: all top colour
+						applyColorToMeshByName(
+							bodyNode,
+							`${bodyMeshPrefix}1`,
+							topColor,
+							scene,
+							id,
+						)
+						applyColorToMeshByName(
+							bodyNode,
+							`${bodyMeshPrefix}3`,
+							topColor,
+							scene,
+							id,
+						)
+					}
+				}
+
+				// Apply bottom colour based on bottom style
+				if (appearance) {
+					const bottomColor = hexToColor3(resolveColor(appearance.bottomColor))
+					const skinColor = hexToColor3(SKIN_TONE_HEX[appearance.skin])
+
+					// primitive4 is always bottom colour
+					applyColorToMeshByName(
+						bodyNode,
+						`${bodyMeshPrefix}4`,
+						bottomColor,
+						scene,
+						id,
+					)
+
+					if (appearance.bottom === 'shorts') {
+						// Shorts: primitive5 is skin (bare leg), primitive6 is skin or sock colour
+						applyColorToMeshByName(
+							bodyNode,
+							`${bodyMeshPrefix}5`,
+							skinColor,
+							scene,
+							id,
+						)
+						if (appearance.socks) {
+							const sockColor = hexToColor3(resolveColor(appearance.socks))
+							applyColorToMeshByName(
+								bodyNode,
+								`${bodyMeshPrefix}6`,
+								sockColor,
+								scene,
+								id,
+							)
+						} else {
+							applyColorToMeshByName(
+								bodyNode,
+								`${bodyMeshPrefix}6`,
+								skinColor,
+								scene,
+								id,
+							)
+						}
+					} else {
+						// Trousers: all bottom colour
+						applyColorToMeshByName(
+							bodyNode,
+							`${bodyMeshPrefix}5`,
+							bottomColor,
+							scene,
+							id,
+						)
+						if (appearance.socks) {
+							const sockColor = hexToColor3(resolveColor(appearance.socks))
+							applyColorToMeshByName(
+								bodyNode,
+								`${bodyMeshPrefix}6`,
+								sockColor,
+								scene,
+								id,
+							)
+						} else {
+							applyColorToMeshByName(
+								bodyNode,
+								`${bodyMeshPrefix}6`,
+								bottomColor,
+								scene,
+								id,
+							)
+						}
+					}
+				}
+			}
+
+			// --- Hair ---
+			const hairStyle = appearance?.hair ?? 'short'
+			if (hairStyle !== 'bald') {
+				// Map HairStyle to GLB node name
+				const hairNodeName = hairStyle === 'long' ? 'long ' : hairStyle
+				const hairNode = findDirectChild(glbRoot, hairNodeName, id)
+				if (hairNode) {
+					setNodeEnabled(hairNode, true)
+					if (appearance) {
+						const hairColor = hexToColor3(HAIR_COLOR_HEX[appearance.hairColor])
+						applyColorToAllMeshes(hairNode, hairColor, scene, id)
+					}
+					// For kid model, offset hair to align with the smaller head
+					if (modelVariant === 'kid' && bodyNode) {
+						const headOffset = getKidHeadOffset(bodyNode, hairNode, id)
+						if (headOffset !== 0) {
+							hairNode.position.y += headOffset
+						}
+					}
+				}
+			}
+
+			// --- Ponytail scrunchie colour (matches top colour) ---
+			if (hairStyle === 'ponytail' && appearance) {
+				const topColor = hexToColor3(resolveColor(appearance.topColor))
+				// ponytail_primitive1 is the scrunchie mesh
+				const scrunchie = findMeshByName(glbRoot, 'ponytail_primitive1', id)
+				if (scrunchie) {
+					const mat = new StandardMaterial(`rScrunchie_${id}`, scene)
+					mat.diffuseColor = topColor
+					mat.specularColor = Color3.Black()
+					scrunchie.material = mat
+				}
+			}
+
+			// --- Facial hair ---
+			if (appearance?.facialHair) {
+				const fhMap: Record<string, string> = {
+					moustache: 'moustache',
+					stubble: 'stubble',
+					beard: 'beard',
+					longBeard: 'long_beard',
+				}
+				const fhNodeName = fhMap[appearance.facialHair]
+				if (fhNodeName) {
+					const fhNode = findDirectChild(glbRoot, fhNodeName, id)
+					if (fhNode) {
+						setNodeEnabled(fhNode, true)
+						const hairColor = hexToColor3(HAIR_COLOR_HEX[appearance.hairColor])
+						applyColorToAllMeshes(fhNode, hairColor, scene, id)
+						// For kid model, offset facial hair to align with the smaller head
+						if (modelVariant === 'kid' && bodyNode) {
+							const headOffset = getKidHeadOffset(bodyNode, fhNode, id)
+							if (headOffset !== 0) {
+								fhNode.position.y += headOffset
+							}
+						}
+					}
+				}
+			}
+
+			// --- Cap (hat) ---
+			if (appearance?.hat) {
+				const capNode = findDirectChild(glbRoot, 'cap', id)
+				if (capNode) {
+					setNodeEnabled(capNode, true)
+					const hatColor = hexToColor3(resolveColor(appearance.hat))
+					applyColorToAllMeshes(capNode, hatColor, scene, id)
+					// For kid model, offset cap to align with the smaller head
+					if (modelVariant === 'kid' && bodyNode) {
+						const headOffset = getKidHeadOffset(bodyNode, capNode, id)
+						if (headOffset !== 0) {
+							capNode.position.y += headOffset
+						}
+					}
+				}
+			}
+
+			// --- Shoe colour (primitive7 of the body variant) ---
+			if (bodyNode) {
+				const shoeHex = appearance?.shoeColor
+					? resolveColor(appearance.shoeColor)
+					: '#EEEEEE'
+				const shoeColor = hexToColor3(shoeHex)
+				applyColorToMeshByName(
+					bodyNode,
+					`${bodyMeshPrefix}7`,
+					shoeColor,
+					scene,
+					id,
+				)
+			}
+
+			// --- Scale and position ---
+			// Measure body meshes using world-space bounds for accurate extents
+			const heightScale = appearance?.heightScale ?? 1
+			const targetH = TARGET_HEIGHT * heightScale
+
+			let minY = Number.POSITIVE_INFINITY
+			let maxY = Number.NEGATIVE_INFINITY
+
+			// Only measure body variant meshes (not hair/accessories) for positioning
+			const measureNode = bodyNode ?? glbRoot
+			glbWrapper.computeWorldMatrix(true)
+			for (const mesh of measureNode.getChildMeshes(false)) {
+				if (!mesh.isEnabled()) continue
+				mesh.computeWorldMatrix(true)
+				const bounds = mesh.getBoundingInfo().boundingBox
+				if (bounds.minimumWorld.y < minY) minY = bounds.minimumWorld.y
+				if (bounds.maximumWorld.y > maxY) maxY = bounds.maximumWorld.y
+			}
+			// Also measure the body node itself if it's a mesh (single-primitive case)
+			if (measureNode instanceof AbstractMesh) {
+				measureNode.computeWorldMatrix(true)
+				const bounds = measureNode.getBoundingInfo().boundingBox
+				if (bounds.minimumWorld.y < minY) minY = bounds.minimumWorld.y
+				if (bounds.maximumWorld.y > maxY) maxY = bounds.maximumWorld.y
+			}
+
+			if (minY === Number.POSITIVE_INFINITY) {
+				minY = 0
+				maxY = 1
+			}
+
+			const rawHeight = maxY - minY || 1
+			const scale = targetH / rawHeight
+
+			glbWrapper.scaling.setAll(scale)
+			// Position so feet are at y=0
+			glbWrapper.position.y = -minY * scale
 		}
 	}
 
-	// ═══════════════════════════════════════
-	// Arms (pivoted at shoulder)
-	// ═══════════════════════════════════════
-	const armW = 0.15
-	const armH = 0.55
-	const armD = 0.15
-	const shoulderY = torsoY + torsoH / 2 - 0.05
-	const shoulderX = torsoW / 2 + armW / 2 + 0.01
-
-	const topStyle = appearance?.top ?? 'tshirt'
-	// Vest: upper arm = skin, Long sleeve: upper arm = shirt
-	const upperArmMat = topStyle === 'vest' ? skinMat : shirtMat
-
+	// Arm/leg pivots – the GLB is a static mesh so these are inert transform
+	// nodes for now. They maintain API compatibility with the pose system.
 	const leftArmPivot = new TransformNode(`rLArmPiv_${id}`, scene)
-	leftArmPivot.position = new Vector3(-shoulderX, shoulderY, 0)
 	leftArmPivot.parent = root
-
-	const leftArmUpper = MeshBuilder.CreateBox(
-		`rLArmUp_${id}`,
-		{
-			width: armW,
-			height: armH / 2,
-			depth: armD,
-		},
-		scene,
-	)
-	leftArmUpper.material = upperArmMat
-	leftArmUpper.position.y = -armH / 4
-	leftArmUpper.parent = leftArmPivot
-
-	const leftArmLower = MeshBuilder.CreateBox(
-		`rLArmLo_${id}`,
-		{
-			width: armW,
-			height: armH / 2,
-			depth: armD,
-		},
-		scene,
-	)
-	leftArmLower.material = topStyle === 'longSleeve' ? shirtMat : skinMat
-	leftArmLower.position.y = (-armH * 3) / 4
-	leftArmLower.parent = leftArmPivot
-
-	// Hand (skin) visible at end of long sleeve
-	if (topStyle === 'longSleeve') {
-		const leftHand = MeshBuilder.CreateBox(
-			`rLHand_${id}`,
-			{
-				width: armW,
-				height: 0.06,
-				depth: armD,
-			},
-			scene,
-		)
-		leftHand.material = skinMat
-		leftHand.position.y = -armH - 0.03
-		leftHand.parent = leftArmPivot
-	}
-
 	const rightArmPivot = new TransformNode(`rRArmPiv_${id}`, scene)
-	rightArmPivot.position = new Vector3(shoulderX, shoulderY, 0)
 	rightArmPivot.parent = root
-
-	const rightArmUpper = MeshBuilder.CreateBox(
-		`rRArmUp_${id}`,
-		{
-			width: armW,
-			height: armH / 2,
-			depth: armD,
-		},
-		scene,
-	)
-	rightArmUpper.material = upperArmMat
-	rightArmUpper.position.y = -armH / 4
-	rightArmUpper.parent = rightArmPivot
-
-	const rightArmLower = MeshBuilder.CreateBox(
-		`rRArmLo_${id}`,
-		{
-			width: armW,
-			height: armH / 2,
-			depth: armD,
-		},
-		scene,
-	)
-	rightArmLower.material = topStyle === 'longSleeve' ? shirtMat : skinMat
-	rightArmLower.position.y = (-armH * 3) / 4
-	rightArmLower.parent = rightArmPivot
-
-	// Hand (skin) visible at end of long sleeve
-	if (topStyle === 'longSleeve') {
-		const rightHand = MeshBuilder.CreateBox(
-			`rRHand_${id}`,
-			{
-				width: armW,
-				height: 0.06,
-				depth: armD,
-			},
-			scene,
-		)
-		rightHand.material = skinMat
-		rightHand.position.y = -armH - 0.03
-		rightHand.parent = rightArmPivot
-	}
-
-	// ═══════════════════════════════════════
-	// Legs (pivoted at hip)
-	// ═══════════════════════════════════════
-	const legW = 0.18
-	const legH = baseLegH
-	const legD = 0.18
-	const hipY = torsoY - torsoH / 2
-	const hipX = 0.1
-
-	const bottomStyle = appearance?.bottom ?? 'shorts'
-	// Trousers: both upper AND lower leg use bottomMat
-	const lowerLegMat = bottomStyle === 'trousers' ? bottomMat : skinMat
-
 	const leftLegPivot = new TransformNode(`rLLegPiv_${id}`, scene)
-	leftLegPivot.position = new Vector3(-hipX, hipY, 0)
 	leftLegPivot.parent = root
-
-	const leftLegUpper = MeshBuilder.CreateBox(
-		`rLLegUp_${id}`,
-		{
-			width: legW,
-			height: legH / 2,
-			depth: legD,
-		},
-		scene,
-	)
-	leftLegUpper.material = bottomMat
-	leftLegUpper.position.y = -legH / 4
-	leftLegUpper.parent = leftLegPivot
-
-	const leftLegLower = MeshBuilder.CreateBox(
-		`rLLegLo_${id}`,
-		{
-			width: legW,
-			height: legH / 2,
-			depth: legD,
-		},
-		scene,
-	)
-	leftLegLower.material = lowerLegMat
-	leftLegLower.position.y = (-legH * 3) / 4
-	leftLegLower.parent = leftLegPivot
-
 	const rightLegPivot = new TransformNode(`rRLegPiv_${id}`, scene)
-	rightLegPivot.position = new Vector3(hipX, hipY, 0)
 	rightLegPivot.parent = root
 
-	const rightLegUpper = MeshBuilder.CreateBox(
-		`rRLegUp_${id}`,
-		{
-			width: legW,
-			height: legH / 2,
-			depth: legD,
-		},
-		scene,
-	)
-	rightLegUpper.material = bottomMat
-	rightLegUpper.position.y = -legH / 4
-	rightLegUpper.parent = rightLegPivot
-
-	const rightLegLower = MeshBuilder.CreateBox(
-		`rRLegLo_${id}`,
-		{
-			width: legW,
-			height: legH / 2,
-			depth: legD,
-		},
-		scene,
-	)
-	rightLegLower.material = lowerLegMat
-	rightLegLower.position.y = (-legH * 3) / 4
-	rightLegLower.parent = rightLegPivot
-
-	// Socks (optional — render on lower 1/4 of each leg, slightly wider so they show over skin)
-	const sockColor = appearance?.socks
-	if (sockColor) {
-		const sockMat = makeMat(
-			`rSock_${id}`,
-			hexToColor3(resolveColor(sockColor)),
-			scene,
-		)
-		const sockH = legH / 4
-		const sockW = legW + 0.005
-		const sockD = legD + 0.005
-		// Socks sit at the bottom quarter of the leg
-		const sockY = -legH + sockH / 2
-
-		const leftSock = MeshBuilder.CreateBox(
-			`rLSock_${id}`,
-			{
-				width: sockW,
-				height: sockH,
-				depth: sockD,
-			},
-			scene,
-		)
-		leftSock.material = sockMat
-		leftSock.position.y = sockY
-		leftSock.parent = leftLegPivot
-
-		const rightSock = MeshBuilder.CreateBox(
-			`rRSock_${id}`,
-			{
-				width: sockW,
-				height: sockH,
-				depth: sockD,
-			},
-			scene,
-		)
-		rightSock.material = sockMat
-		rightSock.position.y = sockY
-		rightSock.parent = rightLegPivot
-	}
-
-	// Shoes (hidden by default; enabled by shoe power-up)
-	const shoeH = 0.08
-	const shoeD = 0.28
-	const shoeW = legW * 1.05
-
+	// Placeholder shoe meshes (hidden) for API compatibility
 	const leftShoe = MeshBuilder.CreateBox(
 		`rLShoe_${id}`,
-		{
-			width: shoeW,
-			height: shoeH,
-			depth: shoeD,
-		},
+		{ width: 0.01, height: 0.01, depth: 0.01 },
 		scene,
 	)
-	leftShoe.material = shoeMat
-	leftShoe.position.set(0, -legH - shoeH * 0.5, shoeD * 0.2)
 	leftShoe.parent = leftLegPivot
 	leftShoe.setEnabled(false)
 
 	const rightShoe = MeshBuilder.CreateBox(
 		`rRShoe_${id}`,
-		{
-			width: shoeW,
-			height: shoeH,
-			depth: shoeD,
-		},
+		{ width: 0.01, height: 0.01, depth: 0.01 },
 		scene,
 	)
-	rightShoe.material = shoeMat
-	rightShoe.position.set(0, -legH - shoeH * 0.5, shoeD * 0.2)
 	rightShoe.parent = rightLegPivot
 	rightShoe.setEnabled(false)
-
-	// For heightScale < 1, shrink the whole model uniformly
-	if (hs < 1) {
-		root.scaling = new Vector3(hs, hs, hs)
-	}
-	// Store base scale so power-ups can multiply on top of it
-	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
-	;(root as any).__baseScale = hs < 1 ? hs : 1
 
 	return {
 		root,
@@ -828,17 +453,176 @@ export function createRunnerModel(
 	}
 }
 
+// ── Helpers ──
+
+/**
+ * Compute the Y offset needed to align an accessory node (hair/cap/facial hair)
+ * with the kid body's head. The accessories are positioned in the GLB for the
+ * 'standart' body, so for the 'kid' body we need to shift them down to match.
+ */
+function getKidHeadOffset(
+	bodyNode: TransformNode,
+	accessoryNode: TransformNode,
+	id: number,
+): number {
+	// Find the head/skin mesh (primitive0) of the kid body to get head top Y
+	let bodyHeadMaxY = Number.NEGATIVE_INFINITY
+	const headMeshName = `kid_primitive0_${id}`
+	for (const mesh of bodyNode.getChildMeshes(false)) {
+		if (mesh.name === headMeshName || mesh.name.startsWith('kid_primitive0')) {
+			mesh.computeWorldMatrix(true)
+			const bounds = mesh.getBoundingInfo().boundingBox
+			if (bounds.maximumWorld.y > bodyHeadMaxY) {
+				bodyHeadMaxY = bounds.maximumWorld.y
+			}
+		}
+	}
+
+	if (bodyHeadMaxY === Number.NEGATIVE_INFINITY) return 0
+
+	// Find the bottom Y of the accessory (hair/cap) to see where it starts
+	let accessoryMinY = Number.POSITIVE_INFINITY
+	for (const mesh of accessoryNode.getChildMeshes(false)) {
+		mesh.computeWorldMatrix(true)
+		const bounds = mesh.getBoundingInfo().boundingBox
+		if (bounds.minimumWorld.y < accessoryMinY) {
+			accessoryMinY = bounds.minimumWorld.y
+		}
+	}
+	// Single-mesh node case
+	if (accessoryNode instanceof AbstractMesh) {
+		accessoryNode.computeWorldMatrix(true)
+		const bounds = accessoryNode.getBoundingInfo().boundingBox
+		if (bounds.minimumWorld.y < accessoryMinY) {
+			accessoryMinY = bounds.minimumWorld.y
+		}
+	}
+
+	if (accessoryMinY === Number.POSITIVE_INFINITY) return 0
+
+	// If the accessory is floating above the head, offset it down
+	const gap = accessoryMinY - bodyHeadMaxY
+	if (gap > 0.001) {
+		return -gap
+	}
+	return 0
+}
+
+/** Find a direct child of parent whose name starts with `prefix` (with _id suffix from instantiation). */
+function findDirectChild(
+	parent: TransformNode,
+	prefix: string,
+	id: number,
+): TransformNode | null {
+	const target = `${prefix}_${id}`
+	for (const child of parent.getChildren()) {
+		if (child instanceof TransformNode && child.name === target) {
+			return child
+		}
+	}
+	// Fallback: partial match (in case naming varies)
+	for (const child of parent.getChildren()) {
+		if (child instanceof TransformNode && child.name.startsWith(prefix)) {
+			return child
+		}
+	}
+	return null
+}
+
+/** Find a mesh by name anywhere in the hierarchy. */
+function findMeshByName(
+	parent: TransformNode,
+	prefix: string,
+	id: number,
+): Mesh | null {
+	const target = `${prefix}_${id}`
+	for (const mesh of parent.getChildMeshes(false)) {
+		if (mesh.name === target || mesh.name.startsWith(prefix)) {
+			return mesh as Mesh
+		}
+	}
+	return null
+}
+
+/** Apply a diffuse colour to a mesh found by name within a parent node. */
+function applyColorToMeshByName(
+	parent: TransformNode,
+	meshName: string,
+	color: Color3,
+	scene: Scene,
+	id: number,
+): void {
+	// Instantiation renames "standart_primitive0" → "standart_primitive0_${id}"
+	const target = `${meshName}_${id}`
+	for (const mesh of parent.getChildMeshes(false)) {
+		if (mesh.name === target) {
+			const mat = new StandardMaterial(`mat_${meshName}_${id}`, scene)
+			mat.diffuseColor = color
+			mat.specularColor = Color3.Black()
+			mesh.material = mat
+			return
+		}
+	}
+}
+
+/** Apply a colour to all meshes under a node (handles single-mesh GLB nodes). */
+function applyColorToAllMeshes(
+	node: TransformNode,
+	color: Color3,
+	scene: Scene,
+	id: number,
+): void {
+	const mat = new StandardMaterial(`mat_${node.name}_${id}`, scene)
+	mat.diffuseColor = color
+	mat.specularColor = Color3.Black()
+	const childMeshes = node.getChildMeshes(false)
+	if (childMeshes.length > 0) {
+		for (const mesh of childMeshes) {
+			mesh.material = mat
+		}
+	} else if (node instanceof AbstractMesh) {
+		// Single-material GLB node: the node IS the mesh (no children)
+		node.material = mat
+	}
+}
+
+/** Enable/disable a node and all its child meshes. */
+function setNodeEnabled(node: TransformNode, enabled: boolean): void {
+	node.setEnabled(enabled)
+}
+
+function findNodeByName(
+	node: TransformNode,
+	name: string,
+): TransformNode | null {
+	if (node.name.toLowerCase().includes(name.toLowerCase())) return node
+	for (const child of node.getChildren()) {
+		if (child instanceof TransformNode) {
+			const found = findNodeByName(child, name)
+			if (found) return found
+		}
+	}
+	return null
+}
+
+function hideNode(node: TransformNode, keep?: TransformNode): void {
+	if (node === keep) return
+	for (const mesh of node.getChildMeshes(false)) {
+		if (keep && mesh.isDescendantOf(keep)) continue
+		mesh.setEnabled(false)
+	}
+}
+
 // ── Pose helpers (call each frame) ──
 
 /** Swing arms and legs in a running motion. `phase` advances with time × speed. */
 export function poseRunning(model: RunnerModelResult, phase: number): void {
 	model.root.rotation.x = 0
-	const swing = Math.sin(phase) * 0.7 // ±0.7 rad ≈ ±40°
+	const swing = Math.sin(phase) * 0.7
 	model.leftArm.rotation.x = swing
 	model.rightArm.rotation.x = -swing
 	model.leftLeg.rotation.x = -swing
 	model.rightLeg.rotation.x = swing
-	// Reset Z rotation (no splay)
 	model.leftArm.rotation.z = 0
 	model.rightArm.rotation.z = 0
 	model.leftLeg.rotation.z = 0
@@ -884,12 +668,10 @@ export function poseJump(
 
 /** Tucked pose for somersault: arms hugged to chest, legs pulled up forward. */
 export function poseTuck(model: RunnerModelResult): void {
-	// Arms crossed over chest
 	model.leftArm.rotation.x = -1.8
 	model.leftArm.rotation.z = 0.4
 	model.rightArm.rotation.x = -1.8
 	model.rightArm.rotation.z = -0.4
-	// Legs pulled up forward (knees to chest)
 	model.leftLeg.rotation.x = -1.4
 	model.leftLeg.rotation.z = -0.05
 	model.rightLeg.rotation.x = -1.4
@@ -898,12 +680,10 @@ export function poseTuck(model: RunnerModelResult): void {
 
 /** Sitting pose: legs forward and flat, arms resting at sides. */
 export function poseSitting(model: RunnerModelResult): void {
-	// Legs straight out in front (rotated -90° around X = forward)
 	model.leftLeg.rotation.x = -Math.PI / 2
-	model.leftLeg.rotation.z = -0.1 // slight outward splay
+	model.leftLeg.rotation.z = -0.1
 	model.rightLeg.rotation.x = -Math.PI / 2
 	model.rightLeg.rotation.z = 0.1
-	// Arms resting at sides, slightly back
 	model.leftArm.rotation.x = 0.2
 	model.leftArm.rotation.z = -0.15
 	model.rightArm.rotation.x = 0.2
@@ -912,22 +692,19 @@ export function poseSitting(model: RunnerModelResult): void {
 
 /**
  * Animated sitting pose: legs stay put, but one arm occasionally
- * raises up and waves. `phase` should advance with real time so
- * different runners with different phase offsets wave at different moments.
+ * raises up and waves.
  */
 export function poseSittingAnimated(
 	model: RunnerModelResult,
 	phase: number,
 ): void {
-	// Legs: same as static sitting
 	model.leftLeg.rotation.x = -Math.PI / 2
 	model.leftLeg.rotation.z = -0.1
 	model.rightLeg.rotation.x = -Math.PI / 2
 	model.rightLeg.rotation.z = 0.1
 
-	// Alternate which arm waves each cycle
-	const cycleDuration = 10 // full cycle in seconds
-	const waveDuration = 2.5 // seconds of actual waving per cycle
+	const cycleDuration = 10
+	const waveDuration = 2.5
 	const cycle = ((phase % cycleDuration) + cycleDuration) % cycleDuration
 	const cycleIndex = Math.floor(
 		(phase < 0 ? phase + 1e6 : phase) / cycleDuration,
@@ -936,9 +713,8 @@ export function poseSittingAnimated(
 
 	const wavingArm = useLeft ? model.leftArm : model.rightArm
 	const restingArm = useLeft ? model.rightArm : model.leftArm
-	const sideSign = useLeft ? -1 : 1 // flip z direction for left vs right arm
+	const sideSign = useLeft ? -1 : 1
 
-	// Resting arm defaults
 	restingArm.rotation.x = 0.2
 	restingArm.rotation.z = sideSign * -0.15
 
@@ -948,20 +724,18 @@ export function poseSittingAnimated(
 		const rampDown = 0.4
 		let raise: number
 		if (t < rampUp) {
-			raise = t / rampUp // ease arm up
+			raise = t / rampUp
 		} else if (t > waveDuration - rampDown) {
-			raise = (waveDuration - t) / rampDown // ease arm down
+			raise = (waveDuration - t) / rampDown
 		} else {
-			raise = 1 // fully raised
+			raise = 1
 		}
 
-		// Raised arm: rotation.x → -2.8 (arm up), oscillate z for wave
 		const waveOsc = Math.sin(phase * 8) * 0.25
 		wavingArm.rotation.x = 0.2 * (1 - raise) + -2.8 * raise
 		wavingArm.rotation.z =
 			sideSign * (0.15 * (1 - raise) + (0.5 + waveOsc) * raise)
 	} else {
-		// Resting
 		wavingArm.rotation.x = 0.2
 		wavingArm.rotation.z = sideSign * 0.15
 	}
@@ -980,16 +754,13 @@ export function poseStanding(model: RunnerModelResult): void {
 	model.rightLeg.rotation.z = 0
 }
 
-/** Front crawl swimming pose — full arm rotations on opposite cycles. Body tilt handled externally. */
+/** Front crawl swimming pose. */
 export function poseSwimming(model: RunnerModelResult, phase: number): void {
-	// Front crawl: arms do full circles (rotation.x goes 0 → -π → -2π, i.e. full 360°)
-	// Each arm is offset by π so they alternate
 	model.leftArm.rotation.x = phase % (Math.PI * 2)
 	model.rightArm.rotation.x = (phase + Math.PI) % (Math.PI * 2)
 	model.leftArm.rotation.z = 0
 	model.rightArm.rotation.z = 0
 
-	// Legs: gentle flutter kick
 	const kick = Math.sin(phase * 3) * 0.25
 	model.leftLeg.rotation.x = kick
 	model.rightLeg.rotation.x = -kick
@@ -999,9 +770,6 @@ export function poseSwimming(model: RunnerModelResult, phase: number): void {
 
 /**
  * Running + one arm raised waving.
- * `side` = 1  → wave with right arm (partner is to the right)
- * `side` = -1 → wave with left arm (partner is to the left)
- * `t` is 0→1 normalised progress through the wave (ramps up then oscillates).
  */
 export function poseWaving(
 	model: RunnerModelResult,
@@ -1009,14 +777,12 @@ export function poseWaving(
 	t: number,
 	side: number,
 ): void {
-	// Legs keep running normally
 	const legSwing = Math.sin(runPhase) * 0.7
 	model.leftLeg.rotation.x = -legSwing
 	model.leftLeg.rotation.z = 0
 	model.rightLeg.rotation.x = legSwing
 	model.rightLeg.rotation.z = 0
 
-	// Ramp envelope: ease-in for first 20%, full for middle 60%, ease-out last 20%
 	let envelope: number
 	if (t < 0.2) envelope = t / 0.2
 	else if (t > 0.8) envelope = (1 - t) / 0.2
@@ -1025,14 +791,12 @@ export function poseWaving(
 	const wavingArm = side >= 0 ? model.rightArm : model.leftArm
 	const freeArm = side >= 0 ? model.leftArm : model.rightArm
 
-	// Free arm runs normally (opposite of legs)
 	const armSwing = Math.sin(runPhase) * 0.7
 	freeArm.rotation.x = side >= 0 ? armSwing : -armSwing
 	freeArm.rotation.z = 0
 
-	// Waving arm: raise up and oscillate
-	const raiseX = -2.6 * envelope // arm up over head
-	const waveOsc = Math.sin(runPhase * 2.5) * 0.3 * envelope // gentle wave oscillation
+	const raiseX = -2.6 * envelope
+	const waveOsc = Math.sin(runPhase * 2.5) * 0.3 * envelope
 	const splayZ = (side >= 0 ? 1 : -1) * (0.4 + waveOsc) * envelope
 
 	wavingArm.rotation.x =
@@ -1042,22 +806,18 @@ export function poseWaving(
 
 /**
  * High-five pose: one arm punches forward to meet the other runner's hand.
- * `side` = 1  → right arm forward, -1 → left arm forward.
- * `t` is 0→1 normalised progress (thrust out, hold, retract).
  */
 export function poseHighFive(
 	model: RunnerModelResult,
 	t: number,
 	side: number,
 ): void {
-	// Legs brake to a brief stop
 	const legBend = 0.15
 	model.leftLeg.rotation.x = legBend
 	model.leftLeg.rotation.z = 0
 	model.rightLeg.rotation.x = legBend
 	model.rightLeg.rotation.z = 0
 
-	// Envelope: quick thrust (0→0.3), hold (0.3→0.7), retract (0.7→1)
 	let envelope: number
 	if (t < 0.3) envelope = t / 0.3
 	else if (t > 0.7) envelope = (1 - t) / 0.3
@@ -1066,20 +826,15 @@ export function poseHighFive(
 	const activeArm = side >= 0 ? model.rightArm : model.leftArm
 	const passiveArm = side >= 0 ? model.leftArm : model.rightArm
 
-	// Active arm: thrust forward-up (rotation.x = -1.5 rad ≈ arm out in front)
 	activeArm.rotation.x = -1.5 * envelope
 	activeArm.rotation.z = (side >= 0 ? 1 : -1) * 0.3 * envelope
 
-	// Passive arm stays relaxed at side
 	passiveArm.rotation.x = 0.1
 	passiveArm.rotation.z = 0
 }
 
-// ── Volunteer vest overlay ──
-
 /**
  * Cheering pose: arms raise periodically, bounce only while arms are up.
- * Exported so the passenger system and preview system can both use it.
  */
 export function poseCheering(
 	model: RunnerModelResult,
@@ -1092,17 +847,15 @@ export function poseCheering(
 	let armRaise = 0
 	if (cyclePos < armRaiseDuration) {
 		const t = cyclePos / armRaiseDuration
-		armRaise = Math.sin(t * Math.PI) // 0→1→0 bell curve
+		armRaise = Math.sin(t * Math.PI)
 	}
 
-	// Legs: slight bend when bouncing (arms up), relaxed when standing
 	const legBend = armRaise * 0.15
 	model.leftLeg.rotation.x = legBend
 	model.rightLeg.rotation.x = legBend
 	model.leftLeg.rotation.z = -0.05
 	model.rightLeg.rotation.z = 0.05
 
-	// Resting: slight outward splay; Raised: arms above head
 	const restX = 0.1
 	const raisedX = -2.8
 	const restZ = 0.2
@@ -1114,19 +867,17 @@ export function poseCheering(
 	model.rightArm.rotation.z = restZ + (raisedZ - restZ) * armRaise
 }
 
+// ── Volunteer vest overlay ──
+
 /** Hi-vis blue for parkwalkers */
 const PARKWALKER_BLUE = new Color3(0.0, 0.45, 0.9)
 /** Hi-vis orange for tailwalkers */
 const TAILWALKER_ORANGE = new Color3(1.0, 0.5, 0.0)
-/** Reflective silver-grey stripe accent */
-const REFLECTIVE_STRIPE = new Color3(0.78, 0.78, 0.78)
 
 /**
- * Overlay a coloured hi-vis volunteer vest (with reflective stripes) on top
- * of an existing runner model. Blue for parkwalker, orange for tailwalker.
- *
- * The vest covers the torso and upper-arm sleeves, identical to MarshalModel
- * proportions but in the appropriate volunteer colour.
+ * Apply a volunteer vest to an existing runner model by recolouring the torso
+ * primitive to fluorescent orange/blue and adding a thin silver stripe mesh
+ * at the correct position based on the torso's actual bounds.
  */
 export function applyVolunteerVest(
 	scene: Scene,
@@ -1140,89 +891,57 @@ export function applyVolunteerVest(
 			? new Color3(0.0, 0.12, 0.25)
 			: new Color3(0.3, 0.15, 0.0)
 
-	const vestMat = makeMat(`rVest_${id}`, vestColor, scene)
-	vestMat.emissiveColor = emissive // slight glow so it pops
-	const stripeMat = makeMat(`rVStripe_${id}`, REFLECTIVE_STRIPE, scene)
+	// Find the torso mesh (primitive2) within the model hierarchy
+	let torsoMesh: AbstractMesh | null = null
+	for (const mesh of model.root.getChildMeshes(false)) {
+		if (
+			mesh.name.includes('_primitive2_') ||
+			mesh.name.includes('_primitive2')
+		) {
+			torsoMesh = mesh
+			break
+		}
+	}
+
+	if (!torsoMesh) return
+
+	// Apply vest colour directly to the torso
+	const vestMat = new StandardMaterial(`rVestMat_${id}`, scene)
+	vestMat.diffuseColor = vestColor
+	vestMat.specularColor = Color3.Black()
+	vestMat.emissiveColor = emissive
+	torsoMesh.material = vestMat
+
+	// Measure torso bounds to position the silver stripe correctly
+	torsoMesh.computeWorldMatrix(true)
+	const bounds = torsoMesh.getBoundingInfo().boundingBox
+	const minWorld = bounds.minimumWorld
+	const maxWorld = bounds.maximumWorld
+
+	const torsoWidth = maxWorld.x - minWorld.x
+	const torsoDepth = maxWorld.z - minWorld.z
+	const torsoMidY = (minWorld.y + maxWorld.y) / 2
+
+	// Create a thin silver stripe at the middle of the torso
+	const stripeH = (maxWorld.y - minWorld.y) * 0.1
+	const stripe = MeshBuilder.CreateBox(
+		`rVStripe_${id}`,
+		{
+			width: torsoWidth + 0.01,
+			height: stripeH,
+			depth: torsoDepth + 0.01,
+		},
+		scene,
+	)
+	const stripeMat = new StandardMaterial(`rVStripeMat_${id}`, scene)
+	stripeMat.diffuseColor = new Color3(0.82, 0.82, 0.82)
+	stripeMat.specularColor = new Color3(0.3, 0.3, 0.3)
 	stripeMat.emissiveColor = new Color3(0.2, 0.2, 0.2)
-
-	// Dimensions must match RunnerModel defaults (heightScale=1)
-	const torsoH = 0.5
-	const torsoW = 0.4
-	const torsoD = 0.25
-	const torsoY = 0.55 + torsoH / 2 // 0.80
-
-	// Vest torso overlay (slightly larger so it renders on top)
-	const vestTorso = MeshBuilder.CreateBox(
-		`rVestTorso_${id}`,
-		{
-			width: torsoW + 0.02,
-			height: torsoH + 0.02,
-			depth: torsoD + 0.02,
-		},
-		scene,
-	)
-	vestTorso.material = vestMat
-	vestTorso.position.y = torsoY
-	vestTorso.parent = model.root
-
-	// Reflective stripe across the chest
-	const stripe1 = MeshBuilder.CreateBox(
-		`rVStripe1_${id}`,
-		{
-			width: torsoW + 0.04,
-			height: 0.06,
-			depth: torsoD + 0.04,
-		},
-		scene,
-	)
-	stripe1.material = stripeMat
-	stripe1.position.y = torsoY - 0.05
-	stripe1.parent = model.root
-
-	// Second stripe higher up
-	const stripe2 = MeshBuilder.CreateBox(
-		`rVStripe2_${id}`,
-		{
-			width: torsoW + 0.04,
-			height: 0.06,
-			depth: torsoD + 0.04,
-		},
-		scene,
-	)
-	stripe2.material = stripeMat
-	stripe2.position.y = torsoY + 0.12
-	stripe2.parent = model.root
-
-	// Vest sleeve overlays on upper arms (parented to arm pivots so they animate)
-	const armW = 0.15
-	const armH = 0.55
-	const armD = 0.15
-
-	const leftSleeve = MeshBuilder.CreateBox(
-		`rVSleeveL_${id}`,
-		{
-			width: armW + 0.02,
-			height: armH / 2 + 0.02,
-			depth: armD + 0.02,
-		},
-		scene,
-	)
-	leftSleeve.material = vestMat
-	leftSleeve.position.y = -armH / 4
-	leftSleeve.parent = model.leftArm
-
-	const rightSleeve = MeshBuilder.CreateBox(
-		`rVSleeveR_${id}`,
-		{
-			width: armW + 0.02,
-			height: armH / 2 + 0.02,
-			depth: armD + 0.02,
-		},
-		scene,
-	)
-	rightSleeve.material = vestMat
-	rightSleeve.position.y = -armH / 4
-	rightSleeve.parent = model.rightArm
+	stripe.material = stripeMat
+	stripe.position.x = (minWorld.x + maxWorld.x) / 2
+	stripe.position.y = torsoMidY
+	stripe.position.z = (minWorld.z + maxWorld.z) / 2
+	stripe.parent = model.root
 }
 
 // ── Helper ──

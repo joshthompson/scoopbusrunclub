@@ -176,6 +176,7 @@ import type { BusColorPalette } from './objects/BusModel'
 import { createCorgiModel } from './objects/CorgiModel'
 import {
 	createRunnerModel,
+	preloadRunnerModel,
 	poseRunning,
 	poseStanding,
 } from './objects/RunnerModel'
@@ -2170,6 +2171,11 @@ export class Game {
 			await this.buildBus()
 		}
 		if (this._disposed) return
+
+		// Preload runner GLB before building any runner models
+		await preloadRunnerModel(this.scene)
+		if (this._disposed) return
+
 		if (!this.demoMode && this.localPlayerRole === 'runner') {
 			const localIsCorgi =
 				this.charSelection?.type === 'runner' &&
