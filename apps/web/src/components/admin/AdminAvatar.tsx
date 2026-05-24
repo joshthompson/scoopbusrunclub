@@ -33,7 +33,7 @@ export function AdminAvatar(props: {
 	const colour = () => colours[props.user.charCodeAt(0) % colours.length]
 
 	const face = () =>
-		runners[props.user as RunnerName]?.[0]().frames.face[0] ?? undefined
+		runners[props.user as RunnerName]?.[0]().frames.face?.[0] ?? undefined
 
 	return (
 		<div

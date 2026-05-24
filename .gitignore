@@ -36,6 +36,9 @@ styled-system
 styled-system-studio
 /apps/game/gpx
 
+# Generated
+*.generated.ts
+
 # Wake runner
 logs/*
 scripts/.wake_runner.sh

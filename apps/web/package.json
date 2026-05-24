@@ -4,9 +4,10 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"start": "panda codegen --clean && panda cssgen && vite",
-		"dev": "panda codegen --clean && panda cssgen && vite",
-		"build": "panda codegen --clean && panda cssgen && vite build",
+		"gen:custom-runner": "tsx scripts/gen-custom-runner-pixels.ts",
+		"start": "pnpm gen:custom-runner && panda codegen --clean && panda cssgen && vite",
+		"dev": "pnpm gen:custom-runner && panda codegen --clean && panda cssgen && vite",
+		"build": "pnpm gen:custom-runner && panda codegen --clean && panda cssgen && vite build",
 		"serve": "vite preview"
 	},
 	"dependencies": {
@@ -18,6 +19,8 @@
 	},
 	"devDependencies": {
 		"@types/leaflet": "^1.9.21",
-		"@types/suncalc": "^1.9.2"
+		"@types/pngjs": "^6.0.5",
+		"@types/suncalc": "^1.9.2",
+		"pngjs": "^7.0.0"
 	}
 }
