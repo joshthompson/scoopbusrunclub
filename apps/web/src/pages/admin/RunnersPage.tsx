@@ -1,9 +1,12 @@
 import { AdminAvatar } from '@/components/admin/AdminAvatar'
 import { AdminButton } from '@/components/admin/AdminButton'
 import { AdminInput } from '@/components/admin/AdminInput'
+import { CharacterEditor } from '@/components/admin/CharacterEditor'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Modal } from '@/components/ui/Modal'
 import { type RunnerName, runners } from '@/data/runners'
+import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
+import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import {
 	type Guest,
 	createGuest,
@@ -52,6 +55,7 @@ export const RunnersPage: Component = () => {
 		name: string
 		extra?: string
 		parkrunId?: string
+		avatar?: CharacterSpriteProps
 	}) => {
 		const existing = editingGuest()
 		if (existing) {
@@ -98,6 +102,7 @@ export const RunnersPage: Component = () => {
 						<table class={styles.table}>
 							<thead>
 								<tr>
+									<th />
 									<th>Name</th>
 									<th>Extra</th>
 									<th>Parkrun ID</th>
@@ -108,6 +113,9 @@ export const RunnersPage: Component = () => {
 								<For each={guests()}>
 									{(guest) => (
 										<tr>
+											<td>
+												<GuestFace avatar={guest.avatar as CharacterSpriteProps | undefined} />
+											</td>
 											<td>{guest.name}</td>
 											<td>{guest.extra ?? '—'}</td>
 											<td>
@@ -158,12 +166,20 @@ export const RunnersPage: Component = () => {
 
 function GuestModal(props: {
 	guest: Guest | null
-	onSave: (data: { name: string; extra?: string; parkrunId?: string }) => void
+	onSave: (data: {
+		name: string
+		extra?: string
+		parkrunId?: string
+		avatar?: CharacterSpriteProps
+	}) => void
 	onClose: () => void
 }) {
 	const [name, setName] = createSignal(props.guest?.name ?? '')
 	const [extra, setExtra] = createSignal(props.guest?.extra ?? '')
 	const [parkrunId, setParkrunId] = createSignal(props.guest?.parkrunId ?? '')
+	const [avatar, setAvatar] = createSignal<CharacterSpriteProps | undefined>(
+		props.guest?.avatar as CharacterSpriteProps | undefined,
+	)
 	const [saving, setSaving] = createSignal(false)
 
 	const handleSubmit = async (e: Event) => {
@@ -175,6 +191,7 @@ function GuestModal(props: {
 				name: name(),
 				extra: extra() || undefined,
 				parkrunId: parkrunId() || undefined,
+				avatar: avatar(),
 			})
 		} finally {
 			setSaving(false)
@@ -185,31 +202,36 @@ function GuestModal(props: {
 		<Modal
 			title={props.guest ? 'Edit Guest' : 'New Guest'}
 			onClose={props.onClose}
-			maxWidth="420px"
+			maxWidth="700px"
 		>
 			<form onSubmit={handleSubmit} class={styles.form}>
-				<AdminInput
-					label="Name"
-					type="text"
-					value={name()}
-					onInput={(e) => setName(e.currentTarget.value)}
-					placeholder='e.g. "Tony"'
-					required
-				/>
-				<AdminInput
-					label="Extra"
-					type="text"
-					value={extra()}
-					onInput={(e) => setExtra(e.currentTarget.value)}
-					placeholder={`e.g. "Rick's dad"`}
-				/>
-				<AdminInput
-					label="Parkrun ID"
-					type="text"
-					value={parkrunId()}
-					onInput={(e) => setParkrunId(e.currentTarget.value)}
-					placeholder="e.g. 12345678"
-				/>
+				<div class={styles.formRow}>
+					<AdminInput
+						label="Name"
+						type="text"
+						value={name()}
+						onInput={(e) => setName(e.currentTarget.value)}
+						placeholder='e.g. "Tony"'
+						required
+					/>
+					<AdminInput
+						label="Extra"
+						type="text"
+						value={extra()}
+						onInput={(e) => setExtra(e.currentTarget.value)}
+						placeholder={`e.g. "Rick's dad"`}
+					/>
+					<AdminInput
+						label="Parkrun ID"
+						type="text"
+						value={parkrunId()}
+						onInput={(e) => setParkrunId(e.currentTarget.value)}
+						placeholder="e.g. 12345678"
+					/>
+				</div>
+
+				<CharacterEditor value={avatar()} onChange={setAvatar} />
+
 				<div class={styles.formActions}>
 					<AdminButton type="submit" disabled={!name() || saving()}>
 						{saving() ? 'Saving...' : props.guest ? 'Update' : 'Create'}
@@ -224,6 +246,29 @@ function GuestModal(props: {
 				</div>
 			</form>
 		</Modal>
+	)
+}
+
+function GuestFace(props: { avatar?: CharacterSpriteProps }) {
+	const faceUrl = () => {
+		const av = props.avatar
+		if (!av?.head) return undefined
+		try {
+			const result = createRunnerFrames(av)
+			return result.frames.face?.[0]
+		} catch {
+			return undefined
+		}
+	}
+
+	return (
+		<Show when={faceUrl()}>
+			<img
+				src={faceUrl()}
+				alt=""
+				style={{ width: '24px', height: 'auto', 'image-rendering': 'pixelated' }}
+			/>
+		</Show>
 	)
 }
 
@@ -300,6 +345,11 @@ const styles = {
 		display: 'flex',
 		flexDirection: 'column',
 		gap: '0.75rem',
+	}),
+	formRow: css({
+		display: 'flex',
+		gap: '0.75rem',
+		flexWrap: 'wrap',
 	}),
 	formActions: css({
 		display: 'flex',

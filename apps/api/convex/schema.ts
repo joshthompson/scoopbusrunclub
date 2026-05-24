@@ -117,7 +117,58 @@ export default defineSchema({
 		name: v.string(),
 		extra: v.optional(v.string()),
 		parkrunId: v.optional(v.string()),
-		avatar: v.object({}),
+		avatar: v.union(
+			v.object({}),
+			v.object({
+				topType: v.union(
+					v.literal('vest'),
+					v.literal('tshirt'),
+					v.literal('longsleeve'),
+				),
+				bottomType: v.union(
+					v.literal('short-shorts'),
+					v.literal('shorts'),
+					v.literal('trousers'),
+				),
+				skin: v.union(
+					v.literal('light'),
+					v.literal('medium'),
+					v.literal('dark'),
+				),
+				topColor: v.string(),
+				bottomColor: v.string(),
+				showColor: v.string(),
+				sockColor: v.optional(v.string()),
+				shoeColor: v.string(),
+				head: v.object({
+					hair: v.optional(
+						v.union(
+							v.literal('long'),
+							v.literal('medium'),
+							v.literal('short'),
+						),
+					),
+					hairColor: v.optional(v.string()),
+					accessory: v.optional(
+						v.union(
+							v.literal('cap'),
+							v.literal('headband'),
+							v.literal('glasses'),
+						),
+					),
+					accessoryColor: v.optional(v.string()),
+					facialHair: v.optional(
+						v.union(
+							v.literal('beard'),
+							v.literal('stubble'),
+							v.literal('long'),
+						),
+					),
+					facialHairColor: v.optional(v.string()),
+					topColorForNeck: v.optional(v.boolean()),
+				}),
+			}),
+		),
 		createdAt: v.number(),
 		modifiedAt: v.number(),
 	}).index('by_parkrunId', ['parkrunId']),

@@ -37,6 +37,7 @@ import { WrappedPage } from './pages/WrappedPage'
 import {
 	fetchAllResults,
 	fetchGuestResults,
+	fetchGuests,
 	fetchPublicRaces,
 	fetchRunners,
 	fetchVolunteers,
@@ -53,6 +54,7 @@ const App: Component = () => {
 	const [races] = createResource(fetchPublicRaces)
 	const [volunteers] = createResource(fetchVolunteers)
 	const [guestResults] = createResource(fetchGuestResults)
+	const [guests] = createResource(fetchGuests)
 
 	// Populate the event name lookup cache
 	createResource(loadEvents)
@@ -73,11 +75,11 @@ const App: Component = () => {
 			<>
 				<Show when={!isAdmin()}>
 					<Show
-						when={results() && runners() && volunteers()}
+						when={results() && runners() && volunteers() && guestResults() && guests()}
 						fallback={<div style={{ height: `${HEADER_HEIGHT}px` }} />}
 					>
 						{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
-						<ScoopBusHeader results={results()!} volunteers={volunteers()!} />
+						<ScoopBusHeader results={results()!} volunteers={volunteers()!} guestResults={guestResults()!} guests={guests()!} />
 					</Show>
 				</Show>
 				<main class={css({ zIndex: 101, position: 'relative' })}>

@@ -261,7 +261,7 @@ export interface Guest {
 	name: string
 	extra?: string
 	parkrunId?: string
-	avatar: Record<string, never>
+	avatar?: Record<string, unknown>
 	createdAt: number
 	modifiedAt: number
 }
@@ -280,6 +280,7 @@ export async function createGuest(data: {
 	name: string
 	extra?: string
 	parkrunId?: string
+	avatar?: Record<string, unknown>
 }): Promise<{ id?: string; error?: string }> {
 	const token = getAuthToken()
 	if (!token) return { error: 'Not authenticated' }
@@ -293,7 +294,12 @@ export async function createGuest(data: {
 
 export async function updateGuest(
 	guestId: string,
-	data: { name?: string; extra?: string; parkrunId?: string },
+	data: {
+		name?: string
+		extra?: string
+		parkrunId?: string
+		avatar?: Record<string, unknown>
+	},
 ): Promise<{ ok?: boolean; error?: string }> {
 	const token = getAuthToken()
 	if (!token) return { error: 'Not authenticated' }

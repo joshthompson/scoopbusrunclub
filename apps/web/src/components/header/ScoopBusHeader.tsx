@@ -7,13 +7,17 @@ import pathAsset from '@/assets/misc/path.png'
 import starsAsset from '@/assets/misc/stars.png'
 import sunAsset from '@/assets/misc/sun.png'
 import {
+	guestRunners,
 	hasHeaderArtwork,
+	type RunnerData,
 	type RunnerName,
 	type RunnerState,
 	runners,
 } from '@/data/runners'
 import { RoleTranslations } from '@/data/volunteer-roles'
-import type { RunResultItem, VolunteerItem } from '@/utils/api'
+import type { GuestItem, GuestResultItem, RunResultItem, VolunteerItem } from '@/utils/api'
+import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
+import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { moonAsset } from '@/utils/moonAsset'
 import { useNavigate } from '@solidjs/router'
@@ -234,6 +238,78 @@ function updateRunnerSpeedsAndConnections(
 interface ScoopBusHeaderProps {
 	results: RunResultItem[]
 	volunteers: VolunteerItem[]
+	guestResults: GuestResultItem[]
+	guests: GuestItem[]
+}
+
+function registerGuestRunners(
+	results: RunResultItem[],
+	volunteers: VolunteerItem[],
+	guestResults: GuestResultItem[],
+	guests: GuestItem[],
+) {
+	// Find the latest event date (matching updateRunnerSpeedsAndConnections logic)
+	let latestDate = ''
+	for (const r of results) {
+		if (r.date > latestDate) latestDate = r.date
+	}
+	for (const v of volunteers) {
+		if (v.date > latestDate) latestDate = v.date
+	}
+	for (const r of guestResults) {
+		if (r.date > latestDate) latestDate = r.date
+	}
+	if (!latestDate) return
+
+	// Build avatar lookup from guests list
+	const guestMap = new Map(guests.map((g) => [g._id, g]))
+
+	// Find unique guests who attended on the latest date
+	const seen = new Set<string>()
+	for (const gr of guestResults) {
+		if (gr.date !== latestDate) continue
+		if (seen.has(gr.guestId)) continue
+		seen.add(gr.guestId)
+
+		const guest = guestMap.get(gr.guestId)
+		const avatar: CharacterSpriteProps =
+			guest?.avatar && 'head' in guest.avatar
+				? (guest.avatar as unknown as CharacterSpriteProps)
+				: {
+						topType: 'tshirt',
+						bottomType: 'shorts',
+						skin: 'light',
+						topColor: '#888888',
+						bottomColor: '#333333',
+						showColor: '#888888',
+						shoeColor: '#222222',
+						head: {},
+					}
+		try {
+			const { frames, width, height } = createRunnerFrames(avatar)
+			const key = `guest_${gr.guestId}`
+			if (!guestRunners[key]) {
+				const timeInSeconds = parseTimeToSeconds(gr.time)
+				const speed = timeInSeconds
+					? Math.max(0.5, 4320 / timeInSeconds)
+					: 1
+				const frameInterval = 186 - 31 * speed
+				guestRunners[key] = createSignal<RunnerData>({
+					name: gr.guestName,
+					id: gr.guestParkrunId ?? gr.guestId,
+					birthday: '01/01',
+					frames,
+					width,
+					height,
+					speed,
+					frameInterval,
+					latestTime: gr.time,
+				})
+			}
+		} catch {
+			// Skip guests with invalid avatar data
+		}
+	}
 }
 
 export function ScoopBusHeader(props: ScoopBusHeaderProps) {
@@ -242,6 +318,9 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
 	// Must run before scene setup so runnerState is available for render ordering
 	updateRunnerSpeedsAndConnections(props.results, props.volunteers)
+
+	// Register guest runners who attended the latest event
+	registerGuestRunners(props.results, props.volunteers, props.guestResults, props.guests)
 
 	const sceneWidth = window.innerWidth
 	const scene = new Scene('header', {
@@ -253,12 +332,18 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			const runnerIds = (
 				Object.keys(runners) as (keyof typeof runners)[]
 			).filter((key) => hasHeaderArtwork(runners[key][0]()))
-			const runnerControllers = Array(runnerIds.length * 1)
-				.fill(0)
-				.map((_, i) =>
+			const guestRunnerIds = Object.keys(guestRunners).filter((key) =>
+				hasHeaderArtwork(guestRunners[key][0]()),
+			)
+			const allRunnerIds = [
+				...runnerIds,
+				...guestRunnerIds,
+			]
+			const runnerControllers = allRunnerIds
+				.map((runnerId, i) =>
 					createRunnerController(
 						`runner${i}`,
-						runnerIds[i % runnerIds.length],
+						runnerId as keyof typeof runners,
 						Math.ceil(Math.random() * 30),
 						$scene,
 						mousePosition,
@@ -304,11 +389,19 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
 			// Split runners into standing (render behind bus) and moving (render in front)
 			const standingRunners = runnerControllers.filter((r) => {
-				const [runner] = runners[r.data.runnerId as keyof typeof runners]
+				const entry =
+					runners[r.data.runnerId as keyof typeof runners] ??
+					guestRunners[r.data.runnerId]
+				if (!entry) return false
+				const [runner] = entry
 				return isStandingState(runner().runnerState ?? 'run')
 			})
 			const movingRunners = runnerControllers.filter((r) => {
-				const [runner] = runners[r.data.runnerId as keyof typeof runners]
+				const entry =
+					runners[r.data.runnerId as keyof typeof runners] ??
+					guestRunners[r.data.runnerId]
+				if (!entry) return true
+				const [runner] = entry
 				return !isStandingState(runner().runnerState ?? 'run')
 			})
 
@@ -401,7 +494,14 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 								.sort((a, b) => a.dist - b.dist)[0]
 
 							if (closest) {
-								navigate(`/member/${closest.runnerId}`)
+								if (closest.runnerId.startsWith('guest_')) {
+									const entry = guestRunners[closest.runnerId]
+									if (entry) {
+										navigate(`/guests/${entry[0]().id}`)
+									}
+								} else {
+									navigate(`/member/${closest.runnerId}`)
+								}
 							} else {
 								navigate('/')
 							}

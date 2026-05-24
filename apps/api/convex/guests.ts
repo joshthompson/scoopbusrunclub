@@ -2,6 +2,46 @@ import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { logAdminEvent, validateSession } from './auth'
 
+const avatarValidator = v.optional(
+	v.object({
+		topType: v.union(
+			v.literal('vest'),
+			v.literal('tshirt'),
+			v.literal('longsleeve'),
+		),
+		bottomType: v.union(
+			v.literal('short-shorts'),
+			v.literal('shorts'),
+			v.literal('trousers'),
+		),
+		skin: v.union(v.literal('light'), v.literal('medium'), v.literal('dark')),
+		topColor: v.string(),
+		bottomColor: v.string(),
+		showColor: v.string(),
+		sockColor: v.optional(v.string()),
+		shoeColor: v.string(),
+		head: v.object({
+			hair: v.optional(
+				v.union(v.literal('long'), v.literal('medium'), v.literal('short')),
+			),
+			hairColor: v.optional(v.string()),
+			accessory: v.optional(
+				v.union(
+					v.literal('cap'),
+					v.literal('headband'),
+					v.literal('glasses'),
+				),
+			),
+			accessoryColor: v.optional(v.string()),
+			facialHair: v.optional(
+				v.union(v.literal('beard'), v.literal('stubble'), v.literal('long')),
+			),
+			facialHairColor: v.optional(v.string()),
+			topColorForNeck: v.optional(v.boolean()),
+		}),
+	}),
+)
+
 // ── Queries ─────────────────────────────────────────────────────────
 
 export const list = query({
@@ -92,6 +132,7 @@ export const create = mutation({
 		name: v.string(),
 		extra: v.optional(v.string()),
 		parkrunId: v.optional(v.string()),
+		avatar: avatarValidator,
 	},
 	handler: async (ctx, args) => {
 		const session = await validateSession(ctx, args.token, true)
@@ -102,7 +143,7 @@ export const create = mutation({
 			name: args.name,
 			extra: args.extra,
 			parkrunId: args.parkrunId,
-			avatar: {},
+			avatar: args.avatar ?? {},
 			createdAt: now,
 			modifiedAt: now,
 		})
@@ -127,6 +168,7 @@ export const update = mutation({
 		name: v.optional(v.string()),
 		extra: v.optional(v.string()),
 		parkrunId: v.optional(v.string()),
+		avatar: avatarValidator,
 	},
 	handler: async (ctx, args) => {
 		const session = await validateSession(ctx, args.token, true)
@@ -135,12 +177,13 @@ export const update = mutation({
 		const existing = await ctx.db.get(args.guestId)
 		if (!existing) return { error: 'Guest not found' }
 
-		const patch: Record<string, string | number | undefined> = {
+		const patch: Record<string, unknown> = {
 			modifiedAt: Date.now(),
 		}
 		if (args.name !== undefined) patch.name = args.name
 		if (args.extra !== undefined) patch.extra = args.extra
 		if (args.parkrunId !== undefined) patch.parkrunId = args.parkrunId
+		if (args.avatar !== undefined) patch.avatar = args.avatar
 
 		await ctx.db.patch(args.guestId, patch)
 

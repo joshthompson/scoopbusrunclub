@@ -71,6 +71,11 @@ export function hasHeaderArtwork(runner: RunnerData): boolean {
 	return Boolean(runner.frames.run?.length && runner.frames.sit?.length)
 }
 
+export const guestRunners: Record<
+	string,
+	[Accessor<RunnerData>, Setter<RunnerData>]
+> = {}
+
 export const runners: Record<
 	RunnerName,
 	[Accessor<RunnerData>, Setter<RunnerData>]

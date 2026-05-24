@@ -377,7 +377,7 @@ export interface GuestItem {
 	name: string
 	extra?: string
 	parkrunId?: string
-	avatar: Record<string, never>
+	avatar?: Record<string, unknown>
 	createdAt: number
 	modifiedAt: number
 }

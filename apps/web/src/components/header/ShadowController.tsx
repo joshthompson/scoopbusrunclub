@@ -1,10 +1,14 @@
 import shadowAsset from '@/assets/runners/shadow.png'
-import { RUNNER_SIZE, runners } from '@/data/runners'
+import { RUNNER_SIZE, guestRunners, runners } from '@/data/runners'
 import { createController } from '@/engine'
 import { type RunnerController, isStandingState } from './RunnerController'
 
 export function createShadowController(id: string, runner: RunnerController) {
-	const [runnerData] = runners[runner.data.runnerId]
+	const [runnerData] =
+		runners[runner.data.runnerId as keyof typeof runners] ??
+		guestRunners[runner.data.runnerId] ??
+		[]
+	if (!runnerData) return createController({ frames: [], init: () => ({ id, type: 'shadow', x: () => 0, y: () => 0, width: () => 0, height: () => 0 }) })
 	const runnerJumpHeight = () => runner.data.baseY() - runner.data.y()
 	const JUMP_SHADOW_SIZE = 100
 

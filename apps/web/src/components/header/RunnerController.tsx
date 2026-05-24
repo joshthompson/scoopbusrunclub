@@ -1,4 +1,4 @@
-import { RUNNER_SIZE, type RunnerState, runners } from '@/data/runners'
+import { RUNNER_SIZE, type RunnerState, guestRunners, runners } from '@/data/runners'
 import { type Scene, createController, createObjectSignal } from '@/engine'
 import { css } from '@style/css'
 import type { Accessor } from 'solid-js'
@@ -94,12 +94,13 @@ function findNonOverlappingX(
 
 export function createRunnerController(
 	id: string,
-	runnerId: keyof typeof runners,
+	runnerId: keyof typeof runners | string,
 	yShift: number,
 	scene: Scene,
 	mousePosition: Accessor<{ x: number; y: number }>,
 ) {
-	const [runner] = runners[runnerId]
+	const [runner] = runners[runnerId as keyof typeof runners] ?? guestRunners[runnerId] ?? []
+	if (!runner) throw new Error(`Runner "${runnerId}" not found`)
 	const runFrames = () => runner().frames.run ?? []
 	const baseY = 124 + yShift
 	let flashTriggered = false

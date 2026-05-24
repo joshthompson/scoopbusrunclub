@@ -1,5 +1,8 @@
 import { BackSignButton } from '@/components/BackSignButton'
+import { CharacterImage } from '@/components/CharacterImage'
 import { FieldBlock } from '@/components/ui/FieldBlock'
+import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
+import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import { formatDate, ordinal } from '@/utils/misc'
 import { A, useParams } from '@solidjs/router'
 import { css } from '@style/css'
@@ -14,7 +17,7 @@ interface GuestData {
 	name: string
 	extra?: string
 	parkrunId?: string
-	avatar: Record<string, never>
+	avatar: Record<string, unknown>
 }
 
 interface GuestResultWithEventName {
@@ -88,6 +91,28 @@ export function GuestPage() {
 				{(g) => (
 					<div class={styles.container}>
 						<FieldBlock title={g().name} signType="purple">
+							<Show when={g().avatar && 'head' in g().avatar}>
+								{(() => {
+									const runnerData = createRunnerFrames(
+										g().avatar as unknown as CharacterSpriteProps,
+									)
+									return (
+										<div class={styles.characterWrap}>
+											<CharacterImage
+												runner={{
+													...runnerData,
+													name: g().name,
+													id: g().parkrunId ?? g()._id,
+													birthday: '01/01',
+													speed: 1,
+													frameInterval: 200,
+												}}
+												pose="sitting"
+											/>
+										</div>
+									)
+								})()}
+							</Show>
 							<p class={styles.extra}>{g().extra}</p>
 						</FieldBlock>
 						<Show when={sortedResults().length > 0}>
@@ -134,6 +159,10 @@ const styles = {
 		gap: '32px',
 		display: 'flex',
 		flexDirection: 'column',
+	}),
+	characterWrap: css({
+		display: 'flex',
+		justifyContent: 'center',
 	}),
 	loading: css({
 		textAlign: 'center',

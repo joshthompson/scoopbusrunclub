@@ -757,6 +757,7 @@ http.route({
 			name: body.name ?? '',
 			extra: body.extra,
 			parkrunId: body.parkrunId,
+			avatar: body.avatar,
 		})
 		if ('error' in result) {
 			return jsonResponse({ error: result.error }, 400)
@@ -782,6 +783,7 @@ http.route({
 			name: body.name,
 			extra: body.extra,
 			parkrunId: body.parkrunId,
+			avatar: body.avatar,
 		})
 		if ('error' in result) {
 			return jsonResponse({ error: result.error }, 400)
