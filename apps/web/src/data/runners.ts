@@ -1,12 +1,15 @@
 import { generateFrames } from '@/utils'
 import { type Accessor, type Setter, createSignal } from 'solid-js'
 import * as assets from './runner-assets'
+import { createRunnerFrames } from '@/utils/createRunnerFrames'
 
 export const RUNNER_SIZE = 2
 export const FRAME_COUNT = 4
 
+type MonthDigit1 = 0 | 1
+type DayDigit1 = 0 | 1 | 2 | 3
 type Digit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
-type Birthday = `${Digit}${Digit}/${Digit}${Digit}`
+type Birthday = `${DayDigit1}${Digit}/${MonthDigit1}${Digit}`
 
 export type RunnerName =
 	| 'josh'
@@ -505,42 +508,41 @@ export const runners: Record<
 	mia: createSignal<RunnerData>({
 		name: 'Mia',
 		id: '8398883',
-		birthday: '00/00',
-		frames: {
-			run: undefined,
-			sit: undefined,
-			face: undefined,
-			tailWalk: undefined,
-			tailSit: undefined,
-			scanner: undefined,
-			photographer: undefined,
-			runDirector: undefined,
-			marshal: undefined,
-			volunteerGeneric: undefined,
-		},
-		width: 21,
-		height: 28,
+		birthday: '22/02',
+		...createRunnerFrames({
+			topType: 'tshirt',
+			skin: 'light',
+			bottomType: 'shorts',
+			topColor: '#333333',
+			bottomColor: '#403d74',
+			showColor: '#0000FF',
+			shoeColor: '#b62b14',
+			head: {
+				hair: 'medium',
+				hairColor: '#b8aa71',
+			},
+		}),
 		speed: 3.2,
 		frameInterval: 75,
 	}),
 	david: createSignal<RunnerData>({
 		name: 'David',
 		id: '3710502',
-		birthday: '00/00',
-		frames: {
-			run: undefined,
-			sit: undefined,
-			face: undefined,
-			tailWalk: undefined,
-			tailSit: undefined,
-			scanner: undefined,
-			photographer: undefined,
-			runDirector: undefined,
-			marshal: undefined,
-			volunteerGeneric: undefined,
-		},
-		width: 21,
-		height: 28,
+		birthday: '04/04',
+		...createRunnerFrames({
+			topType: 'tshirt',
+			skin: 'light',
+			bottomType: 'shorts',
+			topColor: '#81BBBE',
+			bottomColor: '#0E0403',
+			showColor: '#0000FF',
+			sockColor: '#FFFFFF',
+			shoeColor: '#BBBBBB',
+			head: {
+				hair: 'short',
+				hairColor: '#905e37',
+			},
+		}),
 		speed: 3.2,
 		frameInterval: 75,
 	}),
