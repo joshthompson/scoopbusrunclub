@@ -5,13 +5,13 @@
 	"sourceRoot": "apps/web/src",
 	"targets": {
 		"dev": {
-			"command": "panda codegen --clean && panda cssgen && vite",
+			"command": "pnpm gen:custom-runner && panda codegen --clean && panda cssgen && vite",
 			"options": {
 				"cwd": "apps/web"
 			}
 		},
 		"build": {
-			"command": "panda codegen --clean && panda cssgen && vite build",
+			"command": "pnpm gen:custom-runner && panda codegen --clean && panda cssgen && vite build",
 			"options": {
 				"cwd": "apps/web"
 			},

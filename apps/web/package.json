@@ -21,6 +21,7 @@
 		"@types/leaflet": "^1.9.21",
 		"@types/pngjs": "^6.0.5",
 		"@types/suncalc": "^1.9.2",
-		"pngjs": "^7.0.0"
+		"pngjs": "^7.0.0",
+		"tsx": "^4.19.0"
 	}
 }
