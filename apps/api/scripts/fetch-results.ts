@@ -61,6 +61,7 @@ interface IngestPayload {
 
 const ingestAll = process.argv.includes('--all')
 const isDryRun = process.argv.includes('--dry')
+const MAX_UNKNOWN_NAME_RETRIES = 2
 
 /** --all-for=Name1,Name2 fetches full history for specific athletes only */
 const allForArg = process.argv.find((a) => a.startsWith('--all-for='))
@@ -116,13 +117,36 @@ async function main() {
 		)
 
 		try {
-			// Fetch all results page — runner info + full run history
+			// Fetch all results page — runner info + full run history.
+			// If the parsed name is "Unknown", treat it as a transient fetch/parse issue and retry.
 			const allResultsUrl = `https://www.parkrun.org.uk/parkrunner/${parkrunId}/all/`
-			const allHtml = await fetchPage(context, allResultsUrl)
+			let runner: RunnerInfo | null = null
+			let runResults: RunResult[] = []
 
-			// Parse
-			const runner = parseRunnerData(allHtml)
-			const runResults = parseRunResults(allHtml)
+			for (let attempt = 1; attempt <= MAX_UNKNOWN_NAME_RETRIES + 1; attempt++) {
+				const allHtml = await fetchPage(context, allResultsUrl)
+				runner = parseRunnerData(allHtml)
+				runResults = parseRunResults(allHtml)
+
+				if (runner.name !== 'Unknown') break
+
+				if (attempt <= MAX_UNKNOWN_NAME_RETRIES) {
+					const delay = randomDelay({ min: 8_000, max: 15_000 })
+					console.warn(
+						`  ⚠ Parsed runner name as "Unknown" for ${name}; retrying in ${(delay / 1000).toFixed(1)}s (attempt ${attempt}/${MAX_UNKNOWN_NAME_RETRIES})...`,
+					)
+					await sleep(delay)
+					continue
+				}
+
+				throw new Error(
+					`Runner name was "Unknown" after ${MAX_UNKNOWN_NAME_RETRIES + 1} attempts`,
+				)
+			}
+
+			if (!runner) {
+				throw new Error('Runner parse returned no data')
+			}
 
 			console.log(
 				`  → ${runner.name}: ${runner.totalRuns} runs, ${runner.totalJuniorRuns} junior runs, ${runResults.length} run results`,
