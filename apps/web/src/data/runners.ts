@@ -43,6 +43,7 @@ export interface RunnerData {
 	name: string
 	altNames?: string[]
 	id: string
+	'5verstId'?: string
 	birthday: Birthday // Format: DD/MM
 	frames: {
 		run: string[] | undefined
@@ -83,6 +84,7 @@ export const runners: Record<
 	josh: createSignal<RunnerData>({
 		name: 'Josh',
 		id: '8070821',
+		'5verstId': '790281221',
 		birthday: '15/12',
 		frames: {
 			run: generateFrames(
@@ -384,6 +386,7 @@ export const runners: Record<
 	alisa: createSignal<RunnerData>({
 		name: 'Alisa',
 		id: '10663604',
+		'5verstId': '790281220',
 		birthday: '22/11',
 		frames: {
 			run: generateFrames(

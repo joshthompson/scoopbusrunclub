@@ -60,6 +60,8 @@ type ProgressState = {
 	plannedWaitTotalMs: number
 	completedWaitMs: number
 	activeRequestStartedAt: number | null
+	activeWaitStartedAt: number | null
+	activeWaitDurationMs: number
 	progressInterval: NodeJS.Timeout | null
 }
 
@@ -75,6 +77,8 @@ const progress: ProgressState = {
 	plannedWaitTotalMs: 0,
 	completedWaitMs: 0,
 	activeRequestStartedAt: null,
+	activeWaitStartedAt: null,
+	activeWaitDurationMs: 0,
 	progressInterval: null,
 }
 
@@ -119,7 +123,18 @@ function getExpectedElapsedMs(now: number): number {
 		completedRequestEstimateMs -= REQUEST_ESTIMATE_MS
 	}
 
-	return progress.completedWaitMs + completedRequestEstimateMs + currentRequestMs
+	let currentWaitMs = 0
+	if (progress.activeWaitStartedAt !== null) {
+		const waitElapsed = Math.max(0, now - progress.activeWaitStartedAt)
+		currentWaitMs = Math.min(progress.activeWaitDurationMs, waitElapsed)
+	}
+
+	return (
+		progress.completedWaitMs +
+		completedRequestEstimateMs +
+		currentRequestMs +
+		currentWaitMs
+	)
 }
 
 function getOverallFraction(now: number): number {
@@ -160,7 +175,22 @@ function flushProgressLine() {
 	renderedProgressLength = 0
 }
 
+function completeActiveWait() {
+	if (progress.activeWaitStartedAt !== null) {
+		progress.completedWaitMs += progress.activeWaitDurationMs
+		progress.activeWaitStartedAt = null
+		progress.activeWaitDurationMs = 0
+	}
+}
+
+function startActiveWait(durationMs: number) {
+	completeActiveWait()
+	progress.activeWaitStartedAt = Date.now()
+	progress.activeWaitDurationMs = durationMs
+}
+
 function startActiveRequestTimer() {
+	completeActiveWait()
 	progress.activeRequestStartedAt = Date.now()
 }
 
@@ -188,7 +218,21 @@ function completeWait(durationMs: number) {
 	renderProgress()
 }
 
+function parseWaitLine(line: string): number | null {
+	const match = line.match(/Waiting\s+([\d.]+)s\s+before next fetch/)
+	if (!match) return null
+	return Math.round(Number.parseFloat(match[1]) * 1000)
+}
+
 function updateResultsProgress(line: string) {
+	const waitMs = parseWaitLine(line)
+	if (waitMs !== null) {
+		stopActiveRequestTimer()
+		startActiveWait(waitMs)
+		renderProgress()
+		return
+	}
+
 	const match = line.match(/^(\d+)\/(\d+):\s+Fetching results for\s+/)
 	if (!match) return
 
@@ -199,13 +243,22 @@ function updateResultsProgress(line: string) {
 }
 
 function updateParkrunProgress(line: string) {
+	const waitMs = parseWaitLine(line)
+	if (waitMs !== null) {
+		stopActiveRequestTimer()
+		startActiveWait(waitMs)
+		renderProgress()
+		return
+	}
+
 	const statusMatch = line.match(/^\s*([a-z0-9-]+):\s+(.*)$/i)
 	if (statusMatch) {
 		const eventId = statusMatch[1]
 		const message = statusMatch[2]
 		if (
 			parkrunEventIds.has(eventId) &&
-			(message.includes('no new events') || message.includes('new events to scrape'))
+			(message.includes('no new events') ||
+				message.includes('new events to scrape'))
 		) {
 			checkedParkrunEvents.add(eventId)
 			if (!parkrunEventsWithResolvedChecks.has(eventId)) {
@@ -265,10 +318,14 @@ async function runScriptWithStreamingOutput(
 	script: 'results' | 'parkrun',
 ) {
 	return new Promise<void>((resolve, reject) => {
-		const child = spawn('npx', ['tsx', scriptPath, ...args.trim().split(/\s+/).filter(Boolean)], {
-			cwd: dirname(__dirname),
-			stdio: ['ignore', 'pipe', 'pipe'],
-		})
+		const child = spawn(
+			'npx',
+			['tsx', scriptPath, ...args.trim().split(/\s+/).filter(Boolean)],
+			{
+				cwd: dirname(__dirname),
+				stdio: ['ignore', 'pipe', 'pipe'],
+			},
+		)
 
 		let stdoutBuffer = ''
 		let stderrBuffer = ''
@@ -295,7 +352,8 @@ async function runScriptWithStreamingOutput(
 		})
 
 		child.on('close', (code) => {
-		stopActiveRequestTimer()
+			stopActiveRequestTimer()
+			completeActiveWait()
 			if (stdoutBuffer.trim()) {
 				handleScriptLine(script, stdoutBuffer)
 			}
@@ -381,7 +439,8 @@ async function main() {
 		}
 		stopActiveRequestTimer()
 		progress.plannedTotalMs =
-			progress.plannedWaitTotalMs + getPlannedRequestCount() * REQUEST_ESTIMATE_MS
+			progress.plannedWaitTotalMs +
+			getPlannedRequestCount() * REQUEST_ESTIMATE_MS
 		renderProgress()
 	} catch (error) {
 		stopProgressInterval()

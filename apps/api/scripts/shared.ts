@@ -10,9 +10,13 @@ import { chromium } from 'playwright'
 
 // --- Tracked athletes ---
 
-export const TRACKED_ATHLETES: { parkrunId: string; name: string }[] = [
-	{ parkrunId: '8070821', name: 'Josh' },
-	{ parkrunId: '10663604', name: 'Alisa' },
+export const TRACKED_ATHLETES: {
+	parkrunId: string
+	'5verstId'?: string
+	name: string
+}[] = [
+	{ parkrunId: '8070821', name: 'Josh', '5verstId': '790281221' },
+	{ parkrunId: '10663604', name: 'Alisa', '5verstId': '790281220' },
 	{ parkrunId: '7758658', name: 'Adam' },
 	{ parkrunId: '5635044', name: 'Keith' },
 	{ parkrunId: '6076813', name: 'Sophie' },
