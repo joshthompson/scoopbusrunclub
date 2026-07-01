@@ -25,6 +25,7 @@ import { css } from '@style/css'
 import { createSignal, onCleanup, onMount } from 'solid-js'
 import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
+import { createAeroplaneController } from './AeroplaneController'
 import { createBusController } from './BusController'
 import {
 	RUNNER_LABEL_RENDER_DISTANCE,
@@ -235,6 +236,23 @@ function updateRunnerSpeedsAndConnections(
 	}
 }
 
+/** Names of club members whose birthday is today (DD/MM), for the birthday flyby. */
+function todaysBirthdayRunners(): string[] {
+	const now = new Date()
+	const dd = String(now.getDate()).padStart(2, '0')
+	const mm = String(now.getMonth() + 1).padStart(2, '0')
+	const today = `${dd}/${mm}`
+
+	const names: string[] = []
+	for (const [, [getter]] of Object.entries(runners)) {
+		const data = getter()
+		if (data.birthday !== '00/00' && data.birthday === today) {
+			names.push(data.name)
+		}
+	}
+	return names
+}
+
 interface ScoopBusHeaderProps {
 	results: RunResultItem[]
 	volunteers: VolunteerItem[]
@@ -361,6 +379,14 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						150 + i * CLOUD_DIST,
 						CLOUD_DIST * CLOUD_COUNT,
 					),
+				)
+			}
+
+			// Add a birthday flyby (up in the sky, behind trees/runners/bus)
+			const birthdayNames = todaysBirthdayRunners()
+			if (birthdayNames.length > 0) {
+				$scene.addController(
+					createAeroplaneController('aeroplane', sceneWidth, birthdayNames),
 				)
 			}
 
