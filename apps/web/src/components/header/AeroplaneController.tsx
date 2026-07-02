@@ -24,7 +24,7 @@ const aeroplaneFrames = generateFrames(
 
 const SPEED = 3 // px moved left each tick
 const ALTITUDE = 18 // y position, high up among the clouds
-const PASS_GAP = 1200 // px of off-screen space before it flies past again
+const PASS_GAP = 600 // px of off-screen space before it flies past again
 
 export function createAeroplaneController(
 	id: string,
@@ -50,12 +50,20 @@ export function createAeroplaneController(
 							class={css({
 								background: '#FFF',
 								width: 'max-content',
-								padding: '1px 6px',
+								padding: '1px 36px 1px 12px',
 								fontFamily: '"Jersey 10"',
 								position: 'absolute',
 								right: '0',
 								translate: '100% -8px',
 								fontSize: '24px',
+								clipPath: `polygon(
+									0 0,
+									100% 0,
+									calc(100% - 24px) 50%,
+									100% 100%,
+									0 100%,
+									0 0
+								)`,
 							})}
 						>
 							Happy Birthday {names.join(' and ')}!
@@ -68,7 +76,7 @@ export function createAeroplaneController(
 			$.setX($.x() - SPEED)
 			// Once fully off the left edge, loop back out beyond the right edge
 			// so it flies past again after a gap.
-			if ($.x() < -DISPLAY_WIDTH) {
+			if ($.x() < -DISPLAY_WIDTH - 1000) {
 				$.setX(startX + PASS_GAP)
 			}
 		},
