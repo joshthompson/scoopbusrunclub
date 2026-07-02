@@ -24,7 +24,7 @@ const aeroplaneFrames = generateFrames(
 
 const SPEED = 3 // px moved left each tick
 const ALTITUDE = 18 // y position, high up among the clouds
-const PASS_GAP = 600 // px of off-screen space before it flies past again
+const PASS_GAP = 1200 // px of off-screen space before it flies past again
 
 export function createAeroplaneController(
 	id: string,
