@@ -200,8 +200,7 @@ function renderBold(text: string): JSX.Element {
 		<>
 			{parts.map((part, i) =>
 				part.startsWith('*') && part.endsWith('*') ? (
-					// biome-ignore lint/suspicious/noArrayIndexKey: text parts have no stable identity
-					<em key={i}>{part.slice(1, -1)}</em>
+					<em>{part.slice(1, -1)}</em>
 				) : (
 					part
 				),
@@ -468,7 +467,7 @@ function joinRoles(roles: string[]): JSX.Element {
 			{roles.slice(0, -1).map((r, i) => (
 				<>
 					{i > 0 && ', '}
-					<em key={r}>{r}</em>
+					<em>{r}</em>
 				</>
 			))}
 			{' and '}

@@ -19,16 +19,16 @@ const emojiMap: Record<string, string | undefined> = {
 }
 
 export interface EmojiProps {
-	emoji: string
+	emoji: string | undefined
 	shadow?: boolean
 	flipped?: boolean
-	animation: 'default' | 'none' | 'wave'
+	animation?: 'default' | 'none' | 'wave'
 	class?: string
 }
 
 export function Emoji(props: EmojiProps) {
 	const emojiSrc = createMemo(() => {
-		const mappedEmoji = emojiMap[props.emoji]
+		const mappedEmoji = emojiMap[props.emoji ?? '']
 		if (mappedEmoji) return mappedEmoji
 
 		return createPixelEmojiDataUrl(props.emoji, 24, 3)
@@ -64,11 +64,11 @@ export function Emoji(props: EmojiProps) {
 }
 
 function createPixelEmojiDataUrl(
-	emoji: string,
+	emoji: string | undefined,
 	fontSize: number,
 	scale: number,
 ) {
-	if (typeof document === 'undefined') return undefined
+	if (typeof document === 'undefined' || !emoji) return undefined
 
 	const font = `${fontSize}px Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif`
 	const padding = 2
