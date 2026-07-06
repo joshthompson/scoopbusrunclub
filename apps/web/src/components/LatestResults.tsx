@@ -25,6 +25,7 @@ import {
 import { Button } from './ui/Button'
 import { DirtBlock } from './ui/DirtBlock'
 import { Emoji } from './ui/Emoji'
+import logo5Verst from '../assets/misc/5verst.png'
 
 const parkrunIdToRunnerName = new Map<string, string>()
 for (const [, [runner]] of Object.entries(runners)) {
@@ -316,10 +317,16 @@ function RaceBlock(props: { race: RaceItem }) {
 		if (props.race.majorEvent) return ['🔥', '🔥']
 		return undefined
 	}
+	
+	const is5Verst = () => props.race.type === '5 вёрст'
 
 	return (
 		<DirtBlock>
 			<div class={styles.parkrun}>
+				{is5Verst() && (<div
+					class={styles.is5Verst}
+					style={{ 'background-image': `url(${logo5Verst})` }}
+				/>)}
 				<h4 class={styles.parkrunName}>
 					<Show when={eventEmojis()}>
 						<Emoji emoji={eventEmojis()?.[0]} />{' '}
@@ -855,4 +862,11 @@ const styles = {
 		outlineOffset: '-1px',
 		color: '#8B5CF6',
 	}),
+	is5Verst: css({
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		width: '35px',
+		height: '36px',
+	})
 }
