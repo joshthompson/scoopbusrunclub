@@ -1,4 +1,9 @@
-import { RUNNER_SIZE, type RunnerState, guestRunners, runners } from '@/data/runners'
+import {
+	RUNNER_SIZE,
+	type RunnerState,
+	guestRunners,
+	runners,
+} from '@/data/runners'
 import { type Scene, createController, createObjectSignal } from '@/engine'
 import { css } from '@style/css'
 import type { Accessor } from 'solid-js'
@@ -99,7 +104,8 @@ export function createRunnerController(
 	scene: Scene,
 	mousePosition: Accessor<{ x: number; y: number }>,
 ) {
-	const [runner] = runners[runnerId as keyof typeof runners] ?? guestRunners[runnerId] ?? []
+	const [runner] =
+		runners[runnerId as keyof typeof runners] ?? guestRunners[runnerId] ?? []
 	if (!runner) throw new Error(`Runner "${runnerId}" not found`)
 	const runFrames = () => runner().frames.run ?? []
 	const baseY = 124 + yShift
@@ -194,8 +200,6 @@ export function createRunnerController(
 			// Transition into/out of standing states
 			if (state !== $.activeState()) {
 				$.setActiveState(state)
-
-				console.log(state)
 
 				if (isStandingState(state)) {
 					// Position for standing: fixed y of 150, non-overlapping x

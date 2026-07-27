@@ -1,4 +1,5 @@
 import graphIcon from '@/assets/misc/graph-icon.png'
+import stopwatchIcon from '@/assets/misc/stopwatch-icon.png'
 import rock1Asset from '@/assets/misc/rock1.png'
 import { BackSignButton } from '@/components/BackSignButton'
 import { CharacterImage } from '@/components/CharacterImage'
@@ -14,7 +15,6 @@ import { For, Show, createMemo, createSignal } from 'solid-js'
 import {
 	type CelebrationData,
 	CelebrationPill,
-	buildCelebrationData,
 	getCelebrationTags,
 	getOrBuildCelebrationData,
 	getVolunteerCelebrationTags,
@@ -424,6 +424,16 @@ export function MemberPage(props: MemberPageProps) {
 			{(runner) => (
 				<div class={styles.container}>
 					<FieldBlock title={name()} signType="purple">
+						<A href="./stopwatch" class={styles.stopwatchButton}>
+							<img src={rock1Asset} width={59} alt="" />
+							<img
+								src={stopwatchIcon}
+								class={styles.stopwatchButtonIcon}
+								alt="View graph"
+							/>
+							<span class={styles.stopwatchButtonText}>Stopwatch Bingo</span>
+						</A>
+
 						<A href="./graph" class={styles.rockButton}>
 							<img src={rock1Asset} width={59} alt="" />
 							<img
@@ -670,6 +680,28 @@ const styles = {
 	rockButtonText: css({
 		position: 'absolute',
 		fontSize: '0.75rem',
+	}),
+	stopwatchButton: css({
+		position: 'absolute',
+		top: '-15px',
+		right: 'calc(1rem + 59px)',
+		transformOrigin: 'center',
+		transition: 'filter 0.2s ease',
+		_hover: {
+			filter: 'brightness(1.2)',
+		},
+	}),
+	stopwatchButtonIcon: css({
+		position: 'absolute',
+		top: '40%',
+		left: '50%',
+		transform: 'translate(-50%, -50%)',
+		fontSize: '1.1rem',
+	}),
+	stopwatchButtonText: css({
+		position: 'absolute',
+		fontSize: '0.7rem',
+		textAlign: 'center',
 	}),
 	compareGrid: css({
 		display: 'flex',

@@ -17,6 +17,7 @@ import type * as http from "../http.js";
 import type * as parkrun from "../parkrun.js";
 import type * as queries from "../queries.js";
 import type * as races from "../races.js";
+import type * as weather from "../weather.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   parkrun: typeof parkrun;
   queries: typeof queries;
   races: typeof races;
+  weather: typeof weather;
 }>;
 
 /**

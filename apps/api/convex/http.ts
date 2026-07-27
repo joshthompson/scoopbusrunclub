@@ -375,6 +375,19 @@ http.route({
 	}),
 })
 
+// --- GET /api/weather (public) ---
+// Returns the current weather for Haga Park. The action serves a cached value
+// and only calls the XWeather API when the cache is missing or over an hour old.
+
+http.route({
+	path: '/api/weather',
+	method: 'GET',
+	handler: httpAction(async (ctx) => {
+		const weather = await ctx.runAction(api.weather.getWeather)
+		return jsonResponse(weather)
+	}),
+})
+
 // --- GET /api/app-data?key=... ---
 // Protected by INGEST_SECRET. Returns the value for a given key from the appData table.
 
@@ -975,6 +988,7 @@ for (const path of [
 	'/api/ingest-course',
 	'/api/courses',
 	'/api/course',
+	'/api/weather',
 	'/api/app-data',
 	'/api/admin/login',
 	'/api/admin/logout',

@@ -4,7 +4,13 @@ import {
 	Router,
 	useLocation,
 } from '@solidjs/router'
-import { type Component, Show, createMemo, createResource } from 'solid-js'
+import {
+	type Component,
+	Show,
+	createEffect,
+	createMemo,
+	createResource,
+} from 'solid-js'
 import {
 	HEADER_HEIGHT,
 	ScoopBusHeader,
@@ -33,6 +39,7 @@ import { MemberGraphPage } from './pages/MemberGraphPage'
 import { MemberPage } from './pages/MemberPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ReplayPage } from './pages/ReplayPage'
+import { StopwatchBingoPage } from './pages/StopwatchBingoPage'
 import { WrappedPage } from './pages/WrappedPage'
 import {
 	fetchAllResults,
@@ -41,9 +48,11 @@ import {
 	fetchPublicRaces,
 	fetchRunners,
 	fetchVolunteers,
+	fetchWeather,
 	getCached,
 } from './utils/api'
 import { loadEvents } from './utils/events'
+import { parseWeather } from './utils/weather'
 
 const App: Component = () => {
 	// Detect if cache is cold (no cached results) to show splash screen
@@ -59,12 +68,29 @@ const App: Component = () => {
 	// Populate the event name lookup cache
 	createResource(loadEvents)
 
+	// Fetch the current weather for Haga Park on load and derive our own type.
+	const [weather] = createResource(fetchWeather)
+	const weatherType = createMemo(() => parseWeather(weather()).type)
+	createEffect(() => console.log('Weather:', weatherType(), weather()))
+
 	// Pre-compute celebration + PB data once (cached in localStorage alongside results)
 	const celebrationData = createMemo(() => {
 		const r = results()
 		const u = runners()
 		if (!r || !u || r.length === 0 || u.length === 0) return undefined
 		return getOrBuildCelebrationData(r, u, volunteers() ?? [])
+	})
+
+	// Bundle the header's data once all sources are loaded, so the header can be
+	// rendered without per-prop non-null assertions.
+	const headerData = createMemo(() => {
+		const r = results()
+		const u = runners()
+		const v = volunteers()
+		const gr = guestResults()
+		const g = guests()
+		if (!r || !u || !v || !gr || !g) return null
+		return { results: r, volunteers: v, guestResults: gr, guests: g }
 	})
 
 	const RootLayout: Component<RouteSectionProps> = (routeProps) => {
@@ -75,11 +101,18 @@ const App: Component = () => {
 			<>
 				<Show when={!isAdmin()}>
 					<Show
-						when={results() && runners() && volunteers() && guestResults() && guests()}
+						when={headerData()}
 						fallback={<div style={{ height: `${HEADER_HEIGHT}px` }} />}
 					>
-						{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
-						<ScoopBusHeader results={results()!} volunteers={volunteers()!} guestResults={guestResults()!} guests={guests()!} />
+						{(data) => (
+							<ScoopBusHeader
+								results={data().results}
+								volunteers={data().volunteers}
+								guestResults={data().guestResults}
+								guests={data().guests}
+								weatherType={weatherType()}
+							/>
+						)}
 					</Show>
 				</Show>
 				<main class={css({ zIndex: 101, position: 'relative' })}>
@@ -145,6 +178,20 @@ const App: Component = () => {
 							runners={runners() ?? []}
 							celebrationData={celebrationData()}
 						/>
+					)}
+				/>
+				<Route
+					path="/member/:name/stopwatch"
+					component={() => (
+						<Show
+							when={!results.loading && !runners.loading}
+							fallback={<div class={styles.loading}>Loading...</div>}
+						>
+							<StopwatchBingoPage
+								results={results() ?? []}
+								runners={runners() ?? []}
+							/>
+						</Show>
 					)}
 				/>
 				<Route

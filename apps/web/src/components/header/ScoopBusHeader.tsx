@@ -1,3 +1,5 @@
+import rainGif from '@/assets/background/rain.gif'
+import snowGif from '@/assets/background/snow.gif'
 import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
@@ -7,19 +9,25 @@ import pathAsset from '@/assets/misc/path.png'
 import starsAsset from '@/assets/misc/stars.png'
 import sunAsset from '@/assets/misc/sun.png'
 import {
-	guestRunners,
-	hasHeaderArtwork,
 	type RunnerData,
 	type RunnerName,
 	type RunnerState,
+	guestRunners,
+	hasHeaderArtwork,
 	runners,
 } from '@/data/runners'
 import { RoleTranslations } from '@/data/volunteer-roles'
-import type { GuestItem, GuestResultItem, RunResultItem, VolunteerItem } from '@/utils/api'
+import type {
+	GuestItem,
+	GuestResultItem,
+	RunResultItem,
+	VolunteerItem,
+} from '@/utils/api'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { moonAsset } from '@/utils/moonAsset'
+import type { WeatherType } from '@/utils/weather'
 import { useNavigate } from '@solidjs/router'
 import { css } from '@style/css'
 import { createSignal, onCleanup, onMount } from 'solid-js'
@@ -258,6 +266,7 @@ interface ScoopBusHeaderProps {
 	volunteers: VolunteerItem[]
 	guestResults: GuestResultItem[]
 	guests: GuestItem[]
+	weatherType: WeatherType
 }
 
 function registerGuestRunners(
@@ -308,9 +317,7 @@ function registerGuestRunners(
 			const key = `guest_${gr.guestId}`
 			if (!guestRunners[key]) {
 				const timeInSeconds = parseTimeToSeconds(gr.time)
-				const speed = timeInSeconds
-					? Math.max(0.5, 4320 / timeInSeconds)
-					: 1
+				const speed = timeInSeconds ? Math.max(0.5, 4320 / timeInSeconds) : 1
 				const frameInterval = 186 - 31 * speed
 				guestRunners[key] = createSignal<RunnerData>({
 					name: gr.guestName,
@@ -338,7 +345,12 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	updateRunnerSpeedsAndConnections(props.results, props.volunteers)
 
 	// Register guest runners who attended the latest event
-	registerGuestRunners(props.results, props.volunteers, props.guestResults, props.guests)
+	registerGuestRunners(
+		props.results,
+		props.volunteers,
+		props.guestResults,
+		props.guests,
+	)
 
 	const sceneWidth = window.innerWidth
 	const scene = new Scene('header', {
@@ -353,10 +365,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			const guestRunnerIds = Object.keys(guestRunners).filter((key) =>
 				hasHeaderArtwork(guestRunners[key][0]()),
 			)
-			const allRunnerIds = [
-				...runnerIds,
-				...guestRunnerIds,
-			]
+			const allRunnerIds = [...runnerIds, ...guestRunnerIds]
 			const runnerControllers = allRunnerIds
 				.map((runnerId, i) =>
 					createRunnerController(
@@ -474,7 +483,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
 	return (
 		<div aria-label="Welcome to the Scoop Bus Run Club!">
-			<div aria-hidden="true">
+			<div aria-hidden="true" class={styles.root}>
 				<div class={styles.underlay}>
 					<div class={styles.path} style={{ '--image': `url(${pathAsset})` }} />
 					<div class={styles.bg1} style={{ '--image': `url(${bg1Asset})` }} />
@@ -534,15 +543,46 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						}}
 					/>
 				</div>
+				<div
+					class={styles.weather}
+					data-weather={props.weatherType}
+					style={{
+						'--rain-image': `url(${rainGif})`,
+						'--snow-image': `url(${snowGif})`,
+					}}
+				/>
 			</div>
 		</div>
 	)
 }
 
 const styles = {
+	root: css({
+		position: 'relative',
+	}),
 	canvas: css({
 		position: 'relative',
 		zIndex: 100,
+	}),
+	weather: css({
+		position: 'absolute',
+		inset: 0,
+		zIndex: 101,
+		pointerEvents: 'none',
+		maskImage:
+			'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%)',
+
+		'&[data-weather=rain]': {
+			backgroundImage: 'var(--rain-image)',
+			backgroundRepeat: 'repeat',
+			opacity: 0.85,
+		},
+
+		'&[data-weather=snow]': {
+			backgroundImage: 'var(--snow-image)',
+			backgroundRepeat: 'repeat',
+			backgroundSize: 'auto 100%',
+		},
 	}),
 	underlay: css({
 		height: '240px',

@@ -422,3 +422,24 @@ export async function fetchGuestResults(): Promise<GuestResultItem[]> {
 	setCache(cacheKey, data)
 	return data
 }
+
+// ---------- Weather ----------
+
+export interface Weather {
+	/** Epoch ms when the backend last refreshed from XWeather. */
+	updatedAt: number
+	/** Raw XWeather `response` payload for Haga Park. */
+	data: unknown
+}
+
+/**
+ * Fetch the current weather for Haga Park. The backend caches this for up to
+ * an hour, so this is cheap to call on every page load. Not persisted in the
+ * localStorage cache — weather is time-sensitive and served fresh each load.
+ */
+export async function fetchWeather(): Promise<Weather | null> {
+	const url = `${CONVEX_URL}/api/weather`
+	const response = await fetch(url)
+	if (!response.ok) return null
+	return (await response.json()) as Weather | null
+}
