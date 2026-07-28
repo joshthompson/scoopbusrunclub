@@ -1,34 +1,38 @@
 import { BackSignButton } from '@/components/BackSignButton'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { ALPHABET, ALPHABET_SLOTS, firstLetterSlot } from '@/utils/alphabet'
 import type { RunResultItem, Runner } from '@/utils/api'
 import { computeBingoProgress } from '@/utils/bingo'
 import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
-import { formatDate, parseTimeToSeconds } from '@/utils/misc'
-import {
-	BINGO_SLOTS,
-	expectedRunsRemaining,
-	runsVsAverage,
-} from '@/utils/stopwatchBingo'
+import { formatDate } from '@/utils/misc'
 import { A, useParams } from '@solidjs/router'
 import { css, cva } from '@style/css'
 import { For, Show, createMemo, createSignal } from 'solid-js'
 import { NotFoundPage } from './NotFoundPage'
 
-interface StopwatchBingoPageProps {
+interface AlphabetPageProps {
 	results: RunResultItem[]
 	runners: Runner[]
 }
 
-function BingoRow(props: { second: number; occurrences: RunResultItem[] }) {
+/** One distinct event (parkrun) the runner has completed for a given letter. */
+interface LetterEvent {
+	event: string
+	eventName: string
+	date: string // earliest date at this event
+	eventNumber: number // event number of that first visit
+}
+
+function AlphabetRow(props: { letter: string; events: LetterEvent[] }) {
 	const [expanded, setExpanded] = createSignal(false)
-	const achieved = () => props.occurrences.length > 0
-	const first = () => props.occurrences[0]
-	const rest = () => props.occurrences.slice(1)
+	const achieved = () => props.events.length > 0
+	const first = () => props.events[0]
+	const rest = () => props.events.slice(1)
 
 	return (
 		<div class={styles.row({ achieved: achieved() })}>
-			<div class={styles.second}>{String(props.second).padStart(2, '0')}</div>
+			<div class={styles.letter}>{props.letter}</div>
 			<div class={styles.content}>
 				<Show
 					when={achieved()}
@@ -51,23 +55,18 @@ function BingoRow(props: { second: number; occurrences: RunResultItem[] }) {
 						</Show>
 					</div>
 					<div class={styles.meta}>
-						<strong>{first().time}</strong> ·{' '}
 						{formatDate(new Date(`${first().date}T00:00:00`))}
 					</div>
 
 					<Show when={expanded()}>
 						<For each={rest()}>
-							{(occurrence) => (
+							{(ev) => (
 								<div class={styles.meta}>
-									<strong>{occurrence.time}</strong> at{' '}
-									<A href={`/event/${occurrence.event}`} class={styles.event}>
-										{occurrence.eventName}
+									<A href={`/event/${ev.event}`} class={styles.event}>
+										{ev.eventName}
 									</A>
-									<span class={styles.eventNumber}>
-										{' '}
-										#{occurrence.eventNumber}
-									</span>{' '}
-									· {formatDate(new Date(`${occurrence.date}T00:00:00`))}
+									<span class={styles.eventNumber}> #{ev.eventNumber}</span> ·{' '}
+									{formatDate(new Date(`${ev.date}T00:00:00`))}
 								</div>
 							)}
 						</For>
@@ -78,7 +77,7 @@ function BingoRow(props: { second: number; occurrences: RunResultItem[] }) {
 	)
 }
 
-export function StopwatchBingoPage(props: StopwatchBingoPageProps) {
+export function AlphabetPage(props: AlphabetPageProps) {
 	const params = useParams<{ name: string }>()
 	const runnerKey = createMemo(
 		() => getRunnerKeyFromRouteName(params.name) ?? '',
@@ -89,52 +88,62 @@ export function StopwatchBingoPage(props: StopwatchBingoPageProps) {
 	const runnerData = createMemo(() => runnerSignal()?.[0]())
 	const runnerId = createMemo(() => runnerData()?.id ?? '')
 
-	// Only timed results contribute a finishing second.
 	const runnerResults = createMemo(() =>
-		props.results.filter(
-			(result) =>
-				result.parkrunId === runnerId() &&
-				Number.isFinite(parseTimeToSeconds(result.time)),
-		),
+		props.results.filter((result) => result.parkrunId === runnerId()),
 	)
 
-	// second (0..59) → occurrences, earliest first (the first one is "first achieved").
-	const occurrencesBySecond = createMemo(() => {
-		const map = new Map<number, RunResultItem[]>()
+	// letter slot → distinct events completed for that letter, earliest first.
+	const eventsByLetter = createMemo(() => {
+		const byLetter = new Map<number, Map<string, LetterEvent>>()
 		for (const result of runnerResults()) {
-			const second = parseTimeToSeconds(result.time) % BINGO_SLOTS
-			const list = map.get(second)
-			if (list) list.push(result)
-			else map.set(second, [result])
+			const slot = firstLetterSlot(result.eventName)
+			if (slot < 0) continue
+			let events = byLetter.get(slot)
+			if (!events) {
+				events = new Map()
+				byLetter.set(slot, events)
+			}
+			const existing = events.get(result.event)
+			// Keep the earliest visit to each distinct event.
+			if (!existing || result.date < existing.date) {
+				events.set(result.event, {
+					event: result.event,
+					eventName: result.eventName,
+					date: result.date,
+					eventNumber: result.eventNumber,
+				})
+			}
 		}
-		for (const list of map.values()) {
-			list.sort((a, b) => a.date.localeCompare(b.date))
+
+		const sorted = new Map<number, LetterEvent[]>()
+		for (const [slot, events] of byLetter) {
+			sorted.set(
+				slot,
+				[...events.values()].sort((a, b) => a.date.localeCompare(b.date)),
+			)
 		}
-		return map
+		return sorted
 	})
 
 	const runs = createMemo(() => runnerResults().length)
+	// Completion counts distinct events only — visiting Haga twice still counts
+	// as one H — so feed one entry per distinct event (its first-visit date).
 	const progress = createMemo(() =>
 		computeBingoProgress(
-			runnerResults().map((result) => ({
-				date: result.date,
-				slot: parseTimeToSeconds(result.time) % BINGO_SLOTS,
-			})),
-			BINGO_SLOTS,
+			[...eventsByLetter()].flatMap(([slot, events]) =>
+				events.map((ev) => ({ date: ev.date, slot })),
+			),
+			ALPHABET_SLOTS,
 		),
 	)
-	// Seconds collected toward the next (not-yet-complete) card.
+	// Letters collected toward the next (not-yet-complete) card.
 	const score = createMemo(() => progress().nextProgress)
-	const vsAverage = createMemo(() => runsVsAverage(runs(), score()))
-	const remaining = createMemo(() => expectedRunsRemaining(score()))
-
-	const seconds = Array.from({ length: BINGO_SLOTS }, (_, i) => i)
 
 	return (
 		<Show when={runnerData()} fallback={<NotFoundPage />}>
 			{(runner) => (
 				<div class={styles.container}>
-					<DirtBlock title={`${runner().name}'s Stopwatch Bingo`}>
+					<DirtBlock title={`${runner().name}'s Alphabet`}>
 						<div class={styles.summary}>
 							<Show
 								when={progress().completions > 0}
@@ -142,24 +151,10 @@ export function StopwatchBingoPage(props: StopwatchBingoPageProps) {
 									<>
 										<div class={styles.scoreValue}>
 											{score()}
-											<span class={styles.scoreTotal}>/{BINGO_SLOTS}</span>
+											<span class={styles.scoreTotal}>/{ALPHABET_SLOTS}</span>
 										</div>
 										<div class={styles.subtle}>
-											{runner().name} · collected over {runs()} parkruns
-										</div>
-										<div class={styles.status}>
-											<Show
-												when={Math.round(vsAverage()) !== 0}
-												fallback={<>Right on the average pace</>}
-											>
-												<strong>{Math.abs(Math.round(vsAverage()))}</strong>{' '}
-												parkruns {vsAverage() > 0 ? 'behind' : 'ahead of'}{' '}
-												average
-											</Show>
-										</div>
-										<div class={styles.subtle}>
-											~{Math.round(remaining())} more parkruns to complete on
-											average
+											letters collected · {runs()} parkruns
 										</div>
 									</>
 								}
@@ -168,29 +163,27 @@ export function StopwatchBingoPage(props: StopwatchBingoPageProps) {
 									<For each={progress().completionsList}>
 										{(lap, i) => (
 											<div class={styles.status}>
-												{i() === 0 ? 'Completed' : 'Completed again'} on{' '}
+												{i() === 0 ? '🎉 Completed' : 'Completed again'} on{' '}
 												<strong>
 													{formatDate(new Date(`${lap.date}T00:00:00`))}
-												</strong>{' '}
-												in {lap.totalRuns} parkruns
+												</strong>
 											</div>
 										)}
 									</For>
 								</div>
 								<div class={styles.subtle}>
 									Next completion progress: <strong>{score()}</strong>/
-									{BINGO_SLOTS}! (~{Math.round(remaining())} more runs to
-									complete)
+									{ALPHABET_SLOTS}!
 								</div>
 							</Show>
 						</div>
 
 						<div class={styles.grid}>
-							<For each={seconds}>
-								{(second) => (
-									<BingoRow
-										second={second}
-										occurrences={occurrencesBySecond().get(second) ?? []}
+							<For each={ALPHABET}>
+								{(letter, i) => (
+									<AlphabetRow
+										letter={letter}
+										events={eventsByLetter().get(i()) ?? []}
 									/>
 								)}
 							</For>
@@ -267,7 +260,7 @@ const styles = {
 			},
 		},
 	}),
-	second: css({
+	letter: css({
 		fontSize: '1.5rem',
 		fontWeight: 'bold',
 		textAlign: 'center',
@@ -279,6 +272,7 @@ const styles = {
 		minWidth: 0,
 	}),
 	event: css({
+		color: 'inherit',
 		textDecoration: 'none',
 		fontWeight: 'bold',
 		_hover: { textDecoration: 'underline' },

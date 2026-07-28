@@ -1,6 +1,7 @@
+import alphabetIcon from '@/assets/misc/alphabet-icon.png'
 import graphIcon from '@/assets/misc/graph-icon.png'
-import stopwatchIcon from '@/assets/misc/stopwatch-icon.png'
 import rock1Asset from '@/assets/misc/rock1.png'
+import stopwatchIcon from '@/assets/misc/stopwatch-icon.png'
 import { BackSignButton } from '@/components/BackSignButton'
 import { CharacterImage } from '@/components/CharacterImage'
 import { ParkrunHeatmap } from '@/components/ParkrunHeatmap'
@@ -424,6 +425,16 @@ export function MemberPage(props: MemberPageProps) {
 			{(runner) => (
 				<div class={styles.container}>
 					<FieldBlock title={name()} signType="purple">
+						<A href="./alphabet" class={styles.alphabetButton}>
+							<img src={rock1Asset} width={59} alt="" />
+							<img
+								src={alphabetIcon}
+								class={styles.alphabetButtonIcon}
+								alt="Alphabet"
+							/>
+							<span class={styles.alphabetButtonText}>Alphabet</span>
+						</A>
+
 						<A href="./stopwatch" class={styles.stopwatchButton}>
 							<img src={rock1Asset} width={59} alt="" />
 							<img
@@ -699,6 +710,27 @@ const styles = {
 		fontSize: '1.1rem',
 	}),
 	stopwatchButtonText: css({
+		position: 'absolute',
+		fontSize: '0.7rem',
+		textAlign: 'center',
+	}),
+	alphabetButton: css({
+		position: 'absolute',
+		top: '-15px',
+		right: 'calc(1.5rem + 118px)',
+		transformOrigin: 'center',
+		transition: 'filter 0.2s ease',
+		_hover: {
+			filter: 'brightness(1.2)',
+		},
+	}),
+	alphabetButtonIcon: css({
+		position: 'absolute',
+		top: '40%',
+		left: '50%',
+		transform: 'translate(-50%, -50%)',
+	}),
+	alphabetButtonText: css({
 		position: 'absolute',
 		fontSize: '0.7rem',
 		textAlign: 'center',

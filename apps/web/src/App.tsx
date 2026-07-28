@@ -28,6 +28,7 @@ import {
 	AdminScanPage,
 	AdminUsersPage,
 } from './pages/AdminPage'
+import { AlphabetPage } from './pages/AlphabetPage'
 import { ComparePage } from './pages/ComparePage'
 import { ConnectionsPage } from './pages/ConnectionsPage'
 import { EventPage } from './pages/EventPage'
@@ -188,6 +189,20 @@ const App: Component = () => {
 							fallback={<div class={styles.loading}>Loading...</div>}
 						>
 							<StopwatchBingoPage
+								results={results() ?? []}
+								runners={runners() ?? []}
+							/>
+						</Show>
+					)}
+				/>
+				<Route
+					path="/member/:name/alphabet"
+					component={() => (
+						<Show
+							when={!results.loading && !runners.loading}
+							fallback={<div class={styles.loading}>Loading...</div>}
+						>
+							<AlphabetPage
 								results={results() ?? []}
 								runners={runners() ?? []}
 							/>
