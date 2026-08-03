@@ -40,15 +40,8 @@ export const AdminLayout: Component<{
 							href="/admin"
 							class={cx(
 								styles.navLink,
-								isActive('/admin') &&
-									!isActive('/admin/scan') &&
-									!isActive('/admin/users') &&
-									!isActive('/admin/account') &&
-									!isActive('/admin/logs') &&
-									!isActive('/admin/runners') &&
-									!isActive('/admin/parkruns')
-									? styles.navLinkActive
-									: '',
+								// isActive('/admin') is an exact match, so no sub-page can match it
+								isActive('/admin') ? styles.navLinkActive : '',
 							)}
 						>
 							Events
@@ -79,6 +72,15 @@ export const AdminLayout: Component<{
 							)}
 						>
 							Scanning
+						</A>
+						<A
+							href="/admin/manual-results"
+							class={cx(
+								styles.navLink,
+								isActive('/admin/manual-results') ? styles.navLinkActive : '',
+							)}
+						>
+							Manual Results
 						</A>
 						<Show when={auth.isSuperAdmin()}>
 							<A

@@ -1,12 +1,21 @@
 // Shared Parkrun HTML parsing logic.
-// Used by scripts/fetch-parkrun.ts and scripts/test-parse.ts.
+// Used by the scraping scripts (apps/api/scripts) and by the Manual Results
+// admin page, which runs these same parsers over hand-downloaded pages.
 //
 // Parses: /parkrunner/{id}/all/ → runner info + all run results
+//
+// Two flavours of HTML reach these parsers: the DOM serialised by Playwright
+// (entities like &nbsp;, English UI when fetched from parkrun.org.uk) and page
+// source saved straight from a browser (literal non-breaking spaces, and any
+// parkrun locale's UI text). Everything here keys off structure rather than
+// wording so both work.
 
 // --- Types ---
 
 export interface RunnerInfo {
 	name: string
+	/** Athlete ID read back off the page, e.g. "8070821". Empty if not found. */
+	parkrunId: string
 	totalRuns: number
 	totalJuniorRuns: number
 }
@@ -123,16 +132,24 @@ function decodeEntities(text: string): string {
 		.replace(/&#(\d+);/g, (_, code) =>
 			String.fromCodePoint(Number.parseInt(code, 10)),
 		)
+		.replace(/\u00a0/g, ' ')
 }
 
 // --- Parse runner info from the /all/ page ---
 
 export function parseRunnerData(html: string): RunnerInfo {
-	// Name: <h2>Josh THOMPSON&nbsp;<span ...>(A8070821)</span></h2>
-	const nameMatch = html.match(/<h2>([^<]+?)&nbsp;/)
-	const name = nameMatch ? nameMatch[1].trim() : 'Unknown'
+	// Name: <h2>Josh THOMPSON&nbsp;<span title="parkrun ID">(A8070821)</span></h2>
+	// The ID span has to be there for us to trust the heading — a blocked or
+	// error page can carry an unrelated <h2>, and callers use the "Unknown"
+	// name as their signal to retry.
+	const heading = html.match(/<h2>([\s\S]*?)<\/h2>/)?.[1] ?? ''
+	const idMatch = heading.match(/\(\s*A?(\d+)\s*\)/)
+	const headingName = decodeEntities(stripTags(heading))
+		.replace(/\(\s*A?\d+\s*\)/, '')
+		.trim()
+	const name = idMatch && headingName ? headingName : 'Unknown'
 
-	// Total runs: <h3>136 parkruns total</h3>  or  <h3>\n  136 parkruns total\n</h3>
+	// Total runs: <h3>136 parkruns total</h3>  or  <h3>\n  136 parkruns totalt\n</h3>
 	// With junior parkruns: <h3>10 parkruns &amp; 4 junior parkruns totalt</h3>
 	const totalMatch = html.match(
 		/<h3>\s*(\d+)\s*parkruns?\s*(?:&amp;|&)?\s*(?:(\d+)\s*junior\s*parkruns?\s*)?total/i,
@@ -142,21 +159,53 @@ export function parseRunnerData(html: string): RunnerInfo {
 		? Number.parseInt(totalMatch[2], 10)
 		: 0
 
-	return { name, totalRuns, totalJuniorRuns }
+	return {
+		name,
+		parkrunId: idMatch ? idMatch[1] : '',
+		totalRuns,
+		totalJuniorRuns,
+	}
 }
 
 // --- Parse all run results from the /all/ page ---
 
-export function parseRunResults(html: string): RunResult[] {
-	const results: RunResult[] = []
+/**
+ * The `<tbody>` blocks that could hold the all-results table, best candidate
+ * first. The page also carries a summary-statistics and a yearly-bests table
+ * with the same `id="results"`, and the caption naming the right one is
+ * localised ("All Results" / "– Alla resultat"), so we try the English caption
+ * first and then fall back to every results table, last one first (the
+ * all-results table is the last on the page).
+ */
+function findResultTbodies(html: string): string[] {
+	const candidates: string[] = []
 
-	// Find the "All Results" table by its caption
-	const allResultsMatch = html.match(
-		/All\s+Results\s*<\/caption>[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/i,
+	const captionMatch = html.match(
+		/All\s+Results\s*<\/caption>[\s\S]*?<tbody[^>]*>([\s\S]*?)<\/tbody>/i,
 	)
-	if (!allResultsMatch) return results
+	if (captionMatch) candidates.push(captionMatch[1])
 
-	const tbody = allResultsMatch[1]
+	const tables = [
+		...html.matchAll(/<table[^>]*id="results"[^>]*>([\s\S]*?)<\/table>/gi),
+	]
+	for (const table of tables.reverse()) {
+		const tbody = table[1].match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i)
+		candidates.push(tbody ? tbody[1] : table[1])
+	}
+
+	return candidates
+}
+
+export function parseRunResults(html: string): RunResult[] {
+	for (const tbody of findResultTbodies(html)) {
+		const results = parseResultRows(tbody)
+		if (results.length > 0) return results
+	}
+	return []
+}
+
+function parseResultRows(tbody: string): RunResult[] {
+	const results: RunResult[] = []
 
 	// Match each row: <tr class="..."><td>...</td><td>...</td>...</tr>
 	const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
@@ -180,8 +229,12 @@ export function parseRunResults(html: string): RunResult[] {
 		)
 		const eventUrl = eventLinkMatch ? eventLinkMatch[1].trim() : ''
 		const eventName = eventLinkMatch
-			? eventLinkMatch[2].trim()
-			: stripTags(cells[0])
+			? decodeEntities(eventLinkMatch[2]).trim()
+			: decodeEntities(stripTags(cells[0]))
+
+		// Only the all-results table links each row to an event's results page —
+		// this is what rules out the statistics tables sharing id="results".
+		if (!/\/results\//.test(eventUrl)) continue
 
 		// Derive eventId from URL (e.g. "haga" from ".../haga/results/394/")
 		const eventIdMatch = eventUrl.match(/\/([^/]+)\/results\//)
@@ -190,10 +243,9 @@ export function parseRunResults(html: string): RunResult[] {
 			: eventName.toLowerCase().replace(/[^a-z0-9]/g, '')
 
 		// Run Date: <a href="..."><span class="format-date">07/03/2026</span></a>
-		const dateMatch = cells[1].match(/>(\d{2})\/(\d{2})\/(\d{4})</)
-		const date = dateMatch
-			? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`
-			: stripTags(cells[1])
+		// Saved pages may carry an already-ISO date instead, depending on which
+		// locale reformatted the cell.
+		const date = parseResultDate(cells[1])
 
 		// Run Number: <a href="...">394</a>
 		const eventNumber = Number.parseInt(stripTags(cells[2]), 10) || 0
@@ -222,6 +274,17 @@ export function parseRunResults(html: string): RunResult[] {
 	}
 
 	return results
+}
+
+/** Read a run date cell as YYYY-MM-DD. Accepts DD/MM/YYYY and YYYY-MM-DD. */
+function parseResultDate(cell: string): string {
+	const dmy = cell.match(/>(\d{2})\/(\d{2})\/(\d{4})</)
+	if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`
+
+	const iso = cell.match(/>(\d{4}-\d{2}-\d{2})</)
+	if (iso) return iso[1]
+
+	return stripTags(cell)
 }
 
 // --- Parse the "largest clubs" league table ---
@@ -320,6 +383,42 @@ export function parseEventDate(html: string): string {
 		/<span\s+class="format-date">(\d{4}-\d{2}-\d{2})<\/span>/,
 	)
 	return match ? match[1] : ''
+}
+
+// --- Parse the identity of a single event results page ---
+// The scraping scripts already know which event page they asked for; the manual
+// upload page has to read it back off the file it was handed.
+//
+//   <h1>Haga parkrun</h1>
+//   <h3><span class="format-date">2026-08-01</span> … <span>#415</span></h3>
+
+export interface EventPageMeta {
+	/** eventId from the in-page athlete links, e.g. "haga". Empty if not found. */
+	eventId: string
+	/** Event title, e.g. "Haga parkrun". Empty if not found. */
+	title: string
+	/** Event number, e.g. 415. Zero if not found. */
+	eventNumber: number
+	/** YYYY-MM-DD, or empty if not found. */
+	date: string
+}
+
+export function parseEventPageMeta(html: string): EventPageMeta {
+	const title = decodeEntities(
+		stripTags(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? ''),
+	)
+
+	// Athlete links on the page are event-relative: /haga/parkrunner/6148794
+	const eventId = html.match(/href="\/([^/"]+)\/parkrunner\//)?.[1] ?? ''
+
+	const numberMatch = html.match(/<span>\s*#(\d+)\s*<\/span>/)
+
+	return {
+		eventId,
+		title,
+		eventNumber: numberMatch ? Number.parseInt(numberMatch[1], 10) : 0,
+		date: parseEventDate(html),
+	}
 }
 
 // --- Parse volunteers from a single event results page ---

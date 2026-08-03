@@ -22,6 +22,7 @@ import { ALWAYS_SHOW_LOADER, SplashScreen } from './components/SplashScreen'
 import {
 	AdminAccountPage,
 	AdminLogsPage,
+	AdminManualResultsPage,
 	AdminPage,
 	AdminParkrunsPage,
 	AdminRunnersPage,
@@ -246,6 +247,10 @@ const App: Component = () => {
 				<Route path="/admin/account" component={AdminAccountPage} />
 				<Route path="/admin/runners" component={AdminRunnersPage} />
 				<Route path="/admin/parkruns" component={AdminParkrunsPage} />
+				<Route
+					path="/admin/manual-results"
+					component={AdminManualResultsPage}
+				/>
 				<Route
 					path="/everyone"
 					component={() => (

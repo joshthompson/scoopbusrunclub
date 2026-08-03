@@ -14,7 +14,7 @@ import { spawn } from 'node:child_process'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PARKRUN_EVENTS } from '../../../libs/shared/parkrun-events'
-import { randomDelay, sleep, TRACKED_ATHLETES } from './shared'
+import { TRACKED_ATHLETES, randomDelay, sleep } from './shared'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 

@@ -1,4 +1,7 @@
-import { PARKRUN_EVENTS } from '../../../libs/shared/parkrun-events'
+import {
+	PARKRUN_EVENTS,
+	type ParkrunEventConfig,
+} from '../../../libs/shared/parkrun-events'
 /**
  * Playwright script to fetch parkrun event pages and extract volunteer data
  * for tracked club members.
@@ -24,7 +27,7 @@ import {
 	parseEventDate,
 	parseEventHistory,
 	parseEventVolunteers,
-} from '../lib/parsers'
+} from '../../../libs/shared/parkrun-parsers'
 import {
 	DELAY_BETWEEN_FETCHES_MS,
 	TRACKED_IDS,

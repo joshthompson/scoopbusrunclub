@@ -1064,6 +1064,245 @@ http.route({
 	}),
 })
 
+// --- Admin: POST /api/admin/manual-ingest ---
+// Receives data the Manual Results admin page parsed in the browser from
+// hand-downloaded parkrun pages — the fallback for when the scrapers are being
+// blocked. Every section is optional so the page can upload in small chunks,
+// and each one runs through the same internal mutations as the scraper's own
+// ingest endpoints above. Authorised by an admin session rather than the
+// INGEST_SECRET, which only the scripts hold.
+
+http.route({
+	path: '/api/admin/manual-ingest',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const token: string = body?.token ?? ''
+
+		const session = await ctx.runQuery(api.auth.validateToken, { token })
+		if (!session) return jsonResponse({ error: 'Unauthorized' }, 401)
+
+		const counts = {
+			runners: 0,
+			runResults: 0,
+			events: 0,
+			volunteers: 0,
+			clubs: 0,
+			courses: 0,
+		}
+		let touchedParkrunData = false
+		let estimatedWeeksToLargest: number | null = null
+
+		// --- Athlete results (mirrors /api/ingest) ---
+
+		let latestResultDate = ''
+
+		if (Array.isArray(body?.athletes)) {
+			for (const athlete of body.athletes) {
+				const { parkrunId, runner, runResults } = athlete
+				if (!parkrunId || !runner) continue
+
+				await ctx.runMutation(internal.parkrun.storeRunnerData, {
+					parkrunId,
+					name: runner.name,
+					totalRuns: runner.totalRuns,
+					totalJuniorRuns: runner.totalJuniorRuns ?? 0,
+				})
+				counts.runners++
+
+				if (Array.isArray(runResults)) {
+					for (const result of runResults) {
+						await ctx.runMutation(internal.parkrun.storeRunResult, {
+							parkrunId,
+							event: result.event,
+							eventNumber: result.eventNumber,
+							position: result.position,
+							time: result.time,
+							ageGrade: result.ageGrade,
+							date: result.date,
+						})
+						counts.runResults++
+						if (result.date > latestResultDate) latestResultDate = result.date
+					}
+				}
+			}
+
+			if (latestResultDate) {
+				await ctx.runMutation(internal.manualResults.raiseWatermark, {
+					key: 'latestResultsScrapeDate',
+					value: latestResultDate,
+					compare: 'date',
+				})
+			}
+
+			touchedParkrunData = true
+		}
+
+		// --- Events discovered in those results ---
+
+		if (Array.isArray(body?.events)) {
+			for (const event of body.events) {
+				if (!event.eventId || !event.name || !event.url || !event.country)
+					continue
+				await ctx.runMutation(internal.parkrun.storeEvent, {
+					eventId: event.eventId,
+					name: event.name,
+					url: event.url,
+					country: event.country,
+				})
+				counts.events++
+			}
+			touchedParkrunData = true
+		}
+
+		// --- Volunteers (mirrors /api/ingest-volunteers) ---
+
+		if (Array.isArray(body?.volunteers)) {
+			/** Highest event number seen per event, for the scrape watermarks. */
+			const highestByEvent = new Map<string, number>()
+
+			for (const vol of body.volunteers) {
+				if (
+					!vol.parkrunId ||
+					!vol.event ||
+					!vol.eventNumber ||
+					!vol.date ||
+					!Array.isArray(vol.roles)
+				)
+					continue
+
+				await ctx.runMutation(internal.parkrun.storeVolunteer, {
+					parkrunId: vol.parkrunId,
+					event: vol.event,
+					eventNumber: vol.eventNumber,
+					date: vol.date,
+					roles: vol.roles,
+				})
+				counts.volunteers++
+
+				const highest = highestByEvent.get(vol.event) ?? 0
+				if (vol.eventNumber > highest) {
+					highestByEvent.set(vol.event, vol.eventNumber)
+				}
+			}
+
+			// An event page with no tracked volunteers on it still counts as
+			// scraped, so the page sends the numbers it processed separately.
+			if (Array.isArray(body?.volunteerEvents)) {
+				for (const processed of body.volunteerEvents) {
+					if (!processed?.event || !processed?.eventNumber) continue
+					const highest = highestByEvent.get(processed.event) ?? 0
+					if (processed.eventNumber > highest) {
+						highestByEvent.set(processed.event, processed.eventNumber)
+					}
+				}
+			}
+
+			for (const [eventId, eventNumber] of highestByEvent) {
+				const capitalised = eventId.charAt(0).toUpperCase() + eventId.slice(1)
+				await ctx.runMutation(internal.manualResults.raiseWatermark, {
+					key: `latest${capitalised}EventNumber`,
+					value: String(eventNumber),
+					compare: 'number',
+				})
+			}
+
+			touchedParkrunData = true
+		}
+
+		// --- Course maps (mirrors /api/ingest-course) ---
+
+		if (Array.isArray(body?.courses)) {
+			for (const course of body.courses) {
+				if (!course?.eventId || !Array.isArray(course.coordinates)) continue
+				await ctx.runMutation(internal.courses.storeCourse, {
+					eventId: course.eventId,
+					coordinates: course.coordinates,
+					points: course.points ?? [],
+				})
+				counts.courses++
+			}
+			touchedParkrunData = true
+		}
+
+		// --- Largest clubs league table (mirrors /api/ingest-largest-clubs) ---
+
+		const largestClubs = body?.largestClubs
+		if (largestClubs && Array.isArray(largestClubs.clubs)) {
+			const week = largestClubs.week
+			if (typeof week !== 'string' || !week) {
+				return jsonResponse(
+					{ error: 'Invalid payload: largestClubs needs a week' },
+					400,
+				)
+			}
+
+			for (const club of largestClubs.clubs) {
+				if (
+					typeof club?.name !== 'string' ||
+					!club.name ||
+					typeof club.members !== 'number' ||
+					typeof club.events !== 'number'
+				)
+					continue
+
+				await ctx.runMutation(internal.largestClubs.storeSnapshot, {
+					week,
+					clubId: club.clubId,
+					name: club.name,
+					members: club.members,
+					events: club.events,
+				})
+				counts.clubs++
+			}
+
+			const summary = await ctx.runQuery(api.largestClubs.getSummary)
+			estimatedWeeksToLargest = summary.estimatedWeeksToLargest
+
+			await ctx.runMutation(internal.parkrun.setAppData, {
+				key: 'largestClubsUpdatedAt',
+				value: Date.now().toString(),
+			})
+		}
+
+		if (touchedParkrunData) {
+			await ctx.runMutation(internal.parkrun.setAppData, {
+				key: 'parkrunDataUpdatedAt',
+				value: Date.now().toString(),
+			})
+		}
+
+		// --- Record what was uploaded ---
+
+		const summaryParts: string[] = []
+		if (counts.runners) {
+			summaryParts.push(
+				`${counts.runners} runner(s), ${counts.runResults} result(s)`,
+			)
+		}
+		if (counts.events) summaryParts.push(`${counts.events} event(s)`)
+		if (counts.volunteers) {
+			summaryParts.push(`${counts.volunteers} volunteer record(s)`)
+		}
+		if (counts.courses) summaryParts.push(`${counts.courses} course(s)`)
+		if (counts.clubs) summaryParts.push(`${counts.clubs} club snapshot(s)`)
+
+		if (summaryParts.length > 0) {
+			await ctx.runMutation(internal.manualResults.logIngest, {
+				token,
+				detail: `Manual upload: ${summaryParts.join(', ')}`,
+			})
+		}
+
+		return jsonResponse({
+			status: 'ok',
+			...counts,
+			latestResultDate: latestResultDate || undefined,
+			estimatedWeeksToLargest,
+		})
+	}),
+})
+
 // --- CORS preflight for all API routes ---
 
 for (const path of [
@@ -1100,6 +1339,7 @@ for (const path of [
 	'/api/largest-clubs',
 	'/api/largest-clubs/all',
 	'/api/ingest-largest-clubs',
+	'/api/admin/manual-ingest',
 ]) {
 	http.route({
 		path,

@@ -4,6 +4,7 @@ import type { Component } from 'solid-js'
 import { AccountPage } from './admin/AccountPage'
 import { EventLogsPage } from './admin/EventLogsPage'
 import { EventsPage } from './admin/EventsPage'
+import { ManualResultsPage } from './admin/ManualResultsPage'
 import { ParkrunsPage } from './admin/ParkrunsPage'
 import { RunnersPage } from './admin/RunnersPage'
 import { ScanPage } from './admin/ScanPage'
@@ -74,6 +75,16 @@ export const AdminParkrunsPage: Component = () => {
 		<AuthGuard>
 			<AdminLayout>
 				<ParkrunsPage />
+			</AdminLayout>
+		</AuthGuard>
+	)
+}
+
+export const AdminManualResultsPage: Component = () => {
+	return (
+		<AuthGuard>
+			<AdminLayout>
+				<ManualResultsPage />
 			</AdminLayout>
 		</AuthGuard>
 	)

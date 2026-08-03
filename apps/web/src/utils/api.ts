@@ -392,6 +392,17 @@ export async function fetchCourse(eventId: string): Promise<CourseData | null> {
 	return data
 }
 
+/**
+ * Event IDs that already have course map data. Deliberately uncached — this
+ * decides which courses the Manual Results page asks to be uploaded, so it has
+ * to reflect the database as it is right now.
+ */
+export async function fetchCourseEventIds(): Promise<string[]> {
+	const response = await fetch(`${CONVEX_URL}/api/courses`)
+	if (!response.ok) throw new Error(`API error: ${response.status}`)
+	return response.json()
+}
+
 // ---------- Guests ----------
 
 export interface GuestItem {

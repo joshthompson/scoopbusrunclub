@@ -19,7 +19,10 @@
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { type LargestClubEntry, parseLargestClubs } from '../lib/parsers'
+import {
+	type LargestClubEntry,
+	parseLargestClubs,
+} from '../../../libs/shared/parkrun-parsers'
 import { fetchPage, launchBrowser, loadEnv, requireEnvVars } from './shared'
 
 const LARGEST_CLUBS_URL = 'https://www.parkrun.se/results/largestclubs/'

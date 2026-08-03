@@ -1,4 +1,3 @@
-import { scrapeCourseMap } from '../lib/map-scraper'
 /**
  * Playwright script to fetch Parkrun athlete pages and POST parsed data to Convex.
  *
@@ -27,7 +26,8 @@ import {
 	extractEvents,
 	parseRunResults,
 	parseRunnerData,
-} from '../lib/parsers'
+} from '../../../libs/shared/parkrun-parsers'
+import { scrapeCourseMap } from '../lib/map-scraper'
 import {
 	DELAY_BETWEEN_FETCHES_MS,
 	TRACKED_ATHLETES,
@@ -123,7 +123,11 @@ async function main() {
 			let runner: RunnerInfo | null = null
 			let runResults: RunResult[] = []
 
-			for (let attempt = 1; attempt <= MAX_UNKNOWN_NAME_RETRIES + 1; attempt++) {
+			for (
+				let attempt = 1;
+				attempt <= MAX_UNKNOWN_NAME_RETRIES + 1;
+				attempt++
+			) {
 				const allHtml = await fetchPage(context, allResultsUrl)
 				runner = parseRunnerData(allHtml)
 				runResults = parseRunResults(allHtml)

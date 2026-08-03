@@ -9,8 +9,8 @@
  * 5. Parse the KML for coordinates and named points
  */
 import JSZip from 'jszip'
+import { type CourseData, parseKml } from '../../../libs/shared/kml-parser'
 import type { BrowserContext } from '../scripts/shared'
-import { type CourseData, parseKml } from './kml-parser'
 
 /**
  * Extract the Google Maps embed `mid` from a parkrun course page HTML.
