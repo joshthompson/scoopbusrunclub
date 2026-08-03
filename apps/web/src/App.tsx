@@ -35,6 +35,7 @@ import { EventPage } from './pages/EventPage'
 import { EveryonePage } from './pages/EveryonePage'
 import { GuestPage } from './pages/GuestPage'
 import { HomePage } from './pages/HomePage'
+import { LargestClubsPage } from './pages/LargestClubsPage'
 import { MapPage } from './pages/MapPage'
 import { MemberGraphPage } from './pages/MemberGraphPage'
 import { MemberPage } from './pages/MemberPage'
@@ -320,6 +321,7 @@ const App: Component = () => {
 						</Show>
 					)}
 				/>
+				<Route path="/largestclubs" component={LargestClubsPage} />
 				<Route path="/guests/:parkrunId" component={() => <GuestPage />} />
 				<Route path="*404" component={NotFoundPage} />
 			</Router>

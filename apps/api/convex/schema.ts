@@ -185,6 +185,20 @@ export default defineSchema({
 		.index('by_guestId', ['guestId'])
 		.index('by_unique_result', ['guestId', 'event', 'eventNumber']),
 
+	// --- Largest clubs in Sweden (weekly league-table snapshots) ---
+
+	largestClubs: defineTable({
+		week: v.string(), // YYYY-MM-DD — the Saturday this snapshot represents
+		clubId: v.optional(v.string()), // parkrun club id, e.g. "50310"
+		name: v.string(),
+		members: v.number(), // "Antal deltagare"
+		events: v.number(), // "Antal starter"
+		fetchedAt: v.number(),
+	})
+		.index('by_week', ['week'])
+		.index('by_name', ['name'])
+		.index('by_unique_snapshot', ['name', 'week']),
+
 	// --- App-level key/value store ---
 
 	appData: defineTable({

@@ -1,6 +1,7 @@
 /**
- * Runs both fetch-results (athlete results) and fetch-parkrun (parkrun-specific
- * data such as volunteering) sequentially with a pause in between.
+ * Runs fetch-results (athlete results), fetch-parkrun (parkrun-specific data
+ * such as volunteering) and fetch-largest-clubs (the Swedish club league table)
+ * sequentially with a pause in between.
  *
  * Usage:
  *   npx tsx scripts/fetch-all.ts
@@ -44,6 +45,7 @@ const resultsWaitDurations = buildWaitDurations(
 	Math.max(0, TRACKED_ATHLETES.length - 1),
 )
 const betweenScriptDelay = isDryRun ? 0 : randomDelay(BETWEEN_SCRIPT_DELAY_MS)
+const beforeClubsDelay = isDryRun ? 0 : randomDelay(BETWEEN_SCRIPT_DELAY_MS)
 const parkrunInterEventWaitDurations = buildWaitDurations(
 	Math.max(0, PARKRUN_EVENTS.length - 1),
 )
@@ -56,6 +58,8 @@ type ProgressState = {
 	parkrunChecksTotal: number
 	parkrunScrapeStarted: number
 	parkrunScrapeTotal: number
+	clubsStarted: number
+	clubsTotal: number
 	plannedTotalMs: number
 	plannedWaitTotalMs: number
 	completedWaitMs: number
@@ -73,6 +77,8 @@ const progress: ProgressState = {
 	parkrunChecksTotal: PARKRUN_EVENTS.length,
 	parkrunScrapeStarted: 0,
 	parkrunScrapeTotal: 0,
+	clubsStarted: 0,
+	clubsTotal: 1,
 	plannedTotalMs: 0,
 	plannedWaitTotalMs: 0,
 	completedWaitMs: 0,
@@ -100,7 +106,8 @@ function getPlannedRequestCount(): number {
 	return (
 		progress.resultsTotal +
 		progress.parkrunChecksTotal +
-		progress.parkrunScrapeTotal
+		progress.parkrunScrapeTotal +
+		progress.clubsTotal
 	)
 }
 
@@ -108,7 +115,8 @@ function getStartedRequestCount(): number {
 	return (
 		progress.resultsStarted +
 		progress.parkrunChecksCompleted +
-		progress.parkrunScrapeStarted
+		progress.parkrunScrapeStarted +
+		progress.clubsStarted
 	)
 }
 
@@ -298,13 +306,24 @@ function updateParkrunProgress(line: string) {
 	renderProgress()
 }
 
-function handleScriptLine(script: 'results' | 'parkrun', line: string) {
+type ScriptName = 'results' | 'parkrun' | 'clubs'
+
+function updateClubsProgress(line: string) {
+	if (!line.startsWith('Fetching https://')) return
+	progress.clubsStarted = progress.clubsTotal
+	startActiveRequestTimer()
+	renderProgress()
+}
+
+function handleScriptLine(script: ScriptName, line: string) {
 	if (!line.trim()) return
 
 	if (script === 'results') {
 		updateResultsProgress(line)
-	} else {
+	} else if (script === 'parkrun') {
 		updateParkrunProgress(line)
+	} else {
+		updateClubsProgress(line)
 	}
 
 	flushProgressLine()
@@ -315,7 +334,7 @@ function handleScriptLine(script: 'results' | 'parkrun', line: string) {
 async function runScriptWithStreamingOutput(
 	scriptPath: string,
 	args: string,
-	script: 'results' | 'parkrun',
+	script: ScriptName,
 ) {
 	return new Promise<void>((resolve, reject) => {
 		const child = spawn(
@@ -378,6 +397,7 @@ async function main() {
 	progress.plannedWaitTotalMs =
 		resultsWaitDurations.reduce((sum, ms) => sum + ms, 0) +
 		betweenScriptDelay +
+		beforeClubsDelay +
 		parkrunInterEventWaitDurations.reduce((sum, ms) => sum + ms, 0)
 	progress.plannedTotalMs =
 		progress.plannedWaitTotalMs + getPlannedRequestCount() * REQUEST_ESTIMATE_MS
@@ -447,6 +467,42 @@ async function main() {
 		flushProgressLine()
 		console.error(
 			'\n✗ fetch-parkrun exited with an error. See output above for details.',
+		)
+		process.exit(1)
+	}
+
+	// --- Pause ---
+	if (!isDryRun) {
+		flushProgressLine()
+		console.log(
+			`\nPausing ${(beforeClubsDelay / 1000).toFixed(1)}s between scripts...\n`,
+		)
+		await sleep(beforeClubsDelay)
+		completeWait(beforeClubsDelay)
+		renderProgress()
+	}
+
+	// --- Step 3: fetch-largest-clubs (Swedish club league table) ---
+	flushProgressLine()
+	console.log('='.repeat(60))
+	console.log('Step 3: Running fetch-largest-clubs (club league table)...')
+	console.log('='.repeat(60))
+	renderProgress()
+
+	try {
+		await runScriptWithStreamingOutput(
+			'scripts/fetch-largest-clubs.ts',
+			`${envFlag}${dryFlag}`,
+			'clubs',
+		)
+		progress.clubsStarted = progress.clubsTotal
+		stopActiveRequestTimer()
+		renderProgress()
+	} catch (error) {
+		stopProgressInterval()
+		flushProgressLine()
+		console.error(
+			'\n✗ fetch-largest-clubs exited with an error. See output above for details.',
 		)
 		process.exit(1)
 	}

@@ -14,6 +14,7 @@ import type * as courses from "../courses.js";
 import type * as crons from "../crons.js";
 import type * as guests from "../guests.js";
 import type * as http from "../http.js";
+import type * as largestClubs from "../largestClubs.js";
 import type * as parkrun from "../parkrun.js";
 import type * as queries from "../queries.js";
 import type * as races from "../races.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   guests: typeof guests;
   http: typeof http;
+  largestClubs: typeof largestClubs;
   parkrun: typeof parkrun;
   queries: typeof queries;
   races: typeof races;

@@ -886,6 +886,96 @@ http.route({
 	}),
 })
 
+// --- GET /api/largest-clubs (public) ---
+// The top two clubs by total runs (plus ties, plus Scoop Bus Run Club) with
+// their recent runs-per-week rate and overtake projections.
+
+http.route({
+	path: '/api/largest-clubs',
+	method: 'GET',
+	handler: httpAction(async (ctx) => {
+		const summary = await ctx.runQuery(api.largestClubs.getSummary)
+		return jsonResponse(summary)
+	}),
+})
+
+// --- GET /api/largest-clubs/all (public) ---
+// Every weekly snapshot, for graphing.
+
+http.route({
+	path: '/api/largest-clubs/all',
+	method: 'GET',
+	handler: httpAction(async (ctx) => {
+		const snapshots = await ctx.runQuery(api.largestClubs.listAll)
+		return jsonResponse(snapshots)
+	}),
+})
+
+// --- POST /api/ingest-largest-clubs ---
+// Receives the parkrun Sweden largest-clubs league table, scraped weekly.
+// Protected by a shared secret in the Authorization header.
+
+http.route({
+	path: '/api/ingest-largest-clubs',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const authHeader = request.headers.get('Authorization')
+		const expectedSecret = process.env.INGEST_SECRET
+
+		if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
+			return jsonResponse({ error: 'Unauthorized' }, 401)
+		}
+
+		const body = await request.json()
+		const clubs = body?.clubs
+		const week = body?.week
+
+		if (!Array.isArray(clubs) || typeof week !== 'string' || !week) {
+			return jsonResponse(
+				{ error: 'Invalid payload: expected { week, clubs: [...] }' },
+				400,
+			)
+		}
+
+		let stored = 0
+		for (const club of clubs) {
+			if (
+				typeof club?.name !== 'string' ||
+				!club.name ||
+				typeof club.members !== 'number' ||
+				typeof club.events !== 'number'
+			)
+				continue
+
+			await ctx.runMutation(internal.largestClubs.storeSnapshot, {
+				week,
+				clubId: club.clubId,
+				name: club.name,
+				members: club.members,
+				events: club.events,
+			})
+			stored++
+		}
+
+		// Recompute the projection from the snapshots we just stored, so the
+		// ingest response can report the current estimate.
+		const summary = await ctx.runQuery(api.largestClubs.getSummary)
+
+		// Mark largest-clubs data as updated so clients know to invalidate cache
+		await ctx.runMutation(internal.parkrun.setAppData, {
+			key: 'largestClubsUpdatedAt',
+			value: Date.now().toString(),
+		})
+
+		return jsonResponse({
+			status: 'ok',
+			week,
+			clubsStored: stored,
+			estimatedWeeksToLargest: summary.estimatedWeeksToLargest,
+		})
+	}),
+})
+
 // --- Admin: GET /api/admin/parkruns ---
 // Returns paginated parkrun events (distinct event+eventNumber combos from runResults)
 
@@ -1007,6 +1097,9 @@ for (const path of [
 	'/api/admin/guests',
 	'/api/admin/guest-result',
 	'/api/admin/parkruns',
+	'/api/largest-clubs',
+	'/api/largest-clubs/all',
+	'/api/ingest-largest-clubs',
 ]) {
 	http.route({
 		path,

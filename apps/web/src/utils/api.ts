@@ -3,7 +3,7 @@ const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string) || ''
 // ---------- Cache infrastructure ----------
 
 const CACHE_PREFIX = 'sbrc:'
-const CACHE_VERSION = 3
+const CACHE_VERSION = 4
 
 /** The single metadata key that controls all cache validity */
 const CACHE_META_KEY = `${CACHE_PREFIX}cache`
@@ -13,6 +13,7 @@ interface CacheMeta {
 	parkrunDataUpdatedAt: string | null
 	scoopBusDataUpdatedAt: string | null
 	guestDataUpdatedAt: string | null
+	largestClubsUpdatedAt: string | null
 }
 
 /** Cache keys that belong to parkrun-scraped data */
@@ -24,6 +25,9 @@ const SCOOPBUS_EXACT_KEYS = ['races']
 
 /** Cache keys that belong to guest data */
 const GUEST_EXACT_KEYS = ['guests', 'guest-results']
+
+/** Cache keys that belong to the largest-clubs league table */
+const LARGEST_CLUBS_EXACT_KEYS = ['largest-clubs', 'largest-clubs-all']
 
 // ---------- Cache meta read / write ----------
 
@@ -107,6 +111,13 @@ function purgeGuestCache(): void {
 	}
 }
 
+/** Remove specific cache entries related to the largest-clubs league table */
+function purgeLargestClubsCache(): void {
+	for (const key of LARGEST_CLUBS_EXACT_KEYS) {
+		localStorage.removeItem(CACHE_PREFIX + key)
+	}
+}
+
 /**
  * Wipe all sbrc: keys from localStorage EXCEPT the admin auth token.
  * Used when migrating from the old cache scheme or on version mismatch.
@@ -148,6 +159,7 @@ async function checkCacheValidity(): Promise<void> {
 			parkrunDataUpdatedAt: string | null
 			scoopBusDataUpdatedAt: string | null
 			guestDataUpdatedAt: string | null
+			largestClubsUpdatedAt: string | null
 		} = await response.json()
 
 		const meta = getCacheMeta()
@@ -160,6 +172,7 @@ async function checkCacheValidity(): Promise<void> {
 				parkrunDataUpdatedAt: server.parkrunDataUpdatedAt,
 				scoopBusDataUpdatedAt: server.scoopBusDataUpdatedAt,
 				guestDataUpdatedAt: server.guestDataUpdatedAt,
+				largestClubsUpdatedAt: server.largestClubsUpdatedAt,
 			})
 			return
 		}
@@ -190,6 +203,15 @@ async function checkCacheValidity(): Promise<void> {
 		if (serverGuest > clientGuest) {
 			purgeGuestCache()
 			meta.guestDataUpdatedAt = server.guestDataUpdatedAt
+			metaChanged = true
+		}
+
+		// Compare largest-clubs data timestamp
+		const serverLargestClubs = Number(server.largestClubsUpdatedAt ?? '0')
+		const clientLargestClubs = Number(meta.largestClubsUpdatedAt ?? '0')
+		if (serverLargestClubs > clientLargestClubs) {
+			purgeLargestClubsCache()
+			meta.largestClubsUpdatedAt = server.largestClubsUpdatedAt
 			metaChanged = true
 		}
 
@@ -419,6 +441,73 @@ export async function fetchGuestResults(): Promise<GuestResultItem[]> {
 	const response = await fetch(url)
 	if (!response.ok) throw new Error(`API error: ${response.status}`)
 	const data: GuestResultItem[] = await response.json()
+	setCache(cacheKey, data)
+	return data
+}
+
+// ---------- Largest clubs ----------
+
+export interface LargestClub {
+	name: string
+	/** "Antal deltagare" — distinct club members who have run. */
+	members: number
+	/** "Antal starter" — total runs started by club members. */
+	events: number
+	/** Runs per week, averaged over the last 6 weeks of snapshots. */
+	averageWeeklyEvents: number
+	isScoopBus: boolean
+	/** Weeks until this club passes Scoop Bus. Null for us, or if never. */
+	weeksToOvertakeScoopBus: number | null
+}
+
+export interface LargestClubsSummary {
+	/** Saturday of the most recent snapshot, YYYY-MM-DD. Null when no data. */
+	week: string | null
+	/** Weeks until Scoop Bus is the largest club. Null if already there or never. */
+	estimatedWeeksToLargest: number | null
+	clubs: LargestClub[]
+}
+
+export interface LargestClubSnapshot {
+	week: string // YYYY-MM-DD (a Saturday)
+	name: string
+	clubId?: string
+	members: number
+	events: number
+}
+
+/**
+ * Never throws — this drives a homepage block, so a missing or unreachable
+ * endpoint should hide the block rather than break the page.
+ */
+export async function fetchLargestClubs(): Promise<LargestClubsSummary | null> {
+	await ensureCacheValidity()
+	const cacheKey = 'largest-clubs'
+	const cached = getCached<LargestClubsSummary>(cacheKey)
+	if (cached) return cached
+
+	try {
+		const url = `${CONVEX_URL}/api/largest-clubs`
+		const response = await fetch(url)
+		if (!response.ok) return null
+		const data: LargestClubsSummary = await response.json()
+		setCache(cacheKey, data)
+		return data
+	} catch {
+		return null
+	}
+}
+
+export async function fetchAllLargestClubs(): Promise<LargestClubSnapshot[]> {
+	await ensureCacheValidity()
+	const cacheKey = 'largest-clubs-all'
+	const cached = getCached<LargestClubSnapshot[]>(cacheKey)
+	if (cached) return cached
+
+	const url = `${CONVEX_URL}/api/largest-clubs/all`
+	const response = await fetch(url)
+	if (!response.ok) throw new Error(`API error: ${response.status}`)
+	const data: LargestClubSnapshot[] = await response.json()
 	setCache(cacheKey, data)
 	return data
 }

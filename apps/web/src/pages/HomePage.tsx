@@ -1,6 +1,7 @@
 import { A } from '@solidjs/router'
 import { css } from '@style/css'
 import { type Component, Show } from 'solid-js'
+import { LargestClub } from '../components/LargestClub'
 import { LatestResults } from '../components/LatestResults'
 import { Milestones } from '../components/Milestones'
 import { RaceCalendar } from '../components/RaceCalendar'
@@ -59,6 +60,7 @@ export const HomePage: Component<{
 				<Show when={!props.runnersLoading}>
 					<Milestones runners={props.runners} results={props.results} />
 				</Show>
+				<LargestClub />
 				<RaceCalendar races={props.races} />
 				<DirtBlock title="Explore">
 					<div

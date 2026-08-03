@@ -8,6 +8,7 @@
 		"fetch-results": "tsx scripts/fetch-results.ts",
 		"fetch-map": "tsx scripts/fetch-map.ts",
 		"fetch-all-maps": "tsx scripts/fetch-all-maps.ts",
+		"fetch-largest-clubs": "tsx scripts/fetch-largest-clubs.ts",
 		"fetch-all": "tsx scripts/fetch-all.ts",
 		"test-parse": "tsx scripts/test-parse.ts"
 	},

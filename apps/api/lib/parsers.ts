@@ -105,6 +105,26 @@ function stripTags(html: string): string {
 	return html.replace(/<[^>]*>/g, '').trim()
 }
 
+// --- Helper: decode the handful of entities parkrun emits in club names ---
+
+const ENTITIES: Record<string, string> = {
+	'&amp;': '&',
+	'&lt;': '<',
+	'&gt;': '>',
+	'&quot;': '"',
+	'&#039;': "'",
+	'&apos;': "'",
+	'&nbsp;': ' ',
+}
+
+function decodeEntities(text: string): string {
+	return text
+		.replace(/&(?:amp|lt|gt|quot|#039|apos|nbsp);/g, (m) => ENTITIES[m] ?? m)
+		.replace(/&#(\d+);/g, (_, code) =>
+			String.fromCodePoint(Number.parseInt(code, 10)),
+		)
+}
+
 // --- Parse runner info from the /all/ page ---
 
 export function parseRunnerData(html: string): RunnerInfo {
@@ -202,6 +222,60 @@ export function parseRunResults(html: string): RunResult[] {
 	}
 
 	return results
+}
+
+// --- Parse the "largest clubs" league table ---
+// Parses https://www.parkrun.se/results/largestclubs/
+// Columns: Klubb | (spacer) | Antal deltagare | Antal starter | Klubbens hemsida
+
+export interface LargestClubEntry {
+	/** parkrun's internal club id, from the `#featureClub=50310` anchor. */
+	clubId?: string
+	name: string
+	/** "Antal deltagare" — distinct club members who have run. */
+	members: number
+	/** "Antal starter" — total runs started by club members. */
+	events: number
+}
+
+export function parseLargestClubs(html: string): LargestClubEntry[] {
+	const entries: LargestClubEntry[] = []
+
+	const tableMatch = html.match(
+		/<table[^>]*id="results"[^>]*>[\s\S]*?<tbody[^>]*>([\s\S]*?)<\/tbody>/i,
+	)
+	if (!tableMatch) return entries
+
+	const tbody = tableMatch[1]
+
+	for (const rowMatch of tbody.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+		const cells: string[] = []
+		for (const cellMatch of rowMatch[1].matchAll(
+			/<td[^>]*>([\s\S]*?)<\/td>/gi,
+		)) {
+			cells.push(cellMatch[1])
+		}
+
+		if (cells.length < 4) continue
+
+		const name = decodeEntities(stripTags(cells[0]))
+		if (!name) continue
+
+		const clubIdMatch = cells[0].match(/#featureClub=(\d+)/)
+		const members = Number.parseInt(stripTags(cells[2]), 10)
+		const events = Number.parseInt(stripTags(cells[3]), 10)
+
+		if (Number.isNaN(members) || Number.isNaN(events)) continue
+
+		entries.push({
+			clubId: clubIdMatch ? clubIdMatch[1] : undefined,
+			name,
+			members,
+			events,
+		})
+	}
+
+	return entries
 }
 
 // --- Types for event page parsing ---

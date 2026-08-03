@@ -109,6 +109,7 @@ export const getAllVolunteers = query({
  * - parkrunDataUpdatedAt: set when parkrun data is ingested (runners, results, volunteers, courses, events)
  * - scoopBusDataUpdatedAt: set when our own data changes (races / event calendar)
  * - guestDataUpdatedAt: set when guest data changes (guests, guest results)
+ * - largestClubsUpdatedAt: set when a largest-clubs snapshot is ingested
  */
 export const getCacheVersion = query({
 	args: {},
@@ -125,10 +126,15 @@ export const getCacheVersion = query({
 			.query('appData')
 			.withIndex('by_key', (q) => q.eq('key', 'guestDataUpdatedAt'))
 			.unique()
+		const largestClubsRow = await ctx.db
+			.query('appData')
+			.withIndex('by_key', (q) => q.eq('key', 'largestClubsUpdatedAt'))
+			.unique()
 		return {
 			parkrunDataUpdatedAt: parkrunRow?.value ?? null,
 			scoopBusDataUpdatedAt: scoopBusRow?.value ?? null,
 			guestDataUpdatedAt: guestRow?.value ?? null,
+			largestClubsUpdatedAt: largestClubsRow?.value ?? null,
 		}
 	},
 })

@@ -9,14 +9,20 @@ import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { useParams } from '@solidjs/router'
 import { css } from '@style/css'
+import { For, Show, createMemo, createSignal } from 'solid-js'
 import {
-	For,
-	Show,
-	createMemo,
-	createSignal,
-	onCleanup,
-	onMount,
-} from 'solid-js'
+	GRAPH_HEIGHT,
+	GRAPH_MARGIN,
+	GraphFrame,
+	GraphLine,
+	GraphPointMarker,
+	GraphTooltip,
+	buildLinePath,
+	createGraphGeometry,
+	createGraphWidth,
+	graphContainer,
+	pickLabelIndexes,
+} from './graph'
 
 /** Category of celebration for filtering */
 export type GraphMarkerCategory = 'pb' | 'coursePb' | 'other'
@@ -49,132 +55,22 @@ interface GraphProps {
 	celebrationData?: CelebrationData
 }
 
-const HEIGHT = 400
-const MARGIN = { left: 60, right: 20, top: 30, bottom: 40 }
-const PLOT_H = HEIGHT - MARGIN.top - MARGIN.bottom
+const HEIGHT = GRAPH_HEIGHT
+const MARGIN = GRAPH_MARGIN
 const MAX_Y_LABELS = 6
 /** Snap distance in pixels for the hover cursor line */
 const SNAP_DISTANCE = 1000
-
-function SignBadge(props: {
-	x: number
-	y: number
-	label: string
-	badgeW?: number
-	badgeH?: number
-}) {
-	const bw = () => props.badgeW ?? 40
-	const bh = () => props.badgeH ?? 18
-	const bx = () => props.x - bw() / 2
-	const by = () => props.y - bh() / 2
-	const postTopY = () => by() + bh()
-	const postBottomY = () => postTopY() + 6
-
-	return (
-		<g>
-			{/* Sign posts */}
-			<line
-				x1={bx() + bw() * 0.3}
-				y1={postTopY()}
-				x2={bx() + bw() * 0.3}
-				y2={postBottomY()}
-				stroke="#4A3215"
-				stroke-width="1.5"
-			/>
-			<line
-				x1={bx() + bw() * 0.7}
-				y1={postTopY()}
-				x2={bx() + bw() * 0.7}
-				y2={postBottomY()}
-				stroke="#4A3215"
-				stroke-width="1.5"
-			/>
-			{/* Badge outline */}
-			<rect
-				x={bx() - 1}
-				y={by() - 1}
-				width={bw() + 2}
-				height={bh() + 2}
-				fill="#4A3215"
-			/>
-			{/* Badge fill */}
-			<rect x={bx()} y={by()} width={bw()} height={bh()} fill="#AD855A" />
-			{/* Badge text */}
-			<text
-				x={props.x}
-				y={props.y}
-				fill="#4A3215"
-				font-family="monospace"
-				font-weight="bold"
-				font-size="11"
-				text-anchor="middle"
-				dominant-baseline="central"
-			>
-				{props.label}
-			</text>
-		</g>
-	)
-}
+/** Width of the x-axis date badges */
+const X_BADGE_W = 65
 
 export function GraphSVG(props: GraphProps) {
-	let containerRef!: HTMLDivElement
-	let svgRef!: SVGSVGElement
-	const [width, setWidth] = createSignal(800)
+	let svgRef: SVGSVGElement | undefined
+	const { width, ref: containerRef } = createGraphWidth()
 	const [mouseX, setMouseX] = createSignal<number | null>(null)
 	const [showPbs, setShowPbs] = createSignal(true)
 	const [showCoursePbs, setShowCoursePbs] = createSignal(true)
 	const [showOther, setShowOther] = createSignal(true)
 	const [filterLowest, setFilterLowest] = createSignal(false)
-
-	/** Whether a touch interaction started on the graph */
-	let isTouching = false
-
-	/** Convert a clientX to SVG-local X */
-	const clientXToLocal = (clientX: number) => {
-		const rect = svgRef.getBoundingClientRect()
-		return clientX - rect.left
-	}
-
-	const handleTouchStart = (e: TouchEvent) => {
-		e.preventDefault()
-		isTouching = true
-		const touch = e.touches[0]
-		if (touch) setMouseX(clientXToLocal(touch.clientX))
-	}
-
-	const handleTouchMove = (e: TouchEvent) => {
-		if (!isTouching) return
-		e.preventDefault()
-		const touch = e.touches[0]
-		if (touch) setMouseX(clientXToLocal(touch.clientX))
-	}
-
-	const handleTouchEnd = () => {
-		if (!isTouching) return
-		isTouching = false
-		setMouseX(null)
-	}
-
-	onMount(() => {
-		const ro = new ResizeObserver((entries) => {
-			for (const entry of entries) {
-				setWidth(entry.contentRect.width)
-			}
-		})
-		ro.observe(containerRef)
-
-		// Attach touchmove/touchend on document so dragging outside the graph still works
-		document.addEventListener('touchmove', handleTouchMove, { passive: false })
-		document.addEventListener('touchend', handleTouchEnd)
-		document.addEventListener('touchcancel', handleTouchEnd)
-
-		onCleanup(() => {
-			ro.disconnect()
-			document.removeEventListener('touchmove', handleTouchMove)
-			document.removeEventListener('touchend', handleTouchEnd)
-			document.removeEventListener('touchcancel', handleTouchEnd)
-		})
-	})
 
 	const params = useParams<{ name: string }>()
 	const runnerKey = createMemo(
@@ -217,8 +113,6 @@ export function GraphSVG(props: GraphProps) {
 		const w = width()
 		if (data.length === 0 || w <= 0) return null
 
-		const plotW = w - MARGIN.left - MARGIN.right
-
 		const times = data.map((r) => parseTimeToSeconds(r.time))
 		const dates = data.map((r) => r.date)
 
@@ -231,14 +125,15 @@ export function GraphSVG(props: GraphProps) {
 		const totalMinutes = maxMinute - minMinute
 		const minuteStep = Math.max(1, Math.ceil(totalMinutes / (MAX_Y_LABELS - 1)))
 
-		const yMin = (minMinute - minuteStep) * 60
-		const yMax = (maxMinute + minuteStep) * 60
-
-		// Coordinate mappers
-		const toX = (i: number) =>
-			MARGIN.left + (i / (data.length - 1 || 1)) * plotW
-		const toY = (t: number) =>
-			MARGIN.top + ((t - yMin) / (yMax - yMin)) * PLOT_H
+		// Faster times sit nearer the top, so the y axis runs the other way.
+		const geometry = createGraphGeometry({
+			width: w,
+			count: data.length,
+			yMin: (minMinute - minuteStep) * 60,
+			yMax: (maxMinute + minuteStep) * 60,
+			largerIsHigher: false,
+		})
+		const { toX, toY, plotW } = geometry
 
 		// Y grid labels
 		const yLabels: { y: number; label: string }[] = []
@@ -247,11 +142,6 @@ export function GraphSVG(props: GraphProps) {
 		}
 
 		// X axis labels
-		const xBadgeW = 65
-		const minLabelSpacing = xBadgeW * 1.5
-		const maxXLabels = Math.max(1, Math.floor(plotW / minLabelSpacing))
-		const xLabelStep = Math.max(1, Math.ceil(data.length / maxXLabels))
-		const xLabels: { x: number; label: string }[] = []
 		const monthNames = [
 			'Jan',
 			'Feb',
@@ -266,13 +156,13 @@ export function GraphSVG(props: GraphProps) {
 			'Nov',
 			'Dec',
 		]
-		for (let i = 0; i < data.length; i += xLabelStep) {
+		const xLabels = pickLabelIndexes(data.length, plotW, X_BADGE_W).map((i) => {
 			const [y, m] = dates[i].split('-')
-			xLabels.push({
+			return {
 				x: toX(i),
 				label: `${monthNames[Number.parseInt(m, 10) - 1]} ${y}`,
-			})
-		}
+			}
+		})
 
 		// Dashed vertical lines on multiples of 5 results, never closer than 30px
 		const verticalLines: number[] = []
@@ -287,11 +177,7 @@ export function GraphSVG(props: GraphProps) {
 
 		// Data points
 		const points = data.map((_, i) => ({ x: toX(i), y: toY(times[i]) }))
-
-		// SVG path for the line
-		const linePath = points
-			.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`)
-			.join(' ')
+		const linePath = buildLinePath(points)
 
 		// Build celebrations from the shared celebration rules
 		const celData = celebrationData()
@@ -342,6 +228,7 @@ export function GraphSVG(props: GraphProps) {
 		}
 
 		return {
+			geometry,
 			yLabels,
 			xLabels,
 			verticalLines,
@@ -494,126 +381,27 @@ export function GraphSVG(props: GraphProps) {
 	const pointSize = createMemo(() => lineSizeProps().pointSize)
 
 	return (
-		<div ref={containerRef} class={styles.container}>
+		<div ref={containerRef} class={graphContainer}>
 			<Show when={chartData()}>
 				{(data) => (
-					<svg
-						ref={svgRef}
-						width={data().width}
-						height={HEIGHT}
-						class={styles.graph}
-						role="img"
-						aria-label="Run time graph"
-						onMouseMove={(e) => {
-							const rect = svgRef.getBoundingClientRect()
-							setMouseX(e.clientX - rect.left)
+					<GraphFrame
+						ref={(element) => {
+							svgRef = element
 						}}
-						onMouseLeave={() => setMouseX(null)}
-						onTouchStart={handleTouchStart}
+						geometry={data().geometry}
+						ariaLabel="Run time graph"
+						yLabels={data().yLabels}
+						xLabels={data().xLabels}
+						xLabelWidth={X_BADGE_W}
+						verticalLines={data().verticalLines}
+						cursorX={cursorLineX()}
+						onPointerXChange={setMouseX}
 					>
-						{/* Horizontal grid lines */}
-						<For each={data().yLabels}>
-							{(label) => (
-								<line
-									x1={MARGIN.left}
-									y1={label.y}
-									x2={data().width - MARGIN.right}
-									y2={label.y}
-									stroke="rgba(0,0,0,0.1)"
-									stroke-width="1"
-								/>
-							)}
-						</For>
-
-						{/* Y axis labels */}
-						<For each={data().yLabels}>
-							{(label) => (
-								<SignBadge
-									x={MARGIN.left - 28}
-									y={label.y}
-									label={label.label}
-								/>
-							)}
-						</For>
-
-						{/* X axis labels */}
-						<For each={data().xLabels}>
-							{(label) => (
-								<SignBadge
-									x={label.x}
-									y={HEIGHT - MARGIN.bottom + 17}
-									label={label.label}
-									badgeW={65}
-								/>
-							)}
-						</For>
-
-						{/* Dashed vertical lines every 5 results */}
-						<For each={data().verticalLines}>
-							{(x) => (
-								<line
-									x1={x}
-									y1={MARGIN.top}
-									x2={x}
-									y2={HEIGHT - MARGIN.bottom}
-									stroke="#AD855A"
-									stroke-width="1"
-									stroke-dasharray="4 4"
-								/>
-							)}
-						</For>
-
-						{/* Y axis */}
-						<line
-							x1={MARGIN.left}
-							y1={MARGIN.top}
-							x2={MARGIN.left}
-							y2={HEIGHT - MARGIN.bottom}
-							stroke="#5c3d1a"
-							stroke-width="2"
-						/>
-						{/* X axis */}
-						<line
-							x1={MARGIN.left}
-							y1={HEIGHT - MARGIN.bottom}
-							x2={data().width - MARGIN.right}
-							y2={HEIGHT - MARGIN.bottom}
-							stroke="#5c3d1a"
-							stroke-width="2"
-						/>
-
-						{/* Hover cursor line (behind graph line, dots & emojis) */}
-						<Show when={cursorLineX()}>
-							{(cx) => (
-								<line
-									x1={cx()}
-									y1={MARGIN.top}
-									x2={cx()}
-									y2={HEIGHT - MARGIN.bottom}
-									stroke="#000"
-									stroke-width="2"
-								/>
-							)}
-						</Show>
-
-						{/* Line outline */}
-						<path
-							d={data().linePath}
-							fill="none"
-							stroke={lineSizeProps().outerLineColor}
-							stroke-width={lineWidth() + 2}
-							stroke-linejoin="bevel"
-							stroke-linecap="square"
-						/>
-
-						{/* Line */}
-						<path
-							d={data().linePath}
-							fill="none"
-							stroke={lineSizeProps().innerLineColor}
-							stroke-width={lineWidth()}
-							stroke-linejoin="round"
-							stroke-linecap="round"
+						<GraphLine
+							path={data().linePath}
+							color={lineSizeProps().innerLineColor}
+							outlineColor={lineSizeProps().outerLineColor}
+							width={lineWidth()}
 						/>
 
 						{/* Data point squares */}
@@ -621,25 +409,22 @@ export function GraphSVG(props: GraphProps) {
 							{(p, i) => {
 								const isPb = () => i() === data().currentPbIndex
 								return (
-									<g>
-										<rect
-											x={p.x - pointSize() / 2}
-											y={p.y - pointSize() / 2}
-											width={pointSize()}
-											height={pointSize()}
-											fill={
-												isPb()
-													? 'var(--gold-pure)'
-													: lineSizeProps().innerPointColor
-											}
-											stroke={
-												isPb()
-													? 'var(--dirt-darker-brown)'
-													: lineSizeProps().outerPointColor
-											}
-											stroke-width={isPb() ? '2' : '1'}
-										/>
-									</g>
+									<GraphPointMarker
+										x={p.x}
+										y={p.y}
+										size={pointSize()}
+										fill={
+											isPb()
+												? 'var(--gold-pure)'
+												: lineSizeProps().innerPointColor
+										}
+										stroke={
+											isPb()
+												? 'var(--dirt-darker-brown)'
+												: lineSizeProps().outerPointColor
+										}
+										strokeWidth={isPb() ? 2 : 1}
+									/>
 								)
 							}}
 						</For>
@@ -662,31 +447,11 @@ export function GraphSVG(props: GraphProps) {
 								)
 							}}
 						</For>
-					</svg>
+					</GraphFrame>
 				)}
 			</Show>
 			<Show when={snappedResult()}>
 				{(result) => {
-					const tooltipWidth = 240
-					const pad = 8
-					const style = () => {
-						const svgRect = svgRef.getBoundingClientRect()
-						// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-						const cx = cursorLineX()!
-						let left = svgRect.left + cx - tooltipWidth / 2
-						left = Math.max(
-							pad,
-							Math.min(left, window.innerWidth - tooltipWidth - pad),
-						)
-						const top = svgRect.top + MARGIN.top - pad
-						return {
-							position: 'fixed' as const,
-							left: `${left}px`,
-							top: `${top}px`,
-							width: `${tooltipWidth}px`,
-							transform: 'translateY(-100%)',
-						}
-					}
 					const r = () => result()
 					const dateStr = () => {
 						const [y, mo, d] = r().date.split('-')
@@ -694,7 +459,11 @@ export function GraphSVG(props: GraphProps) {
 					}
 					const celebrations = () => snappedCelebrations()
 					return (
-						<div class={styles.tooltip} style={style()}>
+						<GraphTooltip
+							svg={svgRef}
+							x={cursorLineX() ?? 0}
+							anchorY={MARGIN.top}
+						>
 							<div class={styles.tooltipTitle}>
 								{r().time} - {r().eventName} #{r().eventNumber}
 							</div>
@@ -714,7 +483,7 @@ export function GraphSVG(props: GraphProps) {
 									</For>
 								</div>
 							</Show>
-						</div>
+						</GraphTooltip>
 					)
 				}}
 			</Show>
@@ -763,33 +532,6 @@ export function GraphSVG(props: GraphProps) {
 }
 
 const styles = {
-	container: css({
-		width: '100%',
-		position: 'relative',
-		touchAction: 'none',
-	}),
-	graph: css({
-		'& text': {
-			fontFamily: '"Jersey 10", sans-serif',
-			textTransform: 'uppercase',
-			fontSize: '1rem',
-		},
-	}),
-	tooltip: css({
-		position: 'fixed',
-		background: 'var(--color-black)',
-		color: 'var(--color-white)',
-		fontSize: '0.75rem',
-		fontWeight: 'normal',
-		lineHeight: '1.3',
-		p: '0.35rem 0.5rem',
-		borderRadius: '4px',
-		cornerShape: 'notch',
-		pointerEvents: 'none',
-		zIndex: 1000,
-		textAlign: 'center',
-		whiteSpace: 'normal',
-	}),
 	tooltipTitle: css({
 		fontWeight: 'bold',
 		fontSize: '0.8rem',
