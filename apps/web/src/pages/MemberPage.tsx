@@ -425,26 +425,6 @@ export function MemberPage(props: MemberPageProps) {
 			{(runner) => (
 				<div class={styles.container}>
 					<FieldBlock title={name()} signType="purple">
-						<A href="./alphabet" class={styles.alphabetButton}>
-							<img src={rock1Asset} width={59} alt="" />
-							<img
-								src={alphabetIcon}
-								class={styles.alphabetButtonIcon}
-								alt="Alphabet"
-							/>
-							<span class={styles.alphabetButtonText}>Alphabet</span>
-						</A>
-
-						<A href="./stopwatch" class={styles.stopwatchButton}>
-							<img src={rock1Asset} width={59} alt="" />
-							<img
-								src={stopwatchIcon}
-								class={styles.stopwatchButtonIcon}
-								alt="View graph"
-							/>
-							<span class={styles.stopwatchButtonText}>Stopwatch Bingo</span>
-						</A>
-
 						<A href="./graph" class={styles.rockButton}>
 							<img src={rock1Asset} width={59} alt="" />
 							<img
@@ -508,36 +488,58 @@ export function MemberPage(props: MemberPageProps) {
 						races={props.races}
 					/>
 
-					{/* Compare with another runner */}
-					<DirtBlock title="Compare">
-						<div class={styles.compareGrid}>
-							<For
-								each={Object.entries(runnerSignals).filter(
-									([key, [signal]]) =>
-										key !== runnerKey() &&
-										key !== 'link' &&
-										Boolean(signal().frames.face?.[0]),
-								)}
-							>
-								{([key, [signal]]) => {
-									const other = signal()
-									return (
-										<A
-											href={`/compare/${runnerKey()}/${key.toLowerCase()}`}
-											class={styles.compareLink}
-										>
-											<img
-												src={other.frames.face[0]}
-												class={styles.compareFace}
-												alt={other.name}
-											/>
-											<span class={styles.compareName}>{other.name}</span>
-										</A>
-									)
-								}}
-							</For>
-						</div>
-					</DirtBlock>
+					<div class={styles.twoColumnGrid}>
+						{/* Compare with another runner */}
+						<DirtBlock title="Compare">
+							<div class={styles.compareGrid}>
+								<For
+									each={Object.entries(runnerSignals).filter(
+										([key, [signal]]) =>
+											key !== runnerKey() &&
+											key !== 'link' &&
+											Boolean(signal().frames.face?.[0]),
+									)}
+								>
+									{([key, [signal]]) => {
+										const other = signal()
+										return (
+											<A
+												href={`/compare/${runnerKey()}/${key.toLowerCase()}`}
+												class={styles.compareLink}
+											>
+												<img
+													src={other.frames.face[0]}
+													class={styles.compareFace}
+													alt={other.name}
+												/>
+												<span class={styles.compareName}>{other.name}</span>
+											</A>
+										)
+									}}
+								</For>
+							</div>
+						</DirtBlock>
+
+						<DirtBlock title="Challenge Tracking">
+							<div class={styles.challengeGrid}>
+								<A href="./alphabet" class={styles.challengeLink}>
+									<img src={rock1Asset} width={59} alt="" />
+									<img src={alphabetIcon} class={styles.challengeIcon} alt="" />
+									<span class={styles.challengeName}>Alphabet</span>
+								</A>
+
+								<A href="./stopwatch" class={styles.challengeLink}>
+									<img src={rock1Asset} width={59} alt="" />
+									<img
+										src={stopwatchIcon}
+										class={styles.challengeIcon}
+										alt=""
+									/>
+									<span class={styles.challengeName}>Stopwatch Bingo</span>
+								</A>
+							</div>
+						</DirtBlock>
+					</div>
 
 					<div class={styles.twoColumnGrid}>
 						<DirtBlock title="Celebrations">
@@ -692,48 +694,34 @@ const styles = {
 		position: 'absolute',
 		fontSize: '0.75rem',
 	}),
-	stopwatchButton: css({
-		position: 'absolute',
-		top: '-15px',
-		right: 'calc(1rem + 59px)',
-		transformOrigin: 'center',
-		transition: 'filter 0.2s ease',
+	challengeGrid: css({
+		display: 'flex',
+		flexWrap: 'wrap',
+		gap: '1.5rem',
+		justifyContent: 'center',
+	}),
+	challengeLink: css({
+		position: 'relative',
+		display: 'flex',
+		flexDirection: 'column',
+		alignItems: 'center',
+		gap: '0.2rem',
+		textDecoration: 'none',
+		color: 'inherit',
+		transition: 'transform 0.15s ease, filter 0.2s ease',
 		_hover: {
+			transform: 'scale(1.1)',
 			filter: 'brightness(1.2)',
 		},
 	}),
-	stopwatchButtonIcon: css({
+	challengeIcon: css({
 		position: 'absolute',
-		top: '40%',
-		left: '50%',
-		transform: 'translate(-50%, -50%)',
-		fontSize: '1.1rem',
-	}),
-	stopwatchButtonText: css({
-		position: 'absolute',
-		fontSize: '0.7rem',
-		textAlign: 'center',
-	}),
-	alphabetButton: css({
-		position: 'absolute',
-		top: '-15px',
-		right: 'calc(1.5rem + 118px)',
-		transformOrigin: 'center',
-		transition: 'filter 0.2s ease',
-		_hover: {
-			filter: 'brightness(1.2)',
-		},
-	}),
-	alphabetButtonIcon: css({
-		position: 'absolute',
-		top: '40%',
+		top: '12px',
 		left: '50%',
 		transform: 'translate(-50%, -50%)',
 	}),
-	alphabetButtonText: css({
-		position: 'absolute',
-		fontSize: '0.7rem',
-		textAlign: 'center',
+	challengeName: css({
+		fontSize: '0.8rem',
 	}),
 	compareGrid: css({
 		display: 'flex',
