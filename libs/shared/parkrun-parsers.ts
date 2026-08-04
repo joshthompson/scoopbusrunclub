@@ -1,5 +1,5 @@
 // Shared Parkrun HTML parsing logic.
-// Used by the scraping scripts (apps/api/scripts) and by the Manual Results
+// Used by the scraping scripts (apps/api/scripts) and by the Process Results
 // admin page, which runs these same parsers over hand-downloaded pages.
 //
 // Parses: /parkrunner/{id}/all/ → runner info + all run results
@@ -42,7 +42,7 @@ export interface EventInfo {
 
 const NAMIBIA_EVENTS = new Set(['walvisbay', 'windhoek', 'swakopmund'])
 
-const DOMAIN_TO_COUNTRY: Record<string, string> = {
+export const DOMAIN_TO_COUNTRY: Record<string, string> = {
 	'parkrun.com.au': 'AU',
 	'parkrun.co.at': 'AT',
 	'parkrun.ca': 'CA',

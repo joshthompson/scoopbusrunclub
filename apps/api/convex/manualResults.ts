@@ -3,7 +3,7 @@ import { internalMutation } from './_generated/server'
 import { logAdminEvent, validateSession } from './auth'
 
 /**
- * Support mutations for the Manual Results admin page.
+ * Support mutations for the Process Results admin page.
  *
  * The upload itself goes through /api/admin/manual-ingest, which reuses the
  * same internal mutations as the scraper's ingest endpoints. These two cover

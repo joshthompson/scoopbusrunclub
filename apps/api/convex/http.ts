@@ -1065,7 +1065,7 @@ http.route({
 })
 
 // --- Admin: POST /api/admin/manual-ingest ---
-// Receives data the Manual Results admin page parsed in the browser from
+// Receives data the Process Results admin page parsed in the browser from
 // hand-downloaded parkrun pages — the fallback for when the scrapers are being
 // blocked. Every section is optional so the page can upload in small chunks,
 // and each one runs through the same internal mutations as the scraper's own

@@ -29,6 +29,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Packs the results-scraper extension into apps/web/public, so the site
+      # serves a current download for the Process Results page.
+      - run: pnpm nx run results-scraper:pack
+
       - run: pnpm nx run web:build
         env:
           VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}

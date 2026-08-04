@@ -1,4 +1,5 @@
 import {
+	Navigate,
 	Route,
 	type RouteSectionProps,
 	Router,
@@ -21,10 +22,11 @@ import { getOrBuildCelebrationData } from './components/ResultCelebrations'
 import { ALWAYS_SHOW_LOADER, SplashScreen } from './components/SplashScreen'
 import {
 	AdminAccountPage,
+	AdminAdvancedUploadPage,
 	AdminLogsPage,
-	AdminManualResultsPage,
 	AdminPage,
 	AdminParkrunsPage,
+	AdminProcessResultsPage,
 	AdminRunnersPage,
 	AdminScanPage,
 	AdminUsersPage,
@@ -248,8 +250,17 @@ const App: Component = () => {
 				<Route path="/admin/runners" component={AdminRunnersPage} />
 				<Route path="/admin/parkruns" component={AdminParkrunsPage} />
 				<Route
+					path="/admin/process-results"
+					component={AdminProcessResultsPage}
+				/>
+				<Route
+					path="/admin/process-results/advanced"
+					component={AdminAdvancedUploadPage}
+				/>
+				{/* Renamed from Manual Results — keep old links working. */}
+				<Route
 					path="/admin/manual-results"
-					component={AdminManualResultsPage}
+					component={() => <Navigate href="/admin/process-results" />}
 				/>
 				<Route
 					path="/everyone"

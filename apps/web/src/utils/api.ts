@@ -394,7 +394,7 @@ export async function fetchCourse(eventId: string): Promise<CourseData | null> {
 
 /**
  * Event IDs that already have course map data. Deliberately uncached — this
- * decides which courses the Manual Results page asks to be uploaded, so it has
+ * decides which courses the Process Results flow asks to be uploaded, so it has
  * to reflect the database as it is right now.
  */
 export async function fetchCourseEventIds(): Promise<string[]> {

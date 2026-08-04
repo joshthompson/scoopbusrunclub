@@ -2,10 +2,11 @@ import { AdminLayout } from '@/components/admin/AdminLayout'
 import { AuthGuard } from '@/components/admin/AuthGuard'
 import type { Component } from 'solid-js'
 import { AccountPage } from './admin/AccountPage'
+import { AdvancedUploadPage } from './admin/AdvancedUploadPage'
 import { EventLogsPage } from './admin/EventLogsPage'
 import { EventsPage } from './admin/EventsPage'
-import { ManualResultsPage } from './admin/ManualResultsPage'
 import { ParkrunsPage } from './admin/ParkrunsPage'
+import { ProcessResultsPage } from './admin/ProcessResultsPage'
 import { RunnersPage } from './admin/RunnersPage'
 import { ScanPage } from './admin/ScanPage'
 import { UsersPage } from './admin/UsersPage'
@@ -80,11 +81,21 @@ export const AdminParkrunsPage: Component = () => {
 	)
 }
 
-export const AdminManualResultsPage: Component = () => {
+export const AdminProcessResultsPage: Component = () => {
 	return (
 		<AuthGuard>
 			<AdminLayout>
-				<ManualResultsPage />
+				<ProcessResultsPage />
+			</AdminLayout>
+		</AuthGuard>
+	)
+}
+
+export const AdminAdvancedUploadPage: Component = () => {
+	return (
+		<AuthGuard>
+			<AdminLayout>
+				<AdvancedUploadPage />
 			</AdminLayout>
 		</AuthGuard>
 	)

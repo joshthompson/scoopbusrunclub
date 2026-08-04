@@ -1,5 +1,5 @@
 /**
- * Client-side processing for the Manual Results admin page.
+ * Client-side processing for the Process Results admin pages.
  *
  * When parkrun blocks the scrapers (or nobody is at a machine that can run
  * them), the pages can be downloaded by hand and dropped into the admin form.
@@ -42,31 +42,14 @@ export const RESULTS_WINDOW_DAYS = 42
 
 export const SCOOP_BUS_CLUB_NAME = 'Scoop Bus Run Club'
 
-// ── Source pages ────────────────────────────────────────────────────
-// Where each upload field's file comes from, so the form can link straight to
-// the page you need to download. These are the URLs the scrapers fetch.
-
-/** An athlete's full run history — what fetch-results.ts requests. */
-export function athletePageUrl(parkrunId: string): string {
-	return `https://www.parkrun.org.uk/parkrunner/${parkrunId}/all/`
-}
-
-/**
- * An event's most recent results. fetch-parkrun.ts walks the event history to
- * find every unscraped number; by hand you want the latest one, which parkrun
- * serves at a stable URL.
- */
-export function latestResultsUrl(eventBaseUrl: string): string {
-	return `${eventBaseUrl.replace(/\/$/, '')}/results/latestresults/`
-}
-
-/** An event's course page, which embeds the Google map holding the KMZ. */
-export function coursePageUrl(eventBaseUrl: string): string {
-	return `${eventBaseUrl.replace(/\/$/, '')}/course/`
-}
-
-/** The league table fetch-largest-clubs.ts scrapes. */
-export const LARGEST_CLUBS_URL = 'https://www.parkrun.se/results/largestclubs/'
+// Source-page URLs live in @shared/parkrun-urls so the scraper extension and the
+// scripts build the same links; re-exported here for the page's convenience.
+export {
+	LARGEST_CLUBS_URL,
+	athletePageUrl,
+	coursePageUrl,
+	latestResultsUrl,
+} from '@shared/parkrun-urls'
 
 /** Oldest result date the default (windowed) ingest will include. */
 export function resultsCutoffDate(now = Date.now()): string {
@@ -142,9 +125,16 @@ export async function parseAthleteFile(
 			`This page is for athlete ${runner.parkrunId} (${runner.name}), not ${expectedParkrunId}.`,
 		)
 	}
-	if (runResults.length !== runner.totalRuns) {
+	// The all-results table lists junior parkruns alongside adult ones, and the
+	// heading counts them separately ("22 parkruns & 5 junior parkruns totalt"),
+	// so the row count should match the two added together.
+	const expectedRows = runner.totalRuns + runner.totalJuniorRuns
+	if (runResults.length !== expectedRows) {
+		const reported = runner.totalJuniorRuns
+			? `${runner.totalRuns} parkruns and ${runner.totalJuniorRuns} junior parkruns`
+			: `${runner.totalRuns} parkruns`
 		warnings.push(
-			`Page reports ${runner.totalRuns} parkruns but the table has ${runResults.length} rows.`,
+			`Page reports ${reported} but the table has ${runResults.length} rows.`,
 		)
 	}
 
@@ -260,6 +250,25 @@ export interface AthleteSummary {
 	warnings: string[]
 }
 
+/**
+ * A single result in the upload, flagged against what's already stored.
+ *
+ * The default window is six weeks, so most of what gets re-sent is already in
+ * the database — only `isNew` rows are worth reading.
+ */
+export interface ResultSummary {
+	parkrunId: string
+	/** Short club name, for the results table. */
+	runner: string
+	event: string
+	eventName: string
+	eventNumber: number
+	date: string
+	position: number
+	time: string
+	isNew: boolean
+}
+
 export interface EventSummary {
 	eventId: string
 	name: string
@@ -296,6 +305,8 @@ export interface ManualSummary {
 	ingestAll: boolean
 	cutoffDate: string
 	athletes: AthleteSummary[]
+	/** Every result in the upload, newest first, each flagged new or already stored. */
+	results: ResultSummary[]
 	events: EventSummary[]
 	volunteers: VolunteerSummary[]
 	courses: CourseSummary[]
@@ -359,6 +370,7 @@ export function buildManualSummary(input: ProcessInput): ManualSummary {
 	const { existing } = input
 
 	const athletes: AthleteSummary[] = []
+	const results: ResultSummary[] = []
 	const payloadAthletes: ManualIngestSections['athletes'] = []
 	const allEvents = new Map<string, EventInfo>()
 
@@ -367,6 +379,24 @@ export function buildManualSummary(input: ProcessInput): ManualSummary {
 			? parsed.runResults
 			: parsed.runResults.filter((r) => r.date >= cutoff)
 
+		const label = ATHLETE_LABELS.get(parkrunId) ?? parkrunId
+
+		for (const result of uploaded) {
+			results.push({
+				parkrunId,
+				runner: label,
+				event: result.event,
+				eventName: result.eventName,
+				eventNumber: result.eventNumber,
+				date: result.date,
+				position: result.position,
+				time: result.time,
+				isNew: !existing.resultKeys.has(
+					resultKey(parkrunId, result.event, result.eventNumber),
+				),
+			})
+		}
+
 		const newResults = uploaded.filter(
 			(r) =>
 				!existing.resultKeys.has(resultKey(parkrunId, r.event, r.eventNumber)),
@@ -374,7 +404,7 @@ export function buildManualSummary(input: ProcessInput): ManualSummary {
 
 		athletes.push({
 			parkrunId,
-			label: ATHLETE_LABELS.get(parkrunId) ?? parkrunId,
+			label,
 			name: parsed.runner.name,
 			totalRuns: parsed.runner.totalRuns,
 			totalJuniorRuns: parsed.runner.totalJuniorRuns,
@@ -402,6 +432,11 @@ export function buildManualSummary(input: ProcessInput): ManualSummary {
 	}
 
 	athletes.sort((a, b) => a.label.localeCompare(b.label))
+
+	// Newest first: the recent stuff is what anyone actually reads.
+	results.sort(
+		(a, b) => b.date.localeCompare(a.date) || a.runner.localeCompare(b.runner),
+	)
 
 	const events: EventSummary[] = [...allEvents.values()]
 		.map((e) => ({
@@ -492,6 +527,7 @@ export function buildManualSummary(input: ProcessInput): ManualSummary {
 		ingestAll: input.ingestAll,
 		cutoffDate: cutoff,
 		athletes,
+		results,
 		events,
 		volunteers,
 		courses,

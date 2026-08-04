@@ -27,6 +27,9 @@
 		"game:dev": "nx run game:dev",
 		"game:build": "nx run game:build",
 		"game:level": "pnpm --filter @scoopbus/game run fetch-level",
+		"scraper:build": "tsx apps/results-scraper/build.mts",
+		"scraper:pack": "tsx apps/results-scraper/build.mts --pack",
+		"scraper:watch": "tsx apps/results-scraper/build.mts --watch",
 		"wake:install": "bash scripts/setup-wake-job.sh",
 		"wake:disable": "bash scripts/setup-wake-job.sh --disable"
 	},

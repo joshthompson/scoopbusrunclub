@@ -38,7 +38,10 @@ styled-system-studio
 
 # Generated
 *.generated.ts
+# Packed extension, produced by `pnpm scraper:pack` at build time
+apps/web/public/results-scraper.zip
 
 # Wake runner
 logs/*
 scripts/.wake_runner.sh
+temp/*

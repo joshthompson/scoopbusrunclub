@@ -74,13 +74,13 @@ export const AdminLayout: Component<{
 							Scanning
 						</A>
 						<A
-							href="/admin/manual-results"
+							href="/admin/process-results"
 							class={cx(
 								styles.navLink,
-								isActive('/admin/manual-results') ? styles.navLinkActive : '',
+								isActive('/admin/process-results') ? styles.navLinkActive : '',
 							)}
 						>
-							Manual Results
+							Process Results
 						</A>
 						<Show when={auth.isSuperAdmin()}>
 							<A

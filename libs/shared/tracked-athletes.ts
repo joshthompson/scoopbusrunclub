@@ -1,7 +1,7 @@
 /**
  * The club members whose parkrun results we ingest.
  *
- * Shared between the scraping scripts and the Manual Results admin page so both
+ * Shared between the scraping scripts and the Process Results admin page so both
  * ask for exactly the same set of athletes. Adding someone here adds them to
  * both the scrape and the manual upload form.
  */

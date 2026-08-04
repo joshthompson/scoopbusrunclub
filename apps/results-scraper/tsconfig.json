@@ -1,0 +1,11 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"lib": ["ESNext", "DOM"],
+		"types": [],
+		"paths": {
+			"@shared/*": ["../../libs/shared/*"]
+		}
+	},
+	"include": ["src", "build.mts"]
+}
