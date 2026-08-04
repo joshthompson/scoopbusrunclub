@@ -8,23 +8,24 @@ It is deliberately **not** published to the Chrome Web Store — load it unpacke
 
 ## Install
 
-Two channels, and which one you want depends on where you're using it.
+One build, two places it works: `scoopbus.run` and `localhost:3005`. Get it
+whichever way suits you.
 
-**Working on the repo** — build the dev channel:
+**Working on the repo:**
 
 ```bash
 pnpm scraper:build      # writes dist/results-scraper
 ```
 
-It's named *[DEV] Scoop Bus Results Scraper* — prefixed so it stays visible where
-Chrome truncates the name — and only answers on `localhost:3005`.
-
 **Anywhere else** — download it from
-[scoopbus.run/admin/process-results](https://scoopbus.run/admin/process-results),
-unzip, and load the folder. That copy only answers on `scoopbus.run`.
+[scoopbus.run/admin/process-results](https://scoopbus.run/admin/process-results)
+and unzip it. Same bundles, no checkout, Node or pnpm needed.
 
-The split is deliberate: both can be installed at once without two extensions
-reacting to the same page and starting two scrapes.
+Don't keep both installed. They're identical and both answer on both origins, so
+two copies means two extensions reacting to one page and two scrapes running.
+(There used to be a localhost-only dev channel to make that safe, but it left the
+repo build unable to talk to the live site, which is the common case even mid
+development.)
 
 ### Why there's no one-click install
 
@@ -35,9 +36,8 @@ last step is always **Load unpacked** by hand. (Enterprise policy can install a
 self-hosted CRX properly, but that needs an MDM profile on the machine, which is
 far more setup than this is worth.)
 
-`pnpm scraper:pack` builds the prod channel and writes
-`apps/web/public/results-scraper.zip`; the deploy workflow runs it so the site
-always serves a current build.
+`pnpm scraper:pack` builds and writes `apps/web/public/results-scraper.zip`; the
+deploy workflow runs it so the site always serves a current build.
 
 Then in Chrome: `chrome://extensions` → enable **Developer mode** → **Load
 unpacked** → pick `dist/results-scraper`.
@@ -48,16 +48,17 @@ it if it's already open).
 
 Pin the icon in Chrome's toolbar to make that a one-click route in.
 
-## What differs between the channels
+## Local vs live
 
-Only the extension name and which admin origin it listens on. Everything else is
-identical — the admin page tells the extension what to fetch and results go back
-to the tab that asked, so nothing about parkrun or the backend is baked in per
-channel.
+Nothing is baked in per environment. The admin page tells the extension what to
+fetch and results go back to the tab that asked, so the same build serves
+`localhost:3005` and `scoopbus.run`.
 
 The toolbar icon is learned rather than configured: it opens the admin origin it
 last talked to, preferring a Process Results tab that's already open, and assumes
-production before it has ever seen one.
+production before it has ever seen one. Loading either admin page is enough to
+switch it — the page announces itself on load. Only the bridge's messages count
+here, so a scrape doesn't teach the icon parkrun's origin.
 
 During development, `pnpm scraper:watch` rebuilds on change. Chrome needs the
 extension reloaded (the ⟳ button on `chrome://extensions`) to pick up service

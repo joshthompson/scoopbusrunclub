@@ -13,7 +13,11 @@ import {
 	SCRAPER_PROTOCOL_VERSION,
 } from '@shared/scraper-protocol'
 import { detach, noteDocumentResponse, noteLoadingFinished } from './capture'
-import { openAdminPage, rememberAdminOrigin } from './openAdmin'
+import {
+	isFromAdminPage,
+	openAdminPage,
+	rememberAdminOrigin,
+} from './openAdmin'
 import {
 	advance,
 	cancelRun,
@@ -34,8 +38,11 @@ import { getRunState, getSession, setRunState } from './state'
 // ── Messages from content scripts ───────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-	// Note where the admin page lives, so the toolbar icon can reopen it.
-	void rememberAdminOrigin(sender.url ?? sender.origin)
+	// Note where the admin page lives, so the toolbar icon can reopen it. Bridge
+	// traffic only — the overlay's messages come from parkrun pages.
+	if (isFromAdminPage(message)) {
+		void rememberAdminOrigin(sender.url ?? sender.origin)
+	}
 
 	// Returning true keeps the response channel open for the async work below.
 	handleMessage(message as PageMessage | { type: string }, sender)

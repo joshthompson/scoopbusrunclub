@@ -16,6 +16,7 @@ import {
 	readPageMessage,
 	wrapForPage,
 } from '@shared/scraper-protocol'
+import { tagFromAdminPage } from './openAdmin'
 
 // --- Page → worker ---
 
@@ -33,7 +34,7 @@ window.addEventListener('message', (event) => {
 			const reply = await chrome.runtime.sendMessage<
 				PageMessage,
 				ExtensionMessage
-			>(message)
+			>(tagFromAdminPage(message))
 			if (reply) toPage(reply)
 		} catch (error) {
 			// The worker was unreachable — usually the extension was just reloaded.
@@ -62,7 +63,7 @@ void (async () => {
 		const hello = await chrome.runtime.sendMessage<
 			PageMessage,
 			ExtensionMessage
-		>({ type: 'ping' })
+		>(tagFromAdminPage<PageMessage>({ type: 'ping' }))
 		if (hello) toPage(hello)
 	} catch {
 		// Extension reloading; the page stays in its "not installed" state.

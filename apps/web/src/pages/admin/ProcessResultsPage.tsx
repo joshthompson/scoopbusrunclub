@@ -356,9 +356,8 @@ function InstallExtension() {
 			</ol>
 
 			<p class={styles.topBarHint}>
-				Already installed? Reload this page — the extension announces itself on
-				load. A build from the repo is named <em>[DEV] …</em> and only works on
-				localhost; the download only works on the live site.
+				Already installed? Reload this page - the extension announces itself on
+				load.
 			</p>
 
 			<div class={styles.topBar}>

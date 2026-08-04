@@ -29,15 +29,8 @@ const outDir = resolve(repoRoot, 'dist/results-scraper')
 
 const watch = process.argv.includes('--watch')
 
-/**
- * Two channels, because both can end up installed on one machine.
- *
- * A dev build only answers on localhost and a packed build only on scoopbus.run,
- * so having the repo checkout loaded *and* the downloaded copy can't result in
- * two extensions reacting to one page and starting two scrapes.
- */
+/** `--pack` only adds the zip step; the bundles it archives are the same ones. */
 const pack = process.argv.includes('--pack')
-const channel: 'dev' | 'prod' = pack ? 'prod' : 'dev'
 
 /** Where the packed archive lands, to be served by the web app. */
 const zipPath = resolve(repoRoot, 'apps/web/public/results-scraper.zip')
@@ -57,8 +50,20 @@ const PROD_ADMIN_ORIGINS = [
 	'https://*.scoopbus.run/*',
 ]
 
-const ADMIN_HOST_PATTERNS =
-	channel === 'prod' ? PROD_ADMIN_ORIGINS : DEV_ADMIN_ORIGINS
+/**
+ * One build, both origins.
+ *
+ * There used to be a dev channel (localhost only) and a packed channel
+ * (scoopbus.run only), so that a machine with both installed couldn't run two
+ * scrapes off one page — but it made the repo build useless against the live
+ * site, which is the common case even while developing. Now a single build
+ * answers on both and the toolbar icon follows whichever admin page it last
+ * heard from (see src/openAdmin.ts).
+ *
+ * The flip side: don't keep the downloaded copy installed alongside a repo
+ * build, or both will react to the same page.
+ */
+const ADMIN_HOST_PATTERNS = [...PROD_ADMIN_ORIGINS, ...DEV_ADMIN_ORIGINS]
 
 /**
  * Extra origins to treat as scrapeable, comma-separated:
@@ -77,17 +82,8 @@ const EXTRA_ORIGINS = (process.env.SCRAPER_EXTRA_ORIGINS ?? '')
 
 const manifest = {
 	manifest_version: 3,
-	// Prefixed, not suffixed: Chrome's extensions popup truncates the name, so a
-	// trailing "(dev)" is the first thing to disappear — exactly when you need to
-	// tell the repo build from the downloaded one.
-	name:
-		channel === 'dev'
-			? '[DEV] Scoop Bus Results Scraper'
-			: 'Scoop Bus Results Scraper',
-	description:
-		channel === 'dev'
-			? 'Collects results the Scoop Bus Run Club website. Development build — localhost only.'
-			: 'Collects results the Scoop Bus Run Club website.',
+	name: 'Scoop Bus Results Scraper',
+	description: 'Collects results the Scoop Bus Run Club website.',
 	version: '1.0.0',
 	permissions: ['tabs', 'debugger', 'storage', 'unlimitedStorage', 'alarms'],
 	host_permissions: [
@@ -226,9 +222,7 @@ console.log(`\nmanifest.json + ${entries.length} bundles → ${outDir}`)
 if (watch) {
 	console.log('Watching for changes. Reload the extension in Chrome to apply.')
 } else {
-	console.log(
-		`Channel: ${channel} — ${channel === 'dev' ? 'localhost only' : 'scoopbus.run only'}`,
-	)
+	console.log('Answers on scoopbus.run and localhost:3005.')
 	console.log(
 		'Load via chrome://extensions → Developer mode → Load unpacked → this folder.',
 	)

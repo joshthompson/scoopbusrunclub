@@ -10,6 +10,37 @@
 const ORIGIN_KEY = 'lastAdminOrigin'
 const PAGE_PATH = '/admin/process-results'
 
+/** Field the bridge adds to say a message came from an admin page. */
+interface AdminPageTag {
+	fromAdminPage?: true
+}
+
+/**
+ * Tag a message as coming from the admin page. Called by the bridge only.
+ *
+ * The overlay content script sends `cancel`, `retry` and `skip` too — the same
+ * types the admin page sends — so a message's type says nothing about where it
+ * came from, and remembering the sender of *any* message meant the icon
+ * "learned" parkrun.org.uk the moment a scrape started. The bridge runs on admin
+ * origins and nowhere else, so its own tag is the dependable signal.
+ *
+ * Spread first so a page that puts `fromAdminPage` in its own message can't
+ * unset it.
+ */
+export function tagFromAdminPage<T extends object>(
+	message: T,
+): T & AdminPageTag {
+	return { ...message, fromAdminPage: true }
+}
+
+export function isFromAdminPage(message: unknown): boolean {
+	return (
+		typeof message === 'object' &&
+		message !== null &&
+		(message as AdminPageTag).fromAdminPage === true
+	)
+}
+
 /**
  * Used only before the bridge has ever announced itself from a real page.
  *
@@ -19,7 +50,13 @@ const PAGE_PATH = '/admin/process-results'
  */
 const FALLBACK_ORIGINS = ['https://scoopbus.run', 'http://localhost:3005']
 
-/** Remember where the admin page lives, from any message the bridge sends. */
+/**
+ * Remember where the admin page lives, from any message the bridge sends.
+ *
+ * Every admin page announces itself with a `ping` on load, so simply opening
+ * localhost:3005 is enough to point the icon there, and opening the live site
+ * points it back.
+ */
 export async function rememberAdminOrigin(
 	senderUrl: string | undefined,
 ): Promise<void> {
