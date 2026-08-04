@@ -5,15 +5,15 @@
 	"sourceRoot": "apps/results-scraper/src",
 	"targets": {
 		"build": {
-			"command": "npx tsx apps/results-scraper/build.mts",
+			"command": "tsx apps/results-scraper/build.mts",
 			"options": { "cwd": "." }
 		},
 		"pack": {
-			"command": "npx tsx apps/results-scraper/build.mts --pack",
+			"command": "tsx apps/results-scraper/build.mts --pack",
 			"options": { "cwd": "." }
 		},
 		"watch": {
-			"command": "npx tsx apps/results-scraper/build.mts --watch",
+			"command": "tsx apps/results-scraper/build.mts --watch",
 			"options": { "cwd": "." }
 		}
 	}
