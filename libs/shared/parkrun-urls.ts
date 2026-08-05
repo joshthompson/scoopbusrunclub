@@ -1,20 +1,37 @@
 /**
  * The parkrun pages our data comes from.
  *
- * Shared by the scraping scripts, the admin upload form (which links to
- * each page you need to download) and the results-scraper extension (which
- * navigates to them). One definition so all three agree.
+ * Shared by the admin upload form (which links to each page you need to download)
+ * and the results-scraper extension (which navigates to them), so the two always
+ * agree on what to fetch. The Playwright scripts predate this module and still
+ * build athlete URLs themselves.
  */
 import { DOMAIN_TO_COUNTRY } from './parkrun-parsers'
 
 /**
- * Which parkrun site to read athlete history from. Every country's site serves
- * the same athlete pages; the scripts have always used the UK one, and its
- * pages are in English, which is the parsers' primary path.
+ * Which parkrun site to read athlete history from.
+ *
+ * Every country's site serves the same athlete pages, so this is a free choice,
+ * and it's the Swedish one because that's where everything else we fetch lives —
+ * the club's events and the league table are both on `parkrun.se`. Keeping athlete
+ * pages there means a whole scrape stays on one origin, which matters for any
+ * scraper working from inside a page rather than through host permissions: the
+ * same-origin policy makes one origin readable and the rest not.
+ *
+ * Swedish pages are a supported parser path rather than a lucky one: the total-runs
+ * regex matches "totalt" as well as "total", and `findResultTbodies` handles the
+ * localised "Alla resultat" caption by falling back to the last results table.
+ * Verified against a real `parkrun.se` athlete page — 155 results parsed.
+ *
+ * Note this constant does not reach the Playwright scripts, which build the same
+ * URL against `parkrun.org.uk` by hand (`apps/api/scripts/fetch-results.ts`).
  */
-export const ATHLETE_SITE = 'https://www.parkrun.org.uk'
+export const ATHLETE_SITE = 'https://www.parkrun.se'
 
-/** An athlete's full run history — what fetch-results.ts requests. */
+/**
+ * An athlete's full run history — requested by the extension and linked to by the
+ * manual upload form.
+ */
 export function athletePageUrl(parkrunId: string): string {
 	return `${ATHLETE_SITE}/parkrunner/${parkrunId}/all/`
 }
