@@ -126,7 +126,12 @@ function DayCell(props: { day: CalendarDay }) {
 			})}
 		>
 			<div class={styles.dayHeader}>
-				<span class={styles.dayNumber}>{props.day.dayOfMonth}</span>
+				<span class={styles.dayNumber}>
+					{props.day.dayOfMonth}
+					<Show when={props.day.isToday}>
+						<span> - Today</span>
+					</Show>
+				</span>
 				<Show when={props.day.inMonth && props.day.specialName}>
 					{(name) => (
 						<span class={styles.special} title={name()}>
@@ -414,8 +419,8 @@ const styles = {
 			padding: '4px',
 			borderRadius: '4px',
 			cornerShape: 'notch',
-			background: 'var(--dirt-parchment)',
-			border: '2px solid var(--overlay-black-15)',
+			background: 'var(--dirt-brown)',
+			border: '2px solid var(--dirt-darker-brown)',
 			overflow: 'hidden',
 		},
 		variants: {
@@ -428,8 +433,8 @@ const styles = {
 			},
 			today: {
 				true: {
-					background: 'var(--gold-pale)',
 					borderColor: 'var(--color-black)',
+					'--today-date-background': 'var(--dirt-dark-brown)',
 				},
 			},
 		},
@@ -439,10 +444,15 @@ const styles = {
 		alignItems: 'baseline',
 		gap: '0.25rem',
 		minWidth: 0,
+		justifyContent: 'space-between',
 	}),
 	dayNumber: css({
 		fontSize: '0.85rem',
 		fontWeight: 'bold',
+		background: 'var(--today-date-background, transparent)',
+		padding: '0 4px',
+		borderRadius: '3px',
+		cornerShape: 'notch',
 	}),
 	special: css({
 		fontSize: '0.6rem',
@@ -498,11 +508,13 @@ const styles = {
 	entryCount: css({
 		flexShrink: 0,
 		ml: 'auto',
-		padding: '0 3px',
+		padding: '2px 5px',
 		borderRadius: '3px',
 		cornerShape: 'notch',
 		background: 'var(--overlay-black-15)',
 		fontSize: '0.65rem',
+		alignSelf: 'flex-start',
+		mt: '2px',
 	}),
 	entryDetail: css({
 		opacity: 0.8,

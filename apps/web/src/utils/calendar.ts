@@ -29,6 +29,8 @@ export interface CalendarEntry {
 	href?: string
 	/** External website, for races that link out instead. */
 	url?: string
+	/** The race's type, for races — used to spot recurring events like Track and Food. */
+	raceType?: string
 	/** Members (and guests) who took part, in finishing order where known. */
 	people: string[]
 	/** Members who volunteered rather than ran. */
@@ -91,17 +93,19 @@ export function formatMonthTitle(year: number, month: number): string {
 // ---------- Name lookups ----------
 
 const parkrunIdToRunnerName = new Map<string, string>()
-/** MM-DD → member names with a birthday that day. */
-const birthdaysByMonthDay = new Map<string, string[]>()
+/** MM-DD → members with a birthday that day, with their member page route. */
+const birthdaysByMonthDay = new Map<string, { name: string; href: string }[]>()
 
-for (const [, [runner]] of Object.entries(runners)) {
+for (const [runnerKey, [runner]] of Object.entries(runners)) {
 	const data = runner()
 	if (data.id) parkrunIdToRunnerName.set(data.id, data.name)
 	const [day, month] = data.birthday.split('/')
 	const key = `${month}-${day}`
+	// MemberPage resolves the route param case-insensitively, so lowercase is safe.
+	const member = { name: data.name, href: `/member/${runnerKey.toLowerCase()}` }
 	const existing = birthdaysByMonthDay.get(key)
-	if (existing) existing.push(data.name)
-	else birthdaysByMonthDay.set(key, [data.name])
+	if (existing) existing.push(member)
+	else birthdaysByMonthDay.set(key, [member])
 }
 
 function memberName(parkrunId: string, fallback: string): string {
@@ -205,6 +209,7 @@ export function indexCalendarEntries(
 			kind: 'race',
 			emoji: raceEmoji(race),
 			name: race.name,
+			raceType: race.type,
 			url: race.website,
 			people: race.attendees.map((attendee) =>
 				raceAttendeeName(attendee.runnerId),
@@ -226,17 +231,61 @@ function raceEmoji(race: RaceItem): string {
 	return '🏅'
 }
 
-/** The birthday entry for a given YYYY-MM-DD, if anyone has one that day. */
-export function birthdayEntry(date: string): CalendarEntry | null {
-	const birthdays = birthdaysByMonthDay.get(date.slice(5))
-	if (!birthdays) return null
-	return {
+/**
+ * Birthday entries for a given YYYY-MM-DD — one per member, so each links to
+ * its own member page.
+ */
+export function birthdayEntries(date: string): CalendarEntry[] {
+	const birthdays = birthdaysByMonthDay.get(date.slice(5)) ?? []
+	return birthdays.map((member) => ({
 		kind: 'birthday',
 		emoji: '🎂',
-		name: birthdays.length > 1 ? 'Birthdays' : `${birthdays[0]}'s birthday`,
-		people: birthdays,
+		name: `${member.name}'s birthday`,
+		href: member.href,
+		people: [],
 		volunteers: [],
-	}
+	}))
+}
+
+const TRACK_AND_FOOD = 'Track and Food'
+/** Nothing before this — the club's Wednesdays only became a standing thing here. */
+const TRACK_AND_FOOD_FROM = '2025-07-01'
+
+/**
+ * Track and Food is on every Wednesday, so the calendar shows one whether or not
+ * anybody has recorded it. A real event that day wins, even when it's been given
+ * its own name, so the standing entry never doubles up on it.
+ */
+function trackAndFoodEntries(
+	date: string,
+	recorded: CalendarEntry[],
+): CalendarEntry[] {
+	if (date < TRACK_AND_FOOD_FROM) return []
+	if (parseISODate(date).getDay() !== 3) return []
+	if (recorded.some((entry) => entry.raceType === TRACK_AND_FOOD)) return []
+	return [
+		{
+			kind: 'race',
+			emoji: '🏟️',
+			name: TRACK_AND_FOOD,
+			raceType: TRACK_AND_FOOD,
+			people: [],
+			volunteers: [],
+		},
+	]
+}
+
+/** Everything on a given day: what was recorded, plus the entries we assume. */
+function entriesForDate(
+	entriesByDate: Map<string, CalendarEntry[]>,
+	date: string,
+): CalendarEntry[] {
+	const recorded = entriesByDate.get(date) ?? []
+	return [
+		...recorded,
+		...trackAndFoodEntries(date, recorded),
+		...birthdayEntries(date),
+	]
 }
 
 /**
@@ -255,9 +304,7 @@ export function upcomingCalendarDays(
 		const date = toISODate(
 			new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset),
 		)
-		const entries = [...(entriesByDate.get(date) ?? [])]
-		const birthday = birthdayEntry(date)
-		if (birthday) entries.push(birthday)
+		const entries = entriesForDate(entriesByDate, date)
 		if (entries.length > 0) upcoming.push({ date, entries })
 	}
 
@@ -287,10 +334,7 @@ export function buildCalendarMonth(
 		const date = new Date(year, month, cell - leading + 1)
 		const iso = toISODate(date)
 		const inMonth = date.getMonth() === month && date.getFullYear() === year
-		const entries = [...(entriesByDate.get(iso) ?? [])]
-
-		const birthday = birthdayEntry(iso)
-		if (birthday) entries.push(birthday)
+		const entries = entriesForDate(entriesByDate, iso)
 
 		const day: CalendarDay = {
 			date: iso,
