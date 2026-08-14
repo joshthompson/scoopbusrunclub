@@ -23,11 +23,11 @@ import {
 	type LargestClubEntry,
 	parseLargestClubs,
 } from '../../../libs/shared/parkrun-parsers'
+import { snapshotWeek } from '../../../libs/shared/snapshot-week'
 import { fetchPage, launchBrowser, loadEnv, requireEnvVars } from './shared'
 
 const LARGEST_CLUBS_URL = 'https://www.parkrun.se/results/largestclubs/'
 const SCOOP_BUS_CLUB_NAME = 'Scoop Bus Run Club'
-const DAY_MS = 24 * 60 * 60 * 1000
 
 // --- Env file loading ---
 
@@ -40,15 +40,6 @@ const { convexSiteUrl: CONVEX_SITE_URL, ingestSecret: INGEST_SECRET } =
 const isDryRun = process.argv.includes('--dry')
 const fileArg = process.argv.find((a) => a.startsWith('--file='))
 const localFile = fileArg ? fileArg.slice('--file='.length) : null
-
-/** The Saturday on or before `timestamp`, as YYYY-MM-DD (UTC). */
-function snapshotWeek(timestamp: number): string {
-	// getUTCDay: Sun=0 … Sat=6. Days elapsed since the most recent Saturday.
-	const daysSinceSaturday = (new Date(timestamp).getUTCDay() + 1) % 7
-	return new Date(timestamp - daysSinceSaturday * DAY_MS)
-		.toISOString()
-		.slice(0, 10)
-}
 
 async function loadHtml(): Promise<string> {
 	if (localFile) {

@@ -103,8 +103,11 @@ already have course maps. The extension just executes:
    exact same parse-and-review path as a hand-picked upload. Nothing is
    uploaded to the backend automatically — you still press Upload.
 
-A floating panel is injected into every visited page showing progress and a
-Cancel button, since you'll be looking at the scrape tab when solving a check.
+A floating panel shows progress and a Cancel button on the page being scraped,
+since you'll be looking at the scrape tab when solving a check. The content
+script is on every parkrun page, but it only ever draws in the scrape tab — the
+worker won't hand run state to any other tab, so parkrun browsed by hand stays
+clean even while a run is live, and long after one finished.
 
 ## Layout
 

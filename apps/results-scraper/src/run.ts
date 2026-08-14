@@ -749,6 +749,9 @@ async function closeScrapeTab(): Promise<void> {
 	await detach(scrapeTabId)
 	await clearLastDocument(scrapeTabId)
 	await chrome.tabs.remove(scrapeTabId).catch(() => {})
+	// Forget the id along with the tab: it's what decides whether a page gets the
+	// overlay, and nothing should inherit that by opening a tab later.
+	await updateSession((session) => ({ ...session, scrapeTabId: undefined }))
 }
 
 /** The run is over — hand the admin page focus back. */

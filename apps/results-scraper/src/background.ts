@@ -11,6 +11,7 @@
 import {
 	type PageMessage,
 	SCRAPER_PROTOCOL_VERSION,
+	emptyRunState,
 } from '@shared/scraper-protocol'
 import { detach, noteDocumentResponse, noteLoadingFinished } from './capture'
 import {
@@ -63,8 +64,21 @@ async function handleMessage(
 				state: await getRunState(),
 			}
 
-		case 'state?':
-			return { type: 'state', state: await getRunState() }
+		/**
+		 * Asked by the overlay, which is injected into every parkrun page — but
+		 * only the scrape tab is part of a run. A run's state outlives the run
+		 * (the admin page can still ask for its files), so answering every tab
+		 * meant a page opened by hand days later still got "Scrape complete".
+		 */
+		case 'state?': {
+			const { scrapeTabId } = await getSession()
+			const inScrapeTab =
+				sender.tab?.id !== undefined && sender.tab.id === scrapeTabId
+			return {
+				type: 'state',
+				state: inScrapeTab ? await getRunState() : emptyRunState(),
+			}
+		}
 
 		case 'start': {
 			const adminTabId = sender.tab?.id

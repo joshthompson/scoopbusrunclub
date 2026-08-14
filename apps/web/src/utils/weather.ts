@@ -2,18 +2,22 @@ import type { Weather } from './api'
 
 /**
  * Our own simplified weather format, decoupled from the raw XWeather payload.
- * Currently just a coarse `type`, but intended to grow (intensity, isDay, etc.).
+ * A coarse `type` plus the snow lying on the ground; intended to grow
+ * (intensity, isDay, etc.).
  */
 export type WeatherType = 'clear' | 'rain' | 'snow'
 
 export interface AppWeather {
 	type: WeatherType
+	/** Estimated snow depth on the ground, in cm. `0` when unknown. */
+	snowDepth: number
 }
 
 /** The subset of an XWeather conditions period that we read. */
 interface XWeatherPeriod {
 	weatherPrimaryCoded?: string
 	precipRateMM?: number
+	snowDepthCM?: number
 }
 
 /**
@@ -42,7 +46,7 @@ function getCurrentPeriod(
 const MIN_PRECIP_RATE_MM = 0.5
 
 /**
- * Map the raw XWeather payload to our own weather format.
+ * Bucket a conditions period into one of our coarse weather types.
  *
  * First gate on precipitation rate — anything below the threshold is `clear`
  * regardless of the coded weather. Otherwise the switch lists every XWeather
@@ -51,11 +55,9 @@ const MIN_PRECIP_RATE_MM = 0.5
  * `clear`. `weatherPrimaryCoded` is a `coverage:intensity:weather` triple
  * (e.g. ":VL:RW"), so the weather code is the third segment.
  */
-export function parseWeather(weather: Weather | null | undefined): AppWeather {
-	const period = getCurrentPeriod(weather)
-
+function parseWeatherType(period: XWeatherPeriod | null): WeatherType {
 	if ((period?.precipRateMM ?? 0) < MIN_PRECIP_RATE_MM) {
-		return { type: 'clear' }
+		return 'clear'
 	}
 
 	const code = (period?.weatherPrimaryCoded ?? '').split(':')[2] ?? ''
@@ -71,7 +73,7 @@ export function parseWeather(weather: Weather | null | undefined): AppWeather {
 		case 'IP': // Ice pellets / sleet
 		case 'ZL': // Freezing drizzle
 		case 'ZR': // Freezing rain
-			return { type: 'rain' }
+			return 'rain'
 
 		// --- Snow: snow / snow showers / wintry mixes ---
 		case 'S': // Snow
@@ -79,7 +81,7 @@ export function parseWeather(weather: Weather | null | undefined): AppWeather {
 		case 'BS': // Blowing snow
 		case 'SI': // Snow/sleet mix
 		case 'WM': // Wintry mix
-			return { type: 'snow' }
+			return 'snow'
 
 		// --- Clear (for now): cloud/fog/haze/dust/wind/misc + unknown ---
 		case 'BD': // Blowing dust
@@ -99,9 +101,19 @@ export function parseWeather(weather: Weather | null | undefined): AppWeather {
 		case 'WP': // Waterspouts
 		case 'ZF': // Freezing fog
 		case 'ZY': // Freezing spray
-			return { type: 'clear' }
+			return 'clear'
 
 		default:
-			return { type: 'clear' }
+			return 'clear'
+	}
+}
+
+/** Map the raw XWeather payload to our own weather format. */
+export function parseWeather(weather: Weather | null | undefined): AppWeather {
+	const period = getCurrentPeriod(weather)
+
+	return {
+		type: parseWeatherType(period),
+		snowDepth: period?.snowDepthCM ?? 0,
 	}
 }

@@ -77,8 +77,6 @@ const App: Component = () => {
 	// Fetch the current weather for Haga Park on load and derive our own type.
 	const [weather] = createResource(fetchWeather)
 	const weatherType = createMemo(() => parseWeather(weather()).type)
-	createEffect(() => console.log('Weather:', weatherType(), weather()))
-
 	// Pre-compute celebration + PB data once (cached in localStorage alongside results)
 	const celebrationData = createMemo(() => {
 		const r = results()

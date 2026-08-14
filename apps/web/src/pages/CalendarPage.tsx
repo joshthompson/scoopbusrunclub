@@ -126,7 +126,7 @@ function DayCell(props: { day: CalendarDay }) {
 			})}
 		>
 			<div class={styles.dayHeader}>
-				<span class={styles.dayNumber}>
+				<span class={styles.dateBadge}>
 					{props.day.dayOfMonth}
 					<Show when={props.day.isToday}>
 						<span> - Today</span>
@@ -258,16 +258,18 @@ export function CalendarPage(props: CalendarPageProps) {
 				<div class={styles.agenda}>
 					<For each={agenda()}>
 						{(day) => (
-							<div class={styles.agendaDay}>
+							<div class={styles.agendaDay({ today: day.isToday })}>
 								<div class={styles.agendaDate}>
-									<Show when={day.isToday} fallback={null}>
-										<span class={styles.agendaToday}>Today</span>
-									</Show>
-									{parseISODate(day.date).toLocaleDateString('en-GB', {
-										weekday: 'short',
-										day: 'numeric',
-										month: 'short',
-									})}
+									<span class={styles.dateBadge}>
+										{parseISODate(day.date).toLocaleDateString('en-GB', {
+											weekday: 'short',
+											day: 'numeric',
+											month: 'short',
+										})}
+										<Show when={day.isToday}>
+											<span> - Today</span>
+										</Show>
+									</span>
 								</div>
 								<div class={styles.entries}>
 									<For each={day.entries}>
@@ -446,7 +448,8 @@ const styles = {
 		minWidth: 0,
 		justifyContent: 'space-between',
 	}),
-	dayNumber: css({
+	/** The day's label — highlighted on today, in both the grid and the agenda. */
+	dateBadge: css({
 		fontSize: '0.85rem',
 		fontWeight: 'bold',
 		background: 'var(--today-date-background, transparent)',
@@ -531,15 +534,25 @@ const styles = {
 			display: 'flex',
 		},
 	}),
-	agendaDay: css({
-		display: 'flex',
-		flexDirection: 'column',
-		gap: '0.25rem',
-		padding: '0.5rem',
-		borderRadius: '4px',
-		cornerShape: 'notch',
-		background: 'var(--dirt-parchment)',
-		border: '2px solid var(--overlay-black-15)',
+	agendaDay: cva({
+		base: {
+			display: 'flex',
+			flexDirection: 'column',
+			gap: '0.25rem',
+			padding: '0.5rem',
+			borderRadius: '4px',
+			cornerShape: 'notch',
+			background: 'var(--dirt-brown)',
+			border: '2px solid var(--dirt-darker-brown)',
+		},
+		variants: {
+			today: {
+				true: {
+					borderColor: 'var(--color-black)',
+					'--today-date-background': 'var(--dirt-dark-brown)',
+				},
+			},
+		},
 	}),
 	agendaDate: css({
 		display: 'flex',
@@ -549,14 +562,6 @@ const styles = {
 		fontWeight: 'bold',
 		textTransform: 'uppercase',
 		opacity: 0.85,
-	}),
-	agendaToday: css({
-		padding: '0 4px',
-		borderRadius: '3px',
-		cornerShape: 'notch',
-		background: 'var(--color-black)',
-		color: 'var(--color-white)',
-		fontSize: '0.65rem',
 	}),
 	upcoming: css({
 		display: 'flex',

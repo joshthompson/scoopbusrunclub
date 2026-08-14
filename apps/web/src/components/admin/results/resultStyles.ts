@@ -37,6 +37,26 @@ export const styles = {
 		paddingTop: '0.75rem',
 		borderTop: '1px solid var(--overlay-black-20)',
 	}),
+	/** The checkbox that decides whether a section is part of the upload. */
+	sectionToggle: css({
+		display: 'inline-flex',
+		alignItems: 'center',
+		gap: '0.5rem',
+		cursor: 'pointer',
+		'& input': {
+			width: '1rem',
+			height: '1rem',
+			flexShrink: 0,
+			cursor: 'pointer',
+			accentColor: 'var(--grass-dark-green, #6a8f4a)',
+		},
+		'&:has(input:disabled)': { cursor: 'default' },
+		'&:has(input:disabled) input': { cursor: 'default' },
+	}),
+	/** An unticked section stays readable, but clearly isn't going anywhere. */
+	sectionOff: css({
+		opacity: 0.4,
+	}),
 	/** Secondary half of a section heading, e.g. "of 40 run". */
 	groupTitleMuted: css({
 		fontWeight: 'normal',

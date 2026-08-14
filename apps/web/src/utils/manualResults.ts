@@ -26,6 +26,7 @@ import {
 	parseRunResults,
 	parseRunnerData,
 } from '@shared/parkrun-parsers'
+import { snapshotWeek } from '@shared/snapshot-week'
 import { TRACKED_ATHLETES, TRACKED_IDS } from '@shared/tracked-athletes'
 import { getAuthToken } from './adminApi'
 import { extractKmlFromKmz } from './kmz'
@@ -56,14 +57,9 @@ export function resultsCutoffDate(now = Date.now()): string {
 	return new Date(now - RESULTS_WINDOW_DAYS * DAY_MS).toISOString().slice(0, 10)
 }
 
-/** The Saturday on or before `timestamp`, as YYYY-MM-DD (UTC). */
-export function snapshotWeek(timestamp = Date.now()): string {
-	// getUTCDay: Sun=0 … Sat=6. Days elapsed since the most recent Saturday.
-	const daysSinceSaturday = (new Date(timestamp).getUTCDay() + 1) % 7
-	return new Date(timestamp - daysSinceSaturday * DAY_MS)
-		.toISOString()
-		.slice(0, 10)
-}
+// Re-exported for the pages: the snapshot week is the upsert key for the club
+// table, so it comes from the shared module the scraper script uses too.
+export { snapshotWeek }
 
 // ── Parsed file shapes ──────────────────────────────────────────────
 
@@ -566,32 +562,74 @@ export interface UploadReport {
 	errors: string[]
 }
 
+/**
+ * The parts of an upload that can be sent independently.
+ *
+ * Each one is a separate set of requests, so the review step can leave any of
+ * them out — handy when, say, the club table came back stale but the runs are
+ * good. 'results' carries the athletes and their run results together, since
+ * one payload holds both.
+ */
+export type UploadSection =
+	| 'results'
+	| 'events'
+	| 'volunteers'
+	| 'courses'
+	| 'clubs'
+
+/** Every section, in the order they're reviewed on the page. */
+export const UPLOAD_SECTIONS: UploadSection[] = [
+	'results',
+	'events',
+	'volunteers',
+	'courses',
+	'clubs',
+]
+
+/** The sections this payload actually has something to send for. */
+export function presentSections(
+	payload: ManualIngestSections,
+): UploadSection[] {
+	const present: UploadSection[] = []
+	if (payload.athletes.length > 0) present.push('results')
+	if (payload.events.length > 0) present.push('events')
+	if (payload.volunteerEvents.length > 0) present.push('volunteers')
+	if (payload.courses.length > 0) present.push('courses')
+	if (payload.largestClubs) present.push('clubs')
+	return present
+}
+
 /** One request's worth of payload, with the label shown while it's in flight. */
 interface UploadChunk {
 	label: string
 	body: Partial<ManualIngestSections>
 }
 
-function buildChunks(payload: ManualIngestSections): UploadChunk[] {
+function buildChunks(
+	payload: ManualIngestSections,
+	sections: ReadonlySet<UploadSection>,
+): UploadChunk[] {
 	const chunks: UploadChunk[] = []
 
 	// One athlete per request: a full history is thousands of row upserts, which
 	// is more than one Convex mutation should be asked to do at once.
-	for (const athlete of payload.athletes) {
-		chunks.push({
-			label: `${athlete.runner.name} (${athlete.runResults.length} results)`,
-			body: { athletes: [athlete] },
-		})
+	if (sections.has('results')) {
+		for (const athlete of payload.athletes) {
+			chunks.push({
+				label: `${athlete.runner.name} (${athlete.runResults.length} results)`,
+				body: { athletes: [athlete] },
+			})
+		}
 	}
 
-	if (payload.events.length > 0) {
+	if (sections.has('events') && payload.events.length > 0) {
 		chunks.push({
 			label: `${payload.events.length} event(s)`,
 			body: { events: payload.events },
 		})
 	}
 
-	if (payload.volunteerEvents.length > 0) {
+	if (sections.has('volunteers') && payload.volunteerEvents.length > 0) {
 		chunks.push({
 			label: `${payload.volunteers.length} volunteer record(s)`,
 			body: {
@@ -601,14 +639,16 @@ function buildChunks(payload: ManualIngestSections): UploadChunk[] {
 		})
 	}
 
-	for (const course of payload.courses) {
-		chunks.push({
-			label: `${course.eventId} course map`,
-			body: { courses: [course] },
-		})
+	if (sections.has('courses')) {
+		for (const course of payload.courses) {
+			chunks.push({
+				label: `${course.eventId} course map`,
+				body: { courses: [course] },
+			})
+		}
 	}
 
-	if (payload.largestClubs) {
+	if (sections.has('clubs') && payload.largestClubs) {
 		chunks.push({
 			label: `${payload.largestClubs.clubs.length} club snapshot(s)`,
 			body: { largestClubs: payload.largestClubs },
@@ -623,10 +663,13 @@ function buildChunks(payload: ManualIngestSections): UploadChunk[] {
  *
  * A failed chunk is reported and the rest still go — every write is an upsert,
  * so a partial upload can simply be retried.
+ *
+ * @param sections Which parts to send; everything by default.
  */
 export async function uploadManualResults(
 	summary: ManualSummary,
 	onProgress?: (done: number, total: number, label: string) => void,
+	sections: ReadonlySet<UploadSection> = new Set(UPLOAD_SECTIONS),
 ): Promise<UploadReport> {
 	const token = getAuthToken()
 	const report: UploadReport = {
@@ -645,7 +688,7 @@ export async function uploadManualResults(
 		return report
 	}
 
-	const chunks = buildChunks(summary.payload)
+	const chunks = buildChunks(summary.payload, sections)
 
 	for (const [index, chunk] of chunks.entries()) {
 		onProgress?.(index, chunks.length, chunk.label)

@@ -7,7 +7,12 @@ import { ScrapePanel } from '@/components/admin/results/ScrapePanel'
 import { styles } from '@/components/admin/results/resultStyles'
 import { createResultSlots } from '@/components/admin/results/useResultSlots'
 import { DirtBlock } from '@/components/ui/DirtBlock'
-import { type ManualSummary, uploadManualResults } from '@/utils/manualResults'
+import {
+	type ManualSummary,
+	type UploadSection,
+	presentSections,
+	uploadManualResults,
+} from '@/utils/manualResults'
 import {
 	buildWorkList,
 	cancelScrape,
@@ -143,18 +148,22 @@ export const ProcessResultsPage: Component = () => {
 		clearScrape()
 	}
 
-	const handleUpload = async () => {
+	const handleUpload = async (sections: Set<UploadSection>) => {
 		const current = summary()
 		if (!current) return
 
 		setProgress('Uploading…')
-		const result = await uploadManualResults(current, (done, total, label) => {
-			setProgress(
-				done >= total
-					? 'Finishing up…'
-					: `Uploading ${done + 1}/${total}: ${label}`,
-			)
-		})
+		const result = await uploadManualResults(
+			current,
+			(done, total, label) => {
+				setProgress(
+					done >= total
+						? 'Finishing up…'
+						: `Uploading ${done + 1}/${total}: ${label}`,
+				)
+			},
+			sections,
+		)
 		setProgress(null)
 
 		if (result.errors.length > 0) {
@@ -165,10 +174,15 @@ export const ProcessResultsPage: Component = () => {
 			return
 		}
 
-		// It's in the database now — wipe the run so a reload starts clean.
 		setUploaded(
 			`${result.runResults} result(s), ${result.volunteers} volunteer record(s), ${result.courses} course(s) and ${result.clubs} club snapshot(s) uploaded.`,
 		)
+
+		// Sections left unticked haven't been sent, so keep the run around — losing
+		// it here would mean scraping again to upload the rest.
+		if (sections.size < presentSections(current.payload).length) return
+
+		// All of it is in the database — wipe the run so a reload starts clean.
 		setSummary(null)
 		slots.reset()
 		clearScrape()

@@ -13,6 +13,7 @@ import {
 	type ManualSummary,
 	RESULTS_WINDOW_DAYS,
 	type UploadReport,
+	type UploadSection,
 	athletePageUrl,
 	coursePageUrl,
 	latestResultsUrl,
@@ -53,18 +54,22 @@ export const AdvancedUploadPage: Component = () => {
 		})
 	}
 
-	const handleUpload = async () => {
+	const handleUpload = async (sections: Set<UploadSection>) => {
 		const current = summary()
 		if (!current) return
 
 		setProgress('Uploading…')
-		const result = await uploadManualResults(current, (done, total, label) => {
-			setProgress(
-				done >= total
-					? 'Finishing up…'
-					: `Uploading ${done + 1}/${total}: ${label}`,
-			)
-		})
+		const result = await uploadManualResults(
+			current,
+			(done, total, label) => {
+				setProgress(
+					done >= total
+						? 'Finishing up…'
+						: `Uploading ${done + 1}/${total}: ${label}`,
+				)
+			},
+			sections,
+		)
 		setProgress(null)
 		setReport(result)
 	}
