@@ -85,7 +85,7 @@ export const runners: Record<
 		name: 'Josh',
 		id: '8070821',
 		'5verstId': '790281221',
-		birthday: '15/12',
+		birthday: '15/08',
 		frames: {
 			run: generateFrames(
 				assets.joshRun,

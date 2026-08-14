@@ -32,6 +32,7 @@ import {
 	AdminUsersPage,
 } from './pages/AdminPage'
 import { AlphabetPage } from './pages/AlphabetPage'
+import { CalendarPage } from './pages/CalendarPage'
 import { ComparePage } from './pages/ComparePage'
 import { ConnectionsPage } from './pages/ConnectionsPage'
 import { EventPage } from './pages/EventPage'
@@ -223,6 +224,22 @@ const App: Component = () => {
 							<MapPage
 								results={results() ?? []}
 								volunteers={volunteers() ?? []}
+							/>
+						</Show>
+					)}
+				/>
+				<Route
+					path="/calendar"
+					component={() => (
+						<Show
+							when={!results.loading}
+							fallback={<div class={styles.loading}>Loading...</div>}
+						>
+							<CalendarPage
+								results={results() ?? []}
+								volunteers={volunteers() ?? []}
+								guestResults={guestResults() ?? []}
+								races={races() ?? []}
 							/>
 						</Show>
 					)}

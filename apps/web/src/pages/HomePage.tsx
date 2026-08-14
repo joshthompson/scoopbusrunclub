@@ -81,6 +81,16 @@ export const HomePage: Component<{
 							🗺️ Scoop Bus Tourism Map
 						</A>
 						<A
+							href="/calendar"
+							class={css({
+								color: 'inherit',
+								textDecoration: 'underline',
+								fontWeight: 'bold',
+							})}
+						>
+							📅 Club Calendar
+						</A>
+						<A
 							href="/everyone"
 							class={css({
 								color: 'inherit',
