@@ -169,8 +169,20 @@ export function MobileNav() {
 	)
 }
 
-/** Height of the bar itself, before the device's safe-area inset */
-export const MOBILE_NAV_HEIGHT = 58
+/** Height of the row of icons, before any safe-area inset */
+const BAR_HEIGHT = 58
+
+/**
+ * Room kept clear below the icons. `env()` is 0 in Safari with its toolbar
+ * showing, so a floor keeps the outer icons off the screen's rounded corners
+ * either way; the same reasoning applies to the sides in landscape.
+ */
+const BOTTOM_INSET = 'max(env(safe-area-inset-bottom), 12px)'
+const LEFT_INSET = 'max(env(safe-area-inset-left), 8px)'
+const RIGHT_INSET = 'max(env(safe-area-inset-right), 8px)'
+
+/** Total height the bar occupies — how much room pages must leave for it */
+export const MOBILE_NAV_SPACE = `calc(${BAR_HEIGHT}px + ${BOTTOM_INSET})`
 
 const styles = {
 	nav: css({
@@ -189,8 +201,10 @@ const styles = {
 		zIndex: 300,
 		display: 'flex',
 		alignItems: 'stretch',
-		height: 'calc(58px + env(safe-area-inset-bottom))',
-		paddingBottom: 'env(safe-area-inset-bottom)',
+		height: MOBILE_NAV_SPACE,
+		paddingBottom: BOTTOM_INSET,
+		paddingLeft: LEFT_INSET,
+		paddingRight: RIGHT_INSET,
 		background: 'var(--dirt-control)',
 		borderTop: '4px solid var(--color-black)',
 		boxShadow: '0 -4px 0 var(--overlay-black-25)',
@@ -255,9 +269,9 @@ const styles = {
 	}),
 	sheet: css({
 		position: 'fixed',
-		left: '0.5rem',
-		width: 'calc(100vw - 1rem)',
-		bottom: 'calc(62px + env(safe-area-inset-bottom) + 0.5rem)',
+		left: `calc(${LEFT_INSET} + 0.5rem)`,
+		width: `calc(100vw - ${LEFT_INSET} - ${RIGHT_INSET} - 1rem)`,
+		bottom: `calc(${MOBILE_NAV_SPACE} + 0.5rem)`,
 		zIndex: 300,
 		display: 'flex',
 		flexDirection: 'column',

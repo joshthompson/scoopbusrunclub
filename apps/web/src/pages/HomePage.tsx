@@ -1,5 +1,5 @@
 import { A } from '@solidjs/router'
-import { css } from '@style/css'
+import { css, cx } from '@style/css'
 import { type Component, Show } from 'solid-js'
 import { LargestClub } from '../components/LargestClub'
 import { LatestResults } from '../components/LatestResults'
@@ -59,13 +59,15 @@ export const HomePage: Component<{
 					</Show>
 				</FieldBlock>
 			</main>
-			<aside class={styles.sidebar}>
+			{/* Mobile gets the results and nothing else — the rest is a tap away
+			    on the bottom nav. */}
+			<aside class={cx(styles.sidebar, styles.desktopOnly)}>
 				<Show when={!props.runnersLoading}>
 					<Milestones runners={props.runners} results={props.results} />
 				</Show>
 				<LargestClub />
 				<RaceCalendar races={props.races} guests={props.guests} />
-				<DirtBlock title="Explore" class={styles.desktopOnly}>
+				<DirtBlock title="Explore">
 					<div
 						class={css({
 							display: 'flex',
@@ -125,10 +127,10 @@ export const HomePage: Component<{
 						</A>
 					</div>
 				</DirtBlock>
-				<DirtBlock title="Strava Activity" class={styles.desktopOnly}>
+				<DirtBlock title="Strava Activity">
 					<StravaWidget />
 				</DirtBlock>
-				<DirtBlock title="About" class={styles.desktopOnly}>
+				<DirtBlock title="About">
 					<p>
 						The Scoop Bus Run Club is a casual running club based in the
 						Stockholm.
@@ -140,7 +142,7 @@ export const HomePage: Component<{
 						and Food.
 					</p>
 				</DirtBlock>
-				<DirtBlock title="FAQ" class={styles.desktopOnly}>
+				<DirtBlock title="FAQ">
 					<strong>What is a Scoop Bus?</strong>
 					<p>
 						A scoop bus is a vehicle that follows the very last participants in
@@ -154,7 +156,7 @@ export const HomePage: Component<{
 }
 
 const styles = {
-	/** Sections the bottom nav replaces on mobile (Explore, Strava, About, FAQ) */
+	/** The sidebar as a whole — the bottom nav covers it on mobile */
 	desktopOnly: css({
 		'@media (max-width: 768px)': {
 			display: 'none',

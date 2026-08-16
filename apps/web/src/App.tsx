@@ -18,7 +18,7 @@ import {
 } from './components/header/ScoopBusHeader'
 import './styles.css'
 import { css } from '@style/css'
-import { MOBILE_NAV_HEIGHT, MobileNav } from './components/MobileNav'
+import { MOBILE_NAV_SPACE, MobileNav } from './components/MobileNav'
 import { getOrBuildCelebrationData } from './components/ResultCelebrations'
 import { ALWAYS_SHOW_LOADER, SplashScreen } from './components/SplashScreen'
 import { AboutPage } from './pages/AboutPage'
@@ -128,7 +128,7 @@ const App: Component = () => {
 						position: 'relative',
 						// Keep page content clear of the fixed mobile nav
 						'@media (max-width: 768px)': {
-							paddingBottom: `calc(${MOBILE_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
+							paddingBottom: MOBILE_NAV_SPACE,
 						},
 					})}
 				>
