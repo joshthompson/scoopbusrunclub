@@ -1,9 +1,12 @@
 import { css, cva } from '@style/css'
 import { For, type JSX, Show } from 'solid-js'
+import { Tooltip } from './Tooltip'
 
 export interface TableColumn {
 	id?: string
 	title: string
+	/** Shown behind an info icon next to the heading, for a column that needs explaining. */
+	info?: string
 	sortable?: boolean
 	width?: string
 }
@@ -54,6 +57,15 @@ export function Table(props: {
 										}}
 									>
 										{column.title}
+										<Show when={column.info}>
+											{(info) => (
+												<Tooltip content={info()}>
+													<span class={styles.info} aria-label={info()}>
+														ℹ️
+													</span>
+												</Tooltip>
+											)}
+										</Show>
 										{column.sortable &&
 											props.sortKey === (column.id || column.title) && (
 												<span class={styles.sortIndicator}>
@@ -127,6 +139,14 @@ const styles = {
 		padding: '0.5rem 0.75rem',
 		borderBottom: '1px solid var(--overlay-black-10)',
 		verticalAlign: 'middle',
+	}),
+	/** The info icon — visible enough to invite a hover, quiet enough to ignore. */
+	info: css({
+		marginLeft: '0.3rem',
+		fontSize: '0.8rem',
+		opacity: 0.6,
+		cursor: 'help',
+		_hover: { opacity: 1 },
 	}),
 	sortIndicator: css({
 		marginLeft: '0.25rem',

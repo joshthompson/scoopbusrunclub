@@ -5,6 +5,7 @@ import type {
 	GuestResultItem,
 	RaceItem,
 	RunResultItem,
+	Runner,
 	VolunteerItem,
 } from '@/utils/api'
 import {
@@ -28,6 +29,7 @@ interface CalendarPageProps {
 	volunteers: VolunteerItem[]
 	guestResults: GuestResultItem[]
 	races: RaceItem[]
+	runners: Runner[]
 }
 
 /** "Josh, Keith and 3 more" — cell space is tight, so cap the visible names. */
@@ -168,6 +170,7 @@ export function CalendarPage(props: CalendarPageProps) {
 			volunteers: props.volunteers,
 			guestResults: props.guestResults,
 			races: props.races,
+			runners: props.runners,
 		}),
 	)
 
@@ -290,6 +293,8 @@ export function CalendarPage(props: CalendarPageProps) {
 					<span class={styles.legendItem}>🏅 Race</span>
 					<span class={styles.legendItem}>🏟️ Track and Food</span>
 					<span class={styles.legendItem}>🎂 Birthday</span>
+					<span class={styles.legendItem}>🎉 Milestone</span>
+					<span class={styles.legendItem}>🎯 Milestone due</span>
 				</div>
 			</FieldBlock>
 
@@ -495,6 +500,7 @@ const styles = {
 				parkrun: { borderLeftColor: 'var(--heatmap-ran)' },
 				race: { borderLeftColor: 'var(--pink-rose)' },
 				birthday: { borderLeftColor: 'var(--purple-heatmap)' },
+				milestone: { borderLeftColor: 'var(--gold-warm)' },
 			},
 		},
 	}),

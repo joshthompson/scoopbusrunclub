@@ -1,6 +1,8 @@
 import { BackSignButton } from '@/components/BackSignButton'
 import { CharacterImage } from '@/components/CharacterImage'
 import { FieldBlock } from '@/components/ui/FieldBlock'
+import { Icon } from '@/components/ui/Icon'
+import { type RaceGuestAttendee, fetchPublicRaces } from '@/utils/api'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import { formatDate, ordinal } from '@/utils/misc'
@@ -29,6 +31,36 @@ interface GuestResultWithEventName {
 	position: number
 	time: string
 	date: string
+}
+
+/** One event a guest turned out at, either a parkrun or a club event */
+interface Appearance {
+	key: string
+	date: string
+	name: string
+	/** Set for parkruns, which link to their own event page */
+	eventId?: string
+	eventNumber?: number
+	/** Set for club events that have a website */
+	website?: string
+	/** Result summary, e.g. "27th place, 52:07" — absent when nothing was recorded */
+	detail?: string
+}
+
+/** Summarise whatever result fields were recorded for a guest at a club event */
+function describeRaceResult(entry: RaceGuestAttendee): string | undefined {
+	const parts: string[] = []
+	if (entry.position != null) parts.push(`${ordinal(entry.position)} place`)
+	if (entry.time) parts.push(entry.time)
+	if (entry.distance != null) parts.push(`${entry.distance}km`)
+	if (entry.laps != null)
+		parts.push(`${entry.laps} ${entry.laps === 1 ? 'lap' : 'laps'}`)
+	return parts.length > 0 ? parts.join(', ') : undefined
+}
+
+/** Parkrun IDs are stored bare (e.g. "3710502"), but tolerate a typed-in "A" prefix */
+function parkrunNumber(parkrunId: string): string {
+	return parkrunId.replace(/^[Aa]/, '')
 }
 
 async function fetchGuestByParkrunId(
@@ -77,9 +109,38 @@ export function GuestPage() {
 		(guestId) => fetchGuestResultsById(guestId),
 	)
 
-	const sortedResults = createMemo(() => {
-		const results = guestResultsFromApi() ?? []
-		return [...results].sort((a, b) => b.date.localeCompare(a.date))
+	const [races] = createResource(fetchPublicRaces)
+
+	const appearances = createMemo<Appearance[]>(() => {
+		const parkruns: Appearance[] = (guestResultsFromApi() ?? []).map((r) => ({
+			key: r._id,
+			date: r.date,
+			name: r.eventName,
+			eventId: r.event,
+			eventNumber: r.eventNumber,
+			detail: `${ordinal(r.position)} place, ${r.time}`,
+		}))
+
+		const guestId = guest()?._id
+		const today = new Date().toISOString().split('T')[0]
+		const clubEvents: Appearance[] = (races() ?? []).flatMap((race) => {
+			if (race.date > today) return []
+			const entry = race.guests?.find((g) => g.guestId === guestId)
+			if (!entry) return []
+			return [
+				{
+					key: race._id,
+					date: race.date,
+					name: race.name,
+					website: race.website,
+					detail: describeRaceResult(entry),
+				},
+			]
+		})
+
+		return [...parkruns, ...clubEvents].sort((a, b) =>
+			b.date.localeCompare(a.date),
+		)
 	})
 
 	return (
@@ -114,28 +175,79 @@ export function GuestPage() {
 								})()}
 							</Show>
 							<p class={styles.extra}>{g().extra}</p>
+							<Show when={g().parkrunId}>
+								{(id) => (
+									<div class={styles.parkrunBlock}>
+										<a
+											href={`https://www.parkrun.se/parkrunner/${parkrunNumber(id())}/all`}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
+											<span class={styles.parkrunLinkText}>
+												View {g().name} on parkrun.se
+											</span>
+											&nbsp;&nbsp;
+											<Icon name="external" size="small" />
+										</a>
+										<div>
+											ID: <strong>A{parkrunNumber(id())}</strong>
+										</div>
+									</div>
+								)}
+							</Show>
 						</FieldBlock>
-						<Show when={sortedResults().length > 0}>
+						<Show when={appearances().length > 0}>
 							<DirtBlock title="Guest Appearances">
 								<ul class={styles.resultList}>
-									<For each={sortedResults()}>
-										{(result) => (
+									<For each={appearances()}>
+										{(appearance) => (
 											<li class={styles.resultItem}>
 												<div class={styles.resultDate}>
-													{formatDate(new Date(`${result.date}T00:00:00`))}
+													{formatDate(new Date(`${appearance.date}T00:00:00`))}
 												</div>
 												<div>
-													<A
-														href={`/event/${result.event}`}
-														class={styles.link}
+													<Show
+														when={appearance.eventId}
+														fallback={
+															<Show
+																when={appearance.website}
+																fallback={<span>{appearance.name}</span>}
+															>
+																{(website) => (
+																	<a
+																		href={website()}
+																		target="_blank"
+																		rel="noopener noreferrer"
+																		class={styles.link}
+																	>
+																		{appearance.name}
+																		&nbsp;
+																		<Icon name="external" size="small" />
+																	</a>
+																)}
+															</Show>
+														}
 													>
-														{result.eventName}
-													</A>{' '}
-													#{result.eventNumber}
-													<span class={styles.resultDetail}>
-														{' '}
-														— {ordinal(result.position)} place, {result.time}
-													</span>
+														{(eventId) => (
+															<>
+																<A
+																	href={`/event/${eventId()}`}
+																	class={styles.link}
+																>
+																	{appearance.name}
+																</A>{' '}
+																#{appearance.eventNumber}
+															</>
+														)}
+													</Show>
+													<Show when={appearance.detail}>
+														{(detail) => (
+															<span class={styles.resultDetail}>
+																{' '}
+																— {detail()}
+															</span>
+														)}
+													</Show>
 												</div>
 											</li>
 										)}
@@ -198,8 +310,19 @@ const styles = {
 		m: '0 auto',
 		textAlign: 'center',
 	}),
-	parkrunLink: css({
-		m: 0,
+	parkrunLinkText: css({
+		color: 'inherit',
+		textDecoration: 'underline',
+		fontWeight: 'bold',
+	}),
+	parkrunBlock: css({
+		backgroundColor: '#9EC681',
+		p: '4px 12px',
+		width: 'fit-content',
+		marginLeft: 'auto',
+		zIndex: 1,
+		borderRadius: '4px',
+		cornerShape: 'notch',
 		'& a': {
 			color: 'inherit',
 		},

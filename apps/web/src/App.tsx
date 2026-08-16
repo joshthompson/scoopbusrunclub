@@ -18,8 +18,10 @@ import {
 } from './components/header/ScoopBusHeader'
 import './styles.css'
 import { css } from '@style/css'
+import { MOBILE_NAV_HEIGHT, MobileNav } from './components/MobileNav'
 import { getOrBuildCelebrationData } from './components/ResultCelebrations'
 import { ALWAYS_SHOW_LOADER, SplashScreen } from './components/SplashScreen'
+import { AboutPage } from './pages/AboutPage'
 import {
 	AdminAccountPage,
 	AdminAdvancedUploadPage,
@@ -37,6 +39,7 @@ import { ComparePage } from './pages/ComparePage'
 import { ConnectionsPage } from './pages/ConnectionsPage'
 import { EventPage } from './pages/EventPage'
 import { EveryonePage } from './pages/EveryonePage'
+import { FaqPage } from './pages/FaqPage'
 import { GuestPage } from './pages/GuestPage'
 import { HomePage } from './pages/HomePage'
 import { LargestClubsPage } from './pages/LargestClubsPage'
@@ -119,9 +122,21 @@ const App: Component = () => {
 						)}
 					</Show>
 				</Show>
-				<main class={css({ zIndex: 101, position: 'relative' })}>
+				<main
+					class={css({
+						zIndex: 101,
+						position: 'relative',
+						// Keep page content clear of the fixed mobile nav
+						'@media (max-width: 768px)': {
+							paddingBottom: `calc(${MOBILE_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
+						},
+					})}
+				>
 					{routeProps.children}
 				</main>
+				<Show when={!isAdmin()}>
+					<MobileNav />
+				</Show>
 			</>
 		)
 	}
@@ -153,6 +168,7 @@ const App: Component = () => {
 							races={races() ?? []}
 							volunteers={volunteers() ?? []}
 							guestResults={guestResults() ?? []}
+							guests={guests() ?? []}
 							celebrationData={celebrationData()}
 						/>
 					)}
@@ -238,6 +254,7 @@ const App: Component = () => {
 								volunteers={volunteers() ?? []}
 								guestResults={guestResults() ?? []}
 								races={races() ?? []}
+								runners={runners() ?? []}
 							/>
 						</Show>
 					)}
@@ -353,6 +370,8 @@ const App: Component = () => {
 					)}
 				/>
 				<Route path="/largestclubs" component={LargestClubsPage} />
+				<Route path="/about" component={AboutPage} />
+				<Route path="/faq" component={FaqPage} />
 				<Route path="/guests/:parkrunId" component={() => <GuestPage />} />
 				<Route path="*404" component={NotFoundPage} />
 			</Router>

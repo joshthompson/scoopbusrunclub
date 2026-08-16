@@ -81,6 +81,15 @@ export interface RaceAttendee {
 	scanned?: boolean
 }
 
+/** A non-club runner attending an event, referencing a row in the guests table */
+export interface RaceGuest {
+	guestId: string
+	position?: number
+	time?: string // hh:mm:ss format
+	distance?: number
+	laps?: number
+}
+
 export interface Race {
 	_id: string
 	date: string
@@ -88,6 +97,7 @@ export interface Race {
 	website?: string
 	type?: string
 	attendees: RaceAttendee[]
+	guests?: RaceGuest[]
 	majorEvent?: boolean
 	public: boolean
 	createdAt: number

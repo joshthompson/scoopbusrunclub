@@ -1,4 +1,5 @@
 import { v } from 'convex/values'
+import { averageWeeklyEvents } from '../../../libs/shared/largest-clubs-rate'
 import { internalMutation, query } from './_generated/server'
 
 /**
@@ -11,11 +12,6 @@ import { internalMutation, query } from './_generated/server'
 
 export const SCOOP_BUS_CLUB_NAME = 'Scoop Bus Run Club'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
-/** How many weeks of history feed the average-weekly-events rate. */
-const RATE_WINDOW_WEEKS = 6
-
 /**
  * Projections further out than this are treated as "not projected" — at that
  * range the rate estimate is noise, not a forecast.
@@ -26,52 +22,12 @@ function isScoopBus(name: string): boolean {
 	return name.trim().toLowerCase() === SCOOP_BUS_CLUB_NAME.toLowerCase()
 }
 
-/** Whole weeks between two YYYY-MM-DD dates (may be fractional). */
-function weeksBetween(from: string, to: string): number {
-	const fromMs = Date.parse(`${from}T00:00:00Z`)
-	const toMs = Date.parse(`${to}T00:00:00Z`)
-	if (Number.isNaN(fromMs) || Number.isNaN(toMs)) return 0
-	return (toMs - fromMs) / (7 * DAY_MS)
-}
-
-/** Shift a YYYY-MM-DD date back by a number of weeks. */
-function weeksBefore(week: string, count: number): string {
-	const ms = Date.parse(`${week}T00:00:00Z`)
-	if (Number.isNaN(ms)) return week
-	return new Date(ms - count * 7 * DAY_MS).toISOString().slice(0, 10)
-}
-
 interface Snapshot {
 	week: string
 	name: string
 	clubId?: string
 	members: number
 	events: number
-}
-
-/**
- * Estimate a club's events-per-week from its snapshots inside the rate window,
- * as the total gain across the window divided by the weeks it spans.
- * Returns 0 when there isn't enough history to tell.
- */
-function averageWeeklyEvents(
-	snapshots: Snapshot[],
-	latestWeek: string,
-): number {
-	const cutoff = weeksBefore(latestWeek, RATE_WINDOW_WEEKS)
-	const window = snapshots
-		.filter((s) => s.week >= cutoff && s.week <= latestWeek)
-		.sort((a, b) => a.week.localeCompare(b.week))
-
-	if (window.length < 2) return 0
-
-	const first = window[0]
-	const last = window[window.length - 1]
-	const weeks = weeksBetween(first.week, last.week)
-	if (weeks <= 0) return 0
-
-	const rate = (last.events - first.events) / weeks
-	return rate > 0 ? Math.round(rate * 100) / 100 : 0
 }
 
 interface ClubRate {
@@ -208,10 +164,11 @@ export const getSummary = query({
 			name: row.name,
 			members: row.members,
 			events: row.events,
-			averageWeeklyEvents: averageWeeklyEvents(
-				snapshotsByName.get(row.name) ?? [],
-				latestWeek,
-			),
+			// A club with too little history has no rate; the projection treats that
+			// as "not growing", which keeps it out of every overtake estimate.
+			averageWeeklyEvents:
+				averageWeeklyEvents(snapshotsByName.get(row.name) ?? [], latestWeek) ??
+				0,
 			isScoopBus: isScoopBus(row.name),
 			/** Weeks until this club passes Scoop Bus. Null for us, or if never. */
 			weeksToOvertakeScoopBus: null as number | null,

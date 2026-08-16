@@ -11,6 +11,14 @@ const attendeeValidator = v.object({
 	scanned: v.optional(v.boolean()),
 })
 
+const guestAttendeeValidator = v.object({
+	guestId: v.id('guests'),
+	position: v.optional(v.number()),
+	time: v.optional(v.string()), // hh:mm:ss format
+	distance: v.optional(v.number()),
+	laps: v.optional(v.number()),
+})
+
 // ── Queries ─────────────────────────────────────────────────────────
 
 export const list = query({
@@ -74,6 +82,7 @@ export const create = mutation({
 		website: v.optional(v.string()),
 		type: v.optional(v.string()),
 		attendees: v.array(attendeeValidator),
+		guests: v.optional(v.array(guestAttendeeValidator)),
 		majorEvent: v.optional(v.boolean()),
 		public: v.boolean(),
 	},
@@ -88,6 +97,7 @@ export const create = mutation({
 			website: args.website,
 			type: args.type,
 			attendees: args.attendees,
+			guests: args.guests,
 			majorEvent: args.majorEvent,
 			public: args.public,
 			createdAt: now,
@@ -117,6 +127,7 @@ export const update = mutation({
 		website: v.optional(v.string()),
 		type: v.optional(v.string()),
 		attendees: v.optional(v.array(attendeeValidator)),
+		guests: v.optional(v.array(guestAttendeeValidator)),
 		majorEvent: v.optional(v.boolean()),
 		public: v.optional(v.boolean()),
 	},
@@ -138,6 +149,7 @@ export const update = mutation({
 		if (args.website !== undefined) patch.website = args.website
 		if (args.type !== undefined) patch.type = args.type
 		if (args.attendees !== undefined) patch.attendees = args.attendees
+		if (args.guests !== undefined) patch.guests = args.guests
 		if (args.majorEvent !== undefined) patch.majorEvent = args.majorEvent
 		if (args.public !== undefined) patch.public = args.public
 

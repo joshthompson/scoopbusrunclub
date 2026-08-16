@@ -296,6 +296,15 @@ export interface RaceAttendee {
 	scanned?: boolean
 }
 
+/** A guest runner attending an event, referencing a row in the guests table */
+export interface RaceGuestAttendee {
+	guestId: string
+	position?: number
+	time?: string
+	distance?: number
+	laps?: number
+}
+
 export interface RaceItem {
 	_id: string
 	date: string
@@ -303,6 +312,7 @@ export interface RaceItem {
 	website?: string
 	type?: string
 	attendees: RaceAttendee[]
+	guests?: RaceGuestAttendee[]
 	majorEvent?: boolean
 	public: boolean
 }

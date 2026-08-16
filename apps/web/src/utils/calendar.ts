@@ -3,8 +3,16 @@ import type {
 	GuestResultItem,
 	RaceItem,
 	RunResultItem,
+	Runner,
 	VolunteerItem,
 } from './api'
+import { getMemberRoute } from './memberRoute'
+import {
+	MILESTONE_SET,
+	nextMilestone,
+	ordinalSuffix,
+	projectedMilestoneDate,
+} from './milestones'
 import { formatName } from './misc'
 import { getSpecialDayName } from './special-days'
 
@@ -19,7 +27,7 @@ export const WEEKDAY_LABELS = [
 	'Sun',
 ] as const
 
-export type CalendarEntryKind = 'parkrun' | 'race' | 'birthday'
+export type CalendarEntryKind = 'parkrun' | 'race' | 'birthday' | 'milestone'
 
 export interface CalendarEntry {
 	kind: CalendarEntryKind
@@ -131,6 +139,83 @@ export interface CalendarSources {
 	volunteers: VolunteerItem[]
 	guestResults: GuestResultItem[]
 	races: RaceItem[]
+	/** Run totals, used to work out which run was a milestone and when the next is due */
+	runners?: Runner[]
+}
+
+/**
+ * Milestone runs — the ones already done, dated from the results, plus each
+ * member's next one on the Saturday it could land.
+ *
+ * parkrun's run total is the source of truth, and our results only go back so
+ * far, so the newest result is treated as run number `totalRuns` and earlier
+ * ones counted back from there.
+ */
+function milestoneEntries(
+	results: RunResultItem[],
+	runners: Runner[],
+): { date: string; entry: CalendarEntry }[] {
+	const byRunner = new Map<string, RunResultItem[]>()
+	for (const result of results) {
+		const existing = byRunner.get(result.parkrunId)
+		if (existing) existing.push(result)
+		else byRunner.set(result.parkrunId, [result])
+	}
+
+	const latestDate = results.reduce(
+		(latest, result) => (result.date > latest ? result.date : latest),
+		'',
+	)
+
+	const entries: { date: string; entry: CalendarEntry }[] = []
+
+	for (const runner of runners) {
+		const history = (byRunner.get(runner.parkrunId) ?? []).sort((a, b) =>
+			a.date.localeCompare(b.date),
+		)
+		if (history.length === 0) continue
+
+		const name = memberName(runner.parkrunId, runner.name)
+		const href = getMemberRoute(runner.parkrunId, runner.name) ?? undefined
+		const runsBeforeHistory = runner.totalRuns - history.length
+
+		history.forEach((result, index) => {
+			const runNumber = runsBeforeHistory + index + 1
+			if (!MILESTONE_SET.has(runNumber)) return
+			entries.push({
+				date: result.date,
+				entry: {
+					kind: 'milestone',
+					emoji: '🎉',
+					name: `${name}'s ${ordinalSuffix(runNumber)} parkrun`,
+					href,
+					people: [],
+					volunteers: [],
+				},
+			})
+		})
+
+		const next = nextMilestone(runner.totalRuns)
+		if (next === null) continue
+		const projected = projectedMilestoneDate(
+			next - runner.totalRuns,
+			latestDate,
+		)
+		if (!projected) continue
+		entries.push({
+			date: toISODate(projected),
+			entry: {
+				kind: 'milestone',
+				emoji: '🎯',
+				name: `${name}'s ${ordinalSuffix(next)} parkrun?`,
+				href,
+				people: [],
+				volunteers: [],
+			},
+		})
+	}
+
+	return entries
 }
 
 /**
@@ -202,6 +287,13 @@ export function indexCalendarEntries(
 				volunteers: parkrun.volunteers,
 			})
 		}
+	}
+
+	for (const milestone of milestoneEntries(
+		sources.results,
+		sources.runners ?? [],
+	)) {
+		push(milestone.date, milestone.entry)
 	}
 
 	for (const race of sources.races) {

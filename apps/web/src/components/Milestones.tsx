@@ -12,6 +12,7 @@ import {
 	UPCOMING_THRESHOLD,
 	nextMilestone,
 	ordinalSuffix,
+	projectedMilestoneDate,
 } from '../utils/milestones'
 
 const parkrunIdToShortName = new Map<string, string>()
@@ -24,47 +25,12 @@ function displayName(parkrunId: string, fallbackName: string): string {
 	return parkrunIdToShortName.get(parkrunId) ?? formatName(fallbackName)
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
-function parseIsoDate(isoDate: string): Date | null {
-	if (!isoDate) return null
-	const date = new Date(`${isoDate}T00:00:00`)
-	return Number.isNaN(date.getTime()) ? null : date
-}
-
-function startOfDay(date: Date): Date {
-	return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function firstSaturdayOnOrAfter(date: Date): Date {
-	const normalized = startOfDay(date)
-	const daysUntilSaturday = (6 - normalized.getDay() + 7) % 7
-	return new Date(normalized.getTime() + daysUntilSaturday * DAY_MS)
-}
-
 function calculatePossibleDate(
 	runsUntil: number,
 	latestResultDate: string,
 ): string {
-	if (runsUntil <= 0) return ''
-
-	const latest = parseIsoDate(latestResultDate)
-	const today = startOfDay(new Date())
-	const dayAfterLatest = latest
-		? new Date(startOfDay(latest).getTime() + DAY_MS)
-		: today
-
-	let firstPossibleSaturday = firstSaturdayOnOrAfter(dayAfterLatest)
-	while (firstPossibleSaturday < today) {
-		firstPossibleSaturday = new Date(
-			firstPossibleSaturday.getTime() + 7 * DAY_MS,
-		)
-	}
-
-	const milestoneDate = new Date(
-		firstPossibleSaturday.getTime() + (runsUntil - 1) * 7 * DAY_MS,
-	)
-	return formatDate(milestoneDate)
+	const date = projectedMilestoneDate(runsUntil, latestResultDate)
+	return date ? formatDate(date) : ''
 }
 
 interface Props {

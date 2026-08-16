@@ -8,7 +8,9 @@ import { getSpecialDayName } from '@/utils/special-days'
 import { A, useNavigate } from '@solidjs/router'
 import { css } from '@style/css'
 import { For, type JSX, Show, createMemo, createSignal } from 'solid-js'
+import logo5Verst from '../assets/misc/5verst.png'
 import type {
+	GuestItem,
 	GuestResultItem,
 	RaceItem,
 	RunResultItem,
@@ -25,7 +27,6 @@ import {
 import { Button } from './ui/Button'
 import { DirtBlock } from './ui/DirtBlock'
 import { Emoji } from './ui/Emoji'
-import logo5Verst from '../assets/misc/5verst.png'
 
 const parkrunIdToRunnerName = new Map<string, string>()
 for (const [, [runner]] of Object.entries(runners)) {
@@ -140,7 +141,9 @@ function groupResults(
 
 	const today = new Date().toISOString().split('T')[0]
 	const pastRaces = allRaces.filter(
-		(r) => r.date <= today && r.attendees.length > 0,
+		(r) =>
+			r.date <= today &&
+			(r.attendees.length > 0 || (r.guests?.length ?? 0) > 0),
 	)
 
 	for (const race of pastRaces) {
@@ -165,6 +168,8 @@ interface LatestResultsProps {
 	races: RaceItem[]
 	volunteers: VolunteerItem[]
 	guestResults?: GuestResultItem[]
+	/** Guest records, used to name the guests attending non-parkrun events */
+	guests?: GuestItem[]
 	celebrationData?: CelebrationData
 }
 
@@ -231,31 +236,50 @@ function joinNames(elements: JSX.Element[]): JSX.Element {
 	)
 }
 
-/** Build a signature string to group attendees with identical result shape */
-function attendeeSignature(
-	a: import('@/utils/api').RaceAttendee,
-	isToday: boolean,
-): string {
+/** The result fields shared by club attendees and guests at an event */
+interface RaceResult {
+	position?: number
+	time?: string
+	distance?: number
+	laps?: number
+}
+
+/** One participant at a non-parkrun event, either a club member or a guest */
+type RaceEntry =
+	| ({ kind: 'member'; id: string } & RaceResult)
+	| ({ kind: 'guest'; id: string } & RaceResult)
+
+/** Build a signature string to group participants with identical result shape */
+function raceEntrySignature(e: RaceEntry, isToday: boolean): string {
 	return JSON.stringify({
-		position: a.position ?? null,
-		time: a.time || null,
-		distance: a.distance ?? null,
-		laps: a.laps ?? null,
+		kind: e.kind,
+		position: e.position ?? null,
+		time: e.time || null,
+		distance: e.distance ?? null,
+		laps: e.laps ?? null,
 		isToday,
 	})
 }
 
-function RaceBlock(props: { race: RaceItem }) {
+function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 	const isToday = () =>
 		props.race.date === new Date().toISOString().split('T')[0]
 
 	const groups = createMemo(() => {
 		const today = isToday()
-		const map = new Map<string, import('@/utils/api').RaceAttendee[]>()
-		for (const a of props.race.attendees) {
-			const key = attendeeSignature(a, today)
+		const map = new Map<string, RaceEntry[]>()
+		const entries: RaceEntry[] = [
+			...props.race.attendees.map(
+				(a): RaceEntry => ({ ...a, kind: 'member', id: a.runnerId }),
+			),
+			...(props.race.guests ?? []).map(
+				(g): RaceEntry => ({ ...g, kind: 'guest', id: g.guestId }),
+			),
+		]
+		for (const entry of entries) {
+			const key = raceEntrySignature(entry, today)
 			if (!map.has(key)) map.set(key, [])
-			map.get(key)?.push(a)
+			map.get(key)?.push(entry)
 		}
 		return Array.from(map.values())
 	})
@@ -272,10 +296,29 @@ function RaceBlock(props: { race: RaceItem }) {
 		)
 	}
 
-	/** Build a text description for a group of attendees with identical results */
-	const describeGroup = (
-		group: import('@/utils/api').RaceAttendee[],
-	): string => {
+	const linkedGuestName = (guestId: string) => {
+		const guest = props.guests.find((g) => g._id === guestId)
+		if (!guest) return <em>Guest</em>
+		return (
+			<>
+				<em>
+					<A
+						href={`/guests/${guest.parkrunId ?? guest._id}`}
+						class={styles.memberLink}
+					>
+						{guest.name}
+					</A>
+				</em>
+				<Show when={guest.extra}> ({guest.extra})</Show>
+			</>
+		)
+	}
+
+	const entryName = (entry: RaceEntry) =>
+		entry.kind === 'guest' ? linkedGuestName(entry.id) : linkedName(entry.id)
+
+	/** Build a text description for a group of participants with identical results */
+	const describeGroup = (group: RaceEntry[]): string => {
 		const rep = group[0]
 		const hasPosition = rep.position != null
 		const hasTime = rep.time != null
@@ -316,16 +359,18 @@ function RaceBlock(props: { race: RaceItem }) {
 		if (props.race.majorEvent) return ['🔥', '🔥']
 		return undefined
 	}
-	
+
 	const is5Verst = () => props.race.type === '5 вёрст'
 
 	return (
 		<DirtBlock>
 			<div class={styles.parkrun}>
-				{is5Verst() && (<div
-					class={styles.is5Verst}
-					style={{ 'background-image': `url(${logo5Verst})` }}
-				/>)}
+				{is5Verst() && (
+					<div
+						class={styles.is5Verst}
+						style={{ 'background-image': `url(${logo5Verst})` }}
+					/>
+				)}
 				<h4 class={styles.parkrunName}>
 					<Show when={eventEmojis()}>
 						<Emoji emoji={eventEmojis()?.[0]} />{' '}
@@ -345,8 +390,14 @@ function RaceBlock(props: { race: RaceItem }) {
 					<For each={groups()}>
 						{(group) => (
 							<li>
-								{joinNames(group.map((a) => linkedName(a.runnerId)))}{' '}
+								{joinNames(group.map(entryName))}{' '}
 								{renderBold(describeGroup(group))}
+								<Show when={group[0].kind === 'guest'}>
+									<span class={styles.guestTag}>
+										{group.length > 1 ? 'Guests' : 'Guest'}{' '}
+										<Emoji emoji="👋" animation="wave" />
+									</span>
+								</Show>
 							</li>
 						)}
 					</For>
@@ -564,7 +615,9 @@ export function LatestResults(props: LatestResultsProps) {
 						<h3 class={styles.date}>
 							{formatDate(new Date(`${result.date}T00:00:00`))}
 						</h3>
-						<For each={result.races}>{(race) => <RaceBlock race={race} />}</For>
+						<For each={result.races}>
+							{(race) => <RaceBlock race={race} guests={props.guests ?? []} />}
+						</For>
 						<For each={result.parkruns}>
 							{(parkrun) => {
 								return (
@@ -867,5 +920,5 @@ const styles = {
 		left: 0,
 		width: '35px',
 		height: '36px',
-	})
+	}),
 }

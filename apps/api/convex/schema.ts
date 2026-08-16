@@ -64,6 +64,17 @@ export default defineSchema({
 				scanned: v.optional(v.boolean()),
 			}),
 		),
+		guests: v.optional(
+			v.array(
+				v.object({
+					guestId: v.id('guests'),
+					position: v.optional(v.number()),
+					time: v.optional(v.string()), // hh:mm:ss format
+					distance: v.optional(v.number()),
+					laps: v.optional(v.number()),
+				}),
+			),
+		),
 		majorEvent: v.optional(v.boolean()),
 		public: v.boolean(),
 		createdAt: v.number(),

@@ -570,6 +570,7 @@ http.route({
 			website: body.website,
 			type: body.type,
 			attendees: body.attendees ?? [],
+			guests: body.guests,
 			majorEvent: body.majorEvent,
 			public: body.public ?? true,
 		})
@@ -599,6 +600,7 @@ http.route({
 			website: body.website,
 			type: body.type,
 			attendees: body.attendees,
+			guests: body.guests,
 			majorEvent: body.majorEvent,
 			public: body.public,
 		})

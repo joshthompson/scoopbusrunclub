@@ -3,10 +3,12 @@ import { AdminAvatar } from '@/components/admin/AdminAvatar'
 import { AdminButton } from '@/components/admin/AdminButton'
 import { AdminInput } from '@/components/admin/AdminInput'
 import { AdminSelect } from '@/components/admin/AdminSelect'
+import { GuestAvatar } from '@/components/admin/GuestAvatar'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Modal } from '@/components/ui/Modal'
 import { type RunnerName, runners } from '@/data/runners'
-import type { Race, RaceAttendee } from '@/utils/adminApi'
+import type { Guest, Race, RaceAttendee, RaceGuest } from '@/utils/adminApi'
+import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { css } from '@style/css'
 import { type Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { EVENT_TYPES } from './EventsPage'
@@ -18,16 +20,81 @@ function isValidTime(v: string): boolean {
 	return v === '' || TIME_RE.test(v)
 }
 
+/** The per-row result inputs, held as strings so typing never loses focus */
+interface FieldStrings {
+	position: string
+	time: string
+	distance: string
+	laps: string
+}
+
+const emptyFields = (): FieldStrings => ({
+	position: '',
+	time: '',
+	distance: '',
+	laps: '',
+})
+
+const fieldsFrom = (r: {
+	position?: number
+	time?: string
+	distance?: number
+	laps?: number
+}): FieldStrings => ({
+	position: r.position != null ? String(r.position) : '',
+	time: r.time ?? '',
+	distance: r.distance != null ? String(r.distance) : '',
+	laps: r.laps != null ? String(r.laps) : '',
+})
+
+/** Parse a row's inputs onto `entry`, returns false if any value is invalid */
+function applyFields(
+	entry: { position?: number; time?: string; distance?: number; laps?: number },
+	s: FieldStrings,
+): boolean {
+	// Position: integer
+	if (s.position !== '') {
+		const n = Number(s.position)
+		if (!Number.isFinite(n) || n < 0) return false
+		entry.position = Math.round(n)
+	}
+
+	// Time: string in hh:mm:ss / mm:ss format
+	if (s.time !== '') {
+		if (!isValidTime(s.time)) return false
+		entry.time = s.time
+	}
+
+	// Distance: decimal number
+	if (s.distance !== '') {
+		const n = Number(s.distance)
+		if (!Number.isFinite(n) || n < 0) return false
+		entry.distance = n
+	}
+
+	// Laps: integer
+	if (s.laps !== '') {
+		const n = Number(s.laps)
+		if (!Number.isFinite(n) || n < 0) return false
+		entry.laps = Math.round(n)
+	}
+
+	return true
+}
+
 interface EventModalProps {
 	race: Race | null
 	/** When true, treat as a new event even if race data is provided (for duplication) */
 	isNew?: boolean
+	/** All guest runners available to add to the event */
+	guests: Guest[]
 	onSave: (data: {
 		date: string
 		name: string
 		website?: string
 		type?: string
 		attendees: RaceAttendee[]
+		guests: RaceGuest[]
 		majorEvent?: boolean
 		public: boolean
 	}) => void
@@ -35,6 +102,47 @@ interface EventModalProps {
 }
 
 const allRunnerKeys = Object.keys(runners) as RunnerName[]
+
+/** Position / time / distance / laps inputs for one row */
+const ResultFields: Component<{
+	values: FieldStrings
+	onChange: (field: keyof FieldStrings, value: string) => void
+}> = (props) => (
+	<div class={styles.attendeeFields}>
+		<AdminInput
+			type="number"
+			placeholder="Pos"
+			value={props.values.position}
+			onInput={(e) => props.onChange('position', e.currentTarget.value)}
+			size="small"
+			width="60px"
+		/>
+		<AdminInput
+			type="text"
+			placeholder="hh:mm:ss"
+			value={props.values.time}
+			onInput={(e) => props.onChange('time', e.currentTarget.value)}
+			size="small"
+			width="80px"
+		/>
+		<AdminInput
+			type="text"
+			placeholder="Distance"
+			value={props.values.distance}
+			onInput={(e) => props.onChange('distance', e.currentTarget.value)}
+			size="small"
+			width="70px"
+		/>
+		<AdminInput
+			type="number"
+			placeholder="Laps"
+			value={props.values.laps}
+			onInput={(e) => props.onChange('laps', e.currentTarget.value)}
+			size="small"
+			width="60px"
+		/>
+	</div>
+)
 
 export const EventModal: Component<EventModalProps> = (props) => {
 	const race = props.race
@@ -50,32 +158,33 @@ export const EventModal: Component<EventModalProps> = (props) => {
 	const [attendees, setAttendees] = createSignal<RaceAttendee[]>(
 		race?.attendees ?? [],
 	)
+	const [raceGuests, setRaceGuests] = createSignal<RaceGuest[]>(
+		race?.guests ?? [],
+	)
 	const [saving, setSaving] = createSignal(false)
 
 	// Local string state for each attendee's numeric/text inputs to avoid losing focus
-	const initStrings = (race?.attendees ?? []).map((a) => ({
-		position: a.position != null ? String(a.position) : '',
-		time: a.time ?? '',
-		distance: a.distance != null ? String(a.distance) : '',
-		laps: a.laps != null ? String(a.laps) : '',
-	}))
-	const [fieldStrings, setFieldStrings] =
-		createSignal<
-			{ position: string; time: string; distance: string; laps: string }[]
-		>(initStrings)
+	const [fieldStrings, setFieldStrings] = createSignal<FieldStrings[]>(
+		(race?.attendees ?? []).map(fieldsFrom),
+	)
+	const [guestFieldStrings, setGuestFieldStrings] = createSignal<
+		FieldStrings[]
+	>((race?.guests ?? []).map(fieldsFrom))
 
 	const availableRunners = createMemo(() => {
 		const used = new Set(attendees().map((a) => a.runnerId))
 		return allRunnerKeys.filter((k) => !used.has(k))
 	})
 
+	const availableGuests = createMemo(() => {
+		const used = new Set(raceGuests().map((g) => g.guestId))
+		return props.guests.filter((g) => !used.has(g._id))
+	})
+
 	const addAttendee = (runnerId: string) => {
 		if (!runnerId) return
 		setAttendees((prev) => [...prev, { runnerId }])
-		setFieldStrings((prev) => [
-			...prev,
-			{ position: '', time: '', distance: '', laps: '' },
-		])
+		setFieldStrings((prev) => [...prev, emptyFields()])
 	}
 
 	const removeAttendee = (index: number) => {
@@ -86,12 +195,38 @@ export const EventModal: Component<EventModalProps> = (props) => {
 		setFieldStrings((prev) => prev.filter((_, i) => i !== index))
 	}
 
+	const addGuest = (guestId: string) => {
+		if (!guestId) return
+		setRaceGuests((prev) => [...prev, { guestId }])
+		setGuestFieldStrings((prev) => [...prev, emptyFields()])
+	}
+
+	const removeGuest = (index: number) => {
+		const g = raceGuests()[index]
+		if (
+			!confirm(`Remove ${guestDisplayName(g?.guestId ?? '')} from this event?`)
+		)
+			return
+		setRaceGuests((prev) => prev.filter((_, i) => i !== index))
+		setGuestFieldStrings((prev) => prev.filter((_, i) => i !== index))
+	}
+
 	const updateFieldString = (
 		index: number,
-		field: 'position' | 'time' | 'distance' | 'laps',
+		field: keyof FieldStrings,
 		value: string,
 	) => {
 		setFieldStrings((prev) =>
+			prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
+		)
+	}
+
+	const updateGuestFieldString = (
+		index: number,
+		field: keyof FieldStrings,
+		value: string,
+	) => {
+		setGuestFieldStrings((prev) =>
 			prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
 		)
 	}
@@ -102,6 +237,12 @@ export const EventModal: Component<EventModalProps> = (props) => {
 		return runnerId
 	}
 
+	const guestRecord = (guestId: string): Guest | undefined =>
+		props.guests.find((g) => g._id === guestId)
+
+	const guestDisplayName = (guestId: string): string =>
+		guestRecord(guestId)?.name ?? 'Unknown guest'
+
 	/** Build attendees array from local string state, returns null if validation fails */
 	const buildAttendees = (): RaceAttendee[] | null => {
 		const strings = fieldStrings()
@@ -109,39 +250,27 @@ export const EventModal: Component<EventModalProps> = (props) => {
 		const result: RaceAttendee[] = []
 
 		for (let i = 0; i < atts.length; i++) {
-			const s = strings[i] ?? { position: '', time: '', distance: '', laps: '' }
 			const entry: RaceAttendee = { runnerId: atts[i].runnerId }
 
 			// Preserve scanned flag
 			if (atts[i].scanned) entry.scanned = true
 
-			// Position: integer
-			if (s.position !== '') {
-				const n = Number(s.position)
-				if (!Number.isFinite(n) || n < 0) return null
-				entry.position = Math.round(n)
-			}
+			if (!applyFields(entry, strings[i] ?? emptyFields())) return null
 
-			// Time: string in hh:mm:ss / mm:ss format
-			if (s.time !== '') {
-				if (!isValidTime(s.time)) return null
-				entry.time = s.time
-			}
+			result.push(entry)
+		}
+		return result
+	}
 
-			// Distance: decimal number
-			if (s.distance !== '') {
-				const n = Number(s.distance)
-				if (!Number.isFinite(n) || n < 0) return null
-				entry.distance = n
-			}
+	/** Build guests array from local string state, returns null if validation fails */
+	const buildGuests = (): RaceGuest[] | null => {
+		const strings = guestFieldStrings()
+		const gs = raceGuests()
+		const result: RaceGuest[] = []
 
-			// Laps: integer
-			if (s.laps !== '') {
-				const n = Number(s.laps)
-				if (!Number.isFinite(n) || n < 0) return null
-				entry.laps = Math.round(n)
-			}
-
+		for (let i = 0; i < gs.length; i++) {
+			const entry: RaceGuest = { guestId: gs[i].guestId }
+			if (!applyFields(entry, strings[i] ?? emptyFields())) return null
 			result.push(entry)
 		}
 		return result
@@ -149,13 +278,14 @@ export const EventModal: Component<EventModalProps> = (props) => {
 
 	const isFormValid = createMemo(() => {
 		if (!date() || !name()) return false
-		return buildAttendees() !== null
+		return buildAttendees() !== null && buildGuests() !== null
 	})
 
 	const handleSubmit = async (e: Event) => {
 		e.preventDefault()
 		const builtAttendees = buildAttendees()
-		if (!date() || !name() || !builtAttendees) return
+		const builtGuests = buildGuests()
+		if (!date() || !name() || !builtAttendees || !builtGuests) return
 		setSaving(true)
 		try {
 			props.onSave({
@@ -164,6 +294,7 @@ export const EventModal: Component<EventModalProps> = (props) => {
 				website: website() || undefined,
 				type: type() || undefined,
 				attendees: builtAttendees,
+				guests: builtGuests,
 				majorEvent: isMajorEvent() || undefined,
 				public: isPublic(),
 			})
@@ -278,68 +409,86 @@ export const EventModal: Component<EventModalProps> = (props) => {
 												</span>
 											</Show>
 										</span>
-										<div class={styles.attendeeFields}>
-											<AdminInput
-												type="number"
-												placeholder="Pos"
-												value={fieldStrings()[idx()]?.position ?? ''}
-												onInput={(e) =>
-													updateFieldString(
-														idx(),
-														'position',
-														e.currentTarget.value,
-													)
-												}
-												size="small"
-												width="60px"
-											/>
-											<AdminInput
-												type="text"
-												placeholder="hh:mm:ss"
-												value={fieldStrings()[idx()]?.time ?? ''}
-												onInput={(e) =>
-													updateFieldString(
-														idx(),
-														'time',
-														e.currentTarget.value,
-													)
-												}
-												size="small"
-												width="80px"
-											/>
-											<AdminInput
-												type="text"
-												placeholder="Distance"
-												value={fieldStrings()[idx()]?.distance ?? ''}
-												onInput={(e) =>
-													updateFieldString(
-														idx(),
-														'distance',
-														e.currentTarget.value,
-													)
-												}
-												size="small"
-												width="70px"
-											/>
-											<AdminInput
-												type="number"
-												placeholder="Laps"
-												value={fieldStrings()[idx()]?.laps ?? ''}
-												onInput={(e) =>
-													updateFieldString(
-														idx(),
-														'laps',
-														e.currentTarget.value,
-													)
-												}
-												size="small"
-												width="60px"
-											/>
-										</div>
+										<ResultFields
+											values={fieldStrings()[idx()] ?? emptyFields()}
+											onChange={(field, value) =>
+												updateFieldString(idx(), field, value)
+											}
+										/>
 										<button
 											type="button"
 											class={styles.removeBtn}
 											onClick={() => removeAttendee(idx())}
+										>
+											✕
+										</button>
+									</div>
+								)}
+							</For>
+						</div>
+					</Show>
+				</div>
+
+				{/* Guests */}
+				<div class={styles.section}>
+					<div class={styles.sectionHeader}>
+						<span>Guests ({raceGuests().length})</span>
+						<Show when={availableGuests().length > 0}>
+							<AdminSelect
+								onChange={(e) => {
+									addGuest(e.currentTarget.value)
+									e.currentTarget.value = ''
+								}}
+							>
+								<option value="">+ Add guest…</option>
+								<For each={availableGuests()}>
+									{(guest) => (
+										<option value={guest._id}>
+											{guest.name}
+											{guest.extra ? ` (${guest.extra})` : ''}
+										</option>
+									)}
+								</For>
+							</AdminSelect>
+						</Show>
+					</div>
+
+					<Show
+						when={raceGuests().length > 0}
+						fallback={
+							<Show when={props.guests.length === 0}>
+								<span class={styles.hint}>
+									No guests exist yet — add them on the Runners page.
+								</span>
+							</Show>
+						}
+					>
+						<div class={styles.attendeeList}>
+							<For each={raceGuests()}>
+								{(guest, idx) => (
+									<div class={styles.attendeeRow}>
+										<GuestAvatar
+											name={guestDisplayName(guest.guestId)}
+											avatar={
+												guestRecord(guest.guestId)?.avatar as
+													| CharacterSpriteProps
+													| undefined
+											}
+											size="medium"
+										/>
+										<span class={styles.attendeeName}>
+											{guestDisplayName(guest.guestId)}
+										</span>
+										<ResultFields
+											values={guestFieldStrings()[idx()] ?? emptyFields()}
+											onChange={(field, value) =>
+												updateGuestFieldString(idx(), field, value)
+											}
+										/>
+										<button
+											type="button"
+											class={styles.removeBtn}
+											onClick={() => removeGuest(idx())}
 										>
 											✕
 										</button>
@@ -392,6 +541,10 @@ const styles = {
 		fontWeight: 'bold',
 		textTransform: 'uppercase',
 		letterSpacing: '0.05em',
+	}),
+	hint: css({
+		color: 'var(--overlay-white-70)',
+		fontSize: '0.75rem',
 	}),
 	attendeeList: css({
 		display: 'flex',

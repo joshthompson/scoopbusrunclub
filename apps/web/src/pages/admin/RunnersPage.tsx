@@ -2,11 +2,10 @@ import { AdminAvatar } from '@/components/admin/AdminAvatar'
 import { AdminButton } from '@/components/admin/AdminButton'
 import { AdminInput } from '@/components/admin/AdminInput'
 import { CharacterEditor } from '@/components/admin/CharacterEditor'
+import { GuestAvatar } from '@/components/admin/GuestAvatar'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Modal } from '@/components/ui/Modal'
 import { type RunnerName, runners } from '@/data/runners'
-import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
-import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import {
 	type Guest,
 	createGuest,
@@ -14,6 +13,7 @@ import {
 	fetchAdminGuests,
 	updateGuest,
 } from '@/utils/adminApi'
+import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { css } from '@style/css'
 import {
 	type Component,
@@ -114,7 +114,13 @@ export const RunnersPage: Component = () => {
 									{(guest) => (
 										<tr>
 											<td>
-												<GuestFace avatar={guest.avatar as CharacterSpriteProps | undefined} />
+												<GuestAvatar
+													name={guest.name}
+													avatar={
+														guest.avatar as CharacterSpriteProps | undefined
+													}
+													size="large"
+												/>
 											</td>
 											<td>{guest.name}</td>
 											<td>{guest.extra ?? '—'}</td>
@@ -246,29 +252,6 @@ function GuestModal(props: {
 				</div>
 			</form>
 		</Modal>
-	)
-}
-
-function GuestFace(props: { avatar?: CharacterSpriteProps }) {
-	const faceUrl = () => {
-		const av = props.avatar
-		if (!av?.head) return undefined
-		try {
-			const result = createRunnerFrames(av)
-			return result.frames.face?.[0]
-		} catch {
-			return undefined
-		}
-	}
-
-	return (
-		<Show when={faceUrl()}>
-			<img
-				src={faceUrl()}
-				alt=""
-				style={{ width: '24px', height: 'auto', 'image-rendering': 'pixelated' }}
-			/>
-		</Show>
 	)
 }
 

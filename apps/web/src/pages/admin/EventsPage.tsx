@@ -7,6 +7,7 @@ import {
 import { AdminInput } from '@/components/admin/AdminInput'
 import { AdminSelect } from '@/components/admin/AdminSelect'
 import { AdminToolbar } from '@/components/admin/AdminToolbar'
+import { GuestAvatar } from '@/components/admin/GuestAvatar'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Icon } from '@/components/ui/Icon'
@@ -14,13 +15,17 @@ import { Table as AdminTable } from '@/components/ui/Table'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { type RunnerName, runners } from '@/data/runners'
 import {
+	type Guest,
 	type Race,
 	type RaceAttendee,
+	type RaceGuest,
 	createRace,
 	deleteRace,
+	fetchAdminGuests,
 	fetchRaces,
 	updateRace,
 } from '@/utils/adminApi'
+import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { css } from '@style/css'
 import {
 	type Component,
@@ -70,6 +75,8 @@ export const EventsPage: Component = () => {
 		() => ({ includeOld: filterEventDate() !== 'upcoming' }),
 		(opts) => fetchRaces(opts.includeOld),
 	)
+
+	const [guests] = createResource(fetchAdminGuests)
 
 	const [filtersOpen, setFiltersOpen] = createSignal(window.innerWidth > 900)
 	const [modalOpen, setModalOpen] = createSignal(false)
@@ -131,7 +138,10 @@ export const EventsPage: Component = () => {
 					cmp = (a.type ?? '').localeCompare(b.type ?? '')
 					break
 				case 'attendees':
-					cmp = a.attendees.length - b.attendees.length
+					cmp =
+						a.attendees.length +
+						(a.guests?.length ?? 0) -
+						(b.attendees.length + (b.guests?.length ?? 0))
 					break
 				case 'public':
 					cmp = Number(a.public) - Number(b.public)
@@ -149,6 +159,12 @@ export const EventsPage: Component = () => {
 		if (r) return r[0]().name
 		return runnerId
 	}
+
+	const guestRecord = (guestId: string): Guest | undefined =>
+		(guests() ?? []).find((g) => g._id === guestId)
+
+	const guestDisplayName = (guestId: string): string =>
+		guestRecord(guestId)?.name ?? 'Unknown guest'
 
 	const handleCreate = () => {
 		setEditingRace(null)
@@ -180,6 +196,7 @@ export const EventsPage: Component = () => {
 		website?: string
 		type?: string
 		attendees: RaceAttendee[]
+		guests: RaceGuest[]
 		majorEvent?: boolean
 		public: boolean
 	}) => {
@@ -331,9 +348,12 @@ export const EventsPage: Component = () => {
 							race.type ?? '—',
 							<span
 								key={`${race.date}-attendees`}
-								title={race.attendees
-									.map((a) => runnerDisplayName(a.runnerId))
-									.join(', ')}
+								title={[
+									...race.attendees.map((a) => runnerDisplayName(a.runnerId)),
+									...(race.guests ?? []).map((g) =>
+										guestDisplayName(g.guestId),
+									),
+								].join(', ')}
 							>
 								<For each={race.attendees}>
 									{(att) => (
@@ -342,6 +362,24 @@ export const EventsPage: Component = () => {
 												user={att.runnerId}
 												size="small"
 												title={runnerDisplayName(att.runnerId)}
+											/>
+										</Tooltip>
+									)}
+								</For>
+								<For each={race.guests ?? []}>
+									{(guest) => (
+										<Tooltip
+											content={`${guestDisplayName(guest.guestId)} (guest)`}
+										>
+											<GuestAvatar
+												name={guestDisplayName(guest.guestId)}
+												avatar={
+													guestRecord(guest.guestId)?.avatar as
+														| CharacterSpriteProps
+														| undefined
+												}
+												size="small"
+												title={`${guestDisplayName(guest.guestId)} (guest)`}
 											/>
 										</Tooltip>
 									)}
@@ -377,6 +415,7 @@ export const EventsPage: Component = () => {
 				<EventModal
 					race={editingRace()}
 					isNew={duplicating()}
+					guests={guests() ?? []}
 					onSave={handleSave}
 					onClose={() => setModalOpen(false)}
 				/>
