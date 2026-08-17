@@ -19,7 +19,7 @@ import {
 	spreadVertically,
 } from './graph'
 
-/** How many clubs to plot. */
+/** How many clubs to plot before the reader picks their own. */
 const MAX_CLUBS = 5
 const MAX_Y_LABELS = 6
 /** Room on the right for the club-name labels. */
@@ -75,18 +75,17 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 	const { width, ref: containerRef } = createGraphWidth()
 	const [mouseX, setMouseX] = createSignal<number | null>(null)
 
+	/** Clubs the reader has picked, or null while the default top few stand. */
+	const [picked, setPicked] = createSignal<string[] | null>(null)
+
 	const weeks = createMemo(() =>
 		[...new Set(props.snapshots.map((s) => s.week))].sort((a, b) =>
 			a.localeCompare(b),
 		),
 	)
 
-	const chartData = createMemo(() => {
-		const allWeeks = weeks()
-		const w = width()
-		if (allWeeks.length < 2 || w <= 0) return null
-
-		// Runs per club per week, and each club's most recent total.
+	/** Runs per club per week, and each club's most recent total. */
+	const clubIndex = createMemo(() => {
 		const byClub = new Map<string, Map<string, number>>()
 		const latestByClub = new Map<string, { week: string; events: number }>()
 		for (const snapshot of props.snapshots) {
@@ -103,12 +102,20 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 			}
 		}
 
-		// Rank by most recent total, then keep the top few. If we've dropped out
-		// of that group, swap us in — this page is about our own progress.
+		// Every club, biggest first — the order the picker offers them in.
 		const ranked = [...latestByClub.entries()]
 			.sort((a, b) => b[1].events - a[1].events)
 			.map(([name]) => name)
 
+		return { byClub, ranked }
+	})
+
+	/**
+	 * The top few clubs. If we've dropped out of that group, swap us in — this
+	 * page is about our own progress.
+	 */
+	const defaultClubs = createMemo(() => {
+		const { ranked } = clubIndex()
 		const chosen = ranked.slice(0, MAX_CLUBS)
 		if (
 			ranked.includes(SCOOP_BUS_CLUB_NAME) &&
@@ -116,6 +123,58 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 		) {
 			chosen[chosen.length - 1] = SCOOP_BUS_CLUB_NAME
 		}
+		return chosen
+	})
+
+	const chosenClubs = createMemo(() => picked() ?? defaultClubs())
+
+	/**
+	 * A colour per plotted club, held apart from the chart so the picker's
+	 * swatches match the lines even at widths where nothing is plotted yet.
+	 *
+	 * A club keeps the colour it was first given for as long as it stays on the
+	 * graph, so removing one club doesn't recolour every line below it.
+	 */
+	const clubColors = createMemo<Map<string, string>>((previous) => {
+		const colors = new Map<string, string>()
+		const used = new Set<string>()
+		let wrapIndex = 0
+
+		const keep = (name: string, color: string) => {
+			colors.set(name, color)
+			used.add(color)
+		}
+
+		for (const name of chosenClubs()) {
+			if (name === SCOOP_BUS_CLUB_NAME) {
+				keep(name, SCOOP_BUS_COLOR)
+				continue
+			}
+			const held = previous.get(name)
+			if (held && !used.has(held)) keep(name, held)
+		}
+
+		for (const name of chosenClubs()) {
+			if (colors.has(name)) continue
+			// Past the palette's length colours have to repeat, so pick round-robin.
+			const free = OTHER_COLORS.find((color) => !used.has(color))
+			keep(name, free ?? OTHER_COLORS[wrapIndex++ % OTHER_COLORS.length])
+		}
+
+		return colors
+	}, new Map())
+
+	const addClub = (name: string) => setPicked([...chosenClubs(), name])
+	const removeClub = (name: string) =>
+		setPicked(chosenClubs().filter((club) => club !== name))
+
+	const chartData = createMemo(() => {
+		const allWeeks = weeks()
+		const w = width()
+		if (allWeeks.length < 2 || w <= 0) return null
+
+		const { byClub } = clubIndex()
+		const chosen = chosenClubs()
 
 		// Y range across the plotted clubs only.
 		let minEvents = Number.POSITIVE_INFINITY
@@ -162,12 +221,10 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 		}))
 		const verticalLines = labelIndexes.filter((i) => i > 0).map((i) => toX(i))
 
-		let colorIndex = 0
+		const colors = clubColors()
 		const series: ClubSeries[] = chosen.map((name) => {
 			const isScoopBus = name === SCOOP_BUS_CLUB_NAME
-			const color = isScoopBus
-				? SCOOP_BUS_COLOR
-				: OTHER_COLORS[colorIndex++ % OTHER_COLORS.length]
+			const color = colors.get(name) ?? SERIES_COLORS[0]
 
 			const values = allWeeks.map((week) => byClub.get(name)?.get(week) ?? null)
 			const points = values.map((value, i) =>
@@ -275,9 +332,11 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 				when={chartData()}
 				fallback={
 					<p class={styles.empty}>
-						{weeks().length === 1
-							? 'Only one week of data so far — the graph appears once there are two snapshots to compare.'
-							: 'No snapshots have been taken yet.'}
+						{chosenClubs().length === 0
+							? 'No clubs on the graph — add one below.'
+							: weeks().length === 1
+								? 'Only one week of data so far — the graph appears once there are two snapshots to compare.'
+								: 'No snapshots have been taken yet.'}
 					</p>
 				}
 			>
@@ -366,27 +425,72 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 				)}
 			</Show>
 
-			{/* Too narrow for names beside the lines — list them underneath */}
-			<Show when={chartData() && !chartData()?.showSideLabels}>
-				<ul class={styles.legend}>
-					<For each={chartData()?.series ?? []}>
-						{(series) => (
-							<li class={styles.legendItem}>
+			{/*
+			 * The plotted clubs, each removable, plus every other club to add. It
+			 * doubles as the legend: on narrow screens there's no room for names
+			 * beside the lines, so these swatches are the only key to the colours.
+			 */}
+			<Show when={clubIndex().ranked.length > 0}>
+				<div class={styles.picker}>
+					<For each={chosenClubs()}>
+						{(name) => (
+							<button
+								type="button"
+								class={styles.chip}
+								onClick={() => removeClub(name)}
+								title={`Remove ${name} from the graph`}
+							>
 								<span
 									class={styles.swatch}
-									style={{ background: series.color }}
+									style={{ background: clubColors().get(name) }}
 								/>
 								<span
 									style={{
-										'font-weight': series.isScoopBus ? 'bold' : 'normal',
+										'font-weight':
+											name === SCOOP_BUS_CLUB_NAME ? 'bold' : 'normal',
 									}}
 								>
-									{series.name}
+									{name}
 								</span>
-							</li>
+								<span class={styles.chipRemove} aria-hidden="true">
+									×
+								</span>
+							</button>
 						)}
 					</For>
-				</ul>
+
+					<select
+						class={styles.add}
+						aria-label="Add a club to the graph"
+						// Bound back to the placeholder so the same club can be added,
+						// removed, then added again.
+						value=""
+						onChange={(event) => {
+							const name = event.currentTarget.value
+							event.currentTarget.value = ''
+							if (name) addClub(name)
+						}}
+					>
+						<option value="">+ Add a club…</option>
+						<For
+							each={clubIndex().ranked.filter(
+								(name) => !chosenClubs().includes(name),
+							)}
+						>
+							{(name) => <option value={name}>{name}</option>}
+						</For>
+					</select>
+
+					<Show when={picked() !== null}>
+						<button
+							type="button"
+							class={styles.reset}
+							onClick={() => setPicked(null)}
+						>
+							Reset
+						</button>
+					</Show>
+				</div>
 			</Show>
 
 			<Show when={snappedTotals()}>
@@ -424,20 +528,54 @@ const styles = {
 		textAlign: 'center',
 		padding: '2rem 1rem',
 	}),
-	legend: css({
-		listStyle: 'none',
-		padding: 0,
+	picker: css({
 		margin: '0.75rem 0 0',
 		display: 'flex',
 		flexWrap: 'wrap',
-		gap: '0.25rem 0.75rem',
+		gap: '0.35rem',
 		justifyContent: 'center',
 		fontSize: '0.8rem',
 	}),
-	legendItem: css({
+	chip: css({
 		display: 'flex',
 		alignItems: 'center',
-		gap: '0.3rem',
+		gap: '0.35rem',
+		padding: '0.15rem 0.4rem',
+		border: '1px solid var(--overlay-white-30)',
+		background: 'transparent',
+		color: 'inherit',
+		font: 'inherit',
+		cursor: 'pointer',
+		cornerShape: 'notch',
+		borderRadius: '4px',
+		_hover: {
+			background: 'var(--overlay-white-10)',
+		},
+	}),
+	/** Only shows the chip is removable — the whole chip is the button. */
+	chipRemove: css({
+		opacity: 0.6,
+		lineHeight: 1,
+	}),
+	add: css({
+		padding: '0.15rem 0.4rem',
+		border: '1px dashed var(--overlay-white-30)',
+		background: 'transparent',
+		color: 'inherit',
+		font: 'inherit',
+		cursor: 'pointer',
+		cornerShape: 'notch',
+		borderRadius: '4px',
+	}),
+	reset: css({
+		padding: '0.15rem 0.4rem',
+		border: 'none',
+		background: 'transparent',
+		color: 'inherit',
+		font: 'inherit',
+		opacity: 0.7,
+		textDecoration: 'underline',
+		cursor: 'pointer',
 	}),
 	tooltipTitle: css({
 		fontWeight: 'bold',
