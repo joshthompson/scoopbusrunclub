@@ -1,4 +1,5 @@
 import backSignAsset from '@/assets/misc/back-sign.png'
+import { snowyAsset } from '@/utils/snow'
 import { useNavigate } from '@solidjs/router'
 import { css, cx } from '@style/css'
 
@@ -15,7 +16,11 @@ export function BackSignButton(props: {
 			class={cx(styles.button, props.class)}
 			onClick={() => navigate(props.to ?? '/')}
 		>
-			<img class={styles.image} src={backSignAsset} alt="Back to home" />
+			<img
+				class={styles.image}
+				src={snowyAsset(backSignAsset)}
+				alt="Back to home"
+			/>
 			<span class={styles.text}>{props.children ?? 'Back to homepage'}</span>
 		</button>
 	)

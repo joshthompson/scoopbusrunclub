@@ -10,6 +10,7 @@ import edgeE from '@/assets/block/edge-e.png'
 import edgeN from '@/assets/block/edge-n.png'
 import edgeS from '@/assets/block/edge-s.png'
 import edgeW from '@/assets/block/edge-w.png'
+import { snowyAsset } from '@/utils/snow'
 import { Show } from 'solid-js'
 import { type SignType, TitleSign } from './TitleSign'
 
@@ -25,20 +26,20 @@ export function FieldBlock(props: {
 				{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 				<TitleSign title={props.title!} type={props.signType} />
 			</Show>
-			<div style={{ 'background-image': `url(${cornerNW})` }} />
-			<div style={{ 'background-image': `url(${edgeN})` }} />
-			<div style={{ 'background-image': `url(${cornerNE})` }} />
-			<div style={{ 'background-image': `url(${edgeW})` }} />
+			<div style={{ 'background-image': `url(${snowyAsset(cornerNW)})` }} />
+			<div style={{ 'background-image': `url(${snowyAsset(edgeN)})` }} />
+			<div style={{ 'background-image': `url(${snowyAsset(cornerNE)})` }} />
+			<div style={{ 'background-image': `url(${snowyAsset(edgeW)})` }} />
 			<div
-				style={{ 'background-image': `url(${center})` }}
+				style={{ 'background-image': `url(${snowyAsset(center)})` }}
 				class={cx(props.title && styles.center)}
 			>
 				{props.children}
 			</div>
-			<div style={{ 'background-image': `url(${edgeE})` }} />
-			<div style={{ 'background-image': `url(${cornerSW})` }} />
-			<div style={{ 'background-image': `url(${edgeS})` }} />
-			<div style={{ 'background-image': `url(${cornerSE})` }} />
+			<div style={{ 'background-image': `url(${snowyAsset(edgeE)})` }} />
+			<div style={{ 'background-image': `url(${snowyAsset(cornerSW)})` }} />
+			<div style={{ 'background-image': `url(${snowyAsset(edgeS)})` }} />
+			<div style={{ 'background-image': `url(${snowyAsset(cornerSE)})` }} />
 		</div>
 	)
 }

@@ -31,6 +31,7 @@ import {
 	onMount,
 } from 'solid-js'
 import { NotFoundPage } from './NotFoundPage'
+import { snowyAsset } from '@/utils/snow'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -182,7 +183,7 @@ const END_POINTS = [
 
 const TREE_ASSETS = [
 	{ src: tree1Asset, isShrub: false },
-	{ src: tree2Asset, isShrub: false },
+	{ src: snowyAsset(tree2Asset), isShrub: false },
 	{ src: shrub1Asset, isShrub: true },
 	{ src: shrub2Asset, isShrub: true },
 ]

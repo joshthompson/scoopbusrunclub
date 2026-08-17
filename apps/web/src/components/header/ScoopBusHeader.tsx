@@ -27,6 +27,7 @@ import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { moonAsset } from '@/utils/moonAsset'
+import { snowyAsset } from '@/utils/snow'
 import type { WeatherType } from '@/utils/weather'
 import { useNavigate } from '@solidjs/router'
 import { css } from '@style/css'
@@ -485,23 +486,41 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		<div aria-label="Welcome to the Scoop Bus Run Club!">
 			<div aria-hidden="true" class={styles.root}>
 				<div class={styles.underlay}>
-					<div class={styles.path} style={{ '--image': `url(${pathAsset})` }} />
-					<div class={styles.bg1} style={{ '--image': `url(${bg1Asset})` }} />
-					<div class={styles.bg2} style={{ '--image': `url(${bg2Asset})` }} />
+					<div
+						class={styles.path}
+						style={{ '--image': `url(${snowyAsset(pathAsset)})` }}
+					/>
+					<div
+						class={styles.bg1}
+						style={{ '--image': `url(${snowyAsset(bg1Asset)})` }}
+					/>
+					<div
+						class={styles.bg2}
+						style={{ '--image': `url(${snowyAsset(bg2Asset)})` }}
+					/>
 					<div
 						class={styles.house2}
-						style={{ '--image': `url(${house2Asset})` }}
+						style={{ '--image': `url(${snowyAsset(house2Asset)})` }}
 					/>
 					<div
 						class={styles.house1}
-						style={{ '--image': `url(${house1Asset})` }}
+						style={{ '--image': `url(${snowyAsset(house1Asset)})` }}
 					/>
-					<div class={styles.bg3} style={{ '--image': `url(${bg3Asset})` }} />
-					<div class={styles.sun} style={{ '--image': `url(${sunAsset})` }} />
-					<div class={styles.moon} style={{ '--image': `url(${moonAsset})` }} />
+					<div
+						class={styles.bg3}
+						style={{ '--image': `url(${snowyAsset(bg3Asset)})` }}
+					/>
+					<div
+						class={styles.sun}
+						style={{ '--image': `url(${snowyAsset(sunAsset)})` }}
+					/>
+					<div
+						class={styles.moon}
+						style={{ '--image': `url(${snowyAsset(moonAsset)})` }}
+					/>
 					<div
 						class={styles.stars}
-						style={{ '--image': `url(${starsAsset})` }}
+						style={{ '--image': `url(${snowyAsset(starsAsset)})` }}
 					/>
 					<div
 						class={styles.sky}

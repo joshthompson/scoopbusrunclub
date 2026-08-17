@@ -1,3 +1,4 @@
+import { snowyAsset } from '@/utils/snow'
 import type { Accessor, Component, JSX } from 'solid-js'
 import type { Controller } from './Controller'
 import type { Canvas, CanvasControllers } from './components/Canvas'
@@ -170,7 +171,8 @@ export class Scene<C extends Controller<any> = Controller<any>> {
 		const frameAssets = this.controllers
 			.get()
 			.flatMap(({ controller }) => controller.frames ?? [])
-			.map((frame) => frame.split('#')[0])
+			// Preload whichever variant Sprite will actually render
+			.map((frame) => snowyAsset(frame.split('#')[0]))
 
 		const imageAssets = [
 			...new Set([...frameAssets, ...(this.options.images ?? [])]),

@@ -140,6 +140,12 @@ html {
 	font-variation-settings: "wdth" 100;
 }
 
+body.snow {
+	--grass-green: #f4f9fa;
+	--grass-dark-green: #e5eaeb;
+	--grass-darker-green: #d4dadb;
+}
+
 body {
 	background-color: var(--sky-blue-top);
 	transition: background-color 0.1s linear;

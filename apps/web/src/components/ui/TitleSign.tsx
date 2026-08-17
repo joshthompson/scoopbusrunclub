@@ -1,5 +1,6 @@
 import purpleSign from '@/assets/misc/purple-sign.png'
 import woodenSign from '@/assets/misc/wooden-sign.png'
+import { snowyAsset } from '@/utils/snow'
 import { cva } from '@style/css'
 import { createEffect, createSignal } from 'solid-js'
 
@@ -10,7 +11,8 @@ export function TitleSign(props: {
 	type?: SignType
 }) {
 	const type = () => props.type ?? 'wooden'
-	const signImage = () => (type() === 'wooden' ? woodenSign : purpleSign)
+	const signImage = () =>
+		snowyAsset(type() === 'wooden' ? woodenSign : purpleSign)
 
 	let innerRef!: HTMLDivElement
 	const [fontSize, setFontSize] = createSignal<string | undefined>(undefined)

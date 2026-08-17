@@ -7,6 +7,7 @@ import right from '@/assets/dirt-block/right.png'
 import topLeft from '@/assets/dirt-block/top-left.png'
 import topRight from '@/assets/dirt-block/top-right.png'
 import top from '@/assets/dirt-block/top.png'
+import { snowyAsset } from '@/utils/snow'
 import { css, cva, cx } from '@style/css'
 import { Show } from 'solid-js'
 import type { JSX } from 'solid-js/jsx-runtime'
@@ -24,35 +25,41 @@ export function DirtBlock(props: {
 				{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 				<TitleSign title={props.title!} type={props.signType} />
 			</Show>
-			<div class={styles.top} style={{ 'background-image': `url(${top})` }} />
+			<div
+				class={styles.top}
+				style={{ 'background-image': `url(${snowyAsset(top)})` }}
+			/>
 			<div
 				class={styles.topLeft}
-				style={{ 'background-image': `url(${topLeft})` }}
+				style={{ 'background-image': `url(${snowyAsset(topLeft)})` }}
 			/>
 			<div
 				class={styles.topRight}
-				style={{ 'background-image': `url(${topRight})` }}
+				style={{ 'background-image': `url(${snowyAsset(topRight)})` }}
 			/>
 			<div
 				class={styles.center}
-				style={{ 'background-image': `url(${center})` }}
+				style={{ 'background-image': `url(${snowyAsset(center)})` }}
 			/>
-			<div class={styles.left} style={{ 'background-image': `url(${left})` }} />
+			<div
+				class={styles.left}
+				style={{ 'background-image': `url(${snowyAsset(left)})` }}
+			/>
 			<div
 				class={styles.right}
-				style={{ 'background-image': `url(${right})` }}
+				style={{ 'background-image': `url(${snowyAsset(right)})` }}
 			/>
 			<div
 				class={styles.bottom}
-				style={{ 'background-image': `url(${bottom})` }}
+				style={{ 'background-image': `url(${snowyAsset(bottom)})` }}
 			/>
 			<div
 				class={styles.bottomLeft}
-				style={{ 'background-image': `url(${bottomLeft})` }}
+				style={{ 'background-image': `url(${snowyAsset(bottomLeft)})` }}
 			/>
 			<div
 				class={styles.bottomRight}
-				style={{ 'background-image': `url(${bottomRight})` }}
+				style={{ 'background-image': `url(${snowyAsset(bottomRight)})` }}
 			/>
 			<div class={styles.content({ withTitle: !!props.title })}>
 				{props.children}
