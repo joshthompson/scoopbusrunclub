@@ -19,31 +19,25 @@ import { SCOOP_BUS_CLUB_NAME, largestClubMessage } from '../utils/largestClubs'
 
 /**
  * Snapshots are weekly, but a week's scrape can be missed — at which point the
- * gain spans more than a week and the heading alone would mislead. So the
+ * bracketed change spans more than a week and "this week" would mislead. So the
  * tooltip names the week actually being compared against, and says how far back
  * it is when that isn't seven days.
  */
 function buildColumns(week: string | null, previousWeek: string | null) {
-	let thisWeekInfo = 'Runs added since the previous snapshot'
+	let changeInfo = 'In brackets: change since the previous snapshot'
 	if (week && previousWeek) {
 		const weeks = Math.round(weeksBetween(previousWeek, week))
-		thisWeekInfo =
+		changeInfo =
 			weeks === 1
-				? `Runs added since ${previousWeek}`
-				: `Runs added since ${previousWeek} — ${weeks} weeks back, the last snapshot before this one`
+				? `In brackets: change since ${previousWeek}`
+				: `In brackets: change since ${previousWeek} — ${weeks} weeks back, the last snapshot before this one`
 	}
 
 	return [
 		{ id: 'rank', title: '#', width: '3rem', sortable: true },
 		{ id: 'name', title: 'Club', sortable: true },
-		{ id: 'members', title: 'Members', sortable: true },
-		{ id: 'runs', title: 'Runs', sortable: true },
-		{
-			id: 'thisWeek',
-			title: 'This Week',
-			info: thisWeekInfo,
-			sortable: true,
-		},
+		{ id: 'members', title: 'Members', info: changeInfo, sortable: true },
+		{ id: 'runs', title: 'Runs', info: changeInfo, sortable: true },
 		// The window comes from the same constant the projection uses, so the
 		// tooltip can't drift from the maths behind the column.
 		{
@@ -55,8 +49,14 @@ function buildColumns(week: string | null, previousWeek: string | null) {
 	]
 }
 
-type SortKey = 'rank' | 'name' | 'members' | 'runs' | 'thisWeek' | 'rate'
+type SortKey = 'rank' | 'name' | 'members' | 'runs' | 'rate'
 type SortDir = 'asc' | 'desc'
+
+/** What a club gained since its previous snapshot. */
+interface Change {
+	events: number
+	members: number
+}
 
 /** One club's line in the latest standings, before it becomes table cells. */
 interface Standing {
@@ -65,8 +65,8 @@ interface Standing {
 	name: string
 	members: number
 	events: number
-	/** Runs added since the previous snapshot, or null with nothing to compare to. */
-	thisWeek: number | null
+	/** Gains since the previous snapshot, or null with nothing to compare to. */
+	change: Change | null
 	/** Runs per week, or null when there isn't enough history to say. */
 	rate: number | null
 }
@@ -80,9 +80,6 @@ function compareStandings(key: SortKey, a: Standing, b: Standing): number {
 			return a.members - b.members
 		case 'runs':
 			return a.events - b.events
-		case 'thisWeek':
-			// Nulls are handled before this runs.
-			return (a.thisWeek ?? 0) - (b.thisWeek ?? 0)
 		case 'rate':
 			// Nulls are filtered out before this runs.
 			return (a.rate ?? 0) - (b.rate ?? 0)
@@ -90,20 +87,6 @@ function compareStandings(key: SortKey, a: Standing, b: Standing): number {
 			// Ascending by rank is the league order: first place at the top.
 			return a.rank - b.rank
 	}
-}
-
-/**
- * The value of a column that can be missing, or undefined for the columns that
- * always have one. Lets the sort push "—" rows to the bottom without caring
- * which of the nullable columns is being sorted on.
- */
-function nullableValue(
-	key: SortKey,
-	standing: Standing,
-): number | null | undefined {
-	if (key === 'rate') return standing.rate
-	if (key === 'thisWeek') return standing.thisWeek
-	return undefined
 }
 
 /** Club name cell — our own club stands out from the rest of the table. */
@@ -124,16 +107,16 @@ function rateCell(rate: number | null) {
 }
 
 /**
- * Runs a club added since its previous snapshot.
+ * What a club gained since its previous snapshot.
  *
  * Measured against the previous snapshot we actually hold rather than the date
  * exactly a week back, because a week's scrape can be missed. Null when there's
  * no earlier snapshot for the club, which is a different thing from no gain.
  */
-function runsThisWeek(
+function changeSincePrevious(
 	snapshots: LargestClubSnapshot[],
 	week: string,
-): number | null {
+): Change | null {
 	let current: LargestClubSnapshot | undefined
 	let previous: LargestClubSnapshot | undefined
 	for (const snapshot of snapshots) {
@@ -147,18 +130,32 @@ function runsThisWeek(
 		}
 	}
 	if (current === undefined || previous === undefined) return null
-	return current.events - previous.events
+	return {
+		events: current.events - previous.events,
+		members: current.members - previous.members,
+	}
+}
+
+/** "(+15)", "(−3)" — signed, so it reads as a change and not another total. */
+function changeLabel(change: number) {
+	return `(${change > 0 ? '+' : '−'}${Math.abs(change).toLocaleString()})`
 }
 
 /**
- * The week's gain, signed so it reads as a change rather than another total.
- * An em dash where there's no earlier snapshot, matching the rate column.
+ * A total with its change since the previous snapshot — "2,192 (+10)".
+ *
+ * A club that didn't move gets no bracket at all. Most clubs gain no members in
+ * a week, and a column of "(0)" buries the few that did move under noise —
+ * which is the one thing the bracket is there to show.
  */
-function thisWeekCell(delta: number | null) {
-	if (delta === null) return '—'
-	if (delta === 0) return '0'
-	const sign = delta > 0 ? '+' : '−'
-	return `${sign}${Math.abs(delta).toLocaleString()}`
+function totalCell(total: number, change: number | null) {
+	if (change === null || change === 0) return total.toLocaleString()
+	return (
+		<>
+			{total.toLocaleString()}{' '}
+			<span class={styles.change}>{changeLabel(change)}</span>
+		</>
+	)
 }
 
 /**
@@ -202,7 +199,7 @@ export function LargestClubsPage() {
 			'',
 		)
 
-		// The week the "This Week" column is measured against, for its tooltip. Most
+		// The week the bracketed changes are measured against, for the tooltip. Most
 		// clubs compare against this one, though a club missing from it falls back
 		// to whatever it does have.
 		const previousWeek =
@@ -232,7 +229,7 @@ export function LargestClubsPage() {
 				name: snapshot.name,
 				members: snapshot.members,
 				events: snapshot.events,
-				thisWeek: runsThisWeek(history.get(snapshot.name) ?? [], week),
+				change: changeSincePrevious(history.get(snapshot.name) ?? [], week),
 				// The same function the projection uses, over the same window — the
 				// column's tooltip promises as much.
 				rate: averageWeeklyEvents(history.get(snapshot.name) ?? [], week),
@@ -253,23 +250,20 @@ export function LargestClubsPage() {
 
 		return [...latest().standings]
 			.sort((a, b) => {
-				// A club with too little history has no rate or weekly gain at all.
-				// Those rows sit at the bottom whichever way the column is sorted,
-				// rather than an em dash leading the table as the smallest number.
-				const aValue = nullableValue(key, a)
-				const bValue = nullableValue(key, b)
-				if (aValue === null || bValue === null) {
-					if (aValue === bValue) return a.rank - b.rank
-					return aValue === null ? 1 : -1
+				// A club with too little history has no rate at all. Those rows sit at
+				// the bottom whichever way the column is sorted, rather than an em dash
+				// leading the table as if it were the smallest number.
+				if (key === 'rate' && (a.rate === null || b.rate === null)) {
+					if (a.rate === b.rate) return a.rank - b.rank
+					return a.rate === null ? 1 : -1
 				}
 				return compareStandings(key, a, b) * direction || a.rank - b.rank
 			})
 			.map((standing) => [
 				`${standing.rank}`,
 				clubCell(standing.name),
-				standing.members.toLocaleString(),
-				standing.events.toLocaleString(),
-				thisWeekCell(standing.thisWeek),
+				totalCell(standing.members, standing.change?.members ?? null),
+				totalCell(standing.events, standing.change?.events ?? null),
 				rateCell(standing.rate),
 			])
 	})
@@ -327,6 +321,12 @@ const styles = {
 		fontSize: '0.8rem',
 		opacity: 0.7,
 		mb: '0.5rem',
+	}),
+	/** The bracketed change is secondary to the total it sits beside. */
+	change: css({
+		fontSize: '0.8em',
+		opacity: 0.7,
+		whiteSpace: 'nowrap',
 	}),
 	loading: css({
 		textAlign: 'center',
