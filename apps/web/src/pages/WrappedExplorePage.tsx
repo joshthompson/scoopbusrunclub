@@ -35,6 +35,61 @@ const SLIDE_MS = 4500
 const BACK_ZONE = 0.33
 
 /**
+ * Wrapped's own preference, deliberately separate from the game's music: the two
+ * are unrelated surfaces and shouldn't reach into each other's settings.
+ *
+ * Not under the `sbrc:` prefix either — `wipeAllCache` clears that whole
+ * namespace on a cache-version bump, which would quietly un-mute the music.
+ */
+const MUSIC_MUTED_KEY = 'sbrc-wrapped-music-muted'
+
+/** Background, not foreground — the story is the thing being watched. */
+const MUSIC_VOLUME = 0.4
+
+/** A year gets one of the two tracks, so consecutive years don't sound alike. */
+function trackForYear(year: number): string {
+	return year % 2 === 0 ? '/audio/JzzFpCOaCic.mp3' : '/audio/9waDB_HmNvs.mp3'
+}
+
+function readMuted(): boolean {
+	try {
+		return localStorage.getItem(MUSIC_MUTED_KEY) === '1'
+	} catch {
+		return false
+	}
+}
+
+function storeMuted(muted: boolean) {
+	try {
+		localStorage.setItem(MUSIC_MUTED_KEY, muted ? '1' : '0')
+	} catch {
+		// Private mode or a full store — the preference just won't persist.
+	}
+}
+
+/**
+ * Ramp the track down and stop it.
+ *
+ * The last slide exits by navigating to the scrolling page, and music cutting
+ * dead on that step is jarring. The element and timer are held by this closure
+ * rather than the component, so the fade finishes after the story has gone.
+ */
+function fadeOutAndStop(element: HTMLAudioElement) {
+	const FADE_MS = 600
+	const TICK_MS = 50
+	const step = element.volume / (FADE_MS / TICK_MS)
+	const fade = setInterval(() => {
+		const next = element.volume - step
+		if (next <= 0.01) {
+			clearInterval(fade)
+			element.pause()
+			return
+		}
+		element.volume = next
+	}, TICK_MS)
+}
+
+/**
  * Wrapped as an Instagram-style story: one slide at a time on a bright
  * gradient, auto-advancing, ending on the scrolling `/wrapped/:year` page.
  * Slides come from the same builder the scrolling page uses.
@@ -115,6 +170,61 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 		}, SLIDE_MS)
 		onCleanup(() => clearTimeout(timer))
 	})
+
+	// --- Background music ---
+
+	const [muted, setMuted] = createSignal(readMuted())
+	/** True when the browser refused to autoplay, so the button can invite a tap. */
+	const [autoplayBlocked, setAutoplayBlocked] = createSignal(false)
+	const [audio, setAudio] = createSignal<HTMLAudioElement>()
+
+	// The element, rebuilt only when the year changes — so pressing mute doesn't
+	// restart the track from the top.
+	createEffect(() => {
+		const element = new Audio(trackForYear(year()))
+		// A story can outlast a track, and silence halfway through reads as broken.
+		element.loop = true
+		element.volume = MUSIC_VOLUME
+		setAudio(element)
+		onCleanup(() => {
+			setAudio(undefined)
+			fadeOutAndStop(element)
+		})
+	})
+
+	// Playback follows the mute preference. Autoplay with sound is only allowed
+	// once the user has interacted with the site — normally true, since a story is
+	// reached by tapping a link, but not when the URL is opened cold.
+	createEffect(() => {
+		const element = audio()
+		if (!element) return
+		if (muted()) {
+			element.pause()
+			return
+		}
+		element
+			.play()
+			.then(() => setAutoplayBlocked(false))
+			.catch(() => setAutoplayBlocked(true))
+	})
+
+	/** No sound is coming out, whether that's the preference or the browser. */
+	const silent = () => muted() || autoplayBlocked()
+
+	const toggleMusic = () => {
+		// Blocked rather than muted: this tap is the gesture the browser wanted, so
+		// take it as "start the music" instead of flipping the preference to off.
+		if (autoplayBlocked() && !muted()) {
+			audio()
+				?.play()
+				.then(() => setAutoplayBlocked(false))
+				.catch(() => {})
+			return
+		}
+		const next = !muted()
+		setMuted(next)
+		storeMuted(next)
+	}
 
 	// Keyboard control, so the story is navigable off a touchscreen too.
 	createEffect(() => {
@@ -199,6 +309,15 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 
 				<button
 					type="button"
+					class={styles.music}
+					onClick={toggleMusic}
+					aria-label={silent() ? 'Play music' : 'Mute music'}
+				>
+					{silent() ? '🔇' : '🔊'}
+				</button>
+
+				<button
+					type="button"
 					class={styles.close}
 					onClick={exit}
 					aria-label="Close"
@@ -237,6 +356,25 @@ const TAP_ZONE = {
 	background: 'transparent',
 	cursor: 'pointer',
 	padding: 0,
+} as const
+
+/** The round controls in the top corner, above the tap zones so they're pressable. */
+const OVERLAY_BUTTON = {
+	position: 'absolute',
+	top: 'max(1.5rem, calc(env(safe-area-inset-top) + 0.75rem))',
+	zIndex: 2,
+	appearance: 'none',
+	border: 'none',
+	background: 'rgba(0,0,0,0.25)',
+	color: 'var(--color-white)',
+	fontSize: '1.1rem',
+	lineHeight: 1,
+	width: '2rem',
+	height: '2rem',
+	borderRadius: '50%',
+	cursor: 'pointer',
+	display: 'grid',
+	placeItems: 'center',
 } as const
 
 const styles = {
@@ -355,23 +493,14 @@ const styles = {
 		animation: `storyProgress ${SLIDE_MS}ms linear forwards`,
 	}),
 	close: css({
-		position: 'absolute',
-		top: 'max(1.5rem, calc(env(safe-area-inset-top) + 0.75rem))',
+		...OVERLAY_BUTTON,
 		right: '0.9rem',
-		// Above the tap zones, so it can actually be pressed.
-		zIndex: 2,
-		appearance: 'none',
-		border: 'none',
-		background: 'rgba(0,0,0,0.25)',
-		color: 'var(--color-white)',
-		fontSize: '1.1rem',
-		lineHeight: 1,
-		width: '2rem',
-		height: '2rem',
-		borderRadius: '50%',
-		cursor: 'pointer',
-		display: 'grid',
-		placeItems: 'center',
+	}),
+	music: css({
+		...OVERLAY_BUTTON,
+		// Sits just inside the close button, which keeps the corner.
+		right: '3.4rem',
+		fontSize: '1rem',
 	}),
 	tapBack: css({
 		...TAP_ZONE,
