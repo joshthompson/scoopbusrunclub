@@ -6,6 +6,7 @@ import { Table } from '@/components/ui/Table'
 import {
 	RATE_WINDOW_WEEKS,
 	averageWeeklyEvents,
+	weeksBetween,
 } from '@shared/largest-clubs-rate'
 import { css } from '@style/css'
 import { Show, createMemo, createResource, createSignal } from 'solid-js'
@@ -16,22 +17,45 @@ import {
 } from '../utils/api'
 import { SCOOP_BUS_CLUB_NAME, largestClubMessage } from '../utils/largestClubs'
 
-const COLUMNS = [
-	{ id: 'rank', title: '#', width: '3rem', sortable: true },
-	{ id: 'name', title: 'Club', sortable: true },
-	{ id: 'members', title: 'Members', sortable: true },
-	{ id: 'runs', title: 'Runs', sortable: true },
-	// The window comes from the same constant the projection uses, so the tooltip
-	// can't drift from the maths behind the column.
-	{
-		id: 'rate',
-		title: 'Avg/week',
-		info: `Average over the last ${RATE_WINDOW_WEEKS} weeks`,
-		sortable: true,
-	},
-]
+/**
+ * Snapshots are weekly, but a week's scrape can be missed — at which point the
+ * gain spans more than a week and the heading alone would mislead. So the
+ * tooltip names the week actually being compared against, and says how far back
+ * it is when that isn't seven days.
+ */
+function buildColumns(week: string | null, previousWeek: string | null) {
+	let thisWeekInfo = 'Runs added since the previous snapshot'
+	if (week && previousWeek) {
+		const weeks = Math.round(weeksBetween(previousWeek, week))
+		thisWeekInfo =
+			weeks === 1
+				? `Runs added since ${previousWeek}`
+				: `Runs added since ${previousWeek} — ${weeks} weeks back, the last snapshot before this one`
+	}
 
-type SortKey = 'rank' | 'name' | 'members' | 'runs' | 'rate'
+	return [
+		{ id: 'rank', title: '#', width: '3rem', sortable: true },
+		{ id: 'name', title: 'Club', sortable: true },
+		{ id: 'members', title: 'Members', sortable: true },
+		{ id: 'runs', title: 'Runs', sortable: true },
+		{
+			id: 'thisWeek',
+			title: 'This Week',
+			info: thisWeekInfo,
+			sortable: true,
+		},
+		// The window comes from the same constant the projection uses, so the
+		// tooltip can't drift from the maths behind the column.
+		{
+			id: 'rate',
+			title: 'Avg/week',
+			info: `Average over the last ${RATE_WINDOW_WEEKS} weeks`,
+			sortable: true,
+		},
+	]
+}
+
+type SortKey = 'rank' | 'name' | 'members' | 'runs' | 'thisWeek' | 'rate'
 type SortDir = 'asc' | 'desc'
 
 /** One club's line in the latest standings, before it becomes table cells. */
@@ -41,6 +65,8 @@ interface Standing {
 	name: string
 	members: number
 	events: number
+	/** Runs added since the previous snapshot, or null with nothing to compare to. */
+	thisWeek: number | null
 	/** Runs per week, or null when there isn't enough history to say. */
 	rate: number | null
 }
@@ -54,6 +80,9 @@ function compareStandings(key: SortKey, a: Standing, b: Standing): number {
 			return a.members - b.members
 		case 'runs':
 			return a.events - b.events
+		case 'thisWeek':
+			// Nulls are handled before this runs.
+			return (a.thisWeek ?? 0) - (b.thisWeek ?? 0)
 		case 'rate':
 			// Nulls are filtered out before this runs.
 			return (a.rate ?? 0) - (b.rate ?? 0)
@@ -61,6 +90,20 @@ function compareStandings(key: SortKey, a: Standing, b: Standing): number {
 			// Ascending by rank is the league order: first place at the top.
 			return a.rank - b.rank
 	}
+}
+
+/**
+ * The value of a column that can be missing, or undefined for the columns that
+ * always have one. Lets the sort push "—" rows to the bottom without caring
+ * which of the nullable columns is being sorted on.
+ */
+function nullableValue(
+	key: SortKey,
+	standing: Standing,
+): number | null | undefined {
+	if (key === 'rate') return standing.rate
+	if (key === 'thisWeek') return standing.thisWeek
+	return undefined
 }
 
 /** Club name cell — our own club stands out from the rest of the table. */
@@ -78,6 +121,44 @@ function clubCell(name: string) {
 function rateCell(rate: number | null) {
 	if (rate === null) return '—'
 	return rate.toLocaleString(undefined, { maximumFractionDigits: 2 })
+}
+
+/**
+ * Runs a club added since its previous snapshot.
+ *
+ * Measured against the previous snapshot we actually hold rather than the date
+ * exactly a week back, because a week's scrape can be missed. Null when there's
+ * no earlier snapshot for the club, which is a different thing from no gain.
+ */
+function runsThisWeek(
+	snapshots: LargestClubSnapshot[],
+	week: string,
+): number | null {
+	let current: LargestClubSnapshot | undefined
+	let previous: LargestClubSnapshot | undefined
+	for (const snapshot of snapshots) {
+		if (snapshot.week === week) {
+			current = snapshot
+		} else if (
+			snapshot.week < week &&
+			(previous === undefined || snapshot.week > previous.week)
+		) {
+			previous = snapshot
+		}
+	}
+	if (current === undefined || previous === undefined) return null
+	return current.events - previous.events
+}
+
+/**
+ * The week's gain, signed so it reads as a change rather than another total.
+ * An em dash where there's no earlier snapshot, matching the rate column.
+ */
+function thisWeekCell(delta: number | null) {
+	if (delta === null) return '—'
+	if (delta === 0) return '0'
+	const sign = delta > 0 ? '+' : '−'
+	return `${sign}${Math.abs(delta).toLocaleString()}`
 }
 
 /**
@@ -112,12 +193,27 @@ export function LargestClubsPage() {
 	/** The most recent week's table in full — the graph only plots the top few. */
 	const latest = createMemo(() => {
 		const data = snapshots() ?? []
-		if (data.length === 0) return { week: null, standings: [] as Standing[] }
+		if (data.length === 0) {
+			return { week: null, previousWeek: null, standings: [] as Standing[] }
+		}
 
 		const week = data.reduce(
 			(newest, snapshot) => (snapshot.week > newest ? snapshot.week : newest),
 			'',
 		)
+
+		// The week the "This Week" column is measured against, for its tooltip. Most
+		// clubs compare against this one, though a club missing from it falls back
+		// to whatever it does have.
+		const previousWeek =
+			data
+				.map((snapshot) => snapshot.week)
+				.filter((candidate) => candidate < week)
+				.reduce<string | null>(
+					(newest, candidate) =>
+						newest === null || candidate > newest ? candidate : newest,
+					null,
+				) ?? null
 
 		// Each club's rate needs its own history, so index every snapshot by club
 		// before walking the latest week.
@@ -136,12 +232,13 @@ export function LargestClubsPage() {
 				name: snapshot.name,
 				members: snapshot.members,
 				events: snapshot.events,
+				thisWeek: runsThisWeek(history.get(snapshot.name) ?? [], week),
 				// The same function the projection uses, over the same window — the
 				// column's tooltip promises as much.
 				rate: averageWeeklyEvents(history.get(snapshot.name) ?? [], week),
 			}))
 
-		return { week, standings }
+		return { week, previousWeek, standings }
 	})
 
 	/**
@@ -156,12 +253,14 @@ export function LargestClubsPage() {
 
 		return [...latest().standings]
 			.sort((a, b) => {
-				// A club with too little history has no rate at all. Those rows sit at
-				// the bottom whichever way the column is sorted, rather than an em dash
-				// leading the table as if it were the smallest number.
-				if (key === 'rate' && (a.rate === null || b.rate === null)) {
-					if (a.rate === b.rate) return a.rank - b.rank
-					return a.rate === null ? 1 : -1
+				// A club with too little history has no rate or weekly gain at all.
+				// Those rows sit at the bottom whichever way the column is sorted,
+				// rather than an em dash leading the table as the smallest number.
+				const aValue = nullableValue(key, a)
+				const bValue = nullableValue(key, b)
+				if (aValue === null || bValue === null) {
+					if (aValue === bValue) return a.rank - b.rank
+					return aValue === null ? 1 : -1
 				}
 				return compareStandings(key, a, b) * direction || a.rank - b.rank
 			})
@@ -170,6 +269,7 @@ export function LargestClubsPage() {
 				clubCell(standing.name),
 				standing.members.toLocaleString(),
 				standing.events.toLocaleString(),
+				thisWeekCell(standing.thisWeek),
 				rateCell(standing.rate),
 			])
 	})
@@ -196,7 +296,7 @@ export function LargestClubsPage() {
 						{(week) => <p class={styles.week}>Snapshot taken {week()}</p>}
 					</Show>
 					<Table
-						columns={COLUMNS}
+						columns={buildColumns(latest().week, latest().previousWeek)}
 						data={rows()}
 						empty="No snapshots have been taken yet."
 						sortKey={sortKey()}

@@ -1,7 +1,7 @@
 import { generateFrames } from '@/utils'
+import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import { type Accessor, type Setter, createSignal } from 'solid-js'
 import * as assets from './runner-assets'
-import { createRunnerFrames } from '@/utils/createRunnerFrames'
 
 export const RUNNER_SIZE = 2
 export const FRAME_COUNT = 4
@@ -45,6 +45,7 @@ export interface RunnerData {
 	id: string
 	'5verstId'?: string
 	birthday: Birthday // Format: DD/MM
+	joined: number // The year the runner joined the club (2025 = Founding member, >2025 = New member)
 	frames: {
 		run: string[] | undefined
 		sit: string[] | undefined
@@ -86,6 +87,7 @@ export const runners: Record<
 		id: '8070821',
 		'5verstId': '790281221',
 		birthday: '15/08',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.joshRun,
@@ -114,6 +116,7 @@ export const runners: Record<
 		name: 'Keith',
 		id: '5635044',
 		birthday: '01/08',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.keithRun,
@@ -142,6 +145,7 @@ export const runners: Record<
 		name: 'Claire',
 		id: '377595',
 		birthday: '06/06',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.claireRun,
@@ -177,6 +181,7 @@ export const runners: Record<
 		name: 'Lyra',
 		id: '8009111',
 		birthday: '00/00',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.lyraRun,
@@ -212,6 +217,7 @@ export const runners: Record<
 		name: 'Adam',
 		id: '7758658',
 		birthday: '12/05',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.adamRun,
@@ -240,6 +246,7 @@ export const runners: Record<
 		name: 'Anna',
 		id: '850764',
 		birthday: '02/12',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.annaRun,
@@ -275,6 +282,7 @@ export const runners: Record<
 		name: 'Eline',
 		id: '8943925',
 		birthday: '06/12',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.elineRun,
@@ -303,6 +311,7 @@ export const runners: Record<
 		name: 'Rick',
 		id: '9679233',
 		birthday: '10/08',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.rickRun,
@@ -331,6 +340,7 @@ export const runners: Record<
 		name: 'Sophie',
 		id: '6076813',
 		birthday: '28/11',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.sophieRun,
@@ -359,6 +369,7 @@ export const runners: Record<
 		name: 'August',
 		id: '545803',
 		birthday: '02/12',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.augustRun,
@@ -388,6 +399,7 @@ export const runners: Record<
 		id: '10663604',
 		'5verstId': '790281220',
 		birthday: '22/11',
+		joined: 2025,
 		frames: {
 			run: generateFrames(
 				assets.alisaRun,
@@ -423,6 +435,7 @@ export const runners: Record<
 		name: 'Link',
 		id: '', // Uses Alisa's speed/data
 		birthday: '09/03',
+		joined: 2025,
 		frames: {
 			run: generateFrames(assets.linkRun, 20 * 2, 28, 20 * 2, 2, true),
 			sit: [assets.linkSit],
@@ -461,6 +474,7 @@ export const runners: Record<
 		],
 		id: '5346109',
 		birthday: '02/07',
+		joined: 2026,
 		frames: {
 			run: generateFrames(
 				assets.otherJoshRun,
@@ -489,6 +503,7 @@ export const runners: Record<
 		name: 'Mikael',
 		id: '9854274',
 		birthday: '01/01',
+		joined: 2026,
 		frames: {
 			run: generateFrames(
 				assets.mikaelRun,
@@ -517,6 +532,7 @@ export const runners: Record<
 		name: 'Mia',
 		id: '8398883',
 		birthday: '22/02',
+		joined: 2026,
 		...createRunnerFrames({
 			topType: 'tshirt',
 			skin: 'light',
@@ -537,6 +553,7 @@ export const runners: Record<
 		name: 'David',
 		id: '3710502',
 		birthday: '04/04',
+		joined: 2026,
 		...createRunnerFrames({
 			topType: 'tshirt',
 			skin: 'light',

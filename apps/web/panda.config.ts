@@ -63,6 +63,22 @@ export default defineConfig({
 				'0%, 100%': { transform: 'scaleX(1)', opacity: 0.1 },
 				'50%': { transform: 'scaleX(1.3)', opacity: 0.06 },
 			},
+			// --- Wrapped "explore" stories ---
+			/** The progress bar segment filling across while a slide is showing. */
+			storyProgress: {
+				from: { transform: 'scaleX(0)' },
+				to: { transform: 'scaleX(1)' },
+			},
+			/** Each slide's content rising into place as it becomes active. */
+			storySlideIn: {
+				from: { opacity: 0, transform: 'translateY(24px) scale(0.97)' },
+				to: { opacity: 1, transform: 'translateY(0) scale(1)' },
+			},
+			/** The gradient behind the slide, fading up under the content. */
+			storyBackdropIn: {
+				from: { opacity: 0 },
+				to: { opacity: 1 },
+			},
 		},
 	},
 

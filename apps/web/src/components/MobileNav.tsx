@@ -177,7 +177,7 @@ const BAR_HEIGHT = 58
  * showing, so a floor keeps the outer icons off the screen's rounded corners
  * either way; the same reasoning applies to the sides in landscape.
  */
-const BOTTOM_INSET = 'max(env(safe-area-inset-bottom), 12px)'
+const BOTTOM_INSET = '8px' // 'max(env(safe-area-inset-bottom), 12px)'
 const LEFT_INSET = 'max(env(safe-area-inset-left), 8px)'
 const RIGHT_INSET = 'max(env(safe-area-inset-right), 8px)'
 
@@ -202,7 +202,6 @@ const styles = {
 		display: 'flex',
 		alignItems: 'stretch',
 		height: MOBILE_NAV_SPACE,
-		paddingBottom: BOTTOM_INSET,
 		paddingLeft: LEFT_INSET,
 		paddingRight: RIGHT_INSET,
 		background: 'var(--dirt-control)',
@@ -223,7 +222,8 @@ const styles = {
 		color: 'var(--color-white)',
 		textDecoration: 'none',
 		cursor: 'pointer',
-		padding: '2px 0',
+		paddingTop: '2px',
+		paddingBottom: BOTTOM_INSET,
 		_active: { background: 'var(--overlay-white-10)' },
 	}),
 	itemActive: css({

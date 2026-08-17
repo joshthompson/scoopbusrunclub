@@ -49,6 +49,7 @@ import { MemberPage } from './pages/MemberPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ReplayPage } from './pages/ReplayPage'
 import { StopwatchBingoPage } from './pages/StopwatchBingoPage'
+import { WrappedExplorePage } from './pages/WrappedExplorePage'
 import { WrappedPage } from './pages/WrappedPage'
 import {
 	fetchAllResults,
@@ -336,6 +337,27 @@ const App: Component = () => {
 								results={results() ?? []}
 								runners={runners() ?? []}
 								volunteers={volunteers() ?? []}
+								races={races() ?? []}
+								guests={guests() ?? []}
+								guestResults={guestResults() ?? []}
+							/>
+						</Show>
+					)}
+				/>
+				<Route
+					path="/wrapped/:year/explore"
+					component={() => (
+						<Show
+							when={!results.loading && !runners.loading}
+							fallback={<div class={styles.loading}>Loading...</div>}
+						>
+							<WrappedExplorePage
+								results={results() ?? []}
+								runners={runners() ?? []}
+								volunteers={volunteers() ?? []}
+								races={races() ?? []}
+								guests={guests() ?? []}
+								guestResults={guestResults() ?? []}
 							/>
 						</Show>
 					)}

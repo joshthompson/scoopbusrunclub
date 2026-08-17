@@ -1,3 +1,4 @@
+import { getWrappedBannerYear, isDecember } from '@/utils/wrappedYears'
 import { A } from '@solidjs/router'
 import { css, cx } from '@style/css'
 import { type Component, Show } from 'solid-js'
@@ -17,7 +18,6 @@ import type {
 	Runner,
 	VolunteerItem,
 } from '../utils/api'
-import { getWrappedBannerYear, isDecember } from './WrappedPage'
 
 export const HomePage: Component<{
 	resultsLoading: boolean
@@ -35,7 +35,7 @@ export const HomePage: Component<{
 			{/* December Wrapped banner */}
 			<Show when={isDecember()}>
 				<A
-					href={`/wrapped/${getWrappedBannerYear()}`}
+					href={`/wrapped/${getWrappedBannerYear()}/explore`}
 					class={styles.wrappedBanner}
 				>
 					🎁 Scoop Bus Wrapped {getWrappedBannerYear()} is here! →
@@ -184,11 +184,11 @@ const styles = {
 		fontWeight: 'bold',
 		fontSize: '1.1rem',
 		padding: '0.75rem 1rem',
-		borderRadius: '8px',
+		borderRadius: '4px',
 		cornerShape: 'notch',
 		textDecoration: 'none',
-		mb: '20px',
-		border: '4px solid var(--color-black)',
+		mb: '40px',
+		border: '2px solid var(--color-black)',
 		animation: 'pulse 2s ease-in-out infinite',
 		'&:hover': {
 			opacity: 0.9,
