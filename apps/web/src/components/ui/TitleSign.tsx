@@ -1,8 +1,9 @@
 import purpleSign from '@/assets/misc/purple-sign.png'
 import woodenSign from '@/assets/misc/wooden-sign.png'
 import { snowyAsset } from '@/utils/snow'
-import { cva } from '@style/css'
-import { createEffect, createSignal } from 'solid-js'
+import { css, cva } from '@style/css'
+import { Show, createEffect, createSignal } from 'solid-js'
+import { SnowShelf } from './SnowShelf'
 
 export type SignType = 'wooden' | 'purple'
 
@@ -53,6 +54,9 @@ export function TitleSign(props: {
 			class={styles.sign({ type: type() })}
 			style={{ 'background-image': `url(${signImage()})` }}
 		>
+			<Show when={type() === 'wooden'}>
+				<SnowShelf class={styles.snowShelf} />
+			</Show>
 			<div
 				ref={innerRef}
 				class={styles.signInner({ type: type() })}
@@ -128,5 +132,9 @@ const styles = {
 				},
 			},
 		},
+	}),
+	snowShelf: css({
+		// Resting on the top edge of the plank
+		top: '10px',
 	}),
 }

@@ -2,6 +2,7 @@ import backSignAsset from '@/assets/misc/back-sign.png'
 import { snowyAsset } from '@/utils/snow'
 import { useNavigate } from '@solidjs/router'
 import { css, cx } from '@style/css'
+import { SnowShelf } from './ui/SnowShelf'
 
 export function BackSignButton(props: {
 	to?: string
@@ -21,7 +22,11 @@ export function BackSignButton(props: {
 				src={snowyAsset(backSignAsset)}
 				alt="Back to home"
 			/>
-			<span class={styles.text}>{props.children ?? 'Back to homepage'}</span>
+			<span class={styles.text}>
+				<SnowShelf class={styles.snowUpperShelf} />
+				<SnowShelf class={styles.snowLowerShelf} />
+				{props.children ?? 'Back to homepage'}
+			</span>
 		</button>
 	)
 }
@@ -50,5 +55,12 @@ const styles = {
 		textTransform: 'uppercase',
 		lineHeight: '20px',
 		color: 'var(--color-black)',
+	}),
+	snowUpperShelf: css({
+		margin: '-5px -1px 0 -1px',
+	}),
+	snowLowerShelf: css({
+		margin: '28px auto',
+		width: '45px',
 	}),
 }

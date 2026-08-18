@@ -753,7 +753,7 @@ const styles = {
 	parkrunBlock: css({
 		bottom: '20px',
 		right: '20px',
-		backgroundColor: '#9EC681',
+		backgroundColor: 'var(--overlay-black-10)',
 		p: '4px 12px',
 		mb: '-8px',
 		zIndex: 1,

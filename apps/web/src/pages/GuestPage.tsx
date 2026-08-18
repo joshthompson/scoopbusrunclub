@@ -316,7 +316,7 @@ const styles = {
 		fontWeight: 'bold',
 	}),
 	parkrunBlock: css({
-		backgroundColor: '#9EC681',
+		backgroundColor: 'var(--overlay-black-10)',
 		p: '4px 12px',
 		width: 'fit-content',
 		marginLeft: 'auto',

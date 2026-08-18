@@ -1,5 +1,7 @@
 import rainGif from '@/assets/background/rain.gif'
-import snowGif from '@/assets/background/snow.gif'
+import snowFar from '@/assets/background/snow-tile-far.png'
+import snowMid from '@/assets/background/snow-tile-mid.png'
+import snowNear from '@/assets/background/snow-tile-near.png'
 import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
@@ -324,6 +326,7 @@ function registerGuestRunners(
 					name: gr.guestName,
 					id: gr.guestParkrunId ?? gr.guestId,
 					birthday: '01/01',
+					joined: -1,
 					frames,
 					width,
 					height,
@@ -482,6 +485,18 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		window.removeEventListener('mousemove', windowMouseMoveHandler)
 	})
 
+	/**
+	 * Fog is drawn as a flat white wash behind each of the three scenery bands, so
+	 * the further back something sits the more washes are stacked in front of it —
+	 * the sky ends up behind all three, `bg3` behind two, `bg2` behind one, and the
+	 * path and `bg1` in clear air. That compounding is the depth cue; a single
+	 * overlay across the whole header would just make it uniformly paler.
+	 */
+	const haze = () =>
+		props.weatherType === 'fog'
+			? 'linear-gradient(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.35))'
+			: 'none'
+
 	return (
 		<div aria-label="Welcome to the Scoop Bus Run Club!">
 			<div aria-hidden="true" class={styles.root}>
@@ -492,11 +507,17 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 					/>
 					<div
 						class={styles.bg1}
-						style={{ '--image': `url(${snowyAsset(bg1Asset)})` }}
+						style={{
+							'--image': `url(${snowyAsset(bg1Asset)})`,
+							'--haze': haze(),
+						}}
 					/>
 					<div
 						class={styles.bg2}
-						style={{ '--image': `url(${snowyAsset(bg2Asset)})` }}
+						style={{
+							'--image': `url(${snowyAsset(bg2Asset)})`,
+							'--haze': haze(),
+						}}
 					/>
 					<div
 						class={styles.house2}
@@ -508,7 +529,10 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 					/>
 					<div
 						class={styles.bg3}
-						style={{ '--image': `url(${snowyAsset(bg3Asset)})` }}
+						style={{
+							'--image': `url(${snowyAsset(bg3Asset)})`,
+							'--haze': haze(),
+						}}
 					/>
 					<div
 						class={styles.sun}
@@ -567,7 +591,9 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 					data-weather={props.weatherType}
 					style={{
 						'--rain-image': `url(${rainGif})`,
-						'--snow-image': `url(${snowGif})`,
+						'--snow-near': `url(${snowNear})`,
+						'--snow-mid': `url(${snowMid})`,
+						'--snow-far': `url(${snowFar})`,
 					}}
 				/>
 			</div>
@@ -597,10 +623,39 @@ const styles = {
 			opacity: 0.85,
 		},
 
-		'&[data-weather=snow]': {
-			backgroundImage: 'var(--snow-image)',
+		'&[data-weather=fog]': {
+			backgroundImage: `
+				linear-gradient(
+					to bottom,
+					rgba(255,255,255,0.3),
+					rgba(255,255,255,0.1),
+					rgba(255,255,255,0.7),
+					rgba(255,255,255, 1)
+				)
+			`,
 			backgroundRepeat: 'repeat',
-			backgroundSize: 'auto 100%',
+			opacity: 0.85,
+		},
+
+		/**
+		 * Three parallax layers of snow, each its own seamless 256px tile from
+		 * `scripts/gen-snow-tiles.ts`. Listed front to back, since the first
+		 * background layer paints on top.
+		 *
+		 * Drawn at the tiles' intrinsic size rather than a share of the header, so
+		 * nothing is rescaled — a fractional scale under the document-wide
+		 * `image-rendering: pixelated` would give some flakes more pixels than
+		 * others. The `snowfall` keyframes then shift each layer by a whole number
+		 * of tiles, which is what makes the loop seamless by construction.
+		 */
+		'&[data-weather=snow]': {
+			backgroundImage: 'var(--snow-near), var(--snow-mid), var(--snow-far)',
+			backgroundRepeat: 'repeat',
+			backgroundSize: '256px 256px',
+			backgroundPosition: '0 0, 0 0, 0 0',
+			animation: 'snowfall 12s steps(256) infinite',
+			// Keeps the repainting layers off the header canvas painted behind them.
+			willChange: 'background-position',
 		},
 	}),
 	underlay: css({
@@ -611,7 +666,12 @@ const styles = {
 		'& > div': {
 			position: 'absolute',
 			inset: 0,
-			backgroundImage: 'var(--image)',
+			// Second background layer, so it paints *behind* the layer's own art
+			// while still covering the full underlay — which is what fog needs, and
+			// which no amount of z-index could give us without renumbering the whole
+			// stack (the existing values are consecutive, with no gaps to slot into).
+			// Layers that don't opt in resolve it to `none`.
+			backgroundImage: 'var(--image), var(--haze, none)',
 		},
 	}),
 	sky: css({
@@ -645,8 +705,13 @@ const styles = {
 	}),
 	bg3: css({
 		zIndex: 5,
-		backgroundRepeat: 'repeat-x',
-		backgroundPosition: '0px 70px',
+		// The second value in each list is for the haze layer: `background-position`
+		// and `-repeat` apply per layer, so without its own entry the haze inherits
+		// this band's vertical offset and starts partway down the header instead of
+		// covering it.
+		backgroundRepeat: 'repeat-x, no-repeat',
+		backgroundPosition: '0px 70px, 0 0',
+		backgroundSize: 'auto, 100% 100%',
 	}),
 	house1: css({
 		zIndex: 6,
@@ -660,13 +725,23 @@ const styles = {
 	}),
 	bg2: css({
 		zIndex: 8,
-		backgroundRepeat: 'repeat-x',
-		backgroundPosition: '0px 90px',
+		// The second value in each list is for the haze layer: `background-position`
+		// and `-repeat` apply per layer, so without its own entry the haze inherits
+		// this band's vertical offset and starts partway down the header instead of
+		// covering it.
+		backgroundRepeat: 'repeat-x, no-repeat',
+		backgroundPosition: '0px 90px, 0 0',
+		backgroundSize: 'auto, 100% 100%',
 	}),
 	bg1: css({
 		zIndex: 9,
-		backgroundRepeat: 'repeat-x',
-		backgroundPosition: 'bottom',
+		// The second value in each list is for the haze layer: `background-position`
+		// and `-repeat` apply per layer, so without its own entry the haze inherits
+		// this band's vertical offset and starts partway down the header instead of
+		// covering it.
+		backgroundRepeat: 'repeat-x, no-repeat',
+		backgroundPosition: 'bottom, 0 0',
+		backgroundSize: 'auto, 100% 100%',
 	}),
 	path: css({
 		zIndex: 10,

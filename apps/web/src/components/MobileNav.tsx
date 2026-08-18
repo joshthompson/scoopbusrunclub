@@ -2,6 +2,7 @@ import { A, useLocation } from '@solidjs/router'
 import { css } from '@style/css'
 import { For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
 import { Emoji } from './ui/Emoji'
+import { SnowShelf } from './ui/SnowShelf'
 
 interface NavItem {
 	href: string
@@ -130,6 +131,7 @@ export function MobileNav() {
 			</Show>
 
 			<div class={styles.bar}>
+				<SnowShelf class={styles.snowShelf} />
 				<For each={barItems()}>
 					{(item) => (
 						<A
@@ -207,6 +209,12 @@ const styles = {
 		background: 'var(--dirt-control)',
 		borderTop: '4px solid var(--color-black)',
 		boxShadow: '0 -4px 0 var(--overlay-black-25)',
+	}),
+	snowShelf: css({
+		// Piled on the bar's top edge, covering the black border it settles on.
+		// Offsets resolve against the padding box, which starts below that border,
+		// so one shelf height up clears it. Panda needs the literal.
+		top: '-7.5px',
 	}),
 	item: css({
 		flex: 1,

@@ -63,6 +63,25 @@ export default defineConfig({
 				'0%, 100%': { transform: 'scaleX(1)', opacity: 0.1 },
 				'50%': { transform: 'scaleX(1.3)', opacity: 0.06 },
 			},
+			/**
+			 * The header's snowfall. Each of the three background layers is shifted
+			 * by a whole number of 256px tiles — 1 across, and 2/3/4 down — so the
+			 * end state is pixel-identical to the start and the loop has no seam.
+			 * Sharing one duration is what creates the parallax: the near layer
+			 * covers twice the distance of the far one in the same time.
+			 *
+			 * Order matches `background-image`: near, mid, far. Paired with
+			 * `steps(256)`, every step moves each layer a whole number of pixels,
+			 * which keeps the flakes crisp under the document-wide
+			 * `image-rendering: pixelated`.
+			 */
+			snowfall: {
+				from: { backgroundPosition: '0 0, 0 0, 0 0' },
+				to: {
+					backgroundPosition: '256px 1024px, 256px 768px, 256px 512px',
+				},
+			},
+
 			// --- Wrapped "explore" stories ---
 			/** The progress bar segment filling across while a slide is showing. */
 			storyProgress: {

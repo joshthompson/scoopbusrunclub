@@ -62,8 +62,8 @@ import {
 	getCached,
 } from './utils/api'
 import { loadEvents } from './utils/events'
-import { isSnowy, setSnowDepth } from './utils/snow'
-import { parseWeather } from './utils/weather'
+import { isSnowy, reportSnowDepth } from './utils/snow'
+import { parseWeather, reportWeatherType, weatherType } from './utils/weather'
 
 const App: Component = () => {
 	// Detect if cache is cold (no cached results) to show splash screen
@@ -82,11 +82,13 @@ const App: Component = () => {
 	// Fetch the current weather for Haga Park on load and derive our own type.
 	const [weather] = createResource(fetchWeather)
 	const appWeather = createMemo(() => parseWeather(weather()))
-	const weatherType = createMemo(() => appWeather().type)
 
-	// Feed the snow depth into the snow module, which drives the `-snow` asset
-	// variants, and mirror the result onto <body> for the snowy CSS palette.
-	createEffect(() => setSnowDepth(appWeather().snowDepth))
+	// Feed the parsed weather into the modules that own it — both of which hold a
+	// console override, so neither is read straight off the forecast here. The snow
+	// depth drives the `-snow` asset variants, mirrored onto <body> for the snowy
+	// CSS palette; the type drives the precipitation over the header.
+	createEffect(() => reportWeatherType(appWeather().type))
+	createEffect(() => reportSnowDepth(appWeather().snowDepth))
 	createEffect(() => document.body.classList.toggle('snow', isSnowy()))
 	// Pre-compute celebration + PB data once (cached in localStorage alongside results)
 	const celebrationData = createMemo(() => {

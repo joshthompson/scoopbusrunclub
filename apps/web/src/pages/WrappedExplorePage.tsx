@@ -73,14 +73,23 @@ function storeMuted(muted: boolean) {
  * The last slide exits by navigating to the scrolling page, and music cutting
  * dead on that step is jarring. The element and timer are held by this closure
  * rather than the component, so the fade finishes after the story has gone.
+ *
+ * The ramp is best-effort: iOS reserves loudness for the hardware buttons and
+ * ignores writes to `volume`, so the tick count — not the volume reaching zero
+ * — is what ends the fade. Waiting on the volume meant looping forever against
+ * a value stuck at 1, never reaching the `pause()`, and a looping track playing
+ * on long after the story had gone.
  */
 function fadeOutAndStop(element: HTMLAudioElement) {
 	const FADE_MS = 600
 	const TICK_MS = 50
-	const step = element.volume / (FADE_MS / TICK_MS)
+	const ticks = Math.ceil(FADE_MS / TICK_MS)
+	const step = element.volume / ticks
+	let tick = 0
 	const fade = setInterval(() => {
+		tick += 1
 		const next = element.volume - step
-		if (next <= 0.01) {
+		if (tick >= ticks || next <= 0.01) {
 			clearInterval(fade)
 			element.pause()
 			return
@@ -206,6 +215,26 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 			.play()
 			.then(() => setAutoplayBlocked(false))
 			.catch(() => setAutoplayBlocked(true))
+	})
+
+	// Leaving the app should silence it. Installed to the home screen there's no
+	// browser chrome to pause from, and iOS freezes the page's timers while
+	// keeping its media playing — so nothing was left running to stop the track,
+	// and the story sang on from the app switcher until it was reopened.
+	createEffect(() => {
+		const element = audio()
+		if (!element) return
+		const onVisibility = () => {
+			if (document.hidden) element.pause()
+			else if (!muted()) element.play().catch(() => {})
+		}
+		const onHide = () => element.pause()
+		document.addEventListener('visibilitychange', onVisibility)
+		window.addEventListener('pagehide', onHide)
+		onCleanup(() => {
+			document.removeEventListener('visibilitychange', onVisibility)
+			window.removeEventListener('pagehide', onHide)
+		})
 	})
 
 	/** No sound is coming out, whether that's the preference or the browser. */

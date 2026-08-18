@@ -12,6 +12,7 @@ import { css, cva, cx } from '@style/css'
 import { Show } from 'solid-js'
 import type { JSX } from 'solid-js/jsx-runtime'
 import { type SignType, TitleSign } from './TitleSign'
+import { SnowShelf } from './SnowShelf'
 
 export function DirtBlock(props: {
 	children: JSX.Element
@@ -61,6 +62,7 @@ export function DirtBlock(props: {
 				class={styles.bottomRight}
 				style={{ 'background-image': `url(${snowyAsset(bottomRight)})` }}
 			/>
+			<SnowShelf class={styles.snowShelf} />
 			<div class={styles.content({ withTitle: !!props.title })}>
 				{props.children}
 			</div>
@@ -76,7 +78,7 @@ const styles = {
 	content: cva({
 		base: {
 			position: 'relative',
-			zIndex: 10,
+			zIndex: 20,
 			m: '1rem',
 			textAlign: 'center',
 		},
@@ -152,5 +154,10 @@ const styles = {
 		bottom: '9px',
 		top: '16px',
 		width: '2px',
+	}),
+	snowShelf: css({
+		position: 'absolute',
+		inset: '0px -1px 0 -1px',
+		zIndex: 3,
 	}),
 }
