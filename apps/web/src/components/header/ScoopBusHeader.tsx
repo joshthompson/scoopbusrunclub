@@ -494,7 +494,13 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	 */
 	const haze = () =>
 		props.weatherType === 'fog'
-			? 'linear-gradient(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.35))'
+			? `
+				linear-gradient(
+					to bottom,
+					color-mix(in srgb, var(--sky-blue-top) 35%, gray 35%),
+					color-mix(in srgb, var(--sky-blue-bottom) 35%, gray 35%)
+				)
+			`
 			: 'none'
 
 	return (
