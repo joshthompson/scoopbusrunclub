@@ -1,6 +1,7 @@
 import { BackSignButton } from '@/components/BackSignButton'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { FieldBlock } from '@/components/ui/FieldBlock'
+import { Tooltip } from '@/components/ui/Tooltip'
 import type {
 	GuestResultItem,
 	RaceItem,
@@ -43,6 +44,7 @@ function summarisePeople(people: string[], limit = 3): string {
 }
 
 function entryDetail(entry: CalendarEntry): string {
+	if (entry.detail) return entry.detail
 	const parts: string[] = []
 	if (entry.people.length > 0) parts.push(summarisePeople(entry.people))
 	if (entry.volunteers.length > 0)
@@ -50,13 +52,29 @@ function entryDetail(entry: CalendarEntry): string {
 	return parts.join(' · ')
 }
 
-/** Everyone involved, for the entry's hover title. */
-function entryTooltip(entry: CalendarEntry): string {
-	const parts: string[] = [entry.name]
-	if (entry.people.length > 0) parts.push(entry.people.join(', '))
+/** Everyone involved, a line at a time, under the entry's name in the tooltip. */
+function entryTooltipLines(entry: CalendarEntry): string[] {
+	const lines: string[] = []
+	const description = entry.tooltip ?? entry.detail
+	if (description) lines.push(description)
+	if (entry.people.length > 0) lines.push(entry.people.join(', '))
 	if (entry.volunteers.length > 0)
-		parts.push(`Volunteered: ${entry.volunteers.join(', ')}`)
-	return parts.join('\n')
+		lines.push(`Volunteered: ${entry.volunteers.join(', ')}`)
+	return lines
+}
+
+/** The whole of an entry, for the days the cell can only hint at it. */
+function EntryTooltip(props: { entry: CalendarEntry }) {
+	return (
+		<div class={styles.tooltip}>
+			<div class={styles.tooltipTitle}>
+				{props.entry.emoji} {props.entry.name}
+			</div>
+			<For each={entryTooltipLines(props.entry)}>
+				{(line) => <div>{line}</div>}
+			</For>
+		</div>
+	)
 }
 
 function Entry(props: { entry: CalendarEntry }) {
@@ -78,44 +96,41 @@ function Entry(props: { entry: CalendarEntry }) {
 	)
 
 	return (
-		<Show
-			when={props.entry.href}
-			fallback={
-				<Show
-					when={props.entry.url}
-					fallback={
-						<span
-							class={styles.entry({ kind: props.entry.kind })}
-							title={entryTooltip(props.entry)}
-						>
-							{body}
-						</span>
-					}
-				>
-					{(url) => (
-						<a
-							href={url()}
-							target="_blank"
-							rel="noreferrer"
-							class={styles.entry({ kind: props.entry.kind })}
-							title={entryTooltip(props.entry)}
-						>
-							{body}
-						</a>
-					)}
-				</Show>
-			}
+		<Tooltip
+			content={<EntryTooltip entry={props.entry} />}
+			class={styles.entryWrapper}
 		>
-			{(href) => (
-				<A
-					href={href()}
-					class={styles.entry({ kind: props.entry.kind })}
-					title={entryTooltip(props.entry)}
-				>
-					{body}
-				</A>
-			)}
-		</Show>
+			<Show
+				when={props.entry.href}
+				fallback={
+					<Show
+						when={props.entry.url}
+						fallback={
+							<span class={styles.entry({ kind: props.entry.kind })}>
+								{body}
+							</span>
+						}
+					>
+						{(url) => (
+							<a
+								href={url()}
+								target="_blank"
+								rel="noreferrer"
+								class={styles.entry({ kind: props.entry.kind })}
+							>
+								{body}
+							</a>
+						)}
+					</Show>
+				}
+			>
+				{(href) => (
+					<A href={href()} class={styles.entry({ kind: props.entry.kind })}>
+						{body}
+					</A>
+				)}
+			</Show>
+		</Tooltip>
 	)
 }
 
@@ -291,10 +306,12 @@ export function CalendarPage(props: CalendarPageProps) {
 					<span class={styles.legendItem}>🏃 parkrun</span>
 					<span class={styles.legendItem}>🔥 Major race</span>
 					<span class={styles.legendItem}>🏅 Race</span>
+					<span class={styles.legendItem}>🚌 Scoop Bus trip</span>
 					<span class={styles.legendItem}>🏟️ Track and Food</span>
 					<span class={styles.legendItem}>🎂 Birthday</span>
 					<span class={styles.legendItem}>🎉 Milestone</span>
 					<span class={styles.legendItem}>🎯 Milestone due</span>
+					<span class={styles.legendItem}>🚌 Distance milestone</span>
 				</div>
 			</FieldBlock>
 
@@ -476,6 +493,23 @@ const styles = {
 		textAlign: 'left',
 		minWidth: 0,
 	}),
+	/** The tooltip wraps each entry, so it has to fill the cell as one did. */
+	entryWrapper: css({
+		display: 'block',
+		minWidth: 0,
+	}),
+	/** Sentences, not a single line — undo the tooltip's own nowrap. */
+	tooltip: css({
+		display: 'flex',
+		flexDirection: 'column',
+		gap: '2px',
+		maxWidth: '18rem',
+		whiteSpace: 'normal',
+		textAlign: 'left',
+	}),
+	tooltipTitle: css({
+		fontWeight: 'bold',
+	}),
 	entry: cva({
 		base: {
 			display: 'flex',
@@ -501,6 +535,7 @@ const styles = {
 				race: { borderLeftColor: 'var(--pink-rose)' },
 				birthday: { borderLeftColor: 'var(--purple-heatmap)' },
 				milestone: { borderLeftColor: 'var(--gold-warm)' },
+				distance: { borderLeftColor: 'var(--green-600)' },
 			},
 		},
 	}),

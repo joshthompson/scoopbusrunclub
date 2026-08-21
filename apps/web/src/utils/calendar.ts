@@ -6,6 +6,12 @@ import type {
 	Runner,
 	VolunteerItem,
 } from './api'
+import {
+	journeyMilestoneDetail,
+	journeyMilestoneShortDetail,
+	journeyMilestoneTitle,
+	journeyMilestones,
+} from './journey'
 import { getMemberRoute } from './memberRoute'
 import {
 	MILESTONE_SET,
@@ -14,6 +20,7 @@ import {
 	projectedMilestoneDate,
 } from './milestones'
 import { formatName } from './misc'
+import { isParkrunTrip, withoutReportedTrips } from './parkrunTrips'
 import { getSpecialDayName } from './special-days'
 
 /** Weekday column headers, Monday-first (the week as Sweden counts it). */
@@ -27,12 +34,21 @@ export const WEEKDAY_LABELS = [
 	'Sun',
 ] as const
 
-export type CalendarEntryKind = 'parkrun' | 'race' | 'birthday' | 'milestone'
+export type CalendarEntryKind =
+	| 'parkrun'
+	| 'race'
+	| 'birthday'
+	| 'milestone'
+	| 'distance'
 
 export interface CalendarEntry {
 	kind: CalendarEntryKind
 	emoji: string
 	name: string
+	/** A line under the name, for entries that describe themselves. */
+	detail?: string
+	/** Fuller wording for the tooltip, where the cell only has room for `detail`. */
+	tooltip?: string
 	/** Internal route this entry links to, if any. */
 	href?: string
 	/** External website, for races that link out instead. */
@@ -296,7 +312,27 @@ export function indexCalendarEntries(
 		push(milestone.date, milestone.entry)
 	}
 
-	for (const race of sources.races) {
+	for (const milestone of journeyMilestones(sources.results)) {
+		push(milestone.date, {
+			kind: 'distance',
+			emoji: '🚌',
+			name: journeyMilestoneTitle(milestone.waypoint),
+			detail: journeyMilestoneShortDetail(milestone.waypoint),
+			tooltip: journeyMilestoneDetail(milestone.waypoint),
+			href: '/everyone',
+			people: [],
+			volunteers: [],
+		})
+	}
+
+	// Trips parkrun has already reported are covered by the results above.
+	const races = withoutReportedTrips(
+		sources.races,
+		sources.results,
+		sources.volunteers,
+	)
+
+	for (const race of races) {
 		push(race.date, {
 			kind: 'race',
 			emoji: raceEmoji(race),
@@ -318,6 +354,7 @@ function parkrunEventLabel(eventName: string): string {
 }
 
 function raceEmoji(race: RaceItem): string {
+	if (isParkrunTrip(race)) return '🚌'
 	if (race.type === 'Track and Food') return '🏟️'
 	if (race.majorEvent) return '🔥'
 	return '🏅'

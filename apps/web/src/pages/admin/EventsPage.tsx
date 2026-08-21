@@ -26,6 +26,7 @@ import {
 	updateRace,
 } from '@/utils/adminApi'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
+import { PARKRUN_TRIP_TYPE } from '@/utils/parkrunTrips'
 import { css } from '@style/css'
 import {
 	type Component,
@@ -38,6 +39,10 @@ import {
 import { EventModal } from './EventModal'
 
 export const EVENT_TYPES = [
+	{
+		groupName: 'parkrun',
+		types: [PARKRUN_TRIP_TYPE],
+	},
 	{
 		groupName: 'Social',
 		types: ['Track and Food', 'Other Social'],

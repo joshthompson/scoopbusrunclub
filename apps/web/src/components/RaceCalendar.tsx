@@ -1,18 +1,38 @@
 import { runners } from '@/data/runners'
 import type { RunnerName } from '@/data/runners'
-import type { GuestItem, RaceItem } from '@/utils/api'
+import type {
+	GuestItem,
+	RaceItem,
+	RunResultItem,
+	VolunteerItem,
+} from '@/utils/api'
+import { toISODate } from '@/utils/calendar'
 import { formatDate } from '@/utils/misc'
+import { isParkrunTrip, withoutReportedTrips } from '@/utils/parkrunTrips'
 import { A } from '@solidjs/router'
 import { css } from '@style/css'
 import { For, Show } from 'solid-js'
 import { DirtBlock } from './ui/DirtBlock'
 
+/**
+ * What the club has coming up: the races worth a mention, and every Scoop Bus
+ * trip out to another parkrun. A trip drops off once parkrun has reported it,
+ * by which point the results say the same thing.
+ */
 export function RaceCalendar(props: {
 	races: RaceItem[]
 	guests?: GuestItem[]
+	results?: RunResultItem[]
+	volunteers?: VolunteerItem[]
 }) {
-	const upcoming = () =>
-		props.races.filter((r) => r.majorEvent && new Date(r.date) >= new Date())
+	const upcoming = () => {
+		const today = toISODate(new Date())
+		return withoutReportedTrips(
+			props.races,
+			props.results ?? [],
+			props.volunteers ?? [],
+		).filter((r) => (r.majorEvent || isParkrunTrip(r)) && r.date >= today)
+	}
 
 	const guestRecord = (guestId: string) =>
 		(props.guests ?? []).find((g) => g._id === guestId)
@@ -24,7 +44,24 @@ export function RaceCalendar(props: {
 					<For each={upcoming()}>
 						{(race) => (
 							<div>
-								<h4 class={styles.raceName}>{race.name}</h4>
+								<h4 class={styles.raceName}>
+									<Show when={isParkrunTrip(race)}>🚌 </Show>
+									<Show
+										when={isParkrunTrip(race) && race.website}
+										fallback={race.name}
+									>
+										{(website) => (
+											<a
+												href={website()}
+												target="_blank"
+												rel="noreferrer"
+												class={styles.link}
+											>
+												{race.name}
+											</a>
+										)}
+									</Show>
+								</h4>
 								<p>{formatDate(new Date(`${race.date}T00:00:00`))}</p>
 								<p>
 									{[

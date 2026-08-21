@@ -1,10 +1,12 @@
-import { css } from '@style/css'
+import { css, cx } from '@style/css'
 import { type JSX, Show, createSignal } from 'solid-js'
 import { Portal } from 'solid-js/web'
 
 export function Tooltip(props: {
 	content: JSX.Element
 	children: JSX.Element
+	/** Restyle the wrapper, for callers whose child isn't an inline blob. */
+	class?: string
 }) {
 	const [visible, setVisible] = createSignal(false)
 	const [pos, setPos] = createSignal({ x: 0, y: 0 })
@@ -22,7 +24,7 @@ export function Tooltip(props: {
 	return (
 		<span
 			ref={ref}
-			class={styles.wrapper}
+			class={cx(styles.wrapper, props.class)}
 			onMouseEnter={() => {
 				updatePos()
 				setVisible(true)

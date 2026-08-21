@@ -2,8 +2,15 @@ import extLinkAsset from '@/assets/misc/ext-link.png'
 import { runners } from '@/data/runners'
 import { RoleTranslations } from '@/data/volunteer-roles'
 import { getEvent } from '@/utils/events'
+import {
+	type JourneyMilestone,
+	journeyMilestoneDetail,
+	journeyMilestoneTitle,
+	journeyMilestonesByDate,
+} from '@/utils/journey'
 import { getMemberRoute } from '@/utils/memberRoute'
 import { formatDate, formatName, ordinal } from '@/utils/misc'
+import { isParkrunTrip, withoutReportedTrips } from '@/utils/parkrunTrips'
 import { getSpecialDayName } from '@/utils/special-days'
 import { A, useNavigate } from '@solidjs/router'
 import { css } from '@style/css'
@@ -355,6 +362,7 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 	}
 
 	const eventEmojis = (): [string, string] | undefined => {
+		if (isParkrunTrip(props.race)) return ['🚌', '🚌']
 		if (props.race.type === 'Track and Food') return ['🏟️', '🍕']
 		if (props.race.majorEvent) return ['🔥', '🔥']
 		return undefined
@@ -402,6 +410,28 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 						)}
 					</For>
 				</ul>
+			</div>
+		</DirtBlock>
+	)
+}
+
+/**
+ * The day the club's collective distance passed one of the journey's waypoints.
+ * Sits with that day's results, and links to the journey it belongs to.
+ */
+function JourneyMilestoneBlock(props: { milestone: JourneyMilestone }) {
+	return (
+		<DirtBlock>
+			<div class={styles.parkrun}>
+				<h4 class={styles.parkrunName}>
+					<Emoji emoji="🚌" />{' '}
+					<A href="/everyone" class={styles.parkrunNameLink}>
+						{journeyMilestoneTitle(props.milestone.waypoint)}
+					</A>
+				</h4>
+				<p class={styles.journeyDetail}>
+					{journeyMilestoneDetail(props.milestone.waypoint)}
+				</p>
 			</div>
 		</DirtBlock>
 	)
@@ -586,11 +616,14 @@ export function LatestResults(props: LatestResultsProps) {
 	const grouped = createMemo(() =>
 		groupResults(
 			props.results,
-			props.races,
+			// A trip parkrun has reported is told by the result block below it.
+			withoutReportedTrips(props.races, props.results, props.volunteers),
 			props.volunteers,
 			props.guestResults ?? [],
 		),
 	)
+
+	const milestones = createMemo(() => journeyMilestonesByDate(props.results))
 
 	const [showAll, setShowAll] = createSignal(false)
 
@@ -615,6 +648,9 @@ export function LatestResults(props: LatestResultsProps) {
 						<h3 class={styles.date}>
 							{formatDate(new Date(`${result.date}T00:00:00`))}
 						</h3>
+						<For each={milestones().get(result.date) ?? []}>
+							{(milestone) => <JourneyMilestoneBlock milestone={milestone} />}
+						</For>
 						<For each={result.races}>
 							{(race) => <RaceBlock race={race} guests={props.guests ?? []} />}
 						</For>
@@ -835,6 +871,12 @@ const styles = {
 		color: 'inherit',
 		textDecoration: 'none',
 		_hover: { textDecoration: 'underline' },
+	}),
+	journeyDetail: css({
+		fontSize: '0.9em',
+		opacity: 0.85,
+		maxWidth: '36rem',
+		m: '0 auto',
 	}),
 	memberLink: css({
 		color: 'inherit',

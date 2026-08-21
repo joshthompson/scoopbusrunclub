@@ -66,7 +66,12 @@ export const HomePage: Component<{
 					<Milestones runners={props.runners} results={props.results} />
 				</Show>
 				<LargestClub />
-				<RaceCalendar races={props.races} guests={props.guests} />
+				<RaceCalendar
+					races={props.races}
+					guests={props.guests}
+					results={props.results}
+					volunteers={props.volunteers}
+				/>
 				<DirtBlock title="Explore">
 					<div
 						class={css({

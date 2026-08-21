@@ -19,6 +19,28 @@ const guestAttendeeValidator = v.object({
 	laps: v.optional(v.number()),
 })
 
+/**
+ * A parkrun trip is identified by the event it's going to, so it only makes
+ * sense with that parkrun's event page as its website — e.g.
+ * https://www.parkrun.se/kalgarden/ or https://parkrun.org.uk/cheltenham/.
+ *
+ * The admin form checks this against the real list of parkrun domains
+ * (apps/web/src/utils/parkrunTrips.ts); this is the backstop behind it, so it
+ * only checks the shape of the URL.
+ */
+const PARKRUN_TRIP_TYPE = 'Parkrun Trip'
+const PARKRUN_EVENT_URL =
+	/^https?:\/\/(?:www\.)?parkrun\.[a-z]{2,3}(?:\.[a-z]{2,3})?\/[a-z0-9-]+\/?$/i
+
+function tripUrlError(
+	type: string | undefined,
+	website: string | undefined,
+): string | null {
+	if (type !== PARKRUN_TRIP_TYPE) return null
+	if (website && PARKRUN_EVENT_URL.test(website.trim())) return null
+	return 'A parkrun trip needs its parkrun event page as the website'
+}
+
 // ── Queries ─────────────────────────────────────────────────────────
 
 export const list = query({
@@ -90,6 +112,9 @@ export const create = mutation({
 		const session = await validateSession(ctx, args.token, true)
 		if (!session) return { error: 'Unauthorized' }
 
+		const tripError = tripUrlError(args.type, args.website)
+		if (tripError) return { error: tripError }
+
 		const now = Date.now()
 		const id = await ctx.db.insert('races', {
 			date: args.date,
@@ -137,6 +162,13 @@ export const update = mutation({
 
 		const existing = await ctx.db.get(args.raceId)
 		if (!existing) return { error: 'Race not found' }
+
+		// Check the record as it will be, since either field may be left alone.
+		const tripError = tripUrlError(
+			args.type !== undefined ? args.type : existing.type,
+			args.website !== undefined ? args.website : existing.website,
+		)
+		if (tripError) return { error: tripError }
 
 		// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 		const patch: Record<string, any> = {

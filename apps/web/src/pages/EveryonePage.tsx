@@ -1,6 +1,12 @@
 import { BackSignButton } from '@/components/BackSignButton'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
 import { getEvent, getEventName } from '@/utils/events'
+import {
+	JOURNEY_WAYPOINTS,
+	JUNIOR_PARKRUN_DISTANCE_KM,
+	PARKRUN_DISTANCE_KM,
+	isJuniorEvent,
+} from '@/utils/journey'
 import { getMemberRoute } from '@/utils/memberRoute'
 import { formatName, parseTimeToSeconds } from '@/utils/misc'
 import { A } from '@solidjs/router'
@@ -15,9 +21,6 @@ import { RunnerSummaryStat } from './RunnerSummaryStat'
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const PARKRUN_DISTANCE_KM = 5
-const JUNIOR_PARKRUN_DISTANCE_KM = 2
 
 /** All parkrun countries with flags and names */
 const PARKRUN_COUNTRIES: { code: string; flag: string; name: string }[] = [
@@ -44,36 +47,9 @@ const PARKRUN_COUNTRIES: { code: string; flag: string; name: string }[] = [
 	{ code: 'US', flag: '🇺🇸', name: 'United States' },
 ]
 
-/** Straight-line (great-circle) distances from Stockholm */
-const JOURNEY_WAYPOINTS: { name: string; km: number; emoji: string }[] = [
-	{ name: 'Stockholm', km: 0, emoji: '🇸🇪' },
-	{ name: 'Uppsala', km: 64, emoji: '🇸🇪' },
-	{ name: 'Copenhagen', km: 522, emoji: '🇩🇰' },
-	{ name: 'Berlin', km: 810, emoji: '🇩🇪' },
-	{ name: 'London', km: 1_435, emoji: '🇬🇧' },
-	{ name: 'Rome', km: 1_985, emoji: '🇮🇹' },
-	{ name: 'Istanbul', km: 2_108, emoji: '🇹🇷' },
-	{ name: 'Cairo', km: 3_212, emoji: '🇪🇬' },
-	{ name: 'Dubai', km: 4_670, emoji: '🇦🇪' },
-	{ name: 'Nairobi', km: 6_275, emoji: '🇰🇪' },
-	{ name: 'Tokyo', km: 8_134, emoji: '🇯🇵' },
-	{ name: 'Cape Town', km: 10_230, emoji: '🇿🇦' },
-	{ name: 'Buenos Aires', km: 12_570, emoji: '🇦🇷' },
-	{ name: 'Sydney', km: 15_590, emoji: '🇦🇺' },
-	{ name: 'Auckland', km: 17_080, emoji: '🇳🇿' },
-	{ name: 'Halfway around the Earth', km: 20_038, emoji: '🌍' },
-	{ name: '¾ around the Earth', km: 30_056, emoji: '🌍' },
-	{ name: 'Around the Earth!', km: 40_075, emoji: '🌍' },
-	{ name: 'To the Moon! 🚀', km: 384_400, emoji: '🌕' },
-]
-
 // ---------------------------------------------------------------------------
 // Data helpers
 // ---------------------------------------------------------------------------
-
-function isJuniorEvent(eventId: string) {
-	return getEventName(eventId).trim().toLowerCase().includes('juniors')
-}
 
 const parkrunIdToName = new Map<string, string>()
 for (const [, [runner]] of Object.entries(runnerSignals)) {

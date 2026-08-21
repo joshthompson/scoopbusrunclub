@@ -9,6 +9,11 @@ import { Modal } from '@/components/ui/Modal'
 import { type RunnerName, runners } from '@/data/runners'
 import type { Guest, Race, RaceAttendee, RaceGuest } from '@/utils/adminApi'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
+import {
+	PARKRUN_EVENT_URL_EXAMPLE,
+	PARKRUN_TRIP_TYPE,
+	isParkrunEventUrl,
+} from '@/utils/parkrunTrips'
 import { css } from '@style/css'
 import { type Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { EVENT_TYPES } from './EventsPage'
@@ -276,8 +281,16 @@ export const EventModal: Component<EventModalProps> = (props) => {
 		return result
 	}
 
+	/**
+	 * A parkrun trip is identified by the event it's going to, so its website has
+	 * to be that parkrun's event page — there's no trip without one.
+	 */
+	const isTrip = () => type() === PARKRUN_TRIP_TYPE
+	const tripUrlOk = () => !isTrip() || isParkrunEventUrl(website())
+
 	const isFormValid = createMemo(() => {
 		if (!date() || !name()) return false
+		if (!tripUrlOk()) return false
 		return buildAttendees() !== null && buildGuests() !== null
 	})
 
@@ -286,6 +299,7 @@ export const EventModal: Component<EventModalProps> = (props) => {
 		const builtAttendees = buildAttendees()
 		const builtGuests = buildGuests()
 		if (!date() || !name() || !builtAttendees || !builtGuests) return
+		if (!tripUrlOk()) return
 		setSaving(true)
 		try {
 			props.onSave({
@@ -330,11 +344,12 @@ export const EventModal: Component<EventModalProps> = (props) => {
 
 				<div class={styles.row2}>
 					<AdminInput
-						label="Website"
+						label={isTrip() ? 'parkrun event page' : 'Website'}
 						type="url"
 						value={website()}
 						onInput={(e) => setWebsite(e.currentTarget.value)}
-						placeholder="https://..."
+						placeholder={isTrip() ? PARKRUN_EVENT_URL_EXAMPLE : 'https://...'}
+						required={isTrip()}
 					/>
 					<AdminSelect
 						label="Type"
@@ -353,6 +368,13 @@ export const EventModal: Component<EventModalProps> = (props) => {
 						</For>
 					</AdminSelect>
 				</div>
+
+				<Show when={!tripUrlOk()}>
+					<span class={styles.error}>
+						A parkrun trip needs the parkrun's event page as its website, e.g.{' '}
+						{PARKRUN_EVENT_URL_EXAMPLE} or https://parkrun.org.uk/cheltenham/
+					</span>
+				</Show>
 
 				<Checkbox
 					label="Public (visible on the site)"
@@ -545,6 +567,11 @@ const styles = {
 	hint: css({
 		color: 'var(--overlay-white-70)',
 		fontSize: '0.75rem',
+	}),
+	error: css({
+		color: 'var(--pink-rose)',
+		fontSize: '0.75rem',
+		fontWeight: 'bold',
 	}),
 	attendeeList: css({
 		display: 'flex',
