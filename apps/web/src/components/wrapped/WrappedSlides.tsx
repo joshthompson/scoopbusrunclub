@@ -391,6 +391,21 @@ export function buildWrappedSlides(
 		</>
 	))
 
+	// However many waypoints the bus passed this year, they're one card — the
+	// story is the journey, not each crossing.
+	if (stats.distanceMilestones.length > 0) {
+		const reached = stats.distanceMilestones
+		const furthest = reached[reached.length - 1]
+		card('distance-milestones', '🚌', 'var(--green-emerald-dark)', () => (
+			<>
+				The Scoop Bus reached{' '}
+				<strong>{joinNames(reached.map((m) => m.label))}</strong> on the journey
+				out of Stockholm — <strong>{furthest.km.toLocaleString()} km</strong> of
+				running, all time
+			</>
+		))
+	}
+
 	card('events-countries', '🌍', 'var(--amber-600)', () => (
 		<>
 			Across <strong>{stats.uniqueEvents} different events</strong> in{' '}

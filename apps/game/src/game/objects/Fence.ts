@@ -1,7 +1,6 @@
 import {
 	Color3,
 	Matrix,
-	Mesh,
 	MeshBuilder,
 	Quaternion,
 	type Scene,

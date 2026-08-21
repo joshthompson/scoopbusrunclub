@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { type MutationCtx, mutation, query } from './_generated/server'
+import { mutation, query } from './_generated/server'
 
 // ── Seed admin toggle ──────────────────────────────────────────────
 // When true, username "admin" / password "admin" is accepted even if

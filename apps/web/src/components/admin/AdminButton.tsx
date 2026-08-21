@@ -1,4 +1,4 @@
-import { css, cva } from '@style/css'
+import { cva } from '@style/css'
 import type { JSX } from 'solid-js'
 
 export function AdminButton(props: {

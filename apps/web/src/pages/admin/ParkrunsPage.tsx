@@ -2,7 +2,6 @@ import { AdminButton } from '@/components/admin/AdminButton'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Modal } from '@/components/ui/Modal'
 import {
-	type Guest,
 	type ParkrunEventItem,
 	addGuestResult,
 	deleteGuestResult,
@@ -14,7 +13,6 @@ import {
 	type Component,
 	For,
 	Show,
-	createEffect,
 	createMemo,
 	createResource,
 	createSignal,

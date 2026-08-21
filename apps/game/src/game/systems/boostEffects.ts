@@ -20,7 +20,6 @@ import {
 	ParticleSystem,
 	PostProcess,
 	type Scene,
-	TransformNode,
 	Vector3,
 } from '@babylonjs/core'
 

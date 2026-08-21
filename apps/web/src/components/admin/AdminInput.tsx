@@ -1,4 +1,4 @@
-import { css, cva, cx } from '@style/css'
+import { cva, cx } from '@style/css'
 import type { JSX } from 'solid-js'
 
 interface AdminInputProps {

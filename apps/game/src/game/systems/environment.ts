@@ -26,7 +26,7 @@ import { createHagaGate } from '../objects/HagaGate'
 import { createKmSign } from '../objects/KmSign'
 import { createMarshalModel, poseCheering } from '../objects/MarshalModel'
 import { createParkrunSign } from '../objects/ParkrunSign'
-import type { Marshal, Runner } from '../types'
+import type { Marshal } from '../types'
 import type {
 	BuildingCollider,
 	BuildingFootprint,

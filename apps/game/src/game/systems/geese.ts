@@ -11,12 +11,11 @@
  *   - Geese avoid water and solid obstacles.
  *   - Scoopable: bus impact launches them like runners but they ragdoll (no riding).
  */
-import { Mesh, MeshBuilder, type Scene, Vector3 } from '@babylonjs/core'
+import { MeshBuilder, type Scene, Vector3 } from '@babylonjs/core'
 import {
 	GOOSE_FLEE_RADIUS,
 	GOOSE_FLEE_SPEED,
 	GOOSE_HERD_MERGE_RADIUS,
-	GOOSE_HERD_RADIUS,
 	GOOSE_IDLE_MAX,
 	GOOSE_LANDED_DURATION,
 	GOOSE_MIN_SEPARATION,
@@ -36,7 +35,6 @@ import {
 	poseGooseSwimming,
 	poseGooseWalking,
 } from '../objects/GooseModel'
-import type { GooseModelResult } from '../objects/GooseModel'
 import type {
 	BuildingCollider,
 	Goose,
@@ -44,7 +42,7 @@ import type {
 	WaterZone,
 } from '../types'
 import { resolvePositionAgainstBuildings } from './buildings'
-import { getWaterSurfaceYAt, isInWaterZone } from './terrain'
+import { getWaterSurfaceYAt } from './terrain'
 
 // ── Seeded RNG (same as terrain.ts) ──
 

@@ -22,8 +22,6 @@ import {
 	type LinesMesh,
 	type Mesh,
 	MeshBuilder,
-	PickingInfo,
-	PointerEventTypes,
 	Scene,
 	StandardMaterial,
 	TransformNode,

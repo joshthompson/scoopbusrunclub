@@ -1,7 +1,6 @@
 import extLinkAsset from '@/assets/misc/ext-link.png'
 import { BackSignButton } from '@/components/BackSignButton'
 import { CourseMap } from '@/components/CourseMap'
-import { CourseSVG } from '@/components/CourseSVG'
 import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Table } from '@/components/ui/Table'
 import { Tooltip } from '@/components/ui/Tooltip'

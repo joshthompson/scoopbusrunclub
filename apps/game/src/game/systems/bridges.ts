@@ -1,12 +1,10 @@
 import {
 	Color3,
-	Mesh,
 	MeshBuilder,
 	type Scene,
 	StandardMaterial,
 	TransformNode,
 	type Vector3,
-	VertexData,
 } from '@babylonjs/core'
 import type { BridgeCollider } from '../types'
 import { BUS_HALF_WIDTH } from './busCollision'

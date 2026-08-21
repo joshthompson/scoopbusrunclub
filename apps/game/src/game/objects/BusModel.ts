@@ -1,7 +1,5 @@
 import {
 	Color3,
-	DynamicTexture,
-	MeshBuilder,
 	PBRMaterial,
 	type Scene,
 	SceneLoader,

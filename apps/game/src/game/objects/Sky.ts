@@ -5,7 +5,6 @@ import {
 	MeshBuilder,
 	type Scene,
 	StandardMaterial,
-	Texture,
 	Vector3,
 } from '@babylonjs/core'
 import { SkyMaterial } from '@babylonjs/materials'

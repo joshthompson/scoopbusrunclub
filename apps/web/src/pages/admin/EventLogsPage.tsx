@@ -10,7 +10,7 @@ import {
 	fetchAdminLogs,
 	fetchAdminUsers,
 } from '@/utils/adminApi'
-import { css, cva, cx } from '@style/css'
+import { css, cva } from '@style/css'
 import {
 	type Component,
 	For,

@@ -5,7 +5,6 @@ import {
 	type Scene,
 	Vector3,
 } from '@babylonjs/core'
-import type { ParticleSystem, TransformNode } from '@babylonjs/core'
 import {
 	BUS_COLLISION_RADIUS,
 	BUS_ROOF_L,

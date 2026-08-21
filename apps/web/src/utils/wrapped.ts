@@ -11,6 +11,12 @@ import type {
 	VolunteerItem,
 } from '@/utils/api'
 import { getEvent, getEventName } from '@/utils/events'
+import {
+	JUNIOR_PARKRUN_DISTANCE_KM,
+	PARKRUN_DISTANCE_KM,
+	isJuniorEvent,
+	journeyMilestones,
+} from '@/utils/journey'
 import { SCOOP_BUS_CLUB_NAME } from '@/utils/largestClubs'
 import { MILESTONE_SET } from '@/utils/milestones'
 import { formatName, parseTimeToSeconds } from '@/utils/misc'
@@ -58,10 +64,6 @@ function translateRole(role: string): string {
 
 function isRunDirector(role: string): boolean {
 	return role === 'Loppansvarig' || translateRole(role) === 'Run Director'
-}
-
-function isJuniorEvent(eventId: string) {
-	return getEventName(eventId).trim().toLowerCase().includes('juniors')
 }
 
 const MONTH_NAMES = [
@@ -237,6 +239,12 @@ export interface WrappedStats {
 	/** Run-count milestones (10th, 25th, 50th…) reached this year. */
 	runMilestones: { name: string; runNumber: number; date: string }[]
 
+	/**
+	 * Waypoints on the journey out of Stockholm that the club's all-time
+	 * distance passed this year, in the order they were reached.
+	 */
+	distanceMilestones: { label: string; km: number; date: string }[]
+
 	// --- Performance ---
 
 	fastestRun: {
@@ -329,6 +337,7 @@ function emptyStats(year: number): WrappedStats {
 		roleCollector: null,
 		volunteerMilestones: [],
 		runMilestones: [],
+		distanceMilestones: [],
 		fastestRun: null,
 		busiestMonth: null,
 		longestStreak: null,
@@ -686,6 +695,25 @@ function computeRaceStats(yearStr: string, races: RaceItem[]): RaceStats {
  * Counts back from each member's lifetime total so a run's number can be
  * derived even though we don't hold their whole history.
  */
+/**
+ * The journey's waypoints passed during the year. The journey is cumulative
+ * over the club's whole history, so this reads every result and then keeps the
+ * crossings that landed in the year being wrapped.
+ */
+function computeDistanceMilestones(
+	yearStr: string,
+	allResults: RunResultItem[],
+): WrappedStats['distanceMilestones'] {
+	return journeyMilestones(allResults)
+		.filter((milestone) => milestone.date.startsWith(yearStr))
+		.map((milestone) => ({
+			// `place` reads as a destination for the waypoints that aren't a city.
+			label: milestone.waypoint.place ?? milestone.waypoint.name,
+			km: milestone.waypoint.km,
+			date: milestone.date,
+		}))
+}
+
 function computeRunMilestones(
 	yearStr: string,
 	results: RunResultItem[],
@@ -767,7 +795,9 @@ export function computeWrappedStats(input: WrappedInput): WrappedStats {
 		else totalRuns++
 	}
 
-	const totalDistanceKm = totalRuns * 5 + totalJuniorRuns * 2
+	const totalDistanceKm =
+		totalRuns * PARKRUN_DISTANCE_KM +
+		totalJuniorRuns * JUNIOR_PARKRUN_DISTANCE_KM
 
 	// Unique events and countries
 	const uniqueEventSet = new Set<string>()
@@ -1233,6 +1263,7 @@ export function computeWrappedStats(input: WrappedInput): WrappedStats {
 		roleCollector: volunteerStats.roleCollector,
 		volunteerMilestones: volunteerStats.volunteerMilestones,
 		runMilestones: computeRunMilestones(yearStr, allResults, allRunners),
+		distanceMilestones: computeDistanceMilestones(yearStr, allResults),
 		fastestRun,
 		busiestMonth,
 		longestStreak,

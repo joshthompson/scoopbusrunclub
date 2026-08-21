@@ -1,5 +1,5 @@
 import { BackSignButton } from '@/components/BackSignButton'
-import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { runners as runnerSignals } from '@/data/runners'
 import { getMemberRoute } from '@/utils/memberRoute'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { A } from '@solidjs/router'

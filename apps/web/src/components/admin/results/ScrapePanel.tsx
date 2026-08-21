@@ -6,7 +6,7 @@
  * should never be something you have to go looking for.
  */
 import { AdminButton } from '@/components/admin/AdminButton'
-import type { ItemState, ItemStatus, RunState } from '@shared/scraper-protocol'
+import type { ItemStatus, RunState } from '@shared/scraper-protocol'
 import { For, Show } from 'solid-js'
 import { styles } from './resultStyles'
 

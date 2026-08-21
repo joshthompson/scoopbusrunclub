@@ -14,7 +14,6 @@
  */
 import {
 	Color3,
-	Mesh,
 	MeshBuilder,
 	type Scene,
 	StandardMaterial,

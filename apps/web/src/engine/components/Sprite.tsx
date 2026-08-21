@@ -4,7 +4,6 @@ import { css, cx } from '@style/css'
 import {
 	type Accessor,
 	type Component,
-	For,
 	Index,
 	type JSX,
 	createEffect,

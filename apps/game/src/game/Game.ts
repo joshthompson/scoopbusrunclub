@@ -174,16 +174,11 @@ import {
 } from './objects/BusModel'
 import type { BusColorPalette } from './objects/BusModel'
 import { createCorgiModel } from './objects/CorgiModel'
-import {
-	createRunnerModel,
-	poseRunning,
-	poseStanding,
-} from './objects/RunnerModel'
+import { createRunnerModel, poseStanding } from './objects/RunnerModel'
 import type { RunnerModelResult } from './objects/RunnerModel'
 import { createSky } from './objects/Sky'
 import {
 	type BusCollisionState,
-	type RemoteBusNudge,
 	type RemoteBusSnapshot,
 	applyBusYawRate,
 	resolveBusToBusCollisions,
@@ -248,7 +243,6 @@ import {
 	createBoostEffects,
 } from './systems/boostEffects'
 import {
-	type BridgeMeshEntry,
 	buildBridgeMeshes,
 	getBridgeDeckY,
 	resolvePositionAgainstBridges,
@@ -315,7 +309,6 @@ import {
 import {
 	assignRoofSeat,
 	buildLocalRunner as buildLocalRunnerFn,
-	packRemoteRiders,
 	spawnRunners as spawnRunnersSystem,
 	updateLocalRunnerVisual as updateLocalRunnerVisualFn,
 	updateRunnersSystem,

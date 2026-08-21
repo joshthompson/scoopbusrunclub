@@ -3,7 +3,7 @@ import { MuteButton } from './MuteButton'
 import logoSrc from './assets/logo.png'
 import { GAME_TYPE_LABELS } from './game/modes'
 import levels from './levels'
-import { MAX_PLAYERS, type RoomInfo, lobby } from './multiplayer'
+import { type RoomInfo, lobby } from './multiplayer'
 import { useMenuNav } from './useMenuNav'
 
 interface RoomBrowserScreenProps {

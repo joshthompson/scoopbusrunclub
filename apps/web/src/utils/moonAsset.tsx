@@ -16,7 +16,6 @@ import moon12Asset from '@/assets/background/moon12.png'
 import moon13Asset from '@/assets/background/moon13.png'
 import moon14Asset from '@/assets/background/moon14.png'
 import moon15Asset from '@/assets/background/moon15.png'
-import { css } from '@style/css'
 
 const moons = [
 	moon15Asset, // Empty

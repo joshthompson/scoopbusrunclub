@@ -24,8 +24,6 @@ import {
 	Vector3,
 } from '@babylonjs/core'
 import '@babylonjs/loaders/glTF'
-
-import { BUS_ROOF_Y } from './game/constants'
 import { createBusModel } from './game/objects/BusModel'
 import {
 	LIGHT_BACK_LEFT_POSITION,

@@ -14,7 +14,6 @@ import {
 	RUNNER_PRESETS,
 	generateRandomAppearance,
 	isCorgiPreset,
-	resolveRunnerAppearance,
 } from '../characters'
 import type { RunnerAppearance } from '../characters'
 import { createCorgiModel } from '../objects/CorgiModel'

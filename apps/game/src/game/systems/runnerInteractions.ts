@@ -5,7 +5,6 @@
  * they wave. If they pass very close they high-five instead.
  */
 
-import type { Vector3 } from '@babylonjs/core'
 import {
 	HIGH_FIVE_DURATION,
 	HIGH_FIVE_TRIGGER_DISTANCE,

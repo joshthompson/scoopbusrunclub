@@ -1,5 +1,5 @@
 import { BackSignButton } from '@/components/BackSignButton'
-import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { runners as runnerSignals } from '@/data/runners'
 import { getEvent, getEventName } from '@/utils/events'
 import {
 	JOURNEY_WAYPOINTS,

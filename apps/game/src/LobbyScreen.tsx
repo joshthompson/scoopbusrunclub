@@ -7,7 +7,7 @@ import {
 } from './game/modes'
 import type { GameType, TeamColor } from './game/modes'
 import levels from './levels'
-import { MAX_PLAYERS, generateRoomCode, lobby, mp } from './multiplayer'
+import { generateRoomCode, lobby, mp } from './multiplayer'
 
 /** Player colour CSS values (1-indexed) */
 const PLAYER_CSS_COLORS = ['#f0c820', '#d94030', '#3470d8', '#9940cc']

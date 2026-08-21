@@ -11,12 +11,11 @@
  *   - Scoopable: bus impact launches them ragdoll.
  *   - Has a 'running' state for moderate-speed movement (between walk and flee).
  */
-import { Mesh, MeshBuilder, type Scene, Vector3 } from '@babylonjs/core'
+import { MeshBuilder, type Scene, Vector3 } from '@babylonjs/core'
 import {
 	DEER_FLEE_RADIUS,
 	DEER_FLEE_SPEED,
 	DEER_HERD_MERGE_RADIUS,
-	DEER_HERD_RADIUS,
 	DEER_IDLE_MAX,
 	DEER_LANDED_DURATION,
 	DEER_MIN_SEPARATION,
@@ -38,7 +37,6 @@ import {
 	poseDeerSitting,
 	poseDeerWalking,
 } from '../objects/DeerModel'
-import type { DeerModelResult } from '../objects/DeerModel'
 import type { BuildingCollider, Deer, SolidObstacle, WaterZone } from '../types'
 import { resolvePositionAgainstBuildings } from './buildings'
 import { isInWaterZone } from './terrain'

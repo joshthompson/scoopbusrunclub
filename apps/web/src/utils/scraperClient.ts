@@ -18,7 +18,6 @@ import {
 import {
 	CLUBS_KEY,
 	type CapturedFile,
-	type ExtensionMessage,
 	type RunRequest,
 	type RunState,
 	type WorkItem,

@@ -9,7 +9,6 @@ import {
 } from '@babylonjs/core'
 import type { ElasticObject } from '../types'
 import { createFloodlightTemplates, placeFloodlight } from './Floodlight'
-import type { FloodlightTemplates } from './Floodlight'
 
 // ── Shared types ────────────────────────────────────────────────────────
 

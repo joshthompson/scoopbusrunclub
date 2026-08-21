@@ -10,7 +10,6 @@ import type { PathType } from './api'
  * - Export each data layer as JSON for copy-pasting into level files
  */
 import { levels, loadLevel } from './levels'
-import type { LevelData } from './levels/types'
 
 // ── Coordinate helpers ──────────────────────────────────────────────────
 
