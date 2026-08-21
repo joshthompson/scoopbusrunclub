@@ -48,6 +48,7 @@ import {
 	createCloudController,
 	createPlantController,
 	createSignController,
+	createSnowmanController,
 	createTreeController,
 } from './SceneryControllers'
 import { createShadowController } from './ShadowController'
@@ -413,6 +414,17 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 				)
 			$scene.addController(...trees)
 
+			// Add a snowman, in a gap between the trees. Added here so it sits at the
+			// trees' level — in front of them (it stands nearer, at the path's edge)
+			// but behind the volunteers and runners, who are added further down.
+			$scene.addController(
+				createSnowmanController(
+					'snowman',
+					trees.map((tree) => tree.data),
+					sceneWidth,
+				),
+			)
+
 			// Add flowers
 			const flowers = Array(100)
 				.fill(0)
@@ -497,8 +509,8 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			? `
 				linear-gradient(
 					to bottom,
-					color-mix(in srgb, var(--sky-blue-top) 35%, gray 35%),
-					color-mix(in srgb, var(--sky-blue-bottom) 35%, gray 35%)
+					color-mix(in srgb, var(--sky-blue-top) 35%, gray 30%),
+					color-mix(in srgb, var(--sky-blue-bottom) 35%, gray 30%)
 				)
 			`
 			: 'none'

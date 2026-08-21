@@ -80,6 +80,7 @@ function bucketForCode(code: string): WeatherType {
 		case 'F': // Fog
 		case 'ZF': // Freezing fog
 		case 'IF': // Ice fog
+		case 'H': // Haze
 			return 'fog'
 
 		// --- Clear (for now): cloud/fog/haze/dust/wind/misc + unknown ---
@@ -88,7 +89,6 @@ function bucketForCode(code: string): WeatherType {
 		case 'BY': // Blowing spray
 		case 'FC': // Funnel cloud
 		case 'FR': // Frost
-		case 'H': // Haze
 		case 'IC': // Ice crystals
 		case 'K': // Smoke
 		case 'TO': // Tornado
