@@ -38,6 +38,7 @@ export type RunnerState =
 	| 'photographer'
 	| 'run-director'
 	| 'marshal'
+	| 'number-checker'
 
 export interface RunnerData {
 	name: string
@@ -57,6 +58,7 @@ export interface RunnerData {
 		runDirector: string[] | undefined
 		marshal: string[] | undefined
 		volunteerGeneric: string[] | undefined // All other volunteer roles that don't have a specific sprite
+		numberChecker: string[] | undefined // For the runner who checks numbers at the finish line
 	}
 	runnerState?: RunnerState
 	width: number
@@ -113,6 +115,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: [assets.joshNumberChecker],
 		},
 		width: 21,
 		height: 28,
@@ -142,6 +145,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,
@@ -178,6 +182,7 @@ export const runners: Record<
 			runDirector: [assets.claireRunDirector],
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,
@@ -214,6 +219,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: [assets.lyraMarshal],
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,
@@ -243,6 +249,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 30,
@@ -279,6 +286,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: [assets.annaMarshal],
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,
@@ -308,6 +316,7 @@ export const runners: Record<
 			photographer: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,
@@ -337,6 +346,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: [assets.rickMarshal],
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,
@@ -366,6 +376,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,
@@ -395,6 +406,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 49,
 		height: 30,
@@ -432,6 +444,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,
@@ -461,6 +474,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 20,
 		height: 28,
@@ -500,6 +514,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,
@@ -529,6 +544,7 @@ export const runners: Record<
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,

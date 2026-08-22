@@ -1,10 +1,10 @@
-import { generateFrames } from '@/utils'
-import type { RunnerData } from '../data/runners'
 import {
 	type SpritePixelData,
 	runPixels,
 	sitPixels,
 } from '@/assets/runners/custom/pixel-data.generated'
+import { generateFrames } from '@/utils'
+import type { RunnerData } from '../data/runners'
 
 type HexColor = string
 type SkinColor = 'light' | 'medium' | 'dark'
@@ -50,6 +50,7 @@ export function createRunnerFrames(
 			runDirector: undefined,
 			marshal: undefined,
 			volunteerGeneric: undefined,
+			numberChecker: undefined,
 		},
 		width: 21,
 		height: 28,

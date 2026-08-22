@@ -16,6 +16,7 @@ const STANDING_STATES: RunnerState[] = [
 	'photographer',
 	'run-director',
 	'marshal',
+	'number-checker',
 ]
 
 export function isStandingState(state: RunnerState): boolean {
@@ -246,6 +247,8 @@ export function createRunnerController(
 				else if (state === 'photographer') frames = runner().frames.photographer
 				else if (state === 'run-director') frames = runner().frames.runDirector
 				else if (state === 'marshal') frames = runner().frames.marshal
+				else if (state === 'number-checker')
+					frames = runner().frames.numberChecker
 
 				// Fall back to volunteerGeneric, then sit frame if no specific sprite
 				if (!frames) frames = runner().frames.volunteerGeneric

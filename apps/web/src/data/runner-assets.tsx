@@ -42,6 +42,7 @@ export { default as joshFace } from '@/assets/runners/josh/face.png'
 export { default as joshScanner } from '@/assets/runners/josh/scanner.png'
 export { default as joshTailWalk } from '@/assets/runners/josh/tail-walk.png'
 export { default as joshTailSit } from '@/assets/runners/josh/tail-sit.png'
+export { default as joshNumberChecker } from '@/assets/runners/josh/number-checker.png'
 
 export { default as keithRun } from '@/assets/runners/keith/run.png'
 export { default as keithSit } from '@/assets/runners/keith/sit.png'
