@@ -9,7 +9,7 @@ import {
 	journeyMilestonesByDate,
 } from '@/utils/journey'
 import { getMemberRoute } from '@/utils/memberRoute'
-import { formatDate, formatName, ordinal } from '@/utils/misc'
+import { formatDate, formatName, formatRaceTime, ordinal } from '@/utils/misc'
 import { isParkrunTrip, withoutReportedTrips } from '@/utils/parkrunTrips'
 import { getSpecialDayName } from '@/utils/special-days'
 import { A, useNavigate } from '@solidjs/router'
@@ -199,10 +199,6 @@ function getDisplayName(name: string, resultCount: number) {
 	if (name !== 'Haga' && resultCount >= 4) return `Scoop Bus trip to ${name}`
 	if (resultCount === totalMembers) return `Full Scoop Gang at ${name}`
 	return name
-}
-
-function formatRaceTime(time: string): string {
-	return time
 }
 
 /** Render a string, converting *text* segments to bold <em> elements */
@@ -697,7 +693,8 @@ export function LatestResults(props: LatestResultsProps) {
 																		({gr.guestExtra})
 																	</Show>{' '}
 																	finished in <em>{ordinal(gr.position)}</em>{' '}
-																	place with a time of <em>{gr.time}</em>
+																	place with a time of{' '}
+																	<em>{formatRaceTime(gr.time)}</em>
 																	<span class={styles.guestTag}>
 																		Guest <Emoji emoji="👋" animation="wave" />
 																	</span>
@@ -740,7 +737,8 @@ export function LatestResults(props: LatestResultsProps) {
 																	</Show>
 																</em>{' '}
 																finished in <em>{ordinal(res.position)}</em>{' '}
-																place with a time of <em>{res.time}</em>
+																place with a time of{' '}
+																<em>{formatRaceTime(res.time)}</em>
 																<ResultCelebrations
 																	data={celebrations()}
 																	resultKey={resultKey}
