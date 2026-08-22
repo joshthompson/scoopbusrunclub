@@ -423,7 +423,8 @@ function JourneyMilestoneBlock(props: { milestone: JourneyMilestone }) {
 					<Emoji emoji="🚌" />{' '}
 					<A href="/everyone" class={styles.parkrunNameLink}>
 						{journeyMilestoneTitle(props.milestone.waypoint)}
-					</A>
+					</A>{' '}
+					<Emoji emoji={props.milestone.waypoint.emoji} />
 				</h4>
 				<p class={styles.journeyDetail}>
 					{journeyMilestoneDetail(props.milestone.waypoint)}
