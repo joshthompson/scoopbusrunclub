@@ -80,6 +80,22 @@ export const guestRunners: Record<
 	[Accessor<RunnerData>, Setter<RunnerData>]
 > = {}
 
+/** Visitor-created racers, keyed `custom_<id>`, registered by the header at load. */
+export const customRacerRunners: Record<
+	string,
+	[Accessor<RunnerData>, Setter<RunnerData>]
+> = {}
+
+/**
+ * Resolve any runner the header knows about — club member, guest, or a racer a
+ * visitor made — since the scene treats all three the same once they're running.
+ */
+export function findRunnerSignal(
+	id: string,
+): [Accessor<RunnerData>, Setter<RunnerData>] | undefined {
+	return runners[id as RunnerName] ?? guestRunners[id] ?? customRacerRunners[id]
+}
+
 export const runners: Record<
 	RunnerName,
 	[Accessor<RunnerData>, Setter<RunnerData>]

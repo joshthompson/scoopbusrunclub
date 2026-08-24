@@ -65,6 +65,15 @@ export const AdminLayout: Component<{
 							Parkruns
 						</A>
 						<A
+							href="/admin/custom-racers"
+							class={cx(
+								styles.navLink,
+								isActive('/admin/custom-racers') ? styles.navLinkActive : '',
+							)}
+						>
+							Custom Racers
+						</A>
+						<A
 							href="/admin/scan"
 							class={cx(
 								styles.navLink,

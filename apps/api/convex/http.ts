@@ -1305,6 +1305,136 @@ http.route({
 	}),
 })
 
+// --- Custom racers (visitor-created runners) ---
+
+/**
+ * Convex sits behind a proxy, so the socket address is useless — the client's
+ * address is the first entry of `x-forwarded-for`. Only used for rate limiting
+ * and for linking abusive submissions in the admin page.
+ */
+function clientIp(request: Request): string {
+	const forwarded = request.headers.get('x-forwarded-for') ?? ''
+	const first = forwarded.split(',')[0]?.trim()
+	return first || request.headers.get('cf-connecting-ip') || ''
+}
+
+// --- GET /api/custom-racers (public) ---
+
+http.route({
+	path: '/api/custom-racers',
+	method: 'GET',
+	handler: httpAction(async (ctx) => {
+		const racers = await ctx.runQuery(api.customRacers.listPublic)
+		return jsonResponse(racers)
+	}),
+})
+
+// --- GET /api/custom-racers/mine?secretId=<id> ---
+
+http.route({
+	path: '/api/custom-racers/mine',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const secretId = url.searchParams.get('secretId') ?? ''
+		const result = await ctx.runQuery(api.customRacers.listMine, { secretId })
+		return jsonResponse(result)
+	}),
+})
+
+// --- POST /api/custom-racers (public, rate limited by IP + browser id) ---
+
+http.route({
+	path: '/api/custom-racers',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.customRacers.create, {
+			name: body.name ?? '',
+			avatar: body.avatar,
+			speed: typeof body.speed === 'number' ? body.speed : 0.5,
+			secretId: body.secretId ?? '',
+			ip: clientIp(request),
+		})
+		if ('error' in result) {
+			// 429 for "you've had your five", 409 for "the header is full"
+			const status =
+				result.error === 'limit' ? 429 : result.error === 'full' ? 409 : 400
+			return jsonResponse(result, status)
+		}
+		return jsonResponse(result)
+	}),
+})
+
+// --- Admin: GET /api/admin/custom-racers ---
+
+http.route({
+	path: '/api/admin/custom-racers',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const token = url.searchParams.get('token') ?? ''
+		const [racers, approval] = await Promise.all([
+			ctx.runQuery(api.customRacers.listAdmin, { token }),
+			ctx.runQuery(api.customRacers.getApprovalMode, { token }),
+		])
+		return jsonResponse({ racers, approvalRequired: approval.required })
+	}),
+})
+
+// --- Admin: PUT /api/admin/custom-racers ---
+
+http.route({
+	path: '/api/admin/custom-racers',
+	method: 'PUT',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.customRacers.adminUpdate, {
+			token: body.token ?? '',
+			racerId: body.racerId,
+			name: body.name,
+			status: body.status,
+		})
+		if ('error' in result) return jsonResponse({ error: result.error }, 400)
+		return jsonResponse(result)
+	}),
+})
+
+// --- Admin: DELETE /api/admin/custom-racers ---
+
+http.route({
+	path: '/api/admin/custom-racers',
+	method: 'DELETE',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const token = url.searchParams.get('token') ?? ''
+		const racerId = url.searchParams.get('id') ?? ''
+		const result = await ctx.runMutation(api.customRacers.adminRemove, {
+			token,
+			// biome-ignore lint/suspicious/noExplicitAny: Convex ID cast from URL param
+			racerId: racerId as any,
+		})
+		if ('error' in result) return jsonResponse({ error: result.error }, 400)
+		return jsonResponse(result)
+	}),
+})
+
+// --- Admin: POST /api/admin/custom-racers/approval ---
+
+http.route({
+	path: '/api/admin/custom-racers/approval',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.customRacers.setApprovalMode, {
+			token: body.token ?? '',
+			required: Boolean(body.required),
+		})
+		if ('error' in result) return jsonResponse({ error: result.error }, 400)
+		return jsonResponse(result)
+	}),
+})
+
 // --- CORS preflight for all API routes ---
 
 for (const path of [
@@ -1342,6 +1472,10 @@ for (const path of [
 	'/api/largest-clubs/all',
 	'/api/ingest-largest-clubs',
 	'/api/admin/manual-ingest',
+	'/api/custom-racers',
+	'/api/custom-racers/mine',
+	'/api/admin/custom-racers',
+	'/api/admin/custom-racers/approval',
 ]) {
 	http.route({
 		path,

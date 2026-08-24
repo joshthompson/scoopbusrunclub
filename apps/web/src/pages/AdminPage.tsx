@@ -3,6 +3,7 @@ import { AuthGuard } from '@/components/admin/AuthGuard'
 import type { Component } from 'solid-js'
 import { AccountPage } from './admin/AccountPage'
 import { AdvancedUploadPage } from './admin/AdvancedUploadPage'
+import { CustomRacersPage } from './admin/CustomRacersPage'
 import { EventLogsPage } from './admin/EventLogsPage'
 import { EventsPage } from './admin/EventsPage'
 import { ParkrunsPage } from './admin/ParkrunsPage'
@@ -66,6 +67,16 @@ export const AdminRunnersPage: Component = () => {
 		<AuthGuard>
 			<AdminLayout>
 				<RunnersPage />
+			</AdminLayout>
+		</AuthGuard>
+	)
+}
+
+export const AdminCustomRacersPage: Component = () => {
+	return (
+		<AuthGuard>
+			<AdminLayout>
+				<CustomRacersPage />
 			</AdminLayout>
 		</AuthGuard>
 	)

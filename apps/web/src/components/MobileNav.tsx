@@ -45,6 +45,12 @@ function navItems(): NavItem[] {
 		},
 		// Everything below here lands in the "More" sheet
 		{
+			href: '/custom-racer/add',
+			label: 'Add Racer',
+			fullLabel: 'Add Your Own Racer',
+			emoji: '🎽',
+		},
+		{
 			href: '/largestclubs',
 			label: 'Largest Clubs',
 			fullLabel: 'Largest Clubs',

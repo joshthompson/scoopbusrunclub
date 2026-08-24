@@ -25,6 +25,7 @@ import { AboutPage } from './pages/AboutPage'
 import {
 	AdminAccountPage,
 	AdminAdvancedUploadPage,
+	AdminCustomRacersPage,
 	AdminLogsPage,
 	AdminPage,
 	AdminParkrunsPage,
@@ -37,6 +38,8 @@ import { AlphabetPage } from './pages/AlphabetPage'
 import { CalendarPage } from './pages/CalendarPage'
 import { ComparePage } from './pages/ComparePage'
 import { ConnectionsPage } from './pages/ConnectionsPage'
+import { CustomRacerAddPage } from './pages/CustomRacerAddPage'
+import { CustomRacersPage } from './pages/CustomRacersPage'
 import { EventPage } from './pages/EventPage'
 import { EveryonePage } from './pages/EveryonePage'
 import { FaqPage } from './pages/FaqPage'
@@ -62,6 +65,7 @@ import {
 	fetchWeather,
 	getCached,
 } from './utils/api'
+import { fetchHeaderRacers } from './utils/customRacers'
 import { loadEvents } from './utils/events'
 import { isSnowy, reportSnowDepth } from './utils/snow'
 import { parseWeather, reportWeatherType, weatherType } from './utils/weather'
@@ -76,6 +80,8 @@ const App: Component = () => {
 	const [volunteers] = createResource(fetchVolunteers)
 	const [guestResults] = createResource(fetchGuestResults)
 	const [guests] = createResource(fetchGuests)
+	// Racers made by visitors, live in the header for a week each
+	const [customRacers] = createResource(fetchHeaderRacers)
 
 	// Populate the event name lookup cache
 	createResource(loadEvents)
@@ -107,8 +113,15 @@ const App: Component = () => {
 		const v = volunteers()
 		const gr = guestResults()
 		const g = guests()
-		if (!r || !u || !v || !gr || !g) return null
-		return { results: r, volunteers: v, guestResults: gr, guests: g }
+		const cr = customRacers()
+		if (!r || !u || !v || !gr || !g || !cr) return null
+		return {
+			results: r,
+			volunteers: v,
+			guestResults: gr,
+			guests: g,
+			customRacers: cr,
+		}
 	})
 
 	const RootLayout: Component<RouteSectionProps> = (routeProps) => {
@@ -128,6 +141,7 @@ const App: Component = () => {
 								volunteers={data().volunteers}
 								guestResults={data().guestResults}
 								guests={data().guests}
+								customRacers={data().customRacers}
 								weatherType={weatherType()}
 							/>
 						)}
@@ -299,6 +313,17 @@ const App: Component = () => {
 						</Show>
 					)}
 				/>
+				<Route path="/custom-racer" component={CustomRacersPage} />
+				<Route path="/custom-racer/add" component={CustomRacerAddPage} />
+				{/* The feature was specced as "customer-racer" in places — keep both working. */}
+				<Route
+					path="/customer-racer"
+					component={() => <Navigate href="/custom-racer" />}
+				/>
+				<Route
+					path="/customer-racer/add"
+					component={() => <Navigate href="/custom-racer/add" />}
+				/>
 				<Route path="/admin" component={AdminPage} />
 				<Route path="/admin/scan" component={AdminScanPage} />
 				<Route path="/admin/users" component={AdminUsersPage} />
@@ -306,6 +331,7 @@ const App: Component = () => {
 				<Route path="/admin/account" component={AdminAccountPage} />
 				<Route path="/admin/runners" component={AdminRunnersPage} />
 				<Route path="/admin/parkruns" component={AdminParkrunsPage} />
+				<Route path="/admin/custom-racers" component={AdminCustomRacersPage} />
 				<Route
 					path="/admin/process-results"
 					component={AdminProcessResultsPage}

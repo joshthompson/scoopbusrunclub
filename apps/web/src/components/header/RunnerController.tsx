@@ -1,8 +1,8 @@
 import {
 	RUNNER_SIZE,
 	type RunnerState,
-	guestRunners,
-	runners,
+	findRunnerSignal,
+	type runners,
 } from '@/data/runners'
 import { type Scene, createController, createObjectSignal } from '@/engine'
 import { css } from '@style/css'
@@ -105,8 +105,7 @@ export function createRunnerController(
 	scene: Scene,
 	mousePosition: Accessor<{ x: number; y: number }>,
 ) {
-	const [runner] =
-		runners[runnerId as keyof typeof runners] ?? guestRunners[runnerId] ?? []
+	const [runner] = findRunnerSignal(runnerId) ?? []
 	if (!runner) throw new Error(`Runner "${runnerId}" not found`)
 	const runFrames = () => runner().frames.run ?? []
 	const baseY = 124 + yShift

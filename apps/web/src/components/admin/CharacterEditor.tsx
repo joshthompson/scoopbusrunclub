@@ -386,23 +386,37 @@ const styles = {
 		gap: '0.5rem',
 		alignItems: 'flex-end',
 	}),
+	// Matches AdminSelect's own label, so a colour sits level with the dropdown
+	// it belongs to rather than floating below it.
 	colorLabel: css({
 		display: 'flex',
 		flexDirection: 'column',
 		gap: '0.25rem',
-		fontSize: '0.7rem',
+		fontSize: '0.8rem',
 		fontWeight: 'bold',
 		textTransform: 'uppercase',
 		letterSpacing: '0.05em',
 	}),
+	/**
+	 * Wears the same chrome as AdminSelect — notched dirt-brown frame, dark fill,
+	 * the medium size's 41px height — with the swatch stripped of its own border
+	 * so the chosen colour fills the frame instead of sitting in a browser chip.
+	 */
 	colorInput: css({
-		width: '36px',
-		height: '28px',
-		padding: '2px',
-		border: '2px solid var(--overlay-black-25)',
+		appearance: 'none',
+		width: '46px',
+		height: '41px',
+		padding: '4px',
+		border: '2px solid var(--dirt-darker-brown)',
+		cornerShape: 'notch',
 		borderRadius: '4px',
+		background: 'var(--overlay-black-30)',
 		cursor: 'pointer',
-		background: 'none',
+		outline: 'none',
+		_focus: { background: 'var(--dirt-dark-brown)' },
+		'&::-webkit-color-swatch-wrapper': { padding: 0 },
+		'&::-webkit-color-swatch': { border: 'none', borderRadius: '2px' },
+		'&::-moz-color-swatch': { border: 'none', borderRadius: '2px' },
 	}),
 	checkLabel: css({
 		display: 'flex',

@@ -333,6 +333,79 @@ export async function deleteGuest(
 	return res.json()
 }
 
+// ── Custom Racers API ───────────────────────────────────────────────
+
+export type CustomRacerStatus = 'active' | 'pending' | 'hidden'
+
+export interface AdminCustomRacer {
+	_id: string
+	name: string
+	avatar: Record<string, unknown>
+	speed: number
+	/** Groups submissions from the same browser, even under different names. */
+	secretId: string
+	ip: string
+	status: CustomRacerStatus
+	/** Why the auto-block hid it — admin eyes only. */
+	flagReason?: string
+	editedByAdmin?: boolean
+	createdAt: number
+	expiresAt: number
+}
+
+export async function fetchAdminCustomRacers(): Promise<{
+	racers: AdminCustomRacer[]
+	approvalRequired: boolean
+}> {
+	const token = getAuthToken()
+	if (!token) return { racers: [], approvalRequired: false }
+	const res = await fetch(
+		`${CONVEX_URL}/api/admin/custom-racers?token=${encodeURIComponent(token)}`,
+	)
+	if (!res.ok) return { racers: [], approvalRequired: false }
+	return res.json()
+}
+
+export async function updateCustomRacer(
+	racerId: string,
+	data: { name?: string; status?: CustomRacerStatus },
+): Promise<{ ok?: boolean; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const res = await fetch(`${CONVEX_URL}/api/admin/custom-racers`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token, racerId, ...data }),
+	})
+	return res.json()
+}
+
+export async function deleteCustomRacer(
+	racerId: string,
+): Promise<{ ok?: boolean; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const res = await fetch(
+		`${CONVEX_URL}/api/admin/custom-racers?token=${encodeURIComponent(token)}&id=${encodeURIComponent(racerId)}`,
+		{ method: 'DELETE' },
+	)
+	return res.json()
+}
+
+/** Flip the "new racers wait for approval" switch, for if the feature gets abused. */
+export async function setCustomRacerApproval(
+	required: boolean,
+): Promise<{ ok?: boolean; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const res = await fetch(`${CONVEX_URL}/api/admin/custom-racers/approval`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token, required }),
+	})
+	return res.json()
+}
+
 // ── Guest Results API ───────────────────────────────────────────────
 
 export async function addGuestResult(data: {

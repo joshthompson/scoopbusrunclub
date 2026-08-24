@@ -153,11 +153,7 @@ export default defineSchema({
 				shoeColor: v.string(),
 				head: v.object({
 					hair: v.optional(
-						v.union(
-							v.literal('long'),
-							v.literal('medium'),
-							v.literal('short'),
-						),
+						v.union(v.literal('long'), v.literal('medium'), v.literal('short')),
 					),
 					hairColor: v.optional(v.string()),
 					accessory: v.optional(
@@ -209,6 +205,74 @@ export default defineSchema({
 		.index('by_week', ['week'])
 		.index('by_name', ['name'])
 		.index('by_unique_snapshot', ['name', 'week']),
+
+	// --- Custom racers (created by visitors, live in the header for a week) ---
+
+	customRacers: defineTable({
+		name: v.string(),
+		avatar: v.object({
+			topType: v.union(
+				v.literal('vest'),
+				v.literal('tshirt'),
+				v.literal('longsleeve'),
+			),
+			bottomType: v.union(
+				v.literal('short-shorts'),
+				v.literal('shorts'),
+				v.literal('trousers'),
+			),
+			skin: v.union(v.literal('light'), v.literal('medium'), v.literal('dark')),
+			topColor: v.string(),
+			bottomColor: v.string(),
+			showColor: v.string(),
+			sockColor: v.optional(v.string()),
+			shoeColor: v.string(),
+			head: v.object({
+				hair: v.optional(
+					v.union(v.literal('long'), v.literal('medium'), v.literal('short')),
+				),
+				hairColor: v.optional(v.string()),
+				accessory: v.optional(
+					v.union(
+						v.literal('cap'),
+						v.literal('headband'),
+						v.literal('glasses'),
+					),
+				),
+				accessoryColor: v.optional(v.string()),
+				facialHair: v.optional(
+					v.union(v.literal('beard'), v.literal('stubble'), v.literal('long')),
+				),
+				facialHairColor: v.optional(v.string()),
+				topColorForNeck: v.optional(v.boolean()),
+			}),
+		}),
+		/** 0 = slowest, 1 = fastest. Mapped onto the header's speed range at render. */
+		speed: v.number(),
+		/** Random per-browser id, so a visitor can see (and be linked to) their own racers. */
+		secretId: v.string(),
+		ip: v.string(),
+		/**
+		 * `active` runs in the header; `hidden` is a shadow ban — still visible to
+		 * its creator, invisible to everyone else; `pending` awaits admin approval,
+		 * which is off unless the `customRacerApproval` app-data key says otherwise.
+		 */
+		status: v.union(
+			v.literal('active'),
+			v.literal('pending'),
+			v.literal('hidden'),
+		),
+		/** Why it was auto-hidden, e.g. "matched blocked term". Admin-only. */
+		flagReason: v.optional(v.string()),
+		/** True once an admin has renamed it, so we don't re-run the auto-block. */
+		editedByAdmin: v.optional(v.boolean()),
+		createdAt: v.number(),
+		expiresAt: v.number(),
+	})
+		.index('by_secretId', ['secretId'])
+		.index('by_ip', ['ip'])
+		.index('by_expiresAt', ['expiresAt'])
+		.index('by_createdAt', ['createdAt']),
 
 	// --- App-level key/value store ---
 

@@ -14,6 +14,8 @@ import {
 	type RunnerData,
 	type RunnerName,
 	type RunnerState,
+	customRacerRunners,
+	findRunnerSignal,
 	guestRunners,
 	hasHeaderArtwork,
 	runners,
@@ -27,12 +29,14 @@ import type {
 } from '@/utils/api'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
+import type { CustomRacer } from '@/utils/customRacers'
+import { racerSpeedToHeaderSpeed } from '@/utils/customRacers'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { moonAsset } from '@/utils/moonAsset'
 import { snowyAsset } from '@/utils/snow'
 import type { WeatherType } from '@/utils/weather'
-import { useNavigate } from '@solidjs/router'
-import { css } from '@style/css'
+import { A, useNavigate } from '@solidjs/router'
+import { css, cx } from '@style/css'
 import { createSignal, onCleanup, onMount } from 'solid-js'
 import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
@@ -271,7 +275,72 @@ interface ScoopBusHeaderProps {
 	volunteers: VolunteerItem[]
 	guestResults: GuestResultItem[]
 	guests: GuestItem[]
+	customRacers: CustomRacer[]
 	weatherType: WeatherType
+}
+
+/** A neutral kit, for a guest or racer whose stored avatar won't parse. */
+const FALLBACK_AVATAR: CharacterSpriteProps = {
+	topType: 'tshirt',
+	bottomType: 'shorts',
+	skin: 'light',
+	topColor: '#888888',
+	bottomColor: '#333333',
+	showColor: '#888888',
+	shoeColor: '#222222',
+	head: {},
+}
+
+/**
+ * The spread of club runners' speeds, which visitor-created racers are placed
+ * against. Falls back to a plausible band on the first load, before any results
+ * have set real speeds.
+ */
+function clubSpeedBand(): { slowest: number; fastest: number } {
+	let slowest = Number.POSITIVE_INFINITY
+	let fastest = 0
+	for (const [, [getter]] of Object.entries(runners)) {
+		const data = getter()
+		if (!hasHeaderArtwork(data)) continue
+		slowest = Math.min(slowest, data.speed)
+		fastest = Math.max(fastest, data.speed)
+	}
+	if (!Number.isFinite(slowest) || fastest === 0) {
+		return { slowest: 2, fastest: 3.5 }
+	}
+	return { slowest, fastest }
+}
+
+/**
+ * Register the racers visitors have made, so they run alongside the club. Their
+ * stored speed is a 0–1 slider value, not a real one — the club's own spread is
+ * what turns it into a pace.
+ */
+function registerCustomRacers(racers: CustomRacer[]) {
+	const { slowest, fastest } = clubSpeedBand()
+
+	for (const racer of racers) {
+		const key = `custom_${racer._id}`
+		if (customRacerRunners[key]) continue
+
+		let frames: Pick<RunnerData, 'frames' | 'width' | 'height'>
+		try {
+			frames = createRunnerFrames(racer.avatar ?? FALLBACK_AVATAR)
+		} catch {
+			continue // Unparseable avatar — leave them out rather than crash the header
+		}
+
+		const speed = racerSpeedToHeaderSpeed(racer.speed, slowest, fastest)
+		customRacerRunners[key] = createSignal<RunnerData>({
+			name: racer.name,
+			id: racer._id,
+			birthday: '01/01',
+			joined: -1,
+			...frames,
+			speed,
+			frameInterval: 186 - 31 * speed,
+		})
+	}
 }
 
 function registerGuestRunners(
@@ -358,6 +427,10 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		props.guests,
 	)
 
+	// Register the racers visitors have made — must run after the club speeds are
+	// set above, since their pace is derived from the club's spread
+	registerCustomRacers(props.customRacers)
+
 	const sceneWidth = window.innerWidth
 	const scene = new Scene('header', {
 		width: sceneWidth,
@@ -371,7 +444,10 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			const guestRunnerIds = Object.keys(guestRunners).filter((key) =>
 				hasHeaderArtwork(guestRunners[key][0]()),
 			)
-			const allRunnerIds = [...runnerIds, ...guestRunnerIds]
+			const customRacerIds = Object.keys(customRacerRunners).filter((key) =>
+				hasHeaderArtwork(customRacerRunners[key][0]()),
+			)
+			const allRunnerIds = [...runnerIds, ...guestRunnerIds, ...customRacerIds]
 			const runnerControllers = allRunnerIds
 				.map((runnerId, i) =>
 					createRunnerController(
@@ -441,17 +517,13 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
 			// Split runners into standing (render behind bus) and moving (render in front)
 			const standingRunners = runnerControllers.filter((r) => {
-				const entry =
-					runners[r.data.runnerId as keyof typeof runners] ??
-					guestRunners[r.data.runnerId]
+				const entry = findRunnerSignal(r.data.runnerId)
 				if (!entry) return false
 				const [runner] = entry
 				return isStandingState(runner().runnerState ?? 'run')
 			})
 			const movingRunners = runnerControllers.filter((r) => {
-				const entry =
-					runners[r.data.runnerId as keyof typeof runners] ??
-					guestRunners[r.data.runnerId]
+				const entry = findRunnerSignal(r.data.runnerId)
 				if (!entry) return true
 				const [runner] = entry
 				return !isStandingState(runner().runnerState ?? 'run')
@@ -517,7 +589,13 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			: 'none'
 
 	return (
-		<div aria-label="Welcome to the Scoop Bus Run Club!">
+		<div
+			class={cx('header-wrapper', styles.wrapper)}
+			aria-label="Welcome to the Scoop Bus Run Club!"
+		>
+			<A href="/custom-racer/add" class={styles.addRacer}>
+				+ Add Racer
+			</A>
 			<div aria-hidden="true" class={styles.root}>
 				<div class={styles.underlay}>
 					<div
@@ -591,7 +669,9 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 								.sort((a, b) => a.dist - b.dist)[0]
 
 							if (closest) {
-								if (closest.runnerId.startsWith('guest_')) {
+								if (closest.runnerId.startsWith('custom_')) {
+									navigate('/custom-racer')
+								} else if (closest.runnerId.startsWith('guest_')) {
 									const entry = guestRunners[closest.runnerId]
 									if (entry) {
 										navigate(`/guests/${entry[0]().id}`)
@@ -621,6 +701,56 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 }
 
 const styles = {
+	wrapper: css({
+		position: 'relative',
+	}),
+	/**
+	 * Sits above the canvas rather than inside it, so it stays a real link — the
+	 * scene is `aria-hidden` and swallows every click into its own navigation.
+	 * Hidden until the header is hovered, but always there for keyboard users and
+	 * on touch devices, where there is no hover to reveal it with.
+	 */
+	addRacer: css({
+		position: 'absolute',
+		top: '0.75rem',
+		right: '0.75rem',
+		zIndex: 102,
+		padding: '0.4rem 0.9rem',
+		border: '3px double currentColor',
+		borderRadius: '4px',
+		cornerShape: 'notch',
+		background: 'var(--overlay-white-70)',
+		color: 'var(--grey-900)',
+		fontWeight: 'bold',
+		fontSize: '0.8rem',
+		textTransform: 'uppercase',
+		textDecoration: 'none',
+		whiteSpace: 'nowrap',
+		opacity: 0,
+		pointerEvents: 'none',
+		transition: 'opacity 150ms ease-out',
+		_hover: {
+			background: 'var(--overlay-white-80)',
+		},
+		'.header-wrapper:hover &': {
+			opacity: 1,
+			pointerEvents: 'auto',
+		},
+		_focusVisible: {
+			opacity: 1,
+			pointerEvents: 'auto',
+		},
+		// A touch device has no hover to reveal it with, so it just stays put —
+		// but only above the mobile breakpoint. Below that the bottom nav owns
+		// navigation and carries "Add Your Own Racer" behind its burger instead.
+		'@media (hover: none) and (min-width: 769px)': {
+			opacity: 1,
+			pointerEvents: 'auto',
+		},
+		'@media (max-width: 768px)': {
+			display: 'none',
+		},
+	}),
 	root: css({
 		position: 'relative',
 	}),
