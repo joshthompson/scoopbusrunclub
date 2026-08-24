@@ -47,6 +47,7 @@ import { MapPage } from './pages/MapPage'
 import { MemberGraphPage } from './pages/MemberGraphPage'
 import { MemberPage } from './pages/MemberPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { PositionBingoPage } from './pages/PositionBingoPage'
 import { ReplayPage } from './pages/ReplayPage'
 import { StopwatchBingoPage } from './pages/StopwatchBingoPage'
 import { WrappedExplorePage } from './pages/WrappedExplorePage'
@@ -232,6 +233,20 @@ const App: Component = () => {
 							fallback={<div class={styles.loading}>Loading...</div>}
 						>
 							<AlphabetPage
+								results={results() ?? []}
+								runners={runners() ?? []}
+							/>
+						</Show>
+					)}
+				/>
+				<Route
+					path="/member/:name/position"
+					component={() => (
+						<Show
+							when={!results.loading && !runners.loading}
+							fallback={<div class={styles.loading}>Loading...</div>}
+						>
+							<PositionBingoPage
 								results={results() ?? []}
 								runners={runners() ?? []}
 							/>

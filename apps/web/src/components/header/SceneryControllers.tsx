@@ -212,7 +212,7 @@ export function createSnowmanController(
 				width: () => SNOWMAN_WIDTH,
 				height: () => SNOWMAN_HEIGHT,
 				x: () => x,
-				y: () => PATH_TOP_Y - SNOWMAN_HEIGHT,
+				y: () => PATH_TOP_Y - SNOWMAN_HEIGHT - 30,
 				frameInterval: () => Number.POSITIVE_INFINITY,
 				class: () => (isSnowy() ? '' : snowmanHidden),
 			}

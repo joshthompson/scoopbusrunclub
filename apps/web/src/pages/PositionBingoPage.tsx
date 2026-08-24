@@ -2,25 +2,21 @@ import { BackSignButton } from '@/components/BackSignButton'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
 import type { RunResultItem, Runner } from '@/utils/api'
-import {
-	computeBingoProgress,
-	expectedRunsRemaining,
-	runsVsAverage,
-} from '@/utils/bingo'
+import { computeBingoProgress } from '@/utils/bingo'
 import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
-import { formatDate, parseTimeToSeconds } from '@/utils/misc'
-import { BINGO_SLOTS } from '@/utils/stopwatchBingo'
+import { formatDate } from '@/utils/misc'
+import { POSITION_SLOTS, positionSlot } from '@/utils/positionBingo'
 import { A, useParams } from '@solidjs/router'
 import { css, cva } from '@style/css'
 import { For, Show, createMemo, createSignal } from 'solid-js'
 import { NotFoundPage } from './NotFoundPage'
 
-interface StopwatchBingoPageProps {
+interface PositionBingoPageProps {
 	results: RunResultItem[]
 	runners: Runner[]
 }
 
-function BingoRow(props: { second: number; occurrences: RunResultItem[] }) {
+function BingoRow(props: { slot: number; occurrences: RunResultItem[] }) {
 	const [expanded, setExpanded] = createSignal(false)
 	const achieved = () => props.occurrences.length > 0
 	const first = () => props.occurrences[0]
@@ -28,7 +24,7 @@ function BingoRow(props: { second: number; occurrences: RunResultItem[] }) {
 
 	return (
 		<div class={styles.row({ achieved: achieved() })}>
-			<div class={styles.second}>{String(props.second).padStart(2, '0')}</div>
+			<div class={styles.slot}>{String(props.slot).padStart(2, '0')}</div>
 			<div class={styles.content}>
 				<Show
 					when={achieved()}
@@ -51,7 +47,8 @@ function BingoRow(props: { second: number; occurrences: RunResultItem[] }) {
 						</Show>
 					</div>
 					<div class={styles.meta}>
-						<strong>{first().time}</strong> ·{' '}
+						<strong>#{first().position}</strong>
+						{' - '}
 						{formatDate(new Date(`${first().date}T00:00:00`))}
 					</div>
 
@@ -59,7 +56,7 @@ function BingoRow(props: { second: number; occurrences: RunResultItem[] }) {
 						<For each={rest()}>
 							{(occurrence) => (
 								<div class={styles.meta}>
-									<strong>{occurrence.time}</strong> at{' '}
+									<strong>#{occurrence.position}</strong> at{' '}
 									<A href={`/event/${occurrence.event}`} class={styles.event}>
 										{occurrence.eventName}
 									</A>
@@ -78,7 +75,7 @@ function BingoRow(props: { second: number; occurrences: RunResultItem[] }) {
 	)
 }
 
-export function StopwatchBingoPage(props: StopwatchBingoPageProps) {
+export function PositionBingoPage(props: PositionBingoPageProps) {
 	const params = useParams<{ name: string }>()
 	const runnerKey = createMemo(
 		() => getRunnerKeyFromRouteName(params.name) ?? '',
@@ -89,23 +86,22 @@ export function StopwatchBingoPage(props: StopwatchBingoPageProps) {
 	const runnerData = createMemo(() => runnerSignal()?.[0]())
 	const runnerId = createMemo(() => runnerData()?.id ?? '')
 
-	// Only timed results contribute a finishing second.
+	// Only results with a recorded finishing position fill a slot.
 	const runnerResults = createMemo(() =>
 		props.results.filter(
 			(result) =>
-				result.parkrunId === runnerId() &&
-				Number.isFinite(parseTimeToSeconds(result.time)),
+				result.parkrunId === runnerId() && positionSlot(result.position) >= 0,
 		),
 	)
 
-	// second (0..59) → occurrences, earliest first (the first one is "first achieved").
-	const occurrencesBySecond = createMemo(() => {
+	// slot (0..99) → occurrences, earliest first (the first one is "first achieved").
+	const occurrencesBySlot = createMemo(() => {
 		const map = new Map<number, RunResultItem[]>()
 		for (const result of runnerResults()) {
-			const second = parseTimeToSeconds(result.time) % BINGO_SLOTS
-			const list = map.get(second)
+			const slot = positionSlot(result.position)
+			const list = map.get(slot)
 			if (list) list.push(result)
-			else map.set(second, [result])
+			else map.set(slot, [result])
 		}
 		for (const list of map.values()) {
 			list.sort((a, b) => a.date.localeCompare(b.date))
@@ -118,27 +114,21 @@ export function StopwatchBingoPage(props: StopwatchBingoPageProps) {
 		computeBingoProgress(
 			runnerResults().map((result) => ({
 				date: result.date,
-				slot: parseTimeToSeconds(result.time) % BINGO_SLOTS,
+				slot: positionSlot(result.position),
 			})),
-			BINGO_SLOTS,
+			POSITION_SLOTS,
 		),
 	)
-	// Seconds collected toward the next (not-yet-complete) card.
+	// Positions collected toward the next (not-yet-complete) card.
 	const score = createMemo(() => progress().nextProgress)
-	const vsAverage = createMemo(() =>
-		runsVsAverage(runs(), score(), BINGO_SLOTS),
-	)
-	const remaining = createMemo(() =>
-		expectedRunsRemaining(score(), BINGO_SLOTS),
-	)
 
-	const seconds = Array.from({ length: BINGO_SLOTS }, (_, i) => i)
+	const slots = Array.from({ length: POSITION_SLOTS }, (_, i) => i)
 
 	return (
 		<Show when={runnerData()} fallback={<NotFoundPage />}>
 			{(runner) => (
 				<div class={styles.container}>
-					<DirtBlock title={`${runner().name}'s Stopwatch Bingo`}>
+					<DirtBlock title={`${runner().name}'s Position Bingo`}>
 						<div class={styles.summary}>
 							<Show
 								when={progress().completions > 0}
@@ -146,24 +136,10 @@ export function StopwatchBingoPage(props: StopwatchBingoPageProps) {
 									<>
 										<div class={styles.scoreValue}>
 											{score()}
-											<span class={styles.scoreTotal}>/{BINGO_SLOTS}</span>
+											<span class={styles.scoreTotal}>/{POSITION_SLOTS}</span>
 										</div>
 										<div class={styles.subtle}>
 											{runner().name} · collected over {runs()} parkruns
-										</div>
-										<div class={styles.status}>
-											<Show
-												when={Math.round(vsAverage()) !== 0}
-												fallback={<>Right on the average pace</>}
-											>
-												<strong>{Math.abs(Math.round(vsAverage()))}</strong>{' '}
-												parkruns {vsAverage() > 0 ? 'behind' : 'ahead of'}{' '}
-												average
-											</Show>
-										</div>
-										<div class={styles.subtle}>
-											~{Math.round(remaining())} more parkruns to complete on
-											average
 										</div>
 									</>
 								}
@@ -183,18 +159,17 @@ export function StopwatchBingoPage(props: StopwatchBingoPageProps) {
 								</div>
 								<div class={styles.subtle}>
 									Next completion progress: <strong>{score()}</strong>/
-									{BINGO_SLOTS}! (~{Math.round(remaining())} more runs to
-									complete)
+									{POSITION_SLOTS}!
 								</div>
 							</Show>
 						</div>
 
 						<div class={styles.grid}>
-							<For each={seconds}>
-								{(second) => (
+							<For each={slots}>
+								{(slot) => (
 									<BingoRow
-										second={second}
-										occurrences={occurrencesBySecond().get(second) ?? []}
+										slot={slot}
+										occurrences={occurrencesBySlot().get(slot) ?? []}
 									/>
 								)}
 							</For>
@@ -248,6 +223,15 @@ const styles = {
 		fontSize: '0.9rem',
 		opacity: 0.8,
 	}),
+	// Stretch to the block width so the sentence wraps inside the centred
+	// column rather than overflowing it on narrow screens.
+	note: css({
+		alignSelf: 'stretch',
+		textAlign: 'center',
+		fontSize: '0.9rem',
+		opacity: 0.8,
+		mt: '0.25rem',
+	}),
 	grid: css({
 		display: 'flex',
 		flexDirection: 'column',
@@ -271,7 +255,7 @@ const styles = {
 			},
 		},
 	}),
-	second: css({
+	slot: css({
 		fontSize: '1.5rem',
 		fontWeight: 'bold',
 		textAlign: 'center',

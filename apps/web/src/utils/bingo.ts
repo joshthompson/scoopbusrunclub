@@ -59,3 +59,56 @@ export function computeBingoProgress(
 
 	return { completions, completionsList, nextProgress }
 }
+
+/**
+ * Coupon-collector maths for a bingo card, shared by every card size.
+ *
+ * Because each new cell gets rarer as you fill the card, filling one is the
+ * classic coupon-collector problem. Expected parkruns to collect the Nth
+ * distinct cell (given you already have N-1 of `slots`) is
+ * `slots / (slots - N + 1)` — there are `slots - N + 1` cells left out of
+ * `slots`, so the chance of a new one per run is `(slots - N + 1) / slots`.
+ *
+ * This assumes every cell is equally likely, which holds well for finishing
+ * seconds but only loosely for finishing positions.
+ */
+
+/** Expected parkruns to collect the Nth distinct cell (1-indexed). */
+export function expectedRunsForToken(n: number, slots: number): number {
+	return slots / (slots - n + 1)
+}
+
+/** Expected total parkruns to have collected `score` distinct cells. */
+export function expectedRunsForScore(score: number, slots: number): number {
+	let total = 0
+	for (let n = 1; n <= score; n++) {
+		total += expectedRunsForToken(n, slots)
+	}
+	return total
+}
+
+/** Expected additional parkruns to finish the card from a given score. */
+export function expectedRunsRemaining(score: number, slots: number): number {
+	let total = 0
+	for (let n = score + 1; n <= slots; n++) {
+		total += expectedRunsForToken(n, slots)
+	}
+	return total
+}
+
+/**
+ * How a runner is doing versus the coupon-collector average, in parkruns.
+ *
+ * The baseline is the expected runs to reach the current score *including the
+ * next, in-progress token* — i.e. `expectedRunsForScore(score + 1)`. This
+ * matches the agreed worked example: 54/60 → baseline of N=1..55 ≈ 143.79, so
+ * 155 runs reads as ~10 behind. Positive → behind (used more runs than
+ * average); negative → ahead.
+ */
+export function runsVsAverage(
+	runs: number,
+	score: number,
+	slots: number,
+): number {
+	return runs - expectedRunsForScore(Math.min(score + 1, slots), slots)
+}

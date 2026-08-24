@@ -1,5 +1,6 @@
 import alphabetIcon from '@/assets/misc/alphabet-icon.png'
 import graphIcon from '@/assets/misc/graph-icon.png'
+import positionIcon from '@/assets/misc/position-icon.png'
 import rock1Asset from '@/assets/misc/rock1.png'
 import stopwatchIcon from '@/assets/misc/stopwatch-icon.png'
 import { BackSignButton } from '@/components/BackSignButton'
@@ -29,6 +30,7 @@ import type {
 } from '../utils/api'
 import { NotFoundPage } from './NotFoundPage'
 import { RunnerSummaryStat } from './RunnerSummaryStat'
+import { snowyAsset } from '@/utils/snow'
 
 interface MemberPageProps {
 	results: RunResultItem[]
@@ -426,7 +428,7 @@ export function MemberPage(props: MemberPageProps) {
 				<div class={styles.container}>
 					<FieldBlock title={name()} signType="purple">
 						<A href="./graph" class={styles.rockButton}>
-							<img src={rock1Asset} width={59} alt="" />
+							<img src={snowyAsset(rock1Asset)} width={59} alt="" />
 							<img
 								src={graphIcon}
 								class={styles.rockButtonIcon}
@@ -523,19 +525,25 @@ export function MemberPage(props: MemberPageProps) {
 						<DirtBlock title="Challenge Tracking">
 							<div class={styles.challengeGrid}>
 								<A href="./alphabet" class={styles.challengeLink}>
-									<img src={rock1Asset} width={59} alt="" />
+									<img src={snowyAsset(rock1Asset)} width={59} alt="" />
 									<img src={alphabetIcon} class={styles.challengeIcon} alt="" />
 									<span class={styles.challengeName}>Alphabet</span>
 								</A>
 
 								<A href="./stopwatch" class={styles.challengeLink}>
-									<img src={rock1Asset} width={59} alt="" />
+									<img src={snowyAsset(rock1Asset)} width={59} alt="" />
 									<img
 										src={stopwatchIcon}
 										class={styles.challengeIcon}
 										alt=""
 									/>
 									<span class={styles.challengeName}>Stopwatch Bingo</span>
+								</A>
+
+								<A href="./position" class={styles.challengeLink}>
+									<img src={snowyAsset(rock1Asset)} width={59} alt="" />
+									<img src={positionIcon} class={styles.challengeIcon} alt="" />
+									<span class={styles.challengeName}>Position Bingo</span>
 								</A>
 							</div>
 						</DirtBlock>
