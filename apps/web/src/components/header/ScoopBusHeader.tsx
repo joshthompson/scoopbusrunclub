@@ -37,7 +37,7 @@ import { snowyAsset } from '@/utils/snow'
 import type { WeatherType } from '@/utils/weather'
 import { A, useNavigate } from '@solidjs/router'
 import { css, cx } from '@style/css'
-import { createSignal, onCleanup, onMount } from 'solid-js'
+import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
 import { createAeroplaneController } from './AeroplaneController'
@@ -316,8 +316,9 @@ function clubSpeedBand(): { slowest: number; fastest: number } {
  * stored speed is a 0–1 slider value, not a real one — the club's own spread is
  * what turns it into a pace.
  */
-function registerCustomRacers(racers: CustomRacer[]) {
+function registerCustomRacers(racers: CustomRacer[]): string[] {
 	const { slowest, fastest } = clubSpeedBand()
+	const added: string[] = []
 
 	for (const racer of racers) {
 		const key = `custom_${racer._id}`
@@ -340,7 +341,10 @@ function registerCustomRacers(racers: CustomRacer[]) {
 			speed,
 			frameInterval: 186 - 31 * speed,
 		})
+		added.push(key)
 	}
+
+	return added
 }
 
 function registerGuestRunners(
@@ -545,6 +549,31 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			// Add moving runners (in front of bus)
 			$scene.addController(...movingRunners)
 		},
+	})
+
+	/**
+	 * Racers added after the header was built — someone finishing the form in
+	 * another tab of this session — join the running scene rather than waiting for
+	 * a reload. The initial batch is already registered by the time this first
+	 * runs, so it no-ops on load.
+	 *
+	 * Appending puts them in front of the bus, which is where moving runners
+	 * belong; standing volunteers are the ones drawn behind it.
+	 */
+	createEffect(() => {
+		for (const runnerId of registerCustomRacers(props.customRacers)) {
+			const controller = createRunnerController(
+				`runner-${runnerId}`,
+				runnerId,
+				Math.ceil(Math.random() * 30),
+				scene,
+				mousePosition,
+			)
+			scene.addController(
+				createShadowController(`shadow-${controller.data.id}`, controller),
+			)
+			scene.addController(controller)
+		}
 	})
 
 	const windowResizeHandler = () => {

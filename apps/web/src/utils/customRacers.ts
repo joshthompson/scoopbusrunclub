@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import type { CharacterSpriteProps } from './createRunnerFrames'
 
 const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string) || ''
@@ -78,6 +79,15 @@ function rememberMadeRacer(): void {
 	}
 }
 
+/**
+ * Racers made in this tab. The header reads its list once on load, so without
+ * this a new racer wouldn't turn up until the next page load — you'd click Add
+ * and see nothing happen in the very place you were promised it would appear.
+ */
+const [addedThisVisit, setAddedThisVisit] = createSignal<CustomRacer[]>([])
+
+export const racersAddedThisVisit = addedThisVisit
+
 // ── API ─────────────────────────────────────────────────────────────
 
 /**
@@ -149,7 +159,24 @@ export async function createCustomRacer(input: {
 			return { ok: false, error: data.error ?? 'Something went wrong' }
 		}
 		rememberMadeRacer()
-		return { ok: true, pending: Boolean(data.pending) }
+
+		// Hand the header the racer we just made, rather than making it refetch to
+		// learn about something we already know everything about.
+		const now = Date.now()
+		const isPending = Boolean(data.pending)
+		const racer: CustomRacer = {
+			_id: data.id,
+			name: input.name,
+			avatar: input.avatar,
+			speed: input.speed,
+			createdAt: now,
+			expiresAt: now + RACER_LIFETIME_DAYS * 86_400_000,
+			pending: isPending,
+		}
+		// A racer awaiting approval isn't in the header yet, so don't put it there
+		if (!isPending) setAddedThisVisit((prev) => [...prev, racer])
+
+		return { ok: true, pending: isPending }
 	} catch {
 		return { ok: false, error: 'Could not reach the server — try again' }
 	}

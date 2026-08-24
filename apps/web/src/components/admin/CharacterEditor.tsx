@@ -96,18 +96,27 @@ export const CharacterEditor: Component<{
 		if (interval) clearInterval(interval)
 	})
 
+	/**
+	 * Sized off the container rather than a fixed pixel scale, so the same sprite
+	 * fills whatever box the breakpoint gives it instead of being clipped.
+	 *
+	 * The sheet is stretched to `frameCount × 100%` wide, which makes one frame
+	 * exactly as wide as the box. Percentage background-positions then align x% of
+	 * the image with x% of the box, so stepping the percentage evenly across the
+	 * frames lands each one exactly — no pixel arithmetic that a resize invalidates.
+	 */
 	const previewStyle = () => {
 		const info = spriteInfo()
 		if (!info) return {}
-		const scale = 300 / info.height
-		const offsetX = -(currentFrame() * info.frameWidth * scale)
+		const step =
+			info.frameCount > 1 ? (currentFrame() / (info.frameCount - 1)) * 100 : 0
 		return {
 			'background-image': `url(${info.url})`,
-			'background-position': `${offsetX}px 0px`,
-			'background-size': `${info.totalWidth * scale}px ${info.height * scale}px`,
+			'background-position': `${step}% 0`,
+			'background-size': `${(info.totalWidth / info.frameWidth) * 100}% 100%`,
 			'background-repeat': 'no-repeat',
-			width: `${info.frameWidth * scale}px`,
-			height: `${info.height * scale}px`,
+			height: '100%',
+			'aspect-ratio': `${info.frameWidth} / ${info.height}`,
 			'max-width': '100%',
 			'image-rendering': 'pixelated' as const,
 		}
@@ -222,10 +231,7 @@ export const CharacterEditor: Component<{
 								label="Neck"
 								value={character().head.topColorForNeck ? 'top' : 'skin'}
 								onChange={(e) =>
-									updateHead(
-										'topColorForNeck',
-										e.currentTarget.value === 'top',
-									)
+									updateHead('topColorForNeck', e.currentTarget.value === 'top')
 								}
 							>
 								<option value="skin">Skin colour</option>
@@ -243,8 +249,7 @@ export const CharacterEditor: Component<{
 								onChange={(e) =>
 									update(
 										'topType',
-										e.currentTarget
-											.value as CharacterSpriteProps['topType'],
+										e.currentTarget.value as CharacterSpriteProps['topType'],
 									)
 								}
 							>
@@ -265,8 +270,7 @@ export const CharacterEditor: Component<{
 								onChange={(e) =>
 									update(
 										'bottomType',
-										e.currentTarget
-											.value as CharacterSpriteProps['bottomType'],
+										e.currentTarget.value as CharacterSpriteProps['bottomType'],
 									)
 								}
 							>
@@ -293,9 +297,7 @@ export const CharacterEditor: Component<{
 										onChange={(e) =>
 											update(
 												'sockColor',
-												e.currentTarget.checked
-													? '#ffffff'
-													: undefined,
+												e.currentTarget.checked ? '#ffffff' : undefined,
 											)
 										}
 									/>
@@ -346,16 +348,31 @@ const styles = {
 	container: css({
 		padding: '0.5rem 0',
 	}),
+	/**
+	 * Preview beside the controls where there's room; stacked below the mobile
+	 * breakpoint, where a 300px preview left the dropdowns squeezed off the edge
+	 * of the screen.
+	 */
 	layout: css({
 		display: 'flex',
 		gap: '1.5rem',
 		alignItems: 'flex-start',
+		'@media (max-width: 768px)': {
+			flexDirection: 'column',
+			alignItems: 'center',
+			gap: '1rem',
+		},
 	}),
 	preview: css({
 		flexShrink: 0,
 		width: '300px',
 		maxWidth: '100%',
 		aspectRatio: '1',
+		// Stacked, it only needs to be big enough to judge the character by —
+		// the rest of the width is better spent on the fields below it.
+		'@media (max-width: 768px)': {
+			width: '60%',
+		},
 		display: 'flex',
 		alignItems: 'center',
 		justifyContent: 'center',
@@ -374,6 +391,11 @@ const styles = {
 		flexDirection: 'column',
 		gap: '0.75rem',
 		flex: 1,
+		// `flex: 1` grows the wrong axis once stacked, so claim the width outright
+		'@media (max-width: 768px)': {
+			flex: 'none',
+			width: '100%',
+		},
 	}),
 	row: css({
 		display: 'flex',

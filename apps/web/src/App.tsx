@@ -65,7 +65,7 @@ import {
 	fetchWeather,
 	getCached,
 } from './utils/api'
-import { fetchHeaderRacers } from './utils/customRacers'
+import { fetchHeaderRacers, racersAddedThisVisit } from './utils/customRacers'
 import { loadEvents } from './utils/events'
 import { isSnowy, reportSnowDepth } from './utils/snow'
 import { parseWeather, reportWeatherType, weatherType } from './utils/weather'
@@ -82,6 +82,18 @@ const App: Component = () => {
 	const [guests] = createResource(fetchGuests)
 	// Racers made by visitors, live in the header for a week each
 	const [customRacers] = createResource(fetchHeaderRacers)
+
+	// Anything made in this tab joins the fetched list straight away, so a racer
+	// starts running the moment it's added rather than on the next page load.
+	const headerRacers = createMemo(() => {
+		const fetched = customRacers()
+		if (!fetched) return undefined
+		const known = new Set(fetched.map((r) => r._id))
+		return [
+			...fetched,
+			...racersAddedThisVisit().filter((r) => !known.has(r._id)),
+		]
+	})
 
 	// Populate the event name lookup cache
 	createResource(loadEvents)
@@ -113,7 +125,7 @@ const App: Component = () => {
 		const v = volunteers()
 		const gr = guestResults()
 		const g = guests()
-		const cr = customRacers()
+		const cr = headerRacers()
 		if (!r || !u || !v || !gr || !g || !cr) return null
 		return {
 			results: r,

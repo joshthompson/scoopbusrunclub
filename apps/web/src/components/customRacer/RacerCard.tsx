@@ -62,12 +62,18 @@ const styles = {
 	sprite: css({
 		height: '70px',
 		imageRendering: 'pixelated',
+		// The shadow is pulled up under the feet and comes later in the DOM, so
+		// without a stacking order of its own the runner would sit behind it.
+		position: 'relative',
+		zIndex: 1,
 	}),
 	shadow: css({
 		width: '48px',
-		mt: '-6px',
+		mt: '-14px',
 		filter: 'brightness(0)',
 		opacity: 0.15,
+		position: 'relative',
+		zIndex: 0,
 	}),
 	name: css({
 		fontWeight: 'bold',
