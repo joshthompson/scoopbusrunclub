@@ -9,7 +9,13 @@ import {
 	journeyMilestonesByDate,
 } from '@/utils/journey'
 import { getMemberRoute } from '@/utils/memberRoute'
-import { formatDate, formatName, formatRaceTime, ordinal } from '@/utils/misc'
+import {
+	formatDate,
+	formatEventTime,
+	formatName,
+	formatParkrunTime,
+	ordinal,
+} from '@/utils/misc'
 import { isParkrunTrip, withoutReportedTrips } from '@/utils/parkrunTrips'
 import { getSpecialDayName } from '@/utils/special-days'
 import { A, useNavigate } from '@solidjs/router'
@@ -342,7 +348,7 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 			if (hasPosition) finished += ` in *${ordinal(rep.position!)}* place`
 			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-			if (hasTime) finished += ` with a time of *${formatRaceTime(rep.time!)}*`
+			if (hasTime) finished += ` with a time of *${formatEventTime(rep.time!)}*`
 			parts.push(finished)
 		}
 
@@ -695,7 +701,7 @@ export function LatestResults(props: LatestResultsProps) {
 																	</Show>{' '}
 																	finished in <em>{ordinal(gr.position)}</em>{' '}
 																	place with a time of{' '}
-																	<em>{formatRaceTime(gr.time)}</em>
+																	<em>{formatParkrunTime(gr.time)}</em>
 																	<span class={styles.guestTag}>
 																		Guest <Emoji emoji="👋" animation="wave" />
 																	</span>
@@ -739,7 +745,7 @@ export function LatestResults(props: LatestResultsProps) {
 																</em>{' '}
 																finished in <em>{ordinal(res.position)}</em>{' '}
 																place with a time of{' '}
-																<em>{formatRaceTime(res.time)}</em>
+																<em>{formatParkrunTime(res.time)}</em>
 																<ResultCelebrations
 																	data={celebrations()}
 																	resultKey={resultKey}

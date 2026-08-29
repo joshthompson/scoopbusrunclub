@@ -19,8 +19,15 @@ import {
 	spreadVertically,
 } from './graph'
 
-/** How many clubs to plot before the reader picks their own. */
-const MAX_CLUBS = 5
+/**
+ * How many clubs the graph opens on, before the reader picks their own.
+ *
+ * Out in front there's only one club worth watching — whoever is closest
+ * behind. Chasing, it's everyone ahead of us, which past tenth place is a wall
+ * of lines that says nothing about our own race.
+ */
+const LEAD_CLUBS = 2
+const MAX_CLUBS_AHEAD = 10
 const MAX_Y_LABELS = 6
 /** Room on the right for the club-name labels. */
 const LABEL_GUTTER = 158
@@ -111,19 +118,23 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 	})
 
 	/**
-	 * The top few clubs. If we've dropped out of that group, swap us in — this
-	 * page is about our own progress.
+	 * Who the graph opens on, which depends on where we stand: this page is
+	 * about our own race, so the default is whoever we're racing.
+	 *
+	 * Leading, that's us and the club closest behind. Chasing, it's every club
+	 * ahead of us up to the cap, and our own line is always added however far
+	 * back it sits. Before we have any snapshot of our own there's no race to
+	 * frame, so the top of the league stands in.
 	 */
 	const defaultClubs = createMemo(() => {
 		const { ranked } = clubIndex()
-		const chosen = ranked.slice(0, MAX_CLUBS)
-		if (
-			ranked.includes(SCOOP_BUS_CLUB_NAME) &&
-			!chosen.includes(SCOOP_BUS_CLUB_NAME)
-		) {
-			chosen[chosen.length - 1] = SCOOP_BUS_CLUB_NAME
-		}
-		return chosen
+		const place = ranked.indexOf(SCOOP_BUS_CLUB_NAME)
+		if (place === -1) return ranked.slice(0, MAX_CLUBS_AHEAD)
+		if (place === 0) return ranked.slice(0, LEAD_CLUBS)
+		return [
+			...ranked.slice(0, Math.min(place, MAX_CLUBS_AHEAD)),
+			SCOOP_BUS_CLUB_NAME,
+		]
 	})
 
 	const chosenClubs = createMemo(() => picked() ?? defaultClubs())
