@@ -1,3 +1,4 @@
+import lightningSheet from '@/assets/background/lightning.png'
 import rainGif from '@/assets/background/rain.gif'
 import snowFar from '@/assets/background/snow-tile-far.png'
 import snowMid from '@/assets/background/snow-tile-mid.png'
@@ -37,7 +38,7 @@ import { snowyAsset } from '@/utils/snow'
 import type { WeatherType } from '@/utils/weather'
 import { A, useNavigate } from '@solidjs/router'
 import { css, cx } from '@style/css'
-import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
+import { Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
 import { createAeroplaneController } from './AeroplaneController'
@@ -617,6 +618,21 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			`
 			: 'none'
 
+	/**
+	 * Wet weather takes the sky down a quarter, so the scenery reads as being
+	 * under weather rather than under the same blue as a clear day.
+	 *
+	 * Only the sky gradient is dimmed, not the whole underlay: the bands in
+	 * front of it carry the fog wash already, and darkening those too would take
+	 * the pixel art's colours away from the palette the sprites are drawn in.
+	 */
+	const skyDim = () =>
+		props.weatherType === 'rain' ||
+		props.weatherType === 'thunderstorm' ||
+		props.weatherType === 'fog'
+			? 'brightness(0.75)'
+			: 'none'
+
 	return (
 		<div
 			class={cx('header-wrapper', styles.wrapper)}
@@ -660,6 +676,18 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 							'--haze': haze(),
 						}}
 					/>
+					{/*
+					 * The bolt belongs to the scenery rather than the weather layer:
+					 * a storm is out over the hills, so the strike has to be behind
+					 * them. It takes its sheet through `--image` like every other
+					 * band, which is what the underlay's shared rule paints.
+					 */}
+					<Show when={props.weatherType === 'thunderstorm'}>
+						<div
+							class={styles.lightning}
+							style={{ '--image': `url(${lightningSheet})` }}
+						/>
+					</Show>
 					<div
 						class={styles.sun}
 						style={{ '--image': `url(${snowyAsset(sunAsset)})` }}
@@ -677,6 +705,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						style={{
 							'--image':
 								'linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom) 35%)',
+							'--sky-dim': skyDim(),
 						}}
 					/>
 				</div>
@@ -723,7 +752,19 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						'--snow-mid': `url(${snowMid})`,
 						'--snow-far': `url(${snowFar})`,
 					}}
-				/>
+				>
+					{/*
+					 * A storm is the rain layer with the flash behind it. The bolt
+					 * itself is back in the scenery, behind the hills; what's left up
+					 * here is the light it throws, which falls on everything. Both
+					 * inherit the parent's mask, so the flash is at full strength over
+					 * the sky and has faded out by the ground.
+					 */}
+					<Show when={props.weatherType === 'thunderstorm'}>
+						<div class={styles.skyFlash} />
+						<div class={styles.stormRain} />
+					</Show>
+				</div>
 			</div>
 		</div>
 	)
@@ -836,6 +877,68 @@ const styles = {
 			willChange: 'background-position',
 		},
 	}),
+
+	/**
+	 * A storm's rain, which is the same gif `data-weather=rain` uses. It's a
+	 * layer of its own rather than a background on the parent so the lightning
+	 * can sit behind it: a child always paints over its parent's background, and
+	 * a bolt in front of the rain reads as being between you and the weather.
+	 */
+	stormRain: css({
+		position: 'absolute',
+		inset: 0,
+		backgroundImage: 'var(--rain-image)',
+		backgroundRepeat: 'repeat',
+		opacity: 0.85,
+	}),
+
+	/**
+	 * The bolt: one frame of the sprite sheet at a time, stepped through by the
+	 * `lightning` keyframes. A band of the scenery like any other, sitting just
+	 * behind the furthest hills — a storm is always out over them, never in
+	 * front — and so above the sun and the stars but below `bg3`.
+	 *
+	 * Sized and positioned to a single frame, centred over the sky and away from
+	 * both the sun (70%) and the moon (30%). Drawn at the sheet's own scale, so
+	 * no pixel is rescaled under the document-wide `image-rendering: pixelated`
+	 * — the sheet is authored at the same 1px-per-pixel the rest of the scenery
+	 * is, by `scripts/gen-lightning.ts`.
+	 *
+	 * `inset` has to out-shout the underlay's shared `inset: 0`, the same way
+	 * the moon's does: this is the one band that isn't full-bleed.
+	 */
+	lightning: css({
+		zIndex: 5,
+		inset: '0 auto auto 50% !important',
+		marginLeft: '-160px',
+		width: '320px',
+		height: '150px',
+		backgroundRepeat: 'no-repeat',
+		animation: 'lightning 13s step-end infinite',
+		willChange: 'background-position',
+	}),
+
+	/**
+	 * The sky going white under the strike. Full-bleed rather than a glow around
+	 * the bolt: lightning lights the whole sky, and the parent's mask is what
+	 * keeps it from washing out the ground.
+	 */
+	skyFlash: css({
+		position: 'absolute',
+		inset: 0,
+		background: 'var(--color-white, #fff)',
+		opacity: 0,
+		animation: 'skyFlash 13s infinite',
+		willChange: 'opacity',
+
+		/**
+		 * A repeating full-width flash is exactly what this query is for, so the
+		 * storm keeps its rain and its bolt but stops lighting the sky up.
+		 */
+		'@media (prefers-reduced-motion: reduce)': {
+			animation: 'none',
+		},
+	}),
 	underlay: css({
 		height: '240px',
 		mb: '-240px',
@@ -846,8 +949,8 @@ const styles = {
 			inset: 0,
 			// Second background layer, so it paints *behind* the layer's own art
 			// while still covering the full underlay — which is what fog needs, and
-			// which no amount of z-index could give us without renumbering the whole
-			// stack (the existing values are consecutive, with no gaps to slot into).
+			// which no z-index could give us at any number: the haze has to sit
+			// behind each of three bands at once, not at one depth in the stack.
 			// Layers that don't opt in resolve it to `none`.
 			backgroundImage: 'var(--image), var(--haze, none)',
 		},
@@ -855,6 +958,8 @@ const styles = {
 	sky: css({
 		zIndex: 1,
 		backgroundRepeat: 'repeat',
+		// Set by `skyDim()`; `none` on a clear day, so this costs nothing then.
+		filter: 'var(--sky-dim, none)',
 	}),
 	stars: css({
 		zIndex: 2,
@@ -882,7 +987,7 @@ const styles = {
     `,
 	}),
 	bg3: css({
-		zIndex: 5,
+		zIndex: 6,
 		// The second value in each list is for the haze layer: `background-position`
 		// and `-repeat` apply per layer, so without its own entry the haze inherits
 		// this band's vertical offset and starts partway down the header instead of
@@ -892,17 +997,17 @@ const styles = {
 		backgroundSize: 'auto, 100% 100%',
 	}),
 	house1: css({
-		zIndex: 6,
+		zIndex: 7,
 		backgroundRepeat: 'no-repeat',
 		backgroundPosition: '30% 65px',
 	}),
 	house2: css({
-		zIndex: 7,
+		zIndex: 8,
 		backgroundRepeat: 'no-repeat',
 		backgroundPosition: 'calc(40% + 70px) 65px',
 	}),
 	bg2: css({
-		zIndex: 8,
+		zIndex: 9,
 		// The second value in each list is for the haze layer: `background-position`
 		// and `-repeat` apply per layer, so without its own entry the haze inherits
 		// this band's vertical offset and starts partway down the header instead of
@@ -912,7 +1017,7 @@ const styles = {
 		backgroundSize: 'auto, 100% 100%',
 	}),
 	bg1: css({
-		zIndex: 9,
+		zIndex: 10,
 		// The second value in each list is for the haze layer: `background-position`
 		// and `-repeat` apply per layer, so without its own entry the haze inherits
 		// this band's vertical offset and starts partway down the header instead of
@@ -922,7 +1027,7 @@ const styles = {
 		backgroundSize: 'auto, 100% 100%',
 	}),
 	path: css({
-		zIndex: 10,
+		zIndex: 11,
 		backgroundRepeat: 'repeat-x',
 		backgroundPosition: '0px 158px',
 	}),

@@ -6,7 +6,7 @@ import type { Weather } from './api'
  * A coarse `type` plus the snow lying on the ground; intended to grow
  * (intensity, isDay, etc.).
  */
-export type WeatherType = 'clear' | 'rain' | 'snow' | 'fog'
+export type WeatherType = 'clear' | 'rain' | 'thunderstorm' | 'snow' | 'fog'
 
 export interface AppWeather {
 	type: WeatherType
@@ -56,13 +56,16 @@ const MIN_PRECIP_RATE_MM = 0.5
  */
 function bucketForCode(code: string): WeatherType {
 	switch (code) {
-		// --- Rain: liquid / freezing / thunder / sleet / hail ---
+		// --- Thunderstorm: rain, with the sky lighting up behind it ---
+		case 'T': // Thunderstorms
+			return 'thunderstorm'
+
+		// --- Rain: liquid / freezing / sleet / hail ---
 		case 'A': // Hail
 		case 'L': // Drizzle
 		case 'R': // Rain
 		case 'RW': // Rain showers
 		case 'RS': // Rain/snow mix
-		case 'T': // Thunderstorms
 		case 'IP': // Ice pellets / sleet
 		case 'ZL': // Freezing drizzle
 		case 'ZR': // Freezing rain
@@ -113,6 +116,11 @@ function bucketForCode(code: string): WeatherType {
  * weather flags even a trace drizzle, so `rain`/`snow` need a meaningful rate
  * behind them. Fog carries no rate at all, so gating it the same way would have
  * meant it never resolved to anything but `clear`.
+ *
+ * Thunderstorms aren't gated either. The gate exists to throw away trace
+ * precipitation, and there is no such thing as a trace thunderstorm — a storm
+ * whose rain hasn't reached us yet is still worth showing, and the code is only
+ * set when there's actual lightning about.
  */
 function parseWeatherType(period: XWeatherPeriod | null): WeatherType {
 	const code = (period?.weatherPrimaryCoded ?? '').split(':')[2] ?? ''
@@ -158,8 +166,9 @@ declare global {
 
 /**
  * `setWeather('rain')` from the browser console to pretend it's raining over the
- * header; `'snow'` for snowfall, `'clear'` to stop it. Sticks until reload, so
- * the forecast won't quietly undo it.
+ * header; `'thunderstorm'` for rain with lightning behind it, `'snow'` for
+ * snowfall, `'clear'` to stop it. Sticks until reload, so the forecast won't
+ * quietly undo it.
  *
  * This is the falling stuff only — snow already lying on the ground is
  * `setSnow(cm)`, since the two are independent (it can be a clear day on top of
@@ -167,7 +176,13 @@ declare global {
  */
 if (typeof window !== 'undefined') {
 	window.setWeather = (type: WeatherType) => {
-		const allowed: WeatherType[] = ['clear', 'rain', 'snow', 'fog']
+		const allowed: WeatherType[] = [
+			'clear',
+			'rain',
+			'thunderstorm',
+			'snow',
+			'fog',
+		]
 		if (!allowed.includes(type))
 			return `weather: expected ${allowed.join(' | ')}`
 		overridden = true

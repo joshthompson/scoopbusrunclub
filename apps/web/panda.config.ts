@@ -82,6 +82,65 @@ export default defineConfig({
 				},
 			},
 
+			/**
+			 * The header's lightning, stepping through the frames of
+			 * `lightning.png` (see `scripts/gen-lightning.ts`). Frame 0 is empty and
+			 * the sheet rests on it for all but the first half-second of each half
+			 * of the cycle, which is what makes the strike an event rather than a
+			 * loop you can watch.
+			 *
+			 * One strike per half: bolt A's four frames from 0%, bolt B's from 50%,
+			 * so no two strikes running are in the same place. Each runs the frames
+			 * down to a fade, blinks out, then flickers back through them — a real
+			 * strike is several return strokes down the same channel, and it's the
+			 * blink that sells it.
+			 *
+			 * Paired with `animation-timing-function: step-end`, so each frame is
+			 * held until the next keyframe rather than the position sliding between
+			 * them, which would scroll the neighbouring bolts through shot.
+			 */
+			lightning: {
+				// --- Bolt A: leader, strike, fade, blink, strike, fade out ---
+				'0%': { backgroundPosition: '-320px 0' },
+				'0.5%': { backgroundPosition: '-640px 0' },
+				'1.2%': { backgroundPosition: '-960px 0' },
+				'1.7%': { backgroundPosition: '0 0' },
+				'2.3%': { backgroundPosition: '-640px 0' },
+				'3%': { backgroundPosition: '-960px 0' },
+				'3.8%': { backgroundPosition: '-1280px 0' },
+				'4.6%': { backgroundPosition: '0 0' },
+				// --- Bolt B, half a cycle later ---
+				'50%': { backgroundPosition: '-1600px 0' },
+				'50.5%': { backgroundPosition: '-1920px 0' },
+				'51.2%': { backgroundPosition: '-2240px 0' },
+				'51.7%': { backgroundPosition: '0 0' },
+				'52.3%': { backgroundPosition: '-1920px 0' },
+				'53%': { backgroundPosition: '-2240px 0' },
+				'53.8%': { backgroundPosition: '-2560px 0' },
+				'54.6%, 100%': { backgroundPosition: '0 0' },
+			},
+
+			/**
+			 * The white the sky goes when a bolt lands, on the same cycle as
+			 * `lightning` and stopped at the same percentages.
+			 *
+			 * Unlike the bolt this one interpolates: a strike is a hard rise and a
+			 * slower decay, so the flash arrives with the frame that draws the bolt
+			 * and is still draining away after it has gone.
+			 */
+			skyFlash: {
+				'0%': { opacity: 0 },
+				'0.5%': { opacity: 0.62 },
+				'1.7%': { opacity: 0.08 },
+				'2.3%': { opacity: 0.45 },
+				'4.6%': { opacity: 0 },
+				'50%': { opacity: 0 },
+				'50.5%': { opacity: 0.62 },
+				'51.7%': { opacity: 0.08 },
+				'52.3%': { opacity: 0.45 },
+				'54.6%, 100%': { opacity: 0 },
+			},
+
 			// --- Wrapped "explore" stories ---
 			/** The progress bar segment filling across while a slide is showing. */
 			storyProgress: {
