@@ -26,6 +26,7 @@ import type {
 	GuestItem,
 	GuestResultItem,
 	RunResultItem,
+	Runner,
 	VolunteerItem,
 } from '@/utils/api'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
@@ -42,6 +43,11 @@ import { Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
 import { createAeroplaneController } from './AeroplaneController'
+import {
+	createBalloonControllers,
+	isBalloonMilestone,
+	registerBalloonConsoleHook,
+} from './BalloonController'
 import { createBusController } from './BusController'
 import {
 	RUNNER_LABEL_RENDER_DISTANCE,
@@ -82,7 +88,13 @@ function determineRunnerState(
 function updateRunnerSpeedsAndConnections(
 	results: RunResultItem[],
 	volunteers: VolunteerItem[],
+	clubRunners: Runner[],
 ) {
+	// Run totals are the club record's running count, so the result someone just
+	// posted is run number `totalRuns` — which is what makes it a milestone.
+	const totalRunsByParkrunId = new Map(
+		clubRunners.map((runner) => [runner.parkrunId, runner.totalRuns]),
+	)
 	// Find the latest result for each parkrunId
 	const latestByParkrunId = new Map<string, RunResultItem>()
 	for (const result of results) {
@@ -171,6 +183,12 @@ function updateRunnerSpeedsAndConnections(
 		const latestTime =
 			volunteeredLatest && !ranLatest ? undefined : latestResult.time
 
+		// Balloons are for a milestone *just* run, so it only counts if their
+		// latest result is the latest event the club has any results for.
+		const totalRuns = totalRunsByParkrunId.get(runnerData.id)
+		const milestone =
+			ranLatest && isBalloonMilestone(totalRuns) ? totalRuns : undefined
+
 		setter({
 			...runnerData,
 			speed,
@@ -179,6 +197,7 @@ function updateRunnerSpeedsAndConnections(
 			connectedTo,
 			latestTime,
 			volunteerRoles,
+			milestone,
 			runnerState: determineRunnerState(volData, latestSaturday),
 		})
 	}
@@ -274,6 +293,7 @@ function todaysBirthdayRunners(): string[] {
 interface ScoopBusHeaderProps {
 	results: RunResultItem[]
 	volunteers: VolunteerItem[]
+	clubRunners: Runner[]
 	guestResults: GuestResultItem[]
 	guests: GuestItem[]
 	customRacers: CustomRacer[]
@@ -422,7 +442,11 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	const [mousePosition, setMousePosition] = createSignal({ x: 0, y: 0 })
 
 	// Must run before scene setup so runnerState is available for render ordering
-	updateRunnerSpeedsAndConnections(props.results, props.volunteers)
+	updateRunnerSpeedsAndConnections(
+		props.results,
+		props.volunteers,
+		props.clubRunners,
+	)
 
 	// Register guest runners who attended the latest event
 	registerGuestRunners(
@@ -534,7 +558,21 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 				return !isStandingState(runner().runnerState ?? 'run')
 			})
 
+			// Balloons for anyone who just ran a milestone. Each bunch goes in just
+			// ahead of the group its own runner is in, so the strings pass behind
+			// every runner rather than across them, and a bunch is never split
+			// across the bus from the person holding it.
+			const balloonsFor = (controllers: RunnerController[]) =>
+				controllers.flatMap((controller) => {
+					const milestone = findRunnerSignal(controller.data.runnerId)?.[0]()
+						.milestone
+					return milestone
+						? createBalloonControllers(controller, milestone)
+						: []
+				})
+
 			// Add standing runners (behind bus, no shadows)
+			$scene.addController(...balloonsFor(standingRunners))
 			$scene.addController(...standingRunners)
 
 			// Add moving runner shadows
@@ -548,7 +586,10 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			$scene.addController(createBusController('bus', $scene))
 
 			// Add moving runners (in front of bus)
+			$scene.addController(...balloonsFor(movingRunners))
 			$scene.addController(...movingRunners)
+
+			registerBalloonConsoleHook($scene)
 		},
 	})
 
@@ -633,6 +674,20 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			? 'brightness(0.75)'
 			: 'none'
 
+	/**
+	 * Rain clouds go down by half — twice what the sky behind them takes, so
+	 * they read as the heavy things the rain is falling out of rather than the
+	 * same fair-weather puffs on a duller day.
+	 *
+	 * Set on the scene's wrapper rather than on the clouds, which are drawn by
+	 * their own controller and inherit it along with the time-of-day opacity
+	 * `SkyService` puts on the document.
+	 */
+	const cloudDim = () =>
+		props.weatherType === 'rain' || props.weatherType === 'thunderstorm'
+			? 'brightness(0.5)'
+			: 'none'
+
 	return (
 		<div
 			class={cx('header-wrapper', styles.wrapper)}
@@ -641,7 +696,11 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			<A href="/custom-racer/add" class={styles.addRacer}>
 				+ Add Racer
 			</A>
-			<div aria-hidden="true" class={styles.root}>
+			<div
+				aria-hidden="true"
+				class={styles.root}
+				style={{ '--cloud-dim': cloudDim() }}
+			>
 				<div class={styles.underlay}>
 					<div
 						class={styles.path}

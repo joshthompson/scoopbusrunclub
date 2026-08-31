@@ -7,8 +7,8 @@ import flower2Asset from '@/assets/misc/flower2.png'
 import flower3Asset from '@/assets/misc/flower3.png'
 import flower4Asset from '@/assets/misc/flower4.png'
 import signAsset from '@/assets/misc/pr-sign.png'
-import snowmanAsset from '@/assets/misc/snowman.png'
 import shrub1Asset from '@/assets/misc/shrub1.png'
+import snowmanAsset from '@/assets/misc/snowman.png'
 import tree1Asset from '@/assets/misc/tree1.png'
 import tree2Asset from '@/assets/misc/tree2.png'
 import { isSnowy } from '@/utils/snow'
@@ -90,7 +90,14 @@ export function createCloudController(id: string, x: number, startX: number) {
 				...createObjectSignal(x + Math.random() * 200 - 100, 'x'),
 				...createObjectSignal(Math.random() * 20 + 5, 'y'),
 				frameInterval: () => Number.POSITIVE_INFINITY,
-				class: () => css({ opacity: 'var(--cloud-opacity)' }),
+				// `--cloud-opacity` is the time of day, from `SkyService`;
+				// `--cloud-dim` is the weather, from the header. Both inherit in, so
+				// a cloud never has to know about either.
+				class: () =>
+					css({
+						opacity: 'var(--cloud-opacity)',
+						filter: 'var(--cloud-dim, none)',
+					}),
 			}
 		},
 		onEnterFrame({ $, $age }) {

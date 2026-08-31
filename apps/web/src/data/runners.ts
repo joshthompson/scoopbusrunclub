@@ -69,6 +69,16 @@ export interface RunnerData {
 	latestTime?: string
 	volunteerRoles?: string[]
 	time?: string
+	/** The parkrun milestone they hit at the latest event, if they just hit one. */
+	milestone?: number
+	/**
+	 * The middle of the runner themselves, in the sprite's own pixels, for
+	 * anything that has to attach to them — currently the milestone balloons.
+	 * Defaults to the middle of the sprite box, which is only wrong for the ones
+	 * drawn at an odd size: a child in an adult-sized box, or a box that is
+	 * mostly pram.
+	 */
+	centerPoint?: Vector
 }
 
 export function hasHeaderArtwork(runner: RunnerData): boolean {
@@ -239,6 +249,7 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		centerPoint: { x: 9, y: 19 },
 		speed: 1.5,
 		frameInterval: 80,
 	}),
@@ -426,6 +437,7 @@ export const runners: Record<
 		},
 		width: 49,
 		height: 30,
+		centerPoint: { x: 37, y: 12 },
 		speed: 3.2,
 		frameInterval: 100,
 	}),

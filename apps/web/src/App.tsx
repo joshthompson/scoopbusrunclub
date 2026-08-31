@@ -129,6 +129,7 @@ const App: Component = () => {
 		if (!r || !u || !v || !gr || !g || !cr) return null
 		return {
 			results: r,
+			clubRunners: u,
 			volunteers: v,
 			guestResults: gr,
 			guests: g,
@@ -150,6 +151,7 @@ const App: Component = () => {
 						{(data) => (
 							<ScoopBusHeader
 								results={data().results}
+								clubRunners={data().clubRunners}
 								volunteers={data().volunteers}
 								guestResults={data().guestResults}
 								guests={data().guests}
