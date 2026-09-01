@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/Icon'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
 import { getMemberRoute, getRunnerKeyFromRouteName } from '@/utils/memberRoute'
 import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
+import { snowyAsset } from '@/utils/snow'
 import { A, useParams } from '@solidjs/router'
 import { css } from '@style/css'
 import { For, Show, createMemo, createSignal } from 'solid-js'
@@ -30,7 +31,6 @@ import type {
 } from '../utils/api'
 import { NotFoundPage } from './NotFoundPage'
 import { RunnerSummaryStat } from './RunnerSummaryStat'
-import { snowyAsset } from '@/utils/snow'
 
 interface MemberPageProps {
 	results: RunResultItem[]
@@ -54,6 +54,7 @@ interface GroupedCelebration {
 	color: string
 	description: string
 	otherRunnerId?: string
+	balloons?: number
 	occurrences: CelebrationOccurrence[]
 }
 
@@ -93,6 +94,7 @@ function AchievementItem(props: { celebration: GroupedCelebration }) {
 						color: props.celebration.color,
 						description: props.celebration.description,
 						otherRunnerId: props.celebration.otherRunnerId,
+						balloons: props.celebration.balloons,
 					}}
 				/>
 				<Show when={props.celebration.occurrences.length > 1}>
@@ -321,6 +323,7 @@ export function MemberPage(props: MemberPageProps) {
 						color: tag.color,
 						description: tag.description,
 						otherRunnerId: tag.otherRunnerId,
+						balloons: tag.balloons,
 						occurrences: [occurrence],
 					})
 					continue

@@ -141,6 +141,34 @@ export default defineConfig({
 				'54.6%, 100%': { opacity: 0 },
 			},
 
+			// --- Milestone balloons on a results card ---
+			/**
+			 * The bunch swaying about the knot it's tied to. Each strand sets its own
+			 * `--angle` to hang at and `--sway` to swing through, so a bunch never
+			 * moves as one piece.
+			 */
+			balloonSway: {
+				'0%, 100%': { rotate: 'calc(var(--angle) - var(--sway))' },
+				'50%': { rotate: 'calc(var(--angle) + var(--sway))' },
+			},
+			/**
+			 * The helium bob. Lengthening the strand rather than moving the balloon
+			 * keeps the string tied at both ends — it's the string that gives.
+			 */
+			balloonBob: {
+				'0%, 100%': { height: 'var(--length)' },
+				'50%': { height: 'calc(var(--length) + 7px)' },
+			},
+
+			/**
+			 * The little balloons in a celebration pill. Only a nudge — they sit in a
+			 * line of text, so anything more would push the line around.
+			 */
+			balloonNudge: {
+				'0%, 100%': { translate: '0 0' },
+				'50%': { translate: '0 -0.14em' },
+			},
+
 			// --- Wrapped "explore" stories ---
 			/** The progress bar segment filling across while a slide is showing. */
 			storyProgress: {

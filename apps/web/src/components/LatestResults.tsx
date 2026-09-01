@@ -1,4 +1,5 @@
 import extLinkAsset from '@/assets/misc/ext-link.png'
+import { isBalloonMilestone } from '@/data/balloons'
 import { runners } from '@/data/runners'
 import { RoleTranslations } from '@/data/volunteer-roles'
 import { getEvent } from '@/utils/events'
@@ -31,6 +32,7 @@ import type {
 	VolunteerItem,
 } from '../utils/api'
 import { MILESTONE_SET } from '../utils/milestones'
+import { type MajorMilestone, MilestoneCard } from './MilestoneCard'
 import {
 	type CelebrationData,
 	ResultCelebrations,
@@ -643,6 +645,47 @@ export function LatestResults(props: LatestResultsProps) {
 
 	const hasMore = createMemo(() => grouped().some((g) => g.date < cutoffDate()))
 
+	/**
+	 * The big milestones — the ones we have balloons for — one card each, so two
+	 * people who both hit one in the same week each get their own.
+	 *
+	 * Sides alternate down the whole page rather than within a day: a bunch flies
+	 * up past the top of its card, and two cards in a row with their balloons on
+	 * the same side would fly them into each other.
+	 */
+	const majorMilestones = createMemo(() => {
+		const byDate = new Map<string, MajorMilestone[]>()
+		let nth = 0
+
+		for (const group of visibleGroups()) {
+			const cards: MajorMilestone[] = []
+			const seen = new Set<string>()
+
+			for (const parkrun of group.parkruns) {
+				for (const res of parkrun.results) {
+					if (seen.has(res.parkrunId)) continue
+					const milestone = celebrations().milestoneMap.get(
+						`${res.parkrunId}:${group.date}`,
+					)
+					if (!isBalloonMilestone(milestone)) continue
+
+					seen.add(res.parkrunId)
+					cards.push({
+						parkrunId: res.parkrunId,
+						name: res.name,
+						milestone,
+						eventName: parkrun.name,
+						side: nth++ % 2 === 0 ? 'right' : 'left',
+					})
+				}
+			}
+
+			if (cards.length > 0) byDate.set(group.date, cards)
+		}
+
+		return byDate
+	})
+
 	return (
 		<div class={styles.container}>
 			<For each={visibleGroups()}>
@@ -651,6 +694,9 @@ export function LatestResults(props: LatestResultsProps) {
 						<h3 class={styles.date}>
 							{formatDate(new Date(`${result.date}T00:00:00`))}
 						</h3>
+						<For each={majorMilestones().get(result.date) ?? []}>
+							{(milestone) => <MilestoneCard milestone={milestone} />}
+						</For>
 						<For each={milestones().get(result.date) ?? []}>
 							{(milestone) => <JourneyMilestoneBlock milestone={milestone} />}
 						</For>

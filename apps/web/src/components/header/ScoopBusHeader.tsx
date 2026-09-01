@@ -11,6 +11,7 @@ import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
 import starsAsset from '@/assets/misc/stars.png'
 import sunAsset from '@/assets/misc/sun.png'
+import { isBalloonMilestone } from '@/data/balloons'
 import {
 	type RunnerData,
 	type RunnerName,
@@ -45,7 +46,6 @@ import { Canvas } from '../../engine/components'
 import { createAeroplaneController } from './AeroplaneController'
 import {
 	createBalloonControllers,
-	isBalloonMilestone,
 	registerBalloonConsoleHook,
 } from './BalloonController'
 import { createBusController } from './BusController'

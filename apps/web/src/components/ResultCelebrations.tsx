@@ -1,4 +1,6 @@
+import { MilestoneBalloonRow } from '@/components/MilestoneBalloons'
 import { Emoji } from '@/components/ui/Emoji'
+import { isBalloonMilestone } from '@/data/balloons'
 import { runners as runnerSignals } from '@/data/runners'
 import { getEvent, getEventName } from '@/utils/events'
 import { formatName, parseTimeToSeconds } from '@/utils/misc'
@@ -1114,6 +1116,8 @@ export interface CelebrationTag {
 	emoji: string
 	color: string
 	otherRunnerId?: string // for pair achievements, the parkrunId of the other runner involved (to link to their profile)
+	/** A milestone we have balloons for, which the pill flies in place of the emoji. */
+	balloons?: number
 }
 
 interface CelebrationRuleContext {
@@ -1182,6 +1186,8 @@ const celebrationRules: ((
 					label: `${ordinalSuffix(milestone)} run!`,
 					description: `Completed ${milestone} parkruns!`,
 					emoji: TAG_EMOJIS.milestone,
+					// The big ones spell themselves out; the rest keep the popper.
+					balloons: isBalloonMilestone(milestone) ? milestone : undefined,
 					color: TAG_COLORS.milestone,
 				}
 			: null
@@ -1555,7 +1561,12 @@ export function CelebrationPill(props: {
 			<Show when={otherRunnerFace()}>
 				{(face) => <img src={face()} alt="" class={styles.runnerFace} />}
 			</Show>
-			<Emoji emoji={props.tag.emoji} />
+			<Show
+				when={props.tag.balloons}
+				fallback={<Emoji emoji={props.tag.emoji} />}
+			>
+				{(milestone) => <MilestoneBalloonRow milestone={milestone()} />}
+			</Show>
 			<Show when={props.showTooltip && hovered()}>
 				<div class={styles.tooltip} style={tooltipStyle()}>
 					{props.tag.description}
