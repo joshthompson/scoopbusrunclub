@@ -1,5 +1,12 @@
 const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string) || ''
 
+/**
+ * The calendar as a subscribable feed. The backend keeps it as a file and
+ * rebuilds it when the data behind it moves on, so this URL always answers
+ * with the current calendar.
+ */
+export const CALENDAR_FEED_URL = `${CONVEX_URL}/api/calendar.ics`
+
 // ---------- Cache infrastructure ----------
 
 const CACHE_PREFIX = 'sbrc:'

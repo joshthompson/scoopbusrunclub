@@ -1,40 +1,20 @@
-import { runners as runnerSignals } from '@/data/runners'
+/**
+ * Member page routes.
+ *
+ * The lookups themselves live in `@shared/members`, alongside the names and
+ * parkrun ids they match on, so the backend resolves the same member to the
+ * same page.
+ */
 
-function normalizeName(name: string) {
-	return name.toLowerCase().replace(/[^a-z0-9]/g, '')
-}
-
-function normalizeRouteKey(key: string) {
-	return key.toLowerCase()
-}
-
-const parkrunIdToRunnerKey = new Map<string, string>()
-const nameToRunnerKey = new Map<string, string>()
-const routeKeyToRunnerKey = new Map<string, string>()
-
-for (const [runnerKey, [runner]] of Object.entries(runnerSignals)) {
-	const data = runner()
-	if (data.id) parkrunIdToRunnerKey.set(data.id, runnerKey)
-	nameToRunnerKey.set(normalizeName(data.name), runnerKey)
-	routeKeyToRunnerKey.set(normalizeRouteKey(runnerKey), runnerKey)
-}
+import { memberKeyFromRoute, memberRoute } from '@shared/members'
 
 export function getMemberRoute(
 	parkrunId?: string,
 	runnerName?: string,
 ): string | null {
-	const byId = parkrunId ? parkrunIdToRunnerKey.get(parkrunId) : undefined
-	if (byId) return `/member/${normalizeRouteKey(byId)}`
-
-	const byName = runnerName
-		? nameToRunnerKey.get(normalizeName(runnerName))
-		: undefined
-	if (byName) return `/member/${normalizeRouteKey(byName)}`
-
-	return null
+	return memberRoute(parkrunId, runnerName)
 }
 
 export function getRunnerKeyFromRouteName(routeName?: string): string | null {
-	if (!routeName) return null
-	return routeKeyToRunnerKey.get(normalizeRouteKey(routeName)) ?? null
+	return memberKeyFromRoute(routeName)
 }

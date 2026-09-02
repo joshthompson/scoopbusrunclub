@@ -26,7 +26,7 @@ import {
 	updateRace,
 } from '@/utils/adminApi'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
-import { PARKRUN_TRIP_TYPE } from '@/utils/parkrunTrips'
+import { PARKRUN_TRIP_TYPE } from '@shared/calendar/parkrun-trips'
 import { css } from '@style/css'
 import {
 	type Component,

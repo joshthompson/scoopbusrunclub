@@ -1,5 +1,5 @@
+import { getSpecialDayName } from '@shared/calendar/special-days'
 import type { RaceItem, RunResultItem, VolunteerItem } from './api'
-import { getSpecialDayName } from './special-days'
 
 export type WeekActivity = 'none' | 'ran' | 'volunteered' | 'both'
 

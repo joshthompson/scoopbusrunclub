@@ -16,16 +16,23 @@ export function nextMilestone(totalRuns: number): number | null {
 	return MILESTONES.find((m) => m > totalRuns) ?? null
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
 function startOfDay(date: Date): Date {
 	return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+/**
+ * Counted in whole days rather than milliseconds: the clocks change twice a
+ * year, and a projection a few months out would otherwise land an hour short
+ * and slip to the day before.
+ */
+function addDays(date: Date, days: number): Date {
+	return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
 }
 
 function firstSaturdayOnOrAfter(date: Date): Date {
 	const normalized = startOfDay(date)
 	const daysUntilSaturday = (6 - normalized.getDay() + 7) % 7
-	return new Date(normalized.getTime() + daysUntilSaturday * DAY_MS)
+	return addDays(normalized, daysUntilSaturday)
 }
 
 /**
@@ -44,19 +51,15 @@ export function projectedMilestoneDate(
 	const today = startOfDay(new Date())
 	const dayAfterLatest =
 		latest && !Number.isNaN(latest.getTime())
-			? new Date(startOfDay(latest).getTime() + DAY_MS)
+			? addDays(startOfDay(latest), 1)
 			: today
 
 	let firstPossibleSaturday = firstSaturdayOnOrAfter(dayAfterLatest)
 	while (firstPossibleSaturday < today) {
-		firstPossibleSaturday = new Date(
-			firstPossibleSaturday.getTime() + 7 * DAY_MS,
-		)
+		firstPossibleSaturday = addDays(firstPossibleSaturday, 7)
 	}
 
-	return new Date(
-		firstPossibleSaturday.getTime() + (runsUntil - 1) * 7 * DAY_MS,
-	)
+	return addDays(firstPossibleSaturday, (runsUntil - 1) * 7)
 }
 
 export function ordinalSuffix(n: number): string {

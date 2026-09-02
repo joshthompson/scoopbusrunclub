@@ -19,6 +19,18 @@ function jsonResponse(data: unknown, status = 200) {
 	})
 }
 
+/**
+ * A calendar feed is a plain file as far as a subscriber is concerned. An hour
+ * of browser/proxy caching is well inside how often calendar apps come back,
+ * and the filename is what they show if they can't read the calendar's name.
+ */
+const calendarHeaders = {
+	'Content-Type': 'text/calendar; charset=utf-8',
+	'Content-Disposition': 'inline; filename="scoop-bus-run-club.ics"',
+	'Cache-Control': 'public, max-age=3600',
+	...corsHeaders,
+}
+
 // --- CORS preflight ---
 
 http.route({
@@ -112,6 +124,73 @@ http.route({
 			sinceDate,
 		})
 		return jsonResponse(results)
+	}),
+})
+
+// --- GET /api/calendar.ics[?results=true] ---
+// The public, subscribable calendar feed. Kept as a file in storage and only
+// rebuilt when the data behind it (or the day) has moved on, so a calendar app
+// checking in every few hours costs us a version check and a file read.
+//
+// By default it leaves out everyone's parkrun attendance, which is most of the
+// calendar by volume. `?results=true` asks for the lot, and is its own stored
+// file rather than a filtered copy of the other.
+
+http.route({
+	path: '/api/calendar.ics',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const results = url.searchParams.get('results')
+		const variant = results === 'true' || results === '1' ? 'full' : 'noResults'
+
+		let state = await ctx.runQuery(internal.calendar.feedState, { variant })
+
+		if (state.stale) {
+			await ctx.runAction(internal.calendar.rebuild, { variant })
+			state = await ctx.runQuery(internal.calendar.feedState, { variant })
+		}
+
+		if (!state.feed) {
+			return new Response('Calendar feed unavailable', {
+				status: 503,
+				headers: { 'Content-Type': 'text/plain', ...corsHeaders },
+			})
+		}
+
+		// The version is the whole of what the feed is made of, so it doubles as
+		// an ETag: a subscriber that already has this one is spared the bytes.
+		const etag = `"${state.feed.version}"`
+		if (request.headers.get('If-None-Match') === etag) {
+			return new Response(null, {
+				status: 304,
+				headers: { ETag: etag, ...calendarHeaders },
+			})
+		}
+
+		const file = await ctx.storage.get(state.feed.storageId)
+		if (!file) {
+			// The note outlived the file. Build it again rather than 500.
+			await ctx.runAction(internal.calendar.rebuild, {
+				variant,
+				force: true,
+			})
+			const rebuilt = await ctx.runQuery(internal.calendar.feedState, {
+				variant,
+			})
+			const retry = rebuilt.feed
+				? await ctx.storage.get(rebuilt.feed.storageId)
+				: null
+			if (!retry) {
+				return new Response('Calendar feed unavailable', {
+					status: 503,
+					headers: { 'Content-Type': 'text/plain', ...corsHeaders },
+				})
+			}
+			return new Response(retry, { headers: calendarHeaders })
+		}
+
+		return new Response(file, { headers: { ETag: etag, ...calendarHeaders } })
 	}),
 })
 

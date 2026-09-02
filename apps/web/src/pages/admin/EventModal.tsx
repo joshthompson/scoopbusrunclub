@@ -13,7 +13,7 @@ import {
 	PARKRUN_EVENT_URL_EXAMPLE,
 	PARKRUN_TRIP_TYPE,
 	isParkrunEventUrl,
-} from '@/utils/parkrunTrips'
+} from '@shared/calendar/parkrun-trips'
 import { css } from '@style/css'
 import { type Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { EVENT_TYPES } from './EventsPage'

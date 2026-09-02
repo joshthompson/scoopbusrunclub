@@ -8,7 +8,10 @@ import type {
 } from '@/utils/api'
 import { toISODate } from '@/utils/calendar'
 import { formatDate } from '@/utils/misc'
-import { isParkrunTrip, withoutReportedTrips } from '@/utils/parkrunTrips'
+import {
+	isParkrunTrip,
+	withoutReportedTrips,
+} from '@shared/calendar/parkrun-trips'
 import { A } from '@solidjs/router'
 import { css } from '@style/css'
 import { For, Show } from 'solid-js'

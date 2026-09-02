@@ -1,33 +1,18 @@
 import { generateFrames } from '@/utils'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
+import { CLUB_MEMBERS, type MemberFacts, type MemberKey } from '@shared/members'
 import { type Accessor, type Setter, createSignal } from 'solid-js'
 import * as assets from './runner-assets'
 
 export const RUNNER_SIZE = 2
 export const FRAME_COUNT = 4
 
-type MonthDigit1 = 0 | 1
-type DayDigit1 = 0 | 1 | 2 | 3
-type Digit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
-type Birthday = `${DayDigit1}${Digit}/${MonthDigit1}${Digit}`
-
-export type RunnerName =
-	| 'josh'
-	| 'keith'
-	| 'claire'
-	| 'lyra'
-	| 'adam'
-	| 'anna'
-	| 'eline'
-	| 'rick'
-	| 'sophie'
-	| 'august'
-	| 'alisa'
-	| 'link'
-	| 'otherJosh'
-	| 'mikael'
-	| 'mia'
-	| 'david'
+/**
+ * The club's members, named by the key their page route uses. The names, ids
+ * and birthdays themselves live in `@shared/members`, so the calendar feed the
+ * backend generates describes the same people this scene draws.
+ */
+export type RunnerName = MemberKey
 
 export type RunnerState =
 	// Default
@@ -40,13 +25,7 @@ export type RunnerState =
 	| 'marshal'
 	| 'number-checker'
 
-export interface RunnerData {
-	name: string
-	altNames?: string[]
-	id: string
-	'5verstId'?: string
-	birthday: Birthday // Format: DD/MM
-	joined: number // The year the runner joined the club (2025 = Founding member, >2025 = New member)
+export interface RunnerData extends MemberFacts {
 	frames: {
 		run: string[] | undefined
 		sit: string[] | undefined
@@ -111,11 +90,7 @@ export const runners: Record<
 	[Accessor<RunnerData>, Setter<RunnerData>]
 > = {
 	josh: createSignal<RunnerData>({
-		name: 'Josh',
-		id: '8070821',
-		'5verstId': '790281221',
-		birthday: '15/08',
-		joined: 2025,
+		...CLUB_MEMBERS.josh,
 		frames: {
 			run: generateFrames(
 				assets.joshRun,
@@ -149,10 +124,7 @@ export const runners: Record<
 		frameInterval: 62,
 	}),
 	keith: createSignal<RunnerData>({
-		name: 'Keith',
-		id: '5635044',
-		birthday: '01/08',
-		joined: 2025,
+		...CLUB_MEMBERS.keith,
 		frames: {
 			run: generateFrames(
 				assets.keithRun,
@@ -179,10 +151,7 @@ export const runners: Record<
 		frameInterval: 80,
 	}),
 	claire: createSignal<RunnerData>({
-		name: 'Claire',
-		id: '377595',
-		birthday: '06/06',
-		joined: 2025,
+		...CLUB_MEMBERS.claire,
 		frames: {
 			run: generateFrames(
 				assets.claireRun,
@@ -216,10 +185,7 @@ export const runners: Record<
 		frameInterval: 125,
 	}),
 	lyra: createSignal<RunnerData>({
-		name: 'Lyra',
-		id: '8009111',
-		birthday: '00/00',
-		joined: 2025,
+		...CLUB_MEMBERS.lyra,
 		frames: {
 			run: generateFrames(
 				assets.lyraRun,
@@ -254,10 +220,7 @@ export const runners: Record<
 		frameInterval: 80,
 	}),
 	adam: createSignal<RunnerData>({
-		name: 'Adam',
-		id: '7758658',
-		birthday: '12/05',
-		joined: 2025,
+		...CLUB_MEMBERS.adam,
 		frames: {
 			run: generateFrames(
 				assets.adamRun,
@@ -284,10 +247,7 @@ export const runners: Record<
 		frameInterval: 65,
 	}),
 	anna: createSignal<RunnerData>({
-		name: 'Anna',
-		id: '850764',
-		birthday: '02/12',
-		joined: 2025,
+		...CLUB_MEMBERS.anna,
 		frames: {
 			run: generateFrames(
 				assets.annaRun,
@@ -321,10 +281,7 @@ export const runners: Record<
 		frameInterval: 120,
 	}),
 	eline: createSignal<RunnerData>({
-		name: 'Eline',
-		id: '8943925',
-		birthday: '06/12',
-		joined: 2025,
+		...CLUB_MEMBERS.eline,
 		frames: {
 			run: generateFrames(
 				assets.elineRun,
@@ -351,10 +308,7 @@ export const runners: Record<
 		frameInterval: 75,
 	}),
 	rick: createSignal<RunnerData>({
-		name: 'Rick',
-		id: '9679233',
-		birthday: '10/08',
-		joined: 2025,
+		...CLUB_MEMBERS.rick,
 		frames: {
 			run: generateFrames(
 				assets.rickRun,
@@ -381,10 +335,7 @@ export const runners: Record<
 		frameInterval: 75,
 	}),
 	sophie: createSignal<RunnerData>({
-		name: 'Sophie',
-		id: '6076813',
-		birthday: '28/11',
-		joined: 2025,
+		...CLUB_MEMBERS.sophie,
 		frames: {
 			run: generateFrames(
 				assets.sophieRun,
@@ -411,10 +362,7 @@ export const runners: Record<
 		frameInterval: 75,
 	}),
 	august: createSignal<RunnerData>({
-		name: 'August',
-		id: '545803',
-		birthday: '02/12',
-		joined: 2025,
+		...CLUB_MEMBERS.august,
 		frames: {
 			run: generateFrames(
 				assets.augustRun,
@@ -442,11 +390,7 @@ export const runners: Record<
 		frameInterval: 100,
 	}),
 	alisa: createSignal<RunnerData>({
-		name: 'Alisa',
-		id: '10663604',
-		'5verstId': '790281220',
-		birthday: '22/11',
-		joined: 2025,
+		...CLUB_MEMBERS.alisa,
 		frames: {
 			run: generateFrames(
 				assets.alisaRun,
@@ -480,10 +424,7 @@ export const runners: Record<
 		frameInterval: 75,
 	}),
 	link: createSignal<RunnerData>({
-		name: 'Link',
-		id: '', // Uses Alisa's speed/data
-		birthday: '09/03',
-		joined: 2025,
+		...CLUB_MEMBERS.link,
 		frames: {
 			run: generateFrames(assets.linkRun, 20 * 2, 28, 20 * 2, 2, true),
 			sit: [assets.linkSit],
@@ -511,19 +452,7 @@ export const runners: Record<
 		connectedTo: 'alisa',
 	}),
 	otherJosh: createSignal<RunnerData>({
-		name: 'Other Josh',
-		altNames: [
-			'Other Josh',
-			'Josh 2',
-			'Joshua II',
-			'Cass',
-			'Josh Cass',
-			'Ozzy Josh',
-			'OJ',
-		],
-		id: '5346109',
-		birthday: '02/07',
-		joined: 2026,
+		...CLUB_MEMBERS.otherJosh,
 		frames: {
 			run: generateFrames(
 				assets.otherJoshRun,
@@ -550,10 +479,7 @@ export const runners: Record<
 		frameInterval: 80,
 	}),
 	mikael: createSignal<RunnerData>({
-		name: 'Mikael',
-		id: '9854274',
-		birthday: '01/01',
-		joined: 2026,
+		...CLUB_MEMBERS.mikael,
 		frames: {
 			run: generateFrames(
 				assets.mikaelRun,
@@ -580,10 +506,7 @@ export const runners: Record<
 		frameInterval: 75,
 	}),
 	mia: createSignal<RunnerData>({
-		name: 'Mia',
-		id: '8398883',
-		birthday: '22/02',
-		joined: 2026,
+		...CLUB_MEMBERS.mia,
 		...createRunnerFrames({
 			topType: 'tshirt',
 			skin: 'light',
@@ -601,10 +524,7 @@ export const runners: Record<
 		frameInterval: 75,
 	}),
 	david: createSignal<RunnerData>({
-		name: 'David',
-		id: '3710502',
-		birthday: '04/04',
-		joined: 2026,
+		...CLUB_MEMBERS.david,
 		...createRunnerFrames({
 			topType: 'tshirt',
 			skin: 'light',

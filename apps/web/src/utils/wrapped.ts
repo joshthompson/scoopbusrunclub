@@ -18,8 +18,8 @@ import {
 	journeyMilestones,
 } from '@/utils/journey'
 import { SCOOP_BUS_CLUB_NAME } from '@/utils/largestClubs'
-import { MILESTONE_SET } from '@/utils/milestones'
 import { formatName, parseTimeToSeconds } from '@/utils/misc'
+import { MILESTONE_SET } from '@shared/calendar/milestones'
 
 // ---------------------------------------------------------------------------
 // Lookups

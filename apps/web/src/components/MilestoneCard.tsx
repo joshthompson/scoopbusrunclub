@@ -1,6 +1,6 @@
 import { type RunnerData, hasHeaderArtwork, runners } from '@/data/runners'
 import { getMemberRoute } from '@/utils/memberRoute'
-import { ordinalSuffix } from '@/utils/milestones'
+import { ordinalSuffix } from '@shared/calendar/milestones'
 import { A } from '@solidjs/router'
 import { css } from '@style/css'
 import { Show } from 'solid-js'

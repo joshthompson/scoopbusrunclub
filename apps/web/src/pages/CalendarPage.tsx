@@ -1,4 +1,5 @@
 import { BackSignButton } from '@/components/BackSignButton'
+import { CalendarSubscribe } from '@/components/CalendarSubscribe'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Tooltip } from '@/components/ui/Tooltip'
@@ -224,6 +225,10 @@ export function CalendarPage(props: CalendarPageProps) {
 	return (
 		<div class={styles.container}>
 			<FieldBlock title="Calendar" signType="purple">
+				<div class={styles.subscribeRow}>
+					<CalendarSubscribe class={styles.subscribeButton} />
+				</div>
+
 				<div class={styles.nav}>
 					<button
 						type="button"
@@ -365,6 +370,22 @@ const styles = {
 		display: 'flex',
 		flexDirection: 'column',
 		gap: '2rem',
+	}),
+	subscribeRow: css({
+		display: 'flex',
+		justifyContent: 'flex-end',
+		// The title sign hangs over the middle of the block, so the button sits
+		// out of its way in the corner.
+		padding: '0 0.25rem 0.5rem',
+	}),
+	subscribeButton: css({
+		alignSelf: 'flex-end',
+		padding: '0.4rem 0.9rem',
+		fontSize: '0.8rem',
+		mt: '-20px',
+		mr: '-10px',
+		// Wraps rather than pushing the page sideways on a narrow phone.
+		maxWidth: '100%',
 	}),
 	nav: css({
 		display: 'flex',

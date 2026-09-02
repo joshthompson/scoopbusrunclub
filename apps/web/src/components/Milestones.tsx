@@ -3,17 +3,17 @@ import { Emoji } from '@/components/ui/Emoji'
 import { runners as runnerSignals } from '@/data/runners'
 import { getMemberRoute } from '@/utils/memberRoute'
 import { formatDate, formatName } from '@/utils/misc'
-import { A } from '@solidjs/router'
-import { css } from '@style/css'
-import { For, Show, createMemo } from 'solid-js'
-import type { RunResultItem, Runner } from '../utils/api'
 import {
 	MILESTONE_SET,
 	UPCOMING_THRESHOLD,
 	nextMilestone,
 	ordinalSuffix,
 	projectedMilestoneDate,
-} from '../utils/milestones'
+} from '@shared/calendar/milestones'
+import { A } from '@solidjs/router'
+import { css } from '@style/css'
+import { For, Show, createMemo } from 'solid-js'
+import type { RunResultItem, Runner } from '../utils/api'
 
 const parkrunIdToShortName = new Map<string, string>()
 for (const [, [runner]] of Object.entries(runnerSignals)) {

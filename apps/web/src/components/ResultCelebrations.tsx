@@ -4,6 +4,7 @@ import { isBalloonMilestone, milestoneColor } from '@/data/balloons'
 import { runners as runnerSignals } from '@/data/runners'
 import { getEvent, getEventName } from '@/utils/events'
 import { formatName, parseTimeToSeconds } from '@/utils/misc'
+import { MILESTONE_SET, ordinalSuffix } from '@shared/calendar/milestones'
 import { css } from '@style/css'
 import { Show, createSignal } from 'solid-js'
 import {
@@ -13,7 +14,6 @@ import {
 	getCached,
 	setCache,
 } from '../utils/api'
-import { MILESTONE_SET, ordinalSuffix } from '../utils/milestones'
 
 // ---------------------------------------------------------------------------
 // PB map

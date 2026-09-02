@@ -17,8 +17,12 @@ import {
 	formatParkrunTime,
 	ordinal,
 } from '@/utils/misc'
-import { isParkrunTrip, withoutReportedTrips } from '@/utils/parkrunTrips'
-import { getSpecialDayName } from '@/utils/special-days'
+import { MILESTONE_SET } from '@shared/calendar/milestones'
+import {
+	isParkrunTrip,
+	withoutReportedTrips,
+} from '@shared/calendar/parkrun-trips'
+import { getSpecialDayName } from '@shared/calendar/special-days'
 import { A, useNavigate } from '@solidjs/router'
 import { css } from '@style/css'
 import { For, type JSX, Show, createMemo, createSignal } from 'solid-js'
@@ -31,7 +35,6 @@ import type {
 	Runner,
 	VolunteerItem,
 } from '../utils/api'
-import { MILESTONE_SET } from '../utils/milestones'
 import { type MajorMilestone, MilestoneCard } from './MilestoneCard'
 import {
 	type CelebrationData,

@@ -1,5 +1,5 @@
-import { DOMAIN_TO_COUNTRY } from '@shared/parkrun-parsers'
-import type { RaceItem, RunResultItem, VolunteerItem } from './api'
+import { DOMAIN_TO_COUNTRY } from '../parkrun-parsers'
+import type { RaceSource, VolunteerSource } from './types'
 
 /**
  * Scoop Bus trips out to another parkrun.
@@ -56,9 +56,9 @@ export function isParkrunEventUrl(url: string | undefined): boolean {
  * Volunteering counts too: a Saturday spent marshalling is still a trip taken.
  */
 export function supersededTripIds(
-	races: RaceItem[],
-	results: RunResultItem[],
-	volunteers: VolunteerItem[],
+	races: RaceSource[],
+	results: { date: string; event: string }[],
+	volunteers: VolunteerSource[],
 ): Set<string> {
 	const superseded = new Set<string>()
 	const trips = races.filter(isParkrunTrip)
@@ -79,11 +79,11 @@ export function supersededTripIds(
 }
 
 /** The events worth showing: everything, less the trips parkrun has reported. */
-export function withoutReportedTrips(
-	races: RaceItem[],
-	results: RunResultItem[],
-	volunteers: VolunteerItem[],
-): RaceItem[] {
+export function withoutReportedTrips<T extends RaceSource>(
+	races: T[],
+	results: { date: string; event: string }[],
+	volunteers: VolunteerSource[],
+): T[] {
 	const superseded = supersededTripIds(races, results, volunteers)
 	if (superseded.size === 0) return races
 	return races.filter((race) => !superseded.has(race._id))

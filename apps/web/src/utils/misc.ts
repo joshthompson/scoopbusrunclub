@@ -1,3 +1,5 @@
+export { formatName } from '@shared/calendar/format'
+
 export function ordinal(n: number) {
 	const s = ['th', 'st', 'nd', 'rd']
 	const v = n % 100
@@ -8,12 +10,6 @@ export function formatDate(date: Date) {
 	const day = date.getDate()
 	const month = date.toLocaleString('en-GB', { month: 'long' })
 	return `${ordinal(day)} ${month} ${date.getFullYear()}`
-}
-
-export function formatName(name: string) {
-	return name
-		.toLowerCase()
-		.replace(/(?<=^|[\s-])\w/g, (char) => char.toUpperCase())
 }
 
 /** Parses a time string like "23:45" or "1:23:45" into total seconds. */
