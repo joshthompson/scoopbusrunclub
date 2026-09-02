@@ -1,6 +1,6 @@
 import { MilestoneBalloonRow } from '@/components/MilestoneBalloons'
 import { Emoji } from '@/components/ui/Emoji'
-import { isBalloonMilestone } from '@/data/balloons'
+import { isBalloonMilestone, milestoneColor } from '@/data/balloons'
 import { runners as runnerSignals } from '@/data/runners'
 import { getEvent, getEventName } from '@/utils/events'
 import { formatName, parseTimeToSeconds } from '@/utils/misc'
@@ -1188,7 +1188,9 @@ const celebrationRules: ((
 					emoji: TAG_EMOJIS.milestone,
 					// The big ones spell themselves out; the rest keep the popper.
 					balloons: isBalloonMilestone(milestone) ? milestone : undefined,
-					color: TAG_COLORS.milestone,
+					// ...but every one of them wears the colour of the balloons, its
+					// own or those of the last major milestone it passed.
+					color: milestoneColor(milestone) ?? TAG_COLORS.milestone,
 				}
 			: null
 	},
