@@ -187,6 +187,7 @@ export const CharacterEditor: Component<{
 								<option value="">None</option>
 								<option value="stubble">Stubble</option>
 								<option value="beard">Beard</option>
+								<option value="moustache">Moustache</option>
 								<option value="long">Long</option>
 							</AdminSelect>
 							<Show when={character().head.facialHair}>

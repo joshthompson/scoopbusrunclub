@@ -4,7 +4,7 @@ import { For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
 import { Emoji } from './ui/Emoji'
 import { SnowShelf } from './ui/SnowShelf'
 
-interface NavItem {
+type NavItem = {
 	href: string
 	/** Short label shown under the icon in the bar */
 	label: string
@@ -24,7 +24,7 @@ const VISIBLE_COUNT = 4
 
 function navItems(): NavItem[] {
 	return [
-		{ href: '/', label: 'Results', fullLabel: 'Latest Results', emoji: '🏃' },
+		{ href: '/', label: 'Results', fullLabel: 'Latest Results', emoji: 'stopwatch' },
 		{
 			href: '/calendar',
 			label: 'Calendar',
@@ -35,20 +35,20 @@ function navItems(): NavItem[] {
 			href: '/map',
 			label: 'Map',
 			fullLabel: 'Scoop Bus Tourism Map',
-			emoji: '🗺️',
+			emoji: '🌍',
 		},
 		{
 			href: '/everyone',
 			label: 'Journey',
 			fullLabel: 'Our Journey Together',
-			emoji: '🚶',
+			emoji: 'flag',
 		},
 		// Everything below here lands in the "More" sheet
 		{
 			href: '/custom-racer/add',
 			label: 'Add Racer',
 			fullLabel: 'Add Your Own Racer',
-			emoji: '🎽',
+			emoji: '*',
 		},
 		{
 			href: '/largestclubs',
@@ -228,7 +228,7 @@ const styles = {
 		display: 'flex',
 		flexDirection: 'column',
 		alignItems: 'center',
-		justifyContent: 'center',
+		justifyContent: 'start',
 		gap: '2px',
 		border: 'none',
 		borderTop: '3px solid transparent',
@@ -236,7 +236,7 @@ const styles = {
 		color: 'var(--color-white)',
 		textDecoration: 'none',
 		cursor: 'pointer',
-		paddingTop: '2px',
+		paddingTop: '3px',
 		paddingBottom: BOTTOM_INSET,
 		_active: { background: 'var(--overlay-white-10)' },
 	}),
@@ -245,7 +245,8 @@ const styles = {
 		borderTopColor: 'var(--green-brand)',
 	}),
 	icon: css({
-		fontSize: '1.5rem',
+		fontSize: '16px',
+		mb: '4px',
 		lineHeight: 1,
 		display: 'block',
 	}),
@@ -260,15 +261,16 @@ const styles = {
 		whiteSpace: 'nowrap',
 	}),
 	burger: css({
-		height: '1.5rem',
+		height: '16px',
 		display: 'flex',
 		flexDirection: 'column',
 		justifyContent: 'center',
 		gap: '3px',
+		my: '3px 4px',
 		'& span': {
 			display: 'block',
-			width: '20px',
-			height: '3px',
+			width: '16px',
+			height: '2px',
 			background: 'var(--color-white)',
 		},
 	}),
@@ -311,7 +313,7 @@ const styles = {
 		background: 'var(--overlay-white-15)',
 	}),
 	sheetIcon: css({
-		fontSize: '1.5rem',
+		fontSize: '16px',
 		lineHeight: 1,
 	}),
 }

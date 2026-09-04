@@ -18,6 +18,7 @@ import type {
 	Runner,
 	VolunteerItem,
 } from '../utils/api'
+import { Emoji } from '@/components/ui/Emoji'
 
 export const HomePage: Component<{
 	resultsLoading: boolean
@@ -38,7 +39,7 @@ export const HomePage: Component<{
 					href={`/wrapped/${getWrappedBannerYear()}/explore`}
 					class={styles.wrappedBanner}
 				>
-					🎁 Scoop Bus Wrapped {getWrappedBannerYear()} is here! →
+					<Emoji emoji="🎁" animation="none" /> Scoop Bus Wrapped {getWrappedBannerYear()} is here! →
 				</A>
 			</Show>
 			<main class={styles.main}>
@@ -88,7 +89,7 @@ export const HomePage: Component<{
 								fontWeight: 'bold',
 							})}
 						>
-							🗺️ Scoop Bus Tourism Map
+							<Emoji emoji="🌍" animation="none" /> Scoop Bus Tourism Map
 						</A>
 						<A
 							href="/calendar"
@@ -98,7 +99,7 @@ export const HomePage: Component<{
 								fontWeight: 'bold',
 							})}
 						>
-							📅 Club Calendar
+							<Emoji emoji="📅" animation="none" /> Club Calendar
 						</A>
 						<A
 							href="/everyone"
@@ -108,7 +109,7 @@ export const HomePage: Component<{
 								fontWeight: 'bold',
 							})}
 						>
-							🚶 Our Journey Together
+							<Emoji emoji="flag" animation="none" /> Our Journey Together
 						</A>
 						<A
 							href="/connections"
@@ -118,7 +119,7 @@ export const HomePage: Component<{
 								fontWeight: 'bold',
 							})}
 						>
-							🕸️ The Connection Web
+							<Emoji emoji="🕸️" animation="none" /> The Connection Web
 						</A>
 						<A
 							href={`/wrapped/${new Date().getFullYear() - (new Date().getMonth() === 11 ? 0 : 1)}`}
@@ -128,7 +129,7 @@ export const HomePage: Component<{
 								fontWeight: 'bold',
 							})}
 						>
-							🎁 Scoop Bus Wrapped
+							<Emoji emoji="🎁" animation="none" /> Scoop Bus Wrapped
 						</A>
 					</div>
 				</DirtBlock>

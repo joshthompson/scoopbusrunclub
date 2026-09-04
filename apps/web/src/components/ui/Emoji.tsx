@@ -5,6 +5,16 @@ import RunDirectorEmoji from '@/assets/emoji/run-director.png'
 import StarEmoji from '@/assets/emoji/star.png'
 import TailWalkerEmoji from '@/assets/emoji/tail-walker.png'
 import VolunteerEmoji from '@/assets/emoji/volunteer.png'
+import WebEmoji from '@assets/emoji/web.png'
+import GlobeEmoji from '@assets/emoji/globe.png'
+import CalendarEmoji from '@assets/emoji/calendar.png'
+import FlagEmoji from '@assets/emoji/flag.png'
+import QuestionEmoji from '@assets/emoji/question.png'
+import InfoEmoji from '@assets/emoji/info.png'
+import PresentEmoji from '@assets/emoji/present.png'
+import AsteriskEmoji from '@assets/emoji/asterisk.png'
+import StopwatchEmoji from '@assets/emoji/stopwatch.png'
+import TrophyEmoji from '@assets/emoji/trophy.png'
 import { css, cva, cx } from '@style/css'
 import { createMemo } from 'solid-js'
 
@@ -16,6 +26,16 @@ const emojiMap: Record<string, string | undefined> = {
 	'🦺🟡': VolunteerEmoji,
 	'🦺🟦': RunDirectorEmoji,
 	'🦺🟠': TailWalkerEmoji,
+	'🕸️': WebEmoji,
+	'🌍': GlobeEmoji,
+	'📅': CalendarEmoji,
+	flag: FlagEmoji,
+	'❓': QuestionEmoji,
+	'ℹ️': InfoEmoji,
+	'🎁': PresentEmoji,
+	'*': AsteriskEmoji,
+	'🏆': TrophyEmoji,
+	stopwatch: StopwatchEmoji,
 }
 
 export interface EmojiProps {
@@ -35,7 +55,11 @@ export function Emoji(props: EmojiProps) {
 	})
 
 	const emoji = emojiSrc() ? (
-		<img src={emojiSrc()} class={styles.image} alt={props.emoji} />
+		<img
+			src={emojiSrc()}
+			class={styles.image}
+			alt={props.emoji}
+		/>
 	) : (
 		props.emoji
 	)

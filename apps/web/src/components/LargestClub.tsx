@@ -4,6 +4,7 @@ import { Show, createResource } from 'solid-js'
 import { fetchLargestClubs } from '../utils/api'
 import { largestClubMessage } from '../utils/largestClubs'
 import { DirtBlock } from './ui/DirtBlock'
+import { Emoji } from './ui/Emoji'
 
 /**
  * Homepage block tracking Scoop Bus Run Club's progress towards being the
@@ -19,7 +20,7 @@ export function LargestClub() {
 				<DirtBlock title="Largest Club">
 					<p class={styles.message}>{text()}</p>
 					<A href="/largestclubs" class={styles.link}>
-						📈 Largest clubs
+						<Emoji emoji="🏆" animation="none" /> Largest clubs
 					</A>
 				</DirtBlock>
 			)}
