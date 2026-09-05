@@ -209,11 +209,13 @@ const styles = {
 		height: 0,
 		zIndex: 25,
 		pointerEvents: 'none',
-		// A phone's card is narrow enough that a full-size bunch lands on the text
-		// of the card above it. Scaling from the knot takes the strings down with
-		// the balloons, so the bunch stays tied where it was.
-		'@media (max-width: 768px)': {
-			scale: '0.7',
+		// A narrow card can't take a full-size bunch: it would land on the text of
+		// the card above rather than the dirt either side of it. Scaling from the
+		// knot takes the strings down with the balloons, so the bunch stays tied
+		// where it was. `MilestoneCard` is what declares the container.
+		scale: '0.7',
+		'@container milestoneCard (min-width: 610px)': {
+			scale: '1',
 		},
 	}),
 	strand: css({

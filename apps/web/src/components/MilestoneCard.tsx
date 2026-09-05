@@ -38,38 +38,40 @@ export function MilestoneCard(props: { milestone: MajorMilestone }) {
 		getMemberRoute(props.milestone.parkrunId, props.milestone.name)
 
 	return (
-		<DirtBlock class={styles.block}>
-			<div class={styles.card} data-milestone-card={props.milestone.side}>
-				<MilestoneBalloons
-					milestone={props.milestone.milestone}
-					side={props.milestone.side}
-					inset={BALLOON_INSET}
-					top={BALLOON_KNOT_DROP}
-				/>
-				<Show when={runner()} keyed>
-					{(data) => (
-						<Show when={hasHeaderArtwork(data)}>
-							<div class={styles.figure}>
-								<CharacterImage runner={data} pose="sitting" />
-							</div>
-						</Show>
-					)}
-				</Show>
-				<h4 class={styles.title}>
-					<Show when={memberRoute()} fallback={<span>{name()}</span>}>
-						{(href) => (
-							<A href={href()} class={styles.link}>
-								{name()}
-							</A>
+		<div class={styles.sizer}>
+			<DirtBlock class={styles.block}>
+				<div class={styles.card} data-milestone-card={props.milestone.side}>
+					<MilestoneBalloons
+						milestone={props.milestone.milestone}
+						side={props.milestone.side}
+						inset={BALLOON_INSET}
+						top={BALLOON_KNOT_DROP}
+					/>
+					<Show when={runner()} keyed>
+						{(data) => (
+							<Show when={hasHeaderArtwork(data)}>
+								<div class={styles.figure}>
+									<CharacterImage runner={data} pose="sitting" />
+								</div>
+							</Show>
 						)}
 					</Show>
-					's {ordinalSuffix(props.milestone.milestone)} parkrun!
-				</h4>
-				<p class={styles.detail}>
-					A milestone run at {props.milestone.eventName}.
-				</p>
-			</div>
-		</DirtBlock>
+					<h4 class={styles.title}>
+						<Show when={memberRoute()} fallback={<span>{name()}</span>}>
+							{(href) => (
+								<A href={href()} class={styles.link}>
+									{name()}
+								</A>
+							)}
+						</Show>
+						's {ordinalSuffix(props.milestone.milestone)} parkrun!
+					</h4>
+					<p class={styles.detail}>
+						A milestone run at {props.milestone.eventName}.
+					</p>
+				</div>
+			</DirtBlock>
+		</div>
 	)
 }
 
@@ -82,15 +84,31 @@ const BALLOON_INSET = 6
 const BALLOON_KNOT_DROP = 24
 
 const styles = {
+	/**
+	 * Nothing but a container for the card to measure itself against.
+	 *
+	 * Whether the bunch can hang over the block above comes down to how wide the
+	 * card is — wide enough and it lands on the empty dirt either side of that
+	 * block's text, narrow and it lands on the words. The viewport doesn't
+	 * answer that on its own: the home page's results column is much narrower
+	 * beside the sidebar than it is once the sidebar drops away below it.
+	 */
+	sizer: css({
+		containerType: 'inline-size',
+		containerName: 'milestoneCard',
+	}),
 	/** Room at the top for the bunch, most of which is drawn above the card. */
 	block: css({
-		mt: '52px',
-		// A phone has one narrow column, where a bunch hanging over the card above
-		// would land on its text rather than the empty dirt either side of it. So
-		// there the card reserves the whole of the scaled-down reach — measured at
-		// 96px above the card, plus the bob and a little air.
-		'@media (max-width: 768px)': {
-			mt: '108px',
+		// A narrow card can't give the bunch the run of the block above — it would
+		// land on the words rather than the dirt either side of them — so it
+		// reserves most of the scaled-down reach, leaving the balloons to nose
+		// just over the bottom edge.
+		mt: '48px',
+		// With room to the sides, the card reserves nothing at all: it sits the
+		// ordinary gap below whatever is above it, like any other block, and the
+		// bunch is left to hang over that block's dirt.
+		'@container milestoneCard (min-width: 610px)': {
+			mt: '0',
 		},
 	}),
 	card: css({
