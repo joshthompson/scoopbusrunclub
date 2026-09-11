@@ -496,6 +496,13 @@ function ParkrunImage(props: { parkrun: ParkrunEvent }) {
 					name: 'Urheilupuisto Parkrun',
 					height: '71px',
 				}
+
+			case 'kalgarden':
+				return {
+					src: new URL('../assets/misc/falun.png', import.meta.url).href,
+					height: '68px',
+				}
+
 			case 'boulognerskogen':
 				return {
 					src: new URL('../assets/misc/gavle.png', import.meta.url).href,
