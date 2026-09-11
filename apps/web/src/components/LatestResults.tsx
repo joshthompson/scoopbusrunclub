@@ -44,7 +44,7 @@ import {
 } from './ResultCelebrations'
 import { Button } from './ui/Button'
 import { DirtBlock } from './ui/DirtBlock'
-import { Emoji } from './ui/Emoji'
+import { Emoji, EmojiString } from './ui/Emoji'
 
 const parkrunIdToRunnerName = new Map<string, string>()
 for (const [, [runner]] of Object.entries(runners)) {
@@ -390,7 +390,7 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 					<Show when={eventEmojis()}>
 						<Emoji emoji={eventEmojis()?.[0]} />{' '}
 					</Show>
-					{props.race.name}
+					<EmojiString text={props.race.name} />
 					<Show when={eventEmojis()}>
 						{' '}
 						<Emoji emoji={eventEmojis()?.[1]} />

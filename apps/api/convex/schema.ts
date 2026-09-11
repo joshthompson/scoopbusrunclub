@@ -54,6 +54,20 @@ export default defineSchema({
 		name: v.string(),
 		website: v.optional(v.string()),
 		type: v.optional(v.string()),
+		time: v.optional(v.string()), // HH:MM, in the club's timezone
+		// Turns `date` into the first of a series; the repeats are worked out on
+		// read rather than stored. See libs/shared/calendar/recurrence.ts.
+		recurrence: v.optional(
+			v.object({
+				freq: v.union(
+					v.literal('weekly'),
+					v.literal('monthly'),
+					v.literal('yearly'),
+				),
+				interval: v.optional(v.number()),
+				until: v.optional(v.string()), // YYYY-MM-DD, inclusive
+			}),
+		),
 		attendees: v.array(
 			v.object({
 				runnerId: v.string(), // RunnerName key from runners.ts

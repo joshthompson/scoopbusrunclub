@@ -1,3 +1,4 @@
+import { Emoji, EmojiString } from '@/components/ui/Emoji'
 import { runners } from '@/data/runners'
 import type { RunnerName } from '@/data/runners'
 import type {
@@ -6,12 +7,16 @@ import type {
 	RunResultItem,
 	VolunteerItem,
 } from '@/utils/api'
-import { toISODate } from '@/utils/calendar'
+import { raceEmoji, toISODate } from '@/utils/calendar'
 import { formatDate } from '@/utils/misc'
 import {
 	isParkrunTrip,
 	withoutReportedTrips,
 } from '@shared/calendar/parkrun-trips'
+import {
+	expandRecurringRaces,
+	withoutClashingRepeats,
+} from '@shared/calendar/recurrence'
 import { A } from '@solidjs/router'
 import { css } from '@style/css'
 import { For, Show } from 'solid-js'
@@ -19,8 +24,9 @@ import { DirtBlock } from './ui/DirtBlock'
 
 /**
  * What the club has coming up: the races worth a mention, and every Scoop Bus
- * trip out to another parkrun. A trip drops off once parkrun has reported it,
- * by which point the results say the same thing.
+ * trip out to another parkrun. A repeating event is listed on each of the dates
+ * it comes round on, and a trip drops off once parkrun has reported it, by which
+ * point the results say the same thing.
  */
 export function RaceCalendar(props: {
 	races: RaceItem[]
@@ -30,11 +36,15 @@ export function RaceCalendar(props: {
 }) {
 	const upcoming = () => {
 		const today = toISODate(new Date())
-		return withoutReportedTrips(
-			props.races,
-			props.results ?? [],
-			props.volunteers ?? [],
-		).filter((r) => (r.majorEvent || isParkrunTrip(r)) && r.date >= today)
+		return withoutClashingRepeats(
+			withoutReportedTrips(
+				expandRecurringRaces(props.races, { today }),
+				props.results ?? [],
+				props.volunteers ?? [],
+			),
+		)
+			.filter((r) => (r.majorEvent || isParkrunTrip(r)) && r.date >= today)
+			.sort((a, b) => a.date.localeCompare(b.date))
 	}
 
 	const guestRecord = (guestId: string) =>
@@ -48,10 +58,10 @@ export function RaceCalendar(props: {
 						{(race) => (
 							<div>
 								<h4 class={styles.raceName}>
-									<Show when={isParkrunTrip(race)}>🚌 </Show>
+									<Emoji emoji={raceEmoji(race)} />{' '}
 									<Show
 										when={isParkrunTrip(race) && race.website}
-										fallback={race.name}
+										fallback={<EmojiString text={race.name} />}
 									>
 										{(website) => (
 											<a
@@ -60,12 +70,15 @@ export function RaceCalendar(props: {
 												rel="noreferrer"
 												class={styles.link}
 											>
-												{race.name}
+												<EmojiString text={race.name} />
 											</a>
 										)}
 									</Show>
 								</h4>
-								<p>{formatDate(new Date(`${race.date}T00:00:00`))}</p>
+								<p>
+									{formatDate(new Date(`${race.date}T00:00:00`))}
+									{race.time ? `, ${race.time}` : ''}
+								</p>
 								<p>
 									{[
 										...race.attendees.map((r) => {

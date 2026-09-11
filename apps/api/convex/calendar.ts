@@ -188,6 +188,8 @@ export const feedSources = internalQuery({
 				name: race.name,
 				website: race.website,
 				type: race.type,
+				time: race.time,
+				recurrence: race.recurrence,
 				attendees: race.attendees.map((a) => ({ runnerId: a.runnerId })),
 				majorEvent: race.majorEvent,
 			}))

@@ -24,6 +24,7 @@ export {
 	formatMonthTitle,
 	parseISODate,
 	parseMonthKey,
+	raceEmoji,
 	toISODate,
 	toMonthKey,
 	upcomingCalendarDays,

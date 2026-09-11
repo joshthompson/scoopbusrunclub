@@ -1,5 +1,6 @@
 import { BackSignButton } from '@/components/BackSignButton'
 import { CharacterImage } from '@/components/CharacterImage'
+import { EmojiString } from '@/components/ui/Emoji'
 import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Icon } from '@/components/ui/Icon'
 import { type RaceGuestAttendee, fetchPublicRaces } from '@/utils/api'
@@ -211,7 +212,11 @@ export function GuestPage() {
 														fallback={
 															<Show
 																when={appearance.website}
-																fallback={<span>{appearance.name}</span>}
+																fallback={
+																	<span>
+																		<EmojiString text={appearance.name} />
+																	</span>
+																}
 															>
 																{(website) => (
 																	<a
@@ -220,7 +225,7 @@ export function GuestPage() {
 																		rel="noopener noreferrer"
 																		class={styles.link}
 																	>
-																		{appearance.name}
+																		<EmojiString text={appearance.name} />
 																		&nbsp;
 																		<Icon name="external" size="small" />
 																	</a>
@@ -234,7 +239,7 @@ export function GuestPage() {
 																	href={`/event/${eventId()}`}
 																	class={styles.link}
 																>
-																	{appearance.name}
+																	<EmojiString text={appearance.name} />
 																</A>{' '}
 																#{appearance.eventNumber}
 															</>

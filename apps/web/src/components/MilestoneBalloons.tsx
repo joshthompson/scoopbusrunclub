@@ -61,12 +61,21 @@ export const BALLOON_REACH = FLOAT_HEIGHT + Math.max(...RISES) + 23 * SCALE
  */
 export function MilestoneBalloons(props: {
 	milestone: number
-	/** Which side of the card the bunch is tied to. */
-	side: 'left' | 'right'
+	/**
+	 * Which side of the card the bunch is tied to, or `center` for the middle of
+	 * whatever it's in — the knot has no width, so half way along is half way
+	 * along.
+	 */
+	side: 'left' | 'right' | 'center'
 	/** The clearance to leave between that side and the outermost balloon. */
 	inset: number
 	/** How far down from the top of the card the knot sits. */
 	top: number
+	/**
+	 * Drawn at this scale instead of the one the card's width implies. For
+	 * anywhere that isn't a card and wants to say the size itself.
+	 */
+	scale?: number
 }) {
 	const widths = () =>
 		(MILESTONE_BALLOONS[props.milestone] ?? []).map(
@@ -122,8 +131,12 @@ export function MilestoneBalloons(props: {
 				aria-hidden="true"
 				class={styles.bunch}
 				style={{
-					[props.side]: `${knotInset()}px`,
+					...(props.side === 'center'
+						? { left: '50%' }
+						: { [props.side]: `${knotInset()}px` }),
 					top: `${props.top}px`,
+					// Inline, so it wins over the card-width rule on the class.
+					...(props.scale === undefined ? {} : { scale: `${props.scale}` }),
 				}}
 			>
 				<For each={strands()}>

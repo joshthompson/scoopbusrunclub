@@ -3,24 +3,24 @@
  *
  * Everything here is built from the same {@link indexCalendarEntries} index the
  * website's calendar page draws, walked a day at a time exactly the way the
- * month grid walks it — so the standing Wednesday and the birthdays a day
- * generates for itself land in the feed too, and a change to the entry logic
- * shows up in both places at once.
+ * month grid walks it — so the birthdays a day generates for itself land in the
+ * feed too, and a change to the entry logic shows up in both places at once.
  */
 
+import { addDays, nextDay, toISODate } from './dates'
 import {
 	type CalendarEntry,
 	type CalendarEntryKind,
+	birthdayEntries,
 	indexCalendarEntries,
-	standingEntriesForDate,
-	toISODate,
 } from './entries'
 import type { CalendarContext, CalendarSources } from './types'
 
 /** Bumped when the feed's own wording or structure changes, to force a rebuild. */
-export const ICS_FORMAT_VERSION = 1
+export const ICS_FORMAT_VERSION = 2
 
 const DEFAULT_SITE_ORIGIN = 'https://scoopbus.run'
+const DEFAULT_TIMEZONE = 'Europe/Stockholm'
 const DEFAULT_DAYS_AHEAD = 365
 const DEFAULT_REFRESH_HOURS = 6
 
@@ -30,16 +30,20 @@ export interface IcsOptions {
 	/** Calendar name, as calendar apps list it. */
 	name?: string
 	description?: string
-	/** Timezone the dates are meant in. Every event is a whole day. */
+	/**
+	 * Timezone the dates are meant in. Whole-day events don't have one; an event
+	 * with a start time is read in this zone, so 17:30 stays 17:30 across the
+	 * spring and autumn clock changes.
+	 */
 	timezone?: string
 	/** Only these kinds of entry. Defaults to all of them. */
 	kinds?: CalendarEntryKind[]
 	/** First day to include. Defaults to the earliest day with anything on it. */
 	from?: string
 	/**
-	 * How far back to work out birthdays and the standing Wednesday. They exist
-	 * for any date at all, and a subscriber has no use for a birthday from
-	 * before the club existed, so they only run from here.
+	 * How far back to work out birthdays. They exist for any date at all, and a
+	 * subscriber has no use for a birthday from before the club existed, so they
+	 * only run from here.
 	 */
 	standingFrom?: string
 	/** How far past today to keep going. Data further out is still included. */
@@ -115,17 +119,84 @@ function hash(value: string): string {
 	return h.toString(16).padStart(8, '0')
 }
 
-// ---------- Dates ----------
+// ---------- Times ----------
 
-/** The day after a YYYY-MM-DD, which is where a whole-day event ends. */
-function nextDay(date: string): string {
-	const [year, month, day] = date.split('-').map(Number)
-	return toISODate(new Date(year, month - 1, day + 1))
+/**
+ * How long an event with a start time is shown as running for. Nothing records
+ * an end time, and a subscriber wants a block in their day rather than a
+ * pin-prick at 17:30.
+ */
+const DEFAULT_EVENT_MINUTES = 60
+
+const zoneFormatters = new Map<string, Intl.DateTimeFormat>()
+
+function zoneFormatter(timeZone: string): Intl.DateTimeFormat {
+	let formatter = zoneFormatters.get(timeZone)
+	if (!formatter) {
+		formatter = new Intl.DateTimeFormat('en-GB', {
+			timeZone,
+			hourCycle: 'h23',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit',
+			second: '2-digit',
+		})
+		zoneFormatters.set(timeZone, formatter)
+	}
+	return formatter
 }
 
-function addDays(date: string, days: number): string {
+/** How far ahead of UTC a zone was at a given instant, in milliseconds. */
+function zoneOffsetMs(instant: number, timeZone: string): number {
+	const at: Record<string, number> = {}
+	for (const part of zoneFormatter(timeZone).formatToParts(new Date(instant))) {
+		if (part.type !== 'literal') at[part.type] = Number(part.value)
+	}
+	const wall = Date.UTC(
+		at.year,
+		at.month - 1,
+		at.day,
+		at.hour,
+		at.minute,
+		at.second,
+	)
+	return wall - Math.floor(instant / 1000) * 1000
+}
+
+/**
+ * The instant a wall-clock time falls at in a zone, e.g. 17:30 on a given date
+ * in Stockholm. The offset is looked up for that date rather than assumed, so
+ * the clocks going forward moves the event with them and nobody turns up an
+ * hour early.
+ *
+ * Returns null if the time can't be read, in which case the event falls back to
+ * being a whole day — a subscriber is better off with the day than with nothing.
+ */
+function zonedInstant(
+	date: string,
+	time: string,
+	timeZone: string,
+): Date | null {
+	const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim())
+	if (!match) return null
 	const [year, month, day] = date.split('-').map(Number)
-	return toISODate(new Date(year, month - 1, day + days))
+	const wall = Date.UTC(
+		year,
+		month - 1,
+		day,
+		Number(match[1]),
+		Number(match[2]),
+	)
+	try {
+		// Twice: the first guess can land the wrong side of a clock change, and
+		// the offset it finds there is the one to correct the guess with.
+		const guess = zoneOffsetMs(wall, timeZone)
+		return new Date(wall - zoneOffsetMs(wall - guess, timeZone))
+	} catch {
+		return null
+	}
 }
 
 // ---------- Events ----------
@@ -148,10 +219,31 @@ function entryLink(entry: CalendarEntry, siteOrigin: string): string | null {
 	return null
 }
 
+/**
+ * When the event runs. An entry with a start time gets a real hour in the day,
+ * written as UTC instants so no subscriber has to agree with us about what
+ * Europe/Stockholm means; everything else is the whole day it falls on.
+ */
+function eventPeriod(
+	date: string,
+	entry: CalendarEntry,
+	timezone: string,
+): string[] {
+	const start = entry.time ? zonedInstant(date, entry.time, timezone) : null
+	if (!start) {
+		return [
+			`DTSTART;VALUE=DATE:${icsDate(date)}`,
+			`DTEND;VALUE=DATE:${icsDate(nextDay(date))}`,
+		]
+	}
+	const end = new Date(start.getTime() + DEFAULT_EVENT_MINUTES * 60_000)
+	return [`DTSTART:${icsTimestamp(start)}`, `DTEND:${icsTimestamp(end)}`]
+}
+
 function eventLines(
 	date: string,
 	entry: CalendarEntry,
-	options: { siteOrigin: string; stamp: string },
+	options: { siteOrigin: string; stamp: string; timezone: string },
 ): string[] {
 	const link = entryLink(entry, options.siteOrigin)
 	const description = eventDescription(entry, link)
@@ -161,8 +253,7 @@ function eventLines(
 		'BEGIN:VEVENT',
 		`UID:${uid}`,
 		`DTSTAMP:${options.stamp}`,
-		`DTSTART;VALUE=DATE:${icsDate(date)}`,
-		`DTEND;VALUE=DATE:${icsDate(nextDay(date))}`,
+		...eventPeriod(date, entry, options.timezone),
 		`SUMMARY:${escapeText(`${entry.emoji} ${entry.name}`)}`,
 		'TRANSP:TRANSPARENT',
 		`CATEGORIES:${escapeText(entry.kind)}`,
@@ -191,9 +282,12 @@ export function buildCalendarIcs(
 	const today = options.today ?? toISODate(generatedAt)
 	const daysAhead = options.daysAhead ?? DEFAULT_DAYS_AHEAD
 	const refreshHours = options.refreshHours ?? DEFAULT_REFRESH_HOURS
+	const timezone = options.timezone ?? DEFAULT_TIMEZONE
 	const kinds = options.kinds ? new Set(options.kinds) : null
 
-	const index = indexCalendarEntries(sources, ctx)
+	// The feed's today, not the host's — it decides how far a recurring event
+	// is worked out, as well as how far ahead the feed runs.
+	const index = indexCalendarEntries(sources, { ...ctx, today })
 	const dates = Array.from(index.keys()).sort()
 
 	const first = options.from ?? dates[0] ?? today
@@ -212,14 +306,13 @@ export function buildCalendarIcs(
 		}
 	}
 
-	// Birthdays and the standing Wednesday, over a window rather than all of
-	// history: a year back, and as far ahead as the horizon. Recorded entries
-	// can sit past it — a projected milestone years out, say — without dragging
-	// a Wednesday a week along behind them.
+	// Birthdays, over a window rather than all of history: a year back, and as
+	// far ahead as the horizon. Recorded entries can sit past it — a projected
+	// milestone years out, say — without dragging a birthday along behind them.
 	const standingFrom = options.standingFrom ?? addDays(today, -365)
 	let date = standingFrom > first ? standingFrom : first
 	while (date <= horizon) {
-		for (const entry of standingEntriesForDate(index, date)) {
+		for (const entry of birthdayEntries(date)) {
 			dated.push({ date, entry })
 		}
 		date = nextDay(date)
@@ -230,7 +323,7 @@ export function buildCalendarIcs(
 	const body: string[] = []
 	for (const { date: on, entry } of dated) {
 		if (kinds && !kinds.has(entry.kind)) continue
-		body.push(...eventLines(on, entry, { siteOrigin, stamp }))
+		body.push(...eventLines(on, entry, { siteOrigin, stamp, timezone }))
 	}
 
 	const name = options.name ?? 'Scoop Bus Run Club'
@@ -246,7 +339,7 @@ export function buildCalendarIcs(
 		'METHOD:PUBLISH',
 		`X-WR-CALNAME:${escapeText(name)}`,
 		`X-WR-CALDESC:${escapeText(description)}`,
-		`X-WR-TIMEZONE:${options.timezone ?? 'Europe/Stockholm'}`,
+		`X-WR-TIMEZONE:${timezone}`,
 		// Both spellings: the standard one, and the one Apple and Outlook read.
 		`REFRESH-INTERVAL;VALUE=DURATION:PT${refreshHours}H`,
 		`X-PUBLISHED-TTL:PT${refreshHours}H`,

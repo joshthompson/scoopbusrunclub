@@ -237,7 +237,14 @@ export interface WrappedStats {
 	// --- Run milestones ---
 
 	/** Run-count milestones (10th, 25th, 50th…) reached this year. */
-	runMilestones: { name: string; runNumber: number; date: string }[]
+	runMilestones: {
+		name: string
+		/** For their artwork and their member page. */
+		parkrunId: string
+		runnerKey: string
+		runNumber: number
+		date: string
+	}[]
 
 	/**
 	 * Waypoints on the journey out of Stockholm that the club's all-time
@@ -742,6 +749,8 @@ function computeRunMilestones(
 			if (!runs[i].date.startsWith(yearStr)) continue
 			milestones.push({
 				name: parkrunIdToMeta.get(parkrunId)?.name ?? parkrunId,
+				parkrunId,
+				runnerKey: parkrunIdToMeta.get(parkrunId)?.key ?? '',
 				runNumber,
 				date: runs[i].date,
 			})

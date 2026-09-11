@@ -1,3 +1,5 @@
+import type { RecurrenceSource } from '@shared/calendar/recurrence'
+
 const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string) || ''
 
 /**
@@ -318,6 +320,10 @@ export interface RaceItem {
 	name: string
 	website?: string
 	type?: string
+	/** When it starts, "HH:MM" in the club's timezone. A whole day without one. */
+	time?: string
+	/** Turns the date into the first of a series of repeats. */
+	recurrence?: RecurrenceSource
 	attendees: RaceAttendee[]
 	guests?: RaceGuestAttendee[]
 	majorEvent?: boolean

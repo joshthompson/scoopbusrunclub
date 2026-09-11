@@ -6,6 +6,8 @@
  * without conversion.
  */
 
+import type { RecurrenceSource } from './recurrence'
+
 export interface RunResultSource {
 	parkrunId: string
 	runnerName: string
@@ -43,6 +45,10 @@ export interface RaceSource {
 	name: string
 	website?: string
 	type?: string
+	/** When it starts, "HH:MM" in the club's timezone. A whole day without one. */
+	time?: string
+	/** Turns the date into the first of a series. See `recurrence.ts`. */
+	recurrence?: RecurrenceSource
 	attendees: RaceAttendeeSource[]
 	majorEvent?: boolean
 }
@@ -73,4 +79,9 @@ export interface CalendarSources {
 export interface CalendarContext {
 	/** Display name for a parkrun event id, e.g. "haga" → "Haga". */
 	eventName: (eventId: string) => string
+	/**
+	 * Today, as YYYY-MM-DD — the point a recurring event's repeats are worked
+	 * out a year forward from. Defaults to the host's today.
+	 */
+	today?: string
 }

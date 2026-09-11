@@ -1,4 +1,8 @@
 import {
+	BALLOON_REACH,
+	MilestoneBalloons,
+} from '@/components/MilestoneBalloons'
+import {
 	SpotlightMembers,
 	buildWrappedSlides,
 } from '@/components/wrapped/WrappedSlides'
@@ -309,8 +313,38 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 									<Match when={slide.kind === 'card' ? slide : null}>
 										{(cardSlide) => (
 											<>
-												<div class={styles.emoji}>{cardSlide().emoji}</div>
-												<div class={styles.body}>{cardSlide().body()}</div>
+												<Show
+													when={cardSlide().balloons}
+													fallback={
+														<div class={styles.emoji}>{cardSlide().emoji}</div>
+													}
+												>
+													{(milestone) => (
+														<div
+															class={styles.balloons}
+															// Panda extracts styles statically, so the height
+															// this needs — which follows the art's own reach —
+															// has to be set here rather than in `css()`.
+															style={{ height: `${BALLOON_KNOT_TOP + 24}px` }}
+														>
+															<MilestoneBalloons
+																milestone={milestone()}
+																side="center"
+																inset={0}
+																top={BALLOON_KNOT_TOP}
+																scale={1}
+															/>
+														</div>
+													)}
+												</Show>
+												<Show when={cardSlide().members}>
+													{(members) => (
+														<SpotlightMembers members={members()} compact />
+													)}
+												</Show>
+												<div class={styles.body}>
+													{(cardSlide().storyBody ?? cardSlide().body)()}
+												</div>
 											</>
 										)}
 									</Match>
@@ -335,6 +369,12 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 						)}
 					</For>
 				</div>
+
+				{/* A year still in progress shouldn't be mistaken for a finished one,
+				    the same warning the scrolling page carries. */}
+				<Show when={preview() && year() === new Date().getFullYear()}>
+					<div class={styles.previewNote}>👀 Preview — {year()} isn't over</div>
+				</Show>
 
 				<button
 					type="button"
@@ -406,6 +446,12 @@ const OVERLAY_BUTTON = {
 	placeItems: 'center',
 } as const
 
+/**
+ * Where the knot — and so the weight the bunch is tied to — sits inside
+ * {@link styles.balloons}, leaving the whole of the balloons' reach above it.
+ */
+const BALLOON_KNOT_TOP = BALLOON_REACH + 6
+
 const styles = {
 	overlay: css({
 		position: 'fixed',
@@ -447,11 +493,29 @@ const styles = {
 		animation: 'storySlideIn 450ms cubic-bezier(0.22, 1, 0.36, 1)',
 		textShadow: '0 2px 12px rgba(0,0,0,0.35)',
 	}),
+	/**
+	 * Where the emoji would have been. The digits are sized in `em`, so the row
+	 * scales with the font size set on this — see {@link balloonSize}.
+	 */
+	/**
+	 * The bunch hangs inside this, tied to its weight — the same way it hangs off
+	 * a milestone card, only tied in the middle. Tall enough for the whole of its
+	 * reach, since the knot is placed at the bottom of it.
+	 */
+	balloons: css({
+		position: 'relative',
+		// Room under the weight so the bunch is tied above the members, not on
+		// top of them.
+		marginBottom: '1.25rem',
+	}),
 	emoji: css({
 		fontSize: '4.5rem',
 		lineHeight: 1,
 		marginBottom: '1.25rem',
-		filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))',
+		// A `filter` here would be clipped by the slide's own scroll box, which
+		// leaves a hard edge around the glyph. `text-shadow` isn't: it paints from
+		// the glyph itself and takes the blur with it.
+		textShadow: '0 4px 12px rgba(0,0,0,0.45)',
 	}),
 	body: css({
 		fontSize: '1.6rem',
@@ -520,6 +584,20 @@ const styles = {
 		background: 'var(--color-white)',
 		transformOrigin: 'left center',
 		animation: `storyProgress ${SLIDE_MS}ms linear forwards`,
+	}),
+	/** Under the progress bar on the left, clear of the buttons in the corner. */
+	previewNote: css({
+		position: 'absolute',
+		top: 'max(1.5rem, calc(env(safe-area-inset-top) + 0.75rem))',
+		left: '0.9rem',
+		zIndex: 2,
+		background: 'rgba(0,0,0,0.25)',
+		borderRadius: '999px',
+		padding: '0.3rem 0.7rem',
+		fontSize: '0.7rem',
+		fontWeight: 700,
+		lineHeight: 1.2,
+		pointerEvents: 'none',
 	}),
 	close: css({
 		...OVERLAY_BUTTON,

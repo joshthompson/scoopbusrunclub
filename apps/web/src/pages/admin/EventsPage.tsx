@@ -27,6 +27,11 @@ import {
 } from '@/utils/adminApi'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { PARKRUN_TRIP_TYPE } from '@shared/calendar/parkrun-trips'
+import {
+	type RecurrenceSource,
+	describeRecurrence,
+	repeatsOnOrAfter,
+} from '@shared/calendar/recurrence'
 import { css } from '@style/css'
 import {
 	type Component,
@@ -113,10 +118,12 @@ export const EventsPage: Component = () => {
 			const now = new Date()
 			const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
+			// A repeating event's date is where the series began, so it counts as
+			// upcoming for as long as it still comes round.
 			if (eventDateVal === 'past') {
-				list = list.filter((r) => r.date < today)
+				list = list.filter((r) => !repeatsOnOrAfter(r, today))
 			} else {
-				list = list.filter((r) => r.date >= today)
+				list = list.filter((r) => repeatsOnOrAfter(r, today))
 			}
 		}
 
@@ -200,6 +207,8 @@ export const EventsPage: Component = () => {
 		name: string
 		website?: string
 		type?: string
+		time?: string
+		recurrence: RecurrenceSource | null
 		attendees: RaceAttendee[]
 		guests: RaceGuest[]
 		majorEvent?: boolean
@@ -331,7 +340,9 @@ export const EventsPage: Component = () => {
 							{ id: 'actions', title: 'Actions', width: '10px' },
 						]}
 						data={(sortedRaces() ?? []).map((race) => [
-							formatDate(race.date),
+							race.time
+								? `${formatDate(race.date)}, ${race.time}`
+								: formatDate(race.date),
 							<>
 								{race.name}
 								<Show key={race.name} when={race.website}>
@@ -350,7 +361,16 @@ export const EventsPage: Component = () => {
 								</Show>
 							</>,
 
-							race.type ?? '—',
+							<span key={`${race.date}-type`}>
+								{race.type ?? '—'}
+								<Show when={race.recurrence}>
+									{(recurrence) => (
+										<span class={styles.repeat}>
+											🔁 {describeRecurrence(recurrence())}
+										</span>
+									)}
+								</Show>
+							</span>,
 							<span
 								key={`${race.date}-attendees`}
 								title={[
@@ -443,6 +463,11 @@ const styles = {
 	}),
 	link: css({
 		textDecoration: 'underline',
+	}),
+	repeat: css({
+		display: 'block',
+		fontSize: '0.7rem',
+		color: 'var(--overlay-white-70)',
 	}),
 	actions: css({
 		display: 'flex',

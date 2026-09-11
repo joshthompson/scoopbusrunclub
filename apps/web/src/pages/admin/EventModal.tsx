@@ -14,12 +14,29 @@ import {
 	PARKRUN_TRIP_TYPE,
 	isParkrunEventUrl,
 } from '@shared/calendar/parkrun-trips'
+import {
+	RECURRENCE_HORIZON_DAYS,
+	type RecurrenceFreq,
+	type RecurrenceSource,
+} from '@shared/calendar/recurrence'
 import { css } from '@style/css'
 import { type Component, For, Show, createMemo, createSignal } from 'solid-js'
 import { EVENT_TYPES } from './EventsPage'
 
 /** Validate time string: accepts h:mm:ss, hh:mm:ss, m:ss, mm:ss */
 const TIME_RE = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/
+
+/** How a repeat is offered in the form, in the order it's offered. */
+const REPEAT_OPTIONS: {
+	value: '' | RecurrenceFreq
+	label: string
+	unit: string
+}[] = [
+	{ value: '', label: "— Doesn't repeat —", unit: '' },
+	{ value: 'weekly', label: 'Weekly', unit: 'weeks' },
+	{ value: 'monthly', label: 'Monthly', unit: 'months' },
+	{ value: 'yearly', label: 'Yearly', unit: 'years' },
+]
 
 function isValidTime(v: string): boolean {
 	return v === '' || TIME_RE.test(v)
@@ -98,6 +115,9 @@ interface EventModalProps {
 		name: string
 		website?: string
 		type?: string
+		time?: string
+		/** Null clears a repeat the event used to have. */
+		recurrence: RecurrenceSource | null
 		attendees: RaceAttendee[]
 		guests: RaceGuest[]
 		majorEvent?: boolean
@@ -156,6 +176,16 @@ export const EventModal: Component<EventModalProps> = (props) => {
 	const [name, setName] = createSignal(race?.name ?? '')
 	const [website, setWebsite] = createSignal(race?.website ?? '')
 	const [type, setType] = createSignal(race?.type ?? '')
+	const [startTime, setStartTime] = createSignal(race?.time ?? '')
+	const [repeatFreq, setRepeatFreq] = createSignal<'' | RecurrenceFreq>(
+		race?.recurrence?.freq ?? '',
+	)
+	const [repeatInterval, setRepeatInterval] = createSignal(
+		String(race?.recurrence?.interval ?? 1),
+	)
+	const [repeatUntil, setRepeatUntil] = createSignal(
+		race?.recurrence?.until ?? '',
+	)
 	const [isMajorEvent, setIsMajorEvent] = createSignal(
 		race?.majorEvent ?? false,
 	)
@@ -288,9 +318,33 @@ export const EventModal: Component<EventModalProps> = (props) => {
 	const isTrip = () => type() === PARKRUN_TRIP_TYPE
 	const tripUrlOk = () => !isTrip() || isParkrunEventUrl(website())
 
+	const repeats = () => repeatFreq() !== ''
+	const repeatUnit = () =>
+		REPEAT_OPTIONS.find((option) => option.value === repeatFreq())?.unit ?? ''
+
+	/** The repeat as it will be saved, or null for an event that happens once. */
+	const recurrence = createMemo<RecurrenceSource | null>(() => {
+		const freq = repeatFreq()
+		if (freq === '') return null
+		const interval = Math.round(Number(repeatInterval()))
+		return {
+			freq,
+			interval:
+				Number.isFinite(interval) && interval > 1 ? interval : undefined,
+			until: repeatUntil() || undefined,
+		}
+	})
+
+	const repeatOk = () => {
+		if (!repeats()) return true
+		const interval = Number(repeatInterval())
+		if (!Number.isInteger(interval) || interval < 1) return false
+		return !repeatUntil() || repeatUntil() >= date()
+	}
+
 	const isFormValid = createMemo(() => {
 		if (!date() || !name()) return false
-		if (!tripUrlOk()) return false
+		if (!tripUrlOk() || !repeatOk()) return false
 		return buildAttendees() !== null && buildGuests() !== null
 	})
 
@@ -299,7 +353,7 @@ export const EventModal: Component<EventModalProps> = (props) => {
 		const builtAttendees = buildAttendees()
 		const builtGuests = buildGuests()
 		if (!date() || !name() || !builtAttendees || !builtGuests) return
-		if (!tripUrlOk()) return
+		if (!tripUrlOk() || !repeatOk()) return
 		setSaving(true)
 		try {
 			props.onSave({
@@ -307,6 +361,8 @@ export const EventModal: Component<EventModalProps> = (props) => {
 				name: name(),
 				website: website() || undefined,
 				type: type() || undefined,
+				time: startTime(),
+				recurrence: recurrence(),
 				attendees: builtAttendees,
 				guests: builtGuests,
 				majorEvent: isMajorEvent() || undefined,
@@ -339,6 +395,12 @@ export const EventModal: Component<EventModalProps> = (props) => {
 						value={date()}
 						onInput={(e) => setDate(e.currentTarget.value)}
 						required
+					/>
+					<AdminInput
+						label="Start time"
+						type="time"
+						value={startTime()}
+						onInput={(e) => setStartTime(e.currentTarget.value)}
 					/>
 				</div>
 
@@ -373,6 +435,44 @@ export const EventModal: Component<EventModalProps> = (props) => {
 					<span class={styles.error}>
 						A parkrun trip needs the parkrun's event page as its website, e.g.{' '}
 						{PARKRUN_EVENT_URL_EXAMPLE} or https://parkrun.org.uk/cheltenham/
+					</span>
+				</Show>
+
+				<div class={styles.row2}>
+					<AdminSelect
+						label="Repeats"
+						value={repeatFreq()}
+						onChange={(e) =>
+							setRepeatFreq(e.currentTarget.value as '' | RecurrenceFreq)
+						}
+					>
+						<For each={REPEAT_OPTIONS}>
+							{(option) => <option value={option.value}>{option.label}</option>}
+						</For>
+					</AdminSelect>
+					<Show when={repeats()}>
+						<AdminInput
+							label={`Every N ${repeatUnit()}`}
+							type="number"
+							min="1"
+							value={repeatInterval()}
+							onInput={(e) => setRepeatInterval(e.currentTarget.value)}
+						/>
+						<AdminInput
+							label="Until (optional)"
+							type="date"
+							min={date()}
+							value={repeatUntil()}
+							onInput={(e) => setRepeatUntil(e.currentTarget.value)}
+						/>
+					</Show>
+				</div>
+
+				<Show when={repeats()}>
+					<span class={styles.hint}>
+						{repeatOk()
+							? `Repeats from the date above, shown up to ${RECURRENCE_HORIZON_DAYS} days ahead. Record who came to one of them as an event of its own — it takes that day's place.`
+							: 'A repeat happens every whole number of periods, and can only end on or after the date above.'}
 					</span>
 				</Show>
 

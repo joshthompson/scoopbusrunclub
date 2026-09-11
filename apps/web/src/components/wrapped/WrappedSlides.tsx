@@ -1,4 +1,10 @@
 import { CharacterImage } from '@/components/CharacterImage'
+import { EmojiString } from '@/components/ui/Emoji'
+import {
+	MILESTONE_GRADIENTS,
+	isBalloonMilestone,
+	milestoneColor,
+} from '@/data/balloons'
 import { type RunnerData, runners as runnerSignals } from '@/data/runners'
 import { getMemberRoute } from '@/utils/memberRoute'
 import type { WrappedStats } from '@/utils/wrapped'
@@ -69,6 +75,27 @@ type SlideContent =
 			/** Left-border accent on the scrolling page. */
 			color: string
 			body: () => JSX.Element
+			/**
+			 * A run total to fly as balloons instead of the emoji, for the slides
+			 * where the number is the whole point. Only totals we have artwork for
+			 * get here — see `isBalloonMilestone`. Who reached it is named by the
+			 * members in the slide's own body.
+			 */
+			balloons?: number
+			/**
+			 * Who the slide is about, shown with their artwork in the stories view.
+			 * The scrolling page is a column of one-line cards, so there they stay
+			 * named in the sentence instead — which is what `body` says and
+			 * {@link storyBody} leaves out.
+			 */
+			members?: SpotlightMember[]
+			/** Used in place of `body` on the slides that show their members. */
+			storyBody?: () => JSX.Element
+			/**
+			 * A backdrop of this slide's own, for the ones whose subject has a
+			 * colour. Everything else takes its turn from {@link SLIDE_GRADIENTS}.
+			 */
+			gradient?: string
 	  }
 	| {
 			kind: 'spotlight'
@@ -272,6 +299,13 @@ const spotlightStyles = {
 		flexDirection: 'column',
 		alignItems: 'center',
 		gap: '0.2rem',
+		// Said outright rather than inherited: a slide's body blows `strong` up to
+		// 2rem for the numbers in its sentence, and a name is a name wherever the
+		// block is used.
+		'& strong': {
+			fontSize: '1rem',
+			fontWeight: 700,
+		},
 	}),
 	link: css({
 		color: 'inherit',
@@ -303,8 +337,22 @@ export function buildWrappedSlides(
 		emoji: string,
 		color: string,
 		body: () => JSX.Element,
+		balloons?: number,
+		gradient?: string,
+		members?: SpotlightMember[],
+		storyBody?: () => JSX.Element,
 	) => {
-		slides.push({ kind: 'card', id, emoji, color, body })
+		slides.push({
+			kind: 'card',
+			id,
+			emoji,
+			color,
+			body,
+			balloons,
+			gradient,
+			members,
+			storyBody,
+		})
 	}
 
 	// --- Joined the club — the founding year gets its own framing ---
@@ -585,19 +633,68 @@ export function buildWrappedSlides(
 	}
 
 	if (stats.runMilestones.length > 0) {
-		const milestones = stats.runMilestones
-		const summary = summariseList(
-			milestones.map((m) => `${m.name}'s ${ordinalSuffix(m.runNumber)}`),
-		)
-		card('run-milestones', '🎊', 'var(--pink-600)', () => (
-			<>
-				<strong>
-					{milestones.length} run{' '}
-					{milestones.length === 1 ? 'milestone' : 'milestones'}
-				</strong>{' '}
-				were reached — {summary}
-			</>
-		))
+		// A card each for the milestones we fly balloons for, so the 50s get their
+		// own red slide and the 100s their own, smallest first — the year's
+		// climbing told in the order it was climbed.
+		const byMilestone = new Map<number, SpotlightMember[]>()
+		const withoutBalloons: typeof stats.runMilestones = []
+
+		for (const milestone of stats.runMilestones) {
+			if (!isBalloonMilestone(milestone.runNumber)) {
+				withoutBalloons.push(milestone)
+				continue
+			}
+			const reached = byMilestone.get(milestone.runNumber) ?? []
+			reached.push({
+				name: milestone.name,
+				parkrunId: milestone.parkrunId || undefined,
+				runnerKey: milestone.runnerKey || undefined,
+			})
+			byMilestone.set(milestone.runNumber, reached)
+		}
+
+		for (const runNumber of [...byMilestone.keys()].sort((a, b) => a - b)) {
+			const reached = byMilestone.get(runNumber) ?? []
+			card(
+				`run-milestone-${runNumber}`,
+				'🎊',
+				milestoneColor(runNumber) ?? 'var(--pink-600)',
+				// A line to itself on the scrolling page, like every card there.
+				() => (
+					<>
+						<strong>{joinNames(reached.map((member) => member.name))}</strong>{' '}
+						reached their <strong>{ordinalSuffix(runNumber)} parkrun</strong>
+					</>
+				),
+				runNumber,
+				MILESTONE_GRADIENTS[runNumber],
+				reached,
+				// In the stories view the members are pictured above this, so they
+				// are the subject and the line only has to finish the sentence.
+				() => (
+					<>
+						reached their <strong>{ordinalSuffix(runNumber)} parkrun</strong>
+					</>
+				),
+			)
+		}
+
+		// Milestones we have no balloons for — a 200th run, say — keep the 🎊 and
+		// share a card, rather than going unmentioned.
+		if (withoutBalloons.length > 0) {
+			const summary = summariseList(
+				withoutBalloons.map((m) => `${m.name}'s ${ordinalSuffix(m.runNumber)}`),
+			)
+			card('run-milestones-other', '🎊', 'var(--pink-600)', () => (
+				<>
+					<strong>
+						{withoutBalloons.length} more run{' '}
+						{withoutBalloons.length === 1 ? 'milestone' : 'milestones'}
+					</strong>{' '}
+					{withoutBalloons.length === 1 ? 'was' : 'were'} reached — {summary}
+				</>
+			))
+		}
 	}
 
 	if (stats.longestStreak) {
@@ -746,8 +843,11 @@ export function buildWrappedSlides(
 				)}
 				{race && (
 					<>
-						. The biggest was <strong>{race.name}</strong> with {race.count}{' '}
-						{race.count === 1 ? 'entrant' : 'entrants'}
+						. The biggest was{' '}
+						<strong>
+							<EmojiString text={race.name} />
+						</strong>{' '}
+						with {race.count} {race.count === 1 ? 'entrant' : 'entrants'}
 					</>
 				)}
 			</>
@@ -760,13 +860,16 @@ export function buildWrappedSlides(
 			<>
 				The furthest anyone went in one go was{' '}
 				<strong>{race.distanceKm} km</strong> —{' '}
-				<strong>{joinNames(race.names)}</strong> at {race.name}
+				<strong>{joinNames(race.names)}</strong> at{' '}
+				<EmojiString text={race.name} />
 			</>
 		))
 	}
 
 	return slides.map((slide, index) => ({
 		...slide,
-		gradient: SLIDE_GRADIENTS[index % SLIDE_GRADIENTS.length],
+		gradient:
+			(slide.kind === 'card' ? slide.gradient : undefined) ??
+			SLIDE_GRADIENTS[index % SLIDE_GRADIENTS.length],
 	}))
 }

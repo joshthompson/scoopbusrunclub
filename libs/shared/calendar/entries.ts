@@ -6,6 +6,7 @@ import {
 	memberRoute,
 	memberRouteFor,
 } from '../members'
+import { toISODate } from './dates'
 import { formatName } from './format'
 import {
 	journeyMilestoneDetail,
@@ -20,6 +21,7 @@ import {
 	projectedMilestoneDate,
 } from './milestones'
 import { isParkrunTrip, withoutReportedTrips } from './parkrun-trips'
+import { expandRecurringRaces, withoutClashingRepeats } from './recurrence'
 import { getSpecialDayName } from './special-days'
 import type {
 	CalendarContext,
@@ -29,6 +31,7 @@ import type {
 	RunnerTotalsSource,
 } from './types'
 
+export { parseISODate, toISODate } from './dates'
 export type { CalendarContext, CalendarSources } from './types'
 
 /** Weekday column headers, Monday-first (the week as Sweden counts it). */
@@ -61,6 +64,8 @@ export interface CalendarEntry {
 	kind: CalendarEntryKind
 	emoji: string
 	name: string
+	/** When it starts, "HH:MM" in the club's timezone. A whole day without one. */
+	time?: string
 	/** A line under the name, for entries that describe themselves. */
 	detail?: string
 	/** Fuller wording for the tooltip, where the cell only has room for `detail`. */
@@ -69,7 +74,7 @@ export interface CalendarEntry {
 	href?: string
 	/** External website, for races that link out instead. */
 	url?: string
-	/** The race's type, for races — used to spot recurring events like Track and Food. */
+	/** The race's type, for races — e.g. "Track and Food" or "Parkrun Trip". */
 	raceType?: string
 	/** Members (and guests) who took part, in finishing order where known. */
 	people: string[]
@@ -88,18 +93,6 @@ export interface CalendarDay {
 	/** Name of the special (non-Saturday) parkrun day, if this is one. */
 	specialName: string | null
 	entries: CalendarEntry[]
-}
-
-/** Format a Date as YYYY-MM-DD using local time (never UTC — dates shift). */
-export function toISODate(date: Date): string {
-	const month = `${date.getMonth() + 1}`.padStart(2, '0')
-	const day = `${date.getDate()}`.padStart(2, '0')
-	return `${date.getFullYear()}-${month}-${day}`
-}
-
-/** Parse a YYYY-MM-DD string as local midnight. */
-export function parseISODate(date: string): Date {
-	return new Date(`${date}T00:00:00`)
 }
 
 /** A "YYYY-MM" month key, as used in the ?month= search param. */
@@ -330,11 +323,17 @@ export function indexCalendarEntries(
 		})
 	}
 
-	// Trips parkrun has already reported are covered by the results above.
-	const races = withoutReportedTrips(
-		sources.races,
-		sources.results,
-		sources.volunteers,
+	// A recurring event is one record, so it becomes the dates it lands on
+	// before anything else looks at it. Trips parkrun has already reported are
+	// covered by the results above.
+	const races = withoutClashingRepeats(
+		withoutReportedTrips(
+			expandRecurringRaces(sources.races, {
+				today: ctx.today ?? toISODate(new Date()),
+			}),
+			sources.results,
+			sources.volunteers,
+		),
 	)
 
 	for (const race of races) {
@@ -342,6 +341,7 @@ export function indexCalendarEntries(
 			kind: 'race',
 			emoji: raceEmoji(race),
 			name: race.name,
+			time: race.time,
 			raceType: race.type,
 			url: race.website,
 			people: race.attendees.map((attendee) =>
@@ -358,7 +358,11 @@ function parkrunEventLabel(eventName: string): string {
 	return eventName === 'Bushy Park' ? 'Scoop Bushy Park' : eventName
 }
 
-function raceEmoji(race: RaceSource): string {
+/**
+ * The face an event wears wherever it's listed — the calendar's cells, the
+ * subscribable feed, and the sidebar's race calendar.
+ */
+export function raceEmoji(race: RaceSource): string {
 	if (isParkrunTrip(race)) return '🚌'
 	if (race.type === 'Track and Food') return '🏟️'
 	if (race.majorEvent) return '🔥'
@@ -381,59 +385,12 @@ export function birthdayEntries(date: string): CalendarEntry[] {
 	}))
 }
 
-const TRACK_AND_FOOD = 'Track and Food'
-/** Nothing before this — the club's Wednesdays only became a standing thing here. */
-const TRACK_AND_FOOD_FROM = '2025-07-01'
-
-/**
- * Track and Food is on every Wednesday, so the calendar shows one whether or not
- * anybody has recorded it. A real event that day wins, even when it's been given
- * its own name, so the standing entry never doubles up on it.
- */
-function trackAndFoodEntries(
-	date: string,
-	recorded: CalendarEntry[],
-): CalendarEntry[] {
-	if (date < TRACK_AND_FOOD_FROM) return []
-	if (parseISODate(date).getDay() !== 3) return []
-	if (recorded.some((entry) => entry.raceType === TRACK_AND_FOOD)) return []
-	return [
-		{
-			kind: 'race',
-			emoji: '🏟️',
-			name: TRACK_AND_FOOD,
-			raceType: TRACK_AND_FOOD,
-			people: [],
-			volunteers: [],
-		},
-	]
-}
-
-/**
- * The entries a day makes for itself rather than having them recorded: the
- * standing Wednesday, and whoever's birthday it is.
- *
- * They exist for any date you care to ask about, which is why the feed only
- * asks about a window of them rather than all the way back to the oldest
- * result it can find.
- */
-export function standingEntriesForDate(
-	entriesByDate: Map<string, CalendarEntry[]>,
-	date: string,
-): CalendarEntry[] {
-	const recorded = entriesByDate.get(date) ?? []
-	return [...trackAndFoodEntries(date, recorded), ...birthdayEntries(date)]
-}
-
-/** Everything on a given day: what was recorded, plus the entries we assume. */
+/** Everything on a given day: what was recorded, plus whoever's birthday it is. */
 export function entriesForDate(
 	entriesByDate: Map<string, CalendarEntry[]>,
 	date: string,
 ): CalendarEntry[] {
-	return [
-		...(entriesByDate.get(date) ?? []),
-		...standingEntriesForDate(entriesByDate, date),
-	]
+	return [...(entriesByDate.get(date) ?? []), ...birthdayEntries(date)]
 }
 
 /**

@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
-import { mutation, query } from './_generated/server'
+import { repeatsOnOrAfter } from '../../../libs/shared/calendar/recurrence'
+import { internalMutation, mutation, query } from './_generated/server'
 import { logAdminEvent, validateSession } from './auth'
 
 const attendeeValidator = v.object({
@@ -9,6 +10,16 @@ const attendeeValidator = v.object({
 	distance: v.optional(v.number()),
 	laps: v.optional(v.number()),
 	scanned: v.optional(v.boolean()),
+})
+
+/**
+ * A repeating event. `null` on an update clears one, which `undefined` can't —
+ * a field left out of an update is a field left alone.
+ */
+const recurrenceValidator = v.object({
+	freq: v.union(v.literal('weekly'), v.literal('monthly'), v.literal('yearly')),
+	interval: v.optional(v.number()),
+	until: v.optional(v.string()),
 })
 
 const guestAttendeeValidator = v.object({
@@ -56,11 +67,13 @@ export const list = query({
 
 		let filtered = allRaces
 		if (!args.includeOld) {
-			// Only show races whose date is within the last 7 days or in the future
+			// Only show races whose date is within the last 7 days or in the future.
+			// A repeating event's date is where the series started, which may be a
+			// long time ago, so it stays listed for as long as it still comes round.
 			const cutoff = new Date()
 			cutoff.setDate(cutoff.getDate() - 7)
 			const cutoffStr = cutoff.toISOString().slice(0, 10)
-			filtered = allRaces.filter((r) => r.date >= cutoffStr)
+			filtered = allRaces.filter((r) => repeatsOnOrAfter(r, cutoffStr))
 		}
 
 		// Sort ascending by date (furthest future at bottom)
@@ -103,6 +116,8 @@ export const create = mutation({
 		name: v.string(),
 		website: v.optional(v.string()),
 		type: v.optional(v.string()),
+		time: v.optional(v.string()),
+		recurrence: v.optional(recurrenceValidator),
 		attendees: v.array(attendeeValidator),
 		guests: v.optional(v.array(guestAttendeeValidator)),
 		majorEvent: v.optional(v.boolean()),
@@ -121,6 +136,8 @@ export const create = mutation({
 			name: args.name,
 			website: args.website,
 			type: args.type,
+			time: args.time || undefined,
+			recurrence: args.recurrence,
 			attendees: args.attendees,
 			guests: args.guests,
 			majorEvent: args.majorEvent,
@@ -151,6 +168,8 @@ export const update = mutation({
 		name: v.optional(v.string()),
 		website: v.optional(v.string()),
 		type: v.optional(v.string()),
+		time: v.optional(v.string()),
+		recurrence: v.optional(v.union(recurrenceValidator, v.null())),
 		attendees: v.optional(v.array(attendeeValidator)),
 		guests: v.optional(v.array(guestAttendeeValidator)),
 		majorEvent: v.optional(v.boolean()),
@@ -180,6 +199,10 @@ export const update = mutation({
 		if (args.name !== undefined) patch.name = args.name
 		if (args.website !== undefined) patch.website = args.website
 		if (args.type !== undefined) patch.type = args.type
+		// An empty time or a null recurrence is how the form says "no longer".
+		if (args.time !== undefined) patch.time = args.time || undefined
+		if (args.recurrence !== undefined)
+			patch.recurrence = args.recurrence ?? undefined
 		if (args.attendees !== undefined) patch.attendees = args.attendees
 		if (args.guests !== undefined) patch.guests = args.guests
 		if (args.majorEvent !== undefined) patch.majorEvent = args.majorEvent
@@ -244,5 +267,41 @@ export const remove = mutation({
 		})
 
 		return { ok: true }
+	},
+})
+
+// ── One-offs ────────────────────────────────────────────────────────
+
+/**
+ * Track and Food, as a record rather than as code.
+ *
+ * The Wednesday session used to be conjured onto the calendar by the entry
+ * logic itself, from the first Wednesday of July 2025 onwards. It is now an
+ * ordinary repeating event, and this puts the row in. Run once, with
+ * `npx convex run races:seedTrackAndFood`; running it again does nothing.
+ */
+export const seedTrackAndFood = internalMutation({
+	args: {},
+	handler: async (ctx) => {
+		const existing = (await ctx.db.query('races').collect()).find(
+			(race) => race.type === 'Track and Food' && race.recurrence,
+		)
+		if (existing) return { id: existing._id, created: false }
+
+		const now = Date.now()
+		const id = await ctx.db.insert('races', {
+			// The first Wednesday from which it became a standing thing.
+			date: '2025-07-02',
+			name: 'Track and Food',
+			type: 'Track and Food',
+			time: '17:30',
+			recurrence: { freq: 'weekly', interval: 1 },
+			attendees: [],
+			public: true,
+			createdAt: now,
+			modifiedAt: now,
+			modifiedBy: 'seed',
+		})
+		return { id, created: true }
 	},
 })

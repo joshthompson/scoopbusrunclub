@@ -1,6 +1,7 @@
 import { BackSignButton } from '@/components/BackSignButton'
 import { CalendarSubscribe } from '@/components/CalendarSubscribe'
 import { DirtBlock } from '@/components/ui/DirtBlock'
+import { EmojiString } from '@/components/ui/Emoji'
 import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Tooltip } from '@/components/ui/Tooltip'
 import type {
@@ -45,17 +46,21 @@ function summarisePeople(people: string[], limit = 3): string {
 }
 
 function entryDetail(entry: CalendarEntry): string {
-	if (entry.detail) return entry.detail
 	const parts: string[] = []
-	if (entry.people.length > 0) parts.push(summarisePeople(entry.people))
-	if (entry.volunteers.length > 0)
-		parts.push(`${summarisePeople(entry.volunteers)} volunteered`)
+	if (entry.time) parts.push(entry.time)
+	if (entry.detail) parts.push(entry.detail)
+	else {
+		if (entry.people.length > 0) parts.push(summarisePeople(entry.people))
+		if (entry.volunteers.length > 0)
+			parts.push(`${summarisePeople(entry.volunteers)} volunteered`)
+	}
 	return parts.join(' · ')
 }
 
 /** Everyone involved, a line at a time, under the entry's name in the tooltip. */
 function entryTooltipLines(entry: CalendarEntry): string[] {
 	const lines: string[] = []
+	if (entry.time) lines.push(`Starts at ${entry.time}`)
 	const description = entry.tooltip ?? entry.detail
 	if (description) lines.push(description)
 	if (entry.people.length > 0) lines.push(entry.people.join(', '))
@@ -69,7 +74,7 @@ function EntryTooltip(props: { entry: CalendarEntry }) {
 	return (
 		<div class={styles.tooltip}>
 			<div class={styles.tooltipTitle}>
-				{props.entry.emoji} {props.entry.name}
+				{props.entry.emoji} <EmojiString text={props.entry.name} />
 			</div>
 			<For each={entryTooltipLines(props.entry)}>
 				{(line) => <div>{line}</div>}
@@ -85,7 +90,7 @@ function Entry(props: { entry: CalendarEntry }) {
 		<>
 			<span class={styles.entryTitle}>
 				<span class={styles.entryEmoji}>{props.entry.emoji}</span>
-				{props.entry.name}
+				<EmojiString text={props.entry.name} />
 				<Show when={props.entry.people.length > 1}>
 					<span class={styles.entryCount}>{props.entry.people.length}</span>
 				</Show>

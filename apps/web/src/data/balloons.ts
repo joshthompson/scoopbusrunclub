@@ -57,6 +57,26 @@ export const MILESTONE_BALLOONS: Record<number, BalloonDigit[]> = {
 	500: [DIGITS.blue5, DIGITS.blue0, DIGITS.blue0],
 }
 
+/**
+ * The backdrop a milestone's own card wears in the stories view: its balloons'
+ * own colour, taken deep enough that the art stays the brightest thing on the
+ * slide and white text over it holds up.
+ *
+ * Which way to take it depends on the balloon. The bright red 50s sit happily
+ * on a deep red, but the purple, green and blue balloons are dark to begin
+ * with, so their grounds go darker still rather than meeting them halfway —
+ * matched in hue, separated in weight. Black is the one that has to invert:
+ * black on black is nothing, so the 10s and 100s get the graphite instead.
+ */
+export const MILESTONE_GRADIENTS: Record<number, string> = {
+	10: 'linear-gradient(160deg, #7C8595, #2A2F38)',
+	25: 'linear-gradient(160deg, #3A2463, #180E2E)',
+	50: 'linear-gradient(160deg, #C4423C, #6B1A22)',
+	100: 'linear-gradient(160deg, #8A93A3, #23272E)',
+	250: 'linear-gradient(160deg, #1B3A30, #0B1D17)',
+	500: 'linear-gradient(160deg, #17356F, #0A1A3C)',
+}
+
 /** Whether a run total is one we have balloons for. */
 export function isBalloonMilestone(
 	totalRuns: number | undefined,

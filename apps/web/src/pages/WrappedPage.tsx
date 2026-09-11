@@ -131,7 +131,7 @@ export function WrappedPage(props: WrappedPageProps) {
 				>
 					<Show when={slides().length > 0}>
 						<A
-							href={`/wrapped/${year()}/explore`}
+							href={`/wrapped/${year()}/explore${previewSuffix()}`}
 							class={pageStyles.exploreLink}
 						>
 							▶ Play {year()} as a story
