@@ -4,6 +4,7 @@ import 'solid-devtools'
 import '../styled-system/styles.css'
 
 import App from './App'
+import { registerServiceWorker } from './notifications/push'
 
 const root = document.getElementById('root')
 
@@ -15,3 +16,9 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 
 // biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 render(() => <App />, root!)
+
+// Registered on every load, not just from the notifications page: a browser
+// drops an unused worker after a while, and without one there's nothing for a
+// push to be delivered to. Deliberately after render and unawaited — it has no
+// bearing on the page drawing.
+registerServiceWorker()

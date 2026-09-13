@@ -16,6 +16,58 @@ export function nextMilestone(totalRuns: number): number | null {
 	return MILESTONES.find((m) => m > totalRuns) ?? null
 }
 
+/** The shape a result needs for its run number to be worked out. */
+export interface MilestoneResultSource {
+	parkrunId: string
+	date: string
+}
+
+/** A runner's current total, as parkrun reports it on their profile. */
+export interface MilestoneRunnerSource {
+	parkrunId: string
+	totalRuns: number
+}
+
+/**
+ * "parkrunId:date" → the run number, for the days a milestone landed on.
+ *
+ * Counted backwards from the runner's current total rather than forwards from
+ * their first result: parkrun knows how many runs someone has, but we only hold
+ * the ones we've scraped, so counting forwards would number everyone's runs
+ * from wherever our records happen to start.
+ *
+ * Shared because the website draws a balloon on these days and the backend
+ * pushes a notification about them — the two must agree on which run was the
+ * 100th.
+ */
+export function buildMilestoneMap(
+	results: MilestoneResultSource[],
+	runners: MilestoneRunnerSource[],
+): Map<string, number> {
+	const totalRunsMap = new Map<string, number>()
+	for (const r of runners) totalRunsMap.set(r.parkrunId, r.totalRuns)
+
+	const byRunner = new Map<string, MilestoneResultSource[]>()
+	for (const item of results) {
+		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
+		byRunner.get(item.parkrunId)?.push(item)
+	}
+
+	const map = new Map<string, number>()
+	for (const [parkrunId, runs] of byRunner) {
+		const totalRuns = totalRunsMap.get(parkrunId)
+		if (totalRuns === undefined) continue
+		runs.sort((a, b) => a.date.localeCompare(b.date))
+		for (let i = 0; i < runs.length; i++) {
+			const runNumber = totalRuns - (runs.length - 1 - i)
+			if (MILESTONE_SET.has(runNumber)) {
+				map.set(`${parkrunId}:${runs[i].date}`, runNumber)
+			}
+		}
+	}
+	return map
+}
+
 function startOfDay(date: Date): Date {
 	return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }

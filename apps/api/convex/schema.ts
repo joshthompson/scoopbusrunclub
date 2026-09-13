@@ -288,6 +288,52 @@ export default defineSchema({
 		.index('by_expiresAt', ['expiresAt'])
 		.index('by_createdAt', ['createdAt']),
 
+	// --- Web push notifications ---
+
+	/**
+	 * One row per device that has opted in. There are no accounts on the site,
+	 * so a subscription is the identity: the endpoint URL the push service gave
+	 * the browser, plus the two keys needed to encrypt a message only that
+	 * browser can open.
+	 */
+	pushSubscriptions: defineTable({
+		/** The push service URL. Unique per browser install, and the row's identity. */
+		endpoint: v.string(),
+		/** The subscription's public key, for encrypting the payload. */
+		p256dh: v.string(),
+		/** The subscription's auth secret, mixed into the same encryption. */
+		auth: v.string(),
+		/** Only to tell an iPhone from a laptop when looking at the table. */
+		userAgent: v.optional(v.string()),
+		/** Who subscribed, for rate limiting an unauthenticated public write. */
+		ip: v.optional(v.string()),
+		createdAt: v.number(),
+		lastSeenAt: v.number(),
+		/**
+		 * Consecutive send failures. A push service reports a dead subscription
+		 * outright (404/410) and it's deleted; this counts the softer failures,
+		 * so one that never recovers is eventually dropped too.
+		 */
+		failureCount: v.number(),
+	})
+		.index('by_endpoint', ['endpoint'])
+		.index('by_ip', ['ip']),
+
+	/**
+	 * Which notifications have already gone out.
+	 *
+	 * Results arrive by two routes and the admin page can upload the same
+	 * Saturday twice, so "have we said this already?" can't be inferred from the
+	 * data — it has to be written down. Every send claims its key here first,
+	 * and a claim that's already taken is silently dropped.
+	 */
+	sentNotifications: defineTable({
+		dedupeKey: v.string(),
+		/** The NotificationKind, so the table reads back meaningfully. */
+		kind: v.string(),
+		sentAt: v.number(),
+	}).index('by_dedupeKey', ['dedupeKey']),
+
 	// --- App-level key/value store ---
 
 	appData: defineTable({

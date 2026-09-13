@@ -68,6 +68,12 @@ function navItems(): NavItem[] {
 			fullLabel: 'Scoop Bus Wrapped',
 			emoji: '🎁',
 		},
+		{
+			href: '/notifications',
+			label: 'Alerts',
+			fullLabel: 'Mobile Notifications',
+			emoji: '🔔',
+		},
 		{ href: '/about', label: 'About', fullLabel: 'About the Club', emoji: 'ℹ️' },
 		{ href: '/faq', label: 'FAQ', fullLabel: 'FAQ', emoji: '❓' },
 	]

@@ -21,6 +21,7 @@ import { css } from '@style/css'
 import { MOBILE_NAV_SPACE, MobileNav } from './components/MobileNav'
 import { getOrBuildCelebrationData } from './components/ResultCelebrations'
 import { ALWAYS_SHOW_LOADER, SplashScreen } from './components/SplashScreen'
+import { NotificationsPage } from './notifications/NotificationsPage'
 import { AboutPage } from './pages/AboutPage'
 import {
 	AdminAccountPage,
@@ -458,6 +459,7 @@ const App: Component = () => {
 				<Route path="/largestclubs" component={LargestClubsPage} />
 				<Route path="/about" component={AboutPage} />
 				<Route path="/faq" component={FaqPage} />
+				<Route path="/notifications" component={NotificationsPage} />
 				<Route path="/guests/:parkrunId" component={() => <GuestPage />} />
 				<Route path="*404" component={NotFoundPage} />
 			</Router>

@@ -1,6 +1,7 @@
 import { httpRouter } from 'convex/server'
+import { buildTest } from '../../../libs/shared/notifications/messages'
 import { api, internal } from './_generated/api'
-import { httpAction } from './_generated/server'
+import { type ActionCtx, httpAction } from './_generated/server'
 
 const http = httpRouter()
 
@@ -17,6 +18,34 @@ function jsonResponse(data: unknown, status = 200) {
 		status,
 		headers: { 'Content-Type': 'application/json', ...corsHeaders },
 	})
+}
+
+// --- Notification helpers ---
+
+/** A result an ingest actually created, as the notification trigger wants it. */
+interface NewResult {
+	parkrunId: string
+	event: string
+	eventNumber: number
+	time: string
+	date: string
+}
+
+/**
+ * Hand freshly inserted results to the notification trigger.
+ *
+ * Scheduled rather than awaited, so working out PBs and milestones — which
+ * means replaying every result the club has — never slows an ingest down or
+ * fails one. Both ingest routes end with this; the trigger's dedupe keys stop
+ * them announcing the same thing twice.
+ */
+async function notifyNewResults(ctx: ActionCtx, newResults: NewResult[]) {
+	if (newResults.length === 0) return
+	await ctx.scheduler.runAfter(
+		0,
+		internal.notificationTriggers.afterResultsIngest,
+		{ newResults },
+	)
 }
 
 /**
@@ -244,6 +273,8 @@ http.route({
 		}
 
 		let stored = 0
+		/** Results this request actually created, for the notifications. */
+		const newResults: NewResult[] = []
 
 		for (const athlete of athletes) {
 			const { parkrunId, runner, runResults } = athlete
@@ -259,15 +290,27 @@ http.route({
 
 			if (Array.isArray(runResults)) {
 				for (const result of runResults) {
-					await ctx.runMutation(internal.parkrun.storeRunResult, {
-						parkrunId,
-						event: result.event,
-						eventNumber: result.eventNumber,
-						position: result.position,
-						time: result.time,
-						ageGrade: result.ageGrade,
-						date: result.date,
-					})
+					const outcome = await ctx.runMutation(
+						internal.parkrun.storeRunResult,
+						{
+							parkrunId,
+							event: result.event,
+							eventNumber: result.eventNumber,
+							position: result.position,
+							time: result.time,
+							ageGrade: result.ageGrade,
+							date: result.date,
+						},
+					)
+					if (outcome === 'inserted') {
+						newResults.push({
+							parkrunId,
+							event: result.event,
+							eventNumber: result.eventNumber,
+							time: result.time,
+							date: result.date,
+						})
+					}
 				}
 			}
 
@@ -305,6 +348,8 @@ http.route({
 			key: 'parkrunDataUpdatedAt',
 			value: Date.now().toString(),
 		})
+
+		await notifyNewResults(ctx, newResults)
 
 		return jsonResponse({ status: 'ok', athletesStored: stored, eventsStored })
 	}),
@@ -1052,6 +1097,12 @@ http.route({
 			value: Date.now().toString(),
 		})
 
+		await ctx.scheduler.runAfter(
+			0,
+			internal.notificationTriggers.afterLargestClubsIngest,
+			{},
+		)
+
 		return jsonResponse({
 			status: 'ok',
 			week,
@@ -1181,6 +1232,8 @@ http.route({
 		// --- Athlete results (mirrors /api/ingest) ---
 
 		let latestResultDate = ''
+		/** Results this upload actually created, for the notifications. */
+		const newResults: NewResult[] = []
 
 		if (Array.isArray(body?.athletes)) {
 			for (const athlete of body.athletes) {
@@ -1197,15 +1250,27 @@ http.route({
 
 				if (Array.isArray(runResults)) {
 					for (const result of runResults) {
-						await ctx.runMutation(internal.parkrun.storeRunResult, {
-							parkrunId,
-							event: result.event,
-							eventNumber: result.eventNumber,
-							position: result.position,
-							time: result.time,
-							ageGrade: result.ageGrade,
-							date: result.date,
-						})
+						const outcome = await ctx.runMutation(
+							internal.parkrun.storeRunResult,
+							{
+								parkrunId,
+								event: result.event,
+								eventNumber: result.eventNumber,
+								position: result.position,
+								time: result.time,
+								ageGrade: result.ageGrade,
+								date: result.date,
+							},
+						)
+						if (outcome === 'inserted') {
+							newResults.push({
+								parkrunId,
+								event: result.event,
+								eventNumber: result.eventNumber,
+								time: result.time,
+								date: result.date,
+							})
+						}
 						counts.runResults++
 						if (result.date > latestResultDate) latestResultDate = result.date
 					}
@@ -1348,6 +1413,12 @@ http.route({
 				key: 'largestClubsUpdatedAt',
 				value: Date.now().toString(),
 			})
+
+			await ctx.scheduler.runAfter(
+				0,
+				internal.notificationTriggers.afterLargestClubsIngest,
+				{},
+			)
 		}
 
 		if (touchedParkrunData) {
@@ -1356,6 +1427,8 @@ http.route({
 				value: Date.now().toString(),
 			})
 		}
+
+		await notifyNewResults(ctx, newResults)
 
 		// --- Record what was uploaded ---
 
@@ -1385,6 +1458,105 @@ http.route({
 			latestResultDate: latestResultDate || undefined,
 			estimatedWeeksToLargest,
 		})
+	}),
+})
+
+// --- Web push notifications (public) ---
+
+/**
+ * The VAPID public key, served rather than baked into the web build.
+ *
+ * The key identifies us to the push services and is public by design — the
+ * browser has to have it to make a subscription. Serving it means the key lives
+ * in exactly one place, and rotating it doesn't need a site rebuild.
+ */
+http.route({
+	path: '/api/notifications/vapid-public-key',
+	method: 'GET',
+	handler: httpAction(async () => {
+		const key = process.env.VAPID_PUBLIC_KEY
+		if (!key) {
+			return jsonResponse({ error: 'Push is not configured' }, 503)
+		}
+		return jsonResponse({ publicKey: key })
+	}),
+})
+
+// --- POST /api/notifications/subscribe ---
+
+http.route({
+	path: '/api/notifications/subscribe',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const endpoint: string = body?.endpoint ?? ''
+		const p256dh: string = body?.keys?.p256dh ?? ''
+		const auth: string = body?.keys?.auth ?? ''
+
+		const result = await ctx.runMutation(api.notifications.subscribe, {
+			endpoint,
+			p256dh,
+			auth,
+			userAgent: request.headers.get('user-agent') ?? undefined,
+			ip: clientIp(request),
+		})
+
+		if (result.status === 'rejected') return jsonResponse(result, 400)
+		return jsonResponse(result)
+	}),
+})
+
+// --- POST /api/notifications/unsubscribe ---
+
+http.route({
+	path: '/api/notifications/unsubscribe',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.notifications.unsubscribe, {
+			endpoint: body?.endpoint ?? '',
+		})
+		return jsonResponse(result)
+	}),
+})
+
+// --- GET /api/notifications/status?endpoint=... ---
+// What the page shows on load: does the backend still know this browser?
+
+http.route({
+	path: '/api/notifications/status',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const endpoint = url.searchParams.get('endpoint') ?? ''
+		if (!endpoint) return jsonResponse({ subscribed: false })
+
+		const subscribed = await ctx.runQuery(api.notifications.isSubscribed, {
+			endpoint,
+		})
+		return jsonResponse({ subscribed })
+	}),
+})
+
+// --- POST /api/notifications/test ---
+// The Test Notification button. Only reaches an endpoint that's already
+// subscribed, so it can't be used to push at an arbitrary browser.
+
+http.route({
+	path: '/api/notifications/test',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const endpoint: string = body?.endpoint ?? ''
+		if (!endpoint) return jsonResponse({ error: 'Missing endpoint' }, 400)
+
+		const result = await ctx.runAction(internal.notificationsSend.sendToOne, {
+			endpoint,
+			payload: buildTest(),
+		})
+
+		if (!result.sent) return jsonResponse({ error: result.error }, 400)
+		return jsonResponse({ status: 'sent' })
 	}),
 })
 
@@ -1559,6 +1731,11 @@ for (const path of [
 	'/api/custom-racers/mine',
 	'/api/admin/custom-racers',
 	'/api/admin/custom-racers/approval',
+	'/api/notifications/vapid-public-key',
+	'/api/notifications/subscribe',
+	'/api/notifications/unsubscribe',
+	'/api/notifications/status',
+	'/api/notifications/test',
 ]) {
 	http.route({
 		path,

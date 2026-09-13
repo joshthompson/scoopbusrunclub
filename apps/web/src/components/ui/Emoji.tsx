@@ -6,6 +6,7 @@ import StarEmoji from '@/assets/emoji/star.png'
 import TailWalkerEmoji from '@/assets/emoji/tail-walker.png'
 import VolunteerEmoji from '@/assets/emoji/volunteer.png'
 import AsteriskEmoji from '@assets/emoji/asterisk.png'
+import BellEmoji from '@assets/emoji/bell.png'
 import BusEmoji from '@assets/emoji/bus.png'
 import CalendarEmoji from '@assets/emoji/calendar.png'
 import FlagEmoji from '@assets/emoji/flag.png'
@@ -37,6 +38,7 @@ const emojiMap: Record<string, string | undefined> = {
 	'*': AsteriskEmoji,
 	'🏆': TrophyEmoji,
 	'🚌': BusEmoji,
+	'🔔': BellEmoji,
 	stopwatch: StopwatchEmoji,
 }
 

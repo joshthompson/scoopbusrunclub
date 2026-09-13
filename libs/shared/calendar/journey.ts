@@ -5,6 +5,16 @@ import type { CalendarContext, RunResultSource } from './types'
 type EventNameLookup = CalendarContext['eventName']
 
 /**
+ * All a result contributes to the journey: the day it happened and which
+ * parkrun it was, which is enough to say how far it carried the club.
+ *
+ * Narrower than the full `RunResultSource` on purpose — the backend works the
+ * journey out from the raw `runResults` rows, which carry no runner name or
+ * event name, and there's no sense making it invent them.
+ */
+export type JourneyResultSource = Pick<RunResultSource, 'date' | 'event'>
+
+/**
  * The club's collective distance, told as a journey out of Stockholm.
  *
  * The waypoints and the distance-per-run figures live here rather than on the
@@ -110,7 +120,7 @@ export interface JourneyMilestone {
  * calendar and the results feed always have something to attach it to.
  */
 export function journeyMilestones(
-	results: RunResultSource[],
+	results: JourneyResultSource[],
 	eventName: EventNameLookup,
 ): JourneyMilestone[] {
 	const kmByDate = new Map<string, number>()
@@ -143,7 +153,7 @@ export function journeyMilestones(
 
 /** Milestones grouped by the day they happened. */
 export function journeyMilestonesByDate(
-	results: RunResultSource[],
+	results: JourneyResultSource[],
 	eventName: EventNameLookup,
 ): Map<string, JourneyMilestone[]> {
 	const byDate = new Map<string, JourneyMilestone[]>()

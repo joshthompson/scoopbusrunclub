@@ -43,6 +43,13 @@ export const storeRunnerData = internalMutation({
 
 // --- Insert run result ---
 
+/**
+ * Upsert one result, reporting whether it was new.
+ *
+ * The return value is what the notifications hang off: a re-scrape rewrites
+ * every result it finds, so "did this row already exist?" is the only way to
+ * tell a Saturday's fresh results from the decade of history alongside them.
+ */
 export const storeRunResult = internalMutation({
 	args: {
 		parkrunId: v.string(),
@@ -72,12 +79,14 @@ export const storeRunResult = internalMutation({
 				date: args.date,
 				fetchedAt: Date.now(),
 			})
-		} else {
-			await ctx.db.insert('runResults', {
-				...args,
-				fetchedAt: Date.now(),
-			})
+			return 'updated' as const
 		}
+
+		await ctx.db.insert('runResults', {
+			...args,
+			fetchedAt: Date.now(),
+		})
+		return 'inserted' as const
 	},
 })
 

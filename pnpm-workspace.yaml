@@ -1,5 +1,9 @@
 packages:
   - apps/*
   - libs/*
+allowBuilds:
+  '@biomejs/biome': set this to true or false
+  esbuild: set this to true or false
+  nx: set this to true or false
 ignoredBuiltDependencies:
   - nx

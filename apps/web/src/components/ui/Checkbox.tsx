@@ -8,7 +8,7 @@ interface CheckboxProps {
 }
 
 export function Checkbox(
-	props: JSX.HTMLAttributes<HTMLInputElement> & CheckboxProps,
+	props: JSX.InputHTMLAttributes<HTMLInputElement> & CheckboxProps,
 ) {
 	return (
 		<label class={styles.toggleLabel}>

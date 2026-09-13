@@ -4,7 +4,12 @@ import { isBalloonMilestone, milestoneColor } from '@/data/balloons'
 import { runners as runnerSignals } from '@/data/runners'
 import { getEvent, getEventName } from '@/utils/events'
 import { formatName, parseTimeToSeconds } from '@/utils/misc'
-import { MILESTONE_SET, ordinalSuffix } from '@shared/calendar/milestones'
+import {
+	MILESTONE_SET,
+	buildMilestoneMap,
+	ordinalSuffix,
+} from '@shared/calendar/milestones'
+import { type PBStatus, buildPBMap as buildSharedPBMap } from '@shared/results/pb'
 import { css } from '@style/css'
 import { Show, createSignal } from 'solid-js'
 import {
@@ -19,115 +24,14 @@ import {
 // PB map
 // ---------------------------------------------------------------------------
 
-interface PBStatus {
-	firstRun?: boolean
-	pb?: boolean
-	juniorPb?: boolean
-	coursePb?: boolean
-}
-
-function isJuniorEvent(eventId: string) {
-	return getEventName(eventId).trim().toLowerCase().includes('juniors')
-}
-
-/** "parkrunId:date:event:eventNumber" → PB flags */
+/**
+ * "parkrunId:date:event:eventNumber" → PB flags.
+ *
+ * The rule itself lives in `@shared/results/pb` so the push notifications can
+ * reach the same verdict; all this adds is the website's own event lookup.
+ */
 function buildPBMap(results: RunResultItem[]): Map<string, PBStatus> {
-	const map = new Map<string, PBStatus>()
-
-	const byRunner = new Map<string, RunResultItem[]>()
-	for (const item of results) {
-		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-		byRunner.get(item.parkrunId)?.push(item)
-	}
-
-	for (const runs of byRunner.values()) {
-		runs.sort((a, b) => a.date.localeCompare(b.date))
-		let bestOverall = Number.POSITIVE_INFINITY
-		let bestJunior = Number.POSITIVE_INFINITY
-		const bestPerCourse = new Map<string, number>()
-
-		for (let i = 0; i < runs.length; i++) {
-			const run = runs[i]
-			const secs = parseTimeToSeconds(run.time)
-			const bestCourse =
-				bestPerCourse.get(run.event) ?? Number.POSITIVE_INFINITY
-			const key = `${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`
-			const isJunior = isJuniorEvent(run.event)
-
-			if (i === 0) {
-				map.set(key, { firstRun: true })
-				if (isJunior) {
-					bestJunior = secs
-				} else {
-					bestOverall = secs
-					bestPerCourse.set(run.event, secs)
-				}
-			} else {
-				if (isJunior) {
-					const isJuniorPb = secs < bestJunior
-
-					if (isJuniorPb) {
-						map.set(key, { juniorPb: true })
-					}
-
-					bestJunior = Math.min(bestJunior, secs)
-					continue
-				}
-
-				const isOverallPb = secs < bestOverall
-				const isCoursePb =
-					bestCourse !== Number.POSITIVE_INFINITY && secs < bestCourse
-
-				if (isOverallPb || isCoursePb) {
-					map.set(key, {
-						pb: isOverallPb,
-						coursePb: isCoursePb,
-					})
-				}
-
-				if (isOverallPb) {
-					bestOverall = secs
-				}
-
-				bestPerCourse.set(run.event, Math.min(bestCourse, secs))
-			}
-		}
-	}
-
-	return map
-}
-
-// ---------------------------------------------------------------------------
-// Milestone map
-// ---------------------------------------------------------------------------
-
-/** "parkrunId:date" → milestone run number */
-function buildMilestoneMap(
-	results: RunResultItem[],
-	runners: Runner[],
-): Map<string, number> {
-	const totalRunsMap = new Map<string, number>()
-	for (const r of runners) totalRunsMap.set(r.parkrunId, r.totalRuns)
-
-	const byRunner = new Map<string, RunResultItem[]>()
-	for (const item of results) {
-		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
-		byRunner.get(item.parkrunId)?.push(item)
-	}
-
-	const map = new Map<string, number>()
-	for (const [parkrunId, runs] of byRunner) {
-		const totalRuns = totalRunsMap.get(parkrunId)
-		if (totalRuns === undefined) continue
-		runs.sort((a, b) => a.date.localeCompare(b.date))
-		for (let i = 0; i < runs.length; i++) {
-			const runNumber = totalRuns - (runs.length - 1 - i)
-			if (MILESTONE_SET.has(runNumber)) {
-				map.set(`${parkrunId}:${runs[i].date}`, runNumber)
-			}
-		}
-	}
-	return map
+	return buildSharedPBMap(results, getEventName)
 }
 
 // ---------------------------------------------------------------------------
