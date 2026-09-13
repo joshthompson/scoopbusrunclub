@@ -115,6 +115,7 @@ export const create = mutation({
 		date: v.string(),
 		name: v.string(),
 		website: v.optional(v.string()),
+		location: v.optional(v.string()),
 		type: v.optional(v.string()),
 		time: v.optional(v.string()),
 		recurrence: v.optional(recurrenceValidator),
@@ -135,6 +136,7 @@ export const create = mutation({
 			date: args.date,
 			name: args.name,
 			website: args.website,
+			location: args.location || undefined,
 			type: args.type,
 			time: args.time || undefined,
 			recurrence: args.recurrence,
@@ -167,6 +169,7 @@ export const update = mutation({
 		date: v.optional(v.string()),
 		name: v.optional(v.string()),
 		website: v.optional(v.string()),
+		location: v.optional(v.string()),
 		type: v.optional(v.string()),
 		time: v.optional(v.string()),
 		recurrence: v.optional(v.union(recurrenceValidator, v.null())),
@@ -199,7 +202,9 @@ export const update = mutation({
 		if (args.name !== undefined) patch.name = args.name
 		if (args.website !== undefined) patch.website = args.website
 		if (args.type !== undefined) patch.type = args.type
-		// An empty time or a null recurrence is how the form says "no longer".
+		// An empty time, location or a null recurrence is how the form says
+		// "no longer".
+		if (args.location !== undefined) patch.location = args.location || undefined
 		if (args.time !== undefined) patch.time = args.time || undefined
 		if (args.recurrence !== undefined)
 			patch.recurrence = args.recurrence ?? undefined

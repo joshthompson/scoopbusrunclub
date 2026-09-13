@@ -319,6 +319,8 @@ export interface RaceItem {
 	date: string
 	name: string
 	website?: string
+	/** Free-text address, shown on the calendar and in the .ics feed. */
+	location?: string
 	type?: string
 	/** When it starts, "HH:MM" in the club's timezone. A whole day without one. */
 	time?: string

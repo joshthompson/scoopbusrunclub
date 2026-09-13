@@ -187,6 +187,7 @@ export const feedSources = internalQuery({
 				date: race.date,
 				name: race.name,
 				website: race.website,
+				location: race.location,
 				type: race.type,
 				time: race.time,
 				recurrence: race.recurrence,

@@ -114,6 +114,7 @@ interface EventModalProps {
 		date: string
 		name: string
 		website?: string
+		location?: string
 		type?: string
 		time?: string
 		/** Null clears a repeat the event used to have. */
@@ -175,6 +176,7 @@ export const EventModal: Component<EventModalProps> = (props) => {
 	const [date, setDate] = createSignal(race?.date ?? '')
 	const [name, setName] = createSignal(race?.name ?? '')
 	const [website, setWebsite] = createSignal(race?.website ?? '')
+	const [location, setLocation] = createSignal(race?.location ?? '')
 	const [type, setType] = createSignal(race?.type ?? '')
 	const [startTime, setStartTime] = createSignal(race?.time ?? '')
 	const [repeatFreq, setRepeatFreq] = createSignal<'' | RecurrenceFreq>(
@@ -360,6 +362,7 @@ export const EventModal: Component<EventModalProps> = (props) => {
 				date: date(),
 				name: name(),
 				website: website() || undefined,
+				location: location(),
 				type: type() || undefined,
 				time: startTime(),
 				recurrence: recurrence(),
@@ -437,6 +440,19 @@ export const EventModal: Component<EventModalProps> = (props) => {
 						{PARKRUN_EVENT_URL_EXAMPLE} or https://parkrun.org.uk/cheltenham/
 					</span>
 				</Show>
+
+				<AdminInput
+					label="Location"
+					type="text"
+					fullWidth
+					value={location()}
+					onInput={(e) => setLocation(e.currentTarget.value)}
+					placeholder="e.g. Kristinebergs idrottsplats, Nordenflychtsvägen 46, 112 51 Stockholm"
+				/>
+				<span class={styles.hint}>
+					A plain address. Calendar apps look it up themselves, so anything you
+					could paste into Maps will do.
+				</span>
 
 				<div class={styles.row2}>
 					<AdminSelect

@@ -17,7 +17,7 @@ import {
 import type { CalendarContext, CalendarSources } from './types'
 
 /** Bumped when the feed's own wording or structure changes, to force a rebuild. */
-export const ICS_FORMAT_VERSION = 2
+export const ICS_FORMAT_VERSION = 3
 
 const DEFAULT_SITE_ORIGIN = 'https://scoopbus.run'
 const DEFAULT_TIMEZONE = 'Europe/Stockholm'
@@ -260,6 +260,11 @@ function eventLines(
 	]
 	if (description.length > 0)
 		lines.push(`DESCRIPTION:${escapeText(description.join('\n'))}`)
+	// Plain text is all LOCATION is: RFC 5545 §3.8.1.7 leaves it free-form, and
+	// Apple, Google and Outlook all geocode the address themselves. The
+	// structured forms (X-APPLE-STRUCTURED-LOCATION, GEO) only save them the
+	// lookup, so an address written out is enough to get a map and travel time.
+	if (entry.location) lines.push(`LOCATION:${escapeText(entry.location)}`)
 	if (link) lines.push(`URL:${link}`)
 	lines.push('END:VEVENT')
 

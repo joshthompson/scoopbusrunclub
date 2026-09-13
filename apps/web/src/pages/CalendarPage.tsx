@@ -63,6 +63,7 @@ function entryTooltipLines(entry: CalendarEntry): string[] {
 	if (entry.time) lines.push(`Starts at ${entry.time}`)
 	const description = entry.tooltip ?? entry.detail
 	if (description) lines.push(description)
+	if (entry.location) lines.push(entry.location)
 	if (entry.people.length > 0) lines.push(entry.people.join(', '))
 	if (entry.volunteers.length > 0)
 		lines.push(`Volunteered: ${entry.volunteers.join(', ')}`)

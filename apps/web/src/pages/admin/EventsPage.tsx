@@ -206,6 +206,7 @@ export const EventsPage: Component = () => {
 		date: string
 		name: string
 		website?: string
+		location?: string
 		type?: string
 		time?: string
 		recurrence: RecurrenceSource | null

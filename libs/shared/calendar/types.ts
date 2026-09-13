@@ -44,6 +44,8 @@ export interface RaceSource {
 	date: string
 	name: string
 	website?: string
+	/** Free-text address, as a calendar app's LOCATION. */
+	location?: string
 	type?: string
 	/** When it starts, "HH:MM" in the club's timezone. A whole day without one. */
 	time?: string

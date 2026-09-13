@@ -53,6 +53,10 @@ export default defineSchema({
 		date: v.string(), // YYYY-MM-DD
 		name: v.string(),
 		website: v.optional(v.string()),
+		// A free-text address, e.g. "Kristinebergs idrottsplats,
+		// Nordenflychtsvägen 46, 112 51 Stockholm". Calendar apps geocode it
+		// themselves; see libs/shared/calendar/ics.ts.
+		location: v.optional(v.string()),
 		type: v.optional(v.string()),
 		time: v.optional(v.string()), // HH:MM, in the club's timezone
 		// Turns `date` into the first of a series; the repeats are worked out on

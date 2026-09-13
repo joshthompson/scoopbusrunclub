@@ -74,6 +74,8 @@ export interface CalendarEntry {
 	href?: string
 	/** External website, for races that link out instead. */
 	url?: string
+	/** Where it happens, as a free-text address. */
+	location?: string
 	/** The race's type, for races — e.g. "Track and Food" or "Parkrun Trip". */
 	raceType?: string
 	/** Members (and guests) who took part, in finishing order where known. */
@@ -344,6 +346,7 @@ export function indexCalendarEntries(
 			time: race.time,
 			raceType: race.type,
 			url: race.website,
+			location: race.location,
 			people: race.attendees.map((attendee) =>
 				raceAttendeeName(attendee.runnerId),
 			),
