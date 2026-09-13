@@ -1,5 +1,8 @@
 import { httpRouter } from 'convex/server'
-import { buildTest } from '../../../libs/shared/notifications/messages'
+import {
+	buildCustom,
+	buildTest,
+} from '../../../libs/shared/notifications/messages'
 import { api, internal } from './_generated/api'
 import { type ActionCtx, httpAction } from './_generated/server'
 
@@ -1560,6 +1563,122 @@ http.route({
 	}),
 })
 
+// --- Admin: notifications ---
+
+// GET /api/admin/notifications?token=... — history, queue, and reach.
+
+http.route({
+	path: '/api/admin/notifications',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const token = url.searchParams.get('token') ?? ''
+		const limit = url.searchParams.get('limit')
+		const cursor = url.searchParams.get('cursor')
+
+		const [sent, custom, subscribers] = await Promise.all([
+			ctx.runQuery(api.notifications.listSent, {
+				token,
+				limit: limit ? Number.parseInt(limit, 10) : undefined,
+				cursor: cursor ? Number.parseInt(cursor, 10) : undefined,
+			}),
+			ctx.runQuery(api.customNotifications.listRecent, { token }),
+			ctx.runQuery(api.notifications.subscriberCount, { token }),
+		])
+
+		return jsonResponse({
+			sent: sent.notifications,
+			hasMore: sent.hasMore,
+			scheduled: custom.scheduled,
+			subscribers,
+		})
+	}),
+})
+
+// POST /api/admin/notifications — compose one, now or for later.
+
+http.route({
+	path: '/api/admin/notifications',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.customNotifications.create, {
+			token: body?.token ?? '',
+			title: body?.title ?? '',
+			body: body?.body ?? '',
+			url: body?.url ?? '',
+			sendAt: typeof body?.sendAt === 'number' ? body.sendAt : Date.now(),
+		})
+		if ('error' in result) {
+			return jsonResponse(result, result.error === 'Unauthorized' ? 401 : 400)
+		}
+		return jsonResponse(result)
+	}),
+})
+
+// POST /api/admin/notifications/cancel — call off a scheduled one.
+
+http.route({
+	path: '/api/admin/notifications/cancel',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		if (!body?.id) return jsonResponse({ error: 'Missing id' }, 400)
+
+		const result = await ctx.runMutation(api.customNotifications.cancel, {
+			token: body?.token ?? '',
+			id: body.id,
+		})
+		if ('error' in result) {
+			return jsonResponse(result, result.error === 'Unauthorized' ? 401 : 400)
+		}
+		return jsonResponse(result)
+	}),
+})
+
+// POST /api/admin/notifications/preview — send the draft to your own device
+// only, so it can be read on a lock screen before everyone gets it.
+
+http.route({
+	path: '/api/admin/notifications/preview',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const session = await ctx.runQuery(api.auth.validateToken, {
+			token: body?.token ?? '',
+		})
+		if (!session) return jsonResponse({ error: 'Unauthorized' }, 401)
+		if (!session.isSuperAdmin) {
+			return jsonResponse(
+				{ error: 'Only super-admins can send notifications' },
+				403,
+			)
+		}
+
+		const endpoint: string = body?.endpoint ?? ''
+		if (!endpoint) {
+			return jsonResponse(
+				{ error: 'This browser has notifications turned off' },
+				400,
+			)
+		}
+
+		const title: string = (body?.title ?? '').trim()
+		const text: string = (body?.body ?? '').trim()
+		if (!title || !text) {
+			return jsonResponse({ error: 'Give it a title and a message' }, 400)
+		}
+
+		const result = await ctx.runAction(internal.notificationsSend.sendToOne, {
+			endpoint,
+			payload: buildCustom(title, text, body?.url || '/'),
+		})
+
+		if (!result.sent) return jsonResponse({ error: result.error }, 400)
+		return jsonResponse({ status: 'sent' })
+	}),
+})
+
 // --- Custom racers (visitor-created runners) ---
 
 /**
@@ -1736,6 +1855,9 @@ for (const path of [
 	'/api/notifications/unsubscribe',
 	'/api/notifications/status',
 	'/api/notifications/test',
+	'/api/admin/notifications',
+	'/api/admin/notifications/cancel',
+	'/api/admin/notifications/preview',
 ]) {
 	http.route({
 		path,

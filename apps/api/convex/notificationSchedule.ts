@@ -232,6 +232,8 @@ export const hourlyTick = internalAction({
 				keys: candidates.map((c) => ({
 					dedupeKey: c.dedupeKey,
 					kind: c.kind,
+					title: c.payload.title,
+					body: c.payload.body,
 				})),
 			},
 		)
@@ -242,6 +244,7 @@ export const hourlyTick = internalAction({
 			if (!claimedSet.has(candidate.dedupeKey)) continue
 			await ctx.scheduler.runAfter(0, internal.notificationsSend.sendToAll, {
 				payload: candidate.payload,
+				dedupeKey: candidate.dedupeKey,
 			})
 			sent++
 		}

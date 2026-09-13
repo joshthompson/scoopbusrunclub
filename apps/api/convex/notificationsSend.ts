@@ -144,7 +144,14 @@ async function pushToAll(
  * this doesn't second-guess whether the message should go — it just sends it.
  */
 export const sendToAll = internalAction({
-	args: { payload: payloadValidator },
+	args: {
+		payload: payloadValidator,
+		/**
+		 * The history row to write the delivered count back to, when there is one.
+		 * The key was claimed before this ran, so the row already exists.
+		 */
+		dedupeKey: v.optional(v.string()),
+	},
 	handler: async (ctx, args) => {
 		const vapid = configureVapid()
 		if (!vapid.ok) {
@@ -155,11 +162,29 @@ export const sendToAll = internalAction({
 		const subscriptions = await ctx.runQuery(
 			internal.notifications.listSubscriptions,
 		)
-		if (subscriptions.length === 0) return { sent: 0, skipped: false as const }
+
+		if (subscriptions.length === 0) {
+			// Still worth recording: "nobody was subscribed" is a better answer on
+			// the admin page than a blank where a number should be.
+			if (args.dedupeKey) {
+				await ctx.runMutation(internal.notifications.recordSentCount, {
+					dedupeKey: args.dedupeKey,
+					sentCount: 0,
+				})
+			}
+			return { sent: 0, skipped: false as const }
+		}
 
 		const outcome = await pushToAll(subscriptions, encodePayload(args.payload))
 
 		await ctx.runMutation(internal.notifications.recordSendOutcome, outcome)
+
+		if (args.dedupeKey) {
+			await ctx.runMutation(internal.notifications.recordSentCount, {
+				dedupeKey: args.dedupeKey,
+				sentCount: outcome.delivered.length,
+			})
+		}
 
 		console.log(
 			`push "${args.payload.title}": ${outcome.delivered.length} delivered, ${outcome.failed.length} failed, ${outcome.gone.length} gone`,

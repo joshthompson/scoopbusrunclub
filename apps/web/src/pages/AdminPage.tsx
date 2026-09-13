@@ -6,6 +6,7 @@ import { AdvancedUploadPage } from './admin/AdvancedUploadPage'
 import { CustomRacersPage } from './admin/CustomRacersPage'
 import { EventLogsPage } from './admin/EventLogsPage'
 import { EventsPage } from './admin/EventsPage'
+import { NotificationsPage } from './admin/NotificationsPage'
 import { ParkrunsPage } from './admin/ParkrunsPage'
 import { ProcessResultsPage } from './admin/ProcessResultsPage'
 import { RunnersPage } from './admin/RunnersPage'
@@ -47,6 +48,16 @@ export const AdminAccountPage: Component = () => {
 		<AuthGuard>
 			<AdminLayout>
 				<AccountPage />
+			</AdminLayout>
+		</AuthGuard>
+	)
+}
+
+export const AdminNotificationsPage: Component = () => {
+	return (
+		<AuthGuard>
+			<AdminLayout>
+				<NotificationsPage />
 			</AdminLayout>
 		</AuthGuard>
 	)

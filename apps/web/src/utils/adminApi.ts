@@ -486,3 +486,98 @@ export async function fetchAdminParkruns(
 	if (!res.ok) return { items: [], page: 1, totalPages: 0, total: 0 }
 	return res.json()
 }
+
+// ── Notifications API ───────────────────────────────────────────────
+
+export interface SentNotification {
+	_id: string
+	dedupeKey: string
+	kind: string
+	title: string | null
+	body: string | null
+	/** Devices that took it. Null while a send is still in flight. */
+	sentCount: number | null
+	sentAt: number
+}
+
+export interface ScheduledNotification {
+	_id: string
+	title: string
+	body: string
+	url: string
+	sendAt: number
+	status: 'scheduled' | 'sent' | 'cancelled'
+	createdBy: string
+	sentAt: number | null
+	sentCount: number | null
+}
+
+export interface NotificationsOverview {
+	sent: SentNotification[]
+	hasMore: boolean
+	scheduled: ScheduledNotification[]
+	/** How many devices a send would reach right now. */
+	subscribers: number
+}
+
+const EMPTY_OVERVIEW: NotificationsOverview = {
+	sent: [],
+	hasMore: false,
+	scheduled: [],
+	subscribers: 0,
+}
+
+export async function fetchNotifications(opts?: {
+	limit?: number
+	cursor?: number
+}): Promise<NotificationsOverview> {
+	const token = getAuthToken()
+	if (!token) return EMPTY_OVERVIEW
+	const params = new URLSearchParams({ token })
+	if (opts?.limit) params.set('limit', String(opts.limit))
+	if (opts?.cursor) params.set('cursor', String(opts.cursor))
+	const res = await fetch(`${CONVEX_URL}/api/admin/notifications?${params}`)
+	if (!res.ok) return EMPTY_OVERVIEW
+	return res.json()
+}
+
+/** Shared shape for the three write calls, which all just report a problem. */
+async function notificationPost(
+	path: string,
+	payload: Record<string, unknown>,
+): Promise<{ error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not signed in' }
+	const res = await fetch(`${CONVEX_URL}${path}`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token, ...payload }),
+	})
+	const data = await res.json().catch(() => ({}))
+	if (!res.ok) return { error: data?.error ?? `Failed (${res.status})` }
+	return data
+}
+
+export function createNotification(input: {
+	title: string
+	body: string
+	url?: string
+	/** Epoch ms. Now, for an immediate send. */
+	sendAt: number
+}) {
+	return notificationPost('/api/admin/notifications', input)
+}
+
+export function cancelNotification(id: string) {
+	return notificationPost('/api/admin/notifications/cancel', { id })
+}
+
+/** Send the draft to this browser only, to see it before everyone does. */
+export function previewNotification(input: {
+	endpoint: string
+	title: string
+	body: string
+	url?: string
+}) {
+	return notificationPost('/api/admin/notifications/preview', input)
+}

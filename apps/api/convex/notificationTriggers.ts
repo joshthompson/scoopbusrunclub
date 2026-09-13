@@ -145,6 +145,8 @@ async function claimAndSend(
 			keys: candidates.map((c) => ({
 				dedupeKey: c.dedupeKey,
 				kind: c.kind,
+				title: c.payload.title,
+				body: c.payload.body,
 			})),
 		},
 	)
@@ -155,6 +157,7 @@ async function claimAndSend(
 	for (const candidate of toSend) {
 		await ctx.scheduler.runAfter(0, internal.notificationsSend.sendToAll, {
 			payload: candidate.payload,
+			dedupeKey: candidate.dedupeKey,
 		})
 	}
 

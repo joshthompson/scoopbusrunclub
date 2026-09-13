@@ -28,6 +28,7 @@ import {
 	AdminAdvancedUploadPage,
 	AdminCustomRacersPage,
 	AdminLogsPage,
+	AdminNotificationsPage,
 	AdminPage,
 	AdminParkrunsPage,
 	AdminProcessResultsPage,
@@ -343,6 +344,7 @@ const App: Component = () => {
 				<Route path="/admin/scan" component={AdminScanPage} />
 				<Route path="/admin/users" component={AdminUsersPage} />
 				<Route path="/admin/logs" component={AdminLogsPage} />
+				<Route path="/admin/notifications" component={AdminNotificationsPage} />
 				<Route path="/admin/account" component={AdminAccountPage} />
 				<Route path="/admin/runners" component={AdminRunnersPage} />
 				<Route path="/admin/parkruns" component={AdminParkrunsPage} />

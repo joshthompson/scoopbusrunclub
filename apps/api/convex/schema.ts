@@ -332,7 +332,63 @@ export default defineSchema({
 		/** The NotificationKind, so the table reads back meaningfully. */
 		kind: v.string(),
 		sentAt: v.number(),
-	}).index('by_dedupeKey', ['dedupeKey']),
+		/**
+		 * The words that actually went out. Kept so the admin page can show what
+		 * was said rather than making somebody decode a dedupe key. Absent on
+		 * seeded rows, which were never sent.
+		 */
+		title: v.optional(v.string()),
+		body: v.optional(v.string()),
+		/**
+		 * How many devices took it. Written once the send finishes, so a row with
+		 * no count is either still in flight or was never sent at all.
+		 */
+		sentCount: v.optional(v.number()),
+		/**
+		 * Written by `seedHistory` to claim a key without sending anything. These
+		 * are bookkeeping, not history, and the admin page leaves them out.
+		 */
+		seeded: v.optional(v.boolean()),
+	})
+		.index('by_dedupeKey', ['dedupeKey'])
+		// Seeded first so the history can be read straight off the index: the
+		// bookkeeping rows sort into their own range and never crowd out the real
+		// ones, however many of them there are.
+		.index('by_seeded_sentAt', ['seeded', 'sentAt']),
+
+	/**
+	 * Notifications written by hand in the admin area, either to go out now or at
+	 * a chosen time.
+	 *
+	 * Separate from `sentNotifications` because the two answer different
+	 * questions: this is the queue — what is due, and what can still be called
+	 * off — while that one is the record of what went out. A custom notification
+	 * appears in both, here until it fires and there afterwards.
+	 */
+	customNotifications: defineTable({
+		title: v.string(),
+		body: v.string(),
+		/** Where tapping it lands. The homepage unless something better is given. */
+		url: v.string(),
+		/** When it should go out; now, for an immediate send. */
+		sendAt: v.number(),
+		status: v.union(
+			v.literal('scheduled'),
+			v.literal('sent'),
+			v.literal('cancelled'),
+		),
+		createdBy: v.string(),
+		createdAt: v.number(),
+		/**
+		 * The Convex job that will send it, so a scheduled one can be called off.
+		 * Convex owns the timing — there's no polling here.
+		 */
+		jobId: v.optional(v.id('_scheduled_functions')),
+		sentAt: v.optional(v.number()),
+		sentCount: v.optional(v.number()),
+	})
+		.index('by_status', ['status'])
+		.index('by_createdAt', ['createdAt']),
 
 	// --- App-level key/value store ---
 

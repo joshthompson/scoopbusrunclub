@@ -157,6 +157,21 @@ async function currentSubscription(): Promise<PushSubscription | null> {
 }
 
 /**
+ * This browser's push endpoint, or null when it isn't subscribed.
+ *
+ * The admin page needs it to send itself a preview — that's the only way the
+ * backend can push to one device rather than all of them.
+ */
+export async function currentEndpoint(): Promise<string | null> {
+	try {
+		const subscription = await currentSubscription()
+		return subscription?.endpoint ?? null
+	} catch {
+		return null
+	}
+}
+
+/**
  * Whether notifications are on.
  *
  * Asks the backend rather than trusting the browser alone: a subscription the

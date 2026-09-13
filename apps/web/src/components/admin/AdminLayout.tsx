@@ -91,6 +91,15 @@ export const AdminLayout: Component<{
 						>
 							Process Results
 						</A>
+						<A
+							href="/admin/notifications"
+							class={cx(
+								styles.navLink,
+								isActive('/admin/notifications') ? styles.navLinkActive : '',
+							)}
+						>
+							Notifications
+						</A>
 						<Show when={auth.isSuperAdmin()}>
 							<A
 								href="/admin/users"

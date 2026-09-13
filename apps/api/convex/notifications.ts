@@ -15,6 +15,7 @@ import {
 	mutation,
 	query,
 } from './_generated/server'
+import { validateSession } from './auth'
 
 /**
  * How many consecutive soft failures a subscription is given before it's
@@ -221,12 +222,19 @@ export const recordSendOutcome = internalMutation({
  */
 export const claimDedupeKeys = internalMutation({
 	args: {
-		keys: v.array(v.object({ dedupeKey: v.string(), kind: v.string() })),
+		keys: v.array(
+			v.object({
+				dedupeKey: v.string(),
+				kind: v.string(),
+				title: v.optional(v.string()),
+				body: v.optional(v.string()),
+			}),
+		),
 	},
 	handler: async (ctx, args) => {
 		const claimed: string[] = []
 
-		for (const { dedupeKey, kind } of args.keys) {
+		for (const { dedupeKey, kind, title, body } of args.keys) {
 			const existing = await ctx.db
 				.query('sentNotifications')
 				.withIndex('by_dedupeKey', (q) => q.eq('dedupeKey', dedupeKey))
@@ -236,12 +244,33 @@ export const claimDedupeKeys = internalMutation({
 			await ctx.db.insert('sentNotifications', {
 				dedupeKey,
 				kind,
+				title,
+				body,
 				sentAt: Date.now(),
 			})
 			claimed.push(dedupeKey)
 		}
 
 		return claimed
+	},
+})
+
+/**
+ * Write down how many devices a send reached.
+ *
+ * Separate from the claim because the two happen at different times: the key is
+ * claimed before anything is sent (so a crash mid-send loses a notification
+ * rather than repeating it), and the count is only known once the push service
+ * has answered for every subscription.
+ */
+export const recordSentCount = internalMutation({
+	args: { dedupeKey: v.string(), sentCount: v.number() },
+	handler: async (ctx, args) => {
+		const row = await ctx.db
+			.query('sentNotifications')
+			.withIndex('by_dedupeKey', (q) => q.eq('dedupeKey', args.dedupeKey))
+			.unique()
+		if (row) await ctx.db.patch(row._id, { sentCount: args.sentCount })
 	},
 })
 
@@ -269,10 +298,76 @@ export const seedDedupeKeys = internalMutation({
 				dedupeKey,
 				kind,
 				sentAt: Date.now(),
+				seeded: true,
 			})
 			seeded++
 		}
 		return seeded
+	},
+})
+
+// ---------------------------------------------------------------------------
+// Reading the history, for the admin page
+// ---------------------------------------------------------------------------
+
+/**
+ * What has actually been sent, newest first.
+ *
+ * Rows written by `seedHistory` are left out: they exist to stop a notification
+ * being sent, not because one was, and a few hundred of them would bury the
+ * handful that are real history.
+ */
+export const listSent = query({
+	args: {
+		token: v.string(),
+		limit: v.optional(v.number()),
+		cursor: v.optional(v.number()),
+	},
+	handler: async (ctx, args) => {
+		const session = await validateSession(ctx, args.token)
+		if (!session) return { notifications: [], hasMore: false }
+
+		const pageSize = Math.min(args.limit ?? 50, 200)
+
+		// Seeded rows are excluded by the index rather than filtered afterwards:
+		// they never carried a `seeded` field only when they were real sends, so
+		// `undefined` selects exactly the history and the several hundred
+		// bookkeeping rows are never read at all.
+		const rows = await ctx.db
+			.query('sentNotifications')
+			.withIndex('by_seeded_sentAt', (q) =>
+				args.cursor !== undefined
+					? q.eq('seeded', undefined).lt('sentAt', args.cursor)
+					: q.eq('seeded', undefined),
+			)
+			.order('desc')
+			.take(pageSize + 1)
+
+		const page = rows.slice(0, pageSize)
+
+		return {
+			notifications: page.map((row) => ({
+				_id: row._id,
+				dedupeKey: row.dedupeKey,
+				kind: row.kind,
+				title: row.title ?? null,
+				body: row.body ?? null,
+				sentCount: row.sentCount ?? null,
+				sentAt: row.sentAt,
+			})),
+			hasMore: rows.length > pageSize,
+		}
+	},
+})
+
+/** How many devices are currently subscribed — what a send would reach. */
+export const subscriberCount = query({
+	args: { token: v.string() },
+	handler: async (ctx, args) => {
+		const session = await validateSession(ctx, args.token)
+		if (!session) return 0
+		const rows = await ctx.db.query('pushSubscriptions').collect()
+		return rows.length
 	},
 })
 

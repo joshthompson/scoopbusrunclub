@@ -13,6 +13,7 @@ import type * as auth from "../auth.js";
 import type * as calendar from "../calendar.js";
 import type * as courses from "../courses.js";
 import type * as crons from "../crons.js";
+import type * as customNotifications from "../customNotifications.js";
 import type * as customRacers from "../customRacers.js";
 import type * as guests from "../guests.js";
 import type * as http from "../http.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   calendar: typeof calendar;
   courses: typeof courses;
   crons: typeof crons;
+  customNotifications: typeof customNotifications;
   customRacers: typeof customRacers;
   guests: typeof guests;
   http: typeof http;

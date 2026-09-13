@@ -68,6 +68,9 @@ everything the club has ever done is technically unannounced.
 `notificationTriggers:seedHistory` writes all of that down without sending any
 of it, and reports `{ seeded, considered }` — around 950 keys as things stand.
 
+Deploy the backend first — pushing to `main` runs `.github/workflows/deploy.yml`,
+which deploys web and backend together. Once that's green:
+
 ```bash
 cd apps/api
 npx convex run --prod notificationTriggers:seedHistory
@@ -75,6 +78,18 @@ npx convex run --prod notificationTriggers:seedHistory
 
 Or from the Convex dashboard → **Functions** → `notificationTriggers` →
 `seedHistory` → **Run**. It needs no VAPID keys, because it sends nothing.
+
+> **Don't add `--push` to that command.** `--push` deploys your working tree to
+> the target deployment, so `--push --prod` would ship whatever is on your disk
+> — uncommitted work included — straight to production, bypassing the GitHub
+> Actions deploy. Prod would then be running code that isn't in `main`, and the
+> next real deploy would quietly overwrite it. Nothing in the CLI stops you, so
+> it's worth remembering.
+>
+> On your **dev** deployment `--push` is exactly right, because deploying the
+> working tree is the point — `npx convex run --push notificationTriggers:seedHistory`
+> pushes and runs in one step, which is the quickest way to rehearse the whole
+> flow before it reaches main.
 
 **How much it actually protects you:** less than it sounds, because the 14-day
 rule below is the real guard. Even in the worst case — the whole `runResults`
@@ -170,6 +185,40 @@ one request, so its count is always right.
 
 ---
 
+## The admin page
+
+`/admin/notifications`, in the admin nav. Any admin can read it; only
+super-admins can send, because a push reaches every subscribed device and can't
+be recalled.
+
+**Sent** lists what has gone out, newest first, with the wording as it appeared
+and how many devices took it. A dash instead of a number means the send is still
+in flight — refresh in a moment. The rows `seedHistory` wrote are left out: they
+exist to stop a notification being sent, not because one was.
+
+**Send a Notification** composes one by hand: a title, a message, and an
+optional link. The link must be a path on the site (`/calendar`), not a full
+URL — a text box that could point the club's phones at any website is not a
+thing worth having.
+
+Three things about sending:
+
+- **Send to me only** pushes the draft to the browser you're sitting at, so you
+  can read it on a real lock screen before anyone else does. It needs that
+  browser to have notifications turned on at `/notifications` first.
+- **Send to everyone** asks for confirmation, and tells you how many devices
+  it's about to reach. Editing the message after confirming resets it.
+- **Send later** turns it into a scheduled send. Convex handles the timing, so
+  it goes out at the minute you asked for rather than waiting on the hourly
+  cron. Scheduled sends appear under **Scheduled** and can be cancelled right up
+  until they fire.
+
+Custom notifications are deduplicated like everything else — keyed on the row
+they came from — so a double-tapped Send, or a scheduled job that retries, sends
+once.
+
+---
+
 ## Where the code lives
 
 Kept apart from the rest of the app, as much as it can be.
@@ -182,6 +231,8 @@ Kept apart from the rest of the app, as much as it can be.
 | `apps/api/convex/notificationsSend.ts` | The actual sending. The only `"use node"` file in the backend, because `web-push` needs Node |
 | `apps/api/convex/notificationTriggers.ts` | Works out what to send after results land |
 | `apps/api/convex/notificationSchedule.ts` | The 9am notifications and the Stockholm clock |
+| `apps/api/convex/customNotifications.ts` | Notifications written by hand, and their scheduling |
+| `apps/web/src/pages/admin/NotificationsPage.tsx` | The admin page |
 | `apps/web/src/notifications/push.ts` | All of the site's contact with the browser Push API |
 | `apps/web/src/notifications/NotificationsPage.tsx` | The `/notifications` page |
 | `apps/web/public/sw.js` | The service worker. Shows the notification and handles the tap — no caching, deliberately |

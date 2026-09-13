@@ -26,6 +26,7 @@ export type NotificationKind =
 	| 'journey'
 	| 'race'
 	| 'wrapped'
+	| 'custom'
 	| 'test'
 
 /** A payload paired with the key that claims it. */
@@ -232,6 +233,38 @@ export function buildWrapped(year: number): PushPayload {
 		body: "Check out this year's stats",
 		url: `/wrapped/${year}/explore`,
 		tag: `wrapped:${year}`,
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Written by hand in the admin area
+// ---------------------------------------------------------------------------
+
+/** Limits the admin form enforces, so a phone shows the whole thing. */
+export const CUSTOM_TITLE_MAX = 60
+export const CUSTOM_BODY_MAX = 180
+
+/**
+ * Keyed by the row it came from, so a custom notification can't be sent twice —
+ * a double-tapped Send, or a scheduled job that runs again after a retry, finds
+ * the key already claimed.
+ */
+export function customKey(id: string): string {
+	return `custom:${id}`
+}
+
+export function buildCustom(
+	title: string,
+	body: string,
+	url: string,
+): PushPayload {
+	return {
+		title,
+		body,
+		url: url || '/',
+		// Unique per message: two announcements are two things to read, and a
+		// shared tag would have the second quietly replace the first.
+		tag: `custom:${title}`,
 	}
 }
 
