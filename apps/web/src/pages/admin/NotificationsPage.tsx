@@ -452,11 +452,11 @@ const styles = {
 	ok: css({
 		fontSize: '0.85rem',
 		fontWeight: 'bold',
-		color: 'var(--green-brand)',
+		color: 'var(--color-black)',
 	}),
 	bad: css({
 		fontSize: '0.85rem',
 		fontWeight: 'bold',
-		color: 'var(--red-600)',
+		color: 'var(--error-red)',
 	}),
 }

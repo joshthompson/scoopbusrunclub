@@ -202,11 +202,11 @@ const styles = {
 	}),
 	message: css({
 		fontWeight: 'bold',
-		color: 'var(--green-brand)',
+		color: 'var(--color-black)',
 	}),
 	error: css({
 		fontWeight: 'bold',
-		color: 'var(--red-600)',
+		color: 'var(--error-red)',
 	}),
 	divider: css({
 		width: '100%',
