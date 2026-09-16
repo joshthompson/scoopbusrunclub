@@ -55,6 +55,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { PositionBingoPage } from './pages/PositionBingoPage'
 import { ReplayPage } from './pages/ReplayPage'
 import { StopwatchBingoPage } from './pages/StopwatchBingoPage'
+import { SwedenPage } from './pages/SwedenPage'
 import { WrappedExplorePage } from './pages/WrappedExplorePage'
 import { WrappedPage } from './pages/WrappedPage'
 import {
@@ -266,6 +267,17 @@ const App: Component = () => {
 								results={results() ?? []}
 								runners={runners() ?? []}
 							/>
+						</Show>
+					)}
+				/>
+				<Route
+					path="/member/:name/sweden"
+					component={() => (
+						<Show
+							when={!results.loading && !runners.loading}
+							fallback={<div class={styles.loading}>Loading...</div>}
+						>
+							<SwedenPage results={results() ?? []} runners={runners() ?? []} />
 						</Show>
 					)}
 				/>

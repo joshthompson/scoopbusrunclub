@@ -18,6 +18,7 @@ const reasons = [
 	'A marshal pointing the wrong way',
 	'A runner doing an extra lap for fun',
 	'A runner not getting a PB and refusing to leave the finish funnel',
+	'No one volunteered to be Car Park Marshal',
 ]
 
 export function NotFoundPage() {

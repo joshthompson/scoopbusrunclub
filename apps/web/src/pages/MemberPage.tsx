@@ -548,6 +548,14 @@ export function MemberPage(props: MemberPageProps) {
 									<img src={positionIcon} class={styles.challengeIcon} alt="" />
 									<span class={styles.challengeName}>Position Bingo</span>
 								</A>
+
+								{/* No pixel icon drawn for this one yet, so it wears the flag
+								    at the size the others' art sits at. */}
+								<A href="./sweden" class={styles.challengeLink}>
+									<img src={snowyAsset(rock1Asset)} width={59} alt="" />
+									<span class={styles.challengeFlag}>🇸🇪</span>
+									<span class={styles.challengeName}>Svenskspringare</span>
+								</A>
 							</div>
 						</DirtBlock>
 					</div>
@@ -730,6 +738,14 @@ const styles = {
 		top: '12px',
 		left: '50%',
 		transform: 'translate(-50%, -50%)',
+	}),
+	challengeFlag: css({
+		position: 'absolute',
+		top: '12px',
+		left: '50%',
+		transform: 'translate(-50%, -50%)',
+		fontSize: '1.5rem',
+		lineHeight: 1,
 	}),
 	challengeName: css({
 		fontSize: '0.8rem',

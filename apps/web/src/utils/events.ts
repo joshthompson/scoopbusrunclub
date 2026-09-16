@@ -37,3 +37,13 @@ export function getEventName(eventId: string): string {
 export function getEvent(eventId: string): EventItem | undefined {
 	return eventMap()?.get(eventId)
 }
+
+/**
+ * Every event we hold for a country, e.g. `SE`. Only the ones someone has run —
+ * the table is written from results — so it's a floor, not a full directory.
+ */
+export function getEventsInCountry(country: string): EventItem[] {
+	const map = eventMap()
+	if (!map) return []
+	return [...map.values()].filter((event) => event.country === country)
+}

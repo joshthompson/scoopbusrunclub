@@ -2,6 +2,7 @@ import { MilestoneBalloonRow } from '@/components/MilestoneBalloons'
 import { Emoji } from '@/components/ui/Emoji'
 import { isBalloonMilestone, milestoneColor } from '@/data/balloons'
 import { runners as runnerSignals } from '@/data/runners'
+import { SWEDISH_PARKRUNS } from '@/data/swedishParkruns'
 import { getEvent, getEventName } from '@/utils/events'
 import { formatName, parseTimeToSeconds } from '@/utils/misc'
 import {
@@ -9,9 +10,12 @@ import {
 	buildMilestoneMap,
 	ordinalSuffix,
 } from '@shared/calendar/milestones'
-import { type PBStatus, buildPBMap as buildSharedPBMap } from '@shared/results/pb'
+import {
+	type PBStatus,
+	buildPBMap as buildSharedPBMap,
+} from '@shared/results/pb'
 import { css } from '@style/css'
-import { Show, createSignal } from 'solid-js'
+import { For, Show, createSignal } from 'solid-js'
 import {
 	type RunResultItem,
 	type Runner,
@@ -115,23 +119,7 @@ const EVENT_LIST_ACHIEVEMENTS: EventListAchievement[] = [
 		description: 'Completed all Swedish parkrun events',
 		emoji: TAG_EMOJIS.svensk,
 		color: TAG_COLORS.svensk,
-		events: [
-			'haga',
-			'judarskogen',
-			'huddinge',
-			'lillsjon',
-			'malmoribersborg',
-			'bulltofta',
-			'billdalsparken',
-			'skatas',
-			'djakneberget',
-			'broparken',
-			'vaxjosjon',
-			'orebro',
-			'vallaskogen',
-			'uppsala',
-			'boulognerskogen',
-		],
+		events: SWEDISH_PARKRUNS.map((pr) => pr.eventId),
 	},
 	{
 		name: 'Stockholm Sprint',
@@ -1333,9 +1321,9 @@ export function ResultCelebrations(props: ResultCelebrationsProps) {
 
 	return (
 		<>
-			{tags().map((tag) => (
-				<CelebrationPill key={tag.label} tag={tag} showTooltip />
-			))}
+			<For each={tags()}>
+				{(tag) => <CelebrationPill tag={tag} showTooltip />}
+			</For>
 		</>
 	)
 }
@@ -1403,9 +1391,9 @@ export function VolunteerCelebrations(props: VolunteerCelebrationsProps) {
 
 	return (
 		<>
-			{tags().map((tag) => (
-				<CelebrationPill key={tag.label} tag={tag} showTooltip />
-			))}
+			<For each={tags()}>
+				{(tag) => <CelebrationPill tag={tag} showTooltip />}
+			</For>
 		</>
 	)
 }
@@ -1414,8 +1402,9 @@ export function VolunteerCelebrations(props: VolunteerCelebrationsProps) {
 function getRunnerFace(parkrunId: string): string | undefined {
 	for (const [, [accessor]] of Object.entries(runnerSignals)) {
 		const data = accessor()
-		if (data.id === parkrunId && (data.frames.face?.length ?? 0) > 0) {
-			return data.frames.face[0]
+		const face = data.frames.face
+		if (data.id === parkrunId && face && face.length > 0) {
+			return face[0]
 		}
 	}
 	return undefined
