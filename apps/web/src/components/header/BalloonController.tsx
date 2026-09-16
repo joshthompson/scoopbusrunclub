@@ -32,11 +32,13 @@ const FLOAT_HEIGHT = 68 // straight up
 const TRAIL_GAP = 16 // behind the runner, before the first balloon
 const BALLOON_GAP = 4 // between balloons
 /**
- * How much lower the second digit hangs than the ones either side of it. Packed
- * close enough to read as one number the digits would foul each other as they
- * lean, and dropping the middle one out of the way is what buys the space.
+ * How much lower every other digit hangs than the ones either side of it.
+ * Packed close enough to read as one number the digits would foul each other as
+ * they lean, and dropping alternate ones out of the way is what buys the space.
+ * For the two- and three-digit milestones that is just the second digit; the
+ * four-digit 1000 drops its second and fourth.
  */
-const MIDDLE_DIGIT_DROP = 22
+const ALTERNATE_DIGIT_DROP = 22
 
 /**
  * The top of the path, from the header's own background. Nothing in a bunch is
@@ -329,7 +331,7 @@ export function createBalloonControllers(
 			anchor,
 			digit,
 			() => rowStart() + centreOfRow,
-			-FLOAT_HEIGHT + (i === 1 ? MIDDLE_DIGIT_DROP : 0),
+			-FLOAT_HEIGHT + (i % 2 === 1 ? ALTERNATE_DIGIT_DROP : 0),
 			// Spread the digits' drift apart, and each runner's bunch apart from the
 			// next, so nothing in the header ever bobs in step.
 			i * 1.9 + Math.random() * Math.PI * 2,

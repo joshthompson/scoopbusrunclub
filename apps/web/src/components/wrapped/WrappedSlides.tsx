@@ -679,7 +679,8 @@ export function buildWrappedSlides(
 			)
 		}
 
-		// Milestones we have no balloons for — a 200th run, say — keep the 🎊 and
+		// Milestones we have no balloons for — a 750th run, or anything past the
+		// 1000th — keep the 🎊 and
 		// share a card, rather than going unmentioned.
 		if (withoutBalloons.length > 0) {
 			const summary = summariseList(

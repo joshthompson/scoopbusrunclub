@@ -2,6 +2,7 @@ import { AdminButton } from '@/components/admin/AdminButton'
 import { AdminInput } from '@/components/admin/AdminInput'
 import { useAuth } from '@/components/admin/AuthGuard'
 import { DirtBlock } from '@/components/ui/DirtBlock'
+import { Table as AdminTable } from '@/components/ui/Table'
 import { currentEndpoint } from '@/notifications/push'
 import {
 	type ScheduledNotification,
@@ -19,6 +20,7 @@ import { css } from '@style/css'
 import {
 	type Component,
 	For,
+	type JSX,
 	Show,
 	createResource,
 	createSignal,
@@ -308,53 +310,60 @@ export const NotificationsPage: Component = () => {
 			</Show>
 
 			<DirtBlock title="Sent">
-				<Show
-					when={(data()?.sent.length ?? 0) > 0}
-					fallback={
+				<AdminTable
+					columns={[
+						{ id: 'content', title: 'Content' },
+						{ id: 'sentAt', title: 'Date', width: '180px' },
+						{ id: 'devices', title: 'Devices', width: '110px' },
+					]}
+					data={(data()?.sent ?? []).map(sentRow)}
+					empty={
 						<p class={styles.empty}>
 							{data.loading ? 'Loading…' : 'Nothing has been sent yet.'}
 						</p>
 					}
-				>
-					<div class={styles.list}>
-						<For each={data()?.sent}>{(item) => <SentRow item={item} />}</For>
-					</div>
-					<Show when={data()?.hasMore}>
-						<p class={styles.meta}>Older notifications not shown.</p>
-					</Show>
+				/>
+				<Show when={data()?.hasMore}>
+					<p class={styles.meta}>Older notifications not shown.</p>
 				</Show>
 			</DirtBlock>
 		</div>
 	)
 }
 
-const SentRow: Component<{ item: SentNotification }> = (props) => (
-	<div class={styles.row}>
+/** One row of the Sent table: content, when it went out, how far it got. */
+function sentRow(item: SentNotification): JSX.Element[] {
+	// The three entries are one row's cells, not a list — nothing to key on.
+	return [
+		// biome-ignore lint/correctness/useJsxKeyInIterable: fixed row cell
 		<div class={styles.rowMain}>
 			{/* Everything sent from now on carries its wording. Anything without it
 			    predates that, so the dedupe key is all there is to show. */}
-			<strong>{props.item.title ?? props.item.dedupeKey}</strong>
-			<Show when={props.item.body}>
-				<span>{props.item.body}</span>
+			<strong>{item.title ?? item.dedupeKey}</strong>
+			<Show when={item.body}>
+				<span>{item.body}</span>
 			</Show>
-			<span class={styles.meta}>
-				{KIND_LABELS[props.item.kind] ?? props.item.kind} ·{' '}
-				{formatWhen(props.item.sentAt)}
-			</span>
-		</div>
+			<span class={styles.meta}>{KIND_LABELS[item.kind] ?? item.kind}</span>
+		</div>,
+		// biome-ignore lint/correctness/useJsxKeyInIterable: fixed row cell
+		<span class={styles.meta}>{formatWhen(item.sentAt)}</span>,
+		// biome-ignore lint/correctness/useJsxKeyInIterable: fixed row cell
 		<span class={styles.count}>
-			{props.item.sentCount === null
+			{item.sentCount === null
 				? '—'
-				: `${props.item.sentCount} device${props.item.sentCount === 1 ? '' : 's'}`}
-		</span>
-	</div>
-)
+				: `${item.sentCount} device${item.sentCount === 1 ? '' : 's'}`}
+		</span>,
+	]
+}
 
 const styles = {
 	page: css({
 		display: 'flex',
 		flexDirection: 'column',
-		gap: '1.5rem',
+		// The title signs hang 2.8rem above their block, so the top one needs
+		// room to clear the sticky nav.
+		paddingTop: '2rem',
+		gap: '2.5rem',
 		maxWidth: '820px',
 		margin: '0 auto',
 		width: '100%',
