@@ -155,13 +155,17 @@ export function SwedenPage(props: SwedenPageProps) {
 		const visits = new Map(
 			rows().map((row) => [row.parkrun.eventId, row.visits]),
 		)
-		return groupByCity(rows().map((row) => row.parkrun)).map((group) => ({
-			city: group.city,
-			rows: group.parkruns.map((parkrun) => ({
+		return groupByCity(rows().map((row) => row.parkrun)).map((group) => {
+			const cityRows = group.parkruns.map((parkrun) => ({
 				parkrun,
 				visits: visits.get(parkrun.eventId) ?? [],
-			})),
-		}))
+			}))
+			return {
+				city: group.city,
+				rows: cityRows,
+				collected: cityRows.filter((row) => row.visits.length > 0).length,
+			}
+		})
 	})
 
 	const collected = createMemo(
@@ -223,7 +227,12 @@ export function SwedenPage(props: SwedenPageProps) {
 							<For each={cities()}>
 								{(group) => (
 									<div class={styles.city}>
-										<h3 class={styles.cityName}>{group.city}</h3>
+										<h3 class={styles.cityName}>
+											<span>{group.city}</span>
+											<span class={styles.cityScore}>
+												{group.collected}/{group.rows.length}
+											</span>
+										</h3>
 										<For each={group.rows}>
 											{(row) => (
 												<SwedenRow parkrun={row.parkrun} visits={row.visits} />
@@ -287,6 +296,10 @@ const styles = {
 		flexDirection: 'column',
 	}),
 	cityName: css({
+		display: 'flex',
+		alignItems: 'baseline',
+		justifyContent: 'space-between',
+		gap: '0.75rem',
 		fontSize: '1.1rem',
 		fontWeight: 'bold',
 		textTransform: 'uppercase',
@@ -294,6 +307,14 @@ const styles = {
 		opacity: 0.75,
 		pb: '0.25rem',
 		borderBottom: '2px solid var(--overlay-black-10)',
+	}),
+	/** The city's own tally, held to the right of its name on the same line. */
+	cityScore: css({
+		flexShrink: 0,
+		fontSize: '0.9rem',
+		fontWeight: 'normal',
+		letterSpacing: 'normal',
+		fontVariantNumeric: 'tabular-nums',
 	}),
 	row: cva({
 		base: {
