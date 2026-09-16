@@ -1,13 +1,15 @@
 import { BackSignButton } from '@/components/BackSignButton'
 import { DirtBlock } from '@/components/ui/DirtBlock'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
 import {
 	type SwedishParkrun,
 	groupByCity,
 	isActive,
 	swedishParkrunCard,
+	titleNamesParkrun,
 } from '@/data/swedishParkruns'
-import type { RunResultItem, Runner } from '@/utils/api'
+import type { RaceItem, RunResultItem, Runner } from '@/utils/api'
 import { getEventsInCountry } from '@/utils/events'
 import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
 import { formatDate } from '@/utils/misc'
@@ -19,12 +21,19 @@ import { NotFoundPage } from './NotFoundPage'
 interface SwedenPageProps {
 	results: RunResultItem[]
 	runners: Runner[]
+	races: RaceItem[]
 }
 
 /** One visit to a Swedish parkrun, for the row that parkrun owns. */
 interface Visit {
 	date: string
-	eventNumber: number
+	/** The parkrun's own event number. Absent when this is a stand-in. */
+	eventNumber?: number
+	/**
+	 * Set when the visit was a club event on a closed parkrun's course rather
+	 * than the parkrun itself — the title it was counted from.
+	 */
+	standIn?: string
 }
 
 function SwedenRow(props: { parkrun: SwedishParkrun; visits: Visit[] }) {
@@ -41,13 +50,18 @@ function SwedenRow(props: { parkrun: SwedishParkrun; visits: Visit[] }) {
 					<A href={`/event/${props.parkrun.eventId}`} class={styles.event}>
 						{props.parkrun.name}
 					</A>
-					<Show when={run()}>
+					<Show when={first()?.eventNumber !== undefined}>
 						<span class={styles.eventNumber}> #{first().eventNumber}</span>
 					</Show>
-					{/* Only ever seen by someone who ran it before it shut — says why
-					    their card is a row longer than everyone else's. */}
+					<Show when={first()?.standIn}>
+						<span class={styles.asterisk}>*</span>
+					</Show>
 					<Show when={!isActive(props.parkrun)}>
-						<span class={styles.closed}>closed</span>
+						<Tooltip content="This parkrun has closed">
+							<span class={styles.info} aria-label="This parkrun has closed">
+								i
+							</span>
+						</Tooltip>
 					</Show>
 					<Show when={rest().length > 0}>
 						{' '}
@@ -65,6 +79,7 @@ function SwedenRow(props: { parkrun: SwedishParkrun; visits: Visit[] }) {
 					fallback={<span class={styles.notYet}>Not yet</span>}
 				>
 					<div class={styles.meta}>
+						<Show when={first().standIn}>{(title) => <>{title()} · </>}</Show>
 						{formatDate(new Date(`${first().date}T00:00:00`))}
 					</div>
 				</Show>
@@ -73,7 +88,17 @@ function SwedenRow(props: { parkrun: SwedishParkrun; visits: Visit[] }) {
 					<For each={rest()}>
 						{(visit) => (
 							<div class={styles.meta}>
-								#{visit.eventNumber} ·{' '}
+								<Show
+									when={visit.standIn}
+									fallback={<>#{visit.eventNumber} · </>}
+								>
+									{(title) => (
+										<>
+											{title()}
+											<span class={styles.asterisk}>*</span> ·{' '}
+										</>
+									)}
+								</Show>
 								{formatDate(new Date(`${visit.date}T00:00:00`))}
 							</div>
 						)}
@@ -133,21 +158,50 @@ export function SwedenPage(props: SwedenPageProps) {
 	})
 
 	/**
-	 * Every parkrun still worth listing, with this runner's visits to it.
+	 * The club events this runner turned out for, earliest first.
 	 *
-	 * A closed-down parkrun is dropped unless they actually ran it — nobody can
-	 * go and get it now, so leaving it on the card would put the challenge out
-	 * of reach for everyone who came late. Someone who did run it keeps it: it's
-	 * a place they've been, and it counts on both sides of the score so having
-	 * caught one can't stop them finishing.
+	 * An attendee is named by their runner key — `josh` — not their parkrun id,
+	 * which is what the rest of this page matches on. Ones still to come are
+	 * left out: signing up for a trip isn't the same as having been on it.
+	 */
+	const attendedRaces = createMemo(() => {
+		const today = new Date()
+		const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+		return props.races
+			.filter(
+				(race) =>
+					race.date <= todayKey &&
+					race.attendees.some((a) => a.runnerId === runnerKey()),
+			)
+			.sort((a, b) => a.date.localeCompare(b.date))
+	})
+
+	/**
+	 * Every parkrun on the card, with this runner's visits to it.
+	 *
+	 * A closed parkrun still gets its row — the (i) beside it says why it can't
+	 * be run — and a club event whose title names it stands in for the parkrun
+	 * itself, since that course is the only way left to tick it off. Those come
+	 * in asterisked, and only for the closed ones: on a parkrun still going the
+	 * answer is to go and run it.
 	 */
 	const rows = createMemo(() =>
-		card()
-			.map((parkrun) => ({
-				parkrun,
-				visits: visitsByEvent().get(parkrun.eventId) ?? [],
-			}))
-			.filter((row) => isActive(row.parkrun) || row.visits.length > 0),
+		card().map((parkrun) => {
+			const visits = [...(visitsByEvent().get(parkrun.eventId) ?? [])]
+			if (!isActive(parkrun)) {
+				for (const race of attendedRaces()) {
+					if (!titleNamesParkrun(race.name, parkrun)) continue
+					visits.push({ date: race.date, standIn: race.name })
+				}
+				visits.sort((a, b) => a.date.localeCompare(b.date))
+			}
+			return { parkrun, visits }
+		}),
+	)
+
+	/** Whether anything on this card was counted from a stand-in event. */
+	const hasStandIn = createMemo(() =>
+		rows().some((row) => row.visits.some((visit) => visit.standIn)),
 	)
 
 	/** The rows again, under the city each one is in. */
@@ -242,6 +296,14 @@ export function SwedenPage(props: SwedenPageProps) {
 								)}
 							</For>
 						</div>
+
+						<Show when={hasStandIn()}>
+							<p class={styles.footnote}>
+								<span class={styles.asterisk}>*</span> Counted from a club event
+								on that course. The parkrun itself has closed, so there is no
+								longer a parkrun result to be had there.
+							</p>
+						</Show>
 					</DirtBlock>
 
 					<BackSignButton to={`/member/${params.name}`}>
@@ -363,16 +425,33 @@ const styles = {
 		fontSize: '0.9rem',
 		fontStyle: 'italic',
 	}),
-	closed: css({
+	/** The (i) beside a closed parkrun, sized to sit in the line of text. */
+	info: css({
+		display: 'inline-flex',
+		alignItems: 'center',
+		justifyContent: 'center',
 		ml: '0.4rem',
-		px: '0.3rem',
-		fontSize: '0.7rem',
-		textTransform: 'uppercase',
-		letterSpacing: '0.05em',
-		border: '1px solid var(--overlay-black-10)',
-		borderRadius: '3px',
+		width: '14px',
+		height: '14px',
+		borderRadius: '50%',
+		border: '1px solid currentColor',
+		fontSize: '0.65rem',
+		fontStyle: 'italic',
+		fontWeight: 'bold',
+		lineHeight: 1,
 		opacity: 0.7,
+		cursor: 'help',
 		verticalAlign: 'middle',
+	}),
+	asterisk: css({
+		fontWeight: 'bold',
+	}),
+	footnote: css({
+		mt: '1.25rem',
+		fontSize: '0.8rem',
+		fontStyle: 'italic',
+		opacity: 0.8,
+		textAlign: 'left',
 	}),
 	moreButton: css({
 		border: 'none',

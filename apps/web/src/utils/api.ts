@@ -297,6 +297,7 @@ export async function fetchRunners(): Promise<Runner[]> {
 }
 
 export interface RaceAttendee {
+	/** The runner's key in `data/runners` — `josh` — not their parkrun id. */
 	runnerId: string
 	position?: number
 	time?: string

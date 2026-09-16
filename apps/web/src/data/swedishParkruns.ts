@@ -76,6 +76,24 @@ export function isActive(parkrun: SwedishParkrun): boolean {
 }
 
 /**
+ * Whether a club event's title names this parkrun, e.g. "Scoop Bus Kungsängen
+ * Reunion" for Kungsängen.
+ *
+ * Only ever asked about a parkrun that has closed. There is no way left to run
+ * one of those, so a club event on the old course is the nearest thing there is
+ * and the card counts it — flagged, because it wasn't the parkrun itself. For a
+ * parkrun still going the question doesn't arise: the answer is to go and run
+ * it, and a title match would otherwise hand out "Haga" to everyone who turned
+ * up to "Haga parkrun's 10th Birthday".
+ */
+export function titleNamesParkrun(
+	eventTitle: string,
+	parkrun: SwedishParkrun,
+): boolean {
+	return eventTitle.toLowerCase().includes(parkrun.name.toLowerCase())
+}
+
+/**
  * The card to fill in: the list above, plus any Swedish event the club has
  * turned out to have run that isn't on it yet. Those arrive from the events
  * table with no city of their own, so they land in {@link UNPLACED_CITY}.

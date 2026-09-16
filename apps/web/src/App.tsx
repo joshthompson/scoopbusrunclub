@@ -277,7 +277,11 @@ const App: Component = () => {
 							when={!results.loading && !runners.loading}
 							fallback={<div class={styles.loading}>Loading...</div>}
 						>
-							<SwedenPage results={results() ?? []} runners={runners() ?? []} />
+							<SwedenPage
+								results={results() ?? []}
+								runners={runners() ?? []}
+								races={races() ?? []}
+							/>
 						</Show>
 					)}
 				/>
