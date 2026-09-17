@@ -191,7 +191,7 @@ const BAR_HEIGHT = 58
  * showing, so a floor keeps the outer icons off the screen's rounded corners
  * either way; the same reasoning applies to the sides in landscape.
  */
-const BOTTOM_INSET = '8px' // 'max(env(safe-area-inset-bottom), 12px)'
+const BOTTOM_INSET = 'max(env(safe-area-inset-bottom), 8px)'
 const LEFT_INSET = 'max(env(safe-area-inset-left), 8px)'
 const RIGHT_INSET = 'max(env(safe-area-inset-right), 8px)'
 

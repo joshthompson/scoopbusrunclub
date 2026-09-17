@@ -149,7 +149,15 @@ const App: Component = () => {
 				<Show when={!isAdmin()}>
 					<Show
 						when={headerData()}
-						fallback={<div style={{ height: `${HEADER_HEIGHT}px` }} />}
+						fallback={
+							// Matches the loaded header, safe-area strip and all, so the
+							// page doesn't jump once the data lands.
+							<div
+								style={{
+									height: `calc(${HEADER_HEIGHT}px + env(safe-area-inset-top, 0px))`,
+								}}
+							/>
+						}
 					>
 						{(data) => (
 							<ScoopBusHeader
@@ -173,6 +181,11 @@ const App: Component = () => {
 							paddingBottom: MOBILE_NAV_SPACE,
 						},
 					})}
+					// Admin has no header to carry the status bar strip for it, so it
+					// keeps clear of the status bar itself.
+					style={
+						isAdmin() ? { 'padding-top': 'env(safe-area-inset-top, 0px)' } : {}
+					}
 				>
 					{routeProps.children}
 				</main>

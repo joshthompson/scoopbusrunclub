@@ -692,6 +692,9 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		<div
 			class={cx('header-wrapper', styles.wrapper)}
 			aria-label="Welcome to the Scoop Bus Run Club!"
+			// Set here rather than on the sky itself so the safe-area strip above the
+			// scene, which is the same colour, dims along with it.
+			style={{ '--sky-dim': skyDim() }}
 		>
 			<A href="/custom-racer/add" class={styles.addRacer}>
 				+ Add Racer
@@ -764,7 +767,6 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						style={{
 							'--image':
 								'linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom) 35%)',
-							'--sky-dim': skyDim(),
 						}}
 					/>
 				</div>
@@ -830,8 +832,51 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 }
 
 const styles = {
+	/**
+	 * Added to the home screen the page runs full-bleed — `viewport-fit=cover`
+	 * with a translucent status bar — so without this the clock and the battery
+	 * would sit on top of the sun and the bus's roof. The inset drops the scene
+	 * clear of them, and `::before` fills the strip that leaves with the sky's
+	 * own top colour, the one `SkyService` keeps in step with the time of day, so
+	 * the status bar reads as more sky rather than a band bolted above it.
+	 *
+	 * `env()` is 0 everywhere else, which leaves the header exactly as it was.
+	 *
+	 * The scrim over that strip is what buys the clock and the battery their
+	 * contrast. `black-translucent` draws them white and is fixed at launch —
+	 * unlike a native status bar there is no restyling it as the sky changes — so
+	 * the strip has to stay dark enough for white text at midday, when the sky
+	 * behind it is at its palest. It fades to nothing by the bottom, where the
+	 * sky gradient picks up at the same colour, so the two meet without a seam
+	 * and the darkening reads as a sky deepening towards the zenith.
+	 */
 	wrapper: css({
 		position: 'relative',
+		paddingTop: 'env(safe-area-inset-top, 0px)',
+		_before: {
+			content: '""',
+			position: 'absolute',
+			top: 0,
+			left: 0,
+			right: 0,
+			height: 'env(safe-area-inset-top, 0px)',
+			// Both stops are black at different alphas, so the fade stays on one
+			// hue — a scrim mixed towards a colour would go muddy halfway down.
+			// Held near full strength down to 75% rather than fading from the top:
+			// the clock and the battery sit around the middle of the strip, so a
+			// scrim that has already thinned out by there buys them nothing.
+			background: `
+				linear-gradient(
+					to bottom,
+					var(--overlay-black-60),
+					var(--overlay-black-50) 75%,
+					transparent
+				),
+				var(--sky-blue-top)
+			`,
+			// Matches what the sky gradient below takes in wet weather.
+			filter: 'var(--sky-dim, none)',
+		},
 	}),
 	/**
 	 * Sits above the canvas rather than inside it, so it stays a real link — the
@@ -841,7 +886,9 @@ const styles = {
 	 */
 	addRacer: css({
 		position: 'absolute',
-		top: '0.75rem',
+		// Offsets resolve against the padding box, so the safe-area inset the
+		// wrapper carries has to be added back to keep this below the status bar.
+		top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
 		right: '0.75rem',
 		zIndex: 102,
 		padding: '0.4rem 0.9rem',

@@ -58,7 +58,7 @@ export function CustomRacersPage() {
 					fallback={
 						<p class={styles.empty}>
 							<Show when={!racers.loading} fallback="Loading…">
-								Nobody has made a racer yet — you could be the first.
+								There are currently no custom runners.
 							</Show>
 						</p>
 					}
