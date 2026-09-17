@@ -1,6 +1,7 @@
 import alphabetIcon from '@/assets/misc/alphabet-icon.png'
 import graphIcon from '@/assets/misc/graph-icon.png'
 import positionIcon from '@/assets/misc/position-icon.png'
+import swedenIcon from '@/assets/misc/sweden-icon.png'
 import rock1Asset from '@/assets/misc/rock1.png'
 import stopwatchIcon from '@/assets/misc/stopwatch-icon.png'
 import { BackSignButton } from '@/components/BackSignButton'
@@ -513,7 +514,7 @@ export function MemberPage(props: MemberPageProps) {
 												class={styles.compareLink}
 											>
 												<img
-													src={other.frames.face[0]}
+													src={other.frames.face?.[0]}
 													class={styles.compareFace}
 													alt={other.name}
 												/>
@@ -553,7 +554,7 @@ export function MemberPage(props: MemberPageProps) {
 								    at the size the others' art sits at. */}
 								<A href="./sweden" class={styles.challengeLink}>
 									<img src={snowyAsset(rock1Asset)} width={59} alt="" />
-									<span class={styles.challengeFlag}>🇸🇪</span>
+									<img src={swedenIcon} class={styles.challengeIcon} alt="" />
 									<span class={styles.challengeName}>Svenskspringare</span>
 								</A>
 							</div>
@@ -738,14 +739,6 @@ const styles = {
 		top: '12px',
 		left: '50%',
 		transform: 'translate(-50%, -50%)',
-	}),
-	challengeFlag: css({
-		position: 'absolute',
-		top: '12px',
-		left: '50%',
-		transform: 'translate(-50%, -50%)',
-		fontSize: '1.5rem',
-		lineHeight: 1,
 	}),
 	challengeName: css({
 		fontSize: '0.8rem',

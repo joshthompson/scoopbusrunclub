@@ -57,8 +57,11 @@ function SwedenRow(props: { parkrun: SwedishParkrun; visits: Visit[] }) {
 						<span class={styles.asterisk}>*</span>
 					</Show>
 					<Show when={!isActive(props.parkrun)}>
-						<Tooltip content="This parkrun has closed">
-							<span class={styles.info} aria-label="This parkrun has closed">
+						<Tooltip content="This parkrun has closed - a specially organised Scoop Bus event can count towards it for challenge completion">
+							<span
+								class={styles.info}
+								aria-label="This parkrun has closed - a specially organised Scoop Bus event can count towards it for challenge completion"
+							>
 								i
 							</span>
 						</Tooltip>
