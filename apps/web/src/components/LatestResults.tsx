@@ -17,6 +17,7 @@ import {
 	formatParkrunTime,
 	ordinal,
 } from '@/utils/misc'
+import { buildEventHands, eventHandKey } from '@/utils/poker'
 import { MILESTONE_SET } from '@shared/calendar/milestones'
 import {
 	isParkrunTrip,
@@ -42,6 +43,7 @@ import {
 	VolunteerCelebrations,
 	getOrBuildCelebrationData,
 } from './ResultCelebrations'
+import { EventPokerHand } from './poker/EventPokerHand'
 import { Button } from './ui/Button'
 import { DirtBlock } from './ui/DirtBlock'
 import { Emoji, EmojiString } from './ui/Emoji'
@@ -640,6 +642,9 @@ export function LatestResults(props: LatestResultsProps) {
 
 	const milestones = createMemo(() => journeyMilestonesByDate(props.results))
 
+	// The poker hand each parkrun was dealt, keyed the way the groups above are.
+	const pokerHands = createMemo(() => buildEventHands(props.results))
+
 	const [showAll, setShowAll] = createSignal(false)
 
 	const cutoffDate = createMemo(() => {
@@ -875,12 +880,26 @@ export function LatestResults(props: LatestResultsProps) {
 												</ul>
 											</Show>
 											<Show when={parkrun.results.length >= 1}>
-												<A
-													href={`/replay/${parkrun.eventId}/${parkrun.eventNumber}`}
-													class={styles.replayLink}
-												>
-													▶ Watch Replay
-												</A>
+												<div class={styles.actions}>
+													<A
+														href={`/replay/${parkrun.eventId}/${parkrun.eventNumber}`}
+														class={styles.replayLink}
+													>
+														▶ Watch Replay
+													</A>
+													<EventPokerHand
+														hand={
+															pokerHands().get(
+																eventHandKey(
+																	parkrun.eventId,
+																	parkrun.eventNumber,
+																),
+															)?.hand
+														}
+														date={result.date}
+														class={styles.replayLink}
+													/>
+												</div>
 											</Show>
 										</div>
 									</DirtBlock>
@@ -981,6 +1000,13 @@ const styles = {
 		maxWidth: '100%',
 		margin: '0 auto',
 	}),
+	actions: css({
+		display: 'flex',
+		flexWrap: 'wrap',
+		justifyContent: 'center',
+		gap: '0.5rem',
+		mt: '4px',
+	}),
 	replayLink: css({
 		display: 'inline-block',
 		fontSize: '0.8rem',
@@ -990,7 +1016,6 @@ const styles = {
 		borderRadius: '4px',
 		cornerShape: 'notch',
 		textDecoration: 'none',
-		margin: '4px auto 0',
 		border: '2px solid black',
 		_hover: { background: 'var(--overlay-black-30)' },
 	}),

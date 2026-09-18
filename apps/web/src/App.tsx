@@ -52,6 +52,7 @@ import { MapPage } from './pages/MapPage'
 import { MemberGraphPage } from './pages/MemberGraphPage'
 import { MemberPage } from './pages/MemberPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { PokerPage } from './pages/PokerPage'
 import { PositionBingoPage } from './pages/PositionBingoPage'
 import { ReplayPage } from './pages/ReplayPage'
 import { StopwatchBingoPage } from './pages/StopwatchBingoPage'
@@ -488,6 +489,17 @@ const App: Component = () => {
 					)}
 				/>
 				<Route path="/largestclubs" component={LargestClubsPage} />
+				<Route
+					path="/poker/:date?"
+					component={() => (
+						<Show
+							when={!results.loading}
+							fallback={<div class={styles.loading}>Loading...</div>}
+						>
+							<PokerPage results={results() ?? []} />
+						</Show>
+					)}
+				/>
 				<Route path="/about" component={AboutPage} />
 				<Route path="/faq" component={FaqPage} />
 				<Route path="/notifications" component={NotificationsPage} />

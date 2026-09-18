@@ -40,6 +40,7 @@ export interface RunnerData extends MemberFacts {
 		numberChecker: string[] | undefined // For the runner who checks numbers at the finish line
 	}
 	runnerState?: RunnerState
+	color?: string
 	width: number
 	height: number
 	speed: number
@@ -91,6 +92,7 @@ export const runners: Record<
 > = {
 	josh: createSignal<RunnerData>({
 		...CLUB_MEMBERS.josh,
+		color: '#e0382f',
 		frames: {
 			run: generateFrames(
 				assets.joshRun,
@@ -125,6 +127,7 @@ export const runners: Record<
 	}),
 	keith: createSignal<RunnerData>({
 		...CLUB_MEMBERS.keith,
+		color: '#414443',
 		frames: {
 			run: generateFrames(
 				assets.keithRun,
@@ -152,6 +155,7 @@ export const runners: Record<
 	}),
 	claire: createSignal<RunnerData>({
 		...CLUB_MEMBERS.claire,
+		color: '#9a54bf',
 		frames: {
 			run: generateFrames(
 				assets.claireRun,
@@ -186,6 +190,7 @@ export const runners: Record<
 	}),
 	lyra: createSignal<RunnerData>({
 		...CLUB_MEMBERS.lyra,
+		color: '#a377bc',
 		frames: {
 			run: generateFrames(
 				assets.lyraRun,
@@ -221,6 +226,7 @@ export const runners: Record<
 	}),
 	adam: createSignal<RunnerData>({
 		...CLUB_MEMBERS.adam,
+		color: '#e4e3e2',
 		frames: {
 			run: generateFrames(
 				assets.adamRun,
@@ -248,6 +254,7 @@ export const runners: Record<
 	}),
 	anna: createSignal<RunnerData>({
 		...CLUB_MEMBERS.anna,
+		color: '#1b5f56',
 		frames: {
 			run: generateFrames(
 				assets.annaRun,
@@ -282,6 +289,7 @@ export const runners: Record<
 	}),
 	eline: createSignal<RunnerData>({
 		...CLUB_MEMBERS.eline,
+		color: '#e16c04',
 		frames: {
 			run: generateFrames(
 				assets.elineRun,
@@ -309,6 +317,7 @@ export const runners: Record<
 	}),
 	rick: createSignal<RunnerData>({
 		...CLUB_MEMBERS.rick,
+		color: '#5a40a6',
 		frames: {
 			run: generateFrames(
 				assets.rickRun,
@@ -336,6 +345,7 @@ export const runners: Record<
 	}),
 	sophie: createSignal<RunnerData>({
 		...CLUB_MEMBERS.sophie,
+		color: '#00aa47',
 		frames: {
 			run: generateFrames(
 				assets.sophieRun,
@@ -363,6 +373,7 @@ export const runners: Record<
 	}),
 	august: createSignal<RunnerData>({
 		...CLUB_MEMBERS.august,
+		color: '#27336a',
 		frames: {
 			run: generateFrames(
 				assets.augustRun,
@@ -391,6 +402,7 @@ export const runners: Record<
 	}),
 	alisa: createSignal<RunnerData>({
 		...CLUB_MEMBERS.alisa,
+		color: '#d3b0df',
 		frames: {
 			run: generateFrames(
 				assets.alisaRun,
@@ -425,6 +437,7 @@ export const runners: Record<
 	}),
 	link: createSignal<RunnerData>({
 		...CLUB_MEMBERS.link,
+		color: '#ef9801',
 		frames: {
 			run: generateFrames(assets.linkRun, 20 * 2, 28, 20 * 2, 2, true),
 			sit: [assets.linkSit],
@@ -453,6 +466,7 @@ export const runners: Record<
 	}),
 	otherJosh: createSignal<RunnerData>({
 		...CLUB_MEMBERS.otherJosh,
+		color: '#985aac',
 		frames: {
 			run: generateFrames(
 				assets.otherJoshRun,
@@ -480,6 +494,7 @@ export const runners: Record<
 	}),
 	mikael: createSignal<RunnerData>({
 		...CLUB_MEMBERS.mikael,
+		color: '#17296c',
 		frames: {
 			run: generateFrames(
 				assets.mikaelRun,
@@ -507,6 +522,7 @@ export const runners: Record<
 	}),
 	mia: createSignal<RunnerData>({
 		...CLUB_MEMBERS.mia,
+		color: '#333333',
 		...createRunnerFrames({
 			topType: 'tshirt',
 			skin: 'light',
@@ -525,6 +541,7 @@ export const runners: Record<
 	}),
 	david: createSignal<RunnerData>({
 		...CLUB_MEMBERS.david,
+		color: '#81BBBE',
 		...createRunnerFrames({
 			topType: 'tshirt',
 			skin: 'light',

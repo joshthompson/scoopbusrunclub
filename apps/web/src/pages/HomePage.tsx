@@ -1,3 +1,4 @@
+import { Emoji } from '@/components/ui/Emoji'
 import { getWrappedBannerYear, isDecember } from '@/utils/wrappedYears'
 import { A } from '@solidjs/router'
 import { css, cx } from '@style/css'
@@ -18,7 +19,6 @@ import type {
 	Runner,
 	VolunteerItem,
 } from '../utils/api'
-import { Emoji } from '@/components/ui/Emoji'
 
 export const HomePage: Component<{
 	resultsLoading: boolean
@@ -39,7 +39,8 @@ export const HomePage: Component<{
 					href={`/wrapped/${getWrappedBannerYear()}/explore`}
 					class={styles.wrappedBanner}
 				>
-					<Emoji emoji="🎁" animation="none" /> Scoop Bus Wrapped {getWrappedBannerYear()} is here! →
+					<Emoji emoji="🎁" animation="none" /> Scoop Bus Wrapped{' '}
+					{getWrappedBannerYear()} is here! →
 				</A>
 			</Show>
 			<main class={styles.main}>
@@ -120,6 +121,16 @@ export const HomePage: Component<{
 							})}
 						>
 							<Emoji emoji="🕸️" animation="none" /> The Connection Web
+						</A>
+						<A
+							href="/poker"
+							class={css({
+								color: 'inherit',
+								textDecoration: 'underline',
+								fontWeight: 'bold',
+							})}
+						>
+							<Emoji emoji="🃏" animation="none" /> Scoop Bus Poker
 						</A>
 						<A
 							href={`/wrapped/${new Date().getFullYear() - (new Date().getMonth() === 11 ? 0 : 1)}`}

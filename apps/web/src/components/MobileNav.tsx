@@ -24,7 +24,12 @@ const VISIBLE_COUNT = 4
 
 function navItems(): NavItem[] {
 	return [
-		{ href: '/', label: 'Results', fullLabel: 'Latest Results', emoji: 'stopwatch' },
+		{
+			href: '/',
+			label: 'Results',
+			fullLabel: 'Latest Results',
+			emoji: 'stopwatch',
+		},
 		{
 			href: '/calendar',
 			label: 'Calendar',
@@ -61,6 +66,12 @@ function navItems(): NavItem[] {
 			label: 'Web',
 			fullLabel: 'The Connection Web',
 			emoji: '🕸️',
+		},
+		{
+			href: '/poker',
+			label: 'Poker',
+			fullLabel: 'Scoop Bus Poker',
+			emoji: '🃏',
 		},
 		{
 			href: `/wrapped/${wrappedYear()}`,
