@@ -1,6 +1,7 @@
 import CorgiEmoji from '@/assets/emoji/corgi.png'
 import MedalEmoji from '@/assets/emoji/medal.png'
 import PartyEmoji from '@/assets/emoji/party.png'
+import PlayEmoji from '@/assets/emoji/play.png'
 import RunDirectorEmoji from '@/assets/emoji/run-director.png'
 import StarEmoji from '@/assets/emoji/star.png'
 import TailWalkerEmoji from '@/assets/emoji/tail-walker.png'
@@ -12,6 +13,7 @@ import CalendarEmoji from '@assets/emoji/calendar.png'
 import FlagEmoji from '@assets/emoji/flag.png'
 import GlobeEmoji from '@assets/emoji/globe.png'
 import InfoEmoji from '@assets/emoji/info.png'
+import JokerEmoji from '@assets/emoji/joker.png'
 import PresentEmoji from '@assets/emoji/present.png'
 import QuestionEmoji from '@assets/emoji/question.png'
 import StopwatchEmoji from '@assets/emoji/stopwatch.png'
@@ -23,6 +25,7 @@ import { For, createMemo } from 'solid-js'
 const emojiMap: Record<string, string | undefined> = {
 	'🏅': MedalEmoji,
 	'🎉': PartyEmoji,
+	'▶': PlayEmoji,
 	'⭐': StarEmoji,
 	'🐶': CorgiEmoji,
 	'🦺🟡': VolunteerEmoji,
@@ -37,6 +40,7 @@ const emojiMap: Record<string, string | undefined> = {
 	'🎁': PresentEmoji,
 	'*': AsteriskEmoji,
 	'🏆': TrophyEmoji,
+	'🃏': JokerEmoji,
 	'🚌': BusEmoji,
 	'🔔': BellEmoji,
 	stopwatch: StopwatchEmoji,

@@ -885,7 +885,7 @@ export function LatestResults(props: LatestResultsProps) {
 														href={`/replay/${parkrun.eventId}/${parkrun.eventNumber}`}
 														class={styles.replayLink}
 													>
-														▶ Watch Replay
+														<Emoji emoji="▶" animation="none" /> Watch Replay
 													</A>
 													<EventPokerHand
 														hand={
@@ -915,6 +915,41 @@ export function LatestResults(props: LatestResultsProps) {
 		</div>
 	)
 }
+
+/** The outline of a box with a square notch cut from each corner. */
+const NOTCH_OUTLINE = [
+	'polygon(',
+	'var(--notch) 0, calc(100% - var(--notch)) 0,',
+	'calc(100% - var(--notch)) var(--notch), 100% var(--notch),',
+	'100% calc(100% - var(--notch)), calc(100% - var(--notch)) calc(100% - var(--notch)),',
+	'calc(100% - var(--notch)) 100%, var(--notch) 100%,',
+	'var(--notch) calc(100% - var(--notch)), 0 calc(100% - var(--notch)),',
+	'0 var(--notch), var(--notch) var(--notch)',
+	')',
+].join(' ')
+
+/**
+ * The same outline with its inside cut away, leaving a `--border` wide ring.
+ * The inner path is the outer one pushed in by the border on every edge, and
+ * even-odd fill makes it a hole.
+ */
+const NOTCH_RING = [
+	'polygon(evenodd,',
+	'var(--notch) 0, calc(100% - var(--notch)) 0,',
+	'calc(100% - var(--notch)) var(--notch), 100% var(--notch),',
+	'100% calc(100% - var(--notch)), calc(100% - var(--notch)) calc(100% - var(--notch)),',
+	'calc(100% - var(--notch)) 100%, var(--notch) 100%,',
+	'var(--notch) calc(100% - var(--notch)), 0 calc(100% - var(--notch)),',
+	'0 var(--notch), var(--notch) var(--notch), var(--notch) 0,',
+	// inner path
+	'var(--nb) var(--border), calc(100% - var(--nb)) var(--border),',
+	'calc(100% - var(--nb)) var(--nb), calc(100% - var(--border)) var(--nb),',
+	'calc(100% - var(--border)) calc(100% - var(--nb)), calc(100% - var(--nb)) calc(100% - var(--nb)),',
+	'calc(100% - var(--nb)) calc(100% - var(--border)), var(--nb) calc(100% - var(--border)),',
+	'var(--nb) calc(100% - var(--nb)), var(--border) calc(100% - var(--nb)),',
+	'var(--border) var(--nb), var(--nb) var(--nb), var(--nb) var(--border)',
+	')',
+].join(' ')
 
 const styles = {
 	date: css({
@@ -1007,17 +1042,40 @@ const styles = {
 		gap: '0.5rem',
 		mt: '4px',
 	}),
+	/**
+	 * A notched pixel button. `corner-shape: notch` would do this in a line,
+	 * but iOS Safari has no support and draws round corners instead, so the
+	 * notch is cut with clip-paths on two layers: a fill, and a black ring.
+	 * The element itself is unclipped, so the poker cards can hang off it.
+	 */
 	replayLink: css({
+		'--notch': '3px',
+		'--border': '2px',
+		'--nb': 'calc(var(--notch) + var(--border))',
+		position: 'relative',
+		isolation: 'isolate',
 		display: 'inline-block',
 		fontSize: '0.8rem',
 		color: 'inherit',
-		background: 'var(--overlay-black-15)',
-		padding: '2px 10px',
-		borderRadius: '4px',
-		cornerShape: 'notch',
+		padding: '4px 12px',
 		textDecoration: 'none',
-		border: '2px solid black',
-		_hover: { background: 'var(--overlay-black-30)' },
+		_before: {
+			content: "''",
+			position: 'absolute',
+			inset: 0,
+			zIndex: -1,
+			background: 'var(--overlay-black-15)',
+			clipPath: NOTCH_OUTLINE,
+		},
+		_after: {
+			content: "''",
+			position: 'absolute',
+			inset: 0,
+			zIndex: -1,
+			background: 'var(--color-black)',
+			clipPath: NOTCH_RING,
+		},
+		_hover: { _before: { background: 'var(--overlay-black-30)' } },
 	}),
 	specialDayTag: css({
 		display: 'inline-block',
