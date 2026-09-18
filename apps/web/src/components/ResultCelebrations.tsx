@@ -73,6 +73,7 @@ const TAG_COLORS = {
 	bff: 'var(--pink-soft)',
 	parkrunPal: 'var(--green-mint)',
 	palindromicPal: 'var(--pink-light)',
+	photoFinish: 'var(--blue-sky)',
 	viking: 'var(--red-800)',
 	hagaStreak: 'var(--green-forest)',
 	volunteerDebut: 'var(--green-emerald-dark)',
@@ -104,6 +105,7 @@ const TAG_EMOJIS = {
 	bff: '💕',
 	parkrunPal: '🤗',
 	palindromicPal: '🔄',
+	photoFinish: '📸',
 	viking: '⚔️',
 	hagaStreak: '🌲',
 	volunteerDebut: '🦺🟡',
@@ -435,6 +437,12 @@ interface PairPartner {
 	parkrunId: string
 }
 
+/** "A", "A and B", "A, B and C" — for celebrations shared with several runners. */
+function formatNameList(names: string[]): string {
+	if (names.length <= 1) return names[0] ?? ''
+	return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
 interface PairAchievements {
 	runBuddyMap: Map<string, PairPartner[]>
 	bestieMap: Map<string, PairPartner[]>
@@ -743,6 +751,65 @@ function buildPalindromePalMap(
 }
 
 // ---------------------------------------------------------------------------
+// Photo Finish map
+// ---------------------------------------------------------------------------
+
+/**
+ * Photo Finish: two or more runners at the same event instance who cross the
+ * line on the exact same second.  Can be earned multiple times.
+ *
+ * Map: "parkrunId:date:event:eventNumber" → the other runners who shared the time.
+ */
+function buildPhotoFinishMap(
+	results: RunResultItem[],
+): Map<string, PairPartner[]> {
+	const map = new Map<string, PairPartner[]>()
+	const nameMap = buildRunnerNameMap()
+
+	// Group results by event instance
+	const byEvent = new Map<string, RunResultItem[]>()
+	for (const r of results) {
+		const eventKey = `${r.event}\0${r.date}\0${r.eventNumber}`
+		if (!byEvent.has(eventKey)) byEvent.set(eventKey, [])
+		byEvent.get(eventKey)?.push(r)
+	}
+
+	for (const eventResults of byEvent.values()) {
+		// Bucket the event's runners by their finish time in whole seconds
+		const bySeconds = new Map<number, RunResultItem[]>()
+		for (const r of eventResults) {
+			const secs = parseTimeToSeconds(r.time)
+			if (!Number.isFinite(secs)) continue
+			if (!bySeconds.has(secs)) bySeconds.set(secs, [])
+			bySeconds.get(secs)?.push(r)
+		}
+
+		for (const sharing of bySeconds.values()) {
+			// Deduplicate runners (one result per runner per event instance)
+			const runners = new Map<string, RunResultItem>()
+			for (const r of sharing) {
+				if (!runners.has(r.parkrunId)) runners.set(r.parkrunId, r)
+			}
+			const runnerList = [...runners.values()]
+			if (runnerList.length < 2) continue
+
+			for (const runner of runnerList) {
+				const key = `${runner.parkrunId}:${runner.date}:${runner.event}:${runner.eventNumber}`
+				const partners = runnerList
+					.filter((other) => other.parkrunId !== runner.parkrunId)
+					.map((other) => ({
+						name: nameMap.get(other.parkrunId) ?? other.runnerName,
+						parkrunId: other.parkrunId,
+					}))
+				map.set(key, partners)
+			}
+		}
+	}
+
+	return map
+}
+
+// ---------------------------------------------------------------------------
 // Viking map
 // ---------------------------------------------------------------------------
 
@@ -864,6 +931,7 @@ export interface CelebrationData {
 	bffMap: Map<string, PairPartner[]>
 	parkrunPalMap: Map<string, PairPartner[]>
 	palindromePalMap: Map<string, PairPartner[]>
+	photoFinishMap: Map<string, PairPartner[]>
 	vikingMap: Set<string>
 	hagaStreakMap: Set<string>
 	/** "parkrunId:date:event:eventNumber" → volunteer count (only for debuts/milestones) */
@@ -895,6 +963,7 @@ export function buildCelebrationData(
 		bffMap,
 		parkrunPalMap: buildParkrunPalMap(results),
 		palindromePalMap: buildPalindromePalMap(results),
+		photoFinishMap: buildPhotoFinishMap(results),
 		vikingMap: buildVikingMap(results),
 		hagaStreakMap: buildHagaStreakMap(results),
 		volunteerMilestoneMap: buildVolunteerMilestoneMap(volunteers ?? []),
@@ -1270,6 +1339,21 @@ const celebrationRules: ((
 			color: TAG_COLORS.palindromicPal,
 			otherRunnerId: partner.parkrunId,
 		}))
+	},
+
+	// Photo Finish
+	({ data, resultKey }) => {
+		const partners = data.photoFinishMap.get(resultKey)
+		if (!partners || partners.length === 0) return null
+		return {
+			label: 'Photo Finish!',
+			description: `Finished at the exact same second as ${formatNameList(
+				partners.map((partner) => formatName(partner.name)),
+			)}`,
+			emoji: TAG_EMOJIS.photoFinish,
+			color: TAG_COLORS.photoFinish,
+			otherRunnerId: partners.length === 1 ? partners[0].parkrunId : undefined,
+		}
 	},
 
 	// Viking

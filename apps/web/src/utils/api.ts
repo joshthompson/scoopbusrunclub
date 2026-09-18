@@ -12,7 +12,7 @@ export const CALENDAR_FEED_URL = `${CONVEX_URL}/api/calendar.ics`
 // ---------- Cache infrastructure ----------
 
 const CACHE_PREFIX = 'sbrc:'
-const CACHE_VERSION = 4
+const CACHE_VERSION = 5
 
 /** The single metadata key that controls all cache validity */
 const CACHE_META_KEY = `${CACHE_PREFIX}cache`
