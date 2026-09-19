@@ -349,7 +349,8 @@ export default defineSchema({
 		 */
 		sentCount: v.optional(v.number()),
 		/**
-		 * Written by `seedHistory` to claim a key without sending anything. These
+		 * A key claimed without a push of its own: written by `seedHistory` on
+		 * first deploy, and by a results summary for each fact it folds in. These
 		 * are bookkeeping, not history, and the admin page leaves them out.
 		 */
 		seeded: v.optional(v.boolean()),
@@ -359,6 +360,21 @@ export default defineSchema({
 		// bookkeeping rows sort into their own range and never crowd out the real
 		// ones, however many of them there are.
 		.index('by_seeded_sentAt', ['seeded', 'sentAt']),
+
+	/**
+	 * A results day waiting to be summarised.
+	 *
+	 * The admin page uploads a Saturday one athlete at a time, so the summary
+	 * can't be written on the first request — it waits until the uploads stop.
+	 * Each ingest re-arms the day with a fresh token; the summariser that fires
+	 * only proceeds if its token is still the one written here, so a re-armed
+	 * day's earlier summariser finds itself stale and stands down.
+	 */
+	pendingResultSummaries: defineTable({
+		date: v.string(),
+		token: v.string(),
+		dueAt: v.number(),
+	}).index('by_date', ['date']),
 
 	/**
 	 * Notifications written by hand in the admin area, either to go out now or at

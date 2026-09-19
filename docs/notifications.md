@@ -136,10 +136,7 @@ step.
 
 | When | Title | Body |
 | --- | --- | --- |
-| Results ingested | New Scoop Bus Results | *N* new results are available |
-| A milestone run | New Milestone! | {Name} has now completed {N} parkruns! |
-| An overall PB | PB Alert! | {Name} just got a new PB - {time}! |
-| A course PB that isn't an overall PB | Course PB Alert! | {Name} just got a new {course} PB - {time}! |
+| A day of results, once the upload has gone quiet | New Scoop Bus Results | *N* new results. {PBs} {Milestones} {Journey} — see below |
 | We top the Swedish table | Largest Club in Sweden! | Scoop Bus Run Club now has {N} parkruns which is the most of any club in Sweden! |
 | A journey waypoint passed | The Scoop Bus is in {Place}! | Scoop Bus Run Club has now collectively ran {N}km which is the distance of Stockholm to {Place}! |
 | 9am on a major race day | {Event name} | Today {names} will be running {event name} |
@@ -148,13 +145,48 @@ step.
 
 Every one uses the web app's own icon.
 
+### The results summary
+
+A day of results is **one** notification, whatever it contained. It used to be
+one push per fact — a count, then a PB alert per person, then a milestone each
+— and a burst like that reaches a phone in any order, or only partly: two
+members looking at the same Saturday saw one notification each, and not the
+same one. Now the day's news goes out as a single message, for example:
+
+> **New Scoop Bus Results**
+> 12 new results. New PBs for Eline (Haga, 23:12) and Josh (21:40). Keith has
+> now completed 100 parkruns! The Scoop Bus has reached Tokyo!
+
+The body is built from the day's facts in that order — count, PBs, milestones,
+journey — and kept under 180 characters so a lock screen shows all of it. When
+a big day overruns, names are dropped from the PB list and then the milestone
+list ("and 3 more") until it fits. An overall PB is also a course PB, and only
+the overall one is mentioned.
+
+**Why it waits.** The admin Process Results page uploads a Saturday one athlete
+per request, so the first request can't know the day's total. Instead each
+ingest *arms* a summary for every day it touched, three minutes out, and every
+further ingest for that day restarts the clock. When the uploads stop, the
+summary fires once, reads the whole day from the database, and says
+everything. The Saturday scraper sends one request and simply waits the three
+minutes.
+
+**A day is announced once.** If the day's key has already been claimed, a
+later upload for that day sends nothing — however many results it adds, and
+even if one of them is a PB. That's deliberate: fixing a single broken result
+and re-ingesting it, or a straggler arriving hours later, shouldn't buzz the
+whole club a second time about a Saturday they've already heard about. The
+facts in the late upload still claim their dedupe keys, so the history stays a
+true record of what has been covered. The per-fact rows are bookkeeping and
+stay off the admin page; the summary that went out is the row you see there.
+
 ### What triggers them
 
-**Results, PBs, milestones and journey waypoints** fire after results land,
-whichever way they arrive — the Saturday scraper (`POST /api/ingest`) or the
-admin Process Results page (`POST /api/admin/manual-ingest`). The ingest records
-which results it actually *created*, and only those can produce a notification;
-re-scraping rewrites existing rows and says nothing.
+**The results summary** follows results landing, whichever way they arrive —
+the Saturday scraper (`POST /api/ingest`) or the admin Process Results page
+(`POST /api/admin/manual-ingest`). The ingest records which results it actually
+*created*, and only those arm a summary; re-scraping rewrites existing rows and
+says nothing.
 
 **Largest club** fires after a largest-clubs snapshot is ingested, and only the
 first time we're clearly ahead of everyone. Holding the lead week after week
@@ -177,11 +209,12 @@ matter how many rows it inserts.
 dropped. That's what makes it safe for both ingest routes to fire, and safe to
 re-upload the same Saturday.
 
-One consequence: the results notification is keyed on the *date of the results*,
-not the upload. If you hand-upload a Saturday in several chunks from the admin
-page, the first chunk announces the day and the rest are silent — so the count
-can be lower than the eventual total. The Saturday scraper sends everything in
-one request, so its count is always right.
+The results summary is keyed on the *date of the results*, not the upload, and
+it waits for the upload to finish before it counts — so a Saturday hand-uploaded
+in chunks from the admin page still announces once, with the right total, as
+long as no chunk is more than three minutes behind the one before it. If one is,
+the day is announced early with what had landed, and whatever arrives after
+that is stored silently: one summary per day, never a second.
 
 ---
 
@@ -229,7 +262,8 @@ Kept apart from the rest of the app, as much as it can be.
 | `libs/shared/notifications/types.ts` | The payload shape the service worker reads |
 | `apps/api/convex/notifications.ts` | Subscriptions, and the record of what's been sent |
 | `apps/api/convex/notificationsSend.ts` | The actual sending. The only `"use node"` file in the backend, because `web-push` needs Node |
-| `apps/api/convex/notificationTriggers.ts` | Works out what to send after results land |
+| `apps/api/convex/notificationTriggers.ts` | Arms and writes the results summary after results land, and the largest-club announcement |
+| `libs/shared/notifications/messages.test.ts` | Tests for the summary wording and its length limit — `pnpm test-notifications` |
 | `apps/api/convex/notificationSchedule.ts` | The 9am notifications and the Stockholm clock |
 | `apps/api/convex/customNotifications.ts` | Notifications written by hand, and their scheduling |
 | `apps/web/src/pages/admin/NotificationsPage.tsx` | The admin page |
@@ -252,9 +286,11 @@ counts as a PB) and `buildMilestoneMap` in
    focus the tab you already have open rather than opening a second one.
 3. The Convex dashboard's `pushSubscriptions` table should have a row. Untick
    and save, and it should be gone.
-4. For the results notifications, re-post a payload with recent dates to
-   `/api/admin/manual-ingest` and check the counts and names. Post the identical
-   payload again — nothing should fire the second time.
+4. For the results summary, re-post a payload with recent dates to
+   `/api/admin/manual-ingest`, wait three minutes, and check the count and
+   names in the one notification that arrives. Post the identical payload again
+   — nothing should fire the second time. While it waits, the day sits in the
+   `pendingResultSummaries` table; it's deleted when the summary fires.
 5. On iOS you have to use a real device: deploy, open the site in **Safari**,
    Share → **Add to Home Screen**, open it from the Home Screen, then enable.
 

@@ -66,31 +66,157 @@ export function joinNames(names: string[]): string {
 }
 
 // ---------------------------------------------------------------------------
-// New results
+// A day of results, summarised
 // ---------------------------------------------------------------------------
 
 /**
- * One notification per day of results, not per upload. The admin page can
- * upload a Saturday in chunks, and the first chunk through claims the day — so
- * a hand-uploaded week announces itself once, with however many results had
- * landed by then, rather than buzzing on every chunk.
+ * Everything a results day produced, folded into one notification.
+ *
+ * Results used to announce themselves one push at a time — a count, then a PB
+ * alert per person, then a milestone each — and a burst like that arrives in
+ * any order, or not at all, on a phone. So a day's news is one message, built
+ * from these facts once the upload has gone quiet.
+ */
+export interface ResultsSummary {
+	/** How many results the day has, counting every upload that fed it. */
+	resultCount: number
+	/** Overall PBs, or course PBs when `course` is set. */
+	pbs: { name: string; time: string; course?: string }[]
+	milestones: { name: string; runs: number }[]
+	journey: { name: string; reached?: string }[]
+}
+
+/**
+ * The most a summary body may run to. The same as the admin form's limit, for
+ * the same reason: past this a phone truncates it and the tail is lost.
+ */
+export const SUMMARY_BODY_MAX = 180
+
+/**
+ * The key a day's results claim. One per day of results, not per upload: the
+ * admin page uploads a Saturday one athlete at a time, and each request
+ * announcing its own count meant the first through said "1 new result" for
+ * the whole day. Now the day is claimed once, by its summary.
  */
 export function resultsKey(resultDate: string): string {
 	return `results:${resultDate}`
 }
 
-export function buildResults(count: number): PushPayload {
+/**
+ * The history row for a summary send. A summary has no key of its own to
+ * dedupe on — the facts inside it each claimed theirs — so this only has to be
+ * unique, and the send time makes it so.
+ */
+export function summaryKey(resultDate: string, sentAt: number): string {
+	return `summary:${resultDate}:${sentAt}`
+}
+
+function pbItem(pb: { name: string; time: string; course?: string }): string {
+	const time = formatFinishTime(pb.time)
+	return pb.course
+		? `${pb.name} (${pb.course}, ${time})`
+		: `${pb.name} (${time})`
+}
+
+/** "Eline got a new Haga PB (23:12)." / "New PBs for Eline (Haga, 23:12) and Josh (21:40)." */
+function pbSentence(pbs: ResultsSummary['pbs'], shown: number): string | null {
+	if (pbs.length === 0) return null
+	if (shown === 0) return `${pbs.length} new PBs.`
+	if (pbs.length === 1) {
+		const pb = pbs[0]
+		const kind = pb.course ? `${pb.course} PB` : 'PB'
+		return `${pb.name} got a new ${kind} (${formatFinishTime(pb.time)}).`
+	}
+	const items = pbs.slice(0, shown).map(pbItem)
+	const rest = pbs.length - shown
+	if (rest > 0) items.push(`${rest} more`)
+	return `New PBs for ${joinNames(items)}.`
+}
+
+/** "Keith has now completed 100 parkruns!" / "Milestones for Keith (100) and Claire (50)!" */
+function milestoneSentence(
+	milestones: ResultsSummary['milestones'],
+	shown: number,
+): string | null {
+	if (milestones.length === 0) return null
+	if (shown === 0) return `${milestones.length} milestones!`
+	if (milestones.length === 1) {
+		const m = milestones[0]
+		return `${m.name} has now completed ${groupThousands(m.runs)} parkruns!`
+	}
+	const items = milestones
+		.slice(0, shown)
+		.map((m) => `${m.name} (${groupThousands(m.runs)})`)
+	const rest = milestones.length - shown
+	if (rest > 0) items.push(`${rest} more`)
+	return `Milestones for ${joinNames(items)}!`
+}
+
+/** Mirrors `journeyMilestoneTitle` — the same sentence the calendar shows. */
+function journeySentence(journey: ResultsSummary['journey']): string | null {
+	if (journey.length === 0) return null
+	return journey
+		.map((w) => `The Scoop Bus ${w.reached ?? `has reached ${w.name}!`}`)
+		.join(' ')
+}
+
+/**
+ * The summary's body.
+ *
+ * Facts go in priority order — the count, then PBs, milestones and the journey
+ * — and when the whole thing overruns `SUMMARY_BODY_MAX`, names are dropped
+ * from the PB list and then the milestone list ("and 3 more") until it fits.
+ * A body that still won't fit is cut short rather than sent long.
+ */
+export function buildResultsSummaryBody(summary: ResultsSummary): string {
+	const compose = (pbShown: number, msShown: number) =>
+		[
+			`${summary.resultCount} new result${summary.resultCount === 1 ? '' : 's'}.`,
+			pbSentence(summary.pbs, pbShown),
+			milestoneSentence(summary.milestones, msShown),
+			journeySentence(summary.journey),
+		]
+			.filter((part): part is string => part !== null)
+			.join(' ')
+
+	let pbShown = summary.pbs.length
+	let msShown = summary.milestones.length
+	let body = compose(pbShown, msShown)
+
+	while (body.length > SUMMARY_BODY_MAX) {
+		if (pbShown > 0) pbShown--
+		else if (msShown > 0) msShown--
+		else break
+		body = compose(pbShown, msShown)
+	}
+
+	if (body.length > SUMMARY_BODY_MAX) {
+		body = `${body.slice(0, SUMMARY_BODY_MAX - 1).trimEnd()}…`
+	}
+	return body
+}
+
+export function buildResultsSummary(
+	resultDate: string,
+	summary: ResultsSummary,
+): PushPayload {
 	return {
 		title: 'New Scoop Bus Results',
-		body: `${count} new result${count === 1 ? ' is' : 's are'} available`,
+		body: buildResultsSummaryBody(summary),
 		url: '/',
-		tag: 'results',
+		// One tag per day, matching the one-summary-per-day rule.
+		tag: resultsKey(resultDate),
 	}
 }
 
 // ---------------------------------------------------------------------------
 // Milestones
 // ---------------------------------------------------------------------------
+//
+// Milestones, PBs and journey waypoints no longer go out as pushes of their
+// own after an ingest — they're folded into the day's summary above. Their keys
+// are still what dedupes them, and the builders remain for anything that wants
+// to say one of these things on its own.
 
 export function milestoneKey(parkrunId: string, runs: number): string {
 	return `milestone:${parkrunId}:${runs}`

@@ -8,6 +8,13 @@
  * same facts — so this reads the same shared functions rather than a second
  * opinion of its own.
  *
+ * A day of results is one notification, not one per fact. Uploads arrive in
+ * pieces — the admin page sends one athlete per request — so an ingest doesn't
+ * announce anything itself: it arms a summary for each day it touched, a few
+ * minutes out, and every further ingest for that day pushes the moment back.
+ * When the uploads go quiet the summary fires once, reads the whole day, and
+ * says everything in a single push.
+ *
  * Nothing here sends: it builds payloads, claims their dedupe keys, and hands
  * the survivors to `notificationsSend`.
  */
@@ -19,17 +26,15 @@ import { memberDisplayName, memberRoute } from '../../../libs/shared/members'
 import {
 	LARGEST_CLUB_KEY,
 	type NotificationKind,
-	buildCoursePb,
-	buildJourney,
+	type ResultsSummary,
 	buildLargestClub,
-	buildMilestone,
-	buildPb,
-	buildResults,
+	buildResultsSummary,
 	coursePbKey,
 	journeyKey,
 	milestoneKey,
 	pbKey,
 	resultsKey,
+	summaryKey,
 } from '../../../libs/shared/notifications/messages'
 import type { PushPayload } from '../../../libs/shared/notifications/types'
 import { buildPBMap, pbResultKey } from '../../../libs/shared/results/pb'
@@ -37,6 +42,7 @@ import { api, internal } from './_generated/api'
 import {
 	type ActionCtx,
 	internalAction,
+	internalMutation,
 	internalQuery,
 } from './_generated/server'
 
@@ -48,6 +54,15 @@ import {
  * this is stored quietly.
  */
 const RECENT_DAYS = 14
+
+/**
+ * How long a results day waits after its last ingest before it's summarised.
+ *
+ * Long enough that an athlete-by-athlete upload from the admin page finishes
+ * inside it, short enough that a Saturday evening doesn't feel late. Every
+ * ingest for the day restarts the clock.
+ */
+const SUMMARY_QUIET_MS = 3 * 60 * 1000
 
 /** A result as the ingest handlers report it having inserted. */
 export const newResultValidator = v.object({
@@ -169,18 +184,109 @@ async function claimAndSend(
 // ---------------------------------------------------------------------------
 
 /**
- * Announce everything that follows from a batch of freshly inserted results.
+ * Note that a batch of results landed, and arm a summary for each day in it.
  *
  * Called by both ingest routes — the Saturday scraper and the admin Process
  * Results page — so the club hears about results whichever way they arrived.
- * The dedupe keys mean the two can't both announce the same thing.
+ * Sends nothing itself; see `summariseResultsDay`.
  */
 export const afterResultsIngest = internalAction({
 	args: { newResults: v.array(newResultValidator) },
 	handler: async (ctx, args) => {
 		const cutoff = daysAgo(RECENT_DAYS)
-		const recent = args.newResults.filter((r) => r.date >= cutoff)
-		if (recent.length === 0) return { sent: 0 }
+		const dates = new Set(
+			args.newResults.filter((r) => r.date >= cutoff).map((r) => r.date),
+		)
+		for (const date of dates) {
+			await ctx.runMutation(internal.notificationTriggers.armResultsSummary, {
+				date,
+			})
+		}
+		return { armed: dates.size }
+	},
+})
+
+/**
+ * Schedule (or re-schedule) the summary for a day of results.
+ *
+ * Rather than cancelling the previously scheduled summariser — cancelling a
+ * function that has already started also cancels anything *it* schedules,
+ * which here would be the push itself — each arming writes a fresh token and
+ * the summariser checks that its own token is still the current one. A stale
+ * summariser runs for a moment, finds it has been superseded, and stops.
+ */
+export const armResultsSummary = internalMutation({
+	args: { date: v.string() },
+	handler: async (ctx, args) => {
+		const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+		const dueAt = Date.now() + SUMMARY_QUIET_MS
+
+		const existing = await ctx.db
+			.query('pendingResultSummaries')
+			.withIndex('by_date', (q) => q.eq('date', args.date))
+			.unique()
+
+		if (existing) await ctx.db.patch(existing._id, { token, dueAt })
+		else
+			await ctx.db.insert('pendingResultSummaries', {
+				date: args.date,
+				token,
+				dueAt,
+			})
+
+		await ctx.scheduler.runAfter(
+			SUMMARY_QUIET_MS,
+			internal.notificationTriggers.summariseResultsDay,
+			{ date: args.date, token },
+		)
+	},
+})
+
+/**
+ * Take the pending summary for a day, if this token still owns it.
+ *
+ * Returns false when a later ingest re-armed the day, in which case the caller
+ * is stale and the newer summariser will do the work.
+ */
+export const takeResultsSummary = internalMutation({
+	args: { date: v.string(), token: v.string() },
+	handler: async (ctx, args) => {
+		const pending = await ctx.db
+			.query('pendingResultSummaries')
+			.withIndex('by_date', (q) => q.eq('date', args.date))
+			.unique()
+		if (!pending || pending.token !== args.token) return false
+		await ctx.db.delete(pending._id)
+		return true
+	},
+})
+
+/**
+ * Say everything a day of results produced, in one push.
+ *
+ * Reads the whole day from the database rather than any one upload, so the
+ * count is the day's real total however many requests it took to get there.
+ * Each fact — the day itself, every PB, milestone and waypoint — claims its
+ * own key first, and only the facts that were new go in the message.
+ *
+ * A day is announced once. If its key was already taken — a straggling upload
+ * hours later, or a single result being fixed and re-ingested — nothing more
+ * is sent, however much the late upload brought with it. The facts still claim
+ * their keys so the history stays a true record of what has been covered.
+ */
+export const summariseResultsDay = internalAction({
+	args: { date: v.string(), token: v.string() },
+	handler: async (ctx, args) => {
+		const isCurrent = await ctx.runMutation(
+			internal.notificationTriggers.takeResultsSummary,
+			{ date: args.date, token: args.token },
+		)
+		if (!isCurrent) return { sent: 0, stale: true as const }
+
+		// Guarded at ingest too, but the quiet period could in principle carry a
+		// day over the line, and history should never buzz anybody.
+		if (args.date < daysAgo(RECENT_DAYS))
+			return { sent: 0, stale: false as const }
 
 		const context = await ctx.runQuery(
 			internal.notificationTriggers.notificationContext,
@@ -191,95 +297,117 @@ export const afterResultsIngest = internalAction({
 		const runnerNames = new Map(
 			context.runners.map((r) => [r.parkrunId, r.name] as const),
 		)
+		const runnerName = (parkrunId: string) =>
+			runnerIdentity(parkrunId, runnerNames.get(parkrunId) ?? 'A Scoop Busser')
+				.name
 
-		const candidates: Candidate[] = []
+		const dayResults = context.results.filter((r) => r.date === args.date)
+		if (dayResults.length === 0) return { sent: 0, stale: false as const }
 
-		// --- How many results there were ---
+		// --- Gather the day's facts, each with the key that claims it ---
 
-		const latestDate = recent.reduce(
-			(latest, r) => (r.date > latest ? r.date : latest),
-			'',
-		)
-		candidates.push({
+		interface Fact {
+			dedupeKey: string
+			kind: NotificationKind
+			apply: (summary: ResultsSummary) => void
+		}
+		const facts: Fact[] = []
+
+		// The day's own key. Whether this one is new decides whether anything
+		// is sent at all; the count itself comes from `dayResults`.
+		facts.push({
+			dedupeKey: resultsKey(args.date),
 			kind: 'results',
-			dedupeKey: resultsKey(latestDate),
-			payload: buildResults(recent.length),
+			apply: () => {},
 		})
 
-		// --- PBs and course PBs, judged against the whole history ---
-
 		const pbMap = buildPBMap(context.results, eventName)
-
-		for (const result of recent) {
+		for (const result of dayResults) {
 			const status = pbMap.get(pbResultKey(result))
 			if (!status) continue
-
-			const { name, url } = runnerIdentity(
-				result.parkrunId,
-				runnerNames.get(result.parkrunId) ?? 'A Scoop Busser',
-			)
+			const name = runnerName(result.parkrunId)
 
 			// An overall PB is also a course PB, and only the bigger news is worth
-			// sending — the brief asks for the course one only when it stands alone.
+			// telling — the course one stands in only when it stands alone.
 			if (status.pb) {
-				candidates.push({
-					kind: 'pb',
+				facts.push({
 					dedupeKey: pbKey(pbResultKey(result)),
-					payload: buildPb(name, result.time, url),
+					kind: 'pb',
+					apply: (summary) => summary.pbs.push({ name, time: result.time }),
 				})
 			} else if (status.coursePb) {
-				candidates.push({
-					kind: 'coursePb',
+				facts.push({
 					dedupeKey: coursePbKey(pbResultKey(result)),
-					payload: buildCoursePb(
-						name,
-						eventName(result.event),
-						result.time,
-						url,
-					),
+					kind: 'coursePb',
+					apply: (summary) =>
+						summary.pbs.push({
+							name,
+							time: result.time,
+							course: eventName(result.event),
+						}),
 				})
 			}
 		}
 
-		// --- Milestones ---
-
 		const milestoneMap = buildMilestoneMap(context.results, context.runners)
-
-		// One runner can only cross one milestone on a day, so the days that just
-		// gained results are the only ones worth looking up.
-		const touchedDays = new Set(recent.map((r) => `${r.parkrunId}:${r.date}`))
-
-		for (const day of touchedDays) {
-			const runs = milestoneMap.get(day)
+		for (const parkrunId of new Set(dayResults.map((r) => r.parkrunId))) {
+			const runs = milestoneMap.get(`${parkrunId}:${args.date}`)
 			if (runs === undefined) continue
-
-			const parkrunId = day.slice(0, day.indexOf(':'))
-			const { name, url } = runnerIdentity(
-				parkrunId,
-				runnerNames.get(parkrunId) ?? 'A Scoop Busser',
-			)
-
-			candidates.push({
-				kind: 'milestone',
+			const name = runnerName(parkrunId)
+			facts.push({
 				dedupeKey: milestoneKey(parkrunId, runs),
-				payload: buildMilestone(name, runs, url),
+				kind: 'milestone',
+				apply: (summary) => summary.milestones.push({ name, runs }),
 			})
 		}
 
-		// --- Journey waypoints ---
-
-		const recentDates = new Set(recent.map((r) => r.date))
 		for (const milestone of journeyMilestones(context.results, eventName)) {
-			if (!recentDates.has(milestone.date)) continue
-			candidates.push({
-				kind: 'journey',
+			if (milestone.date !== args.date) continue
+			facts.push({
 				dedupeKey: journeyKey(milestone.waypoint.name),
-				payload: buildJourney(milestone.waypoint),
+				kind: 'journey',
+				apply: (summary) =>
+					summary.journey.push({
+						name: milestone.waypoint.name,
+						reached: milestone.waypoint.reached,
+					}),
 			})
 		}
 
-		const sent = await claimAndSend(ctx, candidates)
-		return { sent }
+		// --- Claim them, and say only what was new ---
+
+		const claimed = new Set(
+			await ctx.runMutation(internal.notifications.claimQuietly, {
+				keys: facts.map((f) => ({ dedupeKey: f.dedupeKey, kind: f.kind })),
+			}),
+		)
+
+		// The day itself was already announced: this is a late upload, and the
+		// club has heard about the Saturday. Stay quiet.
+		if (!claimed.has(resultsKey(args.date))) {
+			return { sent: 0, stale: false as const, alreadyAnnounced: true as const }
+		}
+
+		const summary: ResultsSummary = {
+			resultCount: dayResults.length,
+			pbs: [],
+			milestones: [],
+			journey: [],
+		}
+		for (const fact of facts) {
+			if (claimed.has(fact.dedupeKey)) fact.apply(summary)
+		}
+
+		const payload = buildResultsSummary(args.date, summary)
+
+		const sent = await claimAndSend(ctx, [
+			{
+				kind: 'results',
+				dedupeKey: summaryKey(args.date, Date.now()),
+				payload,
+			},
+		])
+		return { sent, stale: false as const }
 	},
 })
 

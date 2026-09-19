@@ -18,6 +18,7 @@
 		"deploy:backend:prod": "nx run api:deployProd",
 		"deploy:backend:dev": "nx run api:deployDev",
 		"test-crons": "pnpm --filter @scoopbus/api run test-parse",
+		"test-notifications": "tsx --test libs/shared/notifications/messages.test.ts",
 		"fetch-parkrun": "pnpm --filter @scoopbus/api run fetch-parkrun",
 		"fetch-results": "pnpm --filter @scoopbus/api run fetch-results",
 		"fetch-largest-clubs": "pnpm --filter @scoopbus/api run fetch-largest-clubs",

@@ -306,6 +306,39 @@ export const seedDedupeKeys = internalMutation({
 	},
 })
 
+/**
+ * Claim keys without a push of their own, returning the ones that were new.
+ *
+ * What a results summary does with each fact it folds in: the PB, the
+ * milestone and the day's count each claim their key here so nothing can
+ * announce them again, while the summary that actually went out is the one
+ * row the admin page shows. Like `seedDedupeKeys`, but the caller needs to
+ * know *which* keys were new, because only those go in the message.
+ */
+export const claimQuietly = internalMutation({
+	args: {
+		keys: v.array(v.object({ dedupeKey: v.string(), kind: v.string() })),
+	},
+	handler: async (ctx, args) => {
+		const claimed: string[] = []
+		for (const { dedupeKey, kind } of args.keys) {
+			const existing = await ctx.db
+				.query('sentNotifications')
+				.withIndex('by_dedupeKey', (q) => q.eq('dedupeKey', dedupeKey))
+				.unique()
+			if (existing) continue
+			await ctx.db.insert('sentNotifications', {
+				dedupeKey,
+				kind,
+				sentAt: Date.now(),
+				seeded: true,
+			})
+			claimed.push(dedupeKey)
+		}
+		return claimed
+	},
+})
+
 // ---------------------------------------------------------------------------
 // Reading the history, for the admin page
 // ---------------------------------------------------------------------------
