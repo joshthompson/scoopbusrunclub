@@ -8,6 +8,7 @@ export { default as alisaTailWalk } from '@/assets/runners/alisa/tail-walk.png'
 export { default as alisaTailSit } from '@/assets/runners/alisa/tail-sit.png'
 export { default as alisaFace } from '@/assets/runners/alisa/face.png'
 export { default as alisaScanner } from '@/assets/runners/alisa/scanner.png'
+export { default as alisaMarshal } from '@/assets/runners/alisa/marshal.png'
 export { default as alisaPhotographer } from '@/assets/runners/alisa/photographer.png'
 
 export { default as annaRun } from '@/assets/runners/anna/run.png'

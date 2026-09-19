@@ -427,7 +427,7 @@ export const runners: Record<
 			scanner: [assets.alisaScanner],
 			photographer: [assets.alisaPhotographer],
 			runDirector: undefined,
-			marshal: undefined,
+			marshal: [assets.alisaMarshal],
 			volunteerGeneric: undefined,
 			numberChecker: undefined,
 		},
