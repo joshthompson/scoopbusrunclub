@@ -21,6 +21,7 @@ import { css } from '@style/css'
 import { MOBILE_NAV_SPACE, MobileNav } from './components/MobileNav'
 import { getOrBuildCelebrationData } from './components/ResultCelebrations'
 import { ALWAYS_SHOW_LOADER, SplashScreen } from './components/SplashScreen'
+import { withLinkResults, withLinkVolunteers } from './data/link'
 import { NotificationsPage } from './notifications/NotificationsPage'
 import { AboutPage } from './pages/AboutPage'
 import {
@@ -79,9 +80,14 @@ const App: Component = () => {
 	const needsSplash = ALWAYS_SHOW_LOADER || !getCached<unknown>('results:all')
 
 	const [runners] = createResource(fetchRunners)
-	const [results] = createResource(fetchAllResults)
+	// Link's hand-kept record rides along with the scraped data (see data/link).
+	const [results] = createResource(async () =>
+		withLinkResults(await fetchAllResults()),
+	)
 	const [races] = createResource(fetchPublicRaces)
-	const [volunteers] = createResource(fetchVolunteers)
+	const [volunteers] = createResource(async () =>
+		withLinkVolunteers(await fetchVolunteers()),
+	)
 	const [guestResults] = createResource(fetchGuestResults)
 	const [guests] = createResource(fetchGuests)
 	// Racers made by visitors, live in the header for a week each

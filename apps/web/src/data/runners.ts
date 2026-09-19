@@ -191,6 +191,7 @@ export const runners: Record<
 	lyra: createSignal<RunnerData>({
 		...CLUB_MEMBERS.lyra,
 		color: '#a377bc',
+		birthday: '19/09',
 		frames: {
 			run: generateFrames(
 				assets.lyraRun,
@@ -455,7 +456,8 @@ export const runners: Record<
 			photographer: undefined,
 			runDirector: undefined,
 			marshal: undefined,
-			volunteerGeneric: undefined,
+			// The scanner pose stands in for every role he has no sprite of his own for
+			volunteerGeneric: [assets.linkScanner],
 			numberChecker: undefined,
 		},
 		width: 20,

@@ -12,6 +12,7 @@ import pathAsset from '@/assets/misc/path.png'
 import starsAsset from '@/assets/misc/stars.png'
 import sunAsset from '@/assets/misc/sun.png'
 import { isBalloonMilestone } from '@/data/balloons'
+import { LINK_PARKRUN_ID } from '@/data/link'
 import {
 	type RunnerData,
 	type RunnerName,
@@ -126,18 +127,34 @@ function updateRunnerSpeedsAndConnections(
 		}
 	}
 
+	// Link has no parkrun id of his own; his hand-kept record (data/link) does.
+	// When he has a credit of his own for the latest Saturday it decides his
+	// state, otherwise he inherits Alisa's, whom he runs with.
+	const linkVolunteerData = () => {
+		const own = latestVolByParkrunId.get(LINK_PARKRUN_ID)
+		if (own && own.date === latestSaturday) return own
+		return latestVolByParkrunId.get(runners.alisa[0]().id)
+	}
+
 	// --- Update speeds ---
 	for (const [key, [getter, setter]] of Object.entries(runners)) {
 		const runnerData = getter()
-		const latestResult = latestByParkrunId.get(runnerData.id)
+		const latestResult = latestByParkrunId.get(
+			key === 'link' ? LINK_PARKRUN_ID : runnerData.id,
+		)
 
-		// Link stays connected to Alisa unless Alisa has a standing volunteer role
+		// Link stays connected to Alisa unless one of them has a standing volunteer role
 		if (!latestResult) {
 			if (key === 'link') {
-				const alisaVol = latestVolByParkrunId.get(runners.alisa[0]().id)
-				const alisaState = determineRunnerState(alisaVol, latestSaturday)
-				const connectedTo = isStandingState(alisaState) ? undefined : 'alisa'
-				setter({ ...runnerData, connectedTo })
+				const volData = linkVolunteerData()
+				const runnerState = determineRunnerState(volData, latestSaturday)
+				const connectedTo = isStandingState(runnerState) ? undefined : 'alisa'
+				const translations = RoleTranslations as Record<string, string>
+				const volunteerRoles =
+					volData && latestSaturday && volData.date === latestSaturday
+						? volData.roles.map((r) => translations[r] ?? r)
+						: undefined
+				setter({ ...runnerData, connectedTo, runnerState, volunteerRoles })
 			}
 			continue
 		}
@@ -157,10 +174,9 @@ function updateRunnerSpeedsAndConnections(
 			frameInterval /= 2
 		}
 
-		// Link inherits Alisa's volunteer state
 		const volData =
 			key === 'link'
-				? latestVolByParkrunId.get(runners.alisa[0]().id)
+				? linkVolunteerData()
 				: latestVolByParkrunId.get(runnerData.id)
 
 		// Link stays connected to Alisa unless Alisa has a standing volunteer role

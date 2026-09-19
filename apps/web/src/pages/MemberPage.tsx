@@ -9,6 +9,7 @@ import { CharacterImage } from '@/components/CharacterImage'
 import { ParkrunHeatmap } from '@/components/ParkrunHeatmap'
 import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Icon } from '@/components/ui/Icon'
+import { LINK_PARKRUN_ID } from '@/data/link'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
 import { getMemberRoute, getRunnerKeyFromRouteName } from '@/utils/memberRoute'
 import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
@@ -163,7 +164,10 @@ export function MemberPage(props: MemberPageProps) {
 		() => runnerSignals[runnerKey() as RunnerName],
 	)
 	const runnerData = createMemo(() => runnerSignal()?.[0]())
-	const runnerId = createMemo(() => runnerData()?.id ?? '')
+	// Link has no parkrun id; his hand-kept record (data/link) uses a made-up one.
+	const runnerId = createMemo(() =>
+		runnerKey() === 'link' ? LINK_PARKRUN_ID : (runnerData()?.id ?? ''),
+	)
 
 	const runnerResults = createMemo(() =>
 		props.results.filter((result) => result.parkrunId === runnerId()),
@@ -219,7 +223,7 @@ export function MemberPage(props: MemberPageProps) {
 
 	const oftenRunsWith = (withinSeconds: number) =>
 		createMemo(() => {
-			if (!runnerId()) return '-'
+			if (!runnerId() || runnerResults().length === 0) return '-'
 
 			const nearbyCounts = new Map<string, number>()
 
@@ -408,13 +412,30 @@ export function MemberPage(props: MemberPageProps) {
 			})
 
 		if (runnerKey() === 'link') {
-			items.unshift({
-				name: 'Be a good boy',
-				emoji: '🐶',
-				color: 'var(--gold-warm)',
-				description: 'Achieved everyday!',
-				occurrences: [],
-			})
+			items.unshift(
+				{
+					name: 'Be a good boy',
+					emoji: '🐶',
+					color: '#22b9ef',
+					description: 'Achieved everyday!',
+					occurrences: [],
+				},
+				{
+					name: 'Pee on the Haga sign',
+					emoji: '🚽',
+					color: 'var(--gold-warm)',
+					description: 'Literally pee on the purple Haga sign',
+					occurrences: [
+						{
+							event: 'haga',
+							eventName: 'Haga',
+							eventNumber: 422,
+							date: '2026-09-19',
+							time: '',
+						},
+					],
+				},
+			)
 		}
 
 		return items
