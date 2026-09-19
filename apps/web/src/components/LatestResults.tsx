@@ -202,11 +202,16 @@ function isChristmas(date: string) {
 	return date.slice(5) === '12-25'
 }
 
-function getDisplayName(name: string, resultCount: number) {
+function getDisplayName(
+	name: string,
+	resultCount: number,
+	volunteerCount: number,
+) {
 	const totalMembers = Object.values(runners).filter(
 		(runner) => runner[0]().id,
 	).length
 	if (name === 'Bushy Park') return 'Scoop Bushy Park'
+	if (volunteerCount >= 10) return `Scoop Bus Volunteer Takeover at ${name}`
 	if (name !== 'Haga' && resultCount === totalMembers)
 		return `Whole Gang Scoop Bus trip to ${name}`
 	if (name !== 'Haga' && resultCount >= 4) return `Scoop Bus trip to ${name}`
@@ -454,7 +459,11 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 	const isXmas = () => isChristmas(props.date)
 	const specialDay = () => getSpecialDayName(props.date)
 	const displayName = () =>
-		getDisplayName(props.parkrun.name, props.parkrun.results.length)
+		getDisplayName(
+			props.parkrun.name,
+			props.parkrun.results.length,
+			props.parkrun.volunteers.length,
+		)
 
 	return (
 		<>
