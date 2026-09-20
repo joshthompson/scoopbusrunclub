@@ -191,7 +191,6 @@ export const runners: Record<
 	lyra: createSignal<RunnerData>({
 		...CLUB_MEMBERS.lyra,
 		color: '#a377bc',
-		birthday: '19/09',
 		frames: {
 			run: generateFrames(
 				assets.lyraRun,
@@ -389,9 +388,9 @@ export const runners: Record<
 			tailWalk: undefined,
 			tailSit: undefined,
 			scanner: [assets.augustScanner],
-			photographer: undefined,
 			runDirector: undefined,
-			marshal: undefined,
+			photographer: undefined,
+			marshal: [assets.augustMarshal],
 			volunteerGeneric: undefined,
 			numberChecker: undefined,
 		},

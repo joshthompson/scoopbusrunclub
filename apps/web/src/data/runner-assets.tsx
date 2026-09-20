@@ -22,6 +22,7 @@ export { default as augustRun } from '@/assets/runners/august/run.png'
 export { default as augustSit } from '@/assets/runners/august/sit.png'
 export { default as augustFace } from '@/assets/runners/august/face.png'
 export { default as augustScanner } from '@/assets/runners/august/scanner.png'
+export { default as augustMarshal } from '@/assets/runners/august/marshal.png'
 
 export { default as claireRun } from '@/assets/runners/claire/run.png'
 export { default as claireSit } from '@/assets/runners/claire/sit.png'
