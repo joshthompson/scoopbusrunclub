@@ -297,6 +297,14 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 				(g): RaceEntry => ({ ...g, kind: 'guest', id: g.guestId }),
 			),
 		]
+		// Ranked finishers first, by position, with members and guests
+		// interleaved; anyone without a position keeps their entry order at
+		// the end. The sort is stable, so ties stay in entry order too.
+		entries.sort((a, b) => {
+			if (a.position == null) return b.position == null ? 0 : 1
+			if (b.position == null) return -1
+			return a.position - b.position
+		})
 		for (const entry of entries) {
 			const key = raceEntrySignature(entry, today)
 			if (!map.has(key)) map.set(key, [])
