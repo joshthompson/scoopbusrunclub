@@ -112,7 +112,9 @@ function HistoricHandRow(props: { row: HistoricRow }) {
 				</A>
 				<span class={styles.eventNumber}> #{entry.eventNumber}</span>
 				{' · '}
-				{formatDate(new Date(`${entry.date}T00:00:00`))}
+				<A href={pokerRoute(entry.date)} class={styles.dateLink}>
+					{formatDate(new Date(`${entry.date}T00:00:00`))}
+				</A>
 			</span>
 			<span class={styles.occurrenceCards}>
 				<For each={entry.hand?.cards ?? []}>
@@ -191,12 +193,18 @@ export function PokerPage(props: PokerPageProps) {
 		const date = requestedDate()
 		return date ? handsOnDate(hands(), date) : latestWeekHands(hands())
 	})
-	const winnerKey = createMemo(() => {
-		const top = shown()[0]
-		if (!top?.hand) return null
-		// A lone High Card doesn't "win" anything.
-		if (top.hand.type === 'highCard') return null
-		return `${top.event}#${top.eventNumber}`
+	/**
+	 * The day's best hand by score, whatever its type. A tied score is a draw
+	 * and every event on that score wins.
+	 */
+	const winnerKeys = createMemo(() => {
+		const top = shown()[0]?.hand?.score
+		if (top === undefined) return new Set<string>()
+		return new Set(
+			shown()
+				.filter((entry) => entry.hand?.score === top)
+				.map((entry) => `${entry.event}#${entry.eventNumber}`),
+		)
 	})
 
 	// The result days either side of what's on show, for stepping through
@@ -294,9 +302,9 @@ export function PokerPage(props: PokerPageProps) {
 								{(entry) => (
 									<EventHandBlock
 										entry={entry}
-										winner={
-											`${entry.event}#${entry.eventNumber}` === winnerKey()
-										}
+										winner={winnerKeys().has(
+											`${entry.event}#${entry.eventNumber}`,
+										)}
 									/>
 								)}
 							</For>
@@ -409,6 +417,12 @@ const styles = {
 		textDecoration: 'none',
 		fontWeight: 'bold',
 		_hover: { textDecoration: 'underline' },
+	}),
+	dateLink: css({
+		color: 'inherit',
+		textDecoration: 'underline',
+		textDecorationStyle: 'dotted',
+		_hover: { textDecorationStyle: 'solid' },
 	}),
 	eventNumber: css({
 		opacity: 0.7,
