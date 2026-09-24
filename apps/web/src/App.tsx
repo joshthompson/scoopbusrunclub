@@ -136,7 +136,8 @@ const App: Component = () => {
 		const gr = guestResults()
 		const g = guests()
 		const cr = headerRacers()
-		if (!r || !u || !v || !gr || !g || !cr) return null
+		const ra = races()
+		if (!r || !u || !v || !gr || !g || !cr || !ra) return null
 		return {
 			results: r,
 			clubRunners: u,
@@ -144,6 +145,7 @@ const App: Component = () => {
 			guestResults: gr,
 			guests: g,
 			customRacers: cr,
+			races: ra,
 		}
 	})
 
@@ -174,6 +176,7 @@ const App: Component = () => {
 								guestResults={data().guestResults}
 								guests={data().guests}
 								customRacers={data().customRacers}
+								races={data().races}
 								weatherType={weatherType()}
 							/>
 						)}

@@ -27,6 +27,7 @@ import { RoleTranslations } from '@/data/volunteer-roles'
 import type {
 	GuestItem,
 	GuestResultItem,
+	RaceItem,
 	RunResultItem,
 	Runner,
 	VolunteerItem,
@@ -313,6 +314,7 @@ interface ScoopBusHeaderProps {
 	guestResults: GuestResultItem[]
 	guests: GuestItem[]
 	customRacers: CustomRacer[]
+	races: RaceItem[]
 	weatherType: WeatherType
 }
 
@@ -326,6 +328,86 @@ const FALLBACK_AVATAR: CharacterSpriteProps = {
 	showColor: '#888888',
 	shoeColor: '#222222',
 	head: {},
+}
+
+/** A guest's stored kit, or the neutral one when they have none yet. */
+function guestAvatar(guest: GuestItem | undefined): CharacterSpriteProps {
+	return guest?.avatar && 'head' in guest.avatar
+		? (guest.avatar as unknown as CharacterSpriteProps)
+		: FALLBACK_AVATAR
+}
+
+/** How long a guest keeps running in the header after a custom event. */
+const CUSTOM_EVENT_GUEST_DAYS = 7
+
+/**
+ * The mean speed of the club runners currently drawn, for a guest whose event
+ * gave us nothing to work out a pace from.
+ */
+function averageClubSpeed(): number {
+	let total = 0
+	let count = 0
+	for (const [, [getter]] of Object.entries(runners)) {
+		const data = getter()
+		if (!hasHeaderArtwork(data)) continue
+		total += data.speed
+		count++
+	}
+	return count > 0 ? total / count : 2.5
+}
+
+/**
+ * Register guests who ran a custom event in the past week, so they run in the
+ * header alongside the club until the week is up. Where the event recorded both
+ * a time and a distance, their pace is scaled to a 5k so it sits on the same
+ * scale as everyone's parkrun times; otherwise they run at the club's average.
+ * Must run after the club speeds are set, and after parkrun guests, whose real
+ * 5k time wins if they are in both.
+ */
+function registerCustomEventGuests(races: RaceItem[], guests: GuestItem[]) {
+	const today = new Date()
+	const todayKey = today.toISOString().split('T')[0]
+	const earliest = new Date(today)
+	earliest.setUTCDate(earliest.getUTCDate() - (CUSTOM_EVENT_GUEST_DAYS - 1))
+	const earliestKey = earliest.toISOString().split('T')[0]
+
+	const guestMap = new Map(guests.map((g) => [g._id, g]))
+	const average = averageClubSpeed()
+
+	for (const race of races) {
+		if (race.date < earliestKey || race.date > todayKey) continue
+		for (const entry of race.guests ?? []) {
+			const key = `guest_${entry.guestId}`
+			if (guestRunners[key]) continue
+			const guest = guestMap.get(entry.guestId)
+			if (!guest) continue
+
+			let speed = average
+			const seconds = entry.time ? parseTimeToSeconds(entry.time) : undefined
+			if (seconds && Number.isFinite(seconds) && entry.distance) {
+				const fiveKSeconds = (seconds / entry.distance) * 5
+				speed = Math.max(0.5, 4320 / fiveKSeconds)
+			}
+
+			try {
+				const { frames, width, height } = createRunnerFrames(guestAvatar(guest))
+				guestRunners[key] = createSignal<RunnerData>({
+					name: guest.name,
+					id: guest.parkrunId ?? guest._id,
+					birthday: '01/01',
+					joined: -1,
+					frames,
+					width,
+					height,
+					speed,
+					frameInterval: 186 - 31 * speed,
+					latestTime: entry.time,
+				})
+			} catch {
+				// Unparseable avatar — leave them out rather than crash the header
+			}
+		}
+	}
 }
 
 /**
@@ -414,21 +496,8 @@ function registerGuestRunners(
 		seen.add(gr.guestId)
 
 		const guest = guestMap.get(gr.guestId)
-		const avatar: CharacterSpriteProps =
-			guest?.avatar && 'head' in guest.avatar
-				? (guest.avatar as unknown as CharacterSpriteProps)
-				: {
-						topType: 'tshirt',
-						bottomType: 'shorts',
-						skin: 'light',
-						topColor: '#888888',
-						bottomColor: '#333333',
-						showColor: '#888888',
-						shoeColor: '#222222',
-						head: {},
-					}
 		try {
-			const { frames, width, height } = createRunnerFrames(avatar)
+			const { frames, width, height } = createRunnerFrames(guestAvatar(guest))
 			const key = `guest_${gr.guestId}`
 			if (!guestRunners[key]) {
 				const timeInSeconds = parseTimeToSeconds(gr.time)
@@ -471,6 +540,10 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		props.guestResults,
 		props.guests,
 	)
+
+	// Guests from this week's custom events — after the parkrun guests, so a
+	// real 5k time beats a pace worked out from another distance
+	registerCustomEventGuests(props.races, props.guests)
 
 	// Register the racers visitors have made — must run after the club speeds are
 	// set above, since their pace is derived from the club's spread
