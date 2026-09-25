@@ -91,16 +91,29 @@ export function drawFrame(
  * Outlining happens at the art's own resolution so it stays one crisp pixel.
  */
 export function drawSticker(
-	img: HTMLImageElement,
+	img: HTMLImageElement | HTMLCanvasElement,
 	frameIndex: number,
 	frameCount: number,
 	size: number,
-	options: { outline?: boolean; padding?: number } = {},
+	options: {
+		outline?: boolean
+		/** Outline thickness in source pixels. Defaults to one. */
+		outlineWidth?: number
+		padding?: number
+		/**
+		 * `integer` (the default) keeps every source pixel a whole number of
+		 * output pixels. `fill` scales to the padded square exactly, for wide
+		 * artwork that would otherwise sit small in the frame.
+		 */
+		fit?: 'integer' | 'fill'
+	} = {},
 ): HTMLCanvasElement {
-	const fw = Math.round(img.naturalWidth / frameCount)
-	const fh = img.naturalHeight
+	const iw = img instanceof HTMLCanvasElement ? img.width : img.naturalWidth
+	const ih = img instanceof HTMLCanvasElement ? img.height : img.naturalHeight
+	const fw = Math.round(iw / frameCount)
+	const fh = ih
 	const outline = options.outline ?? true
-	const pad = outline ? 1 : 0
+	const pad = outline ? Math.max(1, Math.round(options.outlineWidth ?? 1)) : 0
 
 	// Native-resolution pass: the frame plus a one-pixel white halo.
 	const small = document.createElement('canvas')
@@ -120,17 +133,13 @@ export function drawSticker(
 		tctx.globalCompositeOperation = 'source-in'
 		tctx.fillStyle = '#ffffff'
 		tctx.fillRect(0, 0, fw, fh)
-		for (const [dx, dy] of [
-			[-1, 0],
-			[1, 0],
-			[0, -1],
-			[0, 1],
-			[-1, -1],
-			[1, -1],
-			[-1, 1],
-			[1, 1],
-		]) {
-			sctx.drawImage(tint, pad + dx, pad + dy)
+		// Stamp the white silhouette at every offset within the radius: a
+		// round dilation, so corners thicken evenly.
+		for (let dx = -pad; dx <= pad; dx++) {
+			for (let dy = -pad; dy <= pad; dy++) {
+				if (dx * dx + dy * dy > pad * pad + pad) continue
+				sctx.drawImage(tint, pad + dx, pad + dy)
+			}
 		}
 	}
 	sctx.drawImage(img, frameIndex * fw, 0, fw, fh, pad, pad, fw, fh)
@@ -138,10 +147,11 @@ export function drawSticker(
 	// Upscale by the largest integer that fits inside the padded square.
 	const padding = options.padding ?? 0.08
 	const inner = size * (1 - padding * 2)
-	const scale = Math.max(
-		1,
-		Math.floor(inner / Math.max(small.width, small.height)),
-	)
+	const longest = Math.max(small.width, small.height)
+	const scale =
+		options.fit === 'fill'
+			? inner / longest
+			: Math.max(1, Math.floor(inner / longest))
 	const canvas = document.createElement('canvas')
 	canvas.width = size
 	canvas.height = size

@@ -1,0 +1,33 @@
+.bus {
+	position: relative;
+	pointer-events: none;
+}
+
+.native {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	width: 269px;
+	height: 151px;
+	transform-origin: 0 100%;
+}
+
+.layer {
+	position: absolute;
+	image-rendering: pixelated;
+	max-width: none;
+}
+
+.wheel {
+	animation: roll 0.44s ease-in-out infinite;
+}
+
+@keyframes roll {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-1px);
+	}
+}

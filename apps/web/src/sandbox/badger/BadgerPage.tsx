@@ -2,10 +2,10 @@
  * Badger Badger Badger, with the club: twelve members pop up on the beat,
  * fika interrupts, and the snake is a race that parkrun insists it isn't.
  */
-import busAsset from '@/assets/bus/bus.png'
 import { For, Show, createSignal, onCleanup } from 'solid-js'
 import { BarePage } from '../shared/BarePage'
 import { RunnerAnim } from '../shared/RunnerAnim'
+import { BUS_WIDTH, ScoopBus } from '../shared/ScoopBus'
 import { type SpriteMember, spriteMembers } from '../shared/sprites'
 import { type StepEvent, createPlayer } from '../shared/synth'
 import styles from './badger.module.css'
@@ -256,16 +256,22 @@ export default function BadgerPage() {
 						<div class={styles.finish}>
 							<span>FINISH</span>
 						</div>
-						<img
-							src={busAsset}
-							alt=""
+						<ScoopBus
+							scale={(stageHeight() * (4 / 3) * 0.42) / BUS_WIDTH}
+							rolling={phase() === 'race'}
 							class={styles.bus}
 							classList={{
 								[styles.busAcross]: busAcross() || phase() === 'notarace',
 							}}
 						/>
-						<div class={styles.raceRunners}>
-							<For each={cast().slice(0, 6)}>
+						<div
+							class={styles.raceRunners}
+							classList={{
+								[styles.raceRunnersAcross]:
+									busAcross() || phase() === 'notarace',
+							}}
+						>
+							<For each={cast()}>
 								{(member, i) => (
 									<div
 										style={{ 'animation-delay': `${i() * -0.1}s` }}
@@ -273,7 +279,7 @@ export default function BadgerPage() {
 									>
 										<RunnerAnim
 											member={member}
-											height={(11 / 100) * stageHeight()}
+											height={(9 / 100) * stageHeight()}
 											cycle={beatSeconds / 2}
 										/>
 									</div>

@@ -48,7 +48,7 @@ const PROJECTS = [
 	{
 		href: '/sandbox/badger',
 		title: 'Badger Badger Badger',
-		blurb: "Members, members, members, fika, fika. Parkrun's not a race.",
+		blurb: 'Scoop bus, Scoop bus, Scoop bus, fika, fika.',
 		bare: true,
 	},
 ]

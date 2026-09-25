@@ -9,6 +9,11 @@ export default defineConfig({
 	server: {
 		port: 3005,
 	},
+	// The WebP encoder loads its wasm relative to its own module URL, which
+	// dev pre-bundling would break.
+	optimizeDeps: {
+		exclude: ['@jsquash/webp'],
+	},
 	build: {
 		target: 'esnext',
 	},

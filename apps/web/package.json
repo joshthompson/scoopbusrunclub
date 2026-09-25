@@ -11,6 +11,7 @@
 		"serve": "vite preview"
 	},
 	"dependencies": {
+		"@jsquash/webp": "^1.5.0",
 		"@solidjs/router": "^0.15.4",
 		"barcode-detector": "^3.1.1",
 		"leaflet": "^1.9.4",
