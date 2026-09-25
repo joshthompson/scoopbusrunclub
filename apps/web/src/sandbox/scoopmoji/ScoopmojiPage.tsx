@@ -1,13 +1,16 @@
 /**
- * Scoopmoji: the club as chat stickers — the bus, the club sign, every
- * member's first stride, and every member's head — in two packs to download.
+ * Scoopmoji: the club as chat stickers — every member running, every
+ * member's head, the bus, the sign and the mascots, and a deck of cards — in
+ * packs to download.
  *
  * Packs are `.wastickers` files, the format the Sticker Maker apps import
- * straight into WhatsApp: a flat zip of 512×512 PNG stickers, a 96×96
+ * straight into WhatsApp: a flat zip of 512×512 WebP stickers, a 96×96
  * `cover.png`, and `title.txt` / `author.txt`, at most thirty stickers each.
- * That matches what sticker-convert writes, which those apps accept.
  */
 import busEmoji from '@/assets/emoji/bus.png'
+import falun from '@/assets/misc/falun.png'
+import gavle from '@/assets/misc/gavle.png'
+import pigDuck from '@/assets/misc/pig-duck.png'
 import clubSign from '@/assets/misc/pr-sign.png'
 import { BackSignButton } from '@/components/BackSignButton'
 import { Button } from '@/components/ui/Button'
@@ -24,13 +27,14 @@ import {
 } from '../shared/sprites'
 import { canvasToWebp } from '../shared/webp'
 import { type ZipEntry, buildZip } from '../shared/zip'
+import { BALLOON_MILESTONES, renderMilestoneBunch } from './balloons'
 import { renderCardBack, renderCardFace } from './poker'
 
 /** WhatsApp wants 512×512 stickers and a 96×96 tray icon. */
 const STICKER_SIZE = 512
 const TRAY_SIZE = 96
 
-type Pack = 'base' | 'heads' | 'poker'
+type Pack = 'base' | 'misc' | 'milestones' | 'heads' | 'poker'
 
 interface Sticker {
 	/** Who or what it is, for the card it sits on. */
@@ -46,7 +50,18 @@ const PACKS: Record<Pack, { title: string; file: string; blurb: string }> = {
 	base: {
 		title: 'Scoop Bus Base Pack',
 		file: 'scoop-bus-base',
-		blurb: 'the bus, the club sign, and every member running',
+		blurb: 'every member running',
+	},
+	misc: {
+		title: 'Scoop Bus Misc Pack',
+		file: 'scoop-bus-misc',
+		blurb:
+			'the bus, the club sign, the pig duck, the Falun horse and the Gävle goat',
+	},
+	milestones: {
+		title: 'Scoop Bus Milestone Pack',
+		file: 'scoop-bus-milestones',
+		blurb: 'balloons for every milestone from the 10th run to the 1000th',
 	},
 	heads: {
 		title: 'Scoop Bus Heads Pack',
@@ -61,7 +76,7 @@ const PACKS: Record<Pack, { title: string; file: string; blurb: string }> = {
 	},
 }
 
-const PACK_ORDER: Pack[] = ['base', 'heads', 'poker']
+const PACK_ORDER: Pack[] = ['base', 'misc', 'milestones', 'heads', 'poker']
 
 function stemFor(key: string) {
 	return key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)
@@ -79,7 +94,7 @@ async function buildStickers(): Promise<Sticker[]> {
 	add(
 		'Bus',
 		'scoop-bus',
-		'base',
+		'misc',
 		drawSticker(await renderBusCanvas(), 0, 1, STICKER_SIZE, {
 			fit: 'fill',
 			outlineWidth: 7,
@@ -88,11 +103,37 @@ async function buildStickers(): Promise<Sticker[]> {
 	add(
 		'Sign',
 		'club-sign',
-		'base',
+		'misc',
 		drawSticker(await loadImage(clubSign), 0, 1, STICKER_SIZE, {
 			padding: 0.12,
 		}),
 	)
+	// The mascots the results list pins on away days.
+	for (const [group, stem, src] of [
+		['Pig Duck', 'pig-duck', pigDuck],
+		['Falun Horse', 'falun-horse', falun],
+		['Gävle Goat', 'gavle-goat', gavle],
+	] as const) {
+		add(
+			group,
+			stem,
+			'misc',
+			drawSticker(await loadImage(src), 0, 1, STICKER_SIZE),
+		)
+	}
+
+	// The balloons every milestone earns, lowest first.
+	for (const milestone of BALLOON_MILESTONES) {
+		add(
+			`${milestone}`,
+			`milestone-${milestone}`,
+			'milestones',
+			drawSticker(await renderMilestoneBunch(milestone), 0, 1, STICKER_SIZE, {
+				padding: 0.05,
+				outlineWidth: 8,
+			}),
+		)
+	}
 
 	// The card back leads the poker pack, so it's the first thing in the tray.
 	add(
@@ -153,17 +194,26 @@ async function png(canvas: HTMLCanvasElement) {
 async function buildWastickers(pack: Pack, stickers: Sticker[]): Promise<Blob> {
 	const encoder = new TextEncoder()
 	const list = stickers.filter((s) => s.pack === pack)
-	const cover =
-		pack === 'poker'
-			? drawSticker(list[0].canvas, 0, 1, TRAY_SIZE, {
-					outline: false,
-					padding: 0.05,
-					fit: 'fill',
-				})
-			: drawSticker(await loadImage(busEmoji), 0, 1, TRAY_SIZE, {
-					outline: false,
-					padding: 0.05,
-				})
+	// The cover: Link leads the runners, the bus the misc pack, the 100 the
+	// milestones, the card back the poker pack; the heads get the bus emoji.
+	const lead =
+		pack === 'base'
+			? (list.find((s) => s.stem === 'link') ?? list[0])
+			: pack === 'milestones'
+				? (list.find((s) => s.stem === 'milestone-100') ?? list[0])
+				: pack === 'heads'
+					? undefined
+					: list[0]
+	const cover = lead
+		? drawSticker(lead.canvas, 0, 1, TRAY_SIZE, {
+				outline: false,
+				padding: 0.05,
+				fit: 'fill',
+			})
+		: drawSticker(await loadImage(busEmoji), 0, 1, TRAY_SIZE, {
+				outline: false,
+				padding: 0.05,
+			})
 	const entries: ZipEntry[] = []
 	for (let i = 0; i < list.length; i++) {
 		entries.push({
@@ -176,18 +226,6 @@ async function buildWastickers(pack: Pack, stickers: Sticker[]): Promise<Blob> {
 		{ name: 'title.txt', data: encoder.encode(`${PACKS[pack].title}\n`) },
 		{ name: 'author.txt', data: encoder.encode('Scoop Bus Run Club\n') },
 	)
-	return buildZip(entries)
-}
-
-/** Every sticker as a plain PNG, for Telegram, Signal, or anything else. */
-async function buildPngZip(stickers: Sticker[]): Promise<Blob> {
-	const entries: ZipEntry[] = []
-	for (const sticker of stickers) {
-		entries.push({
-			name: `${PACKS[sticker.pack].file}/${sticker.stem}.png`,
-			data: await png(sticker.canvas),
-		})
-	}
 	return buildZip(entries)
 }
 
@@ -220,12 +258,6 @@ export function ScoopmojiPage() {
 			`${PACKS[pack].file}.wastickers`,
 		])
 
-	const downloadPngs = () =>
-		run('Zipping…', async () => [
-			await buildPngZip(stickers() ?? []),
-			'scoopmoji-png.zip',
-		])
-
 	return (
 		<div class={styles.container}>
 			<FieldBlock title="Scoopmoji" signType="purple">
@@ -237,13 +269,6 @@ export function ScoopmojiPage() {
 						Maker (iPhone) or Sticker Maker / WAStickerApps (Android) and it
 						lands in WhatsApp. Tap any sticker to save it on its own.
 					</p>
-					<div class={styles.actions}>
-						<Button onClick={downloadPngs}>{busy() ?? 'All as PNG'}</Button>
-						<span class={styles.hint}>
-							A zip of every sticker as a plain PNG, for Telegram, Signal, or
-							anywhere else.
-						</span>
-					</div>
 				</div>
 			</FieldBlock>
 
@@ -306,17 +331,6 @@ const styles = {
 		flexDirection: 'column',
 		gap: '1rem',
 		fontSize: '1.05rem',
-	}),
-	actions: css({
-		display: 'flex',
-		flexDirection: 'column',
-		gap: '0.5rem',
-		alignItems: 'flex-start',
-	}),
-	hint: css({
-		fontSize: '0.85rem',
-		opacity: 0.8,
-		lineHeight: 1.4,
 	}),
 	loading: css({ textAlign: 'center', opacity: 0.7 }),
 	pack: css({
