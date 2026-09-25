@@ -1,0 +1,1 @@
+._runner_apkbl_1{display:inline-block;background-repeat:no-repeat;background-position:0 0;image-rendering:pixelated;animation:_cycle_apkbl_1 var(--cycle) steps(var(--frames)) infinite}@keyframes _cycle_apkbl_1{to{background-position-x:calc(-1 * var(--sheet-width))}}

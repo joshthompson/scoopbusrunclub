@@ -1,0 +1,1 @@
+function r(e){let a=e>>>0;const n=()=>{a=a+1831565813>>>0;let t=a;return t=Math.imul(t^t>>>15,t|1),t^=t+Math.imul(t^t>>>7,t|61),((t^t>>>14)>>>0)/4294967296};return{next:n,int:(t,o)=>t+Math.floor(n()*(o-t+1)),pick:t=>t[Math.floor(n()*t.length)],chance:t=>n()<t}}function l(){const e=new Date;return e.getFullYear()*1e4+(e.getMonth()+1)*100+e.getDate()}export{l as d,r as s};
