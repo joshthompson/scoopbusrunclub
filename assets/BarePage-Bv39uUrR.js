@@ -1,0 +1,1 @@
+import{p as a,o as n,t as r,i as s,a as l,e as o}from"./index-CmgxPCFS.js";const c="_bare_1uv1l_1",i={bare:c};var u=r("<div>");function d(t){return a(()=>{const e=document.title;document.title=t.title,n(()=>{document.title=e})}),(()=>{var e=u();return s(e,()=>t.children),l(()=>o(e,`${i.bare} ${t.class??""}`)),e})()}export{d as B};
