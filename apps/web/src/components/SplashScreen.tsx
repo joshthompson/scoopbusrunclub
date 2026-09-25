@@ -17,6 +17,15 @@ const MIN_DISPLAY_MS = 1500
 /** Set to true to always show the loader (for testing without clearing cache) */
 export const ALWAYS_SHOW_LOADER = false
 
+/**
+ * Whether the splash is covering the page. Anything that animates on arrival
+ * (the poker deal, say) waits on this: the page is mounted and running well
+ * before the loader lifts, so an animation that just starts on mount plays
+ * out behind it, unseen.
+ */
+const [splashVisible, setSplashVisible] = createSignal(false)
+export { splashVisible }
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -28,6 +37,7 @@ interface SplashScreenProps {
 
 export function SplashScreen(props: SplashScreenProps) {
 	const [visible, setVisible] = createSignal(true)
+	setSplashVisible(true)
 	const [progress, setProgress] = createSignal(0)
 	const [fading, setFading] = createSignal(false)
 
@@ -80,7 +90,10 @@ export function SplashScreen(props: SplashScreenProps) {
 					// Start fade-out
 					setTimeout(() => {
 						setFading(true)
-						setTimeout(() => setVisible(false), 400) // match CSS transition
+						setTimeout(() => {
+							setVisible(false)
+							setSplashVisible(false)
+						}, 400) // match CSS transition
 					}, 150)
 				}
 			}
@@ -92,6 +105,7 @@ export function SplashScreen(props: SplashScreenProps) {
 	onCleanup(() => {
 		if (animFrame) cancelAnimationFrame(animFrame)
 		if (spriteInterval) clearInterval(spriteInterval)
+		setSplashVisible(false)
 	})
 
 	// The display scale applied to the sprite in the splash screen

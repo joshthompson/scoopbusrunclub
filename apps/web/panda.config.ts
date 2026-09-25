@@ -185,6 +185,63 @@ export default defineConfig({
 				from: { opacity: 0 },
 				to: { opacity: 1 },
 			},
+
+			// --- Poker cards ---
+			// A dealt card turning face up, in three layers that run on the same
+			// clock (see `PokerCards.tsx`, which also holds the numbers to tweak:
+			// `DEAL_FLIP_MS`, `DEAL_STAGGER_MS`, `DEAL_LIFT_PX`, `DEAL_GROW`).
+			/**
+			 * The turn. It starts at 180° so the back is what shows first, and
+			 * eases across the whole turn rather than per half, which is why the
+			 * lift is a separate layer: sharing keyframes would stall the
+			 * rotation edge-on at the midpoint.
+			 */
+			cardFlip: {
+				from: { transform: 'rotateY(180deg)' },
+				to: { transform: 'rotateY(0deg)' },
+			},
+			/**
+			 * The lift: the card rises and grows to its peak at the midpoint of
+			 * the turn, then settles. Decelerating up and accelerating down, like
+			 * something thrown, so each half names its own easing.
+			 */
+			cardLift: {
+				'0%': {
+					transform: 'translateY(0) scale(1)',
+					animationTimingFunction: 'ease-out',
+				},
+				'50%': {
+					transform:
+						'translateY(calc(-1 * var(--deal-lift))) scale(var(--deal-grow))',
+					animationTimingFunction: 'ease-in',
+				},
+				'100%': { transform: 'translateY(0) scale(1)' },
+			},
+			/**
+			 * The shadow, staying on the table while the card lifts off it: it
+			 * drifts further from the card, spreads, blurs and fades as the card
+			 * rises, then gathers back under it. Rests where the shadow element in
+			 * `PokerCards.tsx` puts it, so a card that isn't dealt looks the same.
+			 */
+			cardShadow: {
+				'0%': {
+					transform: 'translate(3px, 3px) scale(1)',
+					opacity: 1,
+					filter: 'blur(1px)',
+					animationTimingFunction: 'ease-out',
+				},
+				'50%': {
+					transform: 'translate(5px, 7px) scale(1.18)',
+					opacity: 0.4,
+					filter: 'blur(4px)',
+					animationTimingFunction: 'ease-in',
+				},
+				'100%': {
+					transform: 'translate(3px, 3px) scale(1)',
+					opacity: 1,
+					filter: 'blur(1px)',
+				},
+			},
 		},
 	},
 

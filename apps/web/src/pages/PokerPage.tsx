@@ -39,7 +39,12 @@ interface PokerPageProps {
 /** Room for five cards side by side, plus the block's own padding. */
 const EVENT_BLOCK_MIN_WIDTH = CARD_WIDTH * 5 + CARD_GAP * 4 + 32
 
-function EventHandBlock(props: { entry: EventHand; winner: boolean }) {
+function EventHandBlock(props: {
+	entry: EventHand
+	winner: boolean
+	/** How many cards the page has dealt before this block's first. */
+	dealOffset: number
+}) {
 	const cards = createMemo(() => orderedCards(props.entry))
 	return (
 		<div class={styles.eventBlock({ winner: props.winner })}>
@@ -71,8 +76,12 @@ function EventHandBlock(props: { entry: EventHand; winner: boolean }) {
 						</div>
 						<div class={styles.cardRow}>
 							<For each={cards()}>
-								{({ card, inHand }) => (
-									<PokerCardGraphic card={card} inHand={inHand} />
+								{({ card, inHand }, i) => (
+									<PokerCardGraphic
+										card={card}
+										inHand={inHand}
+										dealIndex={props.dealOffset + i()}
+									/>
 								)}
 							</For>
 						</div>
@@ -206,6 +215,19 @@ export function PokerPage(props: PokerPageProps) {
 				.map((entry) => `${entry.event}#${entry.eventNumber}`),
 		)
 	})
+	/**
+	 * Where each block's cards fall in the deal. The page turns its cards over
+	 * one after another from the first block to the last, so each block counts
+	 * on from where the one before finished.
+	 */
+	const dealOffsets = createMemo(() => {
+		let dealt = 0
+		return shown().map((entry) => {
+			const offset = dealt
+			dealt += orderedCards(entry).length
+			return offset
+		})
+	})
 
 	// The result days either side of what's on show, for stepping through
 	// them. From the latest week, "older" is the last day before that week.
@@ -299,12 +321,13 @@ export function PokerPage(props: PokerPageProps) {
 							style={{ '--block-min': `${EVENT_BLOCK_MIN_WIDTH}px` }}
 						>
 							<For each={shown()}>
-								{(entry) => (
+								{(entry, i) => (
 									<EventHandBlock
 										entry={entry}
 										winner={winnerKeys().has(
 											`${entry.event}#${entry.eventNumber}`,
 										)}
+										dealOffset={dealOffsets()[i()] ?? 0}
 									/>
 								)}
 							</For>
