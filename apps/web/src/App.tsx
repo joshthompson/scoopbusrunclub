@@ -60,6 +60,7 @@ import { StopwatchBingoPage } from './pages/StopwatchBingoPage'
 import { SwedenPage } from './pages/SwedenPage'
 import { WrappedExplorePage } from './pages/WrappedExplorePage'
 import { WrappedPage } from './pages/WrappedPage'
+import { SandboxRoutes, isBareSandboxPath } from './sandbox'
 import {
 	fetchAllResults,
 	fetchGuestResults,
@@ -152,10 +153,12 @@ const App: Component = () => {
 	const RootLayout: Component<RouteSectionProps> = (routeProps) => {
 		const location = useLocation()
 		const isAdmin = () => location.pathname.startsWith('/admin')
+		// Admin and the sandbox's throwback pages draw their own chrome.
+		const isBare = () => isAdmin() || isBareSandboxPath(location.pathname)
 
 		return (
 			<>
-				<Show when={!isAdmin()}>
+				<Show when={!isBare()}>
 					<Show
 						when={headerData()}
 						fallback={
@@ -194,12 +197,12 @@ const App: Component = () => {
 					// Admin has no header to carry the status bar strip for it, so it
 					// keeps clear of the status bar itself.
 					style={
-						isAdmin() ? { 'padding-top': 'env(safe-area-inset-top, 0px)' } : {}
+						isBare() ? { 'padding-top': 'env(safe-area-inset-top, 0px)' } : {}
 					}
 				>
 					{routeProps.children}
 				</main>
-				<Show when={!isAdmin()}>
+				<Show when={!isBare()}>
 					<MobileNav />
 				</Show>
 			</>
@@ -513,6 +516,7 @@ const App: Component = () => {
 				<Route path="/faq" component={FaqPage} />
 				<Route path="/notifications" component={NotificationsPage} />
 				<Route path="/guests/:parkrunId" component={() => <GuestPage />} />
+				<SandboxRoutes />
 				<Route path="*404" component={NotFoundPage} />
 			</Router>
 		</>

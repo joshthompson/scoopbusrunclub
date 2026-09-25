@@ -85,6 +85,12 @@ function navItems(): NavItem[] {
 			fullLabel: 'Mobile Notifications',
 			emoji: '🔔',
 		},
+		{
+			href: '/sandbox',
+			label: 'Sandbox',
+			fullLabel: 'The Sandbox',
+			emoji: '🧪',
+		},
 		{ href: '/about', label: 'About', fullLabel: 'About the Club', emoji: 'ℹ️' },
 		{ href: '/faq', label: 'FAQ', fullLabel: 'FAQ', emoji: '❓' },
 	]

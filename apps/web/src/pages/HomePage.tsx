@@ -152,6 +152,16 @@ export const HomePage: Component<{
 						>
 							<Emoji emoji="🔔" animation="none" /> Notifications
 						</A>
+						<A
+							href="/sandbox"
+							class={css({
+								color: 'inherit',
+								textDecoration: 'underline',
+								fontWeight: 'bold',
+							})}
+						>
+							<Emoji emoji="🧪" animation="none" /> Sandbox
+						</A>
 					</div>
 				</DirtBlock>
 				<DirtBlock title="Strava Activity">

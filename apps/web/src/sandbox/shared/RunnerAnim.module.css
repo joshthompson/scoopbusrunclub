@@ -1,0 +1,13 @@
+.runner {
+	display: inline-block;
+	background-repeat: no-repeat;
+	background-position: 0 0;
+	image-rendering: pixelated;
+	animation: cycle var(--cycle) steps(var(--frames)) infinite;
+}
+
+@keyframes cycle {
+	to {
+		background-position-x: calc(-1 * var(--sheet-width));
+	}
+}
