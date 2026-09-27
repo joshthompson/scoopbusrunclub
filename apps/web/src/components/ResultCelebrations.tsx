@@ -58,6 +58,7 @@ const TAG_COLORS = {
 	haga1: 'var(--purple-deep)',
 	haga100: 'var(--green-teal-earthy)',
 	haga200: 'var(--purple-magenta)',
+	hagaHundreds: 'var(--green-teal-earthy)',
 	svensk: 'var(--blue-swedish)',
 	stockholmSprint: 'var(--green-teal-dark)',
 	malmoDouble: 'var(--purple-dark-magenta)',
@@ -90,6 +91,7 @@ const TAG_EMOJIS = {
 	haga1: '🌳',
 	haga100: '💯',
 	haga200: '🎪',
+	hagaHundreds: '💯',
 	svensk: '🇸🇪',
 	stockholmSprint: '🏃‍♂️',
 	malmoDouble: '🏃',
@@ -625,37 +627,49 @@ function buildParkrunPalMap(
 // ---------------------------------------------------------------------------
 
 /**
- * Set of "parkrunId:date:event:eventNumber" keys where a runner
- * completes their 100th run at Haga.
+ * Each member's runs at Haga, in date order, so a run can be counted as
+ * their Nth there.
  */
-function buildHagaMap(
-	results: RunResultItem[],
-	targetRunCount: number,
-): Set<string> {
-	const set = new Set<string>()
-
+function hagaRunsByRunner(results: RunResultItem[]): RunResultItem[][] {
 	const byRunner = new Map<string, RunResultItem[]>()
 	for (const item of results) {
+		if (item.event !== 'haga') continue
 		if (!byRunner.has(item.parkrunId)) byRunner.set(item.parkrunId, [])
 		byRunner.get(item.parkrunId)?.push(item)
 	}
-
 	for (const runs of byRunner.values()) {
 		runs.sort((a, b) => a.date.localeCompare(b.date))
-		let hagaRuns = 0
-
-		for (const run of runs) {
-			if (run.event !== 'haga') continue
-			hagaRuns += 1
-
-			if (hagaRuns === targetRunCount) {
-				set.add(`${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`)
-				break
-			}
-		}
 	}
+	return [...byRunner.values()]
+}
 
+function resultKeyOf(run: RunResultItem): string {
+	return `${run.parkrunId}:${run.date}:${run.event}:${run.eventNumber}`
+}
+
+/** The result that was each member's first run at Haga. */
+function buildHagaDebutMap(results: RunResultItem[]): Set<string> {
+	const set = new Set<string>()
+	for (const runs of hagaRunsByRunner(results)) {
+		if (runs[0]) set.add(resultKeyOf(runs[0]))
+	}
 	return set
+}
+
+/**
+ * Every result that was a member's 100th, 200th, 300th… run at Haga, keyed
+ * to that count. A plain celebration: the balloons are for parkrun's own
+ * milestones.
+ */
+function buildHagaHundredsMap(results: RunResultItem[]): Map<string, number> {
+	const map = new Map<string, number>()
+	for (const runs of hagaRunsByRunner(results)) {
+		runs.forEach((run, i) => {
+			const nth = i + 1
+			if (nth % 100 === 0) map.set(resultKeyOf(run), nth)
+		})
+	}
+	return map
 }
 
 // ---------------------------------------------------------------------------
@@ -917,8 +931,8 @@ export interface CelebrationData {
 	pbMap: Map<string, PBStatus>
 	milestoneMap: Map<string, number>
 	haga1Map: Set<string>
-	haga100Map: Set<string>
-	haga200Map: Set<string>
+	/** "parkrunId:date:event:eventNumber" → which hundredth run at Haga it was */
+	hagaHundredsMap: Map<string, number>
 	eventListMap: Map<string, EventListAchievement[]>
 	birthdayMap: Map<string, string>
 	spellingMap: Map<string, SpellingAchievement>
@@ -948,9 +962,8 @@ export function buildCelebrationData(
 	return {
 		pbMap: buildPBMap(results),
 		milestoneMap: buildMilestoneMap(results, runners),
-		haga1Map: buildHagaMap(results, 1),
-		haga100Map: buildHagaMap(results, 100),
-		haga200Map: buildHagaMap(results, 200),
+		haga1Map: buildHagaDebutMap(results),
+		hagaHundredsMap: buildHagaHundredsMap(results),
 		eventListMap: buildEventListMap(results),
 		birthdayMap: buildBirthdayMap(),
 		spellingMap: buildSpellingMap(results),
@@ -1030,7 +1043,7 @@ function deserializeCelebrationData(raw: string): CelebrationData {
 // Cached celebration data — compute once per fetch cycle
 // ---------------------------------------------------------------------------
 
-const CELEBRATION_CACHE_KEY = 'celebrations'
+const CELEBRATION_CACHE_KEY = 'celebrations:v2'
 
 /**
  * Returns cached CelebrationData if available, otherwise builds it from
@@ -1169,7 +1182,7 @@ const celebrationRules: ((
 
 	// 100 at Haga!
 	({ data, resultKey }) =>
-		data.haga100Map.has(resultKey)
+		data.hagaHundredsMap.get(resultKey) === 100
 			? {
 					label: '100 at Haga!',
 					description: '100 beautiful runs in Haga park!',
@@ -1178,9 +1191,9 @@ const celebrationRules: ((
 				}
 			: null,
 
-	// 250 at Haga!
+	// 200 at Haga!
 	({ data, resultKey }) =>
-		data.haga200Map.has(resultKey)
+		data.hagaHundredsMap.get(resultKey) === 200
 			? {
 					label: '1000km at Haga!',
 					description: 'Making Deri proud!',
@@ -1188,6 +1201,19 @@ const celebrationRules: ((
 					color: TAG_COLORS.haga200,
 				}
 			: null,
+
+	// 300 at Haga!, 400 at Haga!, … — the ones nobody has planned a joke for yet
+	({ data, resultKey }) => {
+		const nth = data.hagaHundredsMap.get(resultKey)
+		return nth !== undefined && nth >= 300
+			? {
+					label: `${nth} at Haga!`,
+					description: `${nth} beautiful runs in Haga park!`,
+					emoji: TAG_EMOJIS.hagaHundreds,
+					color: TAG_COLORS.hagaHundreds,
+				}
+			: null
+	},
 
 	// Event-list achievements (Svenskspringare, Stockholm Sprint, etc.)
 	({ data, resultKey }) => {

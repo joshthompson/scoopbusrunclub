@@ -17,6 +17,8 @@ const ScoopBayPage = lazy(() => import('./scoopbay/ScoopBayPage'))
 const ScoopCoinPage = lazy(() => import('./coin/ScoopCoinPage'))
 const ScoopDancePage = lazy(() => import('./dance/ScoopDancePage'))
 const BadgerPage = lazy(() => import('./badger/BadgerPage'))
+const ZomboPage = lazy(() => import('./zombo/ZomboPage'))
+const LeekScoopPage = lazy(() => import('./leek/LeekScoopPage'))
 
 const PROJECTS = [
 	{
@@ -49,6 +51,19 @@ const PROJECTS = [
 		href: '/sandbox/badger',
 		title: 'Badger Badger Badger',
 		blurb: 'Scoop bus, Scoop bus, Scoop bus, fika, fika.',
+		bare: true,
+	},
+	{
+		href: '/sandbox/zombo',
+		title: 'Welcome to Scoop Bus',
+		blurb:
+			'This is Scoop Bus. You can do anything at Scoop Bus. Anything at all.',
+		bare: true,
+	},
+	{
+		href: '/sandbox/leekscoop',
+		title: 'Leek Scoop',
+		blurb: 'Everyone spins leek here.',
 		bare: true,
 	},
 ]
@@ -97,6 +112,8 @@ export function SandboxRoutes() {
 			<Route path="/sandbox/coin" component={ScoopCoinPage} />
 			<Route path="/sandbox/dance" component={ScoopDancePage} />
 			<Route path="/sandbox/badger" component={BadgerPage} />
+			<Route path="/sandbox/zombo" component={ZomboPage} />
+			<Route path="/sandbox/leekscoop" component={LeekScoopPage} />
 		</>
 	)
 }

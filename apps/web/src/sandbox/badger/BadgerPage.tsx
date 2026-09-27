@@ -20,21 +20,41 @@ import { BADGER_SONG } from './song'
 
 type Phase = 'badgers' | 'fika' | 'race' | 'notarace'
 
-/** Twelve stage positions, back row to front, as percentages of the stage. */
-const SLOTS = [
-	{ x: 14, y: 62, h: 12 },
-	{ x: 38, y: 60, h: 12 },
-	{ x: 62, y: 60, h: 12 },
-	{ x: 86, y: 62, h: 12 },
-	{ x: 8, y: 77, h: 15 },
-	{ x: 30, y: 75, h: 15 },
-	{ x: 52, y: 75, h: 15 },
-	{ x: 74, y: 77, h: 15 },
-	{ x: 20, y: 92, h: 19 },
-	{ x: 44, y: 90, h: 19 },
-	{ x: 66, y: 90, h: 19 },
-	{ x: 90, y: 92, h: 19 },
+type Side = 'left' | 'right' | 'top'
+
+/**
+ * Twelve stage positions in the order they appear: front row first, then
+ * back towards the horizon. `y` is the feet, `h` the height, both as
+ * percentages of the stage; `from` is the edge each one runs in from.
+ */
+const SLOTS: { x: number; y: number; h: number; from: Side }[] = [
+	{ x: 22, y: 108, h: 44, from: 'left' },
+	{ x: 78, y: 106, h: 44, from: 'right' },
+	{ x: 50, y: 86, h: 28, from: 'top' },
+	{ x: 8, y: 82, h: 26, from: 'left' },
+	{ x: 92, y: 82, h: 26, from: 'right' },
+	{ x: 34, y: 66, h: 17, from: 'left' },
+	{ x: 66, y: 66, h: 17, from: 'right' },
+	{ x: 50, y: 60, h: 14, from: 'top' },
+	{ x: 14, y: 50, h: 10, from: 'left' },
+	{ x: 40, y: 46, h: 8, from: 'top' },
+	{ x: 60, y: 46, h: 8, from: 'top' },
+	{ x: 86, y: 50, h: 10, from: 'right' },
 ]
+
+/** Where a slot sits before it runs in: just past the edge it enters from. */
+function enterOffset(slot: (typeof SLOTS)[number], stageH: number): string {
+	const stageW = stageH * (4 / 3)
+	const runnerH = (slot.h / 100) * stageH
+	switch (slot.from) {
+		case 'left':
+			return `translateX(${-((slot.x / 100) * stageW + runnerH)}px)`
+		case 'right':
+			return `translateX(${(1 - slot.x / 100) * stageW + runnerH}px)`
+		case 'top':
+			return `translateY(${-((slot.y / 100) * stageH + 20)}px)`
+	}
+}
 
 const RACE_WORDS = ['A race,', 'a race,', 'race,', 'a race,']
 
@@ -116,7 +136,7 @@ export default function BadgerPage() {
 				case 'fika':
 				case 'fika2': {
 					if (b === 0) setPhase('fika')
-					if (b === 0 || b === 2) flash('Fika,')
+					if (b === 0 || b === 2) flash('Fika!')
 					break
 				}
 				case 'race': {
@@ -187,23 +207,6 @@ export default function BadgerPage() {
 					data-phase={phase()}
 				>
 					<div class={styles.sky} />
-					<div class={styles.sun} />
-					<svg
-						class={styles.hills}
-						viewBox="0 0 800 300"
-						preserveAspectRatio="none"
-						aria-hidden="true"
-					>
-						<path
-							d="M0 120 Q 200 40 400 120 T 800 120 V300 H0 Z"
-							fill="#4caf50"
-						/>
-						<path
-							d="M0 190 Q 250 110 500 190 T 800 170 V300 H0 Z"
-							fill="#43a047"
-						/>
-						<path d="M0 250 Q 300 200 800 250 V300 H0 Z" fill="#388e3c" />
-					</svg>
 
 					{/* The badgers */}
 					<Show when={phase() === 'badgers'}>
@@ -215,7 +218,8 @@ export default function BadgerPage() {
 									style={{
 										left: `${SLOTS[i()].x}%`,
 										top: `${SLOTS[i()].y}%`,
-										'z-index': `${10 + i()}`,
+										'z-index': `${10 + SLOTS.length - i()}`,
+										'--enter': enterOffset(SLOTS[i()], stageHeight()),
 									}}
 								>
 									<div

@@ -59,7 +59,7 @@ export const DANCE_SONG: Song = {
 				{ voice: 'pluck', pattern: STRUM, gain: 0.12, gate: 0.4 },
 				{ voice: 'kick', pattern: 'x - - - x - - -', gain: 0.5 },
 				{ voice: 'snare', pattern: '- - x - - - x -', gain: 0.25 },
-				{ voice: 'hat', pattern: 'x x x x x x x x', gain: 0.08 },
+				{ voice: 'hat', pattern: 'x x xxx x x xxx', gain: 0.08 },
 			],
 		},
 	],

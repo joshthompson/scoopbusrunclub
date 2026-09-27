@@ -2,6 +2,7 @@ import extLinkAsset from '@/assets/misc/ext-link.png'
 import { BackSignButton } from '@/components/BackSignButton'
 import { CourseMap } from '@/components/CourseMap'
 import { FieldBlock } from '@/components/ui/FieldBlock'
+import { Emoji } from '@/components/ui/Emoji'
 import { Table } from '@/components/ui/Table'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { COUNTRY_FLAGS } from '@/data/countries'
@@ -286,11 +287,6 @@ export function EventPage(props: EventPageProps) {
 	})
 	const isJunior = createMemo(() =>
 		eventName().toLowerCase().includes('junior'),
-	)
-
-	// ---- Tourists (visited once) ----
-	const tourists = createMemo(() =>
-		runCountByRunner().filter((r) => r.count === 1),
 	)
 
 	// ---- Double duty: ran AND volunteered ----
@@ -756,18 +752,6 @@ export function EventPage(props: EventPageProps) {
 								</span>
 							</div>
 						</Show>
-						<Show when={tourists().length > 0}>
-							<div class={styles.factItem}>
-								<span class={styles.factEmoji}>🧳</span>
-								<span>
-									<strong>
-										{tourists().length} member
-										{tourists().length !== 1 ? 's' : ''}
-									</strong>{' '}
-									came just once — will they return? 🤔
-								</span>
-							</div>
-						</Show>
 						<Show when={uniqueRoles().length > 0}>
 							<div class={styles.factItem}>
 								<span class={styles.factEmoji}>🎭</span>
@@ -885,7 +869,7 @@ export function EventPage(props: EventPageProps) {
 									class={styles.replayBtn}
 									title="Replay"
 								>
-									▶
+									<Emoji emoji="▶" animation="none" />
 								</A>,
 							])}
 							empty="No visits recorded."
