@@ -26,6 +26,15 @@ export const LINK_VOLUNTEERS: VolunteerItem[] = [
 		roles: ['Funktionär'],
 		date: '2026-09-19',
 	},
+	{
+		parkrunId: LINK_PARKRUN_ID,
+		volunteerName: NAME,
+		event: 'haga',
+		eventName: 'Haga',
+		eventNumber: 423,
+		roles: ['Funktionär'],
+		date: '2026-09-26',
+	},
 ]
 
 /**
