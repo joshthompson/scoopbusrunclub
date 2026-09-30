@@ -162,6 +162,18 @@ export const HomePage: Component<{
 						>
 							<Emoji emoji="🧪" animation="none" /> Sandbox
 						</A>
+						<a
+							href="https://buymeacoffee.com/joshandalisa"
+							target="_blank"
+							rel="noreferrer"
+							class={css({
+								color: 'inherit',
+								textDecoration: 'underline',
+								fontWeight: 'bold',
+							})}
+						>
+							<Emoji emoji="☕" animation="none" /> Buy Me A Coffee
+						</a>
 					</div>
 				</DirtBlock>
 				<DirtBlock title="Strava Activity">

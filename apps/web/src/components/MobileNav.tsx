@@ -11,6 +11,8 @@ type NavItem = {
 	/** Full label shown in the "More" sheet */
 	fullLabel: string
 	emoji: string
+	/** Leaves the site, opening in a new tab rather than through the router */
+	external?: boolean
 }
 
 /** Wrapped points at last year until December, matching the Explore block */
@@ -93,6 +95,13 @@ function navItems(): NavItem[] {
 		},
 		{ href: '/about', label: 'About', fullLabel: 'About the Club', emoji: 'ℹ️' },
 		{ href: '/faq', label: 'FAQ', fullLabel: 'FAQ', emoji: '❓' },
+		{
+			href: 'https://buymeacoffee.com/joshandalisa',
+			label: 'Coffee',
+			fullLabel: 'Buy Me A Coffee',
+			emoji: '☕',
+			external: true,
+		},
 	]
 }
 
@@ -142,19 +151,36 @@ export function MobileNav() {
 				<div class={styles.backdrop} onClick={() => setMenuOpen(false)} />
 				<div class={styles.sheet}>
 					<For each={menuItems()}>
-						{(item) => (
-							<A
-								href={item.href}
-								class={styles.sheetItem}
-								classList={{ [styles.sheetItemActive]: isActive(item.href) }}
-								onClick={() => setMenuOpen(false)}
-							>
-								<span class={styles.sheetIcon}>
-									<Emoji emoji={item.emoji} animation="none" />
-								</span>
-								{item.fullLabel}
-							</A>
-						)}
+						{(item) => {
+							const content = (
+								<>
+									<span class={styles.sheetIcon}>
+										<Emoji emoji={item.emoji} animation="none" />
+									</span>
+									{item.fullLabel}
+								</>
+							)
+							return item.external ? (
+								<a
+									href={item.href}
+									target="_blank"
+									rel="noreferrer"
+									class={styles.sheetItem}
+									onClick={() => setMenuOpen(false)}
+								>
+									{content}
+								</a>
+							) : (
+								<A
+									href={item.href}
+									class={styles.sheetItem}
+									classList={{ [styles.sheetItemActive]: isActive(item.href) }}
+									onClick={() => setMenuOpen(false)}
+								>
+									{content}
+								</A>
+							)
+						}}
 					</For>
 				</div>
 			</Show>
