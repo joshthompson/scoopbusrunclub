@@ -3,6 +3,7 @@ import { isBalloonMilestone } from '@/data/balloons'
 import { runners } from '@/data/runners'
 import { RoleTranslations } from '@/data/volunteer-roles'
 import { getEvent } from '@/utils/events'
+import { isFurbyEvent } from '@/utils/furbys'
 import {
 	type JourneyMilestone,
 	journeyMilestoneDetail,
@@ -36,6 +37,7 @@ import type {
 	Runner,
 	VolunteerItem,
 } from '../utils/api'
+import { FurbyButton, pickFurbies } from './FurbyButton'
 import { type MajorMilestone, MilestoneCard } from './MilestoneCard'
 import {
 	type CelebrationData,
@@ -383,6 +385,11 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 		return parts.join(' ')
 	}
 
+	// The furbies' own events have one either side in place of the emojis.
+	const [leftFurby, rightFurby] = isFurbyEvent(props.race.name)
+		? pickFurbies()
+		: []
+
 	const eventEmojis = (): [string, string] | undefined => {
 		if (isParkrunTrip(props.race)) return ['🚌', '🚌']
 		if (props.race.type === 'Track and Food') return ['🏟️', '🍕']
@@ -402,14 +409,27 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 					/>
 				)}
 				<h4 class={styles.parkrunName}>
-					<Show when={eventEmojis()}>
-						<Emoji emoji={eventEmojis()?.[0]} />{' '}
-					</Show>
+					{leftFurby ? (
+						<>
+							<FurbyButton src={leftFurby} />{' '}
+						</>
+					) : (
+						<Show when={eventEmojis()}>
+							<Emoji emoji={eventEmojis()?.[0]} />{' '}
+						</Show>
+					)}
 					<EmojiString text={props.race.name} />
-					<Show when={eventEmojis()}>
-						{' '}
-						<Emoji emoji={eventEmojis()?.[1]} />
-					</Show>
+					{rightFurby ? (
+						<>
+							{' '}
+							<FurbyButton src={rightFurby} />
+						</>
+					) : (
+						<Show when={eventEmojis()}>
+							{' '}
+							<Emoji emoji={eventEmojis()?.[1]} />
+						</Show>
+					)}
 				</h4>
 				{props.race.website && (
 					<A href={props.race.website} target="_blank">

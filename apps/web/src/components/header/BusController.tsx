@@ -4,6 +4,7 @@ import {
 	createController,
 } from '@/engine'
 import { createObjectSignal } from '@/engine'
+import { furbysOn } from '@/utils/furbys'
 import { type JSX, createSignal } from 'solid-js'
 
 import busBackAsset from '@/assets/bus/bus-back.png'
@@ -22,6 +23,8 @@ const SCOOP_SPEED = 50
 const SCOOP_DURATION = 125
 const MIN_BUS_START_X = 1100
 const MIN_BUS_OFFSCREEN_PX = 250
+/** With the furbies out, how long the bus stays away between drives. */
+const FURBY_BREAK_MS = 30_000
 
 // --- Pixel art storm cloud (bus-width, cloud-shaped with bumps, animated) ---
 const BUS_WIDTH = 247
@@ -289,6 +292,8 @@ export function createBusController(
 	const endX = -247 // 247 is the width of the bus, which is the rightmost part of the bus
 
 	const baseY = 58
+	/** Ticks left parked off the edge, giving the furbies the path. */
+	let parked = 0
 	const bus = createController({
 		frames: [busBackAsset],
 		init() {
@@ -304,6 +309,14 @@ export function createBusController(
 			}
 		},
 		onEnterFrame({ $, $age, $scene }) {
+			// Waiting off the edge while the furbies have the path to stomp about
+			// on. Putting them away sends it straight back out.
+			if (parked > 0 && furbysOn()) {
+				parked--
+				return
+			}
+			parked = 0
+
 			const float = Math.cos(10 + $age) * 1
 			$.setY(baseY + float)
 			$.setX($.x() - BUS_SPEED)
@@ -317,6 +330,8 @@ export function createBusController(
 						MIN_BUS_START_X,
 					),
 				)
+				if (furbysOn())
+					parked = FURBY_BREAK_MS / ($scene.options.frameRate ?? 40)
 			}
 
 			// Scoop the runners
@@ -325,12 +340,17 @@ export function createBusController(
 				const scoopXStart = $.x()
 				const scoopXEnd = scoopXStart + 88
 
-				for (const controller of $scene.getControllersByType<RunnerController>(
-					'runner',
-				)) {
+				// Furbies get scooped too, and carry everything this needs.
+				for (const controller of [
+					...$scene.getControllersByType<RunnerController>('runner'),
+					...$scene.getControllersByType<RunnerController>('furby'),
+				]) {
 					const x = controller.data.x() + controller.data.width()
 					if (
 						!controller.data.scooped() &&
+						// Only what's down at the bus's height, not a furby still up
+						// above the screen or raining down past it.
+						controller.data.y() + controller.data.height() > $.y() &&
 						x >= scoopXStart &&
 						x <= scoopXEnd
 					) {

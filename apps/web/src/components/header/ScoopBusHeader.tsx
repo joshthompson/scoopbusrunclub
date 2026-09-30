@@ -11,6 +11,7 @@ import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
 import starsAsset from '@/assets/misc/stars.png'
 import sunAsset from '@/assets/misc/sun.png'
+import { splashVisible } from '@/components/SplashScreen'
 import { isBalloonMilestone } from '@/data/balloons'
 import { LINK_PARKRUN_ID } from '@/data/link'
 import {
@@ -36,13 +37,21 @@ import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import type { CustomRacer } from '@/utils/customRacers'
 import { racerSpeedToHeaderSpeed } from '@/utils/customRacers'
+import { furbysOn } from '@/utils/furbys'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { moonAsset } from '@/utils/moonAsset'
 import { snowyAsset } from '@/utils/snow'
 import type { WeatherType } from '@/utils/weather'
 import { A, useNavigate } from '@solidjs/router'
 import { css, cx } from '@style/css'
-import { Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js'
+import {
+	Show,
+	createEffect,
+	createSignal,
+	on,
+	onCleanup,
+	onMount,
+} from 'solid-js'
 import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
 import { createAeroplaneController } from './AeroplaneController'
@@ -51,6 +60,8 @@ import {
 	registerBalloonConsoleHook,
 } from './BalloonController'
 import { createBusController } from './BusController'
+import { syncFurbies } from './FurbyController'
+import { addToPath } from './PathOrder'
 import {
 	RUNNER_LABEL_RENDER_DISTANCE,
 	createRunnerController,
@@ -576,7 +587,8 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						mousePosition,
 					),
 				)
-				.sort((a, b) => a.data.y() - b.data.y()) // Sort by y position so they render in the correct order
+				// Nearer the front of the path draws on top.
+				.sort((a, b) => a.data.ground() - b.data.ground())
 
 			// Add clouds
 			const CLOUD_DIST = 360
@@ -688,8 +700,8 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	 * a reload. The initial batch is already registered by the time this first
 	 * runs, so it no-ops on load.
 	 *
-	 * Appending puts them in front of the bus, which is where moving runners
-	 * belong; standing volunteers are the ones drawn behind it.
+	 * They go in front of the bus, which is where moving runners belong, at the
+	 * depth their feet put them among the other runners and any furbies out.
 	 */
 	createEffect(() => {
 		for (const runnerId of registerCustomRacers(props.customRacers)) {
@@ -700,12 +712,26 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 				scene,
 				mousePosition,
 			)
-			scene.addController(
-				createShadowController(`shadow-${controller.data.id}`, controller),
+			addToPath(
+				scene,
+				[controller],
+				[createShadowController(`shadow-${controller.data.id}`, controller)],
 			)
-			scene.addController(controller)
 		}
 	})
+
+	// The week of a Förbi or Furby event: furbies hopping about the path, as many
+	// as the screen has room for. Also let out from the console with
+	// `setFurbys(on)`, or by clicking one on a results block. They rain in once
+	// any splash screen has lifted, rather than behind it.
+	// Only tracks the toggle and the width, not the scene's controllers, which
+	// letting them out or putting them away changes.
+	createEffect(
+		on(
+			[furbysOn, splashVisible, () => scene.canvas.get().width()],
+			([enabled, splash]) => syncFurbies(scene, enabled && !splash),
+		),
+	)
 
 	const windowResizeHandler = () => {
 		scene.setWidth(window.innerWidth)

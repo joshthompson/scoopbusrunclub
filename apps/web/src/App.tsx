@@ -73,6 +73,7 @@ import {
 } from './utils/api'
 import { fetchHeaderRacers, racersAddedThisVisit } from './utils/customRacers'
 import { loadEvents } from './utils/events'
+import { reportFurbyEvents } from './utils/furbys'
 import { isSnowy, reportSnowDepth } from './utils/snow'
 import { parseWeather, reportWeatherType, weatherType } from './utils/weather'
 
@@ -120,6 +121,8 @@ const App: Component = () => {
 	createEffect(() => reportWeatherType(appWeather().type))
 	createEffect(() => reportSnowDepth(appWeather().snowDepth))
 	createEffect(() => document.body.classList.toggle('snow', isSnowy()))
+	// Any Förbi or Furby event lets the furbies out for a week from its day.
+	createEffect(() => reportFurbyEvents(races() ?? []))
 	// Pre-compute celebration + PB data once (cached in localStorage alongside results)
 	const celebrationData = createMemo(() => {
 		const r = results()

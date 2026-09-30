@@ -98,6 +98,22 @@ function findNonOverlappingX(
 	return Math.max(0, Math.min(absEnd, slot * myIndex + slot / 2 - myWidth / 2))
 }
 
+/** How far behind whoever they're tagging along with a follower runs. */
+const FOLLOW_GAP = 28
+/**
+ * After being knocked apart: how much faster a follower runs to catch back up,
+ * or slower to let their leader come back past.
+ */
+const CATCH_UP_PACE = 1.6
+const WAIT_PACE = 0.4
+/**
+ * Further apart than this and one of them has gone round the loop off the
+ * edge, so whoever looks behind is really ahead.
+ */
+const LAPPED = 400
+/** The random extra on each stride, as a share of their speed. */
+const STRIDE_JITTER = 0.4
+
 export function createRunnerController(
 	id: string,
 	runnerId: keyof typeof runners | string,
@@ -111,6 +127,8 @@ export function createRunnerController(
 	const baseY = 124 + yShift
 	let flashTriggered = false
 	let flashCounter = 0
+	let pace = 1
+	let separated = false
 	const FLASH_PROXIMITY = 60
 
 	return createController({
@@ -141,6 +159,10 @@ export function createRunnerController(
 				...createObjectSignal(runFrames(), 'frames'),
 				...createObjectSignal(0, 'sitting'),
 				...createObjectSignal('run' as RunnerState, 'activeState'),
+				// How far they run in a tick, on average: what a furby aims ahead by.
+				step: () => runner().speed * pace * (1 + STRIDE_JITTER / 2),
+				// Where their feet touch the path, however high they've been flung.
+				ground: () => baseY + height(),
 				width,
 				height,
 				children: () => {
@@ -261,17 +283,33 @@ export function createRunnerController(
 			// --- Moving states (run, tail-walker) ---
 			const isTailWalker = state === 'tail-walker'
 
-			// If connected to another runner, follow them instead of running
+			// If connected to another runner, follow them instead of running. With
+			// either of them knocked down or flung by the bus, each is on their own
+			// until both are back up; then the follower catches up, or eases off to
+			// let them past, until they're running together again.
+			pace = 1
 			if (runner().connectedTo && !isStandingState(state)) {
-				const connectedController = $scene
+				const leader = $scene
 					.getControllersByType<RunnerController>('runner')
 					.find(
 						(controller) => controller.data.runnerId === runner().connectedTo,
-					)
-				if (connectedController) {
-					$.setX(connectedController.data.x() + 28)
-					if (!$.scooped() && !connectedController.data.scooped()) {
-						$.setSitting(connectedController.data.sitting())
+					)?.data
+				if (leader) {
+					const spot = leader.x() + FOLLOW_GAP
+					const behind = $.x() - spot
+					if (
+						$.sitting() > 0 ||
+						$.scooped() ||
+						leader.sitting() > 0 ||
+						leader.scooped()
+					) {
+						separated = true
+					} else if (!separated || Math.abs(behind) < runner().speed * 2) {
+						separated = false
+						$.setX(spot)
+					} else {
+						const lapped = Math.abs(behind) > LAPPED
+						pace = behind > 0 !== lapped ? CATCH_UP_PACE : WAIT_PACE
 					}
 				}
 			}
@@ -295,7 +333,9 @@ export function createRunnerController(
 				} else {
 					$.setFrames(runFrames())
 				}
-				$.setX($.x() - runner().speed * (1 + Math.random() * 0.4))
+				$.setX(
+					$.x() - runner().speed * pace * (1 + Math.random() * STRIDE_JITTER),
+				)
 				$.setRotation(Math.random() * 3 - 0.5)
 			}
 

@@ -368,7 +368,8 @@ export const EventModal: Component<EventModalProps> = (props) => {
 				recurrence: recurrence(),
 				attendees: builtAttendees,
 				guests: builtGuests,
-				majorEvent: isMajorEvent() || undefined,
+				// Sent as false rather than left out, or unticking it never saves.
+				majorEvent: isMajorEvent(),
 				public: isPublic(),
 			})
 		} finally {
