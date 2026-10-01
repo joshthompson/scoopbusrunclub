@@ -2,6 +2,7 @@
  * Badger Badger Badger, with the club: twelve members pop up on the beat,
  * fika interrupts, and the snake is a race that parkrun insists it isn't.
  */
+import { track } from '@/utils/analytics'
 import { For, Show, createSignal, onCleanup } from 'solid-js'
 import { BarePage } from '../shared/BarePage'
 import { RunnerAnim } from '../shared/RunnerAnim'
@@ -169,6 +170,7 @@ export default function BadgerPage() {
 	const start = () => {
 		setStarted(true)
 		player.start()
+		track('sandbox_song_played', { sandbox_page: 'badger' })
 	}
 
 	const stop = () => {

@@ -1,6 +1,7 @@
 import { BackSignButton } from '@/components/BackSignButton'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { track } from '@/utils/analytics'
 import type { RunResultItem, Runner } from '@/utils/api'
 import { computeBingoProgress } from '@/utils/bingo'
 import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
@@ -40,7 +41,11 @@ function BingoRow(props: { slot: number; occurrences: RunResultItem[] }) {
 							<button
 								type="button"
 								class={styles.moreButton}
-								onClick={() => setExpanded((v) => !v)}
+								onClick={() => {
+									if (!expanded())
+										track('list_expanded', { list_name: 'position_bingo' })
+									setExpanded((v) => !v)
+								}}
 							>
 								+{rest().length} more
 							</button>

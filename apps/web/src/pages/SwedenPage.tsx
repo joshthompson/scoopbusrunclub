@@ -9,6 +9,7 @@ import {
 	swedishParkrunCard,
 	titleNamesParkrun,
 } from '@/data/swedishParkruns'
+import { track } from '@/utils/analytics'
 import type { RaceItem, RunResultItem, Runner } from '@/utils/api'
 import { getEventsInCountry } from '@/utils/events'
 import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
@@ -71,7 +72,10 @@ function SwedenRow(props: { parkrun: SwedishParkrun; visits: Visit[] }) {
 						<button
 							type="button"
 							class={styles.moreButton}
-							onClick={() => setExpanded((v) => !v)}
+							onClick={() => {
+								if (!expanded()) track('list_expanded', { list_name: 'sweden' })
+								setExpanded((v) => !v)
+							}}
 						>
 							+{rest().length} more
 						</button>

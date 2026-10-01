@@ -25,6 +25,7 @@ import {
 	runners,
 } from '@/data/runners'
 import { RoleTranslations } from '@/data/volunteer-roles'
+import { track } from '@/utils/analytics'
 import type {
 	GuestItem,
 	GuestResultItem,
@@ -806,6 +807,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	return (
 		<div
 			class={cx('header-wrapper', styles.wrapper)}
+			data-link-area="header"
 			aria-label="Welcome to the Scoop Bus Run Club!"
 			// Set here rather than on the sky itself so the safe-area strip above the
 			// scene, which is the same colour, dims along with it.
@@ -904,16 +906,26 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
 							if (closest) {
 								if (closest.runnerId.startsWith('custom_')) {
+									// No name: a racer's is whatever its visitor typed in
+									track('header_runner_clicked', {
+										runner_type: 'custom_racer',
+									})
 									navigate('/custom-racer')
 								} else if (closest.runnerId.startsWith('guest_')) {
+									track('header_runner_clicked', { runner_type: 'guest' })
 									const entry = guestRunners[closest.runnerId]
 									if (entry) {
 										navigate(`/guests/${entry[0]().id}`)
 									}
 								} else {
+									track('header_runner_clicked', {
+										runner_type: 'member',
+										member_name: closest.runnerId,
+									})
 									navigate(`/member/${closest.runnerId}`)
 								}
 							} else {
+								track('header_background_clicked')
 								navigate('/')
 							}
 						}}

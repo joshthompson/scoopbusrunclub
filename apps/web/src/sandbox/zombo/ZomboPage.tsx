@@ -3,6 +3,7 @@
  * pulsing discs while a lounge loop plays and the announcer promises that
  * anything is possible, forever, in the spirit of zombo.com (1999).
  */
+import { track } from '@/utils/analytics'
 import { For, Show, createSignal, onCleanup } from 'solid-js'
 import { BarePage } from '../shared/BarePage'
 import { RunnerAnim } from '../shared/RunnerAnim'
@@ -105,6 +106,7 @@ export default function ZomboPage() {
 	const start = () => {
 		setStarted(true)
 		player.start()
+		track('sandbox_song_played', { sandbox_page: 'zombo' })
 		speaking = true
 		line = 0
 		later(1.2, announce)

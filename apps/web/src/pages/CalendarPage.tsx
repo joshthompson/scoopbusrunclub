@@ -4,6 +4,7 @@ import { DirtBlock } from '@/components/ui/DirtBlock'
 import { EmojiString } from '@/components/ui/Emoji'
 import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { track } from '@/utils/analytics'
 import type {
 	GuestResultItem,
 	RaceItem,
@@ -217,6 +218,9 @@ export function CalendarPage(props: CalendarPageProps) {
 	}
 
 	const goToMonth = (offset: number) => {
+		track('calendar_month_changed', {
+			month_change: offset < 0 ? 'previous' : 'next',
+		})
 		const target = new Date(current().year, current().month + offset, 1)
 		setSearchParams({
 			month: toMonthKey(target.getFullYear(), target.getMonth()),
@@ -224,6 +228,7 @@ export function CalendarPage(props: CalendarPageProps) {
 	}
 
 	const goToToday = () => {
+		track('calendar_month_changed', { month_change: 'today' })
 		const now = new Date()
 		setSearchParams({ month: toMonthKey(now.getFullYear(), now.getMonth()) })
 	}

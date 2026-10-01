@@ -1,5 +1,6 @@
 import { BackSignButton } from '@/components/BackSignButton'
 import { runners as runnerSignals } from '@/data/runners'
+import { track } from '@/utils/analytics'
 import { getMemberRoute } from '@/utils/memberRoute'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { A } from '@solidjs/router'
@@ -247,6 +248,23 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 		null,
 	)
 
+	const selectEdge = (edge: ConnectionEdge, source: 'graph' | 'table') => {
+		setSelectedEdge(edge)
+		track('connection_selected', {
+			first_member_name: edge.nameA,
+			second_member_name: edge.nameB,
+			selection_source: source,
+		})
+	}
+
+	const togglePinnedNode = (node: NodeInfo) => {
+		if (pinnedNode() !== node.id) {
+			track('connection_member_pinned', { member_name: node.name })
+		}
+		setPinnedNode((prev) => (prev === node.id ? null : node.id))
+		setHoveredNode(null)
+	}
+
 	/** Active node is pinned (if set) or hovered */
 	const activeNode = () => pinnedNode() ?? hoveredNode()
 
@@ -336,10 +354,10 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 											stroke-opacity={edgeOpacity(e)}
 											stroke-linecap="round"
 											class={pageStyles.edge}
-											onClick={() => setSelectedEdge(e)}
+											onClick={() => selectEdge(e, 'graph')}
 											onKeyDown={(ev) => {
 												if (ev.key === 'Enter' || ev.key === ' ')
-													setSelectedEdge(e)
+													selectEdge(e, 'graph')
 											}}
 											tabIndex={0}
 											role="button"
@@ -380,18 +398,10 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 										onMouseLeave={() => {
 											if (!pinnedNode()) setHoveredNode(null)
 										}}
-										onClick={() => {
-											setPinnedNode((prev) =>
-												prev === node.id ? null : node.id,
-											)
-											setHoveredNode(null)
-										}}
+										onClick={() => togglePinnedNode(node)}
 										onKeyDown={(e) => {
 											if (e.key === 'Enter' || e.key === ' ') {
-												setPinnedNode((prev) =>
-													prev === node.id ? null : node.id,
-												)
-												setHoveredNode(null)
+												togglePinnedNode(node)
 											}
 										}}
 										style={{ cursor: 'pointer' }}
@@ -528,7 +538,7 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
 							key={`${e.idA}-${e.idB}-cell`}
 							type="button"
 							class={pageStyles.pairCell}
-							onClick={() => setSelectedEdge(e)}
+							onClick={() => selectEdge(e, 'table')}
 						>
 							{e.nameA} & {e.nameB}
 						</button>,

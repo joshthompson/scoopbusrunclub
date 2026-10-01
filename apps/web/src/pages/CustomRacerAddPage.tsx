@@ -4,6 +4,7 @@ import { RacerCard } from '@/components/customRacer/RacerCard'
 import { RacerSpeedSlider } from '@/components/customRacer/RacerSpeedSlider'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { FieldBlock } from '@/components/ui/FieldBlock'
+import { track } from '@/utils/analytics'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import {
@@ -91,6 +92,8 @@ export function CustomRacerAddPage() {
 			return
 		}
 
+		// Track the racer joining the header in Mixpanel (not its name, which is free text)
+		track('custom_racer_created', { racer_speed: speed() })
 		setJustSaved(true)
 		setName('')
 		refetch()

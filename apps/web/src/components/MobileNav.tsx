@@ -1,3 +1,4 @@
+import { track } from '@/utils/analytics'
 import { A, useLocation } from '@solidjs/router'
 import { css } from '@style/css'
 import { For, Show, createEffect, createMemo, createSignal, on } from 'solid-js'
@@ -145,7 +146,7 @@ export function MobileNav() {
 	)
 
 	return (
-		<nav class={styles.nav}>
+		<nav class={styles.nav} data-link-area="mobile_navigation">
 			<Show when={menuOpen()}>
 				{/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop is a convenience, Escape-free by design */}
 				<div class={styles.backdrop} onClick={() => setMenuOpen(false)} />
@@ -211,7 +212,10 @@ export function MobileNav() {
 						}}
 						aria-expanded={menuOpen()}
 						aria-label="More pages"
-						onClick={() => setMenuOpen((open) => !open)}
+						onClick={() => {
+							if (!menuOpen()) track('mobile_menu_opened')
+							setMenuOpen((open) => !open)
+						}}
 					>
 						<span class={styles.burger}>
 							<span />

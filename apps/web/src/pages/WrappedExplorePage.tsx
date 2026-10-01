@@ -6,6 +6,7 @@ import {
 	SpotlightMembers,
 	buildWrappedSlides,
 } from '@/components/wrapped/WrappedSlides'
+import { track } from '@/utils/analytics'
 import { computeWrappedStats } from '@/utils/wrapped'
 import {
 	PREVIEW_HASH,
@@ -154,8 +155,27 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 	/** The story always ends on the scrolling page for the same year. */
 	const exit = () => navigate(`/wrapped/${year()}${previewSuffix()}`)
 
+	const storyProperties = () => ({
+		wrapped_year: year(),
+		slide_count: slides().length,
+		is_preview: preview(),
+	})
+	/** Past the last slide, whether tapped there or left to run out. */
+	const finish = () => {
+		track('wrapped_story_finished', storyProperties())
+		exit()
+	}
+	/** Left early, with the close button or Escape. */
+	const close = () => {
+		track('wrapped_story_closed', {
+			...storyProperties(),
+			slide_number: index() + 1,
+		})
+		exit()
+	}
+
 	const forward = () => {
-		if (index() >= slides().length - 1) exit()
+		if (index() >= slides().length - 1) finish()
 		else setIndex((i) => i + 1)
 	}
 	const back = () => setIndex((i) => Math.max(0, i - 1))
@@ -178,7 +198,7 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 		const total = slides().length
 		if (total === 0) return
 		const timer = setTimeout(() => {
-			if (at >= total - 1) exit()
+			if (at >= total - 1) finish()
 			else setIndex(at + 1)
 		}, SLIDE_MS)
 		onCleanup(() => clearTimeout(timer))
@@ -248,6 +268,7 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 		// Blocked rather than muted: this tap is the gesture the browser wanted, so
 		// take it as "start the music" instead of flipping the preference to off.
 		if (autoplayBlocked() && !muted()) {
+			track('wrapped_music_toggled', { ...storyProperties(), is_muted: false })
 			audio()
 				?.play()
 				.then(() => setAutoplayBlocked(false))
@@ -255,6 +276,7 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 			return
 		}
 		const next = !muted()
+		track('wrapped_music_toggled', { ...storyProperties(), is_muted: next })
 		setMuted(next)
 		storeMuted(next)
 	}
@@ -264,7 +286,7 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === 'ArrowRight' || event.key === ' ') forward()
 			else if (event.key === 'ArrowLeft') back()
-			else if (event.key === 'Escape') exit()
+			else if (event.key === 'Escape') close()
 			else return
 			event.preventDefault()
 		}
@@ -388,7 +410,7 @@ export function WrappedExplorePage(props: WrappedPageProps) {
 				<button
 					type="button"
 					class={styles.close}
-					onClick={exit}
+					onClick={close}
 					aria-label="Close"
 				>
 					✕

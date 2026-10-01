@@ -2,6 +2,7 @@ import { BackSignButton } from '@/components/BackSignButton'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
 import { ALPHABET, ALPHABET_SLOTS, firstLetterSlot } from '@/utils/alphabet'
+import { track } from '@/utils/analytics'
 import type { RunResultItem, Runner } from '@/utils/api'
 import { computeBingoProgress } from '@/utils/bingo'
 import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
@@ -48,7 +49,11 @@ function AlphabetRow(props: { letter: string; events: LetterEvent[] }) {
 							<button
 								type="button"
 								class={styles.moreButton}
-								onClick={() => setExpanded((v) => !v)}
+								onClick={() => {
+									if (!expanded())
+										track('list_expanded', { list_name: 'alphabet' })
+									setExpanded((v) => !v)
+								}}
 							>
 								+{rest().length} more
 							</button>

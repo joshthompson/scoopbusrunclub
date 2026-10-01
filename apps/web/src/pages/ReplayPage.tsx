@@ -9,6 +9,7 @@ import { Table } from '@/components/ui/Table'
 import { COURSE_OVERRIDES } from '@/data/courses'
 import { runners as runnerSignals } from '@/data/runners'
 import { RoleTranslations } from '@/data/volunteer-roles'
+import { track } from '@/utils/analytics'
 import {
 	type CourseData,
 	type RunResultItem,
@@ -18,6 +19,7 @@ import {
 import { getEventName } from '@/utils/events'
 import { getMemberRoute } from '@/utils/memberRoute'
 import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
+import { snowyAsset } from '@/utils/snow'
 import { VOLUNTEER_EVENT_IDS } from '@shared/parkrun-events'
 import { A, useParams } from '@solidjs/router'
 import { css } from '@style/css'
@@ -31,7 +33,6 @@ import {
 	onMount,
 } from 'solid-js'
 import { NotFoundPage } from './NotFoundPage'
-import { snowyAsset } from '@/utils/snow'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -676,19 +677,26 @@ export function ReplayPage(props: ReplayPageProps) {
 	let animFrameId: number | undefined
 	let lastTimestamp: number | undefined
 
+	/** What every replay event carries, so they can be told apart by run. */
+	const replayProperties = () => ({
+		parkrun_event: eventId(),
+		parkrun_event_number: eventNumber(),
+	})
+
 	function tick(ts: number) {
 		if (lastTimestamp === undefined) lastTimestamp = ts
 		const dt = (ts - lastTimestamp) / 1000 // real seconds elapsed
 		lastTimestamp = ts
 
-		setElapsedSecs((prev) => {
-			const next = prev + dt * speed()
-			if (next >= maxFinishTime()) {
-				setPlaying(false)
-				return maxFinishTime()
-			}
-			return next
-		})
+		const next = elapsedSecs() + dt * speed()
+		if (next >= maxFinishTime()) {
+			setElapsedSecs(maxFinishTime())
+			setPlaying(false)
+			// Once per playthrough: this is the frame the last runner finishes on
+			track('replay_finished', { ...replayProperties(), replay_speed: speed() })
+		} else {
+			setElapsedSecs(next)
+		}
 		if (playing()) animFrameId = requestAnimationFrame(tick)
 	}
 
@@ -698,8 +706,15 @@ export function ReplayPage(props: ReplayPageProps) {
 			if (animFrameId) cancelAnimationFrame(animFrameId)
 			lastTimestamp = undefined
 		} else {
+			const isRestart = elapsedSecs() >= maxFinishTime()
+			track('replay_played', {
+				...replayProperties(),
+				replay_speed: speed(),
+				is_restart: isRestart,
+				is_from_start: isRestart || elapsedSecs() === 0,
+			})
 			// If at end, restart
-			if (elapsedSecs() >= maxFinishTime()) setElapsedSecs(0)
+			if (isRestart) setElapsedSecs(0)
 			setPlaying(true)
 			lastTimestamp = undefined
 			animFrameId = requestAnimationFrame(tick)
@@ -827,7 +842,13 @@ export function ReplayPage(props: ReplayPageProps) {
 										styles.toggleBtn +
 										(!show3D() ? ` ${styles.toggleBtnActive}` : '')
 									}
-									onClick={() => setShow3D(false)}
+									onClick={() => {
+										setShow3D(false)
+										track('replay_view_changed', {
+											...replayProperties(),
+											replay_view: '2d',
+										})
+									}}
 								>
 									2D Replay
 								</button>
@@ -837,7 +858,13 @@ export function ReplayPage(props: ReplayPageProps) {
 										styles.toggleBtn +
 										(show3D() ? ` ${styles.toggleBtnActive}` : '')
 									}
-									onClick={() => setShow3D(true)}
+									onClick={() => {
+										setShow3D(true)
+										track('replay_view_changed', {
+											...replayProperties(),
+											replay_view: '3d',
+										})
+									}}
 								>
 									3D Replay
 								</button>
@@ -867,6 +894,7 @@ export function ReplayPage(props: ReplayPageProps) {
 													document.exitFullscreen()
 												} else {
 													const wrapper = iframeRef?.parentElement
+													track('replay_fullscreen_entered', replayProperties())
 													if (wrapper?.requestFullscreen) {
 														wrapper.requestFullscreen()
 													} else if (
@@ -1017,6 +1045,10 @@ export function ReplayPage(props: ReplayPageProps) {
 											onInput={(e) =>
 												handleSlider(Number(e.currentTarget.value))
 											}
+											// Fires once the thumb is let go, unlike onInput
+											onChange={() =>
+												track('replay_scrubbed', replayProperties())
+											}
 										/>
 										<span class={styles.time}>
 											{formatSecs(maxFinishTime())}
@@ -1033,7 +1065,13 @@ export function ReplayPage(props: ReplayPageProps) {
 														styles.speedBtn +
 														(speed() === s ? ` ${styles.speedBtnActive}` : '')
 													}
-													onClick={() => setSpeed(s)}
+													onClick={() => {
+														setSpeed(s)
+														track('replay_speed_changed', {
+															...replayProperties(),
+															replay_speed: s,
+														})
+													}}
 												>
 													x{s}
 												</button>

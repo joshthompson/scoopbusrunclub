@@ -6,6 +6,7 @@ import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Modal } from '@/components/ui/Modal'
 import { Table } from '@/components/ui/Table'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { track } from '@/utils/analytics'
 import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { A, useNavigate, useParams } from '@solidjs/router'
@@ -80,6 +81,10 @@ export function ComparePage(props: ComparePageProps) {
 	)
 
 	function addRunner(key: string) {
+		track('compare_member_added', {
+			member_name: key,
+			member_count: uniqueNames().length + 1,
+		})
 		navigate(`/compare/${[...uniqueNames(), key.toLowerCase()].join('/')}`)
 	}
 
@@ -89,6 +94,10 @@ export function ComparePage(props: ComparePageProps) {
 			return k !== key
 		})
 		if (remaining.length < 2) return
+		track('compare_member_removed', {
+			member_name: key,
+			member_count: remaining.length,
+		})
 		navigate(`/compare/${remaining.join('/')}`)
 	}
 

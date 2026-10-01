@@ -4,6 +4,7 @@ import {
 	getOrBuildCelebrationData,
 } from '@/components/ResultCelebrations'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { track } from '@/utils/analytics'
 import type { RunResultItem, Runner } from '@/utils/api'
 import { getRunnerKeyFromRouteName } from '@/utils/memberRoute'
 import { parseTimeToSeconds } from '@/utils/misc'
@@ -493,7 +494,13 @@ export function GraphSVG(props: GraphProps) {
 						type="checkbox"
 						class={styles.checkbox}
 						checked={showPbs()}
-						onChange={(e) => setShowPbs(e.currentTarget.checked)}
+						onChange={(e) => {
+							setShowPbs(e.currentTarget.checked)
+							track('graph_option_changed', {
+								graph_option: 'personal_bests',
+								is_enabled: e.currentTarget.checked,
+							})
+						}}
 					/>
 					🏅 Show PBs
 				</label>
@@ -502,7 +509,13 @@ export function GraphSVG(props: GraphProps) {
 						type="checkbox"
 						class={styles.checkbox}
 						checked={showCoursePbs()}
-						onChange={(e) => setShowCoursePbs(e.currentTarget.checked)}
+						onChange={(e) => {
+							setShowCoursePbs(e.currentTarget.checked)
+							track('graph_option_changed', {
+								graph_option: 'course_personal_bests',
+								is_enabled: e.currentTarget.checked,
+							})
+						}}
 					/>
 					⭐ Show Course PBs
 				</label>
@@ -511,7 +524,13 @@ export function GraphSVG(props: GraphProps) {
 						type="checkbox"
 						class={styles.checkbox}
 						checked={showOther()}
-						onChange={(e) => setShowOther(e.currentTarget.checked)}
+						onChange={(e) => {
+							setShowOther(e.currentTarget.checked)
+							track('graph_option_changed', {
+								graph_option: 'other_celebrations',
+								is_enabled: e.currentTarget.checked,
+							})
+						}}
 					/>
 					🎊 Show Other Celebrations
 				</label>
@@ -522,7 +541,13 @@ export function GraphSVG(props: GraphProps) {
 						type="checkbox"
 						class={styles.checkbox}
 						checked={filterLowest()}
-						onChange={(e) => setFilterLowest(e.currentTarget.checked)}
+						onChange={(e) => {
+							setFilterLowest(e.currentTarget.checked)
+							track('graph_option_changed', {
+								graph_option: 'walks_filtered',
+								is_enabled: e.currentTarget.checked,
+							})
+						}}
 					/>
 					🚶 Filter out walks
 				</label>

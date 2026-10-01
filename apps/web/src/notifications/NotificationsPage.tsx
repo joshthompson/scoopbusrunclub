@@ -2,6 +2,7 @@ import { BackSignButton } from '@/components/BackSignButton'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { DirtBlock } from '@/components/ui/DirtBlock'
+import { track } from '@/utils/analytics'
 import { css } from '@style/css'
 import { Match, Show, Switch, createResource, createSignal } from 'solid-js'
 import { disable, enable, isEnabled, pushSupport, sendTest } from './push'
@@ -37,8 +38,10 @@ export function NotificationsPage() {
 		setError('')
 		setMessage('')
 		try {
-			if (checked()) await enable()
+			const turningOn = checked()
+			if (turningOn) await enable()
 			else await disable()
+			track(turningOn ? 'notifications_enabled' : 'notifications_disabled')
 			setWanted(null)
 			await refetch()
 			setMessage(checked() ? 'Notifications are on!' : 'Notifications are off')
@@ -56,6 +59,7 @@ export function NotificationsPage() {
 		setMessage('')
 		try {
 			await sendTest()
+			track('test_notification_sent')
 			setMessage('Sent! It should arrive in a moment.')
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Could not send')

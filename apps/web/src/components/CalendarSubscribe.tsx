@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Modal } from '@/components/ui/Modal'
+import { track } from '@/utils/analytics'
 import { CALENDAR_FEED_URL } from '@/utils/api'
 import { css } from '@style/css'
 import { Show, createSignal } from 'solid-js'
@@ -39,9 +40,17 @@ export function CalendarSubscribe(props: { class?: string }) {
 
 	const url = () => feedUrl(withResults())
 
+	/** No way to see what the calendar app does next, so the choice is the signal. */
+	const subscribed = (method: 'apple' | 'google' | 'copy') =>
+		track('calendar_subscribed', {
+			subscribe_method: method,
+			is_with_results: withResults(),
+		})
+
 	const copy = async () => {
 		try {
 			await navigator.clipboard.writeText(url())
+			subscribed('copy')
 			setCopied(true)
 			setTimeout(() => setCopied(false), 2000)
 		} catch {
@@ -51,7 +60,13 @@ export function CalendarSubscribe(props: { class?: string }) {
 
 	return (
 		<>
-			<Button class={props.class} onClick={() => setOpen(true)}>
+			<Button
+				class={props.class}
+				onClick={() => {
+					setOpen(true)
+					track('calendar_subscribe_opened')
+				}}
+			>
 				🗓️ Subscribe
 			</Button>
 
@@ -83,7 +98,10 @@ export function CalendarSubscribe(props: { class?: string }) {
 						<a
 							class={styles.option}
 							href={webcalUrl(url())}
-							onClick={() => setOpen(false)}
+							onClick={() => {
+								subscribed('apple')
+								setOpen(false)
+							}}
 						>
 							<span class={styles.optionTitle}>🍎 Apple Calendar</span>
 							<span class={styles.optionDetail}>
@@ -96,7 +114,10 @@ export function CalendarSubscribe(props: { class?: string }) {
 							href={googleCalendarUrl(url())}
 							target="_blank"
 							rel="noreferrer"
-							onClick={() => setOpen(false)}
+							onClick={() => {
+								subscribed('google')
+								setOpen(false)
+							}}
 						>
 							<span class={styles.optionTitle}>📆 Google Calendar</span>
 							<span class={styles.optionDetail}>

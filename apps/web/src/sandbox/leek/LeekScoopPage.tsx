@@ -3,6 +3,7 @@
  * to a polka, edge to edge, and every sixteen bars they slide off to the
  * left so the next one can slide in from the right with a leek of their own.
  */
+import { track } from '@/utils/analytics'
 import { For, Show, createSignal, onCleanup } from 'solid-js'
 import { BarePage } from '../shared/BarePage'
 import { RunnerAnim } from '../shared/RunnerAnim'
@@ -136,6 +137,7 @@ export default function LeekScoopPage() {
 	const start = () => {
 		setStarted(true)
 		player.start()
+		track('sandbox_song_played', { sandbox_page: 'leek_scoop' })
 	}
 
 	const stop = () => {

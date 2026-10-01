@@ -15,6 +15,7 @@ import clubSign from '@/assets/misc/pr-sign.png'
 import { BackSignButton } from '@/components/BackSignButton'
 import { Button } from '@/components/ui/Button'
 import { FieldBlock } from '@/components/ui/FieldBlock'
+import { track } from '@/utils/analytics'
 import { css } from '@style/css'
 import { For, Show, createResource, createSignal } from 'solid-js'
 import { renderBusCanvas } from '../shared/ScoopBus'
@@ -239,6 +240,10 @@ export function ScoopmojiPage() {
 	const downloadOne = async (sticker: Sticker) => {
 		const blob = await canvasToBlob(sticker.canvas, 'image/png')
 		downloadBlob(blob, `scoopmoji-${sticker.stem}-${sticker.pack}.png`)
+		track('sticker_downloaded', {
+			sticker_name: sticker.stem,
+			sticker_pack: sticker.pack,
+		})
 	}
 
 	const run = async (label: string, job: () => Promise<[Blob, string]>) => {
@@ -253,10 +258,11 @@ export function ScoopmojiPage() {
 	}
 
 	const downloadPack = (pack: Pack) =>
-		run('Packing…', async () => [
-			await buildWastickers(pack, stickers() ?? []),
-			`${PACKS[pack].file}.wastickers`,
-		])
+		run('Packing…', async () => {
+			const blob = await buildWastickers(pack, stickers() ?? [])
+			track('sticker_pack_downloaded', { sticker_pack: pack })
+			return [blob, `${PACKS[pack].file}.wastickers`]
+		})
 
 	return (
 		<div class={styles.container}>

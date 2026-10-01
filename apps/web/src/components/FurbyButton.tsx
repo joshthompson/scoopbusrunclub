@@ -1,3 +1,4 @@
+import { track } from '@/utils/analytics'
 import { furbyAssets, setFurbys } from '@/utils/furbys'
 import { css } from '@style/css'
 
@@ -20,6 +21,7 @@ export function FurbyButton(props: { src: string }) {
 			aria-label="Let the furbies out"
 			onClick={() => {
 				setFurbys(true)
+				track('furbies_released')
 				window.scrollTo({ top: 0, behavior: 'smooth' })
 			}}
 		>

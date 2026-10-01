@@ -2,6 +2,7 @@ import extLinkAsset from '@/assets/misc/ext-link.png'
 import { isBalloonMilestone } from '@/data/balloons'
 import { runners } from '@/data/runners'
 import { RoleTranslations } from '@/data/volunteer-roles'
+import { track } from '@/utils/analytics'
 import { getEvent } from '@/utils/events'
 import { isFurbyEvent } from '@/utils/furbys'
 import {
@@ -947,7 +948,14 @@ export function LatestResults(props: LatestResultsProps) {
 				)}
 			</For>
 			<Show when={hasMore() && !showAll()}>
-				<Button onClick={() => setShowAll(true)}>Show all results</Button>
+				<Button
+					onClick={() => {
+						setShowAll(true)
+						track('list_expanded', { list_name: 'latest_results' })
+					}}
+				>
+					Show all results
+				</Button>
 			</Show>
 		</div>
 	)

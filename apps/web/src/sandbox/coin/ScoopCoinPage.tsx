@@ -3,6 +3,7 @@
  * and the only fundamental is Saturday morning.
  */
 import busEmoji from '@/assets/emoji/bus.png'
+import { track } from '@/utils/analytics'
 import {
 	For,
 	Show,
@@ -185,7 +186,10 @@ export default function ScoopCoinPage() {
 			err ??
 				`${side() === 'buy' ? 'Bought' : 'Sold'} ${amount()} ${symbol()} at ${fmtPrice(token().price)}`,
 		)
-		if (!err) setAmount('')
+		if (!err) {
+			track('scoopcoin_traded', { trade_side: side(), token_symbol: symbol() })
+			setAmount('')
+		}
 	}
 
 	const setPercent = (p: number) => {
@@ -229,7 +233,10 @@ export default function ScoopCoinPage() {
 					<button
 						type="button"
 						class={styles.connect}
-						onClick={() => setConnected((c) => !c)}
+						onClick={() => {
+							if (!connected()) track('scoopcoin_wallet_connected')
+							setConnected((c) => !c)
+						}}
 					>
 						{connected() ? '0xSC00P…BU5' : 'Connect Wallet'}
 					</button>
@@ -478,7 +485,14 @@ export default function ScoopCoinPage() {
 				<section class={styles.bottom}>
 					<div class={styles.panelTitle}>
 						Positions
-						<button type="button" class={styles.reset} onClick={market.reset}>
+						<button
+							type="button"
+							class={styles.reset}
+							onClick={() => {
+								market.reset()
+								track('scoopcoin_wallet_reset')
+							}}
+						>
 							reset wallet
 						</button>
 					</div>

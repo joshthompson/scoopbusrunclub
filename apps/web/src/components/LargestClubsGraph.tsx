@@ -1,3 +1,4 @@
+import { track } from '@/utils/analytics'
 import type { LargestClubSnapshot } from '@/utils/api'
 import { SCOOP_BUS_CLUB_NAME } from '@/utils/largestClubs'
 import { css } from '@style/css'
@@ -175,9 +176,14 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 		return colors
 	}, new Map())
 
-	const addClub = (name: string) => setPicked([...chosenClubs(), name])
-	const removeClub = (name: string) =>
+	const addClub = (name: string) => {
+		setPicked([...chosenClubs(), name])
+		track('graph_club_added', { club_name: name })
+	}
+	const removeClub = (name: string) => {
 		setPicked(chosenClubs().filter((club) => club !== name))
+		track('graph_club_removed', { club_name: name })
+	}
 
 	const chartData = createMemo(() => {
 		const allWeeks = weeks()
@@ -496,7 +502,10 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 						<button
 							type="button"
 							class={styles.reset}
-							onClick={() => setPicked(null)}
+							onClick={() => {
+								setPicked(null)
+								track('graph_clubs_reset')
+							}}
 						>
 							Reset
 						</button>

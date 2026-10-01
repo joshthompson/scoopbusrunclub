@@ -1,6 +1,7 @@
 /**
  * ScoopDance: a 1999 homepage where the whole club dances in rows, forever.
  */
+import { track } from '@/utils/analytics'
 import { For, createMemo, createSignal, onCleanup } from 'solid-js'
 import { BarePage } from '../shared/BarePage'
 import { RunnerAnim } from '../shared/RunnerAnim'
@@ -95,6 +96,7 @@ export default function ScoopDancePage() {
 		} else {
 			player.start()
 			setPlaying(true)
+			track('sandbox_song_played', { sandbox_page: 'dance' })
 		}
 	}
 
@@ -116,6 +118,8 @@ export default function ScoopDancePage() {
 			...guestbook(),
 		]
 		setGuestbook(next)
+		// Nothing they wrote, only that they signed
+		track('guestbook_signed')
 		try {
 			localStorage.setItem(GUESTBOOK_KEY, JSON.stringify(next))
 		} catch {}

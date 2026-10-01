@@ -1,6 +1,7 @@
 /**
  * Scoop Bay: an auction site as it looked in 1999, listing mostly Furbys.
  */
+import { track } from '@/utils/analytics'
 import { For, Show, createMemo, createSignal, onCleanup } from 'solid-js'
 import { BarePage } from '../shared/BarePage'
 import { Furby } from './Furby'
@@ -57,6 +58,7 @@ export default function ScoopBayPage() {
 	}
 
 	const show = (id: number) => {
+		track('scoopbay_listing_viewed', { listing_id: id })
 		setOpenId(id)
 		setBidMessage(null)
 		setBidInput('')
@@ -91,6 +93,7 @@ export default function ScoopBayPage() {
 					: item,
 			),
 		)
+		track('scoopbay_bid_placed', { listing_id: l.id, bid_amount: amount })
 		setBidMessage(
 			`Congratulations! You are the current high bidder at ${money(amount)}. You will receive an e-mail if you are outbid, provided you have an e-mail.`,
 		)

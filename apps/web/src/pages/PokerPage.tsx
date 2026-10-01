@@ -9,6 +9,7 @@ import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Emoji } from '@/components/ui/Emoji'
 import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { track } from '@/utils/analytics'
 import type { RunResultItem } from '@/utils/api'
 import { formatDate } from '@/utils/misc'
 import {
@@ -158,7 +159,10 @@ function HistoricHandRow(props: { row: HistoricRow }) {
 					<button
 						type="button"
 						class={styles.moreButton}
-						onClick={() => setExpanded(true)}
+						onClick={() => {
+							setExpanded(true)
+							track('list_expanded', { list_name: 'poker_hand' })
+						}}
 					>
 						+{rest().length} more
 					</button>

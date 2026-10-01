@@ -5,6 +5,7 @@ import '../styled-system/styles.css'
 
 import App from './App'
 import { registerServiceWorker } from './notifications/push'
+import { initAnalytics } from './utils/analytics'
 
 const root = document.getElementById('root')
 
@@ -22,3 +23,4 @@ render(() => <App />, root!)
 // push to be delivered to. Deliberately after render and unawaited — it has no
 // bearing on the page drawing.
 registerServiceWorker()
+initAnalytics()

@@ -1,3 +1,4 @@
+import { track } from '@/utils/analytics'
 import { css, cva } from '@style/css'
 import { For, type JSX, Show } from 'solid-js'
 import { Tooltip } from './Tooltip'
@@ -20,6 +21,15 @@ export function Table(props: {
 	onSortChange?: (key: string, dir: 'asc' | 'desc') => void
 	onDoubleClick?: (index: number) => void
 }) {
+	const sortBy = (column: TableColumn) => {
+		if (!column.sortable || !props.onSortChange) return
+		const newDir =
+			props.sortKey === column.id && props.sortDir === 'asc' ? 'desc' : 'asc'
+		const key = column.id || column.title
+		props.onSortChange(key, newDir)
+		track('table_sorted', { sort_column: key, sort_direction: newDir })
+	}
+
 	return (
 		<Show
 			when={props.data.length > 0 || props.empty === undefined}
@@ -34,26 +44,9 @@ export function Table(props: {
 									<th
 										class={styles.headerCell({ sortable: column.sortable })}
 										style={{ width: column.width ?? undefined }}
-										onClick={() => {
-											if (!column.sortable || !props.onSortChange) return
-											const newDir =
-												props.sortKey === column.id && props.sortDir === 'asc'
-													? 'desc'
-													: 'asc'
-											props.onSortChange(column.id || column.title, newDir)
-										}}
+										onClick={() => sortBy(column)}
 										onKeyDown={(e) => {
-											if (
-												(e.key === 'Enter' || e.key === ' ') &&
-												column.sortable &&
-												props.onSortChange
-											) {
-												const newDir =
-													props.sortKey === column.id && props.sortDir === 'asc'
-														? 'desc'
-														: 'asc'
-												props.onSortChange(column.id || column.title, newDir)
-											}
+											if (e.key === 'Enter' || e.key === ' ') sortBy(column)
 										}}
 									>
 										{column.title}

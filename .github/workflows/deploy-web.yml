@@ -36,6 +36,10 @@ jobs:
       - run: pnpm nx run web:build
         env:
           VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
+          # Mixpanel project tokens are public (they ship in the page's JS), so
+          # it lives here rather than in a secret. Only set for deploys, so
+          # local dev never sends anything.
+          VITE_MIXPANEL_TOKEN: 43db215a8007569e8f05b4079de8707c
 
       - run: pnpm nx run game:build
         env:

@@ -1,9 +1,9 @@
 import alphabetIcon from '@/assets/misc/alphabet-icon.png'
 import graphIcon from '@/assets/misc/graph-icon.png'
 import positionIcon from '@/assets/misc/position-icon.png'
-import swedenIcon from '@/assets/misc/sweden-icon.png'
 import rock1Asset from '@/assets/misc/rock1.png'
 import stopwatchIcon from '@/assets/misc/stopwatch-icon.png'
+import swedenIcon from '@/assets/misc/sweden-icon.png'
 import { BackSignButton } from '@/components/BackSignButton'
 import { CharacterImage } from '@/components/CharacterImage'
 import { ParkrunHeatmap } from '@/components/ParkrunHeatmap'
@@ -11,6 +11,7 @@ import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Icon } from '@/components/ui/Icon'
 import { LINK_PARKRUN_ID } from '@/data/link'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
+import { track } from '@/utils/analytics'
 import { getMemberRoute, getRunnerKeyFromRouteName } from '@/utils/memberRoute'
 import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
 import { snowyAsset } from '@/utils/snow'
@@ -124,7 +125,10 @@ function AchievementItem(props: { celebration: GroupedCelebration }) {
 							<button
 								class={styles.showMoreInline}
 								type="button"
-								onClick={() => setShowMore(true)}
+								onClick={() => {
+									setShowMore(true)
+									track('list_expanded', { list_name: 'member_celebration' })
+								}}
 							>
 								Show more
 							</button>
