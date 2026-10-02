@@ -12,8 +12,15 @@ serves is already public on scoopbus.run.
 
 | Deployment | URL |
 | --- | --- |
-| Production | `https://effervescent-jellyfish-751.convex.site/api/mcp` |
+| Production | `https://mcp.scoopbus.run` |
+| Production, direct | `https://effervescent-jellyfish-751.eu-west-1.convex.site/api/mcp` |
 | Dev | `https://charming-yak-976.eu-west-1.convex.site/api/mcp` |
+
+`mcp.scoopbus.run` is a Cloudflare Worker (`apps/cloudflare-worker-proxy/worker.js`)
+that forwards every request to the production Convex route unchanged. It's
+there because scoopbus.run is GitHub Pages, which can't forward a POST. If the
+Worker ever needs changing, paste the file into its editor in the Cloudflare
+dashboard again.
 
 - **claude.ai** (web, desktop and mobile): Settings → Connectors → **Add custom
   connector**, then paste the URL. Leave the authentication settings empty.
