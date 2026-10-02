@@ -5,6 +5,8 @@ import {
 } from '../../../libs/shared/notifications/messages'
 import { api, internal } from './_generated/api'
 import { type ActionCtx, httpAction } from './_generated/server'
+import { handleMcpRequest } from './mcp/protocol'
+import { type SnapshotFile, getSnapshotFile } from './snapshots'
 
 const http = httpRouter()
 
@@ -63,6 +65,35 @@ const calendarHeaders = {
 	...corsHeaders,
 }
 
+// --- Snapshot files ---
+
+/**
+ * The public lists are served from their JSON snapshots (see snapshots.ts), so
+ * a visit costs one small `appData` read rather than whole tables. `no-cache`
+ * has the browser check back every time, and the ETag spares it the bytes when
+ * nothing has changed.
+ */
+const snapshotHeaders = {
+	'Content-Type': 'application/json',
+	'Cache-Control': 'no-cache',
+	...corsHeaders,
+}
+
+async function serveSnapshot(
+	ctx: ActionCtx,
+	request: Request,
+	file: SnapshotFile,
+) {
+	const snapshot = await getSnapshotFile(ctx, file, {
+		ifNoneMatch: request.headers.get('If-None-Match') ?? undefined,
+	})
+	if (!snapshot) return jsonResponse({ error: 'Data unavailable' }, 503)
+
+	const headers = { ETag: `"${snapshot.version}"`, ...snapshotHeaders }
+	if (!snapshot.blob) return new Response(null, { status: 304, headers })
+	return new Response(snapshot.blob, { headers })
+}
+
 // --- CORS preflight ---
 
 http.route({
@@ -74,14 +105,15 @@ http.route({
 })
 
 // --- GET /api/cache-version ---
-// Public, unauthenticated. Returns the two last-updated timestamps the
-// client uses to decide whether its localStorage cache is stale.
+// Public, unauthenticated. Returns the last-updated timestamps the client uses
+// to decide whether its localStorage cache is stale — as of the snapshots it
+// will be served, not the latest write. See `snapshots.cacheVersion`.
 
 http.route({
 	path: '/api/cache-version',
 	method: 'GET',
 	handler: httpAction(async (ctx) => {
-		const result = await ctx.runQuery(api.queries.getCacheVersion)
+		const result = await ctx.runQuery(internal.snapshots.cacheVersion)
 		return jsonResponse(result)
 	}),
 })
@@ -91,10 +123,7 @@ http.route({
 http.route({
 	path: '/api/runners',
 	method: 'GET',
-	handler: httpAction(async (ctx) => {
-		const runners = await ctx.runQuery(api.queries.getAllRunners)
-		return jsonResponse(runners)
-	}),
+	handler: httpAction((ctx, request) => serveSnapshot(ctx, request, 'members')),
 })
 
 // --- GET /api/runners/:id ---
@@ -149,13 +178,17 @@ http.route({
 	path: '/api/results',
 	method: 'GET',
 	handler: httpAction(async (ctx, request) => {
-		const url = new URL(request.url)
-		const sinceDate = url.searchParams.get('since') ?? '0000-00-00'
+		const sinceDate = new URL(request.url).searchParams.get('since')
+		if (!sinceDate) return serveSnapshot(ctx, request, 'results')
 
-		const results = await ctx.runQuery(api.queries.getRecentResults, {
-			sinceDate,
-		})
-		return jsonResponse(results)
+		// Filtered from the file rather than the table: no database reads.
+		const snapshot = await getSnapshotFile(ctx, 'results')
+		if (!snapshot?.blob) return jsonResponse({ error: 'Data unavailable' }, 503)
+		const results = JSON.parse(await snapshot.blob.text()) as { date: string }[]
+		return new Response(
+			JSON.stringify(results.filter((r) => r.date >= sinceDate)),
+			{ headers: snapshotHeaders },
+		)
 	}),
 })
 
@@ -231,10 +264,9 @@ http.route({
 http.route({
 	path: '/api/events',
 	method: 'GET',
-	handler: httpAction(async (ctx) => {
-		const events = await ctx.runQuery(api.queries.getAllEvents)
-		return jsonResponse(events)
-	}),
+	handler: httpAction((ctx, request) =>
+		serveSnapshot(ctx, request, 'parkruns'),
+	),
 })
 
 // --- GET /api/volunteers ---
@@ -242,10 +274,9 @@ http.route({
 http.route({
 	path: '/api/volunteers',
 	method: 'GET',
-	handler: httpAction(async (ctx) => {
-		const volunteers = await ctx.runQuery(api.queries.getAllVolunteers)
-		return jsonResponse(volunteers)
-	}),
+	handler: httpAction((ctx, request) =>
+		serveSnapshot(ctx, request, 'volunteers'),
+	),
 })
 
 // --- POST /api/ingest ---
@@ -663,10 +694,9 @@ http.route({
 http.route({
 	path: '/api/races',
 	method: 'GET',
-	handler: httpAction(async (ctx) => {
-		const races = await ctx.runQuery(api.races.listPublic)
-		return jsonResponse(races)
-	}),
+	handler: httpAction((ctx, request) =>
+		serveSnapshot(ctx, request, 'our-events'),
+	),
 })
 
 // --- Admin: GET /api/admin/races ---
@@ -814,10 +844,7 @@ http.route({
 http.route({
 	path: '/api/guests',
 	method: 'GET',
-	handler: httpAction(async (ctx) => {
-		const guests = await ctx.runQuery(api.guests.listPublic)
-		return jsonResponse(guests)
-	}),
+	handler: httpAction((ctx, request) => serveSnapshot(ctx, request, 'guests')),
 })
 
 // --- GET /api/guest?id=<guestId> (public) ---
@@ -874,10 +901,9 @@ http.route({
 http.route({
 	path: '/api/guest-results',
 	method: 'GET',
-	handler: httpAction(async (ctx) => {
-		const results = await ctx.runQuery(api.guests.getAllGuestResults)
-		return jsonResponse(results)
-	}),
+	handler: httpAction((ctx, request) =>
+		serveSnapshot(ctx, request, 'guest-results'),
+	),
 })
 
 // --- Admin: GET /api/admin/guests ---
@@ -1812,6 +1838,46 @@ http.route({
 })
 
 // --- CORS preflight for all API routes ---
+
+// --- /api/mcp ---
+// The club's data as an MCP server, for LLM clients (claude.ai connectors,
+// Claude Code, ...). Read-only and unauthenticated, like the rest of the
+// public API, and answered from the snapshot files. See mcp/protocol.ts.
+
+http.route({
+	path: '/api/mcp',
+	method: 'POST',
+	handler: httpAction((ctx, request) => handleMcpRequest(ctx, request)),
+})
+
+http.route({
+	path: '/api/mcp',
+	method: 'OPTIONS',
+	handler: httpAction(async () => {
+		return new Response(null, {
+			status: 204,
+			headers: {
+				...corsHeaders,
+				'Access-Control-Allow-Headers':
+					'Content-Type, Authorization, Mcp-Protocol-Version, Mcp-Session-Id, Last-Event-ID',
+			},
+		})
+	}),
+})
+
+for (const method of ['GET', 'DELETE'] as const) {
+	// Stateless: no server-to-client stream to open and no session to end.
+	http.route({
+		path: '/api/mcp',
+		method,
+		handler: httpAction(async () => {
+			return new Response(null, {
+				status: 405,
+				headers: { Allow: 'POST, OPTIONS', ...corsHeaders },
+			})
+		}),
+	})
+}
 
 for (const path of [
 	'/api/runners',

@@ -19,6 +19,9 @@ import type * as guests from "../guests.js";
 import type * as http from "../http.js";
 import type * as largestClubs from "../largestClubs.js";
 import type * as manualResults from "../manualResults.js";
+import type * as mcp_data from "../mcp/data.js";
+import type * as mcp_protocol from "../mcp/protocol.js";
+import type * as mcp_tools from "../mcp/tools.js";
 import type * as notificationSchedule from "../notificationSchedule.js";
 import type * as notificationTriggers from "../notificationTriggers.js";
 import type * as notifications from "../notifications.js";
@@ -27,6 +30,7 @@ import type * as parkrun from "../parkrun.js";
 import type * as profanity from "../profanity.js";
 import type * as queries from "../queries.js";
 import type * as races from "../races.js";
+import type * as snapshots from "../snapshots.js";
 import type * as weather from "../weather.js";
 
 import type {
@@ -47,6 +51,9 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   largestClubs: typeof largestClubs;
   manualResults: typeof manualResults;
+  "mcp/data": typeof mcp_data;
+  "mcp/protocol": typeof mcp_protocol;
+  "mcp/tools": typeof mcp_tools;
   notificationSchedule: typeof notificationSchedule;
   notificationTriggers: typeof notificationTriggers;
   notifications: typeof notifications;
@@ -55,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   profanity: typeof profanity;
   queries: typeof queries;
   races: typeof races;
+  snapshots: typeof snapshots;
   weather: typeof weather;
 }>;
 

@@ -5,7 +5,8 @@ Nx monorepo for the Scoop Bus Run Club website and services.
 ## Structure
 
 - `apps/web` — SolidJS frontend (Vite + PandaCSS)
-- `apps/api` — Convex backend (coming soon)
+- `apps/api` — Convex backend, including the club's MCP server (see
+  `docs/mcp.md`)
 - `apps/results-scraper` — local-only Chrome extension that fetches parkrun pages
   for the Process Results admin page (see its README; `pnpm scraper:build`)
 - `libs/shared` — parsers, URLs and types shared by all three

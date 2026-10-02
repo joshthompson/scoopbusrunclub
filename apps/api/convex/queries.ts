@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { query } from './_generated/server'
+import { type QueryCtx, query } from './_generated/server'
 
 export const getAllRunners = query({
 	args: {},
@@ -40,34 +40,42 @@ export const getRunResults = query({
 })
 
 /**
+ * Every run result since a date, with runner and event names attached for
+ * display. The body of `/api/results` and of the `results.json` snapshot.
+ */
+export async function resultsSince(ctx: QueryCtx, sinceDate: string) {
+	const runners = await ctx.db.query('runners').collect()
+	const runnerMap = new Map(runners.map((r) => [r.parkrunId, r.name]))
+
+	const events = await ctx.db.query('events').collect()
+	const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]))
+
+	const allResults = await ctx.db.query('runResults').collect()
+
+	return allResults
+		.filter((r) => r.date >= sinceDate)
+		.map((r) => ({
+			parkrunId: r.parkrunId,
+			runnerName: runnerMap.get(r.parkrunId) ?? 'Unknown',
+			event: r.event,
+			eventName: eventNameMap.get(r.event) ?? r.event,
+			eventNumber: r.eventNumber,
+			position: r.position,
+			time: r.time,
+			ageGrade: r.ageGrade,
+			date: r.date,
+		}))
+}
+
+export type ResultItem = Awaited<ReturnType<typeof resultsSince>>[number]
+
+/**
  * Get all run results across all runners since a given date.
  * Returns results with runner names attached for display.
  */
 export const getRecentResults = query({
 	args: { sinceDate: v.string() },
-	handler: async (ctx, args) => {
-		const runners = await ctx.db.query('runners').collect()
-		const runnerMap = new Map(runners.map((r) => [r.parkrunId, r.name]))
-
-		const events = await ctx.db.query('events').collect()
-		const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]))
-
-		const allResults = await ctx.db.query('runResults').collect()
-
-		return allResults
-			.filter((r) => r.date >= args.sinceDate)
-			.map((r) => ({
-				parkrunId: r.parkrunId,
-				runnerName: runnerMap.get(r.parkrunId) ?? 'Unknown',
-				event: r.event,
-				eventName: eventNameMap.get(r.event) ?? r.event,
-				eventNumber: r.eventNumber,
-				position: r.position,
-				time: r.time,
-				ageGrade: r.ageGrade,
-				date: r.date,
-			}))
-	},
+	handler: (ctx, args) => resultsSince(ctx, args.sinceDate),
 })
 
 export const getAllEvents = query({
@@ -78,63 +86,36 @@ export const getAllEvents = query({
 })
 
 /**
+ * Every volunteer record, with runner and event names attached for display.
+ * The body of `/api/volunteers` and of the `volunteers.json` snapshot.
+ */
+export async function allVolunteers(ctx: QueryCtx) {
+	const runners = await ctx.db.query('runners').collect()
+	const runnerMap = new Map(runners.map((r) => [r.parkrunId, r.name]))
+
+	const events = await ctx.db.query('events').collect()
+	const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]))
+
+	const allVolunteers = await ctx.db.query('volunteers').collect()
+
+	return allVolunteers.map((v) => ({
+		parkrunId: v.parkrunId,
+		volunteerName: runnerMap.get(v.parkrunId) ?? 'Unknown',
+		event: v.event,
+		eventName: eventNameMap.get(v.event) ?? v.event,
+		eventNumber: v.eventNumber,
+		roles: v.roles,
+		date: v.date,
+	}))
+}
+
+export type VolunteerItem = Awaited<ReturnType<typeof allVolunteers>>[number]
+
+/**
  * Get all volunteer records for tracked runners.
  * Returns volunteer entries with runner names attached for display.
  */
 export const getAllVolunteers = query({
 	args: {},
-	handler: async (ctx) => {
-		const runners = await ctx.db.query('runners').collect()
-		const runnerMap = new Map(runners.map((r) => [r.parkrunId, r.name]))
-
-		const events = await ctx.db.query('events').collect()
-		const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]))
-
-		const allVolunteers = await ctx.db.query('volunteers').collect()
-
-		return allVolunteers.map((v) => ({
-			parkrunId: v.parkrunId,
-			volunteerName: runnerMap.get(v.parkrunId) ?? 'Unknown',
-			event: v.event,
-			eventName: eventNameMap.get(v.event) ?? v.event,
-			eventNumber: v.eventNumber,
-			roles: v.roles,
-			date: v.date,
-		}))
-	},
-})
-
-/**
- * Return the last-updated timestamps used by the client-side cache.
- * - parkrunDataUpdatedAt: set when parkrun data is ingested (runners, results, volunteers, courses, events)
- * - scoopBusDataUpdatedAt: set when our own data changes (races / event calendar)
- * - guestDataUpdatedAt: set when guest data changes (guests, guest results)
- * - largestClubsUpdatedAt: set when a largest-clubs snapshot is ingested
- */
-export const getCacheVersion = query({
-	args: {},
-	handler: async (ctx) => {
-		const parkrunRow = await ctx.db
-			.query('appData')
-			.withIndex('by_key', (q) => q.eq('key', 'parkrunDataUpdatedAt'))
-			.unique()
-		const scoopBusRow = await ctx.db
-			.query('appData')
-			.withIndex('by_key', (q) => q.eq('key', 'scoopBusDataUpdatedAt'))
-			.unique()
-		const guestRow = await ctx.db
-			.query('appData')
-			.withIndex('by_key', (q) => q.eq('key', 'guestDataUpdatedAt'))
-			.unique()
-		const largestClubsRow = await ctx.db
-			.query('appData')
-			.withIndex('by_key', (q) => q.eq('key', 'largestClubsUpdatedAt'))
-			.unique()
-		return {
-			parkrunDataUpdatedAt: parkrunRow?.value ?? null,
-			scoopBusDataUpdatedAt: scoopBusRow?.value ?? null,
-			guestDataUpdatedAt: guestRow?.value ?? null,
-			largestClubsUpdatedAt: largestClubsRow?.value ?? null,
-		}
-	},
+	handler: (ctx) => allVolunteers(ctx),
 })

@@ -48,7 +48,7 @@ interface ClubNow {
  * runtime turns out to ship without timezone data it throws a RangeError on an
  * unknown zone, and the EU rules below answer instead.
  */
-function clubNow(at: Date = new Date()): ClubNow {
+export function clubNow(at: Date = new Date()): ClubNow {
 	return clubNowViaIntl(at) ?? clubNowViaEuRules(at)
 }
 

@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { mutation, query } from './_generated/server'
+import { type QueryCtx, mutation, query } from './_generated/server'
 import { logAdminEvent, validateSession } from './auth'
 
 const avatarValidator = v.optional(
@@ -26,11 +26,7 @@ const avatarValidator = v.optional(
 			),
 			hairColor: v.optional(v.string()),
 			accessory: v.optional(
-				v.union(
-					v.literal('cap'),
-					v.literal('headband'),
-					v.literal('glasses'),
-				),
+				v.union(v.literal('cap'), v.literal('headband'), v.literal('glasses')),
 			),
 			accessoryColor: v.optional(v.string()),
 			facialHair: v.optional(
@@ -95,33 +91,43 @@ export const getGuestResults = query({
 	},
 })
 
+/**
+ * Every guest result, with guest and event names attached. The body of
+ * `/api/guest-results` and of the `guest-results.json` snapshot.
+ */
+export async function allGuestResults(ctx: QueryCtx) {
+	const guests = await ctx.db.query('guests').collect()
+	const guestMap = new Map(guests.map((g) => [g._id, g]))
+
+	const events = await ctx.db.query('events').collect()
+	const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]))
+
+	const allResults = await ctx.db.query('guestResults').collect()
+
+	return allResults.map((r) => {
+		const guest = guestMap.get(r.guestId)
+		return {
+			guestId: r.guestId,
+			guestName: guest?.name ?? 'Unknown',
+			guestExtra: guest?.extra,
+			guestParkrunId: guest?.parkrunId,
+			event: r.event,
+			eventName: eventNameMap.get(r.event) ?? r.event,
+			eventNumber: r.eventNumber,
+			position: r.position,
+			time: r.time,
+			date: r.date,
+		}
+	})
+}
+
+export type GuestResultItem = Awaited<
+	ReturnType<typeof allGuestResults>
+>[number]
+
 export const getAllGuestResults = query({
 	args: {},
-	handler: async (ctx) => {
-		const guests = await ctx.db.query('guests').collect()
-		const guestMap = new Map(guests.map((g) => [g._id, g]))
-
-		const events = await ctx.db.query('events').collect()
-		const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]))
-
-		const allResults = await ctx.db.query('guestResults').collect()
-
-		return allResults.map((r) => {
-			const guest = guestMap.get(r.guestId)
-			return {
-				guestId: r.guestId,
-				guestName: guest?.name ?? 'Unknown',
-				guestExtra: guest?.extra,
-				guestParkrunId: guest?.parkrunId,
-				event: r.event,
-				eventName: eventNameMap.get(r.event) ?? r.event,
-				eventNumber: r.eventNumber,
-				position: r.position,
-				time: r.time,
-				date: r.date,
-			}
-		})
-	},
+	handler: (ctx) => allGuestResults(ctx),
 })
 
 // ── Mutations ───────────────────────────────────────────────────────

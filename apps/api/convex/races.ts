@@ -1,6 +1,11 @@
 import { v } from 'convex/values'
 import { repeatsOnOrAfter } from '../../../libs/shared/calendar/recurrence'
-import { internalMutation, mutation, query } from './_generated/server'
+import {
+	type QueryCtx,
+	internalMutation,
+	mutation,
+	query,
+} from './_generated/server'
 import { logAdminEvent, validateSession } from './auth'
 
 const attendeeValidator = v.object({
@@ -81,14 +86,20 @@ export const list = query({
 	},
 })
 
+/**
+ * The public races, oldest first. The body of `/api/races` and of the
+ * `our-events.json` snapshot.
+ */
+export async function publicRaces(ctx: QueryCtx) {
+	const allRaces = await ctx.db.query('races').collect()
+	return allRaces
+		.filter((r) => r.public)
+		.sort((a, b) => a.date.localeCompare(b.date))
+}
+
 export const listPublic = query({
 	args: {},
-	handler: async (ctx) => {
-		const allRaces = await ctx.db.query('races').collect()
-		return allRaces
-			.filter((r) => r.public)
-			.sort((a, b) => a.date.localeCompare(b.date))
-	},
+	handler: (ctx) => publicRaces(ctx),
 })
 
 export const getToday = query({

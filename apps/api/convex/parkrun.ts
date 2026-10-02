@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import { internalMutation, internalQuery } from './_generated/server'
+import { armSnapshots, isDataTimestampKey } from './snapshots'
 
 /**
  * Internal mutations for storing Parkrun data.
@@ -179,6 +180,10 @@ export const setAppData = internalMutation({
 				value: args.value,
 			})
 		}
+
+		// Every write to the public data ends by bumping one of these, so this
+		// is the one place the JSON snapshots need to hear about it.
+		if (isDataTimestampKey(args.key)) await armSnapshots(ctx, args.key)
 	},
 })
 
