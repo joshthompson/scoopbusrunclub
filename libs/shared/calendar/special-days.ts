@@ -3,20 +3,55 @@
  * Returns the name of the special event for a given date, or null if it's a normal day.
  */
 
-/** Fixed MM-DD → event name mapping */
-const FIXED_SPECIAL_DAYS: Record<string, string> = {
-	'01-01': "New Year's Day",
-	'03-11': 'Lithuanian Independence Restoration Day',
-	'04-27': 'Freedom Day', // South Africa
-	'05-04': 'Greenery Day', // Japan
-	'07-01': 'Canada Day',
-	'08-09': 'National Day', // Singapore
-	'09-16': 'Malaysia Day',
-	'10-03': 'German Unity Day',
-	'10-26': 'Austrian National Day',
-	'12-25': 'Christmas Day',
-	'12-26': 'Boxing Day',
+/**
+ * A day parkrun lets events hold an extra run. Apart from New Year's Day,
+ * each country picks its own, so a day only counts for the countries listed.
+ */
+interface SpecialDay {
+	name: string
+	/** Country codes as in DOMAIN_TO_COUNTRY (`SE`, `UK`, …), or 'all' */
+	countries: readonly string[] | 'all'
+	/** First year the day applies, for a country that changed its day */
+	fromYear?: number
+	/** Last year the day applies */
+	untilYear?: number
+	/** Years no event in the country held it */
+	exceptYears?: readonly number[]
 }
+
+/** Fixed MM-DD → special days on that date */
+const FIXED_SPECIAL_DAYS: Record<string, SpecialDay[]> = {
+	'01-01': [{ name: "New Year's Day", countries: 'all' }],
+	'03-11': [
+		{ name: 'Lithuanian Independence Restoration Day', countries: ['LT'] },
+	],
+	'04-27': [{ name: 'Freedom Day', countries: ['ZA'] }],
+	// Austria moved its day from National Day to May 1 for 2026, and then
+	// every Austrian event declined it.
+	'05-01': [
+		{
+			name: 'State Holiday',
+			countries: ['AT'],
+			fromYear: 2026,
+			exceptYears: [2026],
+		},
+	],
+	'05-04': [{ name: 'Greenery Day', countries: ['JP'] }],
+	'07-01': [{ name: 'Canada Day', countries: ['CA'] }],
+	'08-09': [{ name: 'National Day', countries: ['SG'] }],
+	'09-16': [{ name: 'Malaysia Day', countries: ['MY'] }],
+	'10-03': [{ name: 'German Unity Day', countries: ['DE'] }],
+	'10-26': [
+		{ name: 'Austrian National Day', countries: ['AT'], untilYear: 2025 },
+	],
+	'12-25': [
+		{ name: 'Christmas Day', countries: ['AU', 'IE', 'IT', 'NZ', 'UK'] },
+	],
+	'12-26': [{ name: 'Boxing Day', countries: ['PL'] }],
+}
+
+/** The club's home country, used when there's no parkrun to take one from */
+const DEFAULT_COUNTRY = 'SE'
 
 // ---------- Dynamic date helpers ----------
 
@@ -44,7 +79,7 @@ function toMMDD(d: Date): string {
 }
 
 /** Dynamic special days that depend on Easter or other yearly calculations */
-function getDynamicSpecialDays(year: number): Record<string, string> {
+function getDynamicSpecialDays(year: number): Record<string, SpecialDay[]> {
 	const easter = easterSunday(year)
 
 	const ascension = new Date(easter)
@@ -61,25 +96,36 @@ function getDynamicSpecialDays(year: number): Record<string, string> {
 	const thanksgivingDate = new Date(year, 10, fourthThursday)
 
 	return {
-		[toMMDD(ascension)]: 'Ascension Day',
-		[toMMDD(whitMon)]: 'Whit Monday',
-		[toMMDD(thanksgivingDate)]: 'Thanksgiving',
+		[toMMDD(ascension)]: [
+			{ name: 'Ascension Day', countries: ['DK', 'FI', 'NO', 'SE'] },
+		],
+		[toMMDD(whitMon)]: [{ name: 'Whit Monday', countries: ['NL'] }],
+		[toMMDD(thanksgivingDate)]: [{ name: 'Thanksgiving', countries: ['US'] }],
 	}
 }
 
+function appliesTo(day: SpecialDay, country: string, year: number): boolean {
+	if (day.countries !== 'all' && !day.countries.includes(country)) return false
+	if (day.fromYear != null && year < day.fromYear) return false
+	if (day.untilYear != null && year > day.untilYear) return false
+	return !day.exceptYears?.includes(year)
+}
+
 /**
- * Given a date string (YYYY-MM-DD), returns the special event name or null.
+ * Given a date string (YYYY-MM-DD) and the country of the parkrun, returns
+ * the special event name or null. Without a country it answers for Sweden.
  */
-export function getSpecialDayName(dateStr: string): string | null {
+export function getSpecialDayName(
+	dateStr: string,
+	country: string = DEFAULT_COUNTRY,
+): string | null {
 	const mmdd = dateStr.slice(5) // "MM-DD"
-
-	// Check fixed dates first
-	if (FIXED_SPECIAL_DAYS[mmdd]) return FIXED_SPECIAL_DAYS[mmdd]
-
-	// Check dynamic dates for the year
 	const year = Number.parseInt(dateStr.slice(0, 4), 10)
 	if (Number.isNaN(year)) return null
 
-	const dynamic = getDynamicSpecialDays(year)
-	return dynamic[mmdd] ?? null
+	const candidates = [
+		...(FIXED_SPECIAL_DAYS[mmdd] ?? []),
+		...(getDynamicSpecialDays(year)[mmdd] ?? []),
+	]
+	return candidates.find((day) => appliesTo(day, country, year))?.name ?? null
 }

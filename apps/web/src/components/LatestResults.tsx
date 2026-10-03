@@ -18,6 +18,7 @@ import {
 	formatName,
 	formatParkrunTime,
 	ordinal,
+	parseTimeToSeconds,
 } from '@/utils/misc'
 import { buildEventHands, eventHandKey } from '@/utils/poker'
 import { MILESTONE_SET } from '@shared/calendar/milestones'
@@ -279,19 +280,41 @@ function raceEntrySignature(e: RaceEntry, isToday: boolean): string {
 		kind: e.kind,
 		position: e.position ?? null,
 		time: e.time || null,
-		distance: e.distance ?? null,
-		laps: e.laps ?? null,
 		isToday,
 	})
+}
+
+/** Heading for a distance / laps section, e.g. "12 Laps - 80.4km" */
+function raceSectionTitle(laps?: number, distance?: number): string {
+	const parts: string[] = []
+	if (laps != null) parts.push(`${laps} ${laps === 1 ? 'Lap' : 'Laps'}`)
+	if (distance != null) parts.push(`${distance}km`)
+	return parts.length ? parts.join(' - ') : 'Other'
+}
+
+/** Compare two optional numbers, missing last */
+function compareOptional(
+	a: number | undefined,
+	b: number | undefined,
+	direction: 1 | -1,
+): number {
+	if (a == null) return b == null ? 0 : 1
+	if (b == null) return -1
+	return (a - b) * direction
+}
+
+interface RaceSection {
+	/** Absent when nobody at the event has a distance or laps */
+	title?: string
+	groups: RaceEntry[][]
 }
 
 function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 	const isToday = () =>
 		props.race.date === new Date().toISOString().split('T')[0]
 
-	const groups = createMemo(() => {
+	const sections = createMemo((): RaceSection[] => {
 		const today = isToday()
-		const map = new Map<string, RaceEntry[]>()
 		const entries: RaceEntry[] = [
 			...props.race.attendees.map(
 				(a): RaceEntry => ({ ...a, kind: 'member', id: a.runnerId }),
@@ -300,20 +323,56 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 				(g): RaceEntry => ({ ...g, kind: 'guest', id: g.guestId }),
 			),
 		]
-		// Ranked finishers first, by position, with members and guests
-		// interleaved; anyone without a position keeps their entry order at
-		// the end. The sort is stable, so ties stay in entry order too.
-		entries.sort((a, b) => {
-			if (a.position == null) return b.position == null ? 0 : 1
-			if (b.position == null) return -1
-			return a.position - b.position
-		})
+		// Fastest first, then by position, with members and guests
+		// interleaved; anyone with neither keeps their entry order at the
+		// end. The sort is stable, so ties stay in entry order too.
+		entries.sort(
+			(a, b) =>
+				compareOptional(
+					a.time ? parseTimeToSeconds(a.time) : undefined,
+					b.time ? parseTimeToSeconds(b.time) : undefined,
+					1,
+				) || compareOptional(a.position, b.position, 1),
+		)
+
+		// Split into distance / laps sections, most laps then furthest first,
+		// with anyone missing both under "Other" at the end. Events with no
+		// distances or laps at all stay as one untitled section.
+		const isSectioned = entries.some(
+			(e) => e.distance != null || e.laps != null,
+		)
+		const sectionMap = new Map<string, RaceEntry[]>()
 		for (const entry of entries) {
-			const key = raceEntrySignature(entry, today)
-			if (!map.has(key)) map.set(key, [])
-			map.get(key)?.push(entry)
+			const key = isSectioned
+				? JSON.stringify([entry.laps ?? null, entry.distance ?? null])
+				: ''
+			if (!sectionMap.has(key)) sectionMap.set(key, [])
+			sectionMap.get(key)?.push(entry)
 		}
-		return Array.from(map.values())
+		const sectionEntries = Array.from(sectionMap.values()).sort((a, b) => {
+			const isOtherA = a[0].laps == null && a[0].distance == null
+			const isOtherB = b[0].laps == null && b[0].distance == null
+			if (isOtherA !== isOtherB) return isOtherA ? 1 : -1
+			return (
+				compareOptional(a[0].laps, b[0].laps, -1) ||
+				compareOptional(a[0].distance, b[0].distance, -1)
+			)
+		})
+
+		return sectionEntries.map((sectionEntries) => {
+			const map = new Map<string, RaceEntry[]>()
+			for (const entry of sectionEntries) {
+				const key = raceEntrySignature(entry, today)
+				if (!map.has(key)) map.set(key, [])
+				map.get(key)?.push(entry)
+			}
+			return {
+				title: isSectioned
+					? raceSectionTitle(sectionEntries[0].laps, sectionEntries[0].distance)
+					: undefined,
+				groups: Array.from(map.values()),
+			}
+		})
 	})
 
 	const linkedName = (runnerId: string) => {
@@ -354,36 +413,22 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 		const rep = group[0]
 		const hasPosition = rep.position != null
 		const hasTime = rep.time != null
-		const hasDistance = rep.distance != null
-		const hasLaps = rep.laps != null
-		const hasResults = hasPosition || hasTime || hasDistance || hasLaps
+		// Distance and laps are in the section heading instead
+		const hasDistance = rep.distance != null || rep.laps != null
 
-		if (!hasResults) {
+		if (!hasPosition && !hasTime) {
+			if (hasDistance) return 'ran'
 			if (isToday())
 				return group.length > 1 ? 'are running today' : 'is running today'
 			return 'participated'
 		}
 
-		const parts: string[] = []
-
-		if (hasPosition || hasTime) {
-			let finished = 'finished'
-			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-			if (hasPosition) finished += ` in *${ordinal(rep.position!)}* place`
-			// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-			if (hasTime) finished += ` with a time of *${formatEventTime(rep.time!)}*`
-			parts.push(finished)
-		}
-
-		if (hasDistance || hasLaps) {
-			let ran = hasPosition || hasTime ? 'and ran' : 'ran'
-			if (hasDistance) ran += ` *${rep.distance}km*`
-			if (hasLaps)
-				ran += `${hasDistance ? ' over' : ''} *${rep.laps} ${rep.laps === 1 ? 'lap' : 'laps'}*`
-			parts.push(ran)
-		}
-
-		return parts.join(' ')
+		let finished = 'finished'
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+		if (hasPosition) finished += ` in *${ordinal(rep.position!)}* place`
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+		if (hasTime) finished += ` with a time of *${formatEventTime(rep.time!)}*`
+		return finished
 	}
 
 	// The furbies' own events have one either side in place of the emojis.
@@ -437,22 +482,31 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 						<img src={extLinkAsset} class={styles.externalRaceLink} alt="" />
 					</A>
 				)}
-				<ul style={{ 'list-style': 'none', padding: '0' }}>
-					<For each={groups()}>
-						{(group) => (
-							<li>
-								{joinNames(group.map(entryName))}{' '}
-								{renderBold(describeGroup(group))}
-								<Show when={group[0].kind === 'guest'}>
-									<span class={styles.guestTag}>
-										{group.length > 1 ? 'Guests' : 'Guest'}{' '}
-										<Emoji emoji="👋" animation="wave" />
-									</span>
-								</Show>
-							</li>
-						)}
-					</For>
-				</ul>
+				<For each={sections()}>
+					{(section) => (
+						<div>
+							<Show when={section.title}>
+								<h5 class={styles.raceSectionTitle}>{section.title}</h5>
+							</Show>
+							<ul style={{ 'list-style': 'none', padding: '0' }}>
+								<For each={section.groups}>
+									{(group) => (
+										<li>
+											{joinNames(group.map(entryName))}{' '}
+											{renderBold(describeGroup(group))}
+											<Show when={group[0].kind === 'guest'}>
+												<span class={styles.guestTag}>
+													{group.length > 1 ? 'Guests' : 'Guest'}{' '}
+													<Emoji emoji="👋" animation="wave" />
+												</span>
+											</Show>
+										</li>
+									)}
+								</For>
+							</ul>
+						</div>
+					)}
+				</For>
 			</div>
 		</DirtBlock>
 	)
@@ -486,7 +540,8 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 		props.parkrun.name !== 'Haga' && props.parkrun.results.length >= 4
 	const isMilestone = () => isMilestoneEvent(props.parkrun.eventNumber)
 	const isXmas = () => isChristmas(props.date)
-	const specialDay = () => getSpecialDayName(props.date)
+	const specialDay = () =>
+		getSpecialDayName(props.date, getEvent(props.parkrun.eventId)?.country)
 	const displayName = () =>
 		getDisplayName(
 			props.parkrun.name,
@@ -1026,6 +1081,11 @@ const styles = {
 		fontSize: '1.5em',
 		maxWidth: 'calc(100% - 40px)',
 		m: '0 auto',
+	}),
+	raceSectionTitle: css({
+		fontWeight: 'bold',
+		fontSize: '1.1em',
+		m: '0 0 0.25rem',
 	}),
 	parkrunNameLink: css({
 		color: 'inherit',

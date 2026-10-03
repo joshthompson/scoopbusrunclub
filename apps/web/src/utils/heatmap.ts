@@ -1,5 +1,6 @@
 import { getSpecialDayName } from '@shared/calendar/special-days'
 import type { RaceItem, RunResultItem, VolunteerItem } from './api'
+import { getEvent } from './events'
 
 export type WeekActivity = 'none' | 'ran' | 'volunteered' | 'both'
 
@@ -145,18 +146,30 @@ export function buildHeatmapData(
 	})
 
 	// Build special event cells from non-Saturday parkrun results/volunteering
-	const specialDates = new Map<string, { ran: string[]; vol: string[] }>()
+	// Each date keeps the country of its first parkrun, for naming the day
+	const specialDates = new Map<
+		string,
+		{ ran: string[]; vol: string[]; country?: string }
+	>()
 	for (const r of specialResults) {
 		if (r.date < startSat || r.date > todaySat) continue
 		if (!specialDates.has(r.date))
-			specialDates.set(r.date, { ran: [], vol: [] })
+			specialDates.set(r.date, {
+				ran: [],
+				vol: [],
+				country: getEvent(r.event)?.country,
+			})
 		const entry = specialDates.get(r.date)
 		if (entry) entry.ran.push(`${r.eventName} #${r.eventNumber}`)
 	}
 	for (const v of specialVolunteers) {
 		if (v.date < startSat || v.date > todaySat) continue
 		if (!specialDates.has(v.date))
-			specialDates.set(v.date, { ran: [], vol: [] })
+			specialDates.set(v.date, {
+				ran: [],
+				vol: [],
+				country: getEvent(v.event)?.country,
+			})
 		const entry = specialDates.get(v.date)
 		if (entry) entry.vol.push(`${v.eventName} #${v.eventNumber} (volunteer)`)
 	}
@@ -178,7 +191,7 @@ export function buildHeatmapData(
 
 	// Create special cells and insert them at the right positions
 	const specialCells: WeekCell[] = []
-	for (const [date, { ran, vol }] of specialDates) {
+	for (const [date, { ran, vol, country }] of specialDates) {
 		let activity: WeekActivity = 'none'
 		if (ran.length > 0 && vol.length > 0) activity = 'both'
 		else if (ran.length > 0) activity = 'ran'
@@ -186,7 +199,9 @@ export function buildHeatmapData(
 
 		const labels = [...ran, ...vol]
 		const specialName =
-			raceNameByDate.get(date) ?? getSpecialDayName(date) ?? 'Special Event'
+			raceNameByDate.get(date) ??
+			getSpecialDayName(date, country) ??
+			'Special Event'
 		specialCells.push({
 			date,
 			activity,
