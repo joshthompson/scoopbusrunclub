@@ -28,6 +28,8 @@ const FIXED_SPECIAL_DAYS: Record<string, SpecialDay[]> = {
 	'04-27': [{ name: 'Freedom Day', countries: ['ZA'] }],
 	// Austria moved its day from National Day to May 1 for 2026, and then
 	// every Austrian event declined it.
+	// Before 2024 each Nordic country had its own day; since then Denmark,
+	// Norway and Sweden share Finland's Ascension Day.
 	'05-01': [
 		{
 			name: 'State Holiday',
@@ -35,8 +37,13 @@ const FIXED_SPECIAL_DAYS: Record<string, SpecialDay[]> = {
 			fromYear: 2026,
 			exceptYears: [2026],
 		},
+		{ name: 'Labour Day', countries: ['NO'], untilYear: 2023 },
 	],
 	'05-04': [{ name: 'Greenery Day', countries: ['JP'] }],
+	'06-05': [{ name: 'Constitution Day', countries: ['DK'], untilYear: 2023 }],
+	'06-06': [
+		{ name: 'National Day of Sweden', countries: ['SE'], untilYear: 2023 },
+	],
 	'07-01': [{ name: 'Canada Day', countries: ['CA'] }],
 	'08-09': [{ name: 'National Day', countries: ['SG'] }],
 	'09-16': [{ name: 'Malaysia Day', countries: ['MY'] }],
@@ -97,7 +104,8 @@ function getDynamicSpecialDays(year: number): Record<string, SpecialDay[]> {
 
 	return {
 		[toMMDD(ascension)]: [
-			{ name: 'Ascension Day', countries: ['DK', 'FI', 'NO', 'SE'] },
+			{ name: 'Ascension Day', countries: ['FI'] },
+			{ name: 'Ascension Day', countries: ['DK', 'NO', 'SE'], fromYear: 2024 },
 		],
 		[toMMDD(whitMon)]: [{ name: 'Whit Monday', countries: ['NL'] }],
 		[toMMDD(thanksgivingDate)]: [{ name: 'Thanksgiving', countries: ['US'] }],
