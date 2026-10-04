@@ -51,6 +51,7 @@ interface Appearance {
 /** Summarise whatever result fields were recorded for a guest at a club event */
 function describeRaceResult(entry: RaceGuestAttendee): string | undefined {
 	const parts: string[] = []
+	if (entry.class) parts.push(entry.class)
 	if (entry.position != null) parts.push(`${ordinal(entry.position)} place`)
 	if (entry.time) parts.push(entry.time)
 	if (entry.distance != null) parts.push(`${entry.distance}km`)

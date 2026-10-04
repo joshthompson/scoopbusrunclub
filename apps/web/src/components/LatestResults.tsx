@@ -267,6 +267,8 @@ interface RaceResult {
 	time?: string
 	distance?: number
 	laps?: number
+	/** Groups results in place of laps / distance */
+	class?: string
 }
 
 /** One participant at a non-parkrun event, either a club member or a guest */
@@ -280,6 +282,9 @@ function raceEntrySignature(e: RaceEntry, isToday: boolean): string {
 		kind: e.kind,
 		position: e.position ?? null,
 		time: e.time || null,
+		// Only a class section leaves laps / distance out of its heading
+		laps: e.class ? (e.laps ?? null) : null,
+		distance: e.class ? (e.distance ?? null) : null,
 		isToday,
 	})
 }
@@ -290,6 +295,14 @@ function raceSectionTitle(laps?: number, distance?: number): string {
 	if (laps != null) parts.push(`${laps} ${laps === 1 ? 'Lap' : 'Laps'}`)
 	if (distance != null) parts.push(`${distance}km`)
 	return parts.length ? parts.join(' - ') : 'Other'
+}
+
+/** Laps and distance for a result line, e.g. "12 laps, 80.4km" */
+function lapsAndDistance(laps?: number, distance?: number): string | undefined {
+	const parts: string[] = []
+	if (laps != null) parts.push(`${laps} ${laps === 1 ? 'lap' : 'laps'}`)
+	if (distance != null) parts.push(`${distance}km`)
+	return parts.length ? parts.join(', ') : undefined
 }
 
 /** Compare two optional numbers, missing last */
@@ -323,6 +336,11 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 				(g): RaceEntry => ({ ...g, kind: 'guest', id: g.guestId }),
 			),
 		]
+		// Classes are headed in the order they were entered, before sorting
+		const classOrder = [
+			...new Set(entries.map((e) => e.class).filter((c) => c != null)),
+		]
+
 		// Fastest first, then by position, with members and guests
 		// interleaved; anyone with neither keeps their entry order at the
 		// end. The sort is stable, so ties stay in entry order too.
@@ -335,29 +353,35 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 				) || compareOptional(a.position, b.position, 1),
 		)
 
-		// Split into distance / laps sections, most laps then furthest first,
-		// with anyone missing both under "Other" at the end. Events with no
-		// distances or laps at all stay as one untitled section.
+		// Split into sections: a class wins over laps / distance, so classes
+		// come first in entry order, then distance / laps sections with most
+		// laps then furthest first, then anyone with none of them under
+		// "Other" at the end. Events with none at all stay as one untitled
+		// section.
 		const isSectioned = entries.some(
-			(e) => e.distance != null || e.laps != null,
+			(e) => e.class != null || e.distance != null || e.laps != null,
 		)
 		const sectionMap = new Map<string, RaceEntry[]>()
 		for (const entry of entries) {
-			const key = isSectioned
-				? JSON.stringify([entry.laps ?? null, entry.distance ?? null])
-				: ''
+			const key = !isSectioned
+				? ''
+				: entry.class != null
+					? JSON.stringify(['class', entry.class])
+					: JSON.stringify([entry.laps ?? null, entry.distance ?? null])
 			if (!sectionMap.has(key)) sectionMap.set(key, [])
 			sectionMap.get(key)?.push(entry)
 		}
-		const sectionEntries = Array.from(sectionMap.values()).sort((a, b) => {
-			const isOtherA = a[0].laps == null && a[0].distance == null
-			const isOtherB = b[0].laps == null && b[0].distance == null
-			if (isOtherA !== isOtherB) return isOtherA ? 1 : -1
-			return (
+		const rank = (e: RaceEntry) => {
+			if (e.class != null) return classOrder.indexOf(e.class)
+			if (e.laps == null && e.distance == null) return classOrder.length + 1
+			return classOrder.length
+		}
+		const sectionEntries = Array.from(sectionMap.values()).sort(
+			(a, b) =>
+				rank(a[0]) - rank(b[0]) ||
 				compareOptional(a[0].laps, b[0].laps, -1) ||
-				compareOptional(a[0].distance, b[0].distance, -1)
-			)
-		})
+				compareOptional(a[0].distance, b[0].distance, -1),
+		)
 
 		return sectionEntries.map((sectionEntries) => {
 			const map = new Map<string, RaceEntry[]>()
@@ -367,9 +391,13 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 				map.get(key)?.push(entry)
 			}
 			return {
-				title: isSectioned
-					? raceSectionTitle(sectionEntries[0].laps, sectionEntries[0].distance)
-					: undefined,
+				title: !isSectioned
+					? undefined
+					: (sectionEntries[0].class ??
+						raceSectionTitle(
+							sectionEntries[0].laps,
+							sectionEntries[0].distance,
+						)),
 				groups: Array.from(map.values()),
 			}
 		})
@@ -413,10 +441,15 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 		const rep = group[0]
 		const hasPosition = rep.position != null
 		const hasTime = rep.time != null
-		// Distance and laps are in the section heading instead
 		const hasDistance = rep.distance != null || rep.laps != null
+		// Distance and laps are in the section heading instead, unless a
+		// class took the heading
+		const distance = rep.class
+			? lapsAndDistance(rep.laps, rep.distance)
+			: undefined
 
 		if (!hasPosition && !hasTime) {
+			if (distance) return `ran *${distance}*`
 			if (hasDistance) return 'ran'
 			if (isToday())
 				return group.length > 1 ? 'are running today' : 'is running today'
@@ -428,6 +461,7 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 		if (hasPosition) finished += ` in *${ordinal(rep.position!)}* place`
 		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 		if (hasTime) finished += ` with a time of *${formatEventTime(rep.time!)}*`
+		if (distance) finished += ` over *${distance}*`
 		return finished
 	}
 

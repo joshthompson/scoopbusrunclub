@@ -208,6 +208,7 @@ function ourEventRow(
 					time: a.time,
 					distance_km: a.distance,
 					laps: a.laps,
+					class: a.class,
 				}))
 			: undefined,
 		guests: race.guests?.length
@@ -217,6 +218,7 @@ function ourEventRow(
 					time: g.time,
 					distance_km: g.distance,
 					laps: g.laps,
+					class: g.class,
 				}))
 			: undefined,
 	}
@@ -375,6 +377,7 @@ const getMember: Tool = {
 							position: me?.position,
 							time: me?.time,
 							distance_km: me?.distance,
+							class: me?.class,
 						}
 					}),
 				upcoming: theirEvents

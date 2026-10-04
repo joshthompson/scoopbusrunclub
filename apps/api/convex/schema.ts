@@ -79,6 +79,7 @@ export default defineSchema({
 				time: v.optional(v.string()), // hh:mm:ss format
 				distance: v.optional(v.number()),
 				laps: v.optional(v.number()),
+				class: v.optional(v.string()), // groups results in place of laps / distance
 				scanned: v.optional(v.boolean()),
 			}),
 		),
@@ -90,6 +91,7 @@ export default defineSchema({
 					time: v.optional(v.string()), // hh:mm:ss format
 					distance: v.optional(v.number()),
 					laps: v.optional(v.number()),
+					class: v.optional(v.string()),
 				}),
 			),
 		),

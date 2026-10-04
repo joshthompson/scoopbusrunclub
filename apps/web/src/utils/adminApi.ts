@@ -80,6 +80,8 @@ export interface RaceAttendee {
 	time?: string // hh:mm:ss format
 	distance?: number
 	laps?: number
+	/** Groups results in place of laps / distance, e.g. "Half marathon" */
+	class?: string
 	scanned?: boolean
 }
 
@@ -90,6 +92,8 @@ export interface RaceGuest {
 	time?: string // hh:mm:ss format
 	distance?: number
 	laps?: number
+	/** Groups results in place of laps / distance, e.g. "Half marathon" */
+	class?: string
 }
 
 export interface Race {

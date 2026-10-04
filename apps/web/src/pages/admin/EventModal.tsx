@@ -48,6 +48,7 @@ interface FieldStrings {
 	time: string
 	distance: string
 	laps: string
+	class: string
 }
 
 const emptyFields = (): FieldStrings => ({
@@ -55,6 +56,7 @@ const emptyFields = (): FieldStrings => ({
 	time: '',
 	distance: '',
 	laps: '',
+	class: '',
 })
 
 const fieldsFrom = (r: {
@@ -62,16 +64,24 @@ const fieldsFrom = (r: {
 	time?: string
 	distance?: number
 	laps?: number
+	class?: string
 }): FieldStrings => ({
 	position: r.position != null ? String(r.position) : '',
 	time: r.time ?? '',
 	distance: r.distance != null ? String(r.distance) : '',
 	laps: r.laps != null ? String(r.laps) : '',
+	class: r.class ?? '',
 })
 
 /** Parse a row's inputs onto `entry`, returns false if any value is invalid */
 function applyFields(
-	entry: { position?: number; time?: string; distance?: number; laps?: number },
+	entry: {
+		position?: number
+		time?: string
+		distance?: number
+		laps?: number
+		class?: string
+	},
 	s: FieldStrings,
 ): boolean {
 	// Position: integer
@@ -101,6 +111,10 @@ function applyFields(
 		entry.laps = Math.round(n)
 	}
 
+	// Class: free text, groups results in place of laps / distance
+	const raceClass = s.class.trim()
+	if (raceClass) entry.class = raceClass
+
 	return true
 }
 
@@ -129,7 +143,7 @@ interface EventModalProps {
 
 const allRunnerKeys = Object.keys(runners) as RunnerName[]
 
-/** Position / time / distance / laps inputs for one row */
+/** Position / time / distance / laps / class inputs for one row */
 const ResultFields: Component<{
 	values: FieldStrings
 	onChange: (field: keyof FieldStrings, value: string) => void
@@ -166,6 +180,15 @@ const ResultFields: Component<{
 			onInput={(e) => props.onChange('laps', e.currentTarget.value)}
 			size="small"
 			width="60px"
+		/>
+		<AdminInput
+			type="text"
+			placeholder="Class"
+			title="Groups results under this heading instead of laps / distance"
+			value={props.values.class}
+			onInput={(e) => props.onChange('class', e.currentTarget.value)}
+			size="small"
+			width="90px"
 		/>
 	</div>
 )
