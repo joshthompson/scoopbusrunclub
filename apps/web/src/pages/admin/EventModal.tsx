@@ -143,6 +143,14 @@ interface EventModalProps {
 
 const allRunnerKeys = Object.keys(runners) as RunnerName[]
 
+/** `list` with the item at `from` moved to `to` */
+function moveItem<T>(list: T[], from: number, to: number): T[] {
+	const next = [...list]
+	const [item] = next.splice(from, 1)
+	next.splice(to, 0, item)
+	return next
+}
+
 /** Position / time / distance / laps / class inputs for one row */
 const ResultFields: Component<{
 	values: FieldStrings
@@ -269,6 +277,75 @@ export const EventModal: Component<EventModalProps> = (props) => {
 			return
 		setRaceGuests((prev) => prev.filter((_, i) => i !== index))
 		setGuestFieldStrings((prev) => prev.filter((_, i) => i !== index))
+	}
+
+	// Dragging a row by its handle reorders the list. The order is saved, and
+	// the results page heads each class in the order it first appears.
+	const [dragging, setDragging] = createSignal<{
+		list: 'attendees' | 'guests'
+		index: number
+	} | null>(null)
+	const [dropIndex, setDropIndex] = createSignal<number | null>(null)
+
+	const moveRow = (list: 'attendees' | 'guests', from: number, to: number) => {
+		if (from === to) return
+		if (list === 'attendees') {
+			setAttendees((prev) => moveItem(prev, from, to))
+			setFieldStrings((prev) => moveItem(prev, from, to))
+		} else {
+			setRaceGuests((prev) => moveItem(prev, from, to))
+			setGuestFieldStrings((prev) => moveItem(prev, from, to))
+		}
+	}
+
+	/** Drop-target handlers for a row, plus its drag handle */
+	const dragRow = (list: 'attendees' | 'guests', index: () => number) => {
+		const isOver = () =>
+			dragging()?.list === list &&
+			dropIndex() === index() &&
+			dragging()?.index !== index()
+		const handle = (
+			<span
+				class={styles.dragHandle}
+				draggable={true}
+				title="Drag to reorder"
+				onDragStart={(e) => {
+					setDragging({ list, index: index() })
+					if (e.dataTransfer) {
+						e.dataTransfer.effectAllowed = 'move'
+						// Firefox won't start a drag without some data
+						e.dataTransfer.setData('text/plain', String(index()))
+						const row = e.currentTarget.parentElement
+						if (row) e.dataTransfer.setDragImage(row, 0, 0)
+					}
+				}}
+				onDragEnd={() => {
+					setDragging(null)
+					setDropIndex(null)
+				}}
+			>
+				⠿
+			</span>
+		)
+		return {
+			handle,
+			isOver,
+			rowProps: {
+				onDragOver: (e: DragEvent) => {
+					if (dragging()?.list !== list) return
+					e.preventDefault()
+					setDropIndex(index())
+				},
+				onDrop: (e: DragEvent) => {
+					const from = dragging()
+					if (from?.list !== list) return
+					e.preventDefault()
+					moveRow(list, from.index, index())
+					setDragging(null)
+					setDropIndex(null)
+				},
+			},
+		}
 	}
 
 	const updateFieldString = (
@@ -552,40 +629,48 @@ export const EventModal: Component<EventModalProps> = (props) => {
 					<Show when={attendees().length > 0}>
 						<div class={styles.attendeeList}>
 							<For each={attendees()}>
-								{(att, idx) => (
-									<div class={styles.attendeeRow}>
-										<AdminAvatar user={att.runnerId} size="medium" />
-										<span class={styles.attendeeName}>
-											{runnerDisplayName(att.runnerId)}
-											<Show when={att.scanned}>
-												<span
-													class={styles.scannedIcon}
-													title="Scanned via barcode"
-												>
-													<img
-														src={qrIconAsset}
-														alt="Scanned via barcode"
-														width={12}
-														height={12}
-													/>
-												</span>
-											</Show>
-										</span>
-										<ResultFields
-											values={fieldStrings()[idx()] ?? emptyFields()}
-											onChange={(field, value) =>
-												updateFieldString(idx(), field, value)
-											}
-										/>
-										<button
-											type="button"
-											class={styles.removeBtn}
-											onClick={() => removeAttendee(idx())}
+								{(att, idx) => {
+									const drag = dragRow('attendees', idx)
+									return (
+										<div
+											class={styles.attendeeRow}
+											classList={{ [styles.dropTarget]: drag.isOver() }}
+											{...drag.rowProps}
 										>
-											✕
-										</button>
-									</div>
-								)}
+											{drag.handle}
+											<AdminAvatar user={att.runnerId} size="medium" />
+											<span class={styles.attendeeName}>
+												{runnerDisplayName(att.runnerId)}
+												<Show when={att.scanned}>
+													<span
+														class={styles.scannedIcon}
+														title="Scanned via barcode"
+													>
+														<img
+															src={qrIconAsset}
+															alt="Scanned via barcode"
+															width={12}
+															height={12}
+														/>
+													</span>
+												</Show>
+											</span>
+											<ResultFields
+												values={fieldStrings()[idx()] ?? emptyFields()}
+												onChange={(field, value) =>
+													updateFieldString(idx(), field, value)
+												}
+											/>
+											<button
+												type="button"
+												class={styles.removeBtn}
+												onClick={() => removeAttendee(idx())}
+											>
+												✕
+											</button>
+										</div>
+									)
+								}}
 							</For>
 						</div>
 					</Show>
@@ -627,35 +712,43 @@ export const EventModal: Component<EventModalProps> = (props) => {
 					>
 						<div class={styles.attendeeList}>
 							<For each={raceGuests()}>
-								{(guest, idx) => (
-									<div class={styles.attendeeRow}>
-										<GuestAvatar
-											name={guestDisplayName(guest.guestId)}
-											avatar={
-												guestRecord(guest.guestId)?.avatar as
-													| CharacterSpriteProps
-													| undefined
-											}
-											size="medium"
-										/>
-										<span class={styles.attendeeName}>
-											{guestDisplayName(guest.guestId)}
-										</span>
-										<ResultFields
-											values={guestFieldStrings()[idx()] ?? emptyFields()}
-											onChange={(field, value) =>
-												updateGuestFieldString(idx(), field, value)
-											}
-										/>
-										<button
-											type="button"
-											class={styles.removeBtn}
-											onClick={() => removeGuest(idx())}
+								{(guest, idx) => {
+									const drag = dragRow('guests', idx)
+									return (
+										<div
+											class={styles.attendeeRow}
+											classList={{ [styles.dropTarget]: drag.isOver() }}
+											{...drag.rowProps}
 										>
-											✕
-										</button>
-									</div>
-								)}
+											{drag.handle}
+											<GuestAvatar
+												name={guestDisplayName(guest.guestId)}
+												avatar={
+													guestRecord(guest.guestId)?.avatar as
+														| CharacterSpriteProps
+														| undefined
+												}
+												size="medium"
+											/>
+											<span class={styles.attendeeName}>
+												{guestDisplayName(guest.guestId)}
+											</span>
+											<ResultFields
+												values={guestFieldStrings()[idx()] ?? emptyFields()}
+												onChange={(field, value) =>
+													updateGuestFieldString(idx(), field, value)
+												}
+											/>
+											<button
+												type="button"
+												class={styles.removeBtn}
+												onClick={() => removeGuest(idx())}
+											>
+												✕
+											</button>
+										</div>
+									)
+								}}
 							</For>
 						</div>
 					</Show>
@@ -760,6 +853,20 @@ const styles = {
 		fontSize: '0.75rem',
 		outline: 'none',
 		textAlign: 'center',
+	}),
+	dragHandle: css({
+		color: 'var(--color-white)',
+		cursor: 'grab',
+		fontSize: '1rem',
+		lineHeight: 1,
+		padding: '0 2px',
+		userSelect: 'none',
+		opacity: 0.7,
+		_hover: { opacity: 1 },
+	}),
+	dropTarget: css({
+		outline: '2px dashed var(--color-white)',
+		outlineOffset: '-2px',
 	}),
 	removeBtn: css({
 		position: 'absolute',

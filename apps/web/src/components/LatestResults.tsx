@@ -336,7 +336,8 @@ function RaceBlock(props: { race: RaceItem; guests: GuestItem[] }) {
 				(g): RaceEntry => ({ ...g, kind: 'guest', id: g.guestId }),
 			),
 		]
-		// Classes are headed in the order they were entered, before sorting
+		// Classes are headed in the order they first appear in the event's
+		// results, as arranged in admin, so this is worked out before sorting
 		const classOrder = [
 			...new Set(entries.map((e) => e.class).filter((c) => c != null)),
 		]
