@@ -36,10 +36,13 @@ interface CalendarPageProps {
 	runners: Runner[]
 }
 
-/** "Josh, Keith and 3 more" — cell space is tight, so cap the visible names. */
+/**
+ * "Josh, Keith and 3 more" — cell space is tight, so cap the visible names.
+ * "and 1 more" takes as much room as the name itself, so one over the limit is named in full.
+ */
 function summarisePeople(people: string[], limit = 3): string {
 	if (people.length === 0) return ''
-	if (people.length <= limit) {
+	if (people.length <= limit + 1) {
 		if (people.length === 1) return people[0]
 		return `${people.slice(0, -1).join(', ')} and ${people[people.length - 1]}`
 	}
