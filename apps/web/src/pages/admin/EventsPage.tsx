@@ -55,11 +55,14 @@ export const EVENT_TYPES = [
 	{
 		groupName: 'Race',
 		types: [
+			'5km',
+			'10km',
 			'Marathon',
 			'Half Marathon',
 			'Ultra',
 			'Trail',
 			'Backyard Ultra',
+			'Triathlon',
 			'Other',
 		],
 	},
