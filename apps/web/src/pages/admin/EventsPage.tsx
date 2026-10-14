@@ -63,7 +63,7 @@ export const EVENT_TYPES = [
 			'Trail',
 			'Backyard Ultra',
 			'Triathlon',
-			'Other',
+			'Other Race',
 		],
 	},
 	{
