@@ -46,7 +46,7 @@ import { EventModal } from './EventModal'
 export const EVENT_TYPES = [
 	{
 		groupName: 'parkrun',
-		types: [PARKRUN_TRIP_TYPE],
+		types: [PARKRUN_TRIP_TYPE, 'Former Parkrun', 'Reverse Parkrun'],
 	},
 	{
 		groupName: 'Social',
@@ -54,7 +54,14 @@ export const EVENT_TYPES = [
 	},
 	{
 		groupName: 'Race',
-		types: ['Marathon', 'Half Marathon', 'Ultra', 'Other'],
+		types: [
+			'Marathon',
+			'Half Marathon',
+			'Ultra',
+			'Trail',
+			'Backyard Ultra',
+			'Other',
+		],
 	},
 	{
 		groupName: 'Misc',

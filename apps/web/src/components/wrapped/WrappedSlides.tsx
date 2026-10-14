@@ -6,6 +6,7 @@ import {
 	milestoneColor,
 } from '@/data/balloons'
 import { type RunnerData, runners as runnerSignals } from '@/data/runners'
+import { getWrappedAwards } from '@/data/wrappedAwards'
 import { getMemberRoute } from '@/utils/memberRoute'
 import type { WrappedStats } from '@/utils/wrapped'
 import {
@@ -17,6 +18,7 @@ import {
 	summariseList,
 	timesLabel,
 } from '@/utils/wrappedFormat'
+import { CLUB_MEMBERS } from '@shared/members'
 import { A } from '@solidjs/router'
 import { css } from '@style/css'
 import { For, type JSX, Show } from 'solid-js'
@@ -127,6 +129,9 @@ const SLIDE_GRADIENTS = [
 	'linear-gradient(160deg, #E0245E, #3B4FDB)',
 	'linear-gradient(160deg, #D97706, #0E9488)',
 ]
+
+/** Gold, for the hand-picked awards, so they read as a set of their own. */
+const AWARD_GRADIENT = 'linear-gradient(160deg, #D4A017, #B45309)'
 
 // ---------------------------------------------------------------------------
 // Shared card + spotlight rendering
@@ -865,6 +870,52 @@ export function buildWrappedSlides(
 				<EmojiString text={race.name} />
 			</>
 		))
+	}
+
+	// --- Awards — hand-picked, so they close the year after the numbers ---
+	for (const award of getWrappedAwards(year)) {
+		const winners: SpotlightMember[] = award.winners.map((key) => ({
+			name: CLUB_MEMBERS[key].name,
+			parkrunId: CLUB_MEMBERS[key].id || undefined,
+			runnerKey: key,
+		}))
+		const reason = () => (
+			<Show when={award.link} fallback={award.reason}>
+				{(href) => (
+					<a
+						href={href()}
+						target="_blank"
+						rel="noopener noreferrer"
+						class={spotlightStyles.link}
+					>
+						{award.reason}
+					</a>
+				)}
+			</Show>
+		)
+		card(
+			`award-${award.id}`,
+			award.emoji,
+			'var(--amber-500)',
+			() => (
+				<>
+					<strong>{award.title}</strong> goes to{' '}
+					<strong>{joinNames(winners.map((member) => member.name))}</strong> for
+					their {reason()}
+				</>
+			),
+			undefined,
+			AWARD_GRADIENT,
+			winners,
+			// The winners are pictured above this in the stories view.
+			() => (
+				<>
+					<strong>{award.title}</strong>
+					<br />
+					for their {reason()}
+				</>
+			),
+		)
 	}
 
 	return slides.map((slide, index) => ({
