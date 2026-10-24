@@ -2,6 +2,7 @@ import {
 	type SpritePixelData,
 	runPixels,
 	sitPixels,
+	zombiePixels,
 } from '@/assets/runners/custom/pixel-data.generated'
 import { generateFrames } from '@/utils'
 import type { RunnerData } from '../data/runners'
@@ -34,14 +35,23 @@ const RUNNER_SIZE = 2
 
 export function createRunnerFrames(
 	character: CharacterSpriteProps,
-): Pick<RunnerData, 'frames' | 'width' | 'height'> {
+): Pick<
+	RunnerData,
+	'frames' | 'width' | 'height' | 'headPoint' | 'sitHeadPoint'
+> {
 	const run = generateCustomSpriteFrames(character, runPixels, FRAME_COUNT)
 	const sit = generateCustomSpriteFrames(character, sitPixels, 1)
+	const zombie = generateCustomSpriteFrames(
+		character,
+		zombiePixels,
+		FRAME_COUNT,
+	)
 	const face = generateFaceFrame(character)
 	return {
 		frames: {
-			run,
-			sit,
+			run: run?.frames,
+			zombie: zombie?.frames,
+			sit: sit?.frames,
 			face,
 			tailWalk: undefined,
 			tailSit: undefined,
@@ -54,6 +64,8 @@ export function createRunnerFrames(
 		},
 		width: 21,
 		height: 28,
+		headPoint: run?.headPoint,
+		sitHeadPoint: sit?.headPoint,
 	}
 }
 
@@ -371,11 +383,17 @@ function generateFaceFrame(character: CharacterSpriteProps): string[] {
 	return [imageUrl]
 }
 
+/**
+ * The middle of the face in `HEAD.base`, which is where anything worn on the
+ * head is centred.
+ */
+const HEAD_FACE_CENTRE: Vector = { x: 4, y: 3 }
+
 function generateCustomSpriteFrames(
 	character: CharacterSpriteProps,
 	spritePixels: SpritePixelData | null,
 	frameCount: number,
-): string[] | undefined {
+): { frames: string[]; headPoint: Vector } | undefined {
 	if (!spritePixels) return undefined
 
 	const spriteData = decodePixels(spritePixels)
@@ -492,14 +510,26 @@ function generateCustomSpriteFrames(
 	const imageUrl = finalCanvas.toDataURL('image/png')
 	const spriteWidth = totalWidth / frameCount
 
-	return generateFrames(
-		imageUrl,
-		spriteWidth * frameCount,
-		totalHeight,
-		spriteWidth * RUNNER_SIZE,
-		frameCount,
-		true,
-	)
+	return {
+		frames: generateFrames(
+			imageUrl,
+			spriteWidth * frameCount,
+			totalHeight,
+			spriteWidth * RUNNER_SIZE,
+			frameCount,
+			true,
+		),
+		// Where the head went in the first frame. The body templates keep the
+		// neck in the same place from frame to frame, so it holds for all of them.
+		headPoint: {
+			x: spriteRedPixels[0].x - headRedPixel.x + HEAD_FACE_CENTRE.x,
+			y:
+				headExtensionAboveSprite +
+				spriteRedPixels[0].y -
+				headRedPixel.y +
+				HEAD_FACE_CENTRE.y,
+		},
+	}
 }
 
 function skinColor(skin: SkinColor): HexColor {

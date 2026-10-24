@@ -40,6 +40,9 @@ const moon = SunCalc.getMoonIllumination(new Date('2026-04-15'))
 export const moonAsset =
 	moons[Math.floor(moon.phase * moons.length) % moons.length]
 
+/** Halloween's moon, which is always full whatever the real one is up to. */
+export const fullMoonAsset = moon7Asset
+
 document.documentElement.style.setProperty(
 	'--moon-angle',
 	`calc(${moon.angle - Math.PI / 2}rad)`,

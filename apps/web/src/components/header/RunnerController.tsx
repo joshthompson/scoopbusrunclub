@@ -5,9 +5,11 @@ import {
 	type runners,
 } from '@/data/runners'
 import { type Scene, createController, createObjectSignal } from '@/engine'
+import { isHalloween } from '@/utils/halloween'
 import { css } from '@style/css'
-import type { Accessor } from 'solid-js'
+import type { Accessor, JSX } from 'solid-js'
 import { createCameraFlashController } from './CameraFlashController'
+import { createPumpkinController } from './PumpkinController'
 
 export const RUNNER_LABEL_RENDER_DISTANCE = 50
 
@@ -21,6 +23,15 @@ const STANDING_STATES: RunnerState[] = [
 
 export function isStandingState(state: RunnerState): boolean {
 	return STANDING_STATES.includes(state)
+}
+
+/**
+ * What a runner is doing in the header: their volunteer post from the latest
+ * Saturday, except in Halloween mode, when everyone's out running — it's more
+ * fun with the whole club in the zombie game.
+ */
+export function headerState(state: RunnerState | undefined): RunnerState {
+	return isHalloween() ? 'run' : (state ?? 'run')
 }
 
 /** Find a random x position that doesn't overlap any other standing-state runners.
@@ -114,6 +125,15 @@ const LAPPED = 400
 /** The random extra on each stride, as a share of their speed. */
 const STRIDE_JITTER = 0.4
 
+/**
+ * A zombie's green: just enough to look unwell without losing their kit's own
+ * colours. On the frame image alone, so their pumpkin stays orange.
+ */
+const ZOMBIE_TINT = 'sepia(0.35) hue-rotate(55deg) saturate(1.3)'
+
+/** Zombies shamble along at half their old speed, legs and all. */
+const ZOMBIE_PACE = 0.5
+
 export function createRunnerController(
 	id: string,
 	runnerId: keyof typeof runners | string,
@@ -131,7 +151,7 @@ export function createRunnerController(
 	let separated = false
 	const FLASH_PROXIMITY = 60
 
-	return createController({
+	const controller = createController({
 		frames: [...runFrames()],
 		randomStartFrame: true,
 		init() {
@@ -142,12 +162,26 @@ export function createRunnerController(
 			const { y, setY } = createObjectSignal(baseY, 'y')
 			const width = () => runner().width * RUNNER_SIZE
 			const height = () => runner().height * RUNNER_SIZE
+			// Whether they're drawn in their sit sprite, which puts their head
+			// lower and further back than it is in all the others.
+			const { seated, setSeated } = createObjectSignal(false, 'seated')
+			const { activeState, setActiveState } = createObjectSignal(
+				'run' as RunnerState,
+				'activeState',
+			)
+			// Stood at a post in one of their volunteer sprites, which are drawn
+			// facing right — the run and sit sprites all face left, the way they run.
+			const standing = () => !seated() && isStandingState(activeState())
+			const { zombie, setZombie } = createObjectSignal(false, 'zombie')
+			// How much of their usual speed they're managing.
+			const undeadPace = () => (zombie() ? ZOMBIE_PACE : 1)
 			return {
 				id,
 				type: 'runner',
 				state: () => 'play',
 				runnerId,
-				frameInterval: () => runner().frameInterval,
+				// A slower runner's legs go round slower too, so they don't slide.
+				frameInterval: () => runner().frameInterval / undeadPace(),
 				x,
 				setX,
 				y,
@@ -158,9 +192,34 @@ export function createRunnerController(
 				...createObjectSignal(false, 'scooped'),
 				...createObjectSignal(runFrames(), 'frames'),
 				...createObjectSignal(0, 'sitting'),
-				...createObjectSignal('run' as RunnerState, 'activeState'),
+				seated,
+				setSeated,
+				activeState,
+				setActiveState,
+				// The middle of their head in whichever sprite they're drawn in, in
+				// their sprite's own pixels, for anything worn on it.
+				head: () => {
+					if (seated()) return runner().sitHeadPoint
+					if (standing()) return runner().standHeadPoint ?? runner().headPoint
+					return runner().headPoint
+				},
+				// Which way they're facing, so anything worn on their head can too.
+				facingRight: standing,
+				// Whether a scoop has turned them into one of the undead. Only for as
+				// long as Halloween lasts, and only for anyone drawn as a zombie. A
+				// pumpkin cures them.
+				zombie,
+				setZombie,
+				undeadPace,
+				// The pumpkin they've picked up off the path, if they're wearing one.
+				...createObjectSignal(undefined as string | undefined, 'wornPumpkin'),
+				inner: {
+					style: (): JSX.CSSProperties =>
+						zombie() ? { filter: ZOMBIE_TINT } : {},
+				},
 				// How far they run in a tick, on average: what a furby aims ahead by.
-				step: () => runner().speed * pace * (1 + STRIDE_JITTER / 2),
+				step: () =>
+					runner().speed * pace * undeadPace() * (1 + STRIDE_JITTER / 2),
 				// Where their feet touch the path, however high they've been flung.
 				ground: () => baseY + height(),
 				width,
@@ -217,7 +276,10 @@ export function createRunnerController(
 			}
 		},
 		onEnterFrame({ $, $scene }) {
-			const state: RunnerState = runner().runnerState ?? 'run'
+			const state = headerState(runner().runnerState)
+
+			// Halloween's over: the undead are themselves again.
+			if ($.zombie() && !isHalloween()) $.setZombie(false)
 
 			// Transition into/out of standing states
 			if (state !== $.activeState()) {
@@ -273,6 +335,7 @@ export function createRunnerController(
 
 				// Fall back to volunteerGeneric, then sit frame if no specific sprite
 				if (!frames) frames = runner().frames.volunteerGeneric
+				$.setSeated(!frames)
 				if (!frames) frames = runner().frames.sit
 
 				if (frames?.length) $.setFrames(runFrames().map(() => frames[0]))
@@ -286,7 +349,8 @@ export function createRunnerController(
 			// If connected to another runner, follow them instead of running. With
 			// either of them knocked down or flung by the bus, each is on their own
 			// until both are back up; then the follower catches up, or eases off to
-			// let them past, until they're running together again.
+			// let them past, until they're running together again. A zombie
+			// shambles along on its own until a pumpkin brings it back to its senses.
 			pace = 1
 			if (runner().connectedTo && !isStandingState(state)) {
 				const leader = $scene
@@ -300,6 +364,7 @@ export function createRunnerController(
 					if (
 						$.sitting() > 0 ||
 						$.scooped() ||
+						$.zombie() ||
 						leader.sitting() > 0 ||
 						leader.scooped()
 					) {
@@ -323,18 +388,27 @@ export function createRunnerController(
 							runner().frames.tailSit!
 						: runner().frames.sit
 				if (sitFrames?.length) $.setFrames(runFrames().map(() => sitFrames[0]))
+				$.setSeated(true)
 			}
 
 			// Running
 			else if (!$.scooped()) {
-				if (isTailWalker && runner().frames.tailWalk) {
+				if ($.zombie()) {
+					// biome-ignore lint/style/noNonNullAssertion: only set when they have them
+					$.setFrames(runner().frames.zombie!)
+				} else if (isTailWalker && runner().frames.tailWalk) {
 					// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
 					$.setFrames(runner().frames.tailWalk!)
 				} else {
 					$.setFrames(runFrames())
 				}
+				$.setSeated(false)
 				$.setX(
-					$.x() - runner().speed * pace * (1 + Math.random() * STRIDE_JITTER),
+					$.x() -
+						runner().speed *
+							pace *
+							$.undeadPace() *
+							(1 + Math.random() * STRIDE_JITTER),
 				)
 				$.setRotation(Math.random() * 3 - 0.5)
 			}
@@ -349,6 +423,8 @@ export function createRunnerController(
 					$.setY($.baseY())
 					$.setScooped(false)
 					$.setSitting(Math.random() * 30 + 30)
+					// Scooped during Halloween, they hit the ground undead.
+					if (isHalloween() && runner().frames.zombie?.length) $.setZombie(true)
 				}
 			}
 
@@ -387,6 +463,13 @@ export function createRunnerController(
 			}
 		},
 	})
+
+	// A pumpkin they've picked up goes on as part of them rather than as its own
+	// thing in the scene, so it's drawn inside their box and moves and tips with
+	// them without having to follow along.
+	controller.attach(createPumpkinController(controller))
+
+	return controller
 }
 
 export type RunnerController = ReturnType<typeof createRunnerController>

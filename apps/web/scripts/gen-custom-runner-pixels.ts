@@ -23,6 +23,7 @@ interface SpriteData {
 
 const sprites: SpriteData[] = [
 	{ name: 'run', filename: 'run.png' },
+	{ name: 'zombie', filename: 'zombie.png' },
 	{ name: 'sit', filename: 'sit.png' },
 	{ name: 'head', filename: 'head.png' },
 ]

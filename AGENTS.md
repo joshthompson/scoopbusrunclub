@@ -95,6 +95,7 @@ mixpanel.init(MIXPANEL_TOKEN, {
 | `notifications_enabled` / `notifications_disabled` | Notification settings are saved | none | `notifications/NotificationsPage.tsx` |
 | `test_notification_sent` | A test notification is sent successfully | none | `notifications/NotificationsPage.tsx` |
 | `furbies_released` | A furby button lets the furbies out | none | `components/FurbyButton.tsx` |
+| `halloween_mode_enabled` | A pumpkin beside a Halloween (31 October) parkrun's name turns Halloween mode on | none | `components/PumpkinButton.tsx` |
 | `list_expanded` | A "show all" / "+N more" list is opened | `list_name` (`latest_results`, `member_celebration`, `poker_hand`, `stopwatch_bingo`, `position_bingo`, `alphabet`, `sweden`) | `components/LatestResults.tsx`, `pages/MemberPage.tsx`, `pages/PokerPage.tsx`, the bingo pages |
 | `graph_option_changed` | A checkbox under the member graph | `graph_option` (`personal_bests`, `course_personal_bests`, `other_celebrations`, `walks_filtered`), `is_enabled` | `components/GraphSVG.tsx` |
 | `graph_club_added` / `graph_club_removed` | A club is added to or removed from the largest clubs graph | `club_name` | `components/LargestClubsGraph.tsx` |

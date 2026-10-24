@@ -5,7 +5,11 @@ import {
 } from '@/data/balloons'
 import { RUNNER_SIZE, findRunnerSignal } from '@/data/runners'
 import { type Scene, createController, createObjectSignal } from '@/engine'
-import { type RunnerController, isStandingState } from './RunnerController'
+import {
+	type RunnerController,
+	headerState,
+	isStandingState,
+} from './RunnerController'
 
 /** The controller types a bunch is made of, for clearing one out again. */
 const BALLOON_TYPE = 'balloon'
@@ -83,7 +87,7 @@ const TILT = 5 // degrees each balloon hangs off true, one from the next
  */
 function isStanding(runner: RunnerController) {
 	const [data] = findRunnerSignal(runner.data.runnerId) ?? []
-	return isStandingState(data?.().runnerState ?? 'run')
+	return isStandingState(headerState(data?.().runnerState))
 }
 
 /** A number somewhere in `[centre - spread, centre + spread]`. */

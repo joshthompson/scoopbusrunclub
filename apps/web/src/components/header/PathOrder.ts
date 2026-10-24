@@ -1,8 +1,11 @@
 import type { Controller, ControllerBaseType, Scene } from '@/engine'
 import type { Accessor } from 'solid-js'
 
-/** What stands on the path, drawn in order of where its feet touch it. */
-const ON_PATH = new Set(['runner', 'furby'])
+/**
+ * What stands (or lies) on the path, drawn in order of where its feet touch it.
+ * `pumpkin-loose` is Halloween's pumpkins lying about waiting to be picked up.
+ */
+const ON_PATH = new Set(['runner', 'furby', 'pumpkin-loose'])
 
 type OnPath = Controller<ControllerBaseType & { ground: Accessor<number> }>
 
@@ -46,5 +49,25 @@ export function addToPath(
 		current.splice(inFront === -1 ? current.length : inFront, 0, entry(walker))
 	}
 
+	scene.controllers.set(current)
+}
+
+/**
+ * Put something just behind the bus: over the standing volunteers and the
+ * shadows, under the bus and everyone running in front of it. For a pumpkin
+ * the bus is driving over, which among the runners would be drawn on top of it.
+ */
+export function addBehindBus(
+	scene: Scene,
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
+	controller: Controller<any>,
+) {
+	controller.setGame(scene)
+	const current = [...scene.controllers.get()]
+	const bus = current.findIndex(({ controller }) => controller.type === 'bus')
+	current.splice(bus === -1 ? current.length : bus, 0, {
+		id: controller.id,
+		controller,
+	})
 	scene.controllers.set(current)
 }

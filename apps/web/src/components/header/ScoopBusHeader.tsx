@@ -39,9 +39,9 @@ import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import type { CustomRacer } from '@/utils/customRacers'
 import { racerSpeedToHeaderSpeed } from '@/utils/customRacers'
 import { furbysOn } from '@/utils/furbys'
+import { isHalloween, seasonalAsset } from '@/utils/halloween'
 import { parseTimeToSeconds } from '@/utils/misc'
-import { moonAsset } from '@/utils/moonAsset'
-import { snowyAsset } from '@/utils/snow'
+import { fullMoonAsset, moonAsset } from '@/utils/moonAsset'
 import type { WeatherType } from '@/utils/weather'
 import { A, useNavigate } from '@solidjs/router'
 import { css, cx } from '@style/css'
@@ -62,10 +62,13 @@ import {
 } from './BalloonController'
 import { createBusController } from './BusController'
 import { syncFurbies } from './FurbyController'
-import { addToPath } from './PathOrder'
+import { createGhostController } from './GhostController'
+import { addBehindBus, addToPath } from './PathOrder'
+import { syncPumpkins } from './PumpkinController'
 import {
 	RUNNER_LABEL_RENDER_DISTANCE,
 	createRunnerController,
+	headerState,
 	isStandingState,
 } from './RunnerController'
 import type { RunnerController } from './RunnerController'
@@ -77,9 +80,13 @@ import {
 	createTreeController,
 } from './SceneryControllers'
 import { createShadowController } from './ShadowController'
+import { isSkeleton, syncSkeletons } from './SkeletonRunners'
 import { startSkyService } from './SkyService'
 
 export const HEADER_HEIGHT = 240
+
+/** How many ghosts haunt the header in Halloween mode. */
+const GHOST_COUNT = 4
 
 function determineRunnerState(
 	latestVol: VolunteerItem | undefined,
@@ -161,7 +168,9 @@ function updateRunnerSpeedsAndConnections(
 			if (key === 'link') {
 				const volData = linkVolunteerData()
 				const runnerState = determineRunnerState(volData, latestSaturday)
-				const connectedTo = isStandingState(runnerState) ? undefined : 'alisa'
+				const connectedTo = isStandingState(headerState(runnerState))
+					? undefined
+					: 'alisa'
 				const translations = RoleTranslations as Record<string, string>
 				const volunteerRoles =
 					volData && latestSaturday && volData.date === latestSaturday
@@ -195,7 +204,9 @@ function updateRunnerSpeedsAndConnections(
 		// Link stays connected to Alisa unless Alisa has a standing volunteer role
 		const connectedTo =
 			key === 'link'
-				? isStandingState(determineRunnerState(volData, latestSaturday))
+				? isStandingState(
+						headerState(determineRunnerState(volData, latestSaturday)),
+					)
 					? undefined
 					: 'alisa'
 				: undefined
@@ -251,7 +262,9 @@ function updateRunnerSpeedsAndConnections(
 	// For each runner, find others at the same event and pick the next-fastest
 	for (const [key, current] of runnerLatest) {
 		// Skip runners with standing volunteer roles — they don't move, so they shouldn't follow anyone
-		const currentState = runners[key as RunnerName][0]().runnerState ?? 'run'
+		const currentState = headerState(
+			runners[key as RunnerName][0]().runnerState,
+		)
 		if (isStandingState(currentState)) continue
 
 		const eventKey = `${current.result.event}:${current.result.eventNumber}`
@@ -263,8 +276,9 @@ function updateRunnerSpeedsAndConnections(
 			[]
 		for (const [otherKey, other] of runnerLatest) {
 			if (otherKey === key) continue
-			const otherState =
-				runners[otherKey as RunnerName][0]().runnerState ?? 'run'
+			const otherState = headerState(
+				runners[otherKey as RunnerName][0]().runnerState,
+			)
 			if (isStandingState(otherState)) continue
 			const otherEventKey = `${other.result.event}:${other.result.eventNumber}`
 			if (otherEventKey === eventKey) {
@@ -402,15 +416,13 @@ function registerCustomEventGuests(races: RaceItem[], guests: GuestItem[]) {
 			}
 
 			try {
-				const { frames, width, height } = createRunnerFrames(guestAvatar(guest))
+				const sprite = createRunnerFrames(guestAvatar(guest))
 				guestRunners[key] = createSignal<RunnerData>({
 					name: guest.name,
 					id: guest.parkrunId ?? guest._id,
 					birthday: '01/01',
 					joined: -1,
-					frames,
-					width,
-					height,
+					...sprite,
 					speed,
 					frameInterval: 186 - 31 * speed,
 					latestTime: entry.time,
@@ -455,7 +467,7 @@ function registerCustomRacers(racers: CustomRacer[]): string[] {
 		const key = `custom_${racer._id}`
 		if (customRacerRunners[key]) continue
 
-		let frames: Pick<RunnerData, 'frames' | 'width' | 'height'>
+		let frames: ReturnType<typeof createRunnerFrames>
 		try {
 			frames = createRunnerFrames(racer.avatar ?? FALLBACK_AVATAR)
 		} catch {
@@ -476,6 +488,38 @@ function registerCustomRacers(racers: CustomRacer[]): string[] {
 	}
 
 	return added
+}
+
+/**
+ * Move the club's volunteers between their posts and the path as Halloween
+ * comes and goes: out among the runners with a shadow of their own, or back to
+ * standing behind the bus without one. The header is built with them wherever
+ * they belong when it loads, so this only does anything when Halloween is
+ * switched on or off with the page open.
+ */
+function syncVolunteers(scene: Scene, halloween: boolean) {
+	const current = scene.controllers.get()
+	const hasShadow = (id: string) =>
+		current.some((entry) => entry.id === `shadow-${id}`)
+
+	for (const runner of scene.getControllersByType<RunnerController>('runner')) {
+		const [data] = findRunnerSignal(runner.data.runnerId) ?? []
+		if (!isStandingState(data?.().runnerState ?? 'run')) continue
+		// Out on the path is where they have a shadow.
+		if (hasShadow(runner.id) === halloween) continue
+
+		const shadowId = `shadow-${runner.id}`
+		scene.controllers.set(
+			scene.controllers
+				.get()
+				.filter(({ id }) => id !== runner.id && id !== shadowId),
+		)
+		if (halloween) {
+			addToPath(scene, [runner], [createShadowController(shadowId, runner)])
+		} else {
+			addBehindBus(scene, runner)
+		}
+	}
 }
 
 function registerGuestRunners(
@@ -509,7 +553,7 @@ function registerGuestRunners(
 
 		const guest = guestMap.get(gr.guestId)
 		try {
-			const { frames, width, height } = createRunnerFrames(guestAvatar(guest))
+			const sprite = createRunnerFrames(guestAvatar(guest))
 			const key = `guest_${gr.guestId}`
 			if (!guestRunners[key]) {
 				const timeInSeconds = parseTimeToSeconds(gr.time)
@@ -520,9 +564,7 @@ function registerGuestRunners(
 					id: gr.guestParkrunId ?? gr.guestId,
 					birthday: '01/01',
 					joined: -1,
-					frames,
-					width,
-					height,
+					...sprite,
 					speed,
 					frameInterval,
 					latestTime: gr.time,
@@ -646,18 +688,29 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			// Add sign
 			$scene.addController(createSignController('sign'))
 
+			// Halloween's ghosts. They rise out of the grass in front of the trees
+			// and flowers, so they go in after those, but behind the volunteers,
+			// the bus and the runners, who are all nearer the path. Up in the sky
+			// that leaves them in front of the clouds and the trees, and under the
+			// weather's mist. Always in the scene, and only out in Halloween mode.
+			$scene.addController(
+				...Array.from({ length: GHOST_COUNT }, (_, i) =>
+					createGhostController(`ghost${i}`, i),
+				),
+			)
+
 			// Split runners into standing (render behind bus) and moving (render in front)
 			const standingRunners = runnerControllers.filter((r) => {
 				const entry = findRunnerSignal(r.data.runnerId)
 				if (!entry) return false
 				const [runner] = entry
-				return isStandingState(runner().runnerState ?? 'run')
+				return isStandingState(headerState(runner().runnerState))
 			})
 			const movingRunners = runnerControllers.filter((r) => {
 				const entry = findRunnerSignal(r.data.runnerId)
 				if (!entry) return true
 				const [runner] = entry
-				return !isStandingState(runner().runnerState ?? 'run')
+				return !isStandingState(headerState(runner().runnerState))
 			})
 
 			// Balloons for anyone who just ran a milestone. Each bunch goes in just
@@ -734,6 +787,19 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		),
 	)
 
+	// Halloween's skeletons, running with everyone else for as long as it's on.
+	// Only tracks the toggle, the same as the furbies, not the controllers that
+	// putting them out or away changes.
+	createEffect(
+		on(isHalloween, (enabled) => syncSkeletons(scene, enabled, mousePosition)),
+	)
+
+	// No volunteering on Halloween: everyone's out running in the zombie game.
+	createEffect(on(isHalloween, (enabled) => syncVolunteers(scene, enabled)))
+
+	// And Halloween's pumpkins, lying about the path for runners to pick up.
+	createEffect(on(isHalloween, (enabled) => syncPumpkins(scene, enabled)))
+
 	const windowResizeHandler = () => {
 		scene.setWidth(window.innerWidth)
 	}
@@ -763,17 +829,34 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	 * the sky ends up behind all three, `bg3` behind two, `bg2` behind one, and the
 	 * path and `bg1` in clear air. That compounding is the depth cue; a single
 	 * overlay across the whole header would just make it uniformly paler.
+	 *
+	 * Halloween's fog is an eerie purple mist that lies low instead: clear down to
+	 * the hilltops, so the moon and the stars still show, then thickening towards
+	 * the ground. It compounds the same way, so the hills glow purple further back.
 	 */
-	const haze = () =>
-		props.weatherType === 'fog'
-			? `
+	const haze = () => {
+		if (props.weatherType === 'fog')
+			return `
 				linear-gradient(
 					to bottom,
 					color-mix(in srgb, var(--sky-blue-top) 35%, gray 30%),
 					color-mix(in srgb, var(--sky-blue-bottom) 35%, gray 30%)
 				)
 			`
-			: 'none'
+		if (props.weatherType === 'halloween')
+			return `
+				linear-gradient(
+					to bottom,
+					transparent 35%,
+					color-mix(in srgb, var(--halloween-fog) 35%, transparent)
+				)
+			`
+		return 'none'
+	}
+
+	/** Lightning comes with a storm, and with Halloween, which has no rain. */
+	const hasLightning = () =>
+		props.weatherType === 'thunderstorm' || props.weatherType === 'halloween'
 
 	/**
 	 * Wet weather takes the sky down a quarter, so the scenery reads as being
@@ -824,34 +907,34 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 				<div class={styles.underlay}>
 					<div
 						class={styles.path}
-						style={{ '--image': `url(${snowyAsset(pathAsset)})` }}
+						style={{ '--image': `url(${seasonalAsset(pathAsset)})` }}
 					/>
 					<div
 						class={styles.bg1}
 						style={{
-							'--image': `url(${snowyAsset(bg1Asset)})`,
+							'--image': `url(${seasonalAsset(bg1Asset)})`,
 							'--haze': haze(),
 						}}
 					/>
 					<div
 						class={styles.bg2}
 						style={{
-							'--image': `url(${snowyAsset(bg2Asset)})`,
+							'--image': `url(${seasonalAsset(bg2Asset)})`,
 							'--haze': haze(),
 						}}
 					/>
 					<div
 						class={styles.house2}
-						style={{ '--image': `url(${snowyAsset(house2Asset)})` }}
+						style={{ '--image': `url(${seasonalAsset(house2Asset)})` }}
 					/>
 					<div
 						class={styles.house1}
-						style={{ '--image': `url(${snowyAsset(house1Asset)})` }}
+						style={{ '--image': `url(${seasonalAsset(house1Asset)})` }}
 					/>
 					<div
 						class={styles.bg3}
 						style={{
-							'--image': `url(${snowyAsset(bg3Asset)})`,
+							'--image': `url(${seasonalAsset(bg3Asset)})`,
 							'--haze': haze(),
 						}}
 					/>
@@ -861,23 +944,33 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 					 * them. It takes its sheet through `--image` like every other
 					 * band, which is what the underlay's shared rule paints.
 					 */}
-					<Show when={props.weatherType === 'thunderstorm'}>
+					<Show when={hasLightning()}>
 						<div
 							class={styles.lightning}
 							style={{ '--image': `url(${lightningSheet})` }}
 						/>
 					</Show>
-					<div
-						class={styles.sun}
-						style={{ '--image': `url(${snowyAsset(sunAsset)})` }}
-					/>
+					{/*
+					 * Halloween is always night, so there's no sun at all rather
+					 * than one set down behind the hills, where a dip in them at
+					 * some screen width could still show the top of it.
+					 */}
+					<Show when={!isHalloween()}>
+						<div
+							class={styles.sun}
+							style={{ '--image': `url(${seasonalAsset(sunAsset)})` }}
+						/>
+					</Show>
 					<div
 						class={styles.moon}
-						style={{ '--image': `url(${snowyAsset(moonAsset)})` }}
+						data-blood-moon={isHalloween() ? '' : undefined}
+						style={{
+							'--image': `url(${seasonalAsset(isHalloween() ? fullMoonAsset : moonAsset)})`,
+						}}
 					/>
 					<div
 						class={styles.stars}
-						style={{ '--image': `url(${snowyAsset(starsAsset)})` }}
+						style={{ '--image': `url(${seasonalAsset(starsAsset)})` }}
 					/>
 					<div
 						class={styles.sky}
@@ -894,6 +987,9 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						onClick={({ x, y }) => {
 							const closest = scene
 								.getControllersByType<RunnerController>('runner')
+								// A skeleton has no page to go to, so a click on one
+								// goes through to whatever's behind it.
+								.filter((c) => !isSkeleton(c.data.runnerId))
 								.map((c) => ({
 									runnerId: c.data.runnerId,
 									dist: Math.hypot(
@@ -946,10 +1042,13 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 					 * itself is back in the scenery, behind the hills; what's left up
 					 * here is the light it throws, which falls on everything. Both
 					 * inherit the parent's mask, so the flash is at full strength over
-					 * the sky and has faded out by the ground.
+					 * the sky and has faded out by the ground. Halloween has the flash
+					 * without the rain.
 					 */}
-					<Show when={props.weatherType === 'thunderstorm'}>
+					<Show when={hasLightning()}>
 						<div class={styles.skyFlash} />
+					</Show>
+					<Show when={props.weatherType === 'thunderstorm'}>
 						<div class={styles.stormRain} />
 					</Show>
 				</div>
@@ -980,6 +1079,9 @@ const styles = {
 	wrapper: css({
 		position: 'relative',
 		paddingTop: 'env(safe-area-inset-top, 0px)',
+		// Halloween's fog, shared by the haze behind the hills and the layer over
+		// the scene so the two stay the same purple.
+		'--halloween-fog': '#9b4dff',
 		_before: {
 			content: '""',
 			position: 'absolute',
@@ -1087,6 +1189,24 @@ const styles = {
 			`,
 			backgroundRepeat: 'repeat',
 			opacity: 0.85,
+		},
+
+		/**
+		 * Halloween's mist, over the scene as well as behind the hills: nothing up
+		 * in the sky, so the moon and the lightning are left clear, then rolling
+		 * in over the hills and the far side of the path. The parent's mask fades
+		 * it out again by the runners' feet, so it hangs at about knee height.
+		 */
+		'&[data-weather=halloween]': {
+			backgroundImage: `
+				linear-gradient(
+					to bottom,
+					transparent 40%,
+					color-mix(in srgb, var(--halloween-fog) 40%, transparent) 65%,
+					color-mix(in srgb, var(--halloween-fog) 65%, transparent)
+				)
+			`,
+			backgroundRepeat: 'repeat',
 		},
 
 		/**
@@ -1210,6 +1330,35 @@ const styles = {
 		opacity: 'var(--moon-opacity)',
 		transform: 'rotate(var(--moon-angle, 0rad))',
 		filter: 'blur(1.5px)',
+
+		/**
+		 * Halloween's blood moon: three times the size, tinted red, and glowing
+		 * red into the sky around it. Moved back by half the extra size so it
+		 * grows about the same middle rather than down and to the right, which
+		 * leaves the bottom of it sunk behind the hills, rising.
+		 *
+		 * The art is a pale yellow full moon, so the tint is filters rather than
+		 * an image of its own. It's darkened first, since `sepia` leaves anything
+		 * that pale almost white; then `sepia` takes it to a warm brown,
+		 * `saturate` makes that a strong orange, and `hue-rotate` pulls it round
+		 * to red. Any further round and it goes pink. The two drop shadows are
+		 * the glow — a tight bright one and a wide soft one.
+		 */
+		'&[data-blood-moon]': {
+			height: '90px',
+			width: '90px',
+			inset:
+				'calc(-25px - 30px + var(--moon-y) * 160px) auto auto calc(30% - 30px) !important',
+			filter: `
+				blur(1.5px)
+				brightness(0.5)
+				sepia(1)
+				saturate(8)
+				hue-rotate(-30deg)
+				drop-shadow(0 0 6px #ff2a1a)
+				drop-shadow(0 0 24px rgba(255, 30, 20, 0.7))
+			`,
+		},
 	}),
 	sun: css({
 		zIndex: 4,

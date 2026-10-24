@@ -28,6 +28,8 @@ export type RunnerState =
 export interface RunnerData extends MemberFacts {
 	frames: {
 		run: string[] | undefined
+		/** Halloween's undead run, arms out in front, for getting up after a scoop. */
+		zombie: string[] | undefined
 		sit: string[] | undefined
 		face: string[] | undefined
 		tailWalk: string[] | undefined // and Park Walker
@@ -59,6 +61,18 @@ export interface RunnerData extends MemberFacts {
 	 * mostly pram.
 	 */
 	centerPoint?: Vector
+	/**
+	 * The middle of their head, in the sprite's own pixels, for anything worn on
+	 * it — currently Halloween's pumpkins. `headPoint` is where it is while
+	 * they're running or walking; `sitHeadPoint` is where it drops to in their
+	 * sit sprite, which is lower and usually further back; `standHeadPoint` is
+	 * where it is in their volunteer sprites, only needed where that's somewhere
+	 * else from `headPoint` — Link turns round to face the other way for one.
+	 * A runner without one goes without a pumpkin in that pose.
+	 */
+	headPoint?: Vector
+	sitHeadPoint?: Vector
+	standHeadPoint?: Vector
 }
 
 export function hasHeaderArtwork(runner: RunnerData): boolean {
@@ -76,14 +90,26 @@ export const customRacerRunners: Record<
 	[Accessor<RunnerData>, Setter<RunnerData>]
 > = {}
 
+/** Halloween's skeletons, keyed `skeleton_<n>`, registered by the header. */
+export const skeletonRunners: Record<
+	string,
+	[Accessor<RunnerData>, Setter<RunnerData>]
+> = {}
+
 /**
- * Resolve any runner the header knows about — club member, guest, or a racer a
- * visitor made — since the scene treats all three the same once they're running.
+ * Resolve any runner the header knows about — club member, guest, a racer a
+ * visitor made, or a Halloween skeleton — since the scene treats them all the
+ * same once they're running.
  */
 export function findRunnerSignal(
 	id: string,
 ): [Accessor<RunnerData>, Setter<RunnerData>] | undefined {
-	return runners[id as RunnerName] ?? guestRunners[id] ?? customRacerRunners[id]
+	return (
+		runners[id as RunnerName] ??
+		guestRunners[id] ??
+		customRacerRunners[id] ??
+		skeletonRunners[id]
+	)
 }
 
 export const runners: Record<
@@ -96,6 +122,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.joshRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.joshZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -122,6 +156,8 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 10, y: 4 },
+		sitHeadPoint: { x: 10, y: 14 },
 		speed: 4,
 		frameInterval: 62,
 	}),
@@ -131,6 +167,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.keithRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.keithZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -150,6 +194,9 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 9, y: 4 },
+		sitHeadPoint: { x: 10, y: 13 },
+		standHeadPoint: { x: 11, y: 4 },
 		speed: 3,
 		frameInterval: 80,
 	}),
@@ -159,6 +206,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.claireRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.claireZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -185,6 +240,8 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 11, y: 5 },
+		sitHeadPoint: { x: 13, y: 13 },
 		speed: 2,
 		frameInterval: 125,
 	}),
@@ -194,6 +251,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.lyraRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.lyraZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -221,6 +286,9 @@ export const runners: Record<
 		width: 21,
 		height: 28,
 		centerPoint: { x: 9, y: 19 },
+		headPoint: { x: 10, y: 14 },
+		sitHeadPoint: { x: 10, y: 17 },
+		standHeadPoint: { x: 11, y: 12 },
 		speed: 1.5,
 		frameInterval: 80,
 	}),
@@ -230,6 +298,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.adamRun,
+				22 * FRAME_COUNT,
+				30,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.adamZombie,
 				22 * FRAME_COUNT,
 				30,
 				22 * RUNNER_SIZE,
@@ -249,6 +325,8 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 30,
+		headPoint: { x: 10, y: 4 },
+		sitHeadPoint: { x: 12, y: 14 },
 		speed: 3.9,
 		frameInterval: 65,
 	}),
@@ -258,6 +336,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.annaRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.annaZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -284,6 +370,9 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 10, y: 5 },
+		sitHeadPoint: { x: 12, y: 13 },
+		standHeadPoint: { x: 12, y: 5 },
 		speed: 1.5,
 		frameInterval: 120,
 	}),
@@ -293,6 +382,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.elineRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.elineZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -312,6 +409,9 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 12, y: 5 },
+		sitHeadPoint: { x: 13, y: 14 },
+		standHeadPoint: { x: 11, y: 5 },
 		speed: 3.2,
 		frameInterval: 75,
 	}),
@@ -321,6 +421,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.rickRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.rickZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -340,6 +448,8 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 11, y: 5 },
+		sitHeadPoint: { x: 12, y: 13 },
 		speed: 3.2,
 		frameInterval: 75,
 	}),
@@ -349,6 +459,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.sophieRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.sophieZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -368,6 +486,8 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 12, y: 5 },
+		sitHeadPoint: { x: 13, y: 14 },
 		speed: 3.2,
 		frameInterval: 75,
 	}),
@@ -377,6 +497,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.augustRun,
+				50 * FRAME_COUNT,
+				30,
+				50 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.augustZombie,
 				50 * FRAME_COUNT,
 				30,
 				50 * RUNNER_SIZE,
@@ -397,6 +525,9 @@ export const runners: Record<
 		width: 49,
 		height: 30,
 		centerPoint: { x: 37, y: 12 },
+		headPoint: { x: 34, y: 4 },
+		sitHeadPoint: { x: 37, y: 14 },
+		standHeadPoint: { x: 36, y: 4 },
 		speed: 3.2,
 		frameInterval: 100,
 	}),
@@ -406,6 +537,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.alisaRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.alisaZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -432,6 +571,8 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 12, y: 5 },
+		sitHeadPoint: { x: 13, y: 14 },
 		speed: 2.5,
 		frameInterval: 75,
 	}),
@@ -440,6 +581,7 @@ export const runners: Record<
 		color: '#ef9801',
 		frames: {
 			run: generateFrames(assets.linkRun, 20 * 2, 28, 20 * 2, 2, true),
+			zombie: generateFrames(assets.linkZombie, 20 * 2, 28, 20 * 2, 2, true),
 			sit: [assets.linkSit],
 			tailWalk: generateFrames(
 				assets.linkTailWalk,
@@ -461,6 +603,9 @@ export const runners: Record<
 		},
 		width: 20,
 		height: 28,
+		headPoint: { x: 5, y: 20 },
+		sitHeadPoint: { x: 5, y: 21 },
+		standHeadPoint: { x: 16, y: 20 },
 		speed: 2.5,
 		frameInterval: 75,
 		connectedTo: 'alisa',
@@ -471,6 +616,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.otherJoshRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.otherJoshZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -490,6 +643,8 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 10, y: 5 },
+		sitHeadPoint: { x: 10, y: 14 },
 		speed: 2.5,
 		frameInterval: 80,
 	}),
@@ -499,6 +654,14 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.mikaelRun,
+				22 * FRAME_COUNT,
+				28,
+				22 * RUNNER_SIZE,
+				FRAME_COUNT,
+				true,
+			),
+			zombie: generateFrames(
+				assets.mikaelZombie,
 				22 * FRAME_COUNT,
 				28,
 				22 * RUNNER_SIZE,
@@ -518,6 +681,8 @@ export const runners: Record<
 		},
 		width: 21,
 		height: 28,
+		headPoint: { x: 11, y: 5 },
+		sitHeadPoint: { x: 12, y: 13 },
 		speed: 3.2,
 		frameInterval: 75,
 	}),

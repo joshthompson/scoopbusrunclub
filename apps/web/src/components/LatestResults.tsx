@@ -41,6 +41,7 @@ import type {
 } from '../utils/api'
 import { FurbyButton, pickFurbies } from './FurbyButton'
 import { type MajorMilestone, MilestoneCard } from './MilestoneCard'
+import { PumpkinButton } from './PumpkinButton'
 import {
 	type CelebrationData,
 	ResultCelebrations,
@@ -204,6 +205,11 @@ function isMilestoneEvent(eventNumber: string) {
 
 function isChristmas(date: string) {
 	return date.slice(5) === '12-25'
+}
+
+/** A parkrun on Halloween itself, which gets pumpkins that start Halloween mode. */
+function isHalloweenDay(date: string) {
+	return date.slice(5) === '10-31'
 }
 
 function getDisplayName(
@@ -575,6 +581,7 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 		props.parkrun.name !== 'Haga' && props.parkrun.results.length >= 4
 	const isMilestone = () => isMilestoneEvent(props.parkrun.eventNumber)
 	const isXmas = () => isChristmas(props.date)
+	const isSpooky = () => isHalloweenDay(props.date)
 	const specialDay = () =>
 		getSpecialDayName(props.date, getEvent(props.parkrun.eventId)?.country)
 	const displayName = () =>
@@ -587,6 +594,7 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 	return (
 		<>
 			<h4 class={styles.parkrunName}>
+				{isSpooky() && <PumpkinButton flipped />}
 				{isXmas() && <Emoji emoji="🎄" flipped />}
 				{isMilestone() && <Emoji emoji="🎉" flipped />}
 				{isBusTrip() && <Emoji emoji="🚌" flipped />}{' '}
@@ -594,11 +602,13 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 					href={`/event/${props.parkrun.eventId}`}
 					class={styles.parkrunNameLink}
 				>
+					{isSpooky() && 'Halloween '}
 					{displayName()}
 				</A>{' '}
 				#{props.parkrun.eventNumber} {isBusTrip() && <Emoji emoji="🚌" />}
 				{isMilestone() && <Emoji emoji="🎉" />}
 				{isXmas() && <Emoji emoji="🎄" />}
+				{isSpooky() && <PumpkinButton />}
 			</h4>
 			<Show when={specialDay()}>
 				{(name) => (

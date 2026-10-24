@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { assetVariants } from './assetVariants'
 
 /**
  * Snow depth (cm) at which the site switches to its snowy look: `-snow` asset
@@ -47,33 +48,10 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Every PNG under `src/assets`, mapped to the exact URL a static `import` of
- * that file yields — hashed in a build, or an inlined data URI when the file is
- * small enough. Eager so the lookup below stays synchronous, and keyed by
- * module path so we can pair files up by name.
+ * `normal URL -> snowy URL`: an asset gets a snowy variant just by dropping
+ * `foo-snow.png` next to `foo.png`, no wiring required.
  */
-const assetUrls = import.meta.glob('../assets/**/*.png', {
-	eager: true,
-	import: 'default',
-}) as Record<string, string>
-
-/**
- * `normal URL -> snowy URL`, built from the `-snow` naming convention: an asset
- * gets a snowy variant just by dropping `foo-snow.png` next to `foo.png`, no
- * wiring required.
- *
- * Assets are matched by their built URL rather than their filename, so this
- * works for inlined assets too. The one caveat is that two byte-identical PNGs
- * share a data URI, so a snowy variant of one would apply to both.
- */
-const snowVariants = new Map<string, string>()
-
-for (const path of Object.keys(assetUrls)) {
-	if (!path.endsWith('-snow.png')) continue
-
-	const normal = assetUrls[path.replace('-snow.png', '.png')]
-	if (normal) snowVariants.set(normal, assetUrls[path])
-}
+const snowVariants = assetVariants('snow')
 
 /**
  * Swap an imported asset URL for its `-snow` variant while it's snowy. Assets

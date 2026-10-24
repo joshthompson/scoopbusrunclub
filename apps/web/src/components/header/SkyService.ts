@@ -13,8 +13,13 @@
  *   --light                0 (night) → 1 (midday) estimated light level
  *
  * Sunrise/sunset are computed dynamically via suncalc for Stockholm (59.355, 18.039).
+ *
+ * In Halloween mode the clock is ignored and it's always the dead of night, with
+ * the moon hung where it's best seen.
  */
 
+import { isHalloween } from '@/utils/halloween'
+import { createEffect, on } from 'solid-js'
 import SunCalc from 'suncalc'
 
 // ─── Configuration ───────────────────────────────────────────────
@@ -396,7 +401,39 @@ function applySkyCSSVariablesForHour(h: number): void {
 	el.style.setProperty('--light', lightLevelAtHour(h).toFixed(4))
 }
 
+/**
+ * Where the Halloween moon hangs, rather than wherever the real hour would put
+ * it — which at midnight is right up against the top of the header. Low enough
+ * that the big blood moon's top is just inside the header, with the bottom of
+ * it down behind the hills.
+ */
+const HALLOWEEN_MOON_Y = 0.35
+
+/**
+ * Halloween's sky: the deepest night the colour stops have, every star out and
+ * the moon up, whatever the time or the season. Without a clock behind it this
+ * doesn't need the sun times either.
+ */
+function applyHalloweenSkyCSSVariables(): void {
+	const el = document.documentElement
+	const [r, g, b] = COLOUR_STOPS[0].top
+	const [br, bg, bb] = COLOUR_STOPS[0].bottom
+
+	el.style.setProperty('--sky-blue-top', rgbToHex(r, g, b))
+	el.style.setProperty('--sky-blue-bottom', rgbToHex(br, bg, bb))
+	el.style.setProperty('--sun-y', '1')
+	el.style.setProperty('--moon-y', HALLOWEEN_MOON_Y.toFixed(4))
+	el.style.setProperty('--moon-opacity', '1')
+	el.style.setProperty('--stars-opacity', '1')
+	el.style.setProperty('--cloud-opacity', '0.1')
+	el.style.setProperty('--light', '0')
+}
+
 function applySkyCSSVariables(): void {
+	if (isHalloween()) {
+		applyHalloweenSkyCSSVariables()
+		return
+	}
 	// Refresh sunrise/sunset each tick (handles day rollover)
 	;({ sunrise: SUNRISE, sunset: SUNSET } = getSunTimes())
 	applySkyCSSVariablesForHour(nowAsCETHour())
@@ -446,11 +483,15 @@ async function testDay(): Promise<void> {
  * Start the sky service. Immediately applies current sky state and
  * then updates every 30 seconds (twice per minute).
  *
+ * Call it from inside a component (its `onMount` is fine): the sky is also
+ * redrawn straight away whenever Halloween mode is switched, rather than up to
+ * half a minute later, and that tracking is owned by the caller.
+ *
  * @returns A cleanup function that stops the interval — call it in `onCleanup`.
  */
 export function startSkyService(): () => void {
-	// Apply immediately
-	applySkyCSSVariables()
+	// Apply immediately, and again whenever Halloween mode comes or goes
+	createEffect(on(isHalloween, applySkyCSSVariables))
 
 	// Update twice per minute
 	const intervalId = setInterval(() => {

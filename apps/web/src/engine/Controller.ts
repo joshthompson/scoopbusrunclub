@@ -23,8 +23,10 @@ export type ControllerBaseType = {
 	inner?: {
 		rotation?: Accessor<number>
 		origin?: Accessor<Vector>
+		/** Styles for the frame image, without the controllers attached to it. */
+		style?: Accessor<JSX.CSSProperties>
 	}
-} & Partial<Accessorise<Sprite>>
+} & Partial<Accessorise<Omit<Sprite, 'inner'>>>
 
 export interface Controller<CP extends ControllerBaseType> {
 	type: string
@@ -170,6 +172,7 @@ export function createController<CP extends ControllerBaseType>(
 			inner: {
 				rotation: data.inner?.rotation?.(),
 				origin: data.inner?.origin?.(),
+				style: data.inner?.style?.(),
 			},
 			onChangeFrame: (frame) => setCurrentFrame(frame),
 			onMount: ({ $ref }) => {

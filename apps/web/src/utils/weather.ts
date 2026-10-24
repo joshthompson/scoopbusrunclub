@@ -1,12 +1,23 @@
 import { createSignal } from 'solid-js'
 import type { Weather } from './api'
+import { isHalloween } from './halloween'
 
 /**
  * Our own simplified weather format, decoupled from the raw XWeather payload.
  * A coarse `type` plus the snow lying on the ground; intended to grow
  * (intensity, isDay, etc.).
+ *
+ * `halloween` never comes from the forecast: it's Halloween mode's own weather,
+ * lightning over the hills and a purple fog, which it brings in over whatever's
+ * really happening.
  */
-export type WeatherType = 'clear' | 'rain' | 'thunderstorm' | 'snow' | 'fog'
+export type WeatherType =
+	| 'clear'
+	| 'rain'
+	| 'thunderstorm'
+	| 'snow'
+	| 'fog'
+	| 'halloween'
 
 export interface AppWeather {
 	type: WeatherType
@@ -145,17 +156,21 @@ export function parseWeather(weather: Weather | null | undefined): AppWeather {
 
 // --- Current weather ---
 
-const [weatherType, setWeatherType] = createSignal<WeatherType>('clear')
+const [forecastType, setForecastType] = createSignal<WeatherType>('clear')
+/** Set from the console, and then left alone by the forecast and Halloween. */
+const [overrideType, setOverrideType] = createSignal<WeatherType>()
 
-/** What's falling right now, as one of our coarse types. */
-export { weatherType }
-
-/** Set from the console, and then left alone by the weather. */
-let overridden = false
+/**
+ * What's falling right now, as one of our coarse types: whatever's been set
+ * from the console, else Halloween's weather in Halloween mode, else the
+ * forecast.
+ */
+export const weatherType = (): WeatherType =>
+	overrideType() ?? (isHalloween() ? 'halloween' : forecastType())
 
 /** Report the real weather type from the forecast. */
 export function reportWeatherType(type: WeatherType) {
-	if (!overridden) setWeatherType(type)
+	setForecastType(type)
 }
 
 declare global {
@@ -167,7 +182,8 @@ declare global {
 /**
  * `setWeather('rain')` from the browser console to pretend it's raining over the
  * header; `'thunderstorm'` for rain with lightning behind it, `'snow'` for
- * snowfall, `'clear'` to stop it. Sticks until reload, so the forecast won't
+ * snowfall, `'halloween'` for Halloween's lightning and purple fog, `'clear'` to
+ * stop it. Sticks until reload, so neither the forecast nor Halloween mode will
  * quietly undo it.
  *
  * This is the falling stuff only — snow already lying on the ground is
@@ -182,11 +198,11 @@ if (typeof window !== 'undefined') {
 			'thunderstorm',
 			'snow',
 			'fog',
+			'halloween',
 		]
 		if (!allowed.includes(type))
 			return `weather: expected ${allowed.join(' | ')}`
-		overridden = true
-		setWeatherType(type)
+		setOverrideType(type)
 		return `weather: ${type}`
 	}
 }

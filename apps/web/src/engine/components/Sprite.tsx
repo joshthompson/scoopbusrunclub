@@ -1,5 +1,5 @@
 import { SceneContext } from '@/utils/SceneContext'
-import { snowyAsset } from '@/utils/snow'
+import { seasonalAsset } from '@/utils/halloween'
 import { css, cx } from '@style/css'
 import {
 	type Accessor,
@@ -71,8 +71,9 @@ export const Sprite: Component<Sprite & SpriteExtendedProps> = (props) => {
 	const frames = createMemo(() =>
 		props.frames.map((frame) => {
 			// Every sprite goes through here, so this is where the whole canvas
-			// picks up its `-snow` asset variants (a no-op for assets without one).
-			const image = snowyAsset(frame.split('#')[0])
+			// picks up its `-halloween` and `-snow` asset variants (a no-op for
+			// assets without one).
+			const image = seasonalAsset(frame.split('#')[0])
 			const [left, top, width, height] = frame
 				.split('#')[1]
 				?.split(',')
