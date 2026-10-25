@@ -273,14 +273,44 @@ export async function fetchAllResults(): Promise<RunResultItem[]> {
 	await ensureCacheValidity()
 	const cacheKey = 'results:all'
 	const cached = getCached<RunResultItem[]>(cacheKey)
-	if (cached) return cached
+	if (cached) return withMockHalloweenResults(cached)
 
 	const url = `${CONVEX_URL}/api/results`
 	const response = await fetch(url)
 	if (!response.ok) throw new Error(`API error: ${response.status}`)
 	const data: RunResultItem[] = await response.json()
 	setCache(cacheKey, data)
-	return data
+	return withMockHalloweenResults(data)
+}
+
+// TEMP: a mock Halloween parkrun at Haga, dev only, to try the pumpkins. Added
+// after the cache so the fake results are never stored. Remove before shipping.
+function withMockHalloweenResults(data: RunResultItem[]): RunResultItem[] {
+	if (!import.meta.env.DEV) return data
+	const halloween = {
+		event: 'haga',
+		eventName: 'Haga',
+		eventNumber: 428,
+		ageGrade: '50.00%',
+		date: '2026-10-31',
+	}
+	return [
+		...data,
+		{
+			...halloween,
+			parkrunId: '8070821',
+			runnerName: 'Josh THOMPSON',
+			position: 13,
+			time: '20:31',
+		},
+		{
+			...halloween,
+			parkrunId: '9854274',
+			runnerName: 'Mikael HÄLLGREN',
+			position: 66,
+			time: '26:31',
+		},
+	]
 }
 
 export async function fetchRunners(): Promise<Runner[]> {
