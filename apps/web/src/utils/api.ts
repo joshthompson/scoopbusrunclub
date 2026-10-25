@@ -12,7 +12,7 @@ export const CALENDAR_FEED_URL = `${CONVEX_URL}/api/calendar.ics`
 // ---------- Cache infrastructure ----------
 
 const CACHE_PREFIX = 'sbrc:'
-const CACHE_VERSION = 5
+const CACHE_VERSION = 6
 
 /** The single metadata key that controls all cache validity */
 const CACHE_META_KEY = `${CACHE_PREFIX}cache`
@@ -27,7 +27,8 @@ interface CacheMeta {
 
 /** Cache keys that belong to parkrun-scraped data */
 const PARKRUN_EXACT_KEYS = ['runners', 'events', 'volunteers', 'celebrations']
-const PARKRUN_PREFIX_KEYS = ['results:', 'course:']
+// `celebrations:` catches the versioned key (`celebrations:v2`, …) as well
+const PARKRUN_PREFIX_KEYS = ['results:', 'course:', 'celebrations:']
 
 /** Cache keys that belong to our own data */
 const SCOOPBUS_EXACT_KEYS = ['races']
@@ -92,7 +93,7 @@ function purgeParkrunCache(): void {
 	for (const key of PARKRUN_EXACT_KEYS) {
 		localStorage.removeItem(CACHE_PREFIX + key)
 	}
-	// Also remove prefixed keys (results:*, course:*)
+	// Also remove prefixed keys (results:*, course:*, celebrations:*)
 	for (let i = localStorage.length - 1; i >= 0; i--) {
 		const fullKey = localStorage.key(i)
 		if (!fullKey || !fullKey.startsWith(CACHE_PREFIX)) continue

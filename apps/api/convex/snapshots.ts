@@ -334,8 +334,12 @@ export const savePointer = internalMutation({
 		}
 		await setAppDataRow(ctx, pointerKey(args.group), JSON.stringify(next))
 
+		// Skip files already gone: deleting one throws, which would roll back
+		// the new pointer and leave every read rebuilding against the old one.
 		for (const old of Object.values(previous?.files ?? {})) {
-			if (old) await ctx.storage.delete(old.storageId)
+			if (old && (await ctx.db.system.get(old.storageId))) {
+				await ctx.storage.delete(old.storageId)
+			}
 		}
 		return next
 	},
