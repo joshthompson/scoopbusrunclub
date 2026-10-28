@@ -136,16 +136,16 @@ const JOSHS_DRAWINGS = [
 			'ooooooooooooooooooooooooooooo',
 			'oooo#ooooooo#ooooooooooooooo.',
 			'oooo##ooooo##ooooooooooooooo.',
-			'.oooo#######ooooooooooooooo..',
-			'.oooo#######oooooooooooooo...',
-			'..ooooo###ooooooooooooooo....',
+			'.oooo########oooooooooooooo..',
+			'.oooo########ooooooooooooo...',
+			'..ooooo####oooooooooooooo....',
 			'...ooooooooooooooooooooo.....',
 			'.....ooooooo...oooooooo......',
 		],
 	},
 	{
 		// pumpkin5.png
-		name: 'Grumpy',
+		name: 'Zipper Mouth',
 		rows: [
 			'.............................',
 			'.............................',

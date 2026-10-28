@@ -49,7 +49,7 @@ export function isSkeleton(runnerId: string) {
 const runFrames = Array.from(
 	{ length: FRAME_COUNT },
 	(_, n) =>
-		`${skeletonRunAsset}#${-22 * RUNNER_SIZE * n},0,${22 * FRAME_COUNT},28`,
+		`${skeletonRunAsset}#${-23 * RUNNER_SIZE * n},0,${23 * FRAME_COUNT},29`,
 )
 
 /**
@@ -80,8 +80,8 @@ function registerSkeletons() {
 				volunteerGeneric: undefined,
 				numberChecker: undefined,
 			},
-			width: 21,
-			height: 28,
+			width: 23,
+			height: 29,
 			speed,
 			frameInterval: 186 - 31 * speed,
 		})

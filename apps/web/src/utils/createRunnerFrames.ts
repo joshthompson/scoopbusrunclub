@@ -62,8 +62,9 @@ export function createRunnerFrames(
 			volunteerGeneric: undefined,
 			numberChecker: undefined,
 		},
-		width: 21,
-		height: 28,
+		// Their box is one of their run frames, head and all.
+		width: run?.width ?? 23,
+		height: run?.height ?? 28,
 		headPoint: run?.headPoint,
 		sitHeadPoint: sit?.headPoint,
 	}
@@ -393,7 +394,9 @@ function generateCustomSpriteFrames(
 	character: CharacterSpriteProps,
 	spritePixels: SpritePixelData | null,
 	frameCount: number,
-): { frames: string[]; headPoint: Vector } | undefined {
+):
+	| { frames: string[]; width: number; height: number; headPoint: Vector }
+	| undefined {
 	if (!spritePixels) return undefined
 
 	const spriteData = decodePixels(spritePixels)
@@ -511,14 +514,21 @@ function generateCustomSpriteFrames(
 	const spriteWidth = totalWidth / frameCount
 
 	return {
-		frames: generateFrames(
-			imageUrl,
-			spriteWidth * frameCount,
-			totalHeight,
-			spriteWidth * RUNNER_SIZE,
-			frameCount,
-			true,
-		),
+		// A single frame is just the image, the same as a club runner's sit
+		// sprite, so it's drawn at its own size rather than as a strip of one.
+		frames:
+			frameCount === 1
+				? [imageUrl]
+				: generateFrames(
+						imageUrl,
+						spriteWidth * frameCount,
+						totalHeight,
+						spriteWidth * RUNNER_SIZE,
+						frameCount,
+						true,
+					),
+		width: spriteWidth,
+		height: totalHeight,
 		// Where the head went in the first frame. The body templates keep the
 		// neck in the same place from frame to frame, so it holds for all of them.
 		headPoint: {

@@ -1,6 +1,7 @@
 import { addDays, toISODate } from '@shared/calendar/dates'
 import { createSignal } from 'solid-js'
 import { assetVariants } from './assetVariants'
+import { imageSize } from './imageSize'
 import { snowyAsset } from './snow'
 
 /**
@@ -35,36 +36,13 @@ export const ghostAssets = Object.entries(
 	.sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
 	.map(([, url]) => url)
 
-interface Size {
-	width: number
-	height: number
-}
-
 /**
- * Each Halloween image's size, read off the image itself, so a new pumpkin or
- * ghost can be drawn at whatever size suits it without the header needing to
- * know.
+ * A Halloween image's size once it has loaded, read off the image itself, so a
+ * new pumpkin or ghost can be drawn at whatever size suits it without the
+ * header needing to know. Only ask for it once Halloween mode is on, so the
+ * rest of the year nobody downloads a pumpkin.
  */
-const [sizes, setSizes] = createSignal<Record<string, Size>>({})
-const requested = new Set<string>()
-
-/**
- * A Halloween image's size once it has loaded. Only ask for it once Halloween
- * mode is on, so the rest of the year nobody downloads a pumpkin.
- */
-export function halloweenAssetSize(url: string): Size | undefined {
-	if (!requested.has(url)) {
-		requested.add(url)
-		const image = new Image()
-		image.onload = () =>
-			setSizes((all) => ({
-				...all,
-				[url]: { width: image.naturalWidth, height: image.naturalHeight },
-			}))
-		image.src = url
-	}
-	return sizes()[url]
-}
+export const halloweenAssetSize = imageSize
 
 /** Whether a day falls in Halloween mode's week. */
 export function isHalloweenWeek(today = toISODate(new Date())) {

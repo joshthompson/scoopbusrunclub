@@ -6,6 +6,7 @@ import {
 } from '@/data/runners'
 import { type Scene, createController, createObjectSignal } from '@/engine'
 import { isHalloween } from '@/utils/halloween'
+import { imageSize } from '@/utils/imageSize'
 import { css } from '@style/css'
 import type { Accessor, JSX } from 'solid-js'
 import { createCameraFlashController } from './CameraFlashController'
@@ -172,6 +173,20 @@ export function createRunnerController(
 			// Stood at a post in one of their volunteer sprites, which are drawn
 			// facing right — the run and sit sprites all face left, the way they run.
 			const standing = () => !seated() && isStandingState(activeState())
+			const { frames, setFrames } = createObjectSignal(runFrames(), 'frames')
+			// The size of the image they're drawn from when it's a single one,
+			// sitting or at a volunteer post, rather than their run strip.
+			const still = () => {
+				const frame = frames()[0]
+				return frame && !frame.includes('#') ? imageSize(frame) : undefined
+			}
+			// How far a single image drawn feet on the ground sits below the top
+			// of their box, in the sprite's own pixels: a sit sprite's a row or
+			// so shorter than their run frames.
+			const drop = () => {
+				const size = still()
+				return size ? runner().height - size.height : 0
+			}
 			const { zombie, setZombie } = createObjectSignal(false, 'zombie')
 			// How much of their usual speed they're managing.
 			const undeadPace = () => (zombie() ? ZOMBIE_PACE : 1)
@@ -190,7 +205,8 @@ export function createRunnerController(
 				...createObjectSignal(0, 'rotation'),
 				...createObjectSignal(0, 'ySpeed'),
 				...createObjectSignal(false, 'scooped'),
-				...createObjectSignal(runFrames(), 'frames'),
+				frames,
+				setFrames,
 				...createObjectSignal(0, 'sitting'),
 				seated,
 				setSeated,
@@ -199,9 +215,14 @@ export function createRunnerController(
 				// The middle of their head in whichever sprite they're drawn in, in
 				// their sprite's own pixels, for anything worn on it.
 				head: () => {
-					if (seated()) return runner().sitHeadPoint
-					if (standing()) return runner().standHeadPoint ?? runner().headPoint
-					return runner().headPoint
+					const { sitHeadPoint, standHeadPoint, headPoint } = runner()
+					// The first two are in their own images' pixels, which are drawn
+					// feet on the ground, so they come down with them.
+					const below = (point?: Vector) =>
+						point && { x: point.x, y: point.y + drop() }
+					if (seated()) return below(sitHeadPoint)
+					if (standing()) return below(standHeadPoint) ?? headPoint
+					return headPoint
 				},
 				// Which way they're facing, so anything worn on their head can too.
 				facingRight: standing,
@@ -214,8 +235,21 @@ export function createRunnerController(
 				// The pumpkin they've picked up off the path, if they're wearing one.
 				...createObjectSignal(undefined as string | undefined, 'wornPumpkin'),
 				inner: {
-					style: (): JSX.CSSProperties =>
-						zombie() ? { filter: ZOMBIE_TINT } : {},
+					style: (): JSX.CSSProperties => {
+						const size = still()
+						return {
+							...(zombie() ? { filter: ZOMBIE_TINT } : {}),
+							// A single image at its own size, feet on the ground, rather
+							// than stretched to fill a box the size of their run frames.
+							...(size
+								? {
+										'background-size': `${size.width * RUNNER_SIZE}px ${size.height * RUNNER_SIZE}px`,
+										'background-position': 'left bottom',
+										'background-repeat': 'no-repeat',
+									}
+								: {}),
+						}
+					},
 				},
 				// How far they run in a tick, on average: what a furby aims ahead by.
 				step: () =>

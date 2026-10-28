@@ -5,7 +5,18 @@ import { type RunnerController, isStandingState } from './RunnerController'
 
 export function createShadowController(id: string, runner: RunnerController) {
 	const [runnerData] = findRunnerSignal(runner.data.runnerId) ?? []
-	if (!runnerData) return createController({ frames: [], init: () => ({ id, type: 'shadow', x: () => 0, y: () => 0, width: () => 0, height: () => 0 }) })
+	if (!runnerData)
+		return createController({
+			frames: [],
+			init: () => ({
+				id,
+				type: 'shadow',
+				x: () => 0,
+				y: () => 0,
+				width: () => 0,
+				height: () => 0,
+			}),
+		})
 	const runnerJumpHeight = () => runner.data.baseY() - runner.data.y()
 	const JUMP_SHADOW_SIZE = 100
 
@@ -23,7 +34,8 @@ export function createShadowController(id: string, runner: RunnerController) {
 					runner.data.x() -
 					runnerJumpHeight() / (JUMP_SHADOW_SIZE * 2) +
 					xShift(),
-				y: () => runner.data.baseY() + runnerData().height + 20,
+				// Just above their feet on the ground, however tall they're drawn.
+				y: () => runner.data.ground() - 8,
 				width: () =>
 					runnerData().width * RUNNER_SIZE * sizeMultiplier() +
 					runnerJumpHeight() / JUMP_SHADOW_SIZE,

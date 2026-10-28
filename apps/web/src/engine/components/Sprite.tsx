@@ -165,8 +165,10 @@ export const Sprite: Component<Sprite & SpriteExtendedProps> = (props) => {
 					'transform-origin': props.inner?.origin
 						? `${props.inner.origin.x}px ${props.inner.origin.y}px`
 						: 'center',
-					...(props.inner?.style ?? {}),
 					...frameStyle(),
+					// After the frame's own, so a controller can draw a frame some
+					// other way: at its own size, say, rather than stretched to fit.
+					...(props.inner?.style ?? {}),
 				}}
 			>
 				{props.children}
