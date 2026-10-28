@@ -80,6 +80,7 @@ mixpanel.init(MIXPANEL_TOKEN, {
 | `$mp_web_page_view` (automatic) | First load, then every change of route path (query-string-only changes don't count) | `current_url_path`, `current_page_title`, `current_url_search`, `$current_url`, UTM params | `apps/web/src/utils/analytics.ts` (`track_pageview`) |
 | `link_clicked` | Any `<a href>` clicked or middle-clicked, site-wide, from one capture-phase listener. Off-site links go by beacon. | `link_url` (path if internal, full URL if external, scheme only for `mailto:`/`tel:`), `link_text`, `link_area` (`header`, `mobile_navigation`, `page`, from `data-link-area`), `is_external` | `apps/web/src/utils/analytics.ts` |
 | `header_runner_clicked` | A runner in the header canvas is clicked | `runner_type` (`member`, `guest`, `custom_racer`), `member_name` (members only; custom racer names are free text) | `components/header/ScoopBusHeader.tsx` |
+| `header_pumpkin_clicked` | A carved pumpkin lying on the header's path is clicked (goes to `/pumpkins`) | none (its name is free text) | `components/header/ScoopBusHeader.tsx` |
 | `header_background_clicked` | The header is clicked away from any runner (goes home) | none | `components/header/ScoopBusHeader.tsx` |
 | `mobile_menu_opened` | The mobile nav's "more pages" menu is opened | none | `components/MobileNav.tsx` |
 | `custom_racer_created` | A custom racer is saved (after the API succeeds) | `racer_speed` | `pages/CustomRacerAddPage.tsx` |
@@ -96,6 +97,7 @@ mixpanel.init(MIXPANEL_TOKEN, {
 | `test_notification_sent` | A test notification is sent successfully | none | `notifications/NotificationsPage.tsx` |
 | `furbies_released` | A furby button lets the furbies out | none | `components/FurbyButton.tsx` |
 | `halloween_mode_enabled` | A pumpkin beside a Halloween (31 October) parkrun's name turns Halloween mode on | none | `components/PumpkinButton.tsx` |
+| `pumpkin_carved` | A carved pumpkin is saved on `/pumpkins/carve` (after the API succeeds; its names are free text and not sent) | `carved_pixel_count` | `pages/PumpkinPage.tsx` |
 | `list_expanded` | A "show all" / "+N more" list is opened | `list_name` (`latest_results`, `member_celebration`, `poker_hand`, `stopwatch_bingo`, `position_bingo`, `alphabet`, `sweden`) | `components/LatestResults.tsx`, `pages/MemberPage.tsx`, `pages/PokerPage.tsx`, the bingo pages |
 | `graph_option_changed` | A checkbox under the member graph | `graph_option` (`personal_bests`, `course_personal_bests`, `other_celebrations`, `walks_filtered`), `is_enabled` | `components/GraphSVG.tsx` |
 | `graph_club_added` / `graph_club_removed` | A club is added to or removed from the largest clubs graph | `club_name` | `components/LargestClubsGraph.tsx` |

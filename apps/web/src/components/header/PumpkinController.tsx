@@ -1,11 +1,14 @@
 import { RUNNER_SIZE } from '@/data/runners'
 import { type Scene, createController, createObjectSignal } from '@/engine'
+import { halloweenAssetSize, isHalloween } from '@/utils/halloween'
 import {
-	halloweenAssetSize,
-	isHalloween,
-	pumpkinAssets,
-} from '@/utils/halloween'
-import type { Accessor } from 'solid-js'
+	type HeaderPumpkin,
+	headerPumpkin,
+	isCarvedPumpkin,
+} from '@/utils/pumpkins'
+import { css } from '@style/css'
+import { type Accessor, Show } from 'solid-js'
+import { PumpkinLight, createBlink } from '../PumpkinLight'
 import { addBehindBus, addToPath } from './PathOrder'
 import type { RunnerController } from './RunnerController'
 
@@ -54,6 +57,12 @@ const SPIN = 18
 /** How far from where its wearer lands, in depth, it can come down. */
 const SCATTER = 6
 
+/**
+ * How far round a pumpkin on the path the mouse still counts as on it, it
+ * being so small a thing to point at.
+ */
+const HOVER_SLOP = 4
+
 /** How far the bus's scoop sticks out in front of it (see `BusController`). */
 const SCOOP_REACH = 22
 
@@ -82,6 +91,7 @@ export function createPumpkinController(runner: Wearer) {
 	}
 	const width = () => (size()?.width ?? 0) * PUMPKIN_SCALE
 	const height = () => (size()?.height ?? 0) * PUMPKIN_SCALE
+	const blinkedOn = createBlink()
 
 	return createController({
 		init: () => ({
@@ -101,6 +111,12 @@ export function createPumpkinController(runner: Wearer) {
 			style: () => ({
 				display: size() && head() ? 'block' : 'none',
 			}),
+			// A carved one still has its inside while it's worn.
+			children: () => (
+				<Show when={isCarvedPumpkin(asset() ?? '')}>
+					<PumpkinLight lit={blinkedOn()} />
+				</Show>
+			),
 		}),
 	})
 }
@@ -161,13 +177,21 @@ function reslot(
  * pumpkin, while this one hides — curing them if they're a zombie. If they're
  * scooped, it comes off at the top of their flight and falls back to the path
  * on a line of its own, for anyone else to pick up.
+ *
+ * `pumpkin` can change under it, when carved pumpkins arrive or someone carves
+ * one, and then it's that pumpkin lying there instead. Whoever's already
+ * wearing it keeps the one they picked up. A carved one says whose it is when
+ * the mouse is on it.
  */
 function createLoosePumpkinController(
+	scene: Scene,
 	id: string,
-	asset: string,
+	pumpkin: Accessor<HeaderPumpkin>,
 	x: number,
 	ground: number,
+	mousePosition: Accessor<Vector>,
 ) {
+	const asset = () => pumpkin().image
 	let state: 'ground' | 'worn' | 'flying' = 'ground'
 	let wearer: RunnerController | undefined
 	// Where it is in the draw order: behind the bus, or among the runners.
@@ -175,12 +199,13 @@ function createLoosePumpkinController(
 	let vx = 0
 	let vy = 0
 
-	const size = () => halloweenAssetSize(asset)
+	const size = () => halloweenAssetSize(asset())
 	const width = () => (size()?.width ?? 0) * PUMPKIN_SCALE
 	const height = () => (size()?.height ?? 0) * PUMPKIN_SCALE
+	const hovered = () => pumpkinAt(scene, mousePosition())?.data.id === id
+	const blinkedOn = createBlink()
 
 	return createController({
-		frames: [asset],
 		init() {
 			// Where it rests, or will come to rest: its place in the draw order.
 			const { ground: rest, setGround } = createObjectSignal(ground, 'ground')
@@ -190,6 +215,7 @@ function createLoosePumpkinController(
 			return {
 				id,
 				type: LOOSE_PUMPKIN_TYPE,
+				frames: () => [asset()],
 				...createObjectSignal(x, 'x'),
 				y: () => bottom() - height(),
 				ground: rest,
@@ -201,7 +227,26 @@ function createLoosePumpkinController(
 				...createObjectSignal(0, 'rotation'),
 				width,
 				height,
+				label: () => pumpkin().label,
 				style: () => ({ display: shown() && size() ? 'block' : 'none' }),
+				// Its inside, if it's a carved one, lit up while it's hovered and
+				// now and then by itself, and its name, styled to match the
+				// runners'.
+				children: () => (
+					<>
+						<Show when={isCarvedPumpkin(asset())}>
+							<PumpkinLight lit={hovered() || blinkedOn()} />
+						</Show>
+						<div
+							class={styles.label}
+							style={{
+								display: hovered() ? 'block' : 'none',
+							}}
+						>
+							{pumpkin().label}
+						</div>
+					</>
+				),
 			}
 		},
 		onEnterFrame({ $, $scene, $controller }) {
@@ -232,7 +277,7 @@ function createLoosePumpkinController(
 					if (!finder) return
 					state = 'worn'
 					wearer = finder
-					finder.data.setWornPumpkin(asset)
+					finder.data.setWornPumpkin(asset())
 					finder.data.setZombie(false)
 					$.setShown(false)
 					return
@@ -289,8 +334,15 @@ function createLoosePumpkinController(
  * for, spread across it at random depths — or clear them all away again,
  * including off anyone's head. Safe to call whenever: it only puts them out if
  * there are none.
+ *
+ * They're pumpkins people have carved on `/pumpkins/carve` where there are enough to
+ * go round, and the drawn ones where there aren't.
  */
-export function syncPumpkins(scene: Scene, on: boolean) {
+export function syncPumpkins(
+	scene: Scene,
+	on: boolean,
+	mousePosition: Accessor<Vector>,
+) {
 	const out = scene.getControllersByType(LOOSE_PUMPKIN_TYPE).map(({ id }) => id)
 
 	if (!on) {
@@ -307,17 +359,58 @@ export function syncPumpkins(scene: Scene, on: boolean) {
 		return
 	}
 
-	if (out.length || !pumpkinAssets.length) return
+	if (out.length) return
 	const width = scene.canvas.get().width()
 	const count = Math.min(MAX_PUMPKINS, Math.floor(width / PUMPKIN_SPACING))
 	const share = width / Math.max(1, count)
 	const pumpkins = Array.from({ length: count }, (_, i) =>
 		createLoosePumpkinController(
+			scene,
 			`pumpkin-loose-${i}`,
-			pumpkinAssets[i % pumpkinAssets.length],
+			() => headerPumpkin(i),
 			Math.max(0, share * i + between(share * 0.2, share * 0.7)),
 			Math.round(between(PATH_FAR, PATH_NEAR)),
+			mousePosition,
 		),
 	)
 	addToPath(scene, pumpkins)
+}
+
+type LoosePumpkinController = ReturnType<typeof createLoosePumpkinController>
+
+/**
+ * The carved pumpkin lying on the path at `point`, if there is one: what the
+ * mouse being on names, and a click on takes you to the patch for. Not one in
+ * the air or on someone's head, nor a drawn one, which has no name to give.
+ */
+export function pumpkinAt(scene: Scene, point: Vector) {
+	return scene
+		.getControllersByType<LoosePumpkinController>(LOOSE_PUMPKIN_TYPE)
+		.find(
+			({ data }) =>
+				data.label() &&
+				data.shown() &&
+				data.bottom() >= data.ground() &&
+				point.x >= data.x() - HOVER_SLOP &&
+				point.x <= data.x() + data.width() + HOVER_SLOP &&
+				point.y >= data.y() - HOVER_SLOP &&
+				point.y <= data.bottom() + HOVER_SLOP,
+		)
+}
+
+const styles = {
+	label: css({
+		position: 'absolute',
+		left: '50%',
+		bottom: '100%',
+		translate: '-50% -4px',
+		background: 'var(--color-black)',
+		color: 'var(--color-white)',
+		fontFamily: '"Jersey 10", sans-serif',
+		fontSize: '12px',
+		p: '0px 8px',
+		width: 'max-content',
+		borderRadius: '3px',
+		cornerShape: 'notch',
+	}),
 }

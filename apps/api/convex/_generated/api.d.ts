@@ -28,6 +28,7 @@ import type * as notifications from "../notifications.js";
 import type * as notificationsSend from "../notificationsSend.js";
 import type * as parkrun from "../parkrun.js";
 import type * as profanity from "../profanity.js";
+import type * as pumpkins from "../pumpkins.js";
 import type * as queries from "../queries.js";
 import type * as races from "../races.js";
 import type * as snapshots from "../snapshots.js";
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   notificationsSend: typeof notificationsSend;
   parkrun: typeof parkrun;
   profanity: typeof profanity;
+  pumpkins: typeof pumpkins;
   queries: typeof queries;
   races: typeof races;
   snapshots: typeof snapshots;

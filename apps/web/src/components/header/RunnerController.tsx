@@ -9,7 +9,7 @@ import { isHalloween } from '@/utils/halloween'
 import { css } from '@style/css'
 import type { Accessor, JSX } from 'solid-js'
 import { createCameraFlashController } from './CameraFlashController'
-import { createPumpkinController } from './PumpkinController'
+import { createPumpkinController, pumpkinAt } from './PumpkinController'
 
 export const RUNNER_LABEL_RENDER_DISTANCE = 50
 
@@ -225,17 +225,20 @@ export function createRunnerController(
 				width,
 				height,
 				children: () => {
-					const closest = scene
-						.getControllersByType<RunnerController>('runner')
-						.map((c) => ({
-							id: c.data.id,
-							dist: Math.hypot(
-								c.data.x() + c.data.width() / 2 - mousePosition().x,
-								c.data.y() + c.data.height() / 2 - mousePosition().y,
-							),
-						}))
-						.filter(({ dist }) => dist < RUNNER_LABEL_RENDER_DISTANCE)
-						.sort((a, b) => a.dist - b.dist)[0]
+					// A carved pumpkin under the mouse has the say, with its own name.
+					const closest = pumpkinAt(scene, mousePosition())
+						? undefined
+						: scene
+								.getControllersByType<RunnerController>('runner')
+								.map((c) => ({
+									id: c.data.id,
+									dist: Math.hypot(
+										c.data.x() + c.data.width() / 2 - mousePosition().x,
+										c.data.y() + c.data.height() / 2 - mousePosition().y,
+									),
+								}))
+								.filter(({ dist }) => dist < RUNNER_LABEL_RENDER_DISTANCE)
+								.sort((a, b) => a.dist - b.dist)[0]
 
 					const name = runner().name
 					const parts: string[] = []

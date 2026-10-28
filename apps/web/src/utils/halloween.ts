@@ -12,11 +12,12 @@ const HALLOWEEN_MODE_DAYS = 8
 
 /**
  * Every pumpkin in the halloween assets, so another one joins the patch just by
- * dropping `pumpkin3.png` next to the others. Matched on the `pumpkin` prefix
- * so the rest of the folder's spooky things don't end up on anyone's head.
+ * dropping `pumpkin6.png` next to the others. Matched on `pumpkin` and a
+ * number, so the rest of the folder's spooky things don't end up on anyone's
+ * head, and nor does `pumpkin-base.png`, which is the uncarved one.
  */
 export const pumpkinAssets = Object.entries(
-	import.meta.glob('../assets/halloween/pumpkin*.png', {
+	import.meta.glob('../assets/halloween/pumpkin[0-9]*.png', {
 		eager: true,
 		import: 'default',
 	}) as Record<string, string>,

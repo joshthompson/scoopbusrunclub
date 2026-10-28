@@ -1,4 +1,6 @@
+import { HalloweenBanner } from '@/components/HalloweenBanner'
 import { Emoji } from '@/components/ui/Emoji'
+import { isHalloween } from '@/utils/halloween'
 import { getWrappedBannerYear, isDecember } from '@/utils/wrappedYears'
 import { A } from '@solidjs/router'
 import { css, cx } from '@style/css'
@@ -45,6 +47,9 @@ export const HomePage: Component<{
 			</Show>
 			<main class={styles.main}>
 				<FieldBlock title="Latest Results" signType="purple">
+					<Show when={isHalloween()}>
+						<HalloweenBanner />
+					</Show>
 					<Show
 						when={!props.resultsLoading && !props.runnersLoading}
 						fallback={<div>Loading...</div>}

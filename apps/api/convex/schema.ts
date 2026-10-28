@@ -294,6 +294,27 @@ export default defineSchema({
 		.index('by_expiresAt', ['expiresAt'])
 		.index('by_createdAt', ['createdAt']),
 
+	// --- Carved pumpkins (carved by visitors, out in the header at Halloween) ---
+
+	pumpkins: defineTable({
+		name: v.string(),
+		/** Whoever carved it, as they typed it. */
+		carver: v.string(),
+		/** The pixels of `pumpkin-base.png` carved out, each as `y * width + x`. */
+		carved: v.array(v.number()),
+		ip: v.string(),
+		/**
+		 * `active` can turn up in the header; `hidden` never does, for anyone but
+		 * whoever carved it, in the tab they carved it in.
+		 */
+		status: v.union(v.literal('active'), v.literal('hidden')),
+		/** Why it was auto-hidden, e.g. "matched blocked term". Admin-only. */
+		flagReason: v.optional(v.string()),
+		createdAt: v.number(),
+	})
+		.index('by_ip', ['ip'])
+		.index('by_status', ['status', 'createdAt']),
+
 	// --- Web push notifications ---
 
 	/**

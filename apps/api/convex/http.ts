@@ -1768,6 +1768,62 @@ http.route({
 	}),
 })
 
+// --- GET /api/pumpkins?count=<n> (public) ---
+// A random handful of carved pumpkins. Picked here rather than in the query,
+// whose answer Convex caches.
+
+const MAX_PUMPKINS_PER_REQUEST = 20
+
+http.route({
+	path: '/api/pumpkins',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const asked = Number(new URL(request.url).searchParams.get('count'))
+		const count = Math.min(
+			MAX_PUMPKINS_PER_REQUEST,
+			Number.isInteger(asked) && asked > 0 ? asked : 5,
+		)
+		const patch = await ctx.runQuery(api.pumpkins.listPublic)
+		// The first `count` of a shuffle, without shuffling the rest.
+		for (let i = 0; i < Math.min(count, patch.length); i++) {
+			const j = i + Math.floor(Math.random() * (patch.length - i))
+			;[patch[i], patch[j]] = [patch[j], patch[i]]
+		}
+		return jsonResponse(patch.slice(0, count))
+	}),
+})
+
+// --- GET /api/pumpkins/all (public) ---
+// The patch, newest first, then Josh's: as much of it as `listPublic` reads.
+
+http.route({
+	path: '/api/pumpkins/all',
+	method: 'GET',
+	handler: httpAction(async (ctx) => {
+		return jsonResponse(await ctx.runQuery(api.pumpkins.listPublic))
+	}),
+})
+
+// --- POST /api/pumpkins (public, rate limited by IP) ---
+
+http.route({
+	path: '/api/pumpkins',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.pumpkins.create, {
+			name: typeof body.name === 'string' ? body.name : '',
+			carver: typeof body.carver === 'string' ? body.carver : '',
+			carved: Array.isArray(body.carved) ? body.carved : [],
+			ip: clientIp(request),
+		})
+		if ('error' in result) {
+			return jsonResponse(result, result.error === 'limit' ? 429 : 400)
+		}
+		return jsonResponse(result)
+	}),
+})
+
 // --- Admin: GET /api/admin/custom-racers ---
 
 http.route({
@@ -1918,6 +1974,8 @@ for (const path of [
 	'/api/custom-racers/mine',
 	'/api/admin/custom-racers',
 	'/api/admin/custom-racers/approval',
+	'/api/pumpkins',
+	'/api/pumpkins/all',
 	'/api/notifications/vapid-public-key',
 	'/api/notifications/subscribe',
 	'/api/notifications/unsubscribe',

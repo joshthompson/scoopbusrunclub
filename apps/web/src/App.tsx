@@ -55,6 +55,8 @@ import { MemberPage } from './pages/MemberPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PokerPage } from './pages/PokerPage'
 import { PositionBingoPage } from './pages/PositionBingoPage'
+import { PumpkinPage } from './pages/PumpkinPage'
+import { PumpkinPatchPage } from './pages/PumpkinPatchPage'
 import { ReplayPage } from './pages/ReplayPage'
 import { StopwatchBingoPage } from './pages/StopwatchBingoPage'
 import { SwedenPage } from './pages/SwedenPage'
@@ -74,6 +76,7 @@ import {
 import { fetchHeaderRacers, racersAddedThisVisit } from './utils/customRacers'
 import { loadEvents } from './utils/events'
 import { reportFurbyEvents } from './utils/furbys'
+import { isHalloween } from './utils/halloween'
 import { isSnowy, reportSnowDepth } from './utils/snow'
 import { parseWeather, reportWeatherType, weatherType } from './utils/weather'
 
@@ -121,6 +124,10 @@ const App: Component = () => {
 	createEffect(() => reportWeatherType(appWeather().type))
 	createEffect(() => reportSnowDepth(appWeather().snowDepth))
 	createEffect(() => document.body.classList.toggle('snow', isSnowy()))
+	// The club goes by its Halloween name for Halloween.
+	createEffect(() => {
+		document.title = isHalloween() ? 'Spook Bus Run Club' : 'Scoop Bus Run Club'
+	})
 	// Any Förbi or Furby event lets the furbies out for a week from its day.
 	createEffect(() => reportFurbyEvents(races() ?? []))
 	// Pre-compute celebration + PB data once (cached in localStorage alongside results)
@@ -385,6 +392,8 @@ const App: Component = () => {
 					path="/customer-racer/add"
 					component={() => <Navigate href="/custom-racer/add" />}
 				/>
+				<Route path="/pumpkins" component={PumpkinPatchPage} />
+				<Route path="/pumpkins/carve" component={PumpkinPage} />
 				<Route path="/admin" component={AdminPage} />
 				<Route path="/admin/scan" component={AdminScanPage} />
 				<Route path="/admin/users" component={AdminUsersPage} />

@@ -65,7 +65,7 @@ import { createBusController } from './BusController'
 import { syncFurbies } from './FurbyController'
 import { createGhostController } from './GhostController'
 import { addBehindBus, addToPath } from './PathOrder'
-import { syncPumpkins } from './PumpkinController'
+import { pumpkinAt, syncPumpkins } from './PumpkinController'
 import {
 	RUNNER_LABEL_RENDER_DISTANCE,
 	createRunnerController,
@@ -809,7 +809,9 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	createEffect(on(isHalloween, (enabled) => syncVolunteers(scene, enabled)))
 
 	// And Halloween's pumpkins, lying about the path for runners to pick up.
-	createEffect(on(isHalloween, (enabled) => syncPumpkins(scene, enabled)))
+	createEffect(
+		on(isHalloween, (enabled) => syncPumpkins(scene, enabled, mousePosition)),
+	)
 
 	const windowResizeHandler = () => {
 		scene.setWidth(window.innerWidth)
@@ -996,6 +998,15 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						scene={scene}
 						style={{ cursor: 'pointer', background: 'transparent' }}
 						onClick={({ x, y }) => {
+							// A carved pumpkin on the path, which is in front of
+							// whoever's running past it, goes to the patch.
+							if (pumpkinAt(scene, { x, y })) {
+								// Track the pumpkin patch being opened from the header in Mixpanel
+								// (not the pumpkin's name, which is free text)
+								track('header_pumpkin_clicked')
+								navigate('/pumpkins')
+								return
+							}
 							const closest = scene
 								.getControllersByType<RunnerController>('runner')
 								// A skeleton has no page to go to, so a click on one
