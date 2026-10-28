@@ -41,7 +41,7 @@ import type {
 } from '../utils/api'
 import { FurbyButton, pickFurbies } from './FurbyButton'
 import { type MajorMilestone, MilestoneCard } from './MilestoneCard'
-import { PumpkinButton } from './PumpkinButton'
+import { PumpkinButton, pickPumpkins } from './PumpkinButton'
 import {
 	type CelebrationData,
 	ResultCelebrations,
@@ -582,6 +582,7 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 	const isMilestone = () => isMilestoneEvent(props.parkrun.eventNumber)
 	const isXmas = () => isChristmas(props.date)
 	const isSpooky = () => isHalloweenDay(props.date)
+	const [leftPumpkin, rightPumpkin] = pickPumpkins()
 	const specialDay = () =>
 		getSpecialDayName(props.date, getEvent(props.parkrun.eventId)?.country)
 	const displayName = () =>
@@ -594,7 +595,7 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 	return (
 		<>
 			<h4 class={styles.parkrunName}>
-				{isSpooky() && <PumpkinButton flipped />}
+				{isSpooky() && <PumpkinButton src={leftPumpkin} flipped />}
 				{isXmas() && <Emoji emoji="🎄" flipped />}
 				{isMilestone() && <Emoji emoji="🎉" flipped />}
 				{isBusTrip() && <Emoji emoji="🚌" flipped />}{' '}
@@ -608,7 +609,7 @@ function ParkrunName(props: { parkrun: ParkrunEvent; date: string }) {
 				#{props.parkrun.eventNumber} {isBusTrip() && <Emoji emoji="🚌" />}
 				{isMilestone() && <Emoji emoji="🎉" />}
 				{isXmas() && <Emoji emoji="🎄" />}
-				{isSpooky() && <PumpkinButton />}
+				{isSpooky() && <PumpkinButton src={rightPumpkin} />}
 			</h4>
 			<Show when={specialDay()}>
 				{(name) => (

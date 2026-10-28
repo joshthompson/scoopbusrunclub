@@ -60,6 +60,7 @@ import {
 	createBalloonControllers,
 	registerBalloonConsoleHook,
 } from './BalloonController'
+import { createBatControllers } from './BatController'
 import { createBusController } from './BusController'
 import { syncFurbies } from './FurbyController'
 import { createGhostController } from './GhostController'
@@ -696,6 +697,16 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			$scene.addController(
 				...Array.from({ length: GHOST_COUNT }, (_, i) =>
 					createGhostController(`ghost${i}`, i),
+				),
+			)
+
+			// And its bats, which hang in the trees, so they go in front of them too.
+			// Only out in Halloween mode, the same as the ghosts.
+			$scene.addController(
+				...createBatControllers(
+					trees.map((tree) => tree.data),
+					sceneWidth,
+					mousePosition,
 				),
 			)
 

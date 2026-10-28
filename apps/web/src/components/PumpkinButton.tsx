@@ -1,42 +1,67 @@
 import { track } from '@/utils/analytics'
-import { setHalloween } from '@/utils/halloween'
+import { pumpkinAssets, setHalloween } from '@/utils/halloween'
 import { css } from '@style/css'
-import { Emoji } from './ui/Emoji'
+import { Tooltip } from './ui/Tooltip'
+
+const LABEL = 'Turn on Halloween'
+
+/** Two different pumpkins, picked at random, to stand either side of a title. */
+export function pickPumpkins() {
+	return pumpkinAssets
+		.map((src) => ({ src, order: Math.random() }))
+		.sort((a, b) => a.order - b.order)
+		.slice(0, 2)
+		.map(({ src }) => src)
+}
 
 /**
  * A pumpkin beside a Halloween parkrun's name that turns Halloween mode on, and
  * takes you up to the header to see it — the same as a furby beside a Förbi.
+ * The art looks left, so `flipped` turns the one on the left to face the name.
  */
-export function PumpkinButton(props: { flipped?: boolean }) {
+export function PumpkinButton(props: { src: string; flipped?: boolean }) {
 	return (
-		<button
-			type="button"
-			class={styles.pumpkin}
-			title="Turn on Halloween"
-			aria-label="Turn on Halloween"
-			onClick={() => {
-				setHalloween(true)
-				// Track Halloween mode being turned on from a results block in Mixpanel
-				track('halloween_mode_enabled')
-				window.scrollTo({ top: 0, behavior: 'smooth' })
-			}}
-		>
-			<Emoji emoji="🎃" flipped={props.flipped} />
-		</button>
+		<Tooltip content={LABEL}>
+			<button
+				type="button"
+				class={styles.pumpkin}
+				aria-label={LABEL}
+				onClick={() => {
+					setHalloween(true)
+					// Track Halloween mode being turned on from a results block in Mixpanel
+					track('halloween_mode_enabled')
+					window.scrollTo({ top: 0, behavior: 'smooth' })
+				}}
+			>
+				<img
+					src={props.src}
+					alt=""
+					class={styles.image}
+					style={props.flipped ? { scale: '-1 1' } : undefined}
+				/>
+			</button>
+		</Tooltip>
 	)
 }
 
 const styles = {
 	pumpkin: css({
 		display: 'inline-block',
-		verticalAlign: 'bottom',
 		p: 0,
 		border: 'none',
 		background: 'none',
-		font: 'inherit',
 		cursor: 'pointer',
+		animation: 'buldge 2s ease-in-out infinite',
 		transition: 'translate 0.15s',
 		_hover: { translate: '0 -3px' },
 		_focusVisible: { outline: '2px solid currentColor', outlineOffset: '2px' },
+	}),
+	// The same pixel scale as the furbies, which are a few pixels taller. Left
+	// inline so the pumpkin sits on the name's baseline, not below it.
+	image: css({
+		verticalAlign: 'baseline',
+		height: '1em',
+		width: 'auto',
+		imageRendering: 'pixelated',
 	}),
 }

@@ -14,9 +14,34 @@ import tree2Asset from '@/assets/misc/tree2.png'
 import { isSnowy } from '@/utils/snow'
 import { css } from '@style/css'
 
+/**
+ * `roosts` are where Halloween's bats hang: the pixel on the underside of a
+ * branch their feet hold on to, in the `-halloween` art's own pixels. Picked
+ * where a hanging bat, drawn at double size, comes down clear of the branches
+ * below and of the bats either side, near enough.
+ */
 const trees = [
-	{ asset: tree1Asset, w: 87, h: 120 },
-	{ asset: tree2Asset, w: 56, h: 110 },
+	{
+		asset: tree1Asset,
+		w: 87,
+		h: 120,
+		roosts: [
+			{ x: 42, y: 18 },
+			{ x: 23, y: 29 },
+			{ x: 65, y: 31 },
+			{ x: 69, y: 55 },
+			{ x: 18, y: 60 },
+		],
+	},
+	{
+		asset: tree2Asset,
+		w: 56,
+		h: 110,
+		roosts: [
+			{ x: 46, y: 66 },
+			{ x: 13, y: 80 },
+		],
+	},
 ]
 export function createTreeController(id: string, x: number) {
 	const size = Math.random() * 0.25 + 1
@@ -26,17 +51,26 @@ export function createTreeController(id: string, x: number) {
 	// `Math.random()` per read would give a different answer each time.
 	const jitterX = Math.random() * 150 - 75
 	const jitterY = Math.random() * 5
+	const width = () => tree.w * size
+	const height = () => 120 * size
 	return createController({
 		frames: [tree.asset],
 		init() {
 			return {
 				id,
 				type: 'tree',
-				width: () => tree.w * size,
-				height: () => 120 * size,
+				width,
+				height,
 				x: () => x + jitterX,
 				y: () => 10 + jitterY,
 				frameInterval: () => Number.POSITIVE_INFINITY,
+				// Where the branches are once the art's been stretched to fit, with
+				// the bottom of the pixel being what a bat holds on to.
+				roosts: () =>
+					tree.roosts.map((roost) => ({
+						x: x + jitterX + ((roost.x + 0.5) * width()) / tree.w,
+						y: 10 + jitterY + ((roost.y + 1) * height()) / tree.h,
+					})),
 			}
 		},
 	})
