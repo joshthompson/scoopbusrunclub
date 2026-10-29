@@ -1,10 +1,13 @@
 import shadowAsset from '@/assets/runners/shadow.png'
 import { type RunnerData, runners } from '@/data/runners'
+import { ZOMBIE_TINT } from '@/utils/halloween'
 import { css } from '@style/css'
 
+/** A runner sat down, and as a `zombie` sat down in a zombie's green. */
 export function CharacterImage(props: {
 	runner: RunnerData
 	pose: 'sitting' | 'running'
+	zombie?: boolean
 }) {
 	const runner = () => props.runner
 
@@ -13,6 +16,8 @@ export function CharacterImage(props: {
 			class={styles.characterImage}
 			role="img"
 			aria-label={`Image of ${runner().name}`}
+			// On the runners alone, so their shadows stay grey.
+			style={{ '--zombie-tint': props.zombie ? ZOMBIE_TINT : 'none' }}
 		>
 			{runner().frames.sit?.[0] && (
 				<img src={runner().frames.sit?.[0]} class={styles.sitting} alt="" />
@@ -45,12 +50,14 @@ const styles = {
 		pointerEvents: 'none',
 	}),
 	sitting: css({
+		filter: 'var(--zombie-tint)',
 		zIndex: 2,
 		position: 'relative',
 		m: '-30px auto 0',
 		height: '100%',
 	}),
 	linkSitting: css({
+		filter: 'var(--zombie-tint)',
 		zIndex: 3,
 		position: 'absolute',
 		bottom: '20%',

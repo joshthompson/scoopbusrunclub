@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/Icon'
 import { LINK_PARKRUN_ID } from '@/data/link'
 import { type RunnerName, runners as runnerSignals } from '@/data/runners'
 import { track } from '@/utils/analytics'
+import { isHalloween } from '@/utils/halloween'
 import { getMemberRoute, getRunnerKeyFromRouteName } from '@/utils/memberRoute'
 import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
 import { snowyAsset } from '@/utils/snow'
@@ -455,7 +456,10 @@ export function MemberPage(props: MemberPageProps) {
 		<Show when={runnerData()} fallback={<NotFoundPage />}>
 			{(runner) => (
 				<div class={styles.container}>
-					<FieldBlock title={name()} signType="purple">
+					<FieldBlock
+						title={name()}
+						signType={isHalloween() ? 'tombstone' : 'purple'}
+					>
 						<A href="./graph" class={styles.rockButton}>
 							<img src={snowyAsset(rock1Asset)} width={59} alt="" />
 							<img
@@ -467,7 +471,11 @@ export function MemberPage(props: MemberPageProps) {
 						</A>
 
 						<div class={styles.runnerSummary}>
-							<CharacterImage runner={runner()} pose="sitting" />
+							<CharacterImage
+								runner={runner()}
+								pose="sitting"
+								zombie={isHalloween()}
+							/>
 
 							<div class={styles.runnerSummaryStats}>
 								<RunnerSummaryStat label="Total runs">

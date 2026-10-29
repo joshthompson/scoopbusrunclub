@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/Icon'
 import { type RaceGuestAttendee, fetchPublicRaces } from '@/utils/api'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
+import { isHalloween } from '@/utils/halloween'
 import { formatDate, ordinal } from '@/utils/misc'
 import { A, useParams } from '@solidjs/router'
 import { css } from '@style/css'
@@ -153,7 +154,10 @@ export function GuestPage() {
 			<Show when={guest()} fallback={<NotFoundPage />}>
 				{(g) => (
 					<div class={styles.container}>
-						<FieldBlock title={g().name} signType="purple">
+						<FieldBlock
+							title={g().name}
+							signType={isHalloween() ? 'tombstone' : 'purple'}
+						>
 							<Show when={g().avatar && 'head' in g().avatar}>
 								{(() => {
 									const runnerData = createRunnerFrames(
@@ -171,6 +175,7 @@ export function GuestPage() {
 													frameInterval: 200,
 												}}
 												pose="sitting"
+												zombie={isHalloween()}
 											/>
 										</div>
 									)

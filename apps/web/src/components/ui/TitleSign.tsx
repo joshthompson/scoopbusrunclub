@@ -1,3 +1,4 @@
+import tombstone from '@/assets/halloween/tombstone.png'
 import purpleSign from '@/assets/misc/purple-sign.png'
 import woodenSign from '@/assets/misc/wooden-sign.png'
 import { isHalloween, seasonalAsset } from '@/utils/halloween'
@@ -6,15 +7,31 @@ import { Show, createEffect, createSignal } from 'solid-js'
 import { SignPumpkins } from '../SignPumpkins'
 import { SnowShelf } from './SnowShelf'
 
-export type SignType = 'wooden' | 'purple'
+export type SignType = 'wooden' | 'purple' | 'tombstone'
+
+const SIGN_IMAGES: Record<SignType, string> = {
+	wooden: woodenSign,
+	purple: purpleSign,
+	tombstone,
+}
+
+/**
+ * The space a title has to fit in on the signs that shrink it to fit, in px:
+ * the purple board, and the panel on the tombstone's face.
+ */
+const TITLE_SPACE: Partial<
+	Record<SignType, { width: number; height: number }>
+> = {
+	purple: { width: 105, height: 50 },
+	tombstone: { width: 44, height: 44 },
+}
 
 export function TitleSign(props: {
 	title: string
 	type?: SignType
 }) {
 	const type = () => props.type ?? 'wooden'
-	const signImage = () =>
-		seasonalAsset(type() === 'wooden' ? woodenSign : purpleSign)
+	const signImage = () => seasonalAsset(SIGN_IMAGES[type()])
 
 	let innerRef!: HTMLDivElement
 	const [fontSize, setFontSize] = createSignal<string | undefined>(undefined)
@@ -25,13 +42,13 @@ export function TitleSign(props: {
 		const _type = type()
 		setFontSize(undefined)
 
-		if (_type !== 'purple') return
+		const space = TITLE_SPACE[_type]
+		if (!space) return
 
 		// Wait for DOM to update
 		requestAnimationFrame(() => {
 			if (!innerRef) return
-			const containerWidth = 105
-			const containerHeight = 50
+			const { width: containerWidth, height: containerHeight } = space
 			let size = 1.2 // starting em size (matches the CSS default)
 
 			// Temporarily apply the size so we can measure
@@ -60,6 +77,9 @@ export function TitleSign(props: {
 				<Show when={isHalloween()}>
 					<SignPumpkins />
 				</Show>
+			</Show>
+			<Show when={type() === 'tombstone'}>
+				<SignPumpkins sign="tombstone" />
 			</Show>
 			<div
 				ref={innerRef}
@@ -101,6 +121,15 @@ const styles = {
 					height: '70px',
 					backgroundSize: 'cover',
 				},
+				// Twice its 40 × 67 pixels, planted so its foot is where the purple
+				// sign's bottom edge is.
+				tombstone: {
+					top: 'calc(-2.8rem - 64px)',
+					width: '80px',
+					height: '134px',
+					backgroundSize: '80px 134px',
+					imageRendering: 'pixelated',
+				},
 			},
 		},
 	}),
@@ -136,6 +165,23 @@ const styles = {
 					ml: '5px',
 					fontSize: '1.2em',
 					lineHeight: '1.1em',
+				},
+				// On the panel under the RIP, which is 48px square from 18px in and
+				// 44px down, with a little room kept clear of its border.
+				tombstone: {
+					color: '#383838',
+					// Carved in: lit along the bottom edge of each letter.
+					textShadow: '0 1px 0 #a6a6a6',
+					width: '44px',
+					height: '44px',
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					mt: '46px',
+					ml: '20px',
+					py: 0,
+					fontSize: '1.2em',
+					lineHeight: '0.9em',
 				},
 			},
 		},

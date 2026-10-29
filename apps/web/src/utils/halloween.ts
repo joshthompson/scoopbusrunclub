@@ -52,6 +52,15 @@ export function pumpkinTint(image: string): string {
 	return tint
 }
 
+/**
+ * A zombie's green: just enough to look unwell without losing their kit's own
+ * colours.
+ */
+export const ZOMBIE_TINT = 'sepia(0.35) hue-rotate(55deg) saturate(1.3)'
+
+/** Zombies shamble along at half their old speed, legs and all. */
+export const ZOMBIE_PACE = 0.5
+
 /** Every ghost in the halloween assets, picked up the same way as the pumpkins. */
 export const ghostAssets = Object.entries(
 	import.meta.glob('../assets/halloween/ghost*.png', {

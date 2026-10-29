@@ -5,7 +5,7 @@ import {
 	type runners,
 } from '@/data/runners'
 import { type Scene, createController, createObjectSignal } from '@/engine'
-import { isHalloween } from '@/utils/halloween'
+import { ZOMBIE_PACE, ZOMBIE_TINT, isHalloween } from '@/utils/halloween'
 import { imageSize } from '@/utils/imageSize'
 import { css } from '@style/css'
 import type { Accessor, JSX } from 'solid-js'
@@ -126,15 +126,6 @@ const LAPPED = 400
 /** The random extra on each stride, as a share of their speed. */
 const STRIDE_JITTER = 0.4
 
-/**
- * A zombie's green: just enough to look unwell without losing their kit's own
- * colours. On the frame image alone, so their pumpkin stays orange.
- */
-const ZOMBIE_TINT = 'sepia(0.35) hue-rotate(55deg) saturate(1.3)'
-
-/** Zombies shamble along at half their old speed, legs and all. */
-const ZOMBIE_PACE = 0.5
-
 export function createRunnerController(
 	id: string,
 	runnerId: keyof typeof runners | string,
@@ -238,6 +229,7 @@ export function createRunnerController(
 					style: (): JSX.CSSProperties => {
 						const size = still()
 						return {
+							// On the frame image alone, so their pumpkin stays orange.
 							...(zombie() ? { filter: ZOMBIE_TINT } : {}),
 							// A single image at its own size, feet on the ground, rather
 							// than stretched to fill a box the size of their run frames.
