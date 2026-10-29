@@ -119,6 +119,15 @@ const [carvedThisVisit, setCarvedThisVisit] = createSignal<CarvedPumpkin[]>([])
 
 let requested = false
 
+/**
+ * Whether the fetch `carvedPumpkins` starts has come back, either way. Until
+ * then there's no telling whether there'll be carved pumpkins to show or the
+ * drawn ones will have to stand in, so anything that would only swap one for
+ * the other shows neither yet.
+ */
+const [settled, setSettled] = createSignal(false)
+export const carvedPumpkinsSettled = settled
+
 /** Carved pumpkins from `path`, drawn and ready to show. */
 async function fetchPumpkins(path: string): Promise<CarvedPumpkin[]> {
 	const [response, base] = await Promise.all([
@@ -152,6 +161,7 @@ export function carvedPumpkins(): CarvedPumpkin[] {
 			.then(setFetched)
 			// No carved pumpkins this time: the drawn ones stand in.
 			.catch(() => {})
+			.finally(() => setSettled(true))
 	}
 	return withCarvedThisVisit(fetched())
 }

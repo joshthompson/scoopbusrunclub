@@ -3,6 +3,7 @@ import {
 	PUMPKIN_HEIGHT,
 	PUMPKIN_WIDTH,
 	carvedPumpkins,
+	carvedPumpkinsSettled,
 	pumpkinLabel,
 } from '@/utils/pumpkins'
 import { A } from '@solidjs/router'
@@ -20,10 +21,11 @@ function twoOf(count: number, [a, b]: number[]) {
 
 /**
  * A pumpkin either side of a wooden sign's post, or a tombstone, sat at its
- * foot in the grass it's planted in. Two of the carved ones, lit and labelled like they are
- * everywhere else and off to the patch when clicked; the drawn ones only stand
- * in while there are none. Each sign picks its own two, once, so they don't
- * swap about while the page is open.
+ * foot in the grass it's planted in. Two of the carved ones, lit and labelled
+ * like they are everywhere else and off to the patch when clicked; the drawn
+ * ones only stand in if there are none, and neither shows until that's known.
+ * Each sign picks its own two, once, so they don't swap about while the page
+ * is open.
  */
 export function SignPumpkins(props: {
 	sign?: 'wooden' | 'tombstone'
@@ -33,6 +35,7 @@ export function SignPumpkins(props: {
 
 	const pumpkins = createMemo(() => {
 		const carved = carvedPumpkins()
+		if (!carvedPumpkinsSettled()) return []
 		if (carved.length) {
 			return twoOf(carved.length, picks).map((i) => ({
 				image: carved[i].image,

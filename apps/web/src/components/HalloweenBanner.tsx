@@ -3,6 +3,7 @@ import {
 	PUMPKIN_HEIGHT,
 	PUMPKIN_WIDTH,
 	carvedPumpkins,
+	carvedPumpkinsSettled,
 	pumpkinLabel,
 } from '@/utils/pumpkins'
 import { A } from '@solidjs/router'
@@ -19,12 +20,15 @@ const PUMPKIN_SCALE = 2
 /**
  * The top of the results in Halloween mode: a row of pumpkins people have
  * carved, and the way to carve your own or see everyone's. The patch is never
- * empty (Josh's are always in it), so the drawn ones only stand in while it's
- * loading or can't be reached.
+ * empty (Josh's are always in it), so the drawn ones only stand in when it
+ * can't be reached. While it's loading the row is left empty, rather than
+ * filled with drawn ones that are then swapped for however many carved ones
+ * there are.
  */
 export function HalloweenBanner() {
 	const pumpkins = createMemo(() => {
 		const carved = carvedPumpkins()
+		if (!carvedPumpkinsSettled()) return []
 		if (carved.length) {
 			return carved.slice(0, PUMPKIN_COUNT).map((pumpkin) => ({
 				image: pumpkin.image,
@@ -114,6 +118,9 @@ const styles = {
 		flexWrap: 'wrap',
 		justifyContent: 'center',
 		gap: '0.25rem 0.5rem',
+		// A row's worth of room (`PUMPKIN_HEIGHT * PUMPKIN_SCALE`) kept while
+		// they load, so the buttons don't jump down when they arrive.
+		minHeight: '46px',
 	}),
 	pumpkin: css({
 		display: 'block',
