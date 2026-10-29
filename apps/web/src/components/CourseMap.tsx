@@ -1,7 +1,8 @@
 import type { CourseData } from '@/utils/api'
+import { halloweenPointEmoji, isHalloween } from '@/utils/halloween'
 import { css } from '@style/css'
 import L from 'leaflet'
-import { onCleanup, onMount } from 'solid-js'
+import { createEffect, onCleanup, onMount } from 'solid-js'
 import 'leaflet/dist/leaflet.css'
 
 // ---------------------------------------------------------------------------
@@ -24,8 +25,14 @@ const POINT_EMOJI: Record<string, string> = {
 }
 
 function pointLabel(name: string): string {
-	return POINT_EMOJI[name.toLowerCase()] ?? name
+	return (
+		(isHalloween() && halloweenPointEmoji(name)) ||
+		(POINT_EMOJI[name.toLowerCase()] ?? name)
+	)
 }
+
+/** The route's colour: blue, or a pumpkin orange in Halloween mode. */
+const routeColor = () => (isHalloween() ? '#ff7a1a' : '#3b82f6')
 
 // ---------------------------------------------------------------------------
 // Component
@@ -59,7 +66,7 @@ export function CourseMap(props: { course: CourseData }) {
 
 		// Draw route polyline
 		const polyline = L.polyline(latLngs, {
-			color: '#3b82f6',
+			color: routeColor(),
 			weight: 4,
 			opacity: 0.85,
 			lineCap: 'round',
@@ -68,27 +75,33 @@ export function CourseMap(props: { course: CourseData }) {
 
 		const bounds = polyline.getBounds()
 
-		// Add labelled point markers
-		for (const pt of props.course.points) {
-			const lat = pt.coordinates[1]
-			const lon = pt.coordinates[0]
-			const label = pointLabel(pt.name)
+		// Add labelled point markers, redrawn when Halloween mode comes or goes
+		// (along with the route's colour), as their marks change with it
+		const markers = L.layerGroup().addTo(map)
+		createEffect(() => {
+			polyline.setStyle({ color: routeColor() })
+			markers.clearLayers()
+			for (const pt of props.course.points) {
+				const lat = pt.coordinates[1]
+				const lon = pt.coordinates[0]
+				const label = pointLabel(pt.name)
 
-			const icon = L.divIcon({
-				className: styles.markerIcon,
-				html: `<span class="${styles.markerLabel}">${label}</span>`,
-				iconSize: [28, 28],
-				iconAnchor: [14, 14],
-			})
-
-			L.marker([lat, lon], { icon })
-				.addTo(map)
-				.bindTooltip(pt.name, {
-					permanent: false,
-					direction: 'top',
-					offset: [0, -12],
+				const icon = L.divIcon({
+					className: styles.markerIcon,
+					html: `<span class="${styles.markerLabel}">${label}</span>`,
+					iconSize: [28, 28],
+					iconAnchor: [14, 14],
 				})
-		}
+
+				L.marker([lat, lon], { icon })
+					.addTo(markers)
+					.bindTooltip(pt.name, {
+						permanent: false,
+						direction: 'top',
+						offset: [0, -12],
+					})
+			}
+		})
 
 		// Leaflet needs the container to have its final dimensions before
 		// fitBounds can compute the correct zoom level. Use a ResizeObserver
@@ -117,7 +130,13 @@ export function CourseMap(props: { course: CourseData }) {
 		map?.remove()
 	})
 
-	return <div ref={container} class={styles.container} />
+	return (
+		<div
+			ref={container}
+			class={styles.container}
+			data-halloween={isHalloween() ? '' : undefined}
+		/>
+	)
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +153,11 @@ const styles = {
 		'& .leaflet-control-attribution': {
 			fontSize: '10px',
 		},
+		// The map by night in Halloween mode: turned dark, and a bit purple.
+		'&[data-halloween] .leaflet-tile-pane': {
+			filter:
+				'invert(1) hue-rotate(180deg) brightness(0.8) sepia(0.4) hue-rotate(220deg) saturate(1.3)',
+		},
 	}),
 	markerIcon: css({
 		background: 'none !important',
@@ -146,5 +170,7 @@ const styles = {
 		fontSize: '20px',
 		lineHeight: 1,
 		filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
+		// A name without an emoji for it, which black won't show on by night.
+		'[data-halloween] &': { color: 'var(--color-white)' },
 	}),
 }

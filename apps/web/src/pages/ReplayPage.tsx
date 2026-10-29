@@ -17,9 +17,17 @@ import {
 	fetchCourse,
 } from '@/utils/api'
 import { getEventName } from '@/utils/events'
+import {
+	ZOMBIE_TINT,
+	halloweenPointEmoji,
+	isHalloween,
+	pumpkinAssets,
+	pumpkinTint,
+	seasonalAsset,
+} from '@/utils/halloween'
 import { getMemberRoute } from '@/utils/memberRoute'
 import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
-import { snowyAsset } from '@/utils/snow'
+import { PUMPKIN_HEIGHT, PUMPKIN_WIDTH } from '@/utils/pumpkins'
 import { VOLUNTEER_EVENT_IDS } from '@shared/parkrun-events'
 import { A, useParams } from '@solidjs/router'
 import { css } from '@style/css'
@@ -182,12 +190,41 @@ const END_POINTS = [
 	'start / finish',
 ]
 
+/** Swapped for their snowy or spooky versions when they're drawn. */
 const TREE_ASSETS = [
 	{ src: tree1Asset, isShrub: false },
-	{ src: snowyAsset(tree2Asset), isShrub: false },
+	{ src: tree2Asset, isShrub: false },
 	{ src: shrub1Asset, isShrub: true },
 	{ src: shrub2Asset, isShrub: true },
 ]
+
+/**
+ * What goes where a tree was placed: the tree in season, and in Halloween mode
+ * a pumpkin in place of a shrub, picked by where it is so it holds still. A
+ * pumpkin's drawn at its own pixel size, whatever size the shrub would have
+ * been, as the smallest shrubs make a pumpkin too small to see. `headSize` is
+ * how many SVG units make `HEAD_SIZE` screen pixels.
+ */
+function treeImage(tree: TreePlacement, index: number, headSize: number) {
+	if (isHalloween() && tree.isShrub) {
+		const pumpkin = pumpkinAssets[index % pumpkinAssets.length]
+		const unit = headSize / HEAD_SIZE
+		return {
+			href: pumpkin,
+			filter: pumpkinTint(pumpkin),
+			x: tree.x - (PUMPKIN_WIDTH * unit) / 2,
+			y: tree.y - PUMPKIN_HEIGHT * unit,
+			height: PUMPKIN_HEIGHT * unit,
+		}
+	}
+	return {
+		href: seasonalAsset(tree.asset),
+		filter: undefined,
+		x: tree.x - tree.height * 0.35,
+		y: tree.y - tree.height,
+		height: tree.height,
+	}
+}
 const TREE_COUNT = 25
 
 /** Simple seeded PRNG so trees are deterministic per course. */
@@ -206,6 +243,7 @@ interface TreePlacement {
 	x: number
 	y: number
 	asset: string
+	isShrub: boolean
 	height: number // SVG units
 }
 
@@ -264,6 +302,7 @@ function placeTrees(
 			x,
 			y,
 			asset: pick.src,
+			isShrub: pick.isShrub,
 			height: h,
 		})
 	}
@@ -920,29 +959,46 @@ export function ReplayPage(props: ReplayPageProps) {
 									ref={svgEl}
 									viewBox={viewBox()}
 									class={styles.svg}
+									// Dusk falling over the course in Halloween mode.
+									style={{
+										background: isHalloween()
+											? 'rgba(44, 22, 64, 0.45)'
+											: undefined,
+									}}
 									preserveAspectRatio="xMidYMid meet"
 									role="img"
 									aria-label="Course map"
 								>
 									{/* Decorative trees (behind the path) */}
 									<For each={trees()}>
-										{(tree) => (
-											<image
-												href={tree.asset}
-												x={tree.x - tree.height * 0.35}
-												y={tree.y - tree.height}
-												height={tree.height}
-												preserveAspectRatio="xMidYMax meet"
-												style={{ opacity: '0.85', 'pointer-events': 'none' }}
-											/>
-										)}
+										{(tree, i) => {
+											const image = () => treeImage(tree, i(), headSvgSize())
+											return (
+												<image
+													href={image().href}
+													x={image().x}
+													y={image().y}
+													height={image().height}
+													preserveAspectRatio="xMidYMax meet"
+													style={{
+														opacity: '0.85',
+														'pointer-events': 'none',
+														filter: image().filter,
+													}}
+												/>
+											)
+										}}
 									</For>
 
-									{/* Route path background */}
+									{/* Route path background, glowing orange in Halloween mode */}
 									<path
 										d={pathD()}
 										fill="none"
-										stroke="rgba(255,255,255,0.25)"
+										stroke={
+											isHalloween()
+												? 'rgba(255,122,26,0.55)'
+												: 'rgba(255,255,255,0.25)'
+										}
 										stroke-width="6"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -974,7 +1030,8 @@ export function ReplayPage(props: ReplayPageProps) {
 													text-anchor="middle"
 													class={styles.label}
 												>
-													{POINT_EMOJI[pt.label.toLowerCase()] ?? pt.label}
+													{(isHalloween() && halloweenPointEmoji(pt.label)) ||
+														(POINT_EMOJI[pt.label.toLowerCase()] ?? pt.label)}
 												</text>
 											</g>
 										)}
@@ -1009,6 +1066,10 @@ export function ReplayPage(props: ReplayPageProps) {
 														y={runner.y - headSvgSize() * 0.6}
 														height={headSvgSize()}
 														preserveAspectRatio="xMidYMid meet"
+														// Everyone's a zombie at Halloween.
+														style={{
+															filter: isHalloween() ? ZOMBIE_TINT : undefined,
+														}}
 														transform={
 															runner.facingRight
 																? `translate(${runner.x * 2}, 0) scale(-1, 1)`

@@ -61,6 +61,23 @@ export const ZOMBIE_TINT = 'sepia(0.35) hue-rotate(55deg) saturate(1.3)'
 /** Zombies shamble along at half their old speed, legs and all. */
 export const ZOMBIE_PACE = 0.5
 
+/**
+ * What a course map marks a point with in Halloween mode, going by its name
+ * (which comes in whatever language the course does): a pumpkin to start at, a
+ * grave to finish at, both where they're the same place, and a ghost to turn
+ * round at. Anything else, the km markers included, keeps its usual mark.
+ */
+export function halloweenPointEmoji(name: string): string | undefined {
+	const label = name.toLowerCase()
+	const start = /start|lähtö/.test(label)
+	const finish = /finish|mål|maali/.test(label)
+	if (start && finish) return '🎃 🪦'
+	if (start) return '🎃'
+	if (finish) return '🪦'
+	if (/turn/.test(label)) return '👻'
+	return undefined
+}
+
 /** Every ghost in the halloween assets, picked up the same way as the pumpkins. */
 export const ghostAssets = Object.entries(
 	import.meta.glob('../assets/halloween/ghost*.png', {
