@@ -19,8 +19,8 @@ function twoOf(count: number, [a, b]: number[]) {
 }
 
 /**
- * A pumpkin either side of a wooden sign's post, sat at its foot clear of the
- * grass it's planted in. Two of the carved ones, lit and labelled like they are
+ * A pumpkin either side of a wooden sign's post, sat at its foot in the grass
+ * it's planted in. Two of the carved ones, lit and labelled like they are
  * everywhere else and off to the patch when clicked; the drawn ones only stand
  * in while there are none. Each sign picks its own two, once, so they don't
  * swap about while the page is open.
@@ -87,7 +87,8 @@ export function SignPumpkins(props: { class?: string }) {
 const styles = {
 	pumpkins: css({
 		position: 'absolute',
-		bottom: 0,
+		// A little below the sign's foot, settled into the grass.
+		bottom: '-3px',
 		left: '50%',
 		translate: '-50% 0',
 		// As wide as the pair, not the half of the sign that's right of `left`,

@@ -1,7 +1,14 @@
 import pumpkinBaseAsset from '@/assets/halloween/pumpkin-base.png'
 import { pumpkinTint } from '@/utils/halloween'
+import { PUMPKIN_WIDTH } from '@/utils/pumpkins'
 import { css, cx } from '@style/css'
-import { type Accessor, type JSX, createSignal, onCleanup } from 'solid-js'
+import {
+	type Accessor,
+	type JSX,
+	Show,
+	createSignal,
+	onCleanup,
+} from 'solid-js'
 
 /** How long a blinking light stays on, and off, before it changes, in ms. */
 const ON = [1500, 4000]
@@ -55,7 +62,16 @@ export function createBlink(): Accessor<boolean> {
 	return on
 }
 
-/** A carved pumpkin image with its inside behind it, lit up on hover. */
+/**
+ * A pumpkin drawn at least this many times its own size is big enough to show
+ * its far wall through the holes (see `pumpkinWall`).
+ */
+const WALL_MIN_SCALE = 1.5
+
+/**
+ * A carved pumpkin image with its inside behind it, lit up on hover, and at
+ * twice its size or more its far wall too.
+ */
 export function LitPumpkin(props: {
 	src: string
 	blinking?: boolean
@@ -72,6 +88,9 @@ export function LitPumpkin(props: {
 			data-lights-on-hover
 		>
 			<PumpkinLight blinking={props.blinking} />
+			<Show when={props.width >= PUMPKIN_WIDTH * WALL_MIN_SCALE}>
+				<img src={props.src} alt="" class={pumpkinWall} />
+			</Show>
 			<img
 				src={props.src}
 				alt={props.alt ?? ''}
@@ -82,6 +101,25 @@ export function LitPumpkin(props: {
 		</span>
 	)
 }
+
+/**
+ * The far side of a carved pumpkin's inside: a smaller copy of the front,
+ * stained red and in shadow, between it and the light. The holes show it
+ * instead of straight through to the light, wherever there's wall behind them,
+ * which gives the carving some depth. Fills its parent, like `PumpkinLight`,
+ * and has to come after it.
+ */
+export const pumpkinWall = css({
+	position: 'absolute',
+	inset: 0,
+	zIndex: -1,
+	width: '100%',
+	height: '100%',
+	transform: 'scale(0.95)',
+	imageRendering: 'pixelated',
+	filter: 'hue-rotate(-30deg) saturate(1.6) brightness(0.55)',
+	pointerEvents: 'none',
+})
 
 const styles = {
 	light: css({

@@ -1,7 +1,7 @@
 import eraserAsset from '@/assets/halloween/eraser.png'
 import knifeAsset from '@/assets/halloween/knife.png'
 import { BackSignButton } from '@/components/BackSignButton'
-import { PumpkinLight } from '@/components/PumpkinLight'
+import { PumpkinLight, pumpkinWall } from '@/components/PumpkinLight'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { track } from '@/utils/analytics'
@@ -88,13 +88,17 @@ export function PumpkinPage() {
 	})
 
 	let canvas: HTMLCanvasElement | undefined
+	/** The pumpkin's far wall, carved the same, behind it. */
+	let wall: HTMLCanvasElement | undefined
 	/** Whether a press is carving the last stroke. */
 	let pressing = false
 
 	createEffect(() => {
 		const pixels = base()
 		if (!pixels || !canvas) return
-		canvas.getContext('2d')?.putImageData(carvePumpkin(pixels, carved()), 0, 0)
+		const pumpkin = carvePumpkin(pixels, carved())
+		canvas.getContext('2d')?.putImageData(pumpkin, 0, 0)
+		wall?.getContext('2d')?.putImageData(pumpkin, 0, 0)
 	})
 
 	/**
@@ -188,6 +192,12 @@ export function PumpkinPage() {
 				<form onSubmit={handleSubmit} class={styles.form}>
 					<div class={styles.pumpkin}>
 						<PumpkinLight />
+						<canvas
+							ref={wall}
+							width={PUMPKIN_WIDTH}
+							height={PUMPKIN_HEIGHT}
+							class={pumpkinWall}
+						/>
 						<canvas
 							ref={canvas}
 							width={PUMPKIN_WIDTH}
