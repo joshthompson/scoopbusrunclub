@@ -26,6 +26,32 @@ export const pumpkinAssets = Object.entries(
 	.sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
 	.map(([, url]) => url)
 
+/** How far round towards red a pumpkin can be turned, in degrees. */
+const MAX_REDDENING = 15
+/** How much darker or lighter than drawn a pumpkin can be. */
+const BRIGHTNESS = [0.85, 1.15]
+
+const tints = new Map<string, string>()
+
+/**
+ * A CSS filter turning a pumpkin a random bit redder, and darker or lighter, so
+ * a patch of them isn't all the one orange. Picked once per image rather than per showing, so a
+ * pumpkin is the same colour wherever it turns up, and holds still in the
+ * header, which redraws it every tick. Goes on the whole pumpkin, its lit
+ * inside too, so the light keeps matching the drawn pumpkins' painted faces.
+ */
+export function pumpkinTint(image: string): string {
+	let tint = tints.get(image)
+	if (!tint) {
+		const reddening = Math.round(Math.random() * MAX_REDDENING)
+		const [dimmest, brightest] = BRIGHTNESS
+		const brightness = dimmest + Math.random() * (brightest - dimmest)
+		tint = `hue-rotate(-${reddening}deg) brightness(${brightness.toFixed(2)})`
+		tints.set(image, tint)
+	}
+	return tint
+}
+
 /** Every ghost in the halloween assets, picked up the same way as the pumpkins. */
 export const ghostAssets = Object.entries(
 	import.meta.glob('../assets/halloween/ghost*.png', {

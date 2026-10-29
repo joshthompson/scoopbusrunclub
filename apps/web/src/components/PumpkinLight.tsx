@@ -1,4 +1,5 @@
 import pumpkinBaseAsset from '@/assets/halloween/pumpkin-base.png'
+import { pumpkinTint } from '@/utils/halloween'
 import { css, cx } from '@style/css'
 import { type Accessor, type JSX, createSignal, onCleanup } from 'solid-js'
 
@@ -67,7 +68,7 @@ export function LitPumpkin(props: {
 	return (
 		<span
 			class={cx(styles.lit, props.class)}
-			style={props.style}
+			style={{ filter: pumpkinTint(props.src), ...props.style }}
 			data-lights-on-hover
 		>
 			<PumpkinLight blinking={props.blinking} />

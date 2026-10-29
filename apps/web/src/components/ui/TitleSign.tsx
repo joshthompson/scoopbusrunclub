@@ -1,8 +1,9 @@
 import purpleSign from '@/assets/misc/purple-sign.png'
 import woodenSign from '@/assets/misc/wooden-sign.png'
-import { snowyAsset } from '@/utils/snow'
+import { isHalloween, seasonalAsset } from '@/utils/halloween'
 import { css, cva } from '@style/css'
 import { Show, createEffect, createSignal } from 'solid-js'
+import { SignPumpkins } from '../SignPumpkins'
 import { SnowShelf } from './SnowShelf'
 
 export type SignType = 'wooden' | 'purple'
@@ -13,7 +14,7 @@ export function TitleSign(props: {
 }) {
 	const type = () => props.type ?? 'wooden'
 	const signImage = () =>
-		snowyAsset(type() === 'wooden' ? woodenSign : purpleSign)
+		seasonalAsset(type() === 'wooden' ? woodenSign : purpleSign)
 
 	let innerRef!: HTMLDivElement
 	const [fontSize, setFontSize] = createSignal<string | undefined>(undefined)
@@ -56,10 +57,14 @@ export function TitleSign(props: {
 		>
 			<Show when={type() === 'wooden'}>
 				<SnowShelf class={styles.snowShelf} />
+				<Show when={isHalloween()}>
+					<SignPumpkins />
+				</Show>
 			</Show>
 			<div
 				ref={innerRef}
 				class={styles.signInner({ type: type() })}
+				data-halloween={isHalloween() ? '' : undefined}
 				style={{ ...(fontSize() ? { 'font-size': fontSize() } : {}) }}
 			>
 				{props.title}
@@ -119,6 +124,8 @@ const styles = {
 				},
 				purple: {
 					color: 'var(--gold)',
+					// Gold doesn't show up on the Halloween sign's orange.
+					'&[data-halloween]': { color: 'var(--color-black)' },
 					textAlign: 'center',
 					width: '105px',
 					height: '50px',

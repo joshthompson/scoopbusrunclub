@@ -11,21 +11,52 @@ import { snowyAsset } from '@/utils/snow'
 import { css, cva, cx } from '@style/css'
 import { Show } from 'solid-js'
 import type { JSX } from 'solid-js/jsx-runtime'
-import { type SignType, TitleSign } from './TitleSign'
+import { PatchGround } from './PatchGround'
 import { SnowShelf } from './SnowShelf'
+import { type SignType, TitleSign } from './TitleSign'
+
+/**
+ * What the block's made of: the usual dirt, or the pumpkin patch's tilled
+ * ground (see `PatchGround`).
+ */
+export type Ground = 'dirt' | 'patch'
 
 export function DirtBlock(props: {
 	children: JSX.Element
 	title?: string
 	class?: string
 	signType?: SignType
+	ground?: Ground
 }) {
+	const patch = () => props.ground === 'patch'
 	return (
 		<div class={cx(styles.dirtBlock, props.class)}>
 			<Show when={props.title}>
 				{/* biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic */}
 				<TitleSign title={props.title!} type={props.signType} />
 			</Show>
+			<Show when={patch()}>
+				<PatchGround />
+			</Show>
+			<Show when={!patch()}>
+				<DirtGround />
+			</Show>
+			<div
+				class={styles.content({
+					withTitle: !!props.title,
+					ground: props.ground ?? 'dirt',
+				})}
+			>
+				{props.children}
+			</div>
+		</div>
+	)
+}
+
+/** The usual dirt, in nine pieces so it stretches to any size. */
+function DirtGround() {
+	return (
+		<>
 			<div
 				class={styles.top}
 				style={{ 'background-image': `url(${snowyAsset(top)})` }}
@@ -63,10 +94,7 @@ export function DirtBlock(props: {
 				style={{ 'background-image': `url(${snowyAsset(bottomRight)})` }}
 			/>
 			<SnowShelf class={styles.snowShelf} />
-			<div class={styles.content({ withTitle: !!props.title })}>
-				{props.children}
-			</div>
-		</div>
+		</>
 	)
 }
 
@@ -86,6 +114,13 @@ const styles = {
 			withTitle: {
 				true: {
 					mt: '2.5rem',
+				},
+			},
+			ground: {
+				dirt: {},
+				// Light, to read on the dark soil.
+				patch: {
+					color: 'var(--color-white)',
 				},
 			},
 		},

@@ -242,7 +242,10 @@ const BOTTOM_INSET = 'max(env(safe-area-inset-bottom), 8px)'
 const LEFT_INSET = 'max(env(safe-area-inset-left), 8px)'
 const RIGHT_INSET = 'max(env(safe-area-inset-right), 8px)'
 
-/** Total height the bar occupies — how much room pages must leave for it */
+/**
+ * Total height the bar occupies — how much room pages must leave for it. `App`
+ * writes this out again for `<main>`, since Panda can't follow it across files.
+ */
 export const MOBILE_NAV_SPACE = `calc(${BAR_HEIGHT}px + ${BOTTOM_INSET})`
 
 const styles = {

@@ -23,6 +23,8 @@ import {
 	createMemo,
 	createResource,
 	createSignal,
+	onCleanup,
+	onMount,
 } from 'solid-js'
 
 /** The knife cuts pumpkin out; the eraser puts it back. */
@@ -35,6 +37,7 @@ const TOOLS: {
 	icon: string
 	width: number
 	height: number
+	vPadding: string
 }[] = [
 	{
 		tool: 'knife',
@@ -42,6 +45,7 @@ const TOOLS: {
 		icon: knifeAsset,
 		width: 10,
 		height: 46,
+		vPadding: '1px',
 	},
 	{
 		tool: 'eraser',
@@ -49,6 +53,7 @@ const TOOLS: {
 		icon: eraserAsset,
 		width: 44,
 		height: 32,
+		vPadding: '0px',
 	},
 ]
 
@@ -123,6 +128,26 @@ export function PumpkinPage() {
 		pressing = false
 		setStrokes((all) => (all.at(-1)?.pixels.length ? all : all.slice(0, -1)))
 	}
+
+	/** Take back the last stroke, unless one's still being carved. */
+	const undo = () => {
+		if (!pressing) setStrokes((all) => all.slice(0, -1))
+	}
+
+	// Cmd/Ctrl+Z undoes a stroke too, except in the name fields, which keep
+	// their own undo.
+	onMount(() => {
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key.toLowerCase() !== 'z' || event.shiftKey || event.altKey)
+				return
+			if (!(event.metaKey || event.ctrlKey)) return
+			if (event.target instanceof HTMLInputElement) return
+			event.preventDefault()
+			undo()
+		}
+		window.addEventListener('keydown', onKey)
+		onCleanup(() => window.removeEventListener('keydown', onKey))
+	})
 
 	const handleSubmit = async (e: Event) => {
 		e.preventDefault()
@@ -199,6 +224,7 @@ export function PumpkinPage() {
 												width={option.width}
 												height={option.height}
 												class={styles.icon}
+												style={{ 'padding-inline': option.vPadding ?? '0px' }}
 											/>
 										</button>
 									</Tooltip>
@@ -211,7 +237,7 @@ export function PumpkinPage() {
 						type="button"
 						class={styles.button}
 						disabled={!strokes().length}
-						onClick={() => setStrokes((all) => all.slice(0, -1))}
+						onClick={undo}
 					>
 						Undo
 					</button>

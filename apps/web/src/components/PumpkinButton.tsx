@@ -1,5 +1,5 @@
 import { track } from '@/utils/analytics'
-import { pumpkinAssets, setHalloween } from '@/utils/halloween'
+import { pumpkinAssets, pumpkinTint, setHalloween } from '@/utils/halloween'
 import { css } from '@style/css'
 import { Tooltip } from './ui/Tooltip'
 
@@ -37,7 +37,10 @@ export function PumpkinButton(props: { src: string; flipped?: boolean }) {
 					src={props.src}
 					alt=""
 					class={styles.image}
-					style={props.flipped ? { scale: '-1 1' } : undefined}
+					style={{
+						filter: pumpkinTint(props.src),
+						...(props.flipped ? { scale: '-1 1' } : {}),
+					}}
 				/>
 			</button>
 		</Tooltip>

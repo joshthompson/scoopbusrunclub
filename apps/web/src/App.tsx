@@ -18,7 +18,7 @@ import {
 } from './components/header/ScoopBusHeader'
 import './styles.css'
 import { css } from '@style/css'
-import { MOBILE_NAV_SPACE, MobileNav } from './components/MobileNav'
+import { MobileNav } from './components/MobileNav'
 import { getOrBuildCelebrationData } from './components/ResultCelebrations'
 import { ALWAYS_SHOW_LOADER, SplashScreen } from './components/SplashScreen'
 import { withLinkResults, withLinkVolunteers } from './data/link'
@@ -199,11 +199,10 @@ const App: Component = () => {
 					class={css({
 						zIndex: 101,
 						position: 'relative',
-						// Keep page content clear of the fixed mobile nav
-						'@media (max-width: 768px)': {
-							paddingBottom: MOBILE_NAV_SPACE,
-						},
 					})}
+					// Keep page content clear of the fixed mobile nav, with #root's
+					// own bottom padding as breathing room above it.
+					classList={{ [styles.clearOfMobileNav]: !isBare() }}
 					// Admin has no header to carry the status bar strip for it, so it
 					// keeps clear of the status bar itself.
 					style={
@@ -542,5 +541,11 @@ const styles = {
 		width: 'calc(100% - 2rem)',
 		maxWidth: '1200px',
 		margin: '1rem auto',
+	}),
+	// `MOBILE_NAV_SPACE` written out: Panda can't follow it in from MobileNav.
+	clearOfMobileNav: css({
+		'@media (max-width: 768px)': {
+			paddingBottom: 'calc(58px + max(env(safe-area-inset-bottom), 8px))',
+		},
 	}),
 }

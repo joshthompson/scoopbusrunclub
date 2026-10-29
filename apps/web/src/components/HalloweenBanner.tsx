@@ -1,4 +1,4 @@
-import { pumpkinAssets } from '@/utils/halloween'
+import { pumpkinAssets, pumpkinTint } from '@/utils/halloween'
 import {
 	PUMPKIN_HEIGHT,
 	PUMPKIN_WIDTH,
@@ -55,7 +55,7 @@ export function HalloweenBanner() {
 										width={PUMPKIN_WIDTH * PUMPKIN_SCALE}
 										height={PUMPKIN_HEIGHT * PUMPKIN_SCALE}
 										class={styles.pumpkin}
-										style={flip}
+										style={{ filter: pumpkinTint(pumpkin.image), ...flip }}
 									/>
 								}
 							>
