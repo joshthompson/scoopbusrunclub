@@ -1,15 +1,18 @@
-import { addDays, toISODate } from '@shared/calendar/dates'
 import { createSignal } from 'solid-js'
 import { assetVariants } from './assetVariants'
 import { imageSize } from './imageSize'
 import { snowyAsset } from './snow'
 
 /**
- * Halloween mode runs from Halloween itself through the week after it: 31
- * October to 7 November, both days included.
+ * Halloween mode runs from the evening before Halloween through the week after
+ * it: 18:00 on 30 October to the end of 7 November, in the visitor's own time.
  */
-const HALLOWEEN_MONTH_DAY = '10-31'
-const HALLOWEEN_MODE_DAYS = 8
+function halloweenModeStart(year: number) {
+	return new Date(year, 9, 30, 18)
+}
+function halloweenModeEnd(year: number) {
+	return new Date(year, 10, 8)
+}
 
 /**
  * Every pumpkin in the halloween assets, so another one joins the patch just by
@@ -96,21 +99,46 @@ export const ghostAssets = Object.entries(
  */
 export const halloweenAssetSize = imageSize
 
-/** Whether a day falls in Halloween mode's week. */
-export function isHalloweenWeek(today = toISODate(new Date())) {
-	const halloween = `${today.slice(0, 4)}-${HALLOWEEN_MONTH_DAY}`
-	return halloween <= today && today < addDays(halloween, HALLOWEEN_MODE_DAYS)
+/** Whether a moment falls in Halloween mode's week. */
+export function isHalloweenWeek(now = new Date()) {
+	const year = now.getFullYear()
+	return halloweenModeStart(year) <= now && now < halloweenModeEnd(year)
 }
 
 /** Switched on or off by hand, and then left alone by the calendar. */
 const [forced, setForced] = createSignal<boolean>()
 
+/** Whether it's Halloween mode's week by the clock, as of the last look. */
+const [inSeason, setInSeason] = createSignal(isHalloweenWeek())
+
+/** The longest a `setTimeout` can wait, about 24 days. */
+const MAX_TIMEOUT = 2 ** 31 - 1
+
+/**
+ * Look at the clock again when Halloween mode next starts or ends, so a page
+ * left open over 17:00 on the 30th turns spooky right then. Only when that's
+ * near enough for a timer to wait for: any further off, and the page will
+ * have been reloaded long before.
+ */
+function watchSeason() {
+	const now = new Date()
+	const year = now.getFullYear()
+	const next = [halloweenModeStart(year), halloweenModeEnd(year)].find(
+		(change) => change > now,
+	)
+	if (!next || next.getTime() - now.getTime() > MAX_TIMEOUT) return
+	setTimeout(() => {
+		setInSeason(isHalloweenWeek())
+		watchSeason()
+	}, next.getTime() - now.getTime())
+}
+if (typeof window !== 'undefined') watchSeason()
+
 /**
  * Whether the header is in Halloween mode: its week, unless someone's said
- * otherwise. The date isn't a signal, so a page left open over midnight on the
- * 30th only turns spooky once something else re-reads this.
+ * otherwise.
  */
-export const isHalloween = () => forced() ?? isHalloweenWeek()
+export const isHalloween = () => forced() ?? inSeason()
 
 /** Switch Halloween mode on or off, whatever the date. */
 export function setHalloween(on: boolean) {
