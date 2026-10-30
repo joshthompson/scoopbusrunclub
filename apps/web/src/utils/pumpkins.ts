@@ -1,5 +1,5 @@
 import pumpkinBaseAsset from '@/assets/halloween/pumpkin-base.png'
-import { createSignal } from 'solid-js'
+import { createMemo, createRoot, createSignal } from 'solid-js'
 import { pumpkinAssets } from './halloween'
 
 const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string) || ''
@@ -150,6 +150,16 @@ function withCarvedThisVisit(others: CarvedPumpkin[]) {
 }
 
 /**
+ * The fetched pumpkins with yours ahead of them, put together once each time
+ * either changes rather than on every look: the header's pumpkins look many
+ * times a tick. Lives as long as the page, the same as the signals it's made
+ * from.
+ */
+const carved = createRoot(() =>
+	createMemo(() => withCarvedThisVisit(fetched())),
+)
+
+/**
  * A random few of the pumpkins people have carved, newest of your own first.
  * Only fetched once something asks, so the rest of the year nobody downloads
  * a pumpkin.
@@ -163,7 +173,7 @@ export function carvedPumpkins(): CarvedPumpkin[] {
 			.catch(() => {})
 			.finally(() => setSettled(true))
 	}
-	return withCarvedThisVisit(fetched())
+	return carved()
 }
 
 /**

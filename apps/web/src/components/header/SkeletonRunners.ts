@@ -96,7 +96,7 @@ function registerSkeletons() {
 export function syncSkeletons(
 	scene: Scene,
 	on: boolean,
-	mousePosition: Accessor<{ x: number; y: number }>,
+	labelled: Accessor<string | undefined>,
 ) {
 	const out = scene
 		.getControllersByType<RunnerController>('runner')
@@ -122,7 +122,7 @@ export function syncSkeletons(
 				key,
 				Math.ceil(Math.random() * 30),
 				scene,
-				mousePosition,
+				labelled,
 			),
 		)
 	if (!joining.length) return

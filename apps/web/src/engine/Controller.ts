@@ -26,7 +26,9 @@ export type ControllerBaseType = {
 		/** Styles for the frame image, without the controllers attached to it. */
 		style?: Accessor<JSX.CSSProperties>
 	}
-} & Partial<Accessorise<Omit<Sprite, 'inner'>>>
+	/** Drawn inside the sprite, and drawn again when a signal it reads changes. */
+	children?: Accessor<JSX.Element>
+} & Partial<Accessorise<Omit<Sprite, 'inner' | 'children'>>>
 
 export interface Controller<CP extends ControllerBaseType> {
 	type: string
@@ -151,42 +153,82 @@ export function createController<CP extends ControllerBaseType>(
 		age,
 		data,
 		childControllers,
-		sprite: (): Sprite => ({
-			frames: data?.frames?.() ?? options.frames ?? [],
-			frame: data?.frame?.(),
-			randomStartFrame: options.randomStartFrame ?? false,
-			class: cx(options.class, data.class?.()),
-			style: { ...options.style, ...data.style?.() },
-			x: data.x(),
-			y: data.y(),
-			origin: data.origin?.(),
-			xScale: data.xScale?.() ?? 1,
-			yScale: data.yScale?.() ?? 1,
-			width: data.width(),
-			height: data.height?.() ?? console.log(data.type) ?? 0,
-			parallax: data.parallax?.() ?? 1,
-			rotation: data.rotation?.() ?? 0,
-			state: data.state?.(),
-			frameInterval: data.frameInterval?.(),
-			children: data.children?.(),
-			inner: {
+		sprite: () => sprite,
+	}
+
+	// One sprite for the controller's whole life, each of its values worked out
+	// when it's read. A sprite then only redoes the parts that read whatever
+	// changed: a runner moving doesn't recalculate their frames, their insides
+	// or their name.
+	const sprite: Sprite = {
+		get frames() {
+			return data?.frames?.() ?? options.frames ?? []
+		},
+		get frame() {
+			return data?.frame?.()
+		},
+		randomStartFrame: options.randomStartFrame ?? false,
+		get class() {
+			return cx(options.class, data.class?.())
+		},
+		get style() {
+			return { ...options.style, ...data.style?.() }
+		},
+		get x() {
+			return data.x()
+		},
+		get y() {
+			return data.y()
+		},
+		get origin() {
+			return data.origin?.()
+		},
+		get xScale() {
+			return data.xScale?.() ?? 1
+		},
+		get yScale() {
+			return data.yScale?.() ?? 1
+		},
+		get width() {
+			return data.width()
+		},
+		get height() {
+			return data.height?.() ?? console.log(data.type) ?? 0
+		},
+		get parallax() {
+			return data.parallax?.() ?? 1
+		},
+		get rotation() {
+			return data.rotation?.() ?? 0
+		},
+		get state() {
+			return data.state?.()
+		},
+		get frameInterval() {
+			return data.frameInterval?.()
+		},
+		// Left for the sprite to call, so they're redrawn when something they
+		// show changes rather than whenever the controller moves.
+		children: data.children,
+		get inner() {
+			return {
 				rotation: data.inner?.rotation?.(),
 				origin: data.inner?.origin?.(),
 				style: data.inner?.style?.(),
-			},
-			onChangeFrame: (frame) => setCurrentFrame(frame),
-			onMount: ({ $ref }) => {
-				options.onMount?.({
-					$: data,
-					// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-					$scene: data.scene!,
-					$controller: controller,
-					$currentFrame: currentFrame(),
-					$ref: $ref,
-				})
-			},
-			controllers: childControllers,
-		}),
+			}
+		},
+		onChangeFrame: (frame) => setCurrentFrame(frame),
+		onMount: ({ $ref }) => {
+			options.onMount?.({
+				$: data,
+				// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+				$scene: data.scene!,
+				$controller: controller,
+				$currentFrame: currentFrame(),
+				$ref: $ref,
+			})
+		},
+		controllers: childControllers,
 	}
 
 	return controller

@@ -152,12 +152,19 @@ export default defineConfig({
 				'50%': { rotate: 'calc(var(--angle) + var(--sway))' },
 			},
 			/**
-			 * The helium bob. Lengthening the strand rather than moving the balloon
-			 * keeps the string tied at both ends — it's the string that gives.
+			 * The helium bob: the balloon lifting `--bob` off the top of its string
+			 * while the string stretches by `--stretch`, which is however much
+			 * longer that makes it, so it stays tied at both ends. Both are
+			 * transforms rather than the string's height, so the browser can run
+			 * them without laying out and repainting the card every frame.
 			 */
-			balloonBob: {
-				'0%, 100%': { height: 'var(--length)' },
-				'50%': { height: 'calc(var(--length) + 7px)' },
+			balloonLift: {
+				'0%, 100%': { translate: '-50% 0' },
+				'50%': { translate: '-50% calc(-1 * var(--bob))' },
+			},
+			balloonStretch: {
+				'0%, 100%': { scale: '1 1' },
+				'50%': { scale: '1 var(--stretch)' },
 			},
 
 			/**

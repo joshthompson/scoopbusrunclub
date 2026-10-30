@@ -1,4 +1,5 @@
 import { track } from '@/utils/analytics'
+import { animateWhileOnScreen } from '@/utils/animateWhileOnScreen'
 import { furbyAssets, setFurbys } from '@/utils/furbys'
 import { css } from '@style/css'
 import { Tooltip } from './ui/Tooltip'
@@ -19,6 +20,7 @@ export function FurbyButton(props: { src: string }) {
 	return (
 		<Tooltip content={LABEL} class={styles.tooltip}>
 			<button
+				ref={animateWhileOnScreen}
 				type="button"
 				class={styles.furby}
 				aria-label={LABEL}
@@ -44,6 +46,7 @@ const styles = {
 		background: 'none',
 		cursor: 'pointer',
 		animation: 'buldge 2s ease-in-out infinite',
+		'&[data-offscreen]': { animationPlayState: 'paused' },
 		transition: 'translate 0.15s',
 		_hover: { translate: '0 -3px' },
 		_focusVisible: { outline: '2px solid currentColor', outlineOffset: '2px' },

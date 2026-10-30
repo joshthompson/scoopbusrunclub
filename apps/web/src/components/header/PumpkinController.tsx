@@ -209,7 +209,8 @@ function createLoosePumpkinController(
 	pumpkin: Accessor<HeaderPumpkin>,
 	x: number,
 	ground: number,
-	mousePosition: Accessor<Vector>,
+	/** The id of the pumpkin the mouse is on, if any (see `pumpkinAt`). */
+	hoveredPumpkin: Accessor<string | undefined>,
 ) {
 	const asset = () => pumpkin().image
 	let state: 'ground' | 'worn' | 'flying' = 'ground'
@@ -222,7 +223,7 @@ function createLoosePumpkinController(
 	const size = () => halloweenAssetSize(asset())
 	const width = () => (size()?.width ?? 0) * PUMPKIN_SCALE
 	const height = () => (size()?.height ?? 0) * PUMPKIN_SCALE
-	const hovered = () => pumpkinAt(scene, mousePosition())?.data.id === id
+	const hovered = () => hoveredPumpkin() === id
 	const blinkedOn = createBlink()
 
 	return createController({
@@ -360,7 +361,7 @@ function createLoosePumpkinController(
 export function syncPumpkins(
 	scene: Scene,
 	on: boolean,
-	mousePosition: Accessor<Vector>,
+	hoveredPumpkin: Accessor<string | undefined>,
 ) {
 	const out = scene.getControllersByType(LOOSE_PUMPKIN_TYPE).map(({ id }) => id)
 
@@ -389,7 +390,7 @@ export function syncPumpkins(
 			() => headerPumpkin(i),
 			Math.max(0, share * i + between(share * 0.2, share * 0.7)),
 			Math.round(between(PATH_FAR, PATH_NEAR)),
-			mousePosition,
+			hoveredPumpkin,
 		),
 	)
 	addToPath(scene, pumpkins)

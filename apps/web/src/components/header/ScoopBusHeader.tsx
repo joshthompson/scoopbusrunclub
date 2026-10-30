@@ -71,6 +71,7 @@ import {
 	createRunnerController,
 	headerState,
 	isStandingState,
+	labelledRunnerAt,
 } from './RunnerController'
 import type { RunnerController } from './RunnerController'
 import {
@@ -580,6 +581,10 @@ function registerGuestRunners(
 export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	const navigate = useNavigate()
 	const [mousePosition, setMousePosition] = createSignal({ x: 0, y: 0 })
+	// What the mouse is on, by id: the carved pumpkin it's naming, or else the
+	// runner whose name is showing. Worked out once a tick for the whole scene.
+	const [hoveredPumpkin, setHoveredPumpkin] = createSignal<string>()
+	const [labelledRunner, setLabelledRunner] = createSignal<string>()
 
 	// Must run before scene setup so runnerState is available for render ordering
 	updateRunnerSpeedsAndConnections(
@@ -609,6 +614,13 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		width: sceneWidth,
 		height: HEADER_HEIGHT,
 		images: [],
+		afterEnterFrames({ $scene }) {
+			const mouse = mousePosition()
+			const pumpkin = pumpkinAt($scene, mouse)?.data.id
+			setHoveredPumpkin(pumpkin)
+			// A carved pumpkin under the mouse has the say, with its own name.
+			setLabelledRunner(pumpkin ? undefined : labelledRunnerAt($scene, mouse))
+		},
 		setup($scene) {
 			// Create Runners
 			const runnerIds = (
@@ -628,7 +640,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						runnerId as keyof typeof runners,
 						Math.ceil(Math.random() * 30),
 						$scene,
-						mousePosition,
+						labelledRunner,
 					),
 				)
 				// Nearer the front of the path draws on top.
@@ -775,7 +787,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 				runnerId,
 				Math.ceil(Math.random() * 30),
 				scene,
-				mousePosition,
+				labelledRunner,
 			)
 			addToPath(
 				scene,
@@ -802,7 +814,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	// Only tracks the toggle, the same as the furbies, not the controllers that
 	// putting them out or away changes.
 	createEffect(
-		on(isHalloween, (enabled) => syncSkeletons(scene, enabled, mousePosition)),
+		on(isHalloween, (enabled) => syncSkeletons(scene, enabled, labelledRunner)),
 	)
 
 	// No volunteering on Halloween: everyone's out running in the zombie game.
@@ -810,7 +822,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 
 	// And Halloween's pumpkins, lying about the path for runners to pick up.
 	createEffect(
-		on(isHalloween, (enabled) => syncPumpkins(scene, enabled, mousePosition)),
+		on(isHalloween, (enabled) => syncPumpkins(scene, enabled, hoveredPumpkin)),
 	)
 
 	const windowResizeHandler = () => {

@@ -1,5 +1,12 @@
 import { seasonalAsset } from '@/utils/halloween'
-import type { Accessor, Component, JSX } from 'solid-js'
+import {
+	type Accessor,
+	type Component,
+	type JSX,
+	batch,
+	createMemo,
+	createRoot,
+} from 'solid-js'
 import type { Controller } from './Controller'
 import type { Canvas, CanvasControllers } from './components/Canvas'
 import { type ObjectSignal, createObjectSignal } from './utils'
@@ -11,6 +18,9 @@ export type SceneComponent<T extends {} = any> = Component<
 		mode?: string
 	} & T
 >
+
+// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
+type AnyController = Controller<any>
 
 interface GameOptions {
 	width: number
@@ -27,8 +37,27 @@ interface GameOptions {
 // biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 export class Scene<C extends Controller<any> = Controller<any>> {
 	interval: number
+	/** How long a tick is, in milliseconds. */
+	frameRate: number
+	/**
+	 * Run every tick after the controllers have moved, which is how sprites
+	 * step through their frames: in the same update as everything else, rather
+	 * than each on a clock of its own.
+	 */
+	tickers = new Set<() => void>()
+	/**
+	 * Every controller, the attached ones too, and the same again by type.
+	 * Looked up many times a tick, but only worked out again when a controller
+	 * is added, removed or attached.
+	 */
+	private lookup: Accessor<{
+		all: AnyController[]
+		byType: Map<string, AnyController[]>
+	}>
+	private disposeLookup: () => void
 	loading = createObjectSignal(false)
-	paused = createObjectSignal(false)
+	/** Whether any of the scene is on the screen (see `Canvas`). */
+	visible = createObjectSignal(true)
 	modal = createObjectSignal(undefined as JSX.Element | undefined)
 	loadingAssetCount = createObjectSignal(0)
 	loadingAssetTotal = createObjectSignal(0)
@@ -41,20 +70,42 @@ export class Scene<C extends Controller<any> = Controller<any>> {
 	) {
 		// Setup signals
 		this.canvas = createObjectSignal(this.createCanvas())
-
-		// Setup onEnterFrame functions for controllers
-		this.interval = window.setInterval(() => {
-			if (this.isActive()) {
-				for (const { controller } of this.controllers.get()) {
-					controller.onEnterFrame(this)
+		const lookup = createRoot((dispose) => ({
+			dispose,
+			memo: createMemo(() => {
+				const top = this.controllers.get().map((c) => c.controller)
+				const all = [...top, ...top.flatMap((c) => c.childControllers())]
+				const byType = new Map<string, AnyController[]>()
+				for (const controller of all) {
+					const ofType = byType.get(controller.type)
+					if (ofType) ofType.push(controller)
+					else byType.set(controller.type, [controller])
 				}
-			}
-			this.options.afterEnterFrames?.({ $scene: this })
-		}, this.options.frameRate ?? 40)
+				return { all, byType }
+			}),
+		}))
+		this.lookup = lookup.memo
+		this.disposeLookup = lookup.dispose
 
-		// Set window event listeners
-		window.addEventListener('keydown', this.handleWindowKeydown.bind(this))
-		window.addEventListener('pause-game', this.togglePause.bind(this))
+		// Setup onEnterFrame functions for controllers. Batched, so the page
+		// updates once a tick with everything that moved, rather than after
+		// every single signal a controller sets. Nothing happens while the scene
+		// is off the screen: it carries on from where it was once it's back.
+		this.frameRate = this.options.frameRate ?? 40
+		this.interval = window.setInterval(
+			() =>
+				this.visible.get() &&
+				batch(() => {
+					if (this.isActive()) {
+						for (const { controller } of this.controllers.get()) {
+							controller.onEnterFrame(this)
+						}
+					}
+					for (const ticker of this.tickers) ticker()
+					this.options.afterEnterFrames?.({ $scene: this })
+				}),
+			this.frameRate,
+		)
 
 		// Run setup
 		this.setup()
@@ -77,11 +128,9 @@ export class Scene<C extends Controller<any> = Controller<any>> {
 		)
 	}
 
+	/** Shared between callers, so don't change the array you get back. */
 	getAllControllers() {
-		return [
-			...this.controllers.get().map((c) => c.controller),
-			...this.controllers.get().flatMap((c) => c.controller.childControllers()),
-		]
+		return this.lookup().all
 	}
 
 	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
@@ -89,9 +138,10 @@ export class Scene<C extends Controller<any> = Controller<any>> {
 		return this.getAllControllers().find((c) => c.id === id) as T | undefined
 	}
 
+	/** Shared between callers, so don't change the array you get back. */
 	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 	getControllersByType<T = Controller<any>>(type: string) {
-		return this.getAllControllers().filter((c) => c.type === type) as T[]
+		return (this.lookup().byType.get(type) ?? []) as T[]
 	}
 
 	getSolidControllerRects(): Rect[] {
@@ -118,24 +168,14 @@ export class Scene<C extends Controller<any> = Controller<any>> {
 			})
 	}
 
-	handleWindowKeydown(event: KeyboardEvent) {
-		if (event.key === 'p' || event.key === 'Escape') {
-			this.togglePause()
-		}
-	}
-
-	togglePause() {
-		this.paused.set(!this.paused.get())
-	}
-
 	isActive() {
-		return !this.paused.get() && !this.loading.get() && !this.modal.get()
+		return !this.loading.get() && !this.modal.get()
 	}
 
 	destroy() {
 		clearInterval(this.interval)
-		window.removeEventListener('keydown', this.handleWindowKeydown.bind(this))
-		window.removeEventListener('pause-game', this.togglePause.bind(this))
+		this.tickers.clear()
+		this.disposeLookup()
 	}
 
 	setWidth(width: number) {

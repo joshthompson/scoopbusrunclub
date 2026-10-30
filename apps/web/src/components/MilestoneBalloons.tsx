@@ -1,5 +1,6 @@
 import weightAsset from '@/assets/balloons/weight.png'
 import { MILESTONE_BALLOONS } from '@/data/balloons'
+import { animateWhileOnScreen } from '@/utils/animateWhileOnScreen'
 import { css } from '@style/css'
 import { For, Show } from 'solid-js'
 
@@ -16,6 +17,8 @@ const BALLOON_GAP = 10
 const SWAY = 2.5
 const SWAY_SECONDS = 4.4
 const BOB_SECONDS = 3.1
+/** How far a balloon bobs up, in pixels. */
+const BOB = 7
 
 /**
  * The digits are drawn leaning, which is what the header wants — those balloons
@@ -128,6 +131,7 @@ export function MilestoneBalloons(props: {
 	return (
 		<Show when={strands().length > 0}>
 			<div
+				ref={animateWhileOnScreen}
 				aria-hidden="true"
 				class={styles.bunch}
 				style={{
@@ -147,7 +151,10 @@ export function MilestoneBalloons(props: {
 								'--angle': `${strand.angle}deg`,
 								'--length': `${strand.length}px`,
 								'--sway': `${SWAY}deg`,
-								'animation-delay': `${strand.swayDelay}s, ${strand.bobDelay}s`,
+								'--bob': `${BOB}px`,
+								'--stretch': `${(strand.length + BOB) / strand.length}`,
+								'--bob-delay': `${strand.bobDelay}s`,
+								'animation-delay': `${strand.swayDelay}s`,
 							}}
 						>
 							<div class={styles.string} />
@@ -183,6 +190,7 @@ export function MilestoneBalloonRow(props: { milestone: number }) {
 
 	return (
 		<span
+			ref={animateWhileOnScreen}
 			class={styles.row}
 			aria-hidden="true"
 			data-balloon-row={props.milestone}
@@ -214,6 +222,7 @@ const styles = {
 		height: '1.35em',
 		maxWidth: 'none',
 		animation: 'balloonNudge 2.4s ease-in-out infinite',
+		'[data-offscreen] > &': { animationPlayState: 'paused' },
 	}),
 	/** The knot. Zero-sized, so every string starts from the same point. */
 	bunch: css({
@@ -239,13 +248,19 @@ const styles = {
 		height: 'var(--length)',
 		rotate: 'var(--angle)',
 		transformOrigin: 'bottom center',
-		animation: `balloonSway ${SWAY_SECONDS}s ease-in-out infinite, balloonBob ${BOB_SECONDS}s ease-in-out infinite`,
+		animation: `balloonSway ${SWAY_SECONDS}s ease-in-out infinite`,
+		'[data-offscreen] &': { animationPlayState: 'paused' },
 	}),
 	string: css({
 		position: 'absolute',
 		inset: '0 auto 0 -1px',
 		width: '2px',
 		background: 'rgba(0, 0, 0, 0.55)',
+		// Stretched up from the knot, in step with its balloon lifting.
+		transformOrigin: 'bottom center',
+		animation: `balloonStretch ${BOB_SECONDS}s ease-in-out infinite`,
+		animationDelay: 'var(--bob-delay)',
+		'[data-offscreen] &': { animationPlayState: 'paused' },
 	}),
 	balloon: css({
 		position: 'absolute',
@@ -253,6 +268,9 @@ const styles = {
 		left: '50%',
 		translate: '-50% 0',
 		transformOrigin: 'bottom center',
+		animation: `balloonLift ${BOB_SECONDS}s ease-in-out infinite`,
+		animationDelay: 'var(--bob-delay)',
+		'[data-offscreen] &': { animationPlayState: 'paused' },
 		// The reset caps images at the width of what holds them, and what holds
 		// this one is a string — a line with no width at all.
 		maxWidth: 'none',

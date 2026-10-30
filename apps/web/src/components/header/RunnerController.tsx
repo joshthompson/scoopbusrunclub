@@ -10,9 +10,32 @@ import { imageSize } from '@/utils/imageSize'
 import { css } from '@style/css'
 import type { Accessor, JSX } from 'solid-js'
 import { createCameraFlashController } from './CameraFlashController'
-import { createPumpkinController, pumpkinAt } from './PumpkinController'
+import { createPumpkinController } from './PumpkinController'
 
 export const RUNNER_LABEL_RENDER_DISTANCE = 50
+
+/**
+ * The id of the runner whose name shows for the mouse at `point`, in the
+ * scene: whoever's nearest, if anyone's close enough. Worked out once a tick
+ * by the header for everyone, rather than by every runner for themselves.
+ */
+export function labelledRunnerAt(scene: Scene, point: Vector) {
+	let closest: { id: string; dist: number } | undefined
+	for (const { data } of scene.getControllersByType<RunnerController>(
+		'runner',
+	)) {
+		const dist = Math.hypot(
+			data.x() + data.width() / 2 - point.x,
+			data.y() + data.height() / 2 - point.y,
+		)
+		if (
+			dist < RUNNER_LABEL_RENDER_DISTANCE &&
+			(!closest || dist < closest.dist)
+		)
+			closest = { id: data.id, dist }
+	}
+	return closest?.id
+}
 
 const STANDING_STATES: RunnerState[] = [
 	'scanner',
@@ -131,7 +154,8 @@ export function createRunnerController(
 	runnerId: keyof typeof runners | string,
 	yShift: number,
 	scene: Scene,
-	mousePosition: Accessor<{ x: number; y: number }>,
+	/** The id of whichever runner's name is showing (see `labelledRunnerAt`). */
+	labelled: Accessor<string | undefined>,
 ) {
 	const [runner] = findRunnerSignal(runnerId) ?? []
 	if (!runner) throw new Error(`Runner "${runnerId}" not found`)
@@ -250,36 +274,25 @@ export function createRunnerController(
 				ground: () => baseY + height(),
 				width,
 				height,
+				// Their name, shown while they're the runner `labelled` says.
 				children: () => {
-					// A carved pumpkin under the mouse has the say, with its own name.
-					const closest = pumpkinAt(scene, mousePosition())
-						? undefined
-						: scene
-								.getControllersByType<RunnerController>('runner')
-								.map((c) => ({
-									id: c.data.id,
-									dist: Math.hypot(
-										c.data.x() + c.data.width() / 2 - mousePosition().x,
-										c.data.y() + c.data.height() / 2 - mousePosition().y,
-									),
-								}))
-								.filter(({ dist }) => dist < RUNNER_LABEL_RENDER_DISTANCE)
-								.sort((a, b) => a.dist - b.dist)[0]
-
-					const name = runner().name
-					const parts: string[] = []
-					if (runner().latestTime && runnerId !== 'link')
-						// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-						parts.push(runner().latestTime!)
-					if (runner().volunteerRoles?.length)
-						// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-						parts.push(...runner().volunteerRoles!)
-					const suffix = parts.length ? ` - ${parts.join(', ')}` : ''
+					const label = () => {
+						const name = runner().name
+						const parts: string[] = []
+						if (runner().latestTime && runnerId !== 'link')
+							// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+							parts.push(runner().latestTime!)
+						if (runner().volunteerRoles?.length)
+							// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+							parts.push(...runner().volunteerRoles!)
+						const suffix = parts.length ? ` - ${parts.join(', ')}` : ''
+						return name + suffix
+					}
 
 					return (
 						<div
 							style={{
-								display: closest?.id === id ? 'block' : 'none',
+								display: labelled() === id ? 'block' : 'none',
 								transform:
 									runnerId === 'lyra' || runnerId === 'link'
 										? 'translate(-50%, -50%)'
@@ -298,7 +311,7 @@ export function createRunnerController(
 								cornerShape: 'notch',
 							})}
 						>
-							{name + suffix}
+							{label()}
 						</div>
 					)
 				},

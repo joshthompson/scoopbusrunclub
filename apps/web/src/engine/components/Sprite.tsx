@@ -38,7 +38,11 @@ export interface Sprite {
 		style?: JSX.CSSProperties
 	}
 	parallax?: number
-	children?: JSX.Element
+	/**
+	 * Drawn inside the sprite. A function is called by the sprite itself, and
+	 * again whenever a signal it reads changes, but not on the sprite moving.
+	 */
+	children?: JSX.Element | (() => JSX.Element)
 	onClick?: () => void
 	onChangeFrame?: (frameIndex: number) => void
 	onMount?: (data: { $ref: HTMLDivElement | undefined }) => void
@@ -99,27 +103,43 @@ export const Sprite: Component<Sprite & SpriteExtendedProps> = (props) => {
 		}
 	})
 
-	let enterFrameTimeout: ReturnType<typeof setTimeout> | undefined
-
-	const runAnimation = () => {
+	// Stepped through on the scene's tick, so a sprite changes frame in the same
+	// update as it moves. The time a frame's been showing carries over from tick
+	// to tick, so a frame interval that isn't a whole number of ticks still
+	// comes out right on average.
+	let shown = 0
+	const animate = () => {
 		if (
-			props.active !== false &&
-			props.state === 'play' &&
-			props.frames.length
-		) {
-			setCurrentFrame((prev) => (prev + 1) % props.frames.length)
-		}
-		setTimeout(
-			runAnimation,
+			props.active === false ||
+			props.state !== 'play' ||
+			!props.frames.length
+		)
+			return
+		const interval =
 			typeof props.frameInterval === 'function'
 				? props.frameInterval()
-				: (props.frameInterval ?? 100),
-		)
+				: (props.frameInterval ?? 100)
+		// An infinite interval is a sprite that never changes frame, like the
+		// scenery.
+		if (!Number.isFinite(interval) || interval <= 0) return
+		shown += scene.frameRate
+		const steps = Math.floor(shown / interval)
+		if (!steps) return
+		shown -= steps * interval
+		setCurrentFrame((prev) => (prev + steps) % props.frames.length)
 	}
-	runAnimation()
+	scene.tickers.add(animate)
+
+	// The same children from one move to the next, so they're only drawn again
+	// when they're swapped for others, or when a function's signals change.
+	const children = createMemo(() => props.children)
+	const content = () => {
+		const drawn = children()
+		return typeof drawn === 'function' ? drawn() : drawn
+	}
 
 	onMount(() => props.onMount?.({ $ref: ref }))
-	onCleanup(() => clearTimeout(enterFrameTimeout))
+	onCleanup(() => scene.tickers.delete(animate))
 
 	const top = createMemo(() => {
 		if (props.fixed) return `${props.y}px`
@@ -171,20 +191,40 @@ export const Sprite: Component<Sprite & SpriteExtendedProps> = (props) => {
 					...(props.inner?.style ?? {}),
 				}}
 			>
-				{props.children}
+				{content()}
 			</div>
 			<Index each={props.controllers?.() ?? []}>
 				{(controller) => (
-					<Sprite
-						{...controller().sprite()}
-						id={controller().id}
-						type={controller().type}
+					<ControllerSprite
+						controller={controller()}
 						active={props.active}
 						fixed
 					/>
 				)}
 			</Index>
 		</div>
+	)
+}
+
+/**
+ * A controller drawn as a sprite. Its `sprite()` is the same object every
+ * time, with getters, so each part of the sprite only follows the values it
+ * reads itself.
+ */
+export function ControllerSprite(props: {
+	// biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
+	controller: Controller<any>
+	active?: boolean
+	fixed?: boolean
+}) {
+	return (
+		<Sprite
+			{...props.controller.sprite()}
+			id={props.controller.id}
+			type={props.controller.type}
+			active={props.active}
+			fixed={props.fixed}
+		/>
 	)
 }
 

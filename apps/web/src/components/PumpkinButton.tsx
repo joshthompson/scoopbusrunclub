@@ -1,4 +1,5 @@
 import { track } from '@/utils/analytics'
+import { animateWhileOnScreen } from '@/utils/animateWhileOnScreen'
 import { pumpkinAssets, pumpkinTint, setHalloween } from '@/utils/halloween'
 import { css } from '@style/css'
 import { Tooltip } from './ui/Tooltip'
@@ -23,6 +24,7 @@ export function PumpkinButton(props: { src: string; flipped?: boolean }) {
 	return (
 		<Tooltip content={LABEL}>
 			<button
+				ref={animateWhileOnScreen}
 				type="button"
 				class={styles.pumpkin}
 				aria-label={LABEL}
@@ -55,6 +57,7 @@ const styles = {
 		background: 'none',
 		cursor: 'pointer',
 		animation: 'buldge 2s ease-in-out infinite',
+		'&[data-offscreen]': { animationPlayState: 'paused' },
 		transition: 'translate 0.15s',
 		_hover: { translate: '0 -3px' },
 		_focusVisible: { outline: '2px solid currentColor', outlineOffset: '2px' },

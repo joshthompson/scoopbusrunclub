@@ -6,12 +6,13 @@ import {
 	type JSX,
 	type Setter,
 	onCleanup,
+	onMount,
 } from 'solid-js'
 import { SceneContext } from '../../utils/SceneContext'
 import type { Controller } from '../Controller'
 import type { Scene } from '../Scene'
 import { Modal } from './Modal'
-import { Sprite } from './Sprite'
+import { ControllerSprite } from './Sprite'
 
 // biome-ignore lint/suspicious/noExplicitAny: necessary for dynamic/WebGL API
 export type CanvasControllers = { id: string; controller: Controller<any> }[]
@@ -45,10 +46,25 @@ export interface Canvas<T extends CanvasControllers = CanvasControllers> {
 export function Canvas<T extends CanvasControllers = CanvasControllers>(
 	props: CanvasProps,
 ) {
+	let element: HTMLDivElement | undefined
+
+	// The scene only runs while some of it is on the screen, not while it's
+	// scrolled away.
+	onMount(() => {
+		const observer = new IntersectionObserver(([entry]) =>
+			props.scene.visible.set(entry.isIntersecting),
+		)
+		if (element) observer.observe(element)
+		onCleanup(() => observer.disconnect())
+	})
+
+	// The scene goes with its canvas: otherwise its tick carries on running for
+	// as long as the page is open, long after anyone can see it.
 	onCleanup(() => {
 		for (const { controller } of props.scene.controllers.get()) {
 			controller.destroy()
 		}
+		props.scene.destroy()
 	})
 
 	const sprites = () => {
@@ -93,7 +109,10 @@ export function Canvas<T extends CanvasControllers = CanvasControllers>(
 	return (
 		<SceneContext.Provider value={props.scene}>
 			<div
-				ref={props.ref}
+				ref={(el) => {
+					element = el
+					props.ref = el
+				}}
 				data-game-scene={props.scene.id}
 				class={styles.canvas}
 				style={{
@@ -111,10 +130,8 @@ export function Canvas<T extends CanvasControllers = CanvasControllers>(
 				{props.underlay}
 				<For each={sprites()}>
 					{(controller) => (
-						<Sprite
-							{...controller.sprite()}
-							id={controller.id}
-							type={controller.type}
+						<ControllerSprite
+							controller={controller}
 							active={props.scene.isActive()}
 						/>
 					)}

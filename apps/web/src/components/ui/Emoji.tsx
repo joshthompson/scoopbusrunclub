@@ -6,6 +6,7 @@ import RunDirectorEmoji from '@/assets/emoji/run-director.png'
 import StarEmoji from '@/assets/emoji/star.png'
 import TailWalkerEmoji from '@/assets/emoji/tail-walker.png'
 import VolunteerEmoji from '@/assets/emoji/volunteer.png'
+import { animateWhileOnScreen } from '@/utils/animateWhileOnScreen'
 import AsteriskEmoji from '@assets/emoji/asterisk.png'
 import BellEmoji from '@assets/emoji/bell.png'
 import BusEmoji from '@assets/emoji/bus.png'
@@ -70,6 +71,7 @@ export function Emoji(props: EmojiProps) {
 
 	return (
 		<div
+			ref={animateWhileOnScreen}
 			class={cx(
 				styles.emoji({
 					hasShadow: props.shadow,
@@ -280,6 +282,8 @@ const styles = {
 		base: {
 			position: 'relative',
 			display: 'inline-block',
+			// The shadow under a floating emoji, only while it's on the screen.
+			'&[data-offscreen]::after': { animationPlayState: 'paused' },
 		},
 		variants: {
 			hasShadow: {
@@ -319,6 +323,8 @@ const styles = {
 	inner: cva({
 		base: {
 			animation: 'buldge 2s ease-in-out infinite',
+			// Bulging, floating or waving only while it's on the screen.
+			'[data-offscreen] > &': { animationPlayState: 'paused' },
 		},
 		variants: {
 			hasShadow: {
