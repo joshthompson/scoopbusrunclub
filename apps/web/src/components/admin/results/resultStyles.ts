@@ -299,6 +299,32 @@ export const styles = {
 		maxWidth: '48ch',
 		textAlign: 'left',
 	}),
+	/** The past-volunteer-results form: event, range, go. */
+	backfillForm: css({
+		display: 'flex',
+		alignItems: 'flex-end',
+		gap: '0.75rem',
+		flexWrap: 'wrap',
+		marginBottom: '0.5rem',
+	}),
+	backfillField: css({
+		display: 'flex',
+		flexDirection: 'column',
+		gap: '0.25rem',
+		fontSize: '0.7rem',
+		opacity: 0.85,
+		'& select, & input': {
+			height: '28px',
+			padding: '0 0.375rem',
+			background: 'var(--overlay-black-15)',
+			color: 'var(--color-white)',
+			border: '1px solid var(--overlay-white-20)',
+			borderRadius: '3px',
+			fontSize: '0.8rem',
+		},
+		'& input': { width: '5rem' },
+		'& option': { background: '#222', color: 'var(--color-white)' },
+	}),
 	/** Numbered setup instructions on the install-the-extension state. */
 	steps: css({
 		textAlign: 'left',

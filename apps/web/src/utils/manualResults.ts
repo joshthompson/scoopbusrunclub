@@ -346,6 +346,11 @@ export interface ExistingData {
 
 export interface ProcessInput {
 	athletes: Map<string, ParsedAthleteFile>
+	/**
+	 * Event results pages, keyed by slot: an eventId for the latest results, or
+	 * a pastEventKey() for a backfilled one. Which event a page belongs to comes
+	 * off the page itself.
+	 */
 	events: Map<string, ParsedEventFile>
 	courses: Map<string, ParsedCourseFile>
 	clubs: ParsedClubsFile | null
@@ -452,7 +457,8 @@ export function buildManualSummary(input: ProcessInput): ManualSummary {
 	const payloadVolunteers: ManualIngestSections['volunteers'] = []
 	const volunteerEvents: ManualIngestSections['volunteerEvents'] = []
 
-	for (const [eventId, parsed] of input.events) {
+	for (const parsed of input.events.values()) {
+		const { eventId } = parsed.meta
 		volunteers.push({
 			event: eventId,
 			eventNumber: parsed.meta.eventNumber,
@@ -480,6 +486,10 @@ export function buildManualSummary(input: ProcessInput): ManualSummary {
 			})
 		}
 	}
+
+	volunteers.sort(
+		(a, b) => a.event.localeCompare(b.event) || a.eventNumber - b.eventNumber,
+	)
 
 	// --- Courses ---
 
@@ -599,6 +609,12 @@ export function presentSections(
 	return present
 }
 
+/**
+ * Event pages per volunteers request. A weekly upload is a couple; a backfill
+ * is hundreds, each one a mutation or more on the far side.
+ */
+const VOLUNTEER_EVENTS_PER_CHUNK = 50
+
 /** One request's worth of payload, with the label shown while it's in flight. */
 interface UploadChunk {
 	label: string
@@ -629,14 +645,28 @@ function buildChunks(
 		})
 	}
 
-	if (sections.has('volunteers') && payload.volunteerEvents.length > 0) {
-		chunks.push({
-			label: `${payload.volunteers.length} volunteer record(s)`,
-			body: {
-				volunteers: payload.volunteers,
-				volunteerEvents: payload.volunteerEvents,
-			},
-		})
+	if (sections.has('volunteers')) {
+		const pageKey = (page: { event: string; eventNumber: number }) =>
+			`${page.event}#${page.eventNumber}`
+
+		for (
+			let start = 0;
+			start < payload.volunteerEvents.length;
+			start += VOLUNTEER_EVENTS_PER_CHUNK
+		) {
+			const pages = payload.volunteerEvents.slice(
+				start,
+				start + VOLUNTEER_EVENTS_PER_CHUNK,
+			)
+			const inChunk = new Set(pages.map(pageKey))
+			const volunteers = payload.volunteers.filter((v) =>
+				inChunk.has(pageKey(v)),
+			)
+			chunks.push({
+				label: `${volunteers.length} volunteer record(s) from ${pages.length} event page(s)`,
+				body: { volunteers, volunteerEvents: pages },
+			})
+		}
 	}
 
 	if (sections.has('courses')) {

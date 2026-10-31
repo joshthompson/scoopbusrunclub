@@ -14,6 +14,8 @@ import {
 	uploadManualResults,
 } from '@/utils/manualResults'
 import {
+	PAST_EVENTS_PAUSE_MS,
+	buildPastEventWorkList,
 	buildWorkList,
 	cancelScrape,
 	clearScrape,
@@ -25,10 +27,15 @@ import {
 	skipScrapeItem,
 	startScrape,
 } from '@/utils/scraperClient'
-import type { RunState } from '@shared/scraper-protocol'
+import { PARKRUN_EVENTS } from '@shared/parkrun-events'
+import {
+	PAST_EVENTS_PROTOCOL_VERSION,
+	type RunState,
+} from '@shared/scraper-protocol'
 import { A } from '@solidjs/router'
 import {
 	type Component,
+	For,
 	Show,
 	createResource,
 	createSignal,
@@ -55,6 +62,25 @@ export const ProcessResultsPage: Component = () => {
 	const [uploaded, setUploaded] = createSignal<string | null>(null)
 	/** Something the extension couldn't do, shown without pretending a run failed. */
 	const [notice, setNotice] = createSignal<string | null>(null)
+	const [extensionVersion, setExtensionVersion] = createSignal(0)
+
+	// --- Past volunteer results ---
+
+	// The newest parkrun on the list is the one most likely to need its history.
+	const [backfillEventId, setBackfillEventId] = createSignal(
+		PARKRUN_EVENTS[PARKRUN_EVENTS.length - 1].eventId,
+	)
+	const [backfillFrom, setBackfillFrom] = createSignal(1)
+	/** Null until edited, so it follows the chosen parkrun's latest event. */
+	const [backfillTo, setBackfillTo] = createSignal<number | null>(null)
+	const backfillEnd = () =>
+		backfillTo() ?? slots.latestEventNumbers().get(backfillEventId()) ?? 0
+	const backfillCount = () =>
+		backfillFrom() >= 1 && backfillEnd() >= backfillFrom()
+			? backfillEnd() - backfillFrom() + 1
+			: 0
+	const eventName = (eventId: string) =>
+		slots.existing().eventNames.get(eventId) ?? eventId
 
 	/** A run is in play — started, mid-flight, or finished but not yet processed. */
 	const hasRun = () => runState() !== null
@@ -79,8 +105,9 @@ export const ProcessResultsPage: Component = () => {
 
 	onMount(() => {
 		const stop = listenToScraper({
-			onHello: (state) => {
+			onHello: ({ version, state }) => {
 				setExtensionPresent(true)
+				setExtensionVersion(version)
 				// A run that was already going when the page loaded (or a reload
 				// mid-scrape): show it, and ask for anything captured meanwhile.
 				if (state.status !== 'idle' && state.items.length > 0) {
@@ -94,9 +121,11 @@ export const ProcessResultsPage: Component = () => {
 		})
 		onCleanup(stop)
 
-		void pingScraper().then((state) => {
-			if (!state) return
+		void pingScraper().then((hello) => {
+			if (!hello) return
+			const { state } = hello
 			setExtensionPresent(true)
+			setExtensionVersion(hello.version)
 			if (state.status !== 'idle' && state.items.length > 0) {
 				takeState(state)
 				resendScrapedFiles()
@@ -114,6 +143,30 @@ export const ProcessResultsPage: Component = () => {
 				eventNames: slots.existing().eventNames,
 			}),
 			knownCourseEventIds: [...slots.existing().courseEventIds],
+		})
+	}
+
+	/**
+	 * Fetch a parkrun's numbered results pages for the volunteers on them. It's
+	 * an ordinary run as far as the rest of the page is concerned: same panel,
+	 * same review, same upload.
+	 */
+	const handleBackfill = () => {
+		const event = PARKRUN_EVENTS.find((e) => e.eventId === backfillEventId())
+		if (!event || backfillCount() === 0) return
+		setSummary(null)
+		setUploaded(null)
+		setNotice(null)
+		startScrape({
+			items: buildPastEventWorkList({
+				event,
+				from: backfillFrom(),
+				to: backfillEnd(),
+				eventName: eventName(event.eventId),
+			}),
+			knownCourseEventIds: [],
+			skipCourses: true,
+			pauseMs: PAST_EVENTS_PAUSE_MS,
 		})
 	}
 
@@ -275,6 +328,79 @@ export const ProcessResultsPage: Component = () => {
 								Upload pages by hand instead →
 							</A>
 						</p>
+
+						<h3 class={styles.groupTitle}>Past volunteer results</h3>
+						<p class={styles.groupHint}>
+							The scrape above only fetches each parkrun's latest results. When
+							a parkrun joins the volunteer list, fetch its history here: every
+							numbered results page in the range, then review and upload as
+							usual.
+						</p>
+						<Show
+							when={extensionVersion() >= PAST_EVENTS_PROTOCOL_VERSION}
+							fallback={
+								<p class={styles.groupHint}>
+									The installed extension is too old for this. Get it again (the
+									download, or <code>pnpm scraper:build</code>) and press ⟳ on
+									it in <code>chrome://extensions</code>.
+								</p>
+							}
+						>
+							<div class={styles.backfillForm}>
+								<label class={styles.backfillField}>
+									Parkrun
+									<select
+										value={backfillEventId()}
+										onChange={(e) => {
+											setBackfillEventId(e.currentTarget.value)
+											setBackfillTo(null)
+										}}
+									>
+										<For each={PARKRUN_EVENTS}>
+											{(event) => (
+												<option value={event.eventId}>
+													{eventName(event.eventId)}
+												</option>
+											)}
+										</For>
+									</select>
+								</label>
+								<label class={styles.backfillField}>
+									From #
+									<input
+										type="number"
+										min="1"
+										value={backfillFrom() || ''}
+										onInput={(e) =>
+											setBackfillFrom(e.currentTarget.valueAsNumber || 0)
+										}
+									/>
+								</label>
+								<label class={styles.backfillField}>
+									To #
+									<input
+										type="number"
+										min="1"
+										value={backfillEnd() || ''}
+										onInput={(e) =>
+											setBackfillTo(e.currentTarget.valueAsNumber || 0)
+										}
+									/>
+								</label>
+								<AdminButton
+									disabled={slots.loading() || backfillCount() === 0}
+									onClick={handleBackfill}
+								>
+									Fetch {backfillCount()} page{backfillCount() === 1 ? '' : 's'}
+								</AdminButton>
+							</div>
+							<p class={styles.groupHint}>
+								Pages are spaced a few seconds apart so parkrun doesn't block
+								us, so this takes about{' '}
+								{Math.max(1, Math.round((backfillCount() * 5) / 60))} minute(s).
+								"To" starts at the latest event a member has run there.
+							</p>
+						</Show>
 					</Show>
 				</Show>
 			</DirtBlock>

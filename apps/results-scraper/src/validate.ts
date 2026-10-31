@@ -14,7 +14,7 @@ import {
 	parseRunResults,
 	parseRunnerData,
 } from '@shared/parkrun-parsers'
-import type { CaptureKind } from '@shared/scraper-protocol'
+import { type CaptureKind, readPastEventKey } from '@shared/scraper-protocol'
 
 export type Verdict =
 	/** The page parsed — capture it. */
@@ -90,6 +90,8 @@ export function validate(
 			return validateAthlete(key, html)
 		case 'event':
 			return validateEvent(key, html)
+		case 'pastEvent':
+			return validatePastEvent(key, html)
 		case 'clubs':
 			return validateClubs(html)
 		case 'course':
@@ -110,6 +112,7 @@ function parsesAsRealPage(
 		case 'athlete':
 			return parseRunResults(html).length > 0
 		case 'event':
+		case 'pastEvent':
 			return parseEventPageMeta(html).eventNumber > 0
 		case 'clubs':
 			return parseLargestClubs(html).length > 0
@@ -163,6 +166,29 @@ function validateEvent(eventId: string, html: string): Verdict {
 	// Volunteer counts aren't checked: an event where nobody we track volunteered
 	// is a perfectly good capture. The page decides what's in it.
 	return { outcome: 'ok', detail: `#${meta.eventNumber} · ${meta.date}` }
+}
+
+/**
+ * A numbered page has to be that number, too: a page that parses fine but is
+ * some other event would be credited to the wrong week.
+ */
+function validatePastEvent(key: string, html: string): Verdict {
+	const expected = readPastEventKey(key)
+	if (!expected) {
+		return { outcome: 'unusable', detail: `Bad work item key "${key}".` }
+	}
+
+	const verdict = validateEvent(expected.eventId, html)
+	if (verdict.outcome !== 'ok') return verdict
+
+	const { eventNumber } = parseEventPageMeta(html)
+	if (eventNumber !== expected.eventNumber) {
+		return {
+			outcome: 'unusable',
+			detail: `Page is event #${eventNumber}, expected #${expected.eventNumber}.`,
+		}
+	}
+	return verdict
 }
 
 function validateClubs(html: string): Verdict {

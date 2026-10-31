@@ -269,6 +269,18 @@ async function resolveAutoEvents(
 
 	if (allEvents.length === 0) return []
 
+	// No watermark means a parkrun newly added to PARKRUN_EVENTS. Its history is
+	// hundreds of pages, more than a cron run should take on (and a sure way to
+	// get blocked), so take only the newest here and leave the rest to the
+	// backfill on the Process Results page, or --event=<id>:1-N.
+	if (!latestScraped) {
+		const newest = Math.max(...allEvents.map((e) => e.eventNumber))
+		console.log(
+			`  ${config.eventId}: no watermark yet — scraping only the newest event (#${newest}). Backfill the history separately.`,
+		)
+		return [newest]
+	}
+
 	const newEvents = allEvents
 		.filter((e) => e.eventNumber > latestScraped)
 		.sort((a, b) => a.eventNumber - b.eventNumber)

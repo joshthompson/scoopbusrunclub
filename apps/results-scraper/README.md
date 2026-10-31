@@ -109,6 +109,25 @@ script is on every parkrun page, but it only ever draws in the scrape tab — th
 worker won't hand run state to any other tab, so parkrun browsed by hand stays
 clean even while a run is live, and long after one finished.
 
+## Past volunteer results
+
+The weekly scrape only fetches each parkrun's *latest* results page. When a
+parkrun is added to `PARKRUN_EVENTS` (`libs/shared/parkrun-events.ts`), its
+history is fetched once from the **Past volunteer results** form on Process
+Results: pick the parkrun and a range of event numbers, and the page sends one
+`pastEvent` item per numbered results page (`/huddinge/results/12/`).
+
+It's an ordinary run otherwise — same panel, captchas, resume and review — with
+two differences: the request carries `pauseMs`, so pages are spaced a few seconds
+apart rather than hundreds landing back to back, and each page must be the event
+number it was asked for. Uploading raises the event's watermark, so the
+`fetch-parkrun` cron carries on from there. Until that happens the cron only
+takes the newest event for a parkrun with no watermark, rather than its whole
+history.
+
+The page checks the extension's protocol version before offering the form: an
+install older than version 2 doesn't know `pastEvent` items.
+
 ## Layout
 
 | File | Role |

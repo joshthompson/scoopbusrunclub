@@ -83,6 +83,13 @@ export function ExtractedData(props: {
 		volunteerRecords: props.summary.payload.volunteers.length,
 	}))
 
+	// A backfill is hundreds of event pages, most with nobody we track on them,
+	// so those are folded into one line rather than a block each.
+	const volunteerPages = () =>
+		props.summary.volunteers.filter((entry) => entry.entries.length > 0)
+	const emptyVolunteerPages = () =>
+		props.summary.volunteers.filter((entry) => entry.entries.length === 0)
+
 	return (
 		<DirtBlock>
 			<h2 class={styles.sectionTitle} id={EXTRACTED_DATA_ID}>
@@ -255,34 +262,41 @@ export function ExtractedData(props: {
 			<Show when={props.summary.volunteers.length > 0}>
 				<SectionToggle section="volunteers">
 					Volunteers — {totals().volunteerRecords} record(s)
+					<span class={styles.groupTitleMuted}>
+						{' '}
+						from {props.summary.volunteers.length} event page(s)
+					</span>
 				</SectionToggle>
 				<div classList={{ [styles.sectionOff]: !isOn('volunteers') }}>
-					<For each={props.summary.volunteers}>
+					<For each={volunteerPages()}>
 						{(entry) => (
 							<div class={styles.subBlock}>
 								<p class={styles.subTitle}>
 									{entry.event} #{entry.eventNumber} · {entry.date}
 								</p>
-								<Show
-									when={entry.entries.length > 0}
-									fallback={
-										<p class={styles.emptyState}>No tracked volunteers.</p>
-									}
-								>
-									<ul class={styles.list}>
-										<For each={entry.entries}>
-											{(volunteer) => (
-												<li>
-													<strong>{volunteer.label}</strong> —{' '}
-													{volunteer.roles.join(', ')}
-												</li>
-											)}
-										</For>
-									</ul>
-								</Show>
+								<ul class={styles.list}>
+									<For each={entry.entries}>
+										{(volunteer) => (
+											<li>
+												<strong>{volunteer.label}</strong> —{' '}
+												{volunteer.roles.join(', ')}
+											</li>
+										)}
+									</For>
+								</ul>
 							</div>
 						)}
 					</For>
+					<Show when={emptyVolunteerPages().length > 0}>
+						<p class={styles.emptyState}>
+							No tracked volunteers{' '}
+							{emptyVolunteerPages().length <= 10
+								? `at ${emptyVolunteerPages()
+										.map((entry) => `${entry.event} #${entry.eventNumber}`)
+										.join(', ')}.`
+								: `on the other ${emptyVolunteerPages().length} pages.`}
+						</p>
+					</Show>
 				</div>
 			</Show>
 

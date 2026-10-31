@@ -22,7 +22,11 @@ import {
 } from '@/utils/manualResults'
 import { capturedFileToFile } from '@/utils/scraperClient'
 import { PARKRUN_EVENTS } from '@shared/parkrun-events'
-import { CLUBS_KEY, type CapturedFile } from '@shared/scraper-protocol'
+import {
+	CLUBS_KEY,
+	type CapturedFile,
+	readPastEventKey,
+} from '@shared/scraper-protocol'
 import { TRACKED_ATHLETES } from '@shared/tracked-athletes'
 import { createMemo, createResource, createSignal } from 'solid-js'
 
@@ -71,6 +75,10 @@ export function createResultSlots() {
 		SlotMap<ParsedAthleteFile>
 	>({})
 	const [eventSlots, setEventSlots] = createSignal<SlotMap<ParsedEventFile>>({})
+	/** Numbered event pages from a volunteer backfill, keyed by pastEventKey(). */
+	const [pastEventSlots, setPastEventSlots] = createSignal<
+		SlotMap<ParsedEventFile>
+	>({})
 	const [courseSlots, setCourseSlots] = createSignal<SlotMap<ParsedCourseFile>>(
 		{},
 	)
@@ -96,6 +104,20 @@ export function createResultSlots() {
 		),
 		courseEventIds: new Set(existingCourseIds() ?? []),
 	}))
+
+	/**
+	 * The highest event number any member has a result at, per event — near
+	 * enough the latest event, and where a backfill should stop by default.
+	 */
+	const latestEventNumbers = createMemo(() => {
+		const latest = new Map<string, number>()
+		for (const result of existingResults() ?? []) {
+			if (result.eventNumber > (latest.get(result.event) ?? 0)) {
+				latest.set(result.event, result.eventNumber)
+			}
+		}
+		return latest
+	})
 
 	/** Events found in parsed athlete files that have no course map stored. */
 	const missingCourses = createMemo<MissingCourse[]>(() => {
@@ -182,6 +204,25 @@ export function createResultSlots() {
 			(f) => parseEventFile(f, eventId),
 		)
 
+	const setPastEventFile = (key: string, file: File) => {
+		const page = readPastEventKey(key)
+		if (!page) return
+		return fillSlot(
+			file,
+			pastEventSlots()[key],
+			updateSlotMap<ParsedEventFile>(setPastEventSlots, key),
+			async (f) => {
+				const parsed = await parseEventFile(f, page.eventId)
+				if (parsed.meta.eventNumber !== page.eventNumber) {
+					throw new Error(
+						`This page is event #${parsed.meta.eventNumber}, not #${page.eventNumber}.`,
+					)
+				}
+				return parsed
+			},
+		)
+	}
+
 	const setCourseFile = (eventId: string, file: File | undefined) =>
 		fillSlot(
 			file,
@@ -216,6 +257,9 @@ export function createResultSlots() {
 			case 'event':
 				void setEventFile(captured.key, file)
 				break
+			case 'pastEvent':
+				void setPastEventFile(captured.key, file)
+				break
 			case 'clubs':
 				void setClubsFile(file)
 				break
@@ -232,6 +276,7 @@ export function createResultSlots() {
 		const all = [
 			...Object.values(athleteSlots()),
 			...Object.values(eventSlots()),
+			...Object.values(pastEventSlots()),
 			...Object.values(courseSlots()),
 			clubsSlot(),
 		]
@@ -286,6 +331,9 @@ export function createResultSlots() {
 			const parsed = eventSlot(event.eventId)?.parsed
 			if (parsed) events.set(event.eventId, parsed)
 		}
+		for (const [key, slot] of Object.entries(pastEventSlots())) {
+			if (slot?.parsed) events.set(key, slot.parsed)
+		}
 
 		const courses = new Map<string, ParsedCourseFile>()
 		for (const course of missingCourses()) {
@@ -306,6 +354,7 @@ export function createResultSlots() {
 	function reset(): void {
 		setAthleteSlots({})
 		setEventSlots({})
+		setPastEventSlots({})
 		setCourseSlots({})
 		setClubsSlot(emptySlot<ParsedClubsFile>())
 	}
@@ -313,6 +362,7 @@ export function createResultSlots() {
 	return {
 		loading,
 		existing,
+		latestEventNumbers,
 		missingCourses,
 		athleteSlot,
 		eventSlot,

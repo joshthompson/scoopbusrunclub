@@ -13,18 +13,44 @@
  * service worker by chrome.runtime messaging.
  */
 
-export const SCRAPER_PROTOCOL_VERSION = 1
+export const SCRAPER_PROTOCOL_VERSION = 2
+
+/**
+ * The first version that understands `pastEvent` items. An older extension has
+ * no validator for them and would wedge on the first page, so the page checks
+ * before offering a backfill.
+ */
+export const PAST_EVENTS_PROTOCOL_VERSION = 2
 
 /** Envelope marker, so postMessage traffic from anything else is ignored. */
 export const SCRAPER_ENVELOPE = 'scoopbus-results-scraper'
 
 // ── Work list ───────────────────────────────────────────────────────
 
-/** Which upload field a captured file belongs to. */
-export type CaptureKind = 'athlete' | 'event' | 'clubs' | 'course'
+/**
+ * Which upload field a captured file belongs to.
+ *
+ * `event` is an event's latest results, keyed by eventId. `pastEvent` is one
+ * numbered results page, for backfilling volunteer history, keyed by
+ * `pastEventKey()` so a run can hold hundreds of them.
+ */
+export type CaptureKind = 'athlete' | 'event' | 'clubs' | 'course' | 'pastEvent'
 
 /** The single form slot that holds the largest-clubs page. */
 export const CLUBS_KEY = 'clubs'
+
+/** Key for a numbered event page, e.g. "huddinge#12". */
+export function pastEventKey(eventId: string, eventNumber: number): string {
+	return `${eventId}#${eventNumber}`
+}
+
+export function readPastEventKey(
+	key: string,
+): { eventId: string; eventNumber: number } | null {
+	const match = key.match(/^([^#]+)#(\d+)$/)
+	if (!match) return null
+	return { eventId: match[1], eventNumber: Number.parseInt(match[2], 10) }
+}
 
 export interface WorkItem {
 	kind: CaptureKind
@@ -44,6 +70,11 @@ export interface RunRequest {
 	knownCourseEventIds: string[]
 	/** Skip the mid-run hunt for new course maps. */
 	skipCourses?: boolean
+	/**
+	 * Wait about this long between pages. A backfill is hundreds of loads, and
+	 * firing them back to back is the quickest way to get parkrun blocking us.
+	 */
+	pauseMs?: number
 }
 
 // ── Run state ───────────────────────────────────────────────────────

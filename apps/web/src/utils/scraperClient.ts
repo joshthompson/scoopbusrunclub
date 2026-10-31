@@ -9,10 +9,11 @@
  * content script. That avoids the page needing to know the extension's ID, which
  * for an unpacked extension depends on where it was installed from.
  */
-import { PARKRUN_EVENTS } from '@shared/parkrun-events'
+import { PARKRUN_EVENTS, type ParkrunEventConfig } from '@shared/parkrun-events'
 import {
 	LARGEST_CLUBS_URL,
 	athletePageUrl,
+	eventResultsUrl,
 	latestResultsUrl,
 } from '@shared/parkrun-urls'
 import {
@@ -21,6 +22,7 @@ import {
 	type RunRequest,
 	type RunState,
 	type WorkItem,
+	pastEventKey,
 	readExtensionMessage,
 	wrapForExtension,
 } from '@shared/scraper-protocol'
@@ -28,6 +30,13 @@ import { TRACKED_ATHLETES } from '@shared/tracked-athletes'
 
 /** How long to wait for the extension to answer a ping before deciding it's absent. */
 const HANDSHAKE_TIMEOUT_MS = 1500
+
+/** What the extension says about itself when it answers. */
+export interface ScraperHello {
+	/** Protocol version, to tell an out-of-date install from a current one. */
+	version: number
+	state: RunState
+}
 
 export interface ScraperEvents {
 	onState: (state: RunState) => void
@@ -43,7 +52,7 @@ export interface ScraperEvents {
  * a run picks the progress panel straight back up.
  */
 export function listenToScraper(
-	events: ScraperEvents & { onHello: (state: RunState) => void },
+	events: ScraperEvents & { onHello: (hello: ScraperHello) => void },
 ): () => void {
 	const handler = (event: MessageEvent) => {
 		if (event.source !== window) return
@@ -52,7 +61,7 @@ export function listenToScraper(
 
 		switch (message.type) {
 			case 'hello':
-				events.onHello(message.state)
+				events.onHello({ version: message.version, state: message.state })
 				break
 			case 'state':
 				events.onState(message.state)
@@ -76,7 +85,7 @@ export function listenToScraper(
  * The bridge announces itself unprompted on page load, but that can land before
  * the page starts listening, so we also ping and wait briefly.
  */
-export function pingScraper(): Promise<RunState | null> {
+export function pingScraper(): Promise<ScraperHello | null> {
 	return new Promise((resolve) => {
 		let settled = false
 
@@ -84,15 +93,15 @@ export function pingScraper(): Promise<RunState | null> {
 			if (event.source !== window) return
 			const message = readExtensionMessage(event.data)
 			if (message?.type !== 'hello') return
-			finish(message.state)
+			finish({ version: message.version, state: message.state })
 		}
 
-		const finish = (state: RunState | null) => {
+		const finish = (hello: ScraperHello | null) => {
 			if (settled) return
 			settled = true
 			window.removeEventListener('message', handler)
 			clearTimeout(timer)
-			resolve(state)
+			resolve(hello)
 		}
 
 		window.addEventListener('message', handler)
@@ -188,6 +197,33 @@ export function buildWorkList(options: {
 		})
 	}
 
+	return items
+}
+
+/**
+ * Rough pause between pages in a backfill. About five seconds a page all told,
+ * so a few hundred pages is the best part of half an hour — slow, but far less
+ * likely to be blocked than hundreds of loads back to back.
+ */
+export const PAST_EVENTS_PAUSE_MS = 3000
+
+/** Every numbered results page from `from` to `to`, oldest first. */
+export function buildPastEventWorkList(options: {
+	event: ParkrunEventConfig
+	from: number
+	to: number
+	/** Display name, for nicer labels. */
+	eventName: string
+}): WorkItem[] {
+	const items: WorkItem[] = []
+	for (let number = options.from; number <= options.to; number++) {
+		items.push({
+			kind: 'pastEvent',
+			key: pastEventKey(options.event.eventId, number),
+			label: `${options.eventName} #${number}`,
+			url: eventResultsUrl(options.event.baseUrl, number),
+		})
+	}
 	return items
 }
 

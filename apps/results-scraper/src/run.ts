@@ -9,11 +9,12 @@
  */
 import { extractEvents, parseRunResults } from '@shared/parkrun-parsers'
 import { courseKmzUrl, coursePageUrl } from '@shared/parkrun-urls'
-import type {
-	CapturedFile,
-	ItemState,
-	RunRequest,
-	RunState,
+import {
+	type CapturedFile,
+	type ItemState,
+	type RunRequest,
+	type RunState,
+	readPastEventKey,
 } from '@shared/scraper-protocol'
 import {
 	clearLastDocument,
@@ -222,6 +223,7 @@ export async function startRun(
 		coursesQueued: false,
 		skipCourses: request.skipCourses ?? false,
 		attempts: 0,
+		pauseMs: request.pauseMs,
 	})
 
 	const state: RunState = {
@@ -421,6 +423,8 @@ async function failRun(message: string): Promise<RunState> {
 
 /** Navigate to the next pending item, or finish if there are none left. */
 export async function advance(): Promise<RunState> {
+	await pauseBetweenPages()
+
 	const state = await getRunState()
 	if (state.status !== 'running') return state
 
@@ -471,6 +475,27 @@ export async function advance(): Promise<RunState> {
 	}
 
 	return running
+}
+
+/**
+ * Wait before the next page, if the run asked for that.
+ *
+ * Jittered so the loads don't land on a metronome. Skipped before the first
+ * page and after the last. The keepalive holds the worker open meanwhile, and
+ * `advance` re-reads the state afterwards, so a cancel during the wait sticks.
+ */
+async function pauseBetweenPages(): Promise<void> {
+	const { pauseMs } = await getSession()
+	if (!pauseMs) return
+
+	const state = await getRunState()
+	if (state.status !== 'running') return
+	const started = state.items.some((item) => item.status !== 'pending')
+	const remaining = state.items.some((item) => item.status === 'pending')
+	if (!started || !remaining) return
+
+	const wait = Math.round(pauseMs * (0.5 + Math.random()))
+	await new Promise((resolve) => setTimeout(resolve, wait))
 }
 
 /**
@@ -796,6 +821,12 @@ function fileNameFor(kind: CapturedFile['kind'], key: string): string {
 			return `athlete-${key}.html`
 		case 'event':
 			return `${key}-latest-results.html`
+		case 'pastEvent': {
+			const page = readPastEventKey(key)
+			return page
+				? `${page.eventId}-${page.eventNumber}-results.html`
+				: `${key}-results.html`
+		}
 		case 'clubs':
 			return 'largest-clubs.html'
 		default:
