@@ -1463,14 +1463,14 @@ export function getVolunteerCelebrationTags(
 	if (count === 1) {
 		result.push({
 			label: 'Volunteer debut!',
-			description: 'First time volunteering at Haga',
+			description: 'First time volunteering',
 			emoji: TAG_EMOJIS.volunteerDebut,
 			color: TAG_COLORS.volunteerDebut,
 		})
 	} else if (count !== undefined) {
 		result.push({
 			label: `${ordinalSuffix(count)} volunteer!`,
-			description: `Volunteered ${count} times at Haga`,
+			description: `Volunteered ${count} times`,
 			emoji: TAG_EMOJIS.volunteerMilestone,
 			color: TAG_COLORS.volunteerMilestone,
 		})
@@ -1479,7 +1479,7 @@ export function getVolunteerCelebrationTags(
 	if (roles.includes('Loppansvarig')) {
 		result.push({
 			label: 'Run Director!',
-			description: 'Call the shots at Haga Parkrun',
+			description: 'Called the shots as Run Director',
 			emoji: TAG_EMOJIS.runDirector,
 			color: TAG_COLORS.runDirector,
 		})

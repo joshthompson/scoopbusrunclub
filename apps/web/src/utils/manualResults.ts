@@ -561,6 +561,13 @@ export function resultKey(
 
 // ── Uploading ───────────────────────────────────────────────────────
 
+/**
+ * Logging in again in another tab is enough: the token lives in localStorage,
+ * which the tabs share, and each upload reads it afresh.
+ */
+const SESSION_EXPIRED_MESSAGE =
+	'Your admin session has expired. Log in again at /admin in another tab, then press Upload here again. Nothing on this page is lost.'
+
 export interface UploadReport {
 	runners: number
 	runResults: number
@@ -731,6 +738,15 @@ export async function uploadManualResults(
 			})
 
 			const data = await response.json()
+
+			// Sessions last 24 hours from login and the admin shell only checks on
+			// page load, so a tab left open overnight (or a long backfill) can look
+			// logged in with a dead token. Every remaining chunk would fail the
+			// same way, so stop and say how to recover.
+			if (response.status === 401) {
+				report.errors.push(SESSION_EXPIRED_MESSAGE)
+				break
+			}
 
 			if (!response.ok || data.error) {
 				report.errors.push(
