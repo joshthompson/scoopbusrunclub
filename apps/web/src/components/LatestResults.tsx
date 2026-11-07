@@ -34,6 +34,7 @@ import logo5Verst from '../assets/misc/5verst.png'
 import type {
 	GuestItem,
 	GuestResultItem,
+	GuestVolunteerItem,
 	RaceItem,
 	RunResultItem,
 	Runner,
@@ -83,6 +84,7 @@ interface ParkrunEvent {
 	results: ParkrunResult[]
 	volunteers: ParkrunVolunteer[]
 	guestResults: GuestResultItem[]
+	guestVolunteers: GuestVolunteerItem[]
 }
 
 interface DateGroup {
@@ -96,6 +98,7 @@ function groupResults(
 	allRaces: RaceItem[],
 	volunteerItems: VolunteerItem[],
 	guestResultItems: GuestResultItem[],
+	guestVolunteerItems: GuestVolunteerItem[],
 ): DateGroup[] {
 	const byDate = new Map<string, Map<string, ParkrunEvent>>()
 
@@ -112,6 +115,7 @@ function groupResults(
 				results: [],
 				volunteers: [],
 				guestResults: [],
+				guestVolunteers: [],
 			})
 		}
 		eventMap.get(key)?.results.push({
@@ -136,6 +140,7 @@ function groupResults(
 				results: [],
 				volunteers: [],
 				guestResults: [],
+				guestVolunteers: [],
 			})
 		}
 		eventMap.get(key)?.volunteers.push({
@@ -159,9 +164,30 @@ function groupResults(
 				results: [],
 				volunteers: [],
 				guestResults: [],
+				guestVolunteers: [],
 			})
 		}
 		eventMap.get(key)?.guestResults.push(gr)
+	}
+
+	// And guest volunteers
+	for (const gv of guestVolunteerItems) {
+		if (!byDate.has(gv.date)) byDate.set(gv.date, new Map())
+		// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
+		const eventMap = byDate.get(gv.date)!
+		const key = `${gv.event}#${gv.eventNumber}`
+		if (!eventMap.has(key)) {
+			eventMap.set(key, {
+				name: gv.eventName,
+				eventId: gv.event,
+				eventNumber: String(gv.eventNumber),
+				results: [],
+				volunteers: [],
+				guestResults: [],
+				guestVolunteers: [],
+			})
+		}
+		eventMap.get(key)?.guestVolunteers.push(gv)
 	}
 
 	const today = new Date().toISOString().split('T')[0]
@@ -193,6 +219,7 @@ interface LatestResultsProps {
 	races: RaceItem[]
 	volunteers: VolunteerItem[]
 	guestResults?: GuestResultItem[]
+	guestVolunteers?: GuestVolunteerItem[]
 	/** Guest records, used to name the guests attending non-parkrun events */
 	guests?: GuestItem[]
 	celebrationData?: CelebrationData
@@ -776,6 +803,7 @@ export function LatestResults(props: LatestResultsProps) {
 			withoutReportedTrips(props.races, props.results, props.volunteers),
 			props.volunteers,
 			props.guestResults ?? [],
+			props.guestVolunteers ?? [],
 		),
 	)
 
@@ -958,7 +986,12 @@ export function LatestResults(props: LatestResultsProps) {
 													}}
 												</For>
 											</ol>
-											<Show when={parkrun.volunteers.length > 0}>
+											<Show
+												when={
+													parkrun.volunteers.length > 0 ||
+													parkrun.guestVolunteers.length > 0
+												}
+											>
 												<Show
 													when={
 														parkrun.results.length > 0 ||
@@ -1015,6 +1048,29 @@ export function LatestResults(props: LatestResultsProps) {
 																</li>
 															)
 														}}
+													</For>
+													<For each={parkrun.guestVolunteers}>
+														{(gv) => (
+															<li>
+																<em>
+																	<A
+																		href={`/guests/${gv.guestParkrunId ?? gv.guestId}`}
+																		class={styles.memberLink}
+																	>
+																		{gv.guestName}
+																	</A>
+																</em>
+																<Show when={gv.guestExtra}>
+																	{' '}
+																	({gv.guestExtra})
+																</Show>{' '}
+																volunteered as{' '}
+																{joinRoles(gv.roles.map(translateRole))}
+																<span class={styles.guestTag}>
+																	Guest <Emoji emoji="👋" animation="wave" />
+																</span>
+															</li>
+														)}
 													</For>
 												</ul>
 											</Show>

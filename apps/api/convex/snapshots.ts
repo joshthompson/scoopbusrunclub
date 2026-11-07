@@ -27,7 +27,12 @@ import {
 	internalMutation,
 	internalQuery,
 } from './_generated/server'
-import { type GuestResultItem, allGuestResults } from './guests'
+import {
+	type GuestResultItem,
+	type GuestVolunteerItem,
+	allGuestResults,
+	allGuestVolunteers,
+} from './guests'
 import {
 	type ResultItem,
 	type VolunteerItem,
@@ -58,6 +63,8 @@ export interface SnapshotData {
 	guests: Doc<'guests'>[]
 	/** `/api/guest-results` */
 	'guest-results': GuestResultItem[]
+	/** `/api/guest-volunteers` */
+	'guest-volunteers': GuestVolunteerItem[]
 }
 
 export type SnapshotFile = keyof SnapshotData
@@ -88,6 +95,10 @@ export const SNAPSHOT_FILES: Record<SnapshotFile, { description: string }> = {
 	},
 	'guest-results': {
 		description: 'parkrun results for guests who have run with the club.',
+	},
+	'guest-volunteers': {
+		description:
+			'parkrun volunteering credits for guests of the club, with the roles taken.',
 	},
 }
 
@@ -135,6 +146,7 @@ const fileValidator = v.union(
 	v.literal('our-events'),
 	v.literal('guests'),
 	v.literal('guest-results'),
+	v.literal('guest-volunteers'),
 )
 
 /**
@@ -154,7 +166,7 @@ const GROUPS: Record<
 		dependsOn: ['scoopBusDataUpdatedAt'],
 	},
 	guest: {
-		files: ['guests', 'guest-results'],
+		files: ['guests', 'guest-results', 'guest-volunteers'],
 		dependsOn: ['guestDataUpdatedAt', 'parkrunDataUpdatedAt'],
 	},
 }
@@ -276,6 +288,7 @@ async function loadFile<F extends SnapshotFile>(
 		'our-events': () => publicRaces(ctx),
 		guests: () => ctx.db.query('guests').collect(),
 		'guest-results': () => allGuestResults(ctx),
+		'guest-volunteers': () => allGuestVolunteers(ctx),
 	}
 	return await load[file]()
 }

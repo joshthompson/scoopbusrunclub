@@ -212,6 +212,19 @@ export default defineSchema({
 		.index('by_guestId', ['guestId'])
 		.index('by_unique_result', ['guestId', 'event', 'eventNumber']),
 
+	// A guest's volunteering at a parkrun, added by hand in the admin pages.
+	// Roles are the Swedish names parkrun reports, the same as `volunteers`.
+	guestVolunteers: defineTable({
+		guestId: v.id('guests'),
+		event: v.string(), // eventId, e.g. "haga"
+		eventNumber: v.number(),
+		roles: v.array(v.string()),
+		date: v.string(), // YYYY-MM-DD
+		createdAt: v.number(),
+	})
+		.index('by_guestId', ['guestId'])
+		.index('by_unique_volunteer', ['guestId', 'event', 'eventNumber']),
+
 	// --- Largest clubs in Sweden (weekly league-table snapshots) ---
 
 	largestClubs: defineTable({

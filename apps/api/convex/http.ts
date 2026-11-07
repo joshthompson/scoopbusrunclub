@@ -1047,6 +1047,67 @@ http.route({
 	}),
 })
 
+// --- GET /api/guest-volunteers (public, all) ---
+
+http.route({
+	path: '/api/guest-volunteers',
+	method: 'GET',
+	handler: httpAction((ctx, request) =>
+		serveSnapshot(ctx, request, 'guest-volunteers'),
+	),
+})
+
+// --- Admin: POST /api/admin/guest-volunteer ---
+
+http.route({
+	path: '/api/admin/guest-volunteer',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await request.json()
+		const result = await ctx.runMutation(api.guests.addGuestVolunteer, {
+			token: body.token ?? '',
+			guestId: body.guestId ?? '',
+			event: body.event ?? '',
+			eventNumber: body.eventNumber ?? 0,
+			roles: Array.isArray(body.roles) ? body.roles : [],
+			date: body.date ?? '',
+		})
+		if ('error' in result) {
+			return jsonResponse({ error: result.error }, 400)
+		}
+		await ctx.runMutation(internal.parkrun.setAppData, {
+			key: 'guestDataUpdatedAt',
+			value: Date.now().toString(),
+		})
+		return jsonResponse(result)
+	}),
+})
+
+// --- Admin: DELETE /api/admin/guest-volunteer ---
+
+http.route({
+	path: '/api/admin/guest-volunteer',
+	method: 'DELETE',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const result = await ctx.runMutation(api.guests.removeGuestVolunteer, {
+			token: url.searchParams.get('token') ?? '',
+			// biome-ignore lint/suspicious/noExplicitAny: Convex ID cast from URL param
+			guestId: (url.searchParams.get('guestId') ?? '') as any,
+			event: url.searchParams.get('event') ?? '',
+			eventNumber: Number(url.searchParams.get('eventNumber') ?? '0'),
+		})
+		if ('error' in result) {
+			return jsonResponse({ error: result.error }, 400)
+		}
+		await ctx.runMutation(internal.parkrun.setAppData, {
+			key: 'guestDataUpdatedAt',
+			value: Date.now().toString(),
+		})
+		return jsonResponse(result)
+	}),
+})
+
 // --- GET /api/largest-clubs (public) ---
 // The top two clubs by total runs (plus ties, plus Scoop Bus Run Club) with
 // their recent runs-per-week rate and overtake projections.
@@ -1191,6 +1252,21 @@ http.route({
 			eventMap.get(key)!.resultCount++
 		}
 
+		// Parkruns members only volunteered at, so guests can be added there too
+		const volunteers = await ctx.runQuery(api.queries.getAllVolunteers)
+		for (const v of volunteers) {
+			const key = `${v.event}#${v.eventNumber}`
+			if (!eventMap.has(key)) {
+				eventMap.set(key, {
+					event: v.event,
+					eventName: v.eventName,
+					eventNumber: v.eventNumber,
+					date: v.date,
+					resultCount: 0,
+				})
+			}
+		}
+
 		let allEvents = Array.from(eventMap.values()).sort((a, b) => {
 			const dateCompare = b.date.localeCompare(a.date)
 			if (dateCompare !== 0) return dateCompare
@@ -1221,10 +1297,20 @@ http.route({
 			guestResultsByEvent.get(key)?.push(gr)
 		}
 
+		const guestVolunteers = await ctx.runQuery(api.guests.getAllGuestVolunteers)
+		const guestVolunteersByEvent = new Map<string, typeof guestVolunteers>()
+		for (const gv of guestVolunteers) {
+			const key = `${gv.event}#${gv.eventNumber}`
+			if (!guestVolunteersByEvent.has(key)) guestVolunteersByEvent.set(key, [])
+			guestVolunteersByEvent.get(key)?.push(gv)
+		}
+
 		const itemsWithGuests = items.map((item) => ({
 			...item,
 			guestResults:
 				guestResultsByEvent.get(`${item.event}#${item.eventNumber}`) ?? [],
+			guestVolunteers:
+				guestVolunteersByEvent.get(`${item.event}#${item.eventNumber}`) ?? [],
 		}))
 
 		return jsonResponse({ items: itemsWithGuests, page, totalPages, total })
@@ -1965,6 +2051,8 @@ for (const path of [
 	'/api/guest-results',
 	'/api/admin/guests',
 	'/api/admin/guest-result',
+	'/api/guest-volunteers',
+	'/api/admin/guest-volunteer',
 	'/api/admin/parkruns',
 	'/api/largest-clubs',
 	'/api/largest-clubs/all',

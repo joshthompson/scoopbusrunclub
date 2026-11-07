@@ -1,10 +1,13 @@
 import { AdminButton } from '@/components/admin/AdminButton'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { Modal } from '@/components/ui/Modal'
+import { RoleTranslations } from '@/data/volunteer-roles'
 import {
 	type ParkrunEventItem,
 	addGuestResult,
+	addGuestVolunteer,
 	deleteGuestResult,
+	deleteGuestVolunteer,
 	fetchAdminGuests,
 	fetchAdminParkruns,
 } from '@/utils/adminApi'
@@ -19,6 +22,14 @@ import {
 } from 'solid-js'
 
 const TIME_RE = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/
+
+/** parkrun's Swedish role names, which are what's stored, sorted by their English label */
+const ROLE_OPTIONS = Object.entries(RoleTranslations)
+	.map(([swedish, english]) => ({ swedish, english }))
+	.sort((a, b) => a.english.localeCompare(b.english))
+
+const translateRole = (role: string) =>
+	(RoleTranslations as Record<string, string>)[role] ?? role
 
 export const ParkrunsPage: Component = () => {
 	const [page, setPage] = createSignal(1)
@@ -75,6 +86,7 @@ export const ParkrunsPage: Component = () => {
 								<th>#</th>
 								<th>Members</th>
 								<th>Guests</th>
+								<th>Guest Vols</th>
 								<th>Results</th>
 								<th>Actions</th>
 							</tr>
@@ -88,6 +100,7 @@ export const ParkrunsPage: Component = () => {
 										<td>{item.eventNumber}</td>
 										<td>{item.resultCount}</td>
 										<td>{item.guestResults.length}</td>
+										<td>{item.guestVolunteers.length}</td>
 										<td class={styles.linkCell}>
 											<a
 												href={`https://www.parkrun.se/${item.event}/results/${item.eventNumber}/`}
@@ -233,6 +246,79 @@ function ParkrunModal(props: {
 		setGuestResults((prev) => prev.filter((_, i) => i !== index))
 	}
 
+	// ── Guest volunteers ──
+
+	const [guestVolunteers, setGuestVolunteers] = createSignal(
+		props.parkrun.guestVolunteers,
+	)
+	const [volunteerGuestId, setVolunteerGuestId] = createSignal('')
+	const [volunteerRole, setVolunteerRole] = createSignal('')
+	const [volunteerError, setVolunteerError] = createSignal('')
+
+	const handleAddVolunteer = async () => {
+		const guestId = volunteerGuestId()
+		const role = volunteerRole()
+		if (!guestId || !role) return
+
+		setSaving(true)
+		setVolunteerError('')
+		const result = await addGuestVolunteer({
+			guestId,
+			event: props.parkrun.event,
+			eventNumber: props.parkrun.eventNumber,
+			roles: [role],
+			date: props.parkrun.date,
+		})
+		setSaving(false)
+
+		if (!result.ok) {
+			setVolunteerError(result.error ?? 'Could not add the volunteer')
+			return
+		}
+
+		const roles = result.roles ?? [role]
+		setGuestVolunteers((prev) => {
+			if (prev.some((gv) => gv.guestId === guestId)) {
+				return prev.map((gv) =>
+					gv.guestId === guestId ? { ...gv, roles } : gv,
+				)
+			}
+			const guest = (guests() ?? []).find((g) => g._id === guestId)
+			return [
+				...prev,
+				{
+					guestId,
+					guestName: guest?.name ?? 'Unknown',
+					guestExtra: guest?.extra,
+					event: props.parkrun.event,
+					eventNumber: props.parkrun.eventNumber,
+					roles,
+					date: props.parkrun.date,
+				},
+			]
+		})
+		setVolunteerGuestId('')
+		setVolunteerRole('')
+	}
+
+	const handleRemoveVolunteer = async (guestId: string) => {
+		const gv = guestVolunteers().find((v) => v.guestId === guestId)
+		if (!gv) return
+		if (!confirm(`Remove ${gv.guestName} as a volunteer at this parkrun?`))
+			return
+
+		const result = await deleteGuestVolunteer({
+			guestId,
+			event: props.parkrun.event,
+			eventNumber: props.parkrun.eventNumber,
+		})
+		if (!result.ok) {
+			setVolunteerError(result.error ?? 'Could not remove the volunteer')
+			return
+		}
+		setGuestVolunteers((prev) => prev.filter((v) => v.guestId !== guestId))
+	}
+
 	return (
 		<Modal
 			title={`${props.parkrun.eventName} #${props.parkrun.eventNumber}`}
@@ -354,6 +440,98 @@ function ParkrunModal(props: {
 						</button>
 					</div>
 				</Show>
+
+				<h3 class={styles.modalSectionTitle}>Guest Volunteers</h3>
+
+				<Show
+					when={guestVolunteers().length > 0}
+					fallback={
+						<p class={styles.emptyState}>
+							No guest volunteers for this parkrun yet.
+						</p>
+					}
+				>
+					<table class={styles.guestTable}>
+						<thead>
+							<tr>
+								<th>Guest</th>
+								<th>Roles</th>
+								<th />
+							</tr>
+						</thead>
+						<tbody>
+							<For each={guestVolunteers()}>
+								{(gv) => (
+									<tr>
+										<td>
+											{gv.guestName}
+											<Show when={gv.guestExtra}>
+												<span class={styles.guestExtra}>
+													{' '}
+													({gv.guestExtra})
+												</span>
+											</Show>
+										</td>
+										<td>{gv.roles.map(translateRole).join(', ')}</td>
+										<td>
+											<AdminButton
+												size="small"
+												variant="danger"
+												onClick={() => handleRemoveVolunteer(gv.guestId)}
+											>
+												×
+											</AdminButton>
+										</td>
+									</tr>
+								)}
+							</For>
+						</tbody>
+					</table>
+				</Show>
+
+				<Show when={(guests() ?? []).length > 0 || guests.loading}>
+					<div class={styles.addGuestForm}>
+						<select
+							class={styles.inlineSelect}
+							value={volunteerGuestId()}
+							onChange={(e) => setVolunteerGuestId(e.currentTarget.value)}
+						>
+							<option value="">Guest...</option>
+							<For each={guests() ?? []}>
+								{(g) => (
+									<option value={g._id}>
+										{g.name}
+										{g.extra ? ` (${g.extra})` : ''}
+									</option>
+								)}
+							</For>
+						</select>
+						<select
+							class={styles.inlineSelect}
+							value={volunteerRole()}
+							onChange={(e) => setVolunteerRole(e.currentTarget.value)}
+						>
+							<option value="">Role...</option>
+							<For each={ROLE_OPTIONS}>
+								{(r) => <option value={r.swedish}>{r.english}</option>}
+							</For>
+						</select>
+						<button
+							type="button"
+							class={styles.addBtn}
+							onClick={handleAddVolunteer}
+							disabled={saving() || !volunteerGuestId() || !volunteerRole()}
+						>
+							{saving() ? '...' : '+ Add'}
+						</button>
+					</div>
+					<p class={styles.hint}>
+						Add a guest again to give them another role.
+					</p>
+				</Show>
+				<Show when={volunteerError()}>
+					<p class={styles.error}>{volunteerError()}</p>
+				</Show>
 			</div>
 		</Modal>
 	)
@@ -474,6 +652,17 @@ const styles = {
 	guestExtra: css({
 		fontSize: '0.8rem',
 		opacity: 0.6,
+	}),
+	hint: css({
+		fontSize: '0.75rem',
+		opacity: 0.6,
+		m: 0,
+	}),
+	error: css({
+		color: 'var(--pink-rose)',
+		fontSize: '0.75rem',
+		fontWeight: 'bold',
+		m: 0,
 	}),
 	addGuestForm: css({
 		display: 'flex',

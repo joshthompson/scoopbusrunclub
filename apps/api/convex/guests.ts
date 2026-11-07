@@ -130,6 +130,44 @@ export const getAllGuestResults = query({
 	handler: (ctx) => allGuestResults(ctx),
 })
 
+/**
+ * Every guest volunteering, with guest and event names attached. The body of
+ * `/api/guest-volunteers` and of the `guest-volunteers.json` snapshot.
+ */
+export async function allGuestVolunteers(ctx: QueryCtx) {
+	const guests = await ctx.db.query('guests').collect()
+	const guestMap = new Map(guests.map((g) => [g._id, g]))
+
+	const events = await ctx.db.query('events').collect()
+	const eventNameMap = new Map(events.map((e) => [e.eventId, e.name]))
+
+	const allVolunteers = await ctx.db.query('guestVolunteers').collect()
+
+	return allVolunteers.map((r) => {
+		const guest = guestMap.get(r.guestId)
+		return {
+			guestId: r.guestId,
+			guestName: guest?.name ?? 'Unknown',
+			guestExtra: guest?.extra,
+			guestParkrunId: guest?.parkrunId,
+			event: r.event,
+			eventName: eventNameMap.get(r.event) ?? r.event,
+			eventNumber: r.eventNumber,
+			roles: r.roles,
+			date: r.date,
+		}
+	})
+}
+
+export type GuestVolunteerItem = Awaited<
+	ReturnType<typeof allGuestVolunteers>
+>[number]
+
+export const getAllGuestVolunteers = query({
+	args: {},
+	handler: (ctx) => allGuestVolunteers(ctx),
+})
+
 // ── Mutations ───────────────────────────────────────────────────────
 
 export const create = mutation({
@@ -224,6 +262,15 @@ export const remove = mutation({
 			.withIndex('by_guestId', (q) => q.eq('guestId', args.guestId))
 			.collect()
 		for (const r of results) {
+			await ctx.db.delete(r._id)
+		}
+
+		// And their volunteering
+		const volunteering = await ctx.db
+			.query('guestVolunteers')
+			.withIndex('by_guestId', (q) => q.eq('guestId', args.guestId))
+			.collect()
+		for (const r of volunteering) {
 			await ctx.db.delete(r._id)
 		}
 
@@ -325,6 +372,107 @@ export const removeGuestResult = mutation({
 			detail: `Deleted guest result at ${result.event} #${result.eventNumber}`,
 			targetType: 'guest_result',
 			targetId: result.guestId,
+		})
+
+		return { ok: true }
+	},
+})
+
+// ── Guest volunteer mutations ───────────────────────────────────────
+
+/**
+ * Credit a guest with volunteering at a parkrun. Adding again for the same
+ * parkrun adds the new roles to the ones already there.
+ */
+export const addGuestVolunteer = mutation({
+	args: {
+		token: v.string(),
+		guestId: v.id('guests'),
+		event: v.string(),
+		eventNumber: v.number(),
+		roles: v.array(v.string()),
+		date: v.string(),
+	},
+	handler: async (ctx, args) => {
+		const session = await validateSession(ctx, args.token, true)
+		if (!session) return { error: 'Unauthorized' }
+
+		const guest = await ctx.db.get(args.guestId)
+		if (!guest) return { error: 'Guest not found' }
+
+		const roles = args.roles.map((r) => r.trim()).filter(Boolean)
+		if (roles.length === 0) return { error: 'Pick at least one role' }
+
+		const existing = await ctx.db
+			.query('guestVolunteers')
+			.withIndex('by_unique_volunteer', (q) =>
+				q
+					.eq('guestId', args.guestId)
+					.eq('event', args.event)
+					.eq('eventNumber', args.eventNumber),
+			)
+			.unique()
+
+		let allRoles = roles
+		if (existing) {
+			allRoles = [...new Set([...existing.roles, ...roles])]
+			await ctx.db.patch(existing._id, { roles: allRoles, date: args.date })
+		} else {
+			await ctx.db.insert('guestVolunteers', {
+				guestId: args.guestId,
+				event: args.event,
+				eventNumber: args.eventNumber,
+				roles,
+				date: args.date,
+				createdAt: Date.now(),
+			})
+		}
+
+		await logAdminEvent(ctx, {
+			userId: session.userId,
+			username: session.username,
+			action: 'added_guest_volunteer',
+			detail: `Added guest '${guest.name}' as ${roles.join(', ')} at ${args.event} #${args.eventNumber}`,
+			targetType: 'guest_volunteer',
+			targetId: args.guestId,
+		})
+
+		return { ok: true, roles: allRoles }
+	},
+})
+
+export const removeGuestVolunteer = mutation({
+	args: {
+		token: v.string(),
+		guestId: v.id('guests'),
+		event: v.string(),
+		eventNumber: v.number(),
+	},
+	handler: async (ctx, args) => {
+		const session = await validateSession(ctx, args.token, true)
+		if (!session) return { error: 'Unauthorized' }
+
+		const existing = await ctx.db
+			.query('guestVolunteers')
+			.withIndex('by_unique_volunteer', (q) =>
+				q
+					.eq('guestId', args.guestId)
+					.eq('event', args.event)
+					.eq('eventNumber', args.eventNumber),
+			)
+			.unique()
+		if (!existing) return { error: 'Volunteer record not found' }
+
+		await ctx.db.delete(existing._id)
+
+		const guest = await ctx.db.get(args.guestId)
+		await logAdminEvent(ctx, {
+			userId: session.userId,
+			username: session.username,
+			action: 'deleted_guest_volunteer',
+			detail: `Removed guest '${guest?.name ?? 'Unknown'}' as a volunteer at ${args.event} #${args.eventNumber}`,
+			targetType: 'guest_volunteer',
+			targetId: args.guestId,
 		})
 
 		return { ok: true }

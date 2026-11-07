@@ -3,7 +3,12 @@ import { CharacterImage } from '@/components/CharacterImage'
 import { EmojiString } from '@/components/ui/Emoji'
 import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Icon } from '@/components/ui/Icon'
-import { type RaceGuestAttendee, fetchPublicRaces } from '@/utils/api'
+import { RoleTranslations } from '@/data/volunteer-roles'
+import {
+	type RaceGuestAttendee,
+	fetchGuestVolunteers,
+	fetchPublicRaces,
+} from '@/utils/api'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import { isHalloween } from '@/utils/halloween'
@@ -113,6 +118,7 @@ export function GuestPage() {
 	)
 
 	const [races] = createResource(fetchPublicRaces)
+	const [volunteering] = createResource(fetchGuestVolunteers)
 
 	const appearances = createMemo<Appearance[]>(() => {
 		const parkruns: Appearance[] = (guestResultsFromApi() ?? []).map((r) => ({
@@ -125,6 +131,22 @@ export function GuestPage() {
 		}))
 
 		const guestId = guest()?._id
+		const volunteered: Appearance[] = (volunteering() ?? [])
+			.filter((v) => v.guestId === guestId)
+			.map((v) => ({
+				key: `volunteer:${v.event}#${v.eventNumber}`,
+				date: v.date,
+				name: v.eventName,
+				eventId: v.event,
+				eventNumber: v.eventNumber,
+				detail: `volunteered as ${v.roles
+					.map(
+						(role) =>
+							(RoleTranslations as Record<string, string>)[role] ?? role,
+					)
+					.join(', ')}`,
+			}))
+
 		const today = new Date().toISOString().split('T')[0]
 		const clubEvents: Appearance[] = (races() ?? []).flatMap((race) => {
 			if (race.date > today) return []
@@ -141,7 +163,7 @@ export function GuestPage() {
 			]
 		})
 
-		return [...parkruns, ...clubEvents].sort((a, b) =>
+		return [...parkruns, ...volunteered, ...clubEvents].sort((a, b) =>
 			b.date.localeCompare(a.date),
 		)
 	})

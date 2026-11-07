@@ -16,6 +16,7 @@ import { FieldBlock } from '../components/ui/FieldBlock'
 import type {
 	GuestItem,
 	GuestResultItem,
+	GuestVolunteerItem,
 	RaceItem,
 	RunResultItem,
 	Runner,
@@ -30,6 +31,7 @@ export const HomePage: Component<{
 	races: RaceItem[]
 	volunteers: VolunteerItem[]
 	guestResults: GuestResultItem[]
+	guestVolunteers: GuestVolunteerItem[]
 	guests: GuestItem[]
 	celebrationData?: CelebrationData
 }> = (props) => {
@@ -60,6 +62,7 @@ export const HomePage: Component<{
 							races={props.races}
 							volunteers={props.volunteers}
 							guestResults={props.guestResults}
+							guestVolunteers={props.guestVolunteers}
 							guests={props.guests}
 							celebrationData={props.celebrationData}
 						/>

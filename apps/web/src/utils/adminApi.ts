@@ -450,6 +450,45 @@ export async function deleteGuestResult(
 	return res.json()
 }
 
+// ── Guest Volunteers API ────────────────────────────────────────────
+
+/** Adds the roles to any the guest already has at that parkrun. */
+export async function addGuestVolunteer(data: {
+	guestId: string
+	event: string
+	eventNumber: number
+	roles: string[]
+	date: string
+}): Promise<{ ok?: boolean; roles?: string[]; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const res = await fetch(`${CONVEX_URL}/api/admin/guest-volunteer`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token, ...data }),
+	})
+	return res.json()
+}
+
+export async function deleteGuestVolunteer(data: {
+	guestId: string
+	event: string
+	eventNumber: number
+}): Promise<{ ok?: boolean; error?: string }> {
+	const token = getAuthToken()
+	if (!token) return { error: 'Not authenticated' }
+	const params = new URLSearchParams({
+		token,
+		guestId: data.guestId,
+		event: data.event,
+		eventNumber: String(data.eventNumber),
+	})
+	const res = await fetch(`${CONVEX_URL}/api/admin/guest-volunteer?${params}`, {
+		method: 'DELETE',
+	})
+	return res.json()
+}
+
 // ── Admin Parkruns API ──────────────────────────────────────────────
 
 export interface ParkrunEventItem {
@@ -466,6 +505,15 @@ export interface ParkrunEventItem {
 		eventNumber: number
 		position: number
 		time: string
+		date: string
+	}[]
+	guestVolunteers: {
+		guestId: string
+		guestName: string
+		guestExtra?: string
+		event: string
+		eventNumber: number
+		roles: string[]
 		date: string
 	}[]
 }

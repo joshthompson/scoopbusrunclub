@@ -66,6 +66,7 @@ import { SandboxRoutes, isBareSandboxPath } from './sandbox'
 import {
 	fetchAllResults,
 	fetchGuestResults,
+	fetchGuestVolunteers,
 	fetchGuests,
 	fetchPublicRaces,
 	fetchRunners,
@@ -94,6 +95,7 @@ const App: Component = () => {
 		withLinkVolunteers(await fetchVolunteers()),
 	)
 	const [guestResults] = createResource(fetchGuestResults)
+	const [guestVolunteers] = createResource(fetchGuestVolunteers)
 	const [guests] = createResource(fetchGuests)
 	// Racers made by visitors, live in the header for a week each
 	const [customRacers] = createResource(fetchHeaderRacers)
@@ -245,6 +247,7 @@ const App: Component = () => {
 							races={races() ?? []}
 							volunteers={volunteers() ?? []}
 							guestResults={guestResults() ?? []}
+							guestVolunteers={guestVolunteers() ?? []}
 							guests={guests() ?? []}
 							celebrationData={celebrationData()}
 						/>

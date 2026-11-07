@@ -34,7 +34,7 @@ const PARKRUN_PREFIX_KEYS = ['results:', 'course:', 'celebrations:']
 const SCOOPBUS_EXACT_KEYS = ['races']
 
 /** Cache keys that belong to guest data */
-const GUEST_EXACT_KEYS = ['guests', 'guest-results']
+const GUEST_EXACT_KEYS = ['guests', 'guest-results', 'guest-volunteers']
 
 /** Cache keys that belong to the largest-clubs league table */
 const LARGEST_CLUBS_EXACT_KEYS = ['largest-clubs', 'largest-clubs-all']
@@ -489,6 +489,19 @@ export interface GuestResultItem {
 	date: string
 }
 
+export interface GuestVolunteerItem {
+	guestId: string
+	guestName: string
+	guestExtra?: string
+	guestParkrunId?: string
+	event: string
+	eventName: string
+	eventNumber: number
+	/** The Swedish role names, as for members' {@link VolunteerItem} */
+	roles: string[]
+	date: string
+}
+
 export async function fetchGuests(): Promise<GuestItem[]> {
 	await ensureCacheValidity()
 	const cacheKey = 'guests'
@@ -513,6 +526,20 @@ export async function fetchGuestResults(): Promise<GuestResultItem[]> {
 	const response = await fetch(url)
 	if (!response.ok) throw new Error(`API error: ${response.status}`)
 	const data: GuestResultItem[] = await response.json()
+	setCache(cacheKey, data)
+	return data
+}
+
+export async function fetchGuestVolunteers(): Promise<GuestVolunteerItem[]> {
+	await ensureCacheValidity()
+	const cacheKey = 'guest-volunteers'
+	const cached = getCached<GuestVolunteerItem[]>(cacheKey)
+	if (cached) return cached
+
+	const url = `${CONVEX_URL}/api/guest-volunteers`
+	const response = await fetch(url)
+	if (!response.ok) throw new Error(`API error: ${response.status}`)
+	const data: GuestVolunteerItem[] = await response.json()
 	setCache(cacheKey, data)
 	return data
 }
