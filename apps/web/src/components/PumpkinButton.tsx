@@ -1,6 +1,7 @@
 import { track } from '@/utils/analytics'
 import { animateWhileOnScreen } from '@/utils/animateWhileOnScreen'
-import { pumpkinAssets, pumpkinTint, setHalloween } from '@/utils/halloween'
+import { pumpkinAssets, pumpkinTint } from '@/utils/halloween'
+import { setSeason } from '@/utils/seasons'
 import { css } from '@style/css'
 import { Tooltip } from './ui/Tooltip'
 
@@ -29,7 +30,7 @@ export function PumpkinButton(props: { src: string; flipped?: boolean }) {
 				class={styles.pumpkin}
 				aria-label={LABEL}
 				onClick={() => {
-					setHalloween(true)
+					setSeason('halloween')
 					// Track Halloween mode being turned on from a results block in Mixpanel
 					track('halloween_mode_enabled')
 					window.scrollTo({ top: 0, behavior: 'smooth' })

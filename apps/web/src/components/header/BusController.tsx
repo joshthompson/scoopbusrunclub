@@ -4,6 +4,7 @@ import {
 	createController,
 } from '@/engine'
 import { createObjectSignal } from '@/engine'
+import { isChristmas } from '@/utils/christmas'
 import { furbysOn } from '@/utils/furbys'
 import { type JSX, createSignal } from 'solid-js'
 
@@ -16,6 +17,7 @@ import wheel2Asset from '@/assets/bus/wheel2.png'
 import wheel3Asset from '@/assets/bus/wheel3.png'
 import wheel4Asset from '@/assets/bus/wheel4.png'
 import windowAsset from '@/assets/bus/windows.png'
+import sleighAsset from '@/assets/christmas/sleigh.png'
 import type { RunnerController } from './RunnerController'
 
 const BUS_SPEED = 10
@@ -26,8 +28,25 @@ const MIN_BUS_OFFSCREEN_PX = 250
 /** With the furbies out, how long the bus stays away between drives. */
 const FURBY_BREAK_MS = 30_000
 
-// --- Pixel art storm cloud (bus-width, cloud-shaped with bumps, animated) ---
 const BUS_WIDTH = 247
+
+/**
+ * At Christmas the bus is a sleigh: just the sleigh and the scoop, no back,
+ * wheels, windows or shadow. It's wider and taller than the bus, so it's drawn
+ * level with the front of the bus, 6px higher up, which puts the bottom of its
+ * runners on the ground where the bus's wheels touch it.
+ */
+const SLEIGH_WIDTH = 312
+const SLEIGH_HEIGHT = 148
+const SLEIGH_Y = -6
+
+/** Hidden at Christmas, the bus's parts that the sleigh doesn't have. */
+const busPartStyle =
+	(style: JSX.CSSProperties = {}) =>
+	(): JSX.CSSProperties =>
+		isChristmas() ? { display: 'none' } : style
+
+// --- Pixel art storm cloud (bus-width, cloud-shaped with bumps, animated) ---
 const CX = 3 // cloud pixel size
 const CLOUD_COLS = Math.ceil(BUS_WIDTH / CX) // 83 cols
 const CLOUD_ROWS = 18
@@ -289,7 +308,6 @@ export function createBusController(
 	lightning = false,
 ) {
 	const startX = Math.max(scene.canvas.get().width() + 22, MIN_BUS_START_X) // 22 is the width of the scoop, which is the leftmost part of the bus
-	const endX = -247 // 247 is the width of the bus, which is the rightmost part of the bus
 
 	const baseY = 58
 	/** Ticks left parked off the edge, giving the furbies the path. */
@@ -300,8 +318,10 @@ export function createBusController(
 			return {
 				id,
 				type: 'bus',
-				width: () => 247,
+				width: () => (isChristmas() ? SLEIGH_WIDTH : BUS_WIDTH),
 				height: () => 127,
+				// The back of the bus, seen through its windows.
+				frames: () => (isChristmas() ? [] : [busBackAsset]),
 				...createObjectSignal(startX, 'x'),
 				...createObjectSignal(baseY, 'y'),
 				...createObjectSignal(0, 'rotation'),
@@ -322,8 +342,8 @@ export function createBusController(
 			$.setX($.x() - BUS_SPEED)
 			$.setRotation(Math.random() * 1 - 0.5)
 
-			// Reset
-			if ($.x() < endX) {
+			// Reset, once all of it's off the left edge
+			if ($.x() < -$.width()) {
 				$.setX(
 					Math.max(
 						$scene.canvas.get().width() + 22 + MIN_BUS_OFFSCREEN_PX,
@@ -375,7 +395,7 @@ export function createBusController(
 			width: () => 270,
 			height: () => 50,
 			offset: { x: -20, y: 107 },
-			style: () => ({ opacity: 0.1 }),
+			style: busPartStyle({ opacity: 0.1 }),
 		}),
 	)
 	bus.attach(
@@ -387,6 +407,7 @@ export function createBusController(
 			height: () => 38,
 			offset: { x: 73, y: 105 },
 			y: (_, $age) => Math.cos(10 + $age) * -1,
+			style: busPartStyle(),
 		}),
 	)
 	bus.attach(
@@ -398,6 +419,7 @@ export function createBusController(
 			height: () => 38,
 			offset: { x: 5, y: 103 },
 			y: (_, $age) => Math.cos(10 + $age + 5) * -1,
+			style: busPartStyle(),
 		}),
 	)
 	bus.attach(
@@ -409,6 +431,7 @@ export function createBusController(
 			height: () => 23,
 			offset: { x: 160, y: 105 },
 			y: (_, $age) => Math.cos(10 + $age + 10) * -1,
+			style: busPartStyle(),
 		}),
 	)
 	bus.attach(
@@ -420,6 +443,7 @@ export function createBusController(
 			height: () => 30,
 			offset: { x: 197, y: 102 },
 			y: (_, $age) => Math.cos(10 + $age + 15) * -1,
+			style: busPartStyle(),
 		}),
 	)
 	bus.attach(
@@ -430,7 +454,7 @@ export function createBusController(
 			width: () => 212,
 			height: () => 40,
 			offset: { x: 26, y: 26 },
-			style: () => ({ opacity: 0.75 }),
+			style: busPartStyle({ opacity: 0.75 }),
 		}),
 	)
 	bus.attach(
@@ -438,9 +462,13 @@ export function createBusController(
 			type: 'bus-body',
 			base: bus,
 			frames: [busAsset],
-			width: () => 247,
-			height: () => 127,
+			width: () => (isChristmas() ? SLEIGH_WIDTH : BUS_WIDTH),
+			height: () => (isChristmas() ? SLEIGH_HEIGHT : 127),
 			offset: { x: 0, y: 0 },
+			y: () => (isChristmas() ? SLEIGH_Y : 0),
+			init: () => ({
+				frames: () => (isChristmas() ? [sleighAsset] : [busAsset]),
+			}),
 		}),
 	)
 	bus.attach(

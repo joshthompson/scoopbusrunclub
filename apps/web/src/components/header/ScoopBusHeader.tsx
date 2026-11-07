@@ -34,14 +34,16 @@ import type {
 	Runner,
 	VolunteerItem,
 } from '@/utils/api'
+import { birthday } from '@/utils/birthdays'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
 import type { CustomRacer } from '@/utils/customRacers'
 import { racerSpeedToHeaderSpeed } from '@/utils/customRacers'
 import { furbysOn } from '@/utils/furbys'
-import { isHalloween, seasonalAsset } from '@/utils/halloween'
+import { isHalloween } from '@/utils/halloween'
 import { parseTimeToSeconds } from '@/utils/misc'
 import { fullMoonAsset, moonAsset } from '@/utils/moonAsset'
+import { seasonalAsset } from '@/utils/seasons'
 import type { WeatherType } from '@/utils/weather'
 import { A, useNavigate } from '@solidjs/router'
 import { css, cx } from '@style/css'
@@ -55,7 +57,7 @@ import {
 } from 'solid-js'
 import { Scene } from '../../engine'
 import { Canvas } from '../../engine/components'
-import { createAeroplaneController } from './AeroplaneController'
+import { createAeroplaneController, flyAeroplane } from './AeroplaneController'
 import {
 	createBalloonControllers,
 	registerBalloonConsoleHook,
@@ -659,8 +661,10 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 				)
 			}
 
-			// Add a birthday flyby (up in the sky, behind trees/runners/bus)
-			const birthdayNames = todaysBirthdayRunners()
+			// Add a birthday flyby (up in the sky, behind trees/runners/bus), for
+			// whoever's been named from the console, else whoever's birthday it is
+			const named = birthday()
+			const birthdayNames = named ? [named] : todaysBirthdayRunners()
 			if (birthdayNames.length > 0) {
 				$scene.addController(
 					createAeroplaneController('aeroplane', sceneWidth, birthdayNames),
@@ -815,6 +819,18 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	// putting them out or away changes.
 	createEffect(
 		on(isHalloween, (enabled) => syncSkeletons(scene, enabled, labelledRunner)),
+	)
+
+	// A birthday said from the console, flown for straight away. Only tracks
+	// the name: today's real birthdays are flown for in setup.
+	createEffect(
+		on(
+			birthday,
+			(name) => {
+				if (name) flyAeroplane(scene, [name])
+			},
+			{ defer: true },
+		),
 	)
 
 	// No volunteering on Halloween: everyone's out running in the zombie game.

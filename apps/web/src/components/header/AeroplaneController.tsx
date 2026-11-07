@@ -1,5 +1,5 @@
 import aeroplaneAsset from '@/assets/misc/aeroplane.png'
-import { createController, createObjectSignal } from '@/engine'
+import { type Scene, createController, createObjectSignal } from '@/engine'
 import { generateFrames } from '@/utils'
 import { css } from '@style/css'
 
@@ -26,6 +26,8 @@ const SPEED = 3 // px moved left each tick
 const ALTITUDE = 18 // y position, high up among the clouds
 const PASS_GAP = 600 // px of off-screen space before it flies past again
 
+const AEROPLANE_TYPE = 'aeroplane'
+
 export function createAeroplaneController(
 	id: string,
 	sceneWidth: number,
@@ -37,7 +39,7 @@ export function createAeroplaneController(
 		init() {
 			return {
 				id,
-				type: 'aeroplane',
+				type: AEROPLANE_TYPE,
 				width: () => DISPLAY_WIDTH,
 				height: () => DISPLAY_HEIGHT,
 				...createObjectSignal(startX, 'x'),
@@ -81,4 +83,27 @@ export function createAeroplaneController(
 			}
 		},
 	})
+}
+
+/**
+ * Send the plane over for `names`, in place of any already flying, at the same
+ * depth the header's own birthday plane gets: up in the sky, just in front of
+ * the clouds and behind everything else. It comes in from the right straight
+ * away.
+ */
+export function flyAeroplane(scene: Scene, names: string[]) {
+	const aeroplane = createAeroplaneController(
+		AEROPLANE_TYPE,
+		scene.canvas.get().width(),
+		names,
+	)
+	aeroplane.setGame(scene)
+	const current = scene.controllers
+		.get()
+		.filter(({ controller }) => controller.type !== AEROPLANE_TYPE)
+	const lastCloud = current.findLastIndex(
+		({ controller }) => controller.type === 'cloud',
+	)
+	current.splice(lastCloud + 1, 0, { id: aeroplane.id, controller: aeroplane })
+	scene.controllers.set(current)
 }

@@ -13,7 +13,7 @@ import { LitPumpkin } from './PumpkinLight'
 import { Tooltip } from './ui/Tooltip'
 
 /** Two different picks out of `count`, from two random numbers in `[0, 1)`. */
-function twoOf(count: number, [a, b]: number[]) {
+export function twoOf(count: number, [a, b]: number[]) {
 	const first = Math.floor(a * count)
 	if (count < 2) return [first, first]
 	return [first, (first + 1 + Math.floor(b * (count - 1))) % count]
@@ -49,9 +49,7 @@ export function SignPumpkins(props: {
 	})
 
 	return (
-		<div
-			class={cx(styles.pumpkins({ sign: props.sign ?? 'wooden' }), props.class)}
-		>
+		<div class={cx(signFoot({ sign: props.sign ?? 'wooden' }), props.class)}>
 			<For each={pumpkins()}>
 				{(pumpkin, i) => {
 					// The right one turned round, so the pair face each other.
@@ -92,35 +90,40 @@ export function SignPumpkins(props: {
 	)
 }
 
-const styles = {
-	pumpkins: cva({
-		base: {
-			position: 'absolute',
-			// A little below the sign's foot, settled into the grass.
-			bottom: '-3px',
-			left: '50%',
-			translate: '-50% 0',
-			// As wide as the pair, not the half of the sign that's right of `left`,
-			// which on a short title squashes them down to nothing.
-			width: 'max-content',
-			display: 'flex',
-			alignItems: 'flex-end',
-		},
-		variants: {
-			sign: {
-				wooden: {
-					// Tucked in against the post, over the edges of its grass.
-					gap: '12px',
-					// The post leans right, so the left one stands off it a bit further.
-					'& > :first-child': { translate: '-4px 0' },
-				},
-				// In front of the corners of the tombstone's 80px wide base.
-				tombstone: {
-					gap: '56px',
-				},
+/**
+ * A pair of things sat either side of a sign's post, or a tombstone, at its
+ * foot: the pumpkins here, and Christmas's presents.
+ */
+export const signFoot = cva({
+	base: {
+		position: 'absolute',
+		// A little below the sign's foot, settled into the grass.
+		bottom: '-3px',
+		left: '50%',
+		translate: '-50% 0',
+		// As wide as the pair, not the half of the sign that's right of `left`,
+		// which on a short title squashes them down to nothing.
+		width: 'max-content',
+		display: 'flex',
+		alignItems: 'flex-end',
+	},
+	variants: {
+		sign: {
+			wooden: {
+				// Tucked in against the post, over the edges of its grass.
+				gap: '12px',
+				// The post leans right, so the left one stands off it a bit further.
+				'& > :first-child': { translate: '-4px 0' },
+			},
+			// In front of the corners of the tombstone's 80px wide base.
+			tombstone: {
+				gap: '56px',
 			},
 		},
-	}),
+	},
+})
+
+const styles = {
 	link: css({
 		display: 'block',
 		flexShrink: 0,

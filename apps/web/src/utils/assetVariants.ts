@@ -12,7 +12,9 @@ const assetUrls = import.meta.glob('../assets/**/*.png', {
 /**
  * `normal URL -> variant URL`, built from a naming convention: an asset gets a
  * variant just by dropping `foo-<suffix>.png` next to `foo.png`, no wiring
- * required. `-snow` and `-halloween` are the two in use.
+ * required. `-snow`, `-halloween` and `-christmas` are the ones in use, and
+ * they stack: `foo-christmas-snow.png` is the `-snow` variant of
+ * `foo-christmas.png`.
  *
  * Assets are matched by their built URL rather than their filename, so this
  * works for inlined assets too. The one caveat is that two byte-identical PNGs

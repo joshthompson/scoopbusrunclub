@@ -11,6 +11,8 @@ import shrub1Asset from '@/assets/misc/shrub1.png'
 import snowmanAsset from '@/assets/misc/snowman.png'
 import tree1Asset from '@/assets/misc/tree1.png'
 import tree2Asset from '@/assets/misc/tree2.png'
+import { imageSize } from '@/utils/imageSize'
+import { seasonalAsset } from '@/utils/seasons'
 import { isSnowy } from '@/utils/snow'
 import { css } from '@style/css'
 
@@ -52,7 +54,18 @@ export function createTreeController(id: string, x: number) {
 	const jitterX = Math.random() * 150 - 75
 	const jitterY = Math.random() * 5
 	const width = () => tree.w * size
-	const height = () => 120 * size
+	// The plain art's box, which its seasonal versions keep the bottom of.
+	const plainHeight = 120 * size
+	const top = 10 + jitterY
+	// A seasonal version can be taller than the plain art, with something on
+	// top (the Christmas one's topper): its box grows upwards by those extra
+	// rows, at the same scale, rather than squashing the tree to fit.
+	const extraRows = () => {
+		const drawn = imageSize(seasonalAsset(tree.asset))?.height
+		return drawn ? drawn - tree.h : 0
+	}
+	const extraHeight = () => (extraRows() * plainHeight) / tree.h
+	const height = () => plainHeight + extraHeight()
 	return createController({
 		frames: [tree.asset],
 		init() {
@@ -62,14 +75,14 @@ export function createTreeController(id: string, x: number) {
 				width,
 				height,
 				x: () => x + jitterX,
-				y: () => 10 + jitterY,
+				y: () => top - extraHeight(),
 				frameInterval: () => Number.POSITIVE_INFINITY,
 				// Where the branches are once the art's been stretched to fit, with
 				// the bottom of the pixel being what a bat holds on to.
 				roosts: () =>
 					tree.roosts.map((roost) => ({
 						x: x + jitterX + ((roost.x + 0.5) * width()) / tree.w,
-						y: 10 + jitterY + ((roost.y + 1) * height()) / tree.h,
+						y: top + ((roost.y + 1) * plainHeight) / tree.h,
 					})),
 			}
 		},

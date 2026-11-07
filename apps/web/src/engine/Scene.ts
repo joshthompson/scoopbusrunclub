@@ -1,4 +1,4 @@
-import { seasonalAsset } from '@/utils/halloween'
+import { seasonalAsset } from '@/utils/seasons'
 import {
 	type Accessor,
 	type Component,

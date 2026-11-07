@@ -23,11 +23,12 @@ import {
 	isHalloween,
 	pumpkinAssets,
 	pumpkinTint,
-	seasonalAsset,
 } from '@/utils/halloween'
+import { imageSize } from '@/utils/imageSize'
 import { getMemberRoute } from '@/utils/memberRoute'
 import { formatDate, formatName, parseTimeToSeconds } from '@/utils/misc'
 import { PUMPKIN_HEIGHT, PUMPKIN_WIDTH } from '@/utils/pumpkins'
+import { seasonalAsset } from '@/utils/seasons'
 import { VOLUNTEER_EVENT_IDS } from '@shared/parkrun-events'
 import { A, useParams } from '@solidjs/router'
 import { css } from '@style/css'
@@ -217,12 +218,19 @@ function treeImage(tree: TreePlacement, index: number, headSize: number) {
 			height: PUMPKIN_HEIGHT * unit,
 		}
 	}
+	// A seasonal version taller than the plain art (the Christmas one, with its
+	// topper) grows upwards by its extra rows, rather than coming out smaller
+	// to fit the plain one's height.
+	const href = seasonalAsset(tree.asset)
+	const plain = imageSize(tree.asset)?.height
+	const drawn = imageSize(href)?.height
+	const height = plain && drawn ? (tree.height * drawn) / plain : tree.height
 	return {
-		href: seasonalAsset(tree.asset),
+		href,
 		filter: undefined,
 		x: tree.x - tree.height * 0.35,
-		y: tree.y - tree.height,
-		height: tree.height,
+		y: tree.y - height,
+		height,
 	}
 }
 const TREE_COUNT = 25

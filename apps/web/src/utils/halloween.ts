@@ -1,18 +1,5 @@
-import { createSignal } from 'solid-js'
-import { assetVariants } from './assetVariants'
 import { imageSize } from './imageSize'
-import { snowyAsset } from './snow'
-
-/**
- * Halloween mode runs from the evening before Halloween through the week after
- * it: 18:00 on 30 October to the end of 7 November, in the visitor's own time.
- */
-function halloweenModeStart(year: number) {
-	return new Date(year, 9, 30, 18)
-}
-function halloweenModeEnd(year: number) {
-	return new Date(year, 10, 8)
-}
+import { halloween } from './seasons'
 
 /**
  * Every pumpkin in the halloween assets, so another one joins the patch just by
@@ -99,91 +86,9 @@ export const ghostAssets = Object.entries(
  */
 export const halloweenAssetSize = imageSize
 
-/** Whether a moment falls in Halloween mode's week. */
-export function isHalloweenWeek(now = new Date()) {
-	const year = now.getFullYear()
-	return halloweenModeStart(year) <= now && now < halloweenModeEnd(year)
-}
-
-/** Switched on or off by hand, and then left alone by the calendar. */
-const [forced, setForced] = createSignal<boolean>()
-
-/** Whether it's Halloween mode's week by the clock, as of the last look. */
-const [inSeason, setInSeason] = createSignal(isHalloweenWeek())
-
-/** The longest a `setTimeout` can wait, about 24 days. */
-const MAX_TIMEOUT = 2 ** 31 - 1
-
-/**
- * Look at the clock again when Halloween mode next starts or ends, so a page
- * left open over 17:00 on the 30th turns spooky right then. Only when that's
- * near enough for a timer to wait for: any further off, and the page will
- * have been reloaded long before.
- */
-function watchSeason() {
-	const now = new Date()
-	const year = now.getFullYear()
-	const next = [halloweenModeStart(year), halloweenModeEnd(year)].find(
-		(change) => change > now,
-	)
-	if (!next || next.getTime() - now.getTime() > MAX_TIMEOUT) return
-	setTimeout(() => {
-		setInSeason(isHalloweenWeek())
-		watchSeason()
-	}, next.getTime() - now.getTime())
-}
-if (typeof window !== 'undefined') watchSeason()
-
 /**
  * Whether the header is in Halloween mode: its week, unless someone's said
- * otherwise.
+ * otherwise. Its dates, and `setSeason()` to switch it by hand, are in
+ * `seasons.ts`.
  */
-export const isHalloween = () => forced() ?? inSeason()
-
-/** Switch Halloween mode on or off, whatever the date. */
-export function setHalloween(on: boolean) {
-	setForced(on)
-}
-
-declare global {
-	interface Window {
-		setHalloween: (on: boolean) => string
-	}
-}
-
-/**
- * `setHalloween(true)` from the browser console to turn Halloween mode on out of
- * season, `setHalloween(false)` to turn it off in season. Brings its own
- * weather with it, so there's no need to `setWeather('halloween')` as well.
- * Sticks until reload.
- */
-if (typeof window !== 'undefined') {
-	window.setHalloween = (on: boolean) => {
-		setHalloween(on)
-		return `halloween: ${on ? 'on' : 'off'}`
-	}
-}
-
-/**
- * `normal URL -> Halloween URL`: an asset gets a Halloween variant just by
- * dropping `foo-halloween.png` next to `foo.png`, the same way as `-snow`.
- */
-const halloweenVariants = assetVariants('halloween')
-
-/**
- * Swap an imported asset URL for whichever variant the season calls for: its
- * `-halloween` one in Halloween mode, else its `-snow` one while it's snowy.
- * Halloween wins when both apply — the bus stays in costume even on the rare
- * snowy Halloween. Assets without a variant are returned untouched, so this is
- * safe to use anywhere.
- *
- * Reads signals, so call it inside a reactive context (JSX, a memo, an
- * accessor) rather than at module scope.
- */
-export function seasonalAsset(url: string): string {
-	if (isHalloween()) {
-		const variant = halloweenVariants.get(url)
-		if (variant) return variant
-	}
-	return snowyAsset(url)
-}
+export const isHalloween = halloween.isOn

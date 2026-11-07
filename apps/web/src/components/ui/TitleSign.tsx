@@ -1,9 +1,12 @@
 import tombstone from '@/assets/halloween/tombstone.png'
 import purpleSign from '@/assets/misc/purple-sign.png'
 import woodenSign from '@/assets/misc/wooden-sign.png'
-import { isHalloween, seasonalAsset } from '@/utils/halloween'
+import { isChristmas } from '@/utils/christmas'
+import { isHalloween } from '@/utils/halloween'
+import { seasonalAsset } from '@/utils/seasons'
 import { css, cva } from '@style/css'
 import { Show, createEffect, createSignal } from 'solid-js'
+import { SignPresents } from '../SignPresents'
 import { SignPumpkins } from '../SignPumpkins'
 import { SnowShelf } from './SnowShelf'
 
@@ -76,6 +79,9 @@ export function TitleSign(props: {
 				<SnowShelf class={styles.snowShelf} />
 				<Show when={isHalloween()}>
 					<SignPumpkins />
+				</Show>
+				<Show when={isChristmas()}>
+					<SignPresents />
 				</Show>
 			</Show>
 			<Show when={type() === 'tombstone'}>

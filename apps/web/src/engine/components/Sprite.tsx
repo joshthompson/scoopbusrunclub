@@ -1,5 +1,5 @@
 import { SceneContext } from '@/utils/SceneContext'
-import { seasonalAsset } from '@/utils/halloween'
+import { seasonalAsset } from '@/utils/seasons'
 import { css, cx } from '@style/css'
 import {
 	type Accessor,

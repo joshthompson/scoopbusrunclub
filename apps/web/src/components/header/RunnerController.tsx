@@ -10,6 +10,7 @@ import { imageSize } from '@/utils/imageSize'
 import { css } from '@style/css'
 import type { Accessor, JSX } from 'solid-js'
 import { createCameraFlashController } from './CameraFlashController'
+import { createChristmasHatController } from './ChristmasHatController'
 import { createPumpkinController } from './PumpkinController'
 
 export const RUNNER_LABEL_RENDER_DISTANCE = 50
@@ -510,6 +511,8 @@ export function createRunnerController(
 	// thing in the scene, so it's drawn inside their box and moves and tips with
 	// them without having to follow along.
 	controller.attach(createPumpkinController(controller))
+	// And at Christmas, a Father Christmas hat, the same way.
+	controller.attach(createChristmasHatController(controller))
 
 	return controller
 }
