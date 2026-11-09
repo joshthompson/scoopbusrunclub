@@ -1,5 +1,3 @@
-import { Scene } from '@/engine'
-import { Canvas } from '@/engine/components'
 import {
 	For,
 	type JSX,
@@ -10,36 +8,16 @@ import {
 	untrack,
 } from 'solid-js'
 import { record, today, topScore } from '../highScores'
-import { type Action, setTouch } from '../input'
+import { type Action, anyControls, setTouch } from '../input'
 import { LEVELS } from '../levels'
 import type { Level } from '../levels/types'
 import type { Playable } from '../playable'
 import { reach } from '../progress'
 import { Stage } from '../ui/Stage'
-import { Backdrop, Ground, HorizonTrees } from './Backdrop'
 import { PauseMenu } from './PauseMenu'
+import { RaceCanvas, createRaceScene } from './RaceView'
 import { type Placing, Summary, type SummaryAction } from './Summary'
-import {
-	HITBOX_HALF_WIDTH,
-	PX_PER_M,
-	START_X,
-	TICK_MS,
-	VIEW_HEIGHT,
-	VIEW_WIDTH,
-} from './constants'
-import {
-	createBanner,
-	createBus,
-	createCorgis,
-	createFurbies,
-	createGameController,
-	createObstacle,
-	createPack,
-	createParkrunSign,
-	createPlayer,
-	createRunDirector,
-	createScenery,
-} from './sprites'
+import { PX_PER_M, START_X } from './constants'
 import { POPUP_TICKS } from './step'
 import { type World, createWorld } from './world'
 
@@ -81,8 +59,8 @@ export function Game(props: {
 	const { mode } = props
 	const world = createWorld(
 		props.level,
-		props.runner,
-		mode.kind === 'endless' ? mode.startScore : 0,
+		[{ id: 'solo', runner: props.runner, controls: anyControls }],
+		{ startScore: mode.kind === 'endless' ? mode.startScore : 0 },
 	)
 	/** Endless's next course, round to the first again after the last. */
 	const nextIndex =
@@ -138,55 +116,7 @@ export function Game(props: {
 		]
 	}
 
-	const scene = new Scene('run-game', {
-		width: VIEW_WIDTH,
-		height: VIEW_HEIGHT,
-		frameRate: TICK_MS,
-		// Front to back.
-		assetOrder: [
-			// The near poles of the start and finish banners, which you run past.
-			'banner-front',
-			// Hurdles in the lanes nearer than the runner's.
-			'hazard-front',
-			// In front of the runner: one sits on their head.
-			'furby',
-			'player',
-			// Behind them: they sit on its back.
-			'corgi',
-			'pacer',
-			'bus',
-			'boost',
-			'hazard',
-			'cheerer',
-			'banner',
-			'sign',
-			'mud',
-			'scenery',
-		],
-		setup(scene) {
-			scene.addController(
-				createGameController(world),
-				...createScenery(world),
-				// Just ahead of the runner, so they toe the line rather than stand on it.
-				...createBanner(world, START_X + HITBOX_HALF_WIDTH + 4, 'START'),
-				createParkrunSign(world, START_X - 190),
-				...createBanner(world, world.terrain.finishX, 'FINISH'),
-				createRunDirector(world),
-				...world.obstacles.flatMap((state, i) =>
-					createObstacle(world, state, i),
-				),
-				...createCorgis(world),
-				...createFurbies(world),
-				createBus(world),
-				...createPack(world),
-				createPlayer(world),
-			)
-		},
-	})
-	// The engine scrolls every sprite by the canvas's x.
-	scene.canvas.get().setX(world.camera())
-	const followCamera = () => scene.canvas.get().setX(world.camera())
-	scene.tickers.add(followCamera)
+	const scene = createRaceScene(world)
 
 	const [paused, setPaused] = createSignal(false)
 	/** Over once the result's up: there's nothing left to pause. */
@@ -224,44 +154,32 @@ export function Game(props: {
 
 	return (
 		<Stage>
-			{/* The level's own colours, for the sky, the grass and the path. */}
-			<div style={{ ...props.level.look?.palette, display: 'contents' }}>
-				<Canvas
-					scene={scene}
-					underlay={
-						<>
-							<Backdrop world={world} />
-							<HorizonTrees world={world} />
-							<Ground world={world} />
-						</>
-					}
-					overlay={
-						<>
-							<Hud
-								world={world}
-								mode={mode}
-								actions={actions()}
-								placing={placing()}
-								onPause={() => canPause() && setPaused(true)}
+			<RaceCanvas
+				world={world}
+				scene={scene}
+				overlay={
+					<>
+						<Hud
+							world={world}
+							mode={mode}
+							actions={actions()}
+							placing={placing()}
+							onPause={() => canPause() && setPaused(true)}
+						/>
+						<Show when={paused()}>
+							<PauseMenu
+								items={[
+									{ label: 'Carry on', choose: resume },
+									{ label: 'Restart', choose: props.onRetry },
+									{ label: 'Change course', choose: props.onCourses },
+									{ label: 'Change runner', choose: props.onQuit },
+									{ label: 'Main menu', choose: props.onMenu },
+								]}
 							/>
-							<Show when={paused()}>
-								<PauseMenu
-									items={[
-										{ label: 'Carry on', choose: resume },
-										{ label: 'Restart', choose: props.onRetry },
-										{ label: 'Change course', choose: props.onCourses },
-										{ label: 'Change runner', choose: props.onQuit },
-										{ label: 'Main menu', choose: props.onMenu },
-									]}
-								/>
-							</Show>
-						</>
-					}
-					loading={() => (
-						<div style={styles.loading}>Loading {props.level.name}…</div>
-					)}
-				/>
-			</div>
+						</Show>
+					</>
+				}
+			/>
 		</Stage>
 	)
 }
@@ -384,15 +302,6 @@ function TouchControls() {
 }
 
 const styles = {
-	loading: {
-		position: 'absolute',
-		inset: 0,
-		display: 'grid',
-		'place-items': 'center',
-		background: 'var(--ink)',
-		color: 'white',
-		'font-size': '32px',
-	},
 	hud: {
 		position: 'absolute',
 		inset: 0,

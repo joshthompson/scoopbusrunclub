@@ -1,4 +1,3 @@
-import { isHeld } from '../input'
 import { play } from '../sfx'
 import {
 	AIR_PUSH,
@@ -37,6 +36,7 @@ import {
 	START_X,
 	STUMBLE_SPEED,
 	STUMBLE_TICKS,
+	VIEW_HEIGHT,
 	VIEW_WIDTH,
 } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
@@ -44,7 +44,7 @@ import { FIKA_ART } from './fika'
 import { scoopFurbies, stepFurbies } from './furbies'
 import { KIDS_REACH_UP, kidsWidth } from './kidsArt'
 import { scoopPack, stepPack } from './pack'
-import type { World } from './world'
+import type { Body, Racer, World } from './world'
 
 /** How long a popup stays up. */
 export const POPUP_TICKS = 45
@@ -66,16 +66,19 @@ const SCOOPED_TICKS = 70
 export function stepWorld(world: World) {
 	world.setTicks(world.ticks() + 1)
 	stepPhase(world)
-	stepRunner(world)
+	for (const racer of world.racers) stepRunner(world, racer)
 	stepPack(world)
 	stepFurbies(world)
 	stepCorgis(world)
-	collide(world)
+	for (const racer of world.racers) collide(world, racer)
 	stepBus(world)
-	stepCamera(world)
+	if (world.round) {
+		decideRound(world)
+		frameEveryone(world)
+	} else stepCamera(world)
 
 	// Not while flying out of the scoop: how far they got is where it got them.
-	if (world.phase() !== 'scooped') world.setPlayerX(world.body.x)
+	if (world.racers[0].out !== 'scooped') world.setPlayerX(world.body.x)
 	// A point a metre, for the furthest they've got round.
 	const metres = Math.floor(
 		Math.min(world.terrain.length, world.playerX() - START_X) / PX_PER_M,
@@ -100,13 +103,19 @@ function stepPhase(world: World) {
 	}
 	if (phase === 'running') {
 		world.setRaceTicks(world.raceTicks() + 1)
-		if (world.body.x >= world.terrain.finishX) {
-			world.setPhase('finished')
+		for (const racer of world.racers) {
+			if (racer.out || racer.body.x < world.terrain.finishX) continue
+			racer.out = 'finished'
+			racer.outAt = world.ticks()
 			play('finished')
-			world.finish.busGap = world.body.x - world.bus.frontX
+			if (racer === world.racers[0] && !world.round) {
+				world.setPhase('finished')
+				world.finish.busGap = racer.body.x - world.bus.frontX
+			}
 		}
 		return
 	}
+	if (world.round) return
 	// Over the line: the summary once they've run off the screen.
 	if (
 		phase === 'finished' &&
@@ -118,15 +127,64 @@ function stepPhase(world: World) {
 			distance: world.terrain.length,
 			busGap: world.finish.busGap,
 		})
-	if (phase === 'scooped' && !world.result()) {
-		world.body.spin += 1
-		if (world.body.spin > SCOOPED_TICKS)
-			world.setResult({
-				kind: 'scooped',
-				distance: Math.max(0, world.playerX() - START_X),
-				busGap: 0,
-			})
+	if (phase === 'scooped' && !world.result() && world.body.spin > SCOOPED_TICKS)
+		world.setResult({
+			kind: 'scooped',
+			distance: Math.max(0, world.playerX() - START_X),
+			busGap: 0,
+		})
+}
+
+/**
+ * How long the Round's winner runs on, and the last of anyone scooped flies,
+ * before the Round's over.
+ */
+const WINNER_RUN_TICKS = 150
+
+/**
+ * A Round's decided once nobody's left running, or only one Player is and
+ * nobody's beaten the bus to the line: they've outlasted everyone. In order,
+ * then: over the line first, then whoever was still running, then the
+ * scooped, the last to go first.
+ */
+function decideRound(world: World) {
+	const { racers } = world
+	if (world.phase() !== 'running' || world.order()) return
+	const running = racers.filter((r) => !r.out)
+	const someoneFinished = racers.some((r) => r.out === 'finished')
+	const lastStanding =
+		racers.length > 1 && running.length === 1 && !someoneFinished
+	if (running.length > 0 && !lastStanding) return
+
+	const rank = (r: Racer) =>
+		r.out === 'finished' ? 0 : r.out === 'scooped' ? 2 : 1
+	world.setOrder(
+		[...racers].sort(
+			(a, b) =>
+				rank(a) - rank(b) ||
+				(a.out === 'finished'
+					? a.outAt - b.outAt
+					: a.out === 'scooped'
+						? b.outAt - a.outAt
+						: 0) ||
+				b.body.x - a.body.x,
+		),
+	)
+	world.decidedAt = world.ticks()
+	world.setPhase('finished')
+	if (lastStanding) {
+		play('finished')
+		world.popup(
+			`${running[0].runner.name} wins!`,
+			running[0].body.x,
+			running[0].body.feetY - 90,
+		)
 	}
+}
+
+/** Whether a decided Round's done with: the winner's run on, and the last scooped landed. */
+export function roundOver(world: World) {
+	return !!world.order() && world.ticks() - world.decidedAt > WINNER_RUN_TICKS
 }
 
 /** The countdown's word, if one's being said: "3", "2", "1", then "Go!" for a moment after. */
@@ -135,14 +193,16 @@ export function countdownWord(world: World) {
 	return ['3', '2', '1', 'Go!'][step]
 }
 
-function stepRunner(world: World) {
-	const { body: b, terrain } = world
+function stepRunner(world: World, racer: Racer) {
+	const { terrain } = world
+	const b = racer.body
 	const phase = world.phase()
 
-	if (phase === 'scooped') {
+	if (racer.out === 'scooped') {
 		b.x += b.vx
 		b.feetY += b.vy
 		b.vy += GRAVITY
+		b.spin += 1
 		return
 	}
 
@@ -150,13 +210,16 @@ function stepRunner(world: World) {
 	// would otherwise pull them back down it.
 	if (phase === 'countdown') return
 
-	const racing = phase === 'running'
-	const finished = phase === 'finished'
-	const right = racing && isHeld('right')
-	const left = racing && isHeld('left')
-	const up = racing && isHeld('up')
-	const down = racing && isHeld('down')
+	const racing = phase === 'running' && !racer.out
+	// Over the line, or the last one standing: running on.
+	const finished = !racing
+	const held = racing ? racer.controls() : undefined
+	const right = !!held?.right
+	const left = !!held?.left
+	const up = !!held?.up
+	const down = !!held?.down
 	if (!racing) b.mount = 0
+	if (b.stomped > 0) b.stomped--
 
 	if (b.grounded) {
 		const slope = terrain.slope(b.x)
@@ -231,10 +294,18 @@ export function boost(vx: number, facing: 1 | -1, speed: number) {
 	return facing * Math.min(MAX_SPEED, along + speed)
 }
 
-/** What the runner's run into this tick, and what it does to them. */
-function collide(world: World) {
-	const { body: b, terrain } = world
-	if (world.phase() !== 'running') return
+/**
+ * A popup's words, with the points on the end, unless it's a Round: nobody
+ * scores in one.
+ */
+export const scored = (world: World, words: string, points: string) =>
+	world.round ? words : words ? `${words} ${points}` : points
+
+/** What a racer's run into this tick, and what it does to them. */
+function collide(world: World, racer: Racer) {
+	const { terrain } = world
+	const b = racer.body
+	if (world.phase() !== 'running' || racer.out) return
 
 	const left = b.x - HITBOX_HALF_WIDTH
 	const right = b.x + HITBOX_HALF_WIDTH
@@ -250,7 +321,7 @@ function collide(world: World) {
 		b.stumble = STUMBLE_TICKS
 		b.vx = Math.sign(b.vx) * Math.min(Math.abs(b.vx), STUMBLE_SPEED)
 		world.addBonus('hazards', -HAZARD_POINTS)
-		world.popup(`${word} -${HAZARD_POINTS}`, b.x, top)
+		world.popup(scored(world, word, `-${HAZARD_POINTS}`), b.x, top)
 	}
 
 	b.muddy = false
@@ -333,7 +404,11 @@ function collide(world: World) {
 					if (!b.muddy && !state.used) {
 						state.used = true
 						world.addBonus('hazards', -HAZARD_POINTS)
-						world.popup(`Squelch! -${HAZARD_POINTS}`, b.x, top)
+						world.popup(
+							scored(world, 'Squelch!', `-${HAZARD_POINTS}`),
+							b.x,
+							top,
+						)
 						play('squelch')
 					}
 					b.muddy = true
@@ -351,7 +426,7 @@ function collide(world: World) {
 					state.used = true
 					b.vx = boost(b.vx, b.facing, FIKA_BOOST)
 					world.addBonus('fika', FIKA_POINTS)
-					world.popup(`Fika! +${FIKA_POINTS}`, b.x, top)
+					world.popup(scored(world, 'Fika!', `+${FIKA_POINTS}`), b.x, top)
 					play('fika')
 				}
 				break
@@ -364,24 +439,29 @@ function collide(world: World) {
 					b.x - o.x > 0 !== wasAt - o.x > 0
 				) {
 					state.used = true
+					state.cheered = racer.runner.name
 					state.setCheering(CHEER_TICKS)
 					play('cheer')
 					b.vx = boost(b.vx, b.facing, CHEER_BOOST)
 					world.addBonus('cheers', CHEER_POINTS)
-					world.popup(`+${CHEER_POINTS}`, b.x, top)
+					world.popup(
+						scored(world, world.round ? 'Go!' : '', `+${CHEER_POINTS}`),
+						b.x,
+						top,
+					)
 				}
 				break
 		}
 	}
-
-	for (const state of world.obstacles)
-		if (state.cheering() > 0) state.setCheering(state.cheering() - 1)
 }
 
 function stepBus(world: World) {
-	const { bus, body } = world
+	const { bus } = world
 	const phase = world.phase()
 	if (bus.scooping > 0) bus.scooping--
+	// Cheerers' bubbles run down here, once a tick, whoever set them going.
+	for (const state of world.obstacles)
+		if (state.cheering() > 0) state.setCheering(state.cheering() - 1)
 
 	if (phase === 'countdown') return
 
@@ -401,25 +481,39 @@ function stepBus(world: World) {
 	knockOver(world)
 
 	if (phase !== 'running') return
+	const running = world.racers.filter((r) => !r.out)
+	if (!running.length) return
 	// Never more than its leash behind, however far ahead the runner gets:
-	// pulled along at the end of it, which lets it out a little.
-	if (body.x - bus.frontX > bus.leash) {
+	// pulled along at the end of it, which lets it out a little. In a Round,
+	// it's the leader that pulls it, and anyone that far back is scooped.
+	const leader = Math.max(...running.map((r) => r.body.x))
+	if (leader - bus.frontX > bus.leash) {
 		bus.leash += leashGrowth(bus.leash)
-		bus.frontX = body.x - bus.leash
+		bus.frontX = leader - bus.leash
 	}
 
-	if (bus.frontX >= body.x - HITBOX_HALF_WIDTH) {
-		bus.scooping = 10
-		body.mount = 0
-		body.grounded = false
-		body.ducking = false
-		body.vx = Math.max(bus.speed, 2) + 2
-		body.vy = -15
-		body.spin = 0
-		world.setPhase('scooped')
-		play('scooped')
-		world.popup(`Scooped ${world.runner.name}!`, body.x, body.feetY - 80)
+	for (const racer of running) {
+		const body = racer.body
+		if (bus.frontX < body.x - HITBOX_HALF_WIDTH) continue
+		scoop(world, racer, body)
 	}
+}
+
+/** Caught by the bus: flung up out of the scoop, and out. */
+function scoop(world: World, racer: Racer, body: Body) {
+	const { bus } = world
+	bus.scooping = 10
+	body.mount = 0
+	body.grounded = false
+	body.ducking = false
+	body.vx = Math.max(bus.speed, 2) + 2
+	body.vy = -15
+	body.spin = 0
+	racer.out = 'scooped'
+	racer.outAt = world.ticks()
+	if (!world.round) world.setPhase('scooped')
+	play('scooped')
+	world.popup(`Scooped ${racer.runner.name}!`, body.x, body.feetY - 80)
 }
 
 /**
@@ -501,4 +595,59 @@ function stepCamera(world: World) {
 	)
 	const camera = world.camera()
 	world.setCamera(camera + (target - camera) * 0.25)
+}
+
+/** Room the camera keeps behind the last Player in a Round, for the bus coming, and ahead of the first. */
+const ROUND_BEHIND = 220
+const ROUND_AHEAD = 420
+/** The bus is framed too once it's this near the last Player. */
+const BUS_IN_VIEW = 520
+/** How far the camera zooms out to keep everyone in, at most. */
+export const MAX_ZOOM = 2
+/** How quickly it zooms, a share a tick. */
+const ZOOM_EASE = 0.04
+
+/**
+ * A Round's camera: everyone still running in view, zoomed out up to
+ * `MAX_ZOOM` to fit them all, the leader with room ahead. Anyone further
+ * back than that, the bus has got (see `BUS_LEASH_MAX`). Through the
+ * countdown, the bus parked behind is in too.
+ */
+function frameEveryone(world: World) {
+	const running = world.racers.filter((r) => !r.out)
+	// Left where it is once everyone's out: to watch the last of them fly off.
+	if (!running.length) return
+	const xs = running.map((r) => r.body.x)
+	if (world.phase() === 'countdown') xs.push(world.bus.frontX - 80)
+	const last = Math.min(...xs)
+	// The bus too, once it's closing in on the last of them: they see it coming.
+	const back = Math.min(
+		last - ROUND_BEHIND,
+		Math.max(world.bus.frontX - 80, last - BUS_IN_VIEW),
+	)
+	const front = Math.max(...xs) + ROUND_AHEAD
+	const want = Math.max(1, Math.min(MAX_ZOOM, (front - back) / VIEW_WIDTH))
+	const zoom = world.zoom() + (want - world.zoom()) * ZOOM_EASE
+	world.setZoom(zoom)
+	const width = VIEW_WIDTH * zoom
+	// Room to spare goes behind the leader, evenly either side of everyone.
+	const spare = Math.max(0, width - (front - back))
+	const target = Math.max(
+		LEFT_EDGE - VIEW_WIDTH * CAMERA_LEAD,
+		Math.min(
+			world.terrain.finishX + 500 - width,
+			front > back + width ? front - width : back - spare / 2,
+		),
+	)
+	const camera = world.camera()
+	world.setCamera(camera + (target - camera) * 0.25)
+}
+
+/** Where a point in the world is on the screen, with the camera's zoom: it zooms out from the bottom left. */
+export function onScreen(world: World, x: number, y: number) {
+	const zoom = world.zoom()
+	return {
+		x: (x - world.camera()) / zoom,
+		y: VIEW_HEIGHT - (VIEW_HEIGHT - y) / zoom,
+	}
 }

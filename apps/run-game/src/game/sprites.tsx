@@ -42,7 +42,7 @@ import {
 	PotholeArt,
 	hurdleSize,
 } from './trackArt'
-import type { Corgi, Furby, ObstacleState, Pacer, World } from './world'
+import type { Corgi, Furby, ObstacleState, Pacer, Racer, World } from './world'
 
 /**
  * Everything in the game is drawn by one of these: engine controllers, the
@@ -89,8 +89,8 @@ export function volunteerFrame(member: RunnerName) {
 	)
 }
 
-export function createPlayer(world: World) {
-	const { sprite } = world.runner
+export function createPlayer(world: World, racer: Racer = world.racers[0]) {
+	const { sprite } = racer.runner
 	const run = sprite.run
 	const sit = sprite.sit
 	const runSize = {
@@ -101,14 +101,14 @@ export function createPlayer(world: World) {
 	return createController({
 		frames: [...run, ...(sit ? [sit] : [])],
 		init() {
-			const { body } = world
+			const { body } = racer
 			// Sat down, ducking or riding a corgi. `body` isn't a signal: reading
 			// the tick keeps this up to date.
 			const ducking = () =>
 				world.ticks() >= 0 && (body.ducking || body.mount > 0) && !!sit
 			const size = () => (ducking() ? poseSize(sit, sprite) : runSize)
 			return {
-				id: 'player',
+				id: `player-${racer.id}`,
 				type: 'player',
 				...createObjectSignal(0, 'x'),
 				...createObjectSignal(0, 'y'),
@@ -125,13 +125,13 @@ export function createPlayer(world: World) {
 			}
 		},
 		onEnterFrame({ $ }) {
-			const { body } = world
+			const { body } = racer
 			const width = $.width()
 			$.setX(body.x - width / 2)
 			// Up on a corgi's back, riding one.
 			$.setY(body.feetY - $.height() - (body.mount > 0 ? CORGI_SADDLE : 0))
 
-			if (world.phase() === 'scooped') {
+			if (racer.out === 'scooped') {
 				$.setRotation(body.spin * 14)
 				$.setState('pause')
 				return
@@ -878,7 +878,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			const frame = volunteerFrame(o.member)
 			const runner = runners[o.member][0]
 			const size = poseSize(frame, runner())
-			const name = world.runner.name
 			// Marshals' signs point left, the way the header's runners go. Turned
 			// round, they point on along the course, and face the runner coming.
 			const turned = frame === runner().frames.marshal?.[0]
@@ -895,7 +894,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				children: () => (
 					<Show when={state.cheering() > 0}>
 						<Bubble size={18} mirrored={turned}>
-							Go {name}!
+							Go {state.cheered || world.runner.name}!
 						</Bubble>
 					</Show>
 				),

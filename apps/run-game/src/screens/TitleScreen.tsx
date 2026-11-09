@@ -3,6 +3,7 @@ import { Logo, Menu, OUTLINED, Panel } from '../ui/Menu'
 
 export function TitleScreen(props: {
 	onSinglePlayer: () => void
+	onMultiPlayer: () => void
 	onHighScores: () => void
 	onInstructions: () => void
 	onOptions: () => void
@@ -29,7 +30,7 @@ export function TitleScreen(props: {
 					onChange={props.onChange}
 					items={[
 						{ label: 'Single Player', choose: props.onSinglePlayer },
-						{ label: 'Multi Player', disabled: true, tag: 'Soon!' },
+						{ label: 'Multi Player', choose: props.onMultiPlayer },
 						{ label: 'High Scores', choose: props.onHighScores },
 						{ label: 'Instructions', choose: props.onInstructions },
 						{ label: 'Options', choose: props.onOptions },

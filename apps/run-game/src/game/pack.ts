@@ -1,5 +1,4 @@
 import { guests } from '../guests'
-import { isHeld } from '../input'
 import { DEFAULT_AVATAR, pickAny, randomAvatar } from '../looks'
 import { MEMBERS, type Playable, lookSprite } from '../playable'
 import { play } from '../sfx'
@@ -16,7 +15,6 @@ import {
 	PACER_EVERY_TICKS,
 	PACER_FASTEST,
 	PACER_SLOWEST,
-	PACK_SIZE,
 	RUNNER_SCALE,
 	START_X,
 	STOMP_BOOST,
@@ -30,7 +28,7 @@ import {
 import { kidsWidth } from './kidsArt'
 import { boost } from './step'
 import type { Terrain } from './terrain'
-import type { Pacer, World } from './world'
+import { type Pacer, type Racer, START_GAP, type World } from './world'
 
 /**
  * The pack: everyone else out running Haga. They plod along slower than you,
@@ -91,20 +89,23 @@ export const SCOOP_HEARD = BUS_LEASH_MAX - VIEW_WIDTH * CAMERA_LEAD + 50
 
 /** What `lineUp` needs: the world's still being made when it's called. */
 interface Lineup {
-	runner: Playable
+	racers: { runner: Playable }[]
 	terrain: Terrain
 	pack: Pacer[]
+	packSize: number
 	packState: { nextId: number; nextJoin: number }
 }
 
 /**
  * Someone to join: now and then someone the club knows, a member or one of
- * its guests, as long as they're not running already (or the one running).
+ * its guests, as long as they're not running already (or racing).
  */
 function newcomer(world: Lineup): Pick<Pacer, 'name' | 'member' | 'sprite'> {
 	const members = [...MEMBERS, ...guests()].filter(
 		(m) =>
-			m.id !== world.runner.id && !world.pack.some((p) => p.name === m.name),
+			!world.racers.some(
+				(r) => r.runner.id === m.id || r.runner.name === m.name,
+			) && !world.pack.some((p) => p.name === m.name),
 	)
 	if (members.length && Math.random() < MEMBER_SHARE) {
 		const { name, member, sprite } = pickAny(members)
@@ -132,16 +133,20 @@ function join(world: Lineup, x: number) {
 	})
 }
 
-/** A few lined up behind you at the start: nobody gets ahead of the line. */
+/**
+ * A few lined up behind you at the start, or behind the last Player in a
+ * Round: nobody gets ahead of the line.
+ */
 export function lineUp(world: Lineup) {
-	for (const offset of [-36, -72, -108, -150, -195])
-		join(world, START_X + offset + Math.round(Math.random() * 16))
+	const last = START_X - (world.racers.length - 1) * START_GAP
+	for (const offset of [-36, -72, -108, -150, -195].slice(0, world.packSize))
+		join(world, last + offset + Math.round(Math.random() * 16))
 	world.packState.nextJoin = PACER_EVERY_TICKS
 }
 
 /** One tick of the pack: joining, running, being bounced on, and leaving. */
 export function stepPack(world: World) {
-	const { pack, body, terrain, packState } = world
+	const { pack, terrain, packState } = world
 	const phase = world.phase()
 	// On the start line until "Go!", like everyone.
 	if (phase === 'countdown') return
@@ -149,14 +154,16 @@ export function stepPack(world: World) {
 	if (phase === 'running' && --packState.nextJoin <= 0) {
 		packState.nextJoin = PACER_EVERY_TICKS + Math.random() * PACER_EVERY_SPREAD
 		// Just off the screen ahead, to be caught up with.
-		const x = world.camera() + VIEW_WIDTH + 80
+		const x = world.camera() + world.viewWidth() + 80
 		const running = pack.filter((p) => !p.scooped).length
-		if (running < PACK_SIZE && x < terrain.finishX - 300) join(world, x)
+		if (running < world.packSize && x < terrain.finishX - 300) join(world, x)
 	}
 
 	for (const pacer of pack) movePacer(world, pacer)
-	if (phase === 'running') bounceOffHeads(world)
-	if (body.grounded) body.combo = 0
+	for (const racer of world.racers) {
+		if (phase === 'running' && !racer.out) bounceOffHeads(world, racer)
+		if (racer.body.grounded) racer.body.combo = 0
+	}
 
 	// Gone: fallen off the bottom out of the scoop, or long over the line.
 	// Anyone left behind stays until the bus gets them, on the screen or not.
@@ -221,9 +228,14 @@ function hopAhead(world: World, x: number) {
 	})
 }
 
+/** How long a Player stumbles after another bounces on their head: a little. */
+const STOMPED_TICKS = 18
+/** And how long before anyone can bounce on them again. */
+const STOMPED_GUARD = 60
+
 /** Coming down on someone's head: bounce off it, faster, and score. */
-function bounceOffHeads(world: World) {
-	const b = world.body
+function bounceOffHeads(world: World, racer: Racer) {
+	const b = racer.body
 	if (b.grounded || b.vy <= 0) return
 	/** Where their feet were last tick. */
 	const was = b.feetY - b.vy
@@ -236,8 +248,26 @@ function bounceOffHeads(world: World) {
 		if (was > head || b.feetY < head) continue
 
 		p.dazed = DAZED_TICKS
-		bounceOff(world, head, p.x)
+		bounceOff(world, racer, head, p.x)
 		// One head a tick.
+		return
+	}
+
+	// Another Player's head: a bounce for you, a stumble for them.
+	for (const other of world.racers) {
+		const o = other.body
+		if (other === racer || other.out || o.stomped > 0 || o.mount > 0) continue
+		if (Math.abs(b.x - o.x) > HEAD_REACH) continue
+		const height = o.ducking
+			? other.runner.sprite.height * RUNNER_SCALE * 0.55
+			: other.runner.sprite.height * RUNNER_SCALE
+		const head = o.feetY - height + HEAD_GIVE
+		if (was > head || b.feetY < head) continue
+
+		o.stomped = STOMPED_GUARD
+		o.stumble = Math.max(o.stumble, STOMPED_TICKS)
+		o.vx *= 0.5
+		bounceOff(world, racer, head, o.x)
 		return
 	}
 }
@@ -246,17 +276,18 @@ function bounceOffHeads(world: World) {
  * Off a head whose top is at `head`, at `x`: up, faster, and points, doubling
  * for each more before landing. Corgis' heads too.
  */
-export function bounceOff(world: World, head: number, x: number) {
-	const b = world.body
+export function bounceOff(world: World, racer: Racer, head: number, x: number) {
+	const b = racer.body
 	b.feetY = head
-	b.vy = -(isHeld('up') ? STOMP_BOUNCE_HELD : STOMP_BOUNCE)
+	b.vy = -(racer.controls().up ? STOMP_BOUNCE_HELD : STOMP_BOUNCE)
 	b.vx = boost(b.vx, b.facing, STOMP_BOOST)
 
 	const points = Math.min(STOMP_POINTS_MAX, STOMP_POINTS * 2 ** b.combo)
 	b.combo++
 	world.addBonus('heads', points)
+	const combo = b.combo > 1 ? ` ×${b.combo}` : ''
 	world.popup(
-		b.combo > 1 ? `+${points} ×${b.combo}` : `+${points}`,
+		world.round ? (combo ? `Boing!${combo}` : 'Boing!') : `+${points}${combo}`,
 		x,
 		head - 10,
 	)
@@ -277,6 +308,7 @@ export function scoopPack(world: World) {
 		bus.scooping = 10
 		// Heard, but not announced: "Scooped …!" is for players, not the pack.
 		// Just off the screen behind still counts: the bus isn't far back.
-		if (p.x > camera - SCOOP_HEARD && p.x < camera + VIEW_WIDTH) play('whoosh')
+		if (p.x > camera - SCOOP_HEARD && p.x < camera + world.viewWidth())
+			play('whoosh')
 	}
 }

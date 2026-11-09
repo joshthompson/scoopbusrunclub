@@ -1,8 +1,15 @@
 import type { RunnerName } from '@/data/runners'
 import { type Accessor, createSignal } from 'solid-js'
+import type { Controls } from '../input'
 import type { Level, Obstacle } from '../levels/types'
 import type { Playable } from '../playable'
-import { BUS_START_X, START_LEAD, START_X, VIEW_WIDTH } from './constants'
+import {
+	BUS_START_X,
+	PACK_SIZE,
+	START_LEAD,
+	START_X,
+	VIEW_WIDTH,
+} from './constants'
 import { lineUp } from './pack'
 import type { Terrain } from './terrain'
 
@@ -13,6 +20,37 @@ import type { Terrain } from './terrain'
  * - `finished`: over the line ahead of it
  */
 export type Phase = 'countdown' | 'running' | 'scooped' | 'finished'
+
+/**
+ * Out of the race: caught by the bus, or over the line. Someone still running
+ * when a multiplayer Round's decided isn't out: they won it.
+ */
+export type Out = 'scooped' | 'finished'
+
+/**
+ * One runner in the race, steered by a person: the only one in single player,
+ * or each of a Room's Players in a Round.
+ */
+export interface Racer {
+	/** In a Round, the Player's seat. */
+	id: string
+	runner: Playable
+	body: Body
+	/** What they're holding, read once a tick. */
+	controls: () => Controls
+	/** Their colour and Player number in a Round, for telling them apart. */
+	colour?: string
+	number?: number
+	/** Plain state, like the body: why they stopped, and the tick they did. */
+	out?: Out
+	outAt: number
+}
+
+/** Who's racing, as the game's given them. */
+export type RacerEntry = Pick<
+	Racer,
+	'id' | 'runner' | 'controls' | 'colour' | 'number'
+>
 
 /** The runner, as the physics sees them: `x` is the middle of their feet. */
 export interface Body {
@@ -35,6 +73,8 @@ export interface Body {
 	combo: number
 	/** Ticks left riding a corgi. */
 	mount: number
+	/** Ticks before another Player can bounce on their head again. */
+	stomped: number
 }
 
 /**
@@ -87,6 +127,8 @@ export interface Furby {
 	landed: number
 	/** Degrees, while flying out of the scoop. */
 	spin: number
+	/** Whose head it's on, while `riding`. */
+	rider?: string
 }
 
 /**
@@ -109,6 +151,8 @@ export interface Corgi {
 	barking: boolean
 	/** Degrees, while flying out of the scoop. */
 	spin: number
+	/** Who's on its back, while `ridden`. */
+	rider?: string
 }
 
 export interface Bus {
@@ -130,6 +174,8 @@ export interface ObstacleState {
 	/** Ticks left of a cheerer's "Go!" bubble. */
 	cheering: Accessor<number>
 	setCheering: (ticks: number) => void
+	/** Who they're cheering on: whoever passed them. */
+	cheered: string
 }
 
 /** Words popping up over the runner: "Ouch!", "Fika!". */
@@ -155,13 +201,62 @@ export interface Result {
 	busGap: number
 }
 
+export interface WorldOptions {
+	/** Points carried on from earlier courses, in Endless. */
+	startScore?: number
+	/**
+	 * A multiplayer Round: the camera frames everyone, nobody scores, and it's
+	 * decided when one Player's left.
+	 */
+	round?: boolean
+}
+
+/** A body on the start line at `x`. */
+export function startingBody(terrain: Terrain, x: number): Body {
+	return {
+		x,
+		feetY: terrain.groundY(x),
+		vx: 0,
+		vy: 0,
+		grounded: true,
+		ducking: false,
+		stumble: 0,
+		muddy: false,
+		facing: 1,
+		wasUp: false,
+		spin: 0,
+		combo: 0,
+		mount: 0,
+		stomped: 0,
+	}
+}
+
+/** How far apart Players line up on the start line, one behind the other. */
+export const START_GAP = 26
+
 /**
  * Everything about one attempt at a level. The physics is plain mutable state,
  * stepped once a tick by the game controller; the signals are what the HUD and
  * the sprites follow.
+ *
+ * Everyone in `entries` races; the first of them is who single player's HUD,
+ * score and summary are about.
  */
-export function createWorld(level: Level, runner: Playable, startScore = 0) {
+export function createWorld(
+	level: Level,
+	entries: RacerEntry[],
+	options: WorldOptions = {},
+) {
+	const { startScore = 0, round = false } = options
 	const terrain: Terrain = level.terrain
+	const racers: Racer[] = entries.map((entry, i) => ({
+		...entry,
+		body: startingBody(terrain, START_X - i * START_GAP),
+		outAt: 0,
+	}))
+	const runner = racers[0].runner
+	/** Nobody's out cheering or directing who's running. */
+	const running = new Set(racers.map((r) => r.runner.member).filter(Boolean))
 	const [phase, setPhase] = createSignal<Phase>('countdown')
 	const [ticks, setTicks] = createSignal(0)
 	const [raceTicks, setRaceTicks] = createSignal(0)
@@ -189,21 +284,7 @@ export function createWorld(level: Level, runner: Playable, startScore = 0) {
 	/** This course's points: a point a metre, and the bonuses, less the hazards. Never below 0. */
 	const courseScore = () => Math.max(0, metres() + bonus())
 
-	const body: Body = {
-		x: START_X,
-		feetY: terrain.groundY(START_X),
-		vx: 0,
-		vy: 0,
-		grounded: true,
-		ducking: false,
-		stumble: 0,
-		muddy: false,
-		facing: 1,
-		wasUp: false,
-		spin: 0,
-		combo: 0,
-		mount: 0,
-	}
+	const body = racers[0].body
 	const bus: Bus = {
 		frontX: BUS_START_X,
 		speed: 0,
@@ -215,17 +296,17 @@ export function createWorld(level: Level, runner: Playable, startScore = 0) {
 
 	/** Nobody's out cheering for themselves: they're the one running. */
 	const notRunner = (member: RunnerName) => {
-		if (member !== runner.member) return member
+		if (!running.has(member)) return member
 		const { volunteers } = level
 		const at = volunteers.indexOf(member)
 		for (let i = 1; i <= volunteers.length; i++) {
 			const next = volunteers[(at + i) % volunteers.length]
-			if (next !== runner.member) return next
+			if (!running.has(next)) return next
 		}
 		return member
 	}
 	const runDirector =
-		level.runDirectors.find((member) => member !== runner.member) ??
+		level.runDirectors.find((member) => !running.has(member)) ??
 		level.runDirectors[0]
 
 	const obstacles: ObstacleState[] = level.obstacles.map((placed) => {
@@ -234,16 +315,24 @@ export function createWorld(level: Level, runner: Playable, startScore = 0) {
 				? { ...placed, member: notRunner(placed.member) }
 				: placed
 		const [cheering, setCheering] = createSignal(0)
-		return { obstacle, used: false, cheering, setCheering }
+		return { obstacle, used: false, cheering, setCheering, cheered: '' }
 	})
 
 	let popupId = 0
 	const popup = (text: string, x: number, y: number) =>
 		setPopups((all) => [...all, { id: popupId++, text, x, y, born: ticks() }])
 
+	/** How much of the course the camera shows: 1, or up to 2 zoomed out to frame a Round. */
+	const [zoom, setZoom] = createSignal(1)
+	/** Who's won a Round, and in what order everyone came, once it's decided. */
+	const [order, setOrder] = createSignal<Racer[]>()
+
 	const world = {
 		level,
+		/** Single player's runner, and their body: the first racer's. */
 		runner,
+		racers,
+		round,
 		runDirector,
 		terrain,
 		body,
@@ -260,6 +349,14 @@ export function createWorld(level: Level, runner: Playable, startScore = 0) {
 		setRaceTicks,
 		camera,
 		setCamera,
+		zoom,
+		setZoom,
+		/** How wide the camera's view is, in world pixels. */
+		viewWidth: () => VIEW_WIDTH * zoom(),
+		order,
+		setOrder,
+		/** The tick a Round was decided. */
+		decidedAt: 0,
 		/** The body's and the bus's positions, as signals, for the HUD. */
 		playerX,
 		setPlayerX,
@@ -274,6 +371,8 @@ export function createWorld(level: Level, runner: Playable, startScore = 0) {
 		finish: { busGap: 0 },
 		/** Everyone else on the path. Plain state, like the body. */
 		pack: [] as Pacer[],
+		/** At most this many of them: in a Round, fewer the more Players there are. */
+		packSize: round ? Math.max(0, PACK_SIZE - racers.length) : PACK_SIZE,
 		/** Who's next to join the pack, and when. */
 		packState: { nextId: 0, nextJoin: 0 },
 		metres,

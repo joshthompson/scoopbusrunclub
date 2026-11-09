@@ -19,10 +19,20 @@ import {
 	STAND_HEIGHT,
 	STUMBLE_SPEED,
 	VIEW_HEIGHT,
-	VIEW_WIDTH,
 } from './constants'
 import { SCOOP_HEARD, bounceOff } from './pack'
-import type { Furby, World } from './world'
+import { scored } from './step'
+import type { Furby, Racer, World } from './world'
+
+/** Whoever a furby's after: the nearest racer still running. */
+function nearest(world: World, x: number): Racer | undefined {
+	let best: Racer | undefined
+	for (const r of world.racers) {
+		if (r.out) continue
+		if (!best || Math.abs(r.body.x - x) < Math.abs(best.body.x - x)) best = r
+	}
+	return best
+}
 
 /**
  * Furby Fields' furbies, hopping about the path all the time. Near you, they
@@ -48,7 +58,7 @@ const HOP_OFF_UP = 7
 const HOP_OFF_BACK = 2.5
 
 export function stepFurbies(world: World) {
-	const { furbies, body: b, terrain } = world
+	const { furbies, terrain } = world
 	if (!furbies.length) return
 	const running = world.phase() === 'running'
 
@@ -64,11 +74,14 @@ export function stepFurbies(world: World) {
 		}
 
 		if (f.state === 'riding') {
+			const rider = world.racers.find((r) => r.id === f.rider)
+			const b = (rider ?? world.racers[0]).body
 			f.x = b.x
 			f.feetY = b.feetY - (b.ducking ? DUCK_HEIGHT : STAND_HEIGHT)
 			f.facing = b.facing
-			if (--f.timer <= 0 || !running) {
+			if (--f.timer <= 0 || !running || rider?.out) {
 				f.state = 'hopping'
+				f.rider = undefined
 				f.grounded = false
 				f.vy = -HOP_OFF_UP
 				f.vx = -b.facing * HOP_OFF_BACK
@@ -88,7 +101,8 @@ export function stepFurbies(world: World) {
 		}
 
 		// A little lean your way in the air, if it's after you.
-		const dx = b.x - f.x
+		const target = nearest(world, f.x)
+		const dx = target ? target.body.x - f.x : Number.POSITIVE_INFINITY
 		if (running && f.state === 'hopping' && Math.abs(dx) < FURBY_SPOT) {
 			f.vx += Math.sign(dx) * FURBY_STEER
 			f.vx = Math.max(-FURBY_REACH, Math.min(FURBY_REACH, f.vx))
@@ -110,9 +124,11 @@ export function stepFurbies(world: World) {
 		}
 	}
 
-	if (running && b.mount === 0) {
-		stompFurbies(world)
-		landOnRunner(world)
+	if (!running) return
+	for (const racer of world.racers) {
+		if (racer.out || racer.body.mount > 0) continue
+		stompFurbies(world, racer)
+		landOnRunner(world, racer)
 	}
 }
 
@@ -122,14 +138,14 @@ export function stepFurbies(world: World) {
  * its patch of the path.
  */
 function hop(world: World, f: Furby, running: boolean) {
-	const b = world.body
 	/** About its patch, drifting back towards home. */
 	const wander =
 		(Math.random() * 2 - 1) * FURBY_WANDER +
 		Math.max(-1, Math.min(1, (f.home - f.x) / FURBY_ROAM)) * FURBY_WANDER
 	let vx = wander
-	const dx = b.x - f.x
-	if (running && Math.abs(dx) < FURBY_SPOT) {
+	const target = nearest(world, f.x)
+	const b = target?.body
+	if (b && running && Math.abs(b.x - f.x) < FURBY_SPOT) {
 		const head = b.feetY - STAND_HEIGHT
 		const ticks = ticksToFall(f.feetY, -FURBY_HOP, head) ?? 40
 		const aim = b.x + b.vx * ticks + (Math.random() * 2 - 1) * FURBY_AIM_ERROR
@@ -161,8 +177,8 @@ function ticksToFall(feetY: number, vy: number, line: number) {
 }
 
 /** Coming down on a furby's head: bounced off, and it's dazed. */
-function stompFurbies(world: World) {
-	const b = world.body
+function stompFurbies(world: World, racer: Racer) {
+	const b = racer.body
 	if (b.grounded || b.vy <= 0) return
 	/** Where their feet were last tick. */
 	const was = b.feetY - b.vy
@@ -173,7 +189,7 @@ function stompFurbies(world: World) {
 		const head = f.feetY - FURBY_HEAD + HEAD_GIVE
 		if (was > head || b.feetY < head) continue
 
-		bounceOff(world, head, f.x)
+		bounceOff(world, racer, head, f.x)
 		f.state = 'dazed'
 		f.timer = DAZED_TICKS
 		// Knocked out of the air, if it was up there.
@@ -185,11 +201,15 @@ function stompFurbies(world: World) {
 	}
 }
 
-/** A furby coming down on the runner's head: it sits there, and slows them right down. */
-function landOnRunner(world: World) {
-	const b = world.body
+/** A furby coming down on a racer's head: it sits there, and slows them right down. */
+function landOnRunner(world: World, racer: Racer) {
+	const b = racer.body
 	// Only one on their head at once, and not while they're still reeling.
-	if (b.stumble > 0 || world.furbies.some((f) => f.state === 'riding')) return
+	if (
+		b.stumble > 0 ||
+		world.furbies.some((f) => f.state === 'riding' && f.rider === racer.id)
+	)
+		return
 	const top = b.feetY - (b.ducking ? DUCK_HEIGHT : STAND_HEIGHT)
 
 	for (const f of world.furbies) {
@@ -200,13 +220,18 @@ function landOnRunner(world: World) {
 		if (was > top || f.feetY < top) continue
 
 		f.state = 'riding'
+		f.rider = racer.id
 		f.timer = FURBY_RIDE_TICKS
 		f.vx = 0
 		f.vy = 0
 		b.stumble = FURBY_RIDE_TICKS
 		b.vx = Math.sign(b.vx) * Math.min(Math.abs(b.vx), STUMBLE_SPEED)
 		world.addBonus('hazards', -HAZARD_POINTS)
-		world.popup(`Furby! -${HAZARD_POINTS}`, b.x, top - FURBY_HEIGHT)
+		world.popup(
+			scored(world, 'Furby!', `-${HAZARD_POINTS}`),
+			b.x,
+			top - FURBY_HEIGHT,
+		)
 		play('furby')
 		return
 	}
@@ -224,7 +249,8 @@ export function scoopFurbies(world: World) {
 		f.vy = -12 - Math.random() * 3
 		f.spin = 0
 		bus.scooping = 10
-		if (f.x > camera - SCOOP_HEARD && f.x < camera + VIEW_WIDTH) play('whoosh')
+		if (f.x > camera - SCOOP_HEARD && f.x < camera + world.viewWidth())
+			play('whoosh')
 	}
 }
 

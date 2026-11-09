@@ -1,4 +1,5 @@
 import path from 'node:path'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import { defineConfig } from 'vite'
 import solidPlugin from 'vite-plugin-solid'
 
@@ -10,13 +11,22 @@ import solidPlugin from 'vite-plugin-solid'
  */
 const web = path.resolve(__dirname, '../web/src')
 
+/**
+ * `pnpm dev:phones`: served over HTTPS on the local network, so phones can
+ * join a Room as controllers. Multiplayer needs a secure page (trystero
+ * hashes room names with `crypto.subtle`), and the certificate's
+ * self-signed, so each phone has to accept the warning once.
+ */
+const phones = process.env.PHONES === '1'
+
 export default defineConfig({
 	base: '/run/',
 	// The website's env, for the same backend: the guests come from it.
 	envDir: path.resolve(__dirname, '../web'),
-	plugins: [solidPlugin()],
+	plugins: [solidPlugin(), ...(phones ? [basicSsl()] : [])],
 	server: {
 		port: 3011,
+		host: phones,
 	},
 	build: {
 		target: 'esnext',
