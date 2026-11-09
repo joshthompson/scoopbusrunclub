@@ -48,6 +48,12 @@ jobs:
       - name: Copy game dist into web dist
         run: cp -r apps/game/dist apps/web/dist/game
 
+      # Scoop Bus Run, the 2D runner, at scoopbus.run/run.
+      - run: pnpm nx run run-game:build
+
+      - name: Copy run-game dist into web dist
+        run: cp -r apps/run-game/dist apps/web/dist/run
+
       - name: Copy index.html to 404.html
         run: cp apps/web/dist/index.html apps/web/dist/404.html
 

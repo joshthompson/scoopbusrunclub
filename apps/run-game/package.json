@@ -1,0 +1,23 @@
+{
+	"name": "@scoopbus/run-game",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "pnpm prepare-web && vite",
+		"build": "pnpm prepare-web && vite build",
+		"serve": "vite preview",
+		"prepare-web": "tsx ../web/scripts/gen-custom-runner-pixels.ts && panda codegen --clean && panda cssgen",
+		"extract-profile": "tsx scripts/extract-profile.ts",
+		"turn-bus-lettering": "tsx scripts/turn-bus-lettering.ts"
+	},
+	"dependencies": {
+		"solid-js": "^1.9.5"
+	},
+	"devDependencies": {
+		"@pandacss/dev": "^1.8.2",
+		"@types/pngjs": "^6.0.5",
+		"pngjs": "^7.0.0",
+		"tsx": "^4.19.0"
+	}
+}

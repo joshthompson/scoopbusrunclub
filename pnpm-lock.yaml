@@ -90,6 +90,25 @@ importers:
         specifier: ^4.19.0
         version: 4.21.0
 
+  apps/run-game:
+    dependencies:
+      solid-js:
+        specifier: ^1.9.5
+        version: 1.9.9
+    devDependencies:
+      '@pandacss/dev':
+        specifier: ^1.8.2
+        version: 1.8.2
+      '@types/pngjs':
+        specifier: ^6.0.5
+        version: 6.0.5
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+
   apps/web:
     dependencies:
       '@jsquash/webp':
