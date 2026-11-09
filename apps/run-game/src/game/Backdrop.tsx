@@ -8,9 +8,10 @@ import house2Asset from '@/assets/misc/house2.png'
 import sunAsset from '@/assets/misc/sun.png'
 import tree1Asset from '@/assets/misc/tree1.png'
 import tree2Asset from '@/assets/misc/tree2.png'
-import { For, type JSX } from 'solid-js'
+import { For, type JSX, Show } from 'solid-js'
 import { seeded } from '../levels/seeded'
 import type { BackdropPiece } from '../levels/types'
+import { StadiumBackdrop } from './Stadium'
 import {
 	CAMERA_LEAD,
 	PATH_BACK,
@@ -287,21 +288,26 @@ export function Backdrop(props: { world: View }) {
 					/>
 				)}
 			</For>
-			{band(bg3Asset, 196, 43, 0.12, look.hills?.[0])}
-			<Scattered world={props.world} scattering={far} />
-			{band(bg2Asset, 216, 46, 0.22, look.hills?.[1])}
-			{/* Level with the middle hills, as in the header: any lower and the
-			    sky shows through between them. */}
-			{band(bg1Asset, HORIZON, 150, FIELD_PARALLAX, look.hills?.[2])}
-			<div
-				style={{
-					...layer,
-					top: `${HORIZON + 149}px`,
-					bottom: 0,
-					background: 'var(--grass-green)',
-				}}
-			/>
-			<Scattered world={props.world} scattering={near} />
+			<Show
+				when={!look.stadium}
+				fallback={<StadiumBackdrop world={props.world} />}
+			>
+				{band(bg3Asset, 196, 43, 0.12, look.hills?.[0])}
+				<Scattered world={props.world} scattering={far} />
+				{band(bg2Asset, 216, 46, 0.22, look.hills?.[1])}
+				{/* Level with the middle hills, as in the header: any lower and the
+				    sky shows through between them. */}
+				{band(bg1Asset, HORIZON, 150, FIELD_PARALLAX, look.hills?.[2])}
+				<div
+					style={{
+						...layer,
+						top: `${HORIZON + 149}px`,
+						bottom: 0,
+						background: 'var(--grass-green)',
+					}}
+				/>
+				<Scattered world={props.world} scattering={near} />
+			</Show>
 		</>
 	)
 }
@@ -408,7 +414,7 @@ export function Ground(props: { world: View }) {
 
 	// The path, with the line everyone runs along down its middle, and the
 	// grass on down to the bottom of the screen in front of it.
-	const layers: [number, string][] = [
+	const layers: [number, string][] = props.world.level.look?.ground ?? [
 		// The verge: the same green as the field, so it only shows where
 		// the course runs higher than the field does.
 		[-PATH_BACK - VERGE, 'var(--grass-green)'],

@@ -33,6 +33,14 @@ import { CORGI_HEIGHT, CORGI_WIDTH, CorgiArt, type CorgiPose } from './corgiArt'
 import { FIKA_ART } from './fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from './furbies'
 import { countdownWord, stepWorld } from './step'
+import {
+	HURDLE_HEIGHT,
+	HURDLE_WIDTH,
+	HurdleArt,
+	POTHOLE_ABOVE,
+	POTHOLE_HEIGHT,
+	PotholeArt,
+} from './trackArt'
 import type { Corgi, Furby, ObstacleState, Pacer, World } from './world'
 
 /**
@@ -739,6 +747,33 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				world,
 				children: () => <BranchArt />,
 				style: () => ({ filter: world.level.look?.foliage }),
+			})
+		case 'hurdle':
+			return createFixture({
+				id,
+				type: 'hazard',
+				x: o.x,
+				width: HURDLE_WIDTH,
+				height: HURDLE_HEIGHT,
+				world,
+				children: () => <HurdleArt />,
+				// Knocked over once run into. `used` isn't a signal: reading the
+				// tick keeps it up to date.
+				style: () => ({
+					'--knocked': world.ticks() >= 0 && state.used ? 1 : 0,
+				}),
+			})
+		case 'pothole':
+			return createFixture({
+				id,
+				type: 'mud',
+				x: o.x,
+				width: o.width,
+				height: POTHOLE_HEIGHT,
+				// Into the track, around the line everyone runs along.
+				sink: POTHOLE_HEIGHT - POTHOLE_ABOVE,
+				world,
+				children: () => <PotholeArt width={o.width} />,
 			})
 		case 'mud':
 			return createFixture({

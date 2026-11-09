@@ -257,7 +257,11 @@ function collide(world: World) {
 		if (Math.abs(o.x - b.x) > 200) continue
 		if (
 			riding &&
-			(o.kind === 'rock' || o.kind === 'branch' || o.kind === 'mud')
+			(o.kind === 'rock' ||
+				o.kind === 'branch' ||
+				o.kind === 'mud' ||
+				o.kind === 'hurdle' ||
+				o.kind === 'pothole')
 		)
 			continue
 		const ground = terrain.groundY(o.x)
@@ -281,6 +285,29 @@ function collide(world: World) {
 				) {
 					state.used = true
 					stumble('Bonk!')
+				}
+				break
+			case 'hurdle':
+				// Solid all the way down: over it, not under it.
+				if (
+					!state.used &&
+					b.stumble === 0 &&
+					overlaps(o.x - 14, o.x + 14, ground - 40, ground)
+				) {
+					state.used = true
+					stumble('Clonk!')
+				}
+				break
+			case 'pothole':
+				// Only underfoot, a little way in from its edges.
+				if (
+					!state.used &&
+					b.stumble === 0 &&
+					b.grounded &&
+					Math.abs(b.x - o.x) < o.width / 2 - 4
+				) {
+					state.used = true
+					stumble('Ouch!')
 				}
 				break
 			case 'mud':

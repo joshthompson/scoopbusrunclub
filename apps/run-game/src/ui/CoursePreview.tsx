@@ -4,6 +4,12 @@ import { For, type JSX, Show, createSignal, onCleanup, onMount } from 'solid-js'
 import { Backdrop, Ground, HorizonTrees, type View } from '../game/Backdrop'
 import { PATH_BACK, START_X, VIEW_HEIGHT } from '../game/constants'
 import { CorgiArt } from '../game/corgiArt'
+import {
+	HurdleArt,
+	POTHOLE_ABOVE,
+	POTHOLE_HEIGHT,
+	PotholeArt,
+} from '../game/trackArt'
 import type { Level } from '../levels/types'
 import type { Playable } from '../playable'
 import { RunStrip } from './RunStrip'
@@ -91,6 +97,10 @@ export function CoursePreview(props: {
 	})
 	const runnerX = () => camera() + runnerAcross
 	const rocks = level.obstacles.filter((o) => o.kind === 'rock')
+	const hurdles = level.obstacles.filter((o) => o.kind === 'hurdle')
+	const potholes = level.obstacles.flatMap((o) =>
+		o.kind === 'pothole' ? [o] : [],
+	)
 
 	return (
 		<div
@@ -162,6 +172,25 @@ export function CoursePreview(props: {
 								alt=""
 								style={{ ...at(rock.x, 3), transform: 'translateX(-50%)' }}
 							/>
+						)}
+					</For>
+					<For each={hurdles}>
+						{(hurdle) => (
+							<div style={{ ...at(hurdle.x), transform: 'translateX(-50%)' }}>
+								<HurdleArt />
+							</div>
+						)}
+					</For>
+					<For each={potholes}>
+						{(hole) => (
+							<div
+								style={{
+									...at(hole.x, POTHOLE_HEIGHT - POTHOLE_ABOVE),
+									transform: 'translateX(-50%)',
+								}}
+							>
+								<PotholeArt width={hole.width} />
+							</div>
 						)}
 					</For>
 					<For each={level.corgis ?? []}>

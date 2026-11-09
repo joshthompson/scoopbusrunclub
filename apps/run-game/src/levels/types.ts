@@ -10,6 +10,10 @@ export type Obstacle =
 	| { kind: 'branch'; x: number }
 	/** Slows you right down while you're in it. Jump it. */
 	| { kind: 'mud'; x: number; width: number }
+	/** On a running track: jump it, or knock it over and stumble. */
+	| { kind: 'hurdle'; x: number }
+	/** A hole in the track, `width` across: jump it, or trip in it. */
+	| { kind: 'pothole'; x: number; width: number }
 	/** Fika, for a speed boost, `height` off the ground: some you have to jump for. */
 	| { kind: 'fika'; x: number; height: number; item: FikaItem }
 	/** A club member out volunteering, cheering you on as you pass: another boost. */
@@ -51,6 +55,13 @@ export interface LevelLook {
 	foliage?: string
 	/** Over the mud. */
 	mud?: string
+	/** A stadium behind the course, in place of hills and scenery: see `StadiumBackdrop`. */
+	stadium?: boolean
+	/**
+	 * The ground's layers, in place of Haga's path and grass: offsets from
+	 * the line everyone runs along, each filled from there on down.
+	 */
+	ground?: [number, string][]
 	/** What peeks over the far hills, in place of Haga's houses and pines. */
 	far?: BackdropPiece[]
 	/** What stands on the field behind the course, in place of Haga's trees. */

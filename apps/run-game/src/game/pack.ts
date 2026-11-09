@@ -197,15 +197,20 @@ function movePacer(world: World, p: Pacer) {
 	}
 }
 
-/** A rock or a puddle just ahead of `x`. Branches they just run under: they're shorter than you. */
+/**
+ * A rock, a hurdle, a puddle or a pothole just ahead of `x`. Branches they
+ * just run under: they're shorter than you.
+ */
 function hopAhead(world: World, x: number) {
 	return world.obstacles.some(({ obstacle: o }) => {
 		const edge =
 			o.kind === 'rock'
 				? o.x - 20
-				: o.kind === 'mud'
-					? o.x - o.width / 2
-					: undefined
+				: o.kind === 'hurdle'
+					? o.x - 16
+					: o.kind === 'mud' || o.kind === 'pothole'
+						? o.x - o.width / 2
+						: undefined
 		return edge !== undefined && edge > x && edge - x < HOP_LOOKAHEAD
 	})
 }
