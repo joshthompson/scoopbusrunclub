@@ -57,6 +57,8 @@ function layOut(): Pick<Level, 'obstacles' | 'scenery'> {
 		x += 380 + random() * (520 - progress * 260)
 	}
 
+	addGeese(obstacles)
+
 	const scenery: Level['scenery'] = []
 	const assets = [tree1, tree2, tree1, shrub1, shrub2, flower1, flower2]
 	for (let at = -400; at < terrain.finishX + 900; at += 90 + random() * 260) {
@@ -68,13 +70,58 @@ function layOut(): Pick<Level, 'obstacles' | 'scenery'> {
 	return { obstacles, scenery }
 }
 
+/** Room either side of geese, to land a jump between them and whatever's next. */
+const GEESE_ROOM = 320
+
+/**
+ * Geese, off Brunnsviken, standing about in the wider gaps between
+ * everything else. Their own random numbers, so the rest of the course is
+ * laid out the same as ever.
+ */
+function addGeese(obstacles: Obstacle[]) {
+	const random = seeded(1957)
+	const placed: Obstacle[] = []
+	for (let i = 1; i < obstacles.length; i++) {
+		const before = obstacles[i - 1]
+		const after = obstacles[i]
+		const behind = before.x + ('width' in before ? before.width / 2 : 30)
+		const ahead = after.x - ('width' in after ? after.width / 2 : 30)
+		if (ahead - behind < GEESE_ROOM * 2 || random() > 0.5) continue
+		placed.push({
+			kind: 'geese',
+			x: Math.round((behind + ahead) / 2),
+			count: 1 + Math.floor(random() * 3),
+		})
+	}
+	obstacles.push(...placed)
+	obstacles.sort((a, b) => a.x - b.x)
+}
+
+/** How many flocks fly over, spread round the course. */
+const FLYOVERS = 6
+
+/**
+ * Geese flying over from behind, now and then: their own random numbers
+ * too, to leave everything else where it was.
+ */
+function flyOvers(): NonNullable<Level['flyovers']> {
+	const random = seeded(2024)
+	const from = START_X + 1200
+	const spacing = (terrain.finishX - 900 - from) / FLYOVERS
+	return Array.from({ length: FLYOVERS }, (_, i) => ({
+		x: Math.round(from + spacing * (i + random() * 0.6)),
+		count: 1 + Math.floor(random() * 3),
+	}))
+}
+
 export const haga: LevelDefinition = {
 	id: 'haga',
 	name: 'Haga',
-	blurb: 'The home course. Rocks, low branches and mud.',
+	blurb: 'The home course. Rocks, branches, mud, and geese to catch a ride on.',
 	difficulty: 1,
 	terrain,
 	runDirectors: ['claire', 'eline'],
 	volunteers: VOLUNTEERS,
 	...layOut(),
+	flyovers: flyOvers(),
 }

@@ -32,8 +32,33 @@ import {
 import { CORGI_HEIGHT, CORGI_WIDTH, CorgiArt, type CorgiPose } from './corgiArt'
 import { FIKA_ART } from './fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from './furbies'
-import { countdownWord, stepWorld } from './step'
-import type { Corgi, Furby, ObstacleState, Pacer, World } from './world'
+import {
+	FLYING_GOOSE_HEIGHT,
+	FLYING_GOOSE_WIDTH,
+	FlyingGooseArt,
+	GEESE_HEIGHT,
+	GeeseArt,
+	geeseWidth,
+} from './geeseArt'
+import { KIDS_HEIGHT, KidsArt, kidsWidth } from './kidsArt'
+import { countdownWord, scoopFlight, stepWorld } from './step'
+import {
+	HURDLE_LANES,
+	HurdleArt,
+	POTHOLE_ABOVE,
+	POTHOLE_HEIGHT,
+	PotholeArt,
+	hurdleSize,
+} from './trackArt'
+import type {
+	Corgi,
+	Flyer,
+	Furby,
+	ObstacleState,
+	Pacer,
+	Racer,
+	World,
+} from './world'
 
 /**
  * Everything in the game is drawn by one of these: engine controllers, the
@@ -41,8 +66,15 @@ import type { Corgi, Furby, ObstacleState, Pacer, World } from './world'
  * draw what `stepWorld` decided, which the first of them runs every tick.
  */
 
-/** Runs the world. Added first, so everything drawn after it this tick is up to date. */
-export function createGameController(world: World) {
+/**
+ * Runs the world: `step`s it, which is `stepWorld` unless it's someone else's
+ * race being shown (see `Mirror`). Added first, so everything drawn after it
+ * this tick is up to date.
+ */
+export function createGameController(
+	world: World,
+	step: (world: World) => void = stepWorld,
+) {
 	return createController({
 		init: () => ({
 			id: 'game',
@@ -52,7 +84,7 @@ export function createGameController(world: World) {
 			width: () => 0,
 			height: () => 0,
 		}),
-		onEnterFrame: () => stepWorld(world),
+		onEnterFrame: () => step(world),
 	})
 }
 
@@ -80,8 +112,8 @@ export function volunteerFrame(member: RunnerName) {
 	)
 }
 
-export function createPlayer(world: World) {
-	const { sprite } = world.runner
+export function createPlayer(world: World, racer: Racer = world.racers[0]) {
+	const { sprite } = racer.runner
 	const run = sprite.run
 	const sit = sprite.sit
 	const runSize = {
@@ -92,14 +124,14 @@ export function createPlayer(world: World) {
 	return createController({
 		frames: [...run, ...(sit ? [sit] : [])],
 		init() {
-			const { body } = world
+			const { body } = racer
 			// Sat down, ducking or riding a corgi. `body` isn't a signal: reading
 			// the tick keeps this up to date.
 			const ducking = () =>
 				world.ticks() >= 0 && (body.ducking || body.mount > 0) && !!sit
 			const size = () => (ducking() ? poseSize(sit, sprite) : runSize)
 			return {
-				id: 'player',
+				id: `player-${racer.id}`,
 				type: 'player',
 				...createObjectSignal(0, 'x'),
 				...createObjectSignal(0, 'y'),
@@ -116,13 +148,13 @@ export function createPlayer(world: World) {
 			}
 		},
 		onEnterFrame({ $ }) {
-			const { body } = world
+			const { body } = racer
 			const width = $.width()
 			$.setX(body.x - width / 2)
 			// Up on a corgi's back, riding one.
 			$.setY(body.feetY - $.height() - (body.mount > 0 ? CORGI_SADDLE : 0))
 
-			if (world.phase() === 'scooped') {
+			if (racer.out === 'scooped') {
 				$.setRotation(body.spin * 14)
 				$.setState('pause')
 				return
@@ -224,6 +256,58 @@ export function createPack(world: World) {
 		},
 	})
 	return [keeper, ...world.pack.map((p) => createPacer(world, p))]
+}
+
+/** A goose flying over, kept on the scene for as long as it's about (see `createFlyers`). */
+function createFlyer(world: World, goose: Flyer) {
+	return createController({
+		init: () => ({
+			id: `flyer-${goose.id}`,
+			type: 'flyer',
+			...createObjectSignal(goose.x - FLYING_GOOSE_WIDTH / 2, 'x'),
+			...createObjectSignal(goose.feetY - FLYING_GOOSE_HEIGHT, 'y'),
+			width: () => FLYING_GOOSE_WIDTH,
+			height: () => FLYING_GOOSE_HEIGHT,
+			// `state` isn't a signal: reading the tick keeps it up to date.
+			children: () => (
+				<FlyingGooseArt
+					now={world.ticks() + goose.id * 3}
+					carrying={world.ticks() >= 0 && goose.state === 'carrying'}
+				/>
+			),
+		}),
+		onEnterFrame({ $ }) {
+			$.setX(goose.x - FLYING_GOOSE_WIDTH / 2)
+			$.setY(goose.feetY - FLYING_GOOSE_HEIGHT)
+		},
+	})
+}
+
+/** Geese flying over, added to the scene as they come and taken away once they've gone. */
+export function createFlyers(world: World) {
+	const shown = new Set<number>()
+	return createController({
+		init: () => ({
+			id: 'flyers',
+			type: 'game',
+			x: () => 0,
+			y: () => 0,
+			width: () => 0,
+			height: () => 0,
+		}),
+		onEnterFrame({ $scene }) {
+			for (const goose of world.flyers) {
+				if (shown.has(goose.id)) continue
+				shown.add(goose.id)
+				$scene.addController(createFlyer(world, goose))
+			}
+			for (const id of shown) {
+				if (world.flyers.some((goose) => goose.id === id)) continue
+				shown.delete(id)
+				$scene.removeController(`flyer-${id}`)
+			}
+		},
+	})
 }
 
 /** The level's corgis, if it has any. */
@@ -604,7 +688,13 @@ export function createParkrunSign(world: World, x: number) {
 
 /** How far along the course a banner's poles are either side of its line: its slant across the path. */
 const BANNER_SLANT = 56
-const POLE_HEIGHT = 146
+/**
+ * Tall enough for the bus to drive under: the cloth's lowest, at the near
+ * pole, is this less 50 px off the ground (it hangs 34 px from the pole's top,
+ * which stands on the path's near edge, 16 px below the line everyone runs
+ * along), and the bus's roof is 142 px up, bobbing.
+ */
+const POLE_HEIGHT = 200
 const POLE_WIDTH = 6
 const CLOTH_HEIGHT = 34
 
@@ -712,6 +802,37 @@ const POLE_STYLE: JSX.CSSProperties = {
 	'border-left': '2px solid #5f686d',
 }
 
+/**
+ * Something the bus can scoop up: where it stands until then, and flying off,
+ * spinning, after. `scooped` isn't a signal: reading the tick keeps it moving.
+ */
+function Scoopable(props: {
+	world: World
+	state: ObstacleState
+	children: JSX.Element
+}) {
+	const flight = () => {
+		const now = props.world.ticks()
+		const { scooped } = props.state
+		return scooped ? scoopFlight(scooped, now) : undefined
+	}
+	return (
+		<div
+			style={{
+				'transform-origin': 'center',
+				transform: (() => {
+					const f = flight()
+					return f
+						? `translate(${f.x}px, ${f.y}px) rotate(${f.spin}deg)`
+						: 'none'
+				})(),
+			}}
+		>
+			{props.children}
+		</div>
+	)
+}
+
 export function createObstacle(world: World, state: ObstacleState, i: number) {
 	const o = state.obstacle
 	const id = `${o.kind}-${i}`
@@ -725,7 +846,11 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: 56,
 				height: 29,
 				world,
-				frames: [rockAsset],
+				children: () => (
+					<Scoopable world={world} state={state}>
+						<img src={rockAsset} alt="" style={{ display: 'block' }} />
+					</Scoopable>
+				),
 			})
 		case 'branch':
 			return createFixture({
@@ -739,6 +864,76 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				world,
 				children: () => <BranchArt />,
 				style: () => ({ filter: world.level.look?.foliage }),
+			})
+		case 'hurdle':
+			// One in each lane, across the track. Only the runner's own is run into.
+			return HURDLE_LANES.map((lane, n) =>
+				createFixture({
+					id: `${id}-${n}`,
+					type: lane.front ? 'hazard-front' : 'hazard',
+					x: o.x + lane.along,
+					sink: lane.sink,
+					...hurdleSize(lane.depth),
+					world,
+					children: () => <HurdleArt depth={lane.depth} />,
+					// Knocked over: the runner's own once run into, or flattened by
+					// the bus (which sets `used` too), and every other lane's as the
+					// bus's scoop reaches it. Neither's a signal: reading the tick
+					// keeps it up to date.
+					style: () => ({
+						'--knocked':
+							world.ticks() >= 0 &&
+							(lane.running
+								? state.used
+								: world.bus.frontX >= o.x + lane.along - 14)
+								? 1
+								: 0,
+					}),
+				}),
+			)
+		case 'kids':
+			return createFixture({
+				id,
+				type: 'hazard',
+				x: o.x,
+				width: kidsWidth(o.count),
+				height: KIDS_HEIGHT,
+				world,
+				children: () => (
+					<Scoopable world={world} state={state}>
+						<KidsArt count={o.count} />
+					</Scoopable>
+				),
+			})
+		case 'geese':
+			return createFixture({
+				id,
+				type: 'hazard',
+				x: o.x,
+				width: geeseWidth(o.count),
+				height: GEESE_HEIGHT,
+				world,
+				// Neither `flown` nor the tick they peck by is a signal: reading
+				// the tick keeps both up to date.
+				children: () => (
+					<GeeseArt
+						count={o.count}
+						now={world.ticks()}
+						flown={world.ticks() >= 0 ? state.flown : undefined}
+					/>
+				),
+			})
+		case 'pothole':
+			return createFixture({
+				id,
+				type: 'mud',
+				x: o.x,
+				width: o.width,
+				height: POTHOLE_HEIGHT,
+				// Into the track, around the line everyone runs along.
+				sink: POTHOLE_HEIGHT - POTHOLE_ABOVE,
+				world,
+				children: () => <PotholeArt width={o.width} />,
 			})
 		case 'mud':
 			return createFixture({
@@ -776,7 +971,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			const frame = volunteerFrame(o.member)
 			const runner = runners[o.member][0]
 			const size = poseSize(frame, runner())
-			const name = world.runner.name
 			// Marshals' signs point left, the way the header's runners go. Turned
 			// round, they point on along the course, and face the runner coming.
 			const turned = frame === runner().frames.marshal?.[0]
@@ -793,7 +987,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				children: () => (
 					<Show when={state.cheering() > 0}>
 						<Bubble size={18} mirrored={turned}>
-							Go {name}!
+							Go {state.cheered || world.runner.name}!
 						</Bubble>
 					</Show>
 				),

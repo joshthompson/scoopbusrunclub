@@ -26,6 +26,8 @@ export function createTerrain(
 	heights: number[],
 	stepM: number,
 	distanceM: number,
+	/** Without the small bumps on top: a running track's dead flat. */
+	{ bumps = true }: { bumps?: boolean } = {},
 ): Terrain {
 	const length = distanceM * PX_PER_M
 	const finishX = START_X + length
@@ -44,6 +46,7 @@ export function createTerrain(
 
 	/** 0 on the flat around the start and finish, easing up to 1 in between. */
 	const bumpiness = (x: number) => {
+		if (!bumps) return 0
 		const fromEnds = Math.min(x - START_X, finishX - x)
 		const t = Math.max(0, Math.min(1, fromEnds / FLAT_RUN))
 		return t * t * (3 - 2 * t)

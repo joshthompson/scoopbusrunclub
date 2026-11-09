@@ -13,6 +13,11 @@ type Entry =
 
 const COLUMNS = 5
 
+/** The club, by name. */
+const MEMBERS_BY_NAME = [...MEMBERS].sort((a, b) =>
+	a.name.localeCompare(b.name),
+)
+
 export function CharacterSelect(props: {
 	selectedId: string | undefined
 	onSelect: (id: string) => void
@@ -21,12 +26,13 @@ export function CharacterSelect(props: {
 	onEdit: (runner?: CustomRunner) => void
 	onBack: () => void
 }) {
-	/** Making one first, then your own runners, then the club. */
+	/** Making one first, then your own runners, newest first, then the club. */
 	const entries = (): Entry[] => [
 		{ kind: 'new', id: 'new' },
-		...[...customRunners().map(customPlayable), ...MEMBERS].map(
-			(runner): Entry => ({ kind: 'runner', id: runner.id, runner }),
-		),
+		...[
+			...customRunners().map(customPlayable).reverse(),
+			...MEMBERS_BY_NAME,
+		].map((runner): Entry => ({ kind: 'runner', id: runner.id, runner })),
 	]
 	const selectedIndex = () => {
 		const at = entries().findIndex((entry) => entry.id === props.selectedId)

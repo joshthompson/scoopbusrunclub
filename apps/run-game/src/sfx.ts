@@ -20,6 +20,7 @@ export type Sound =
 	| 'stomp'
 	| 'whoosh'
 	| 'woof'
+	| 'honk'
 	| 'furby'
 
 /** [frequency in Hz, length in seconds, wave] for each note, played one after another. */
@@ -84,6 +85,15 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 			volume: 0.1,
 		},
 		/** A corgi, hopped on. */
+		/** Geese, run into and flying off. */
+		honk: {
+			notes: [
+				[370, 0.08, 'sawtooth'],
+				[300, 0.12, 'sawtooth'],
+			],
+			volume: 0.05,
+			slide: 0.85,
+		},
 		woof: {
 			notes: [
 				[520, 0.05, 'square'],
@@ -105,7 +115,14 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 
 let context: AudioContext | undefined
 
+/** Told of every sound played, sound on or off: a Room's Host passes them on. */
+let overheard: ((sound: Sound) => void) | undefined
+export function overhear(listener: ((sound: Sound) => void) | undefined) {
+	overheard = listener
+}
+
 export function play(sound: Sound) {
+	overheard?.(sound)
 	if (!soundOn()) return
 	try {
 		context ??= new AudioContext()

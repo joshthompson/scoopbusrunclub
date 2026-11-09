@@ -26,6 +26,7 @@ const BONUS_LABELS: Record<BonusKind, string> = {
 	fika: 'Fika',
 	cheers: 'Cheers',
 	corgis: 'Corgi rides',
+	geese: 'Goose rides',
 	hazards: 'Hazards hit',
 }
 

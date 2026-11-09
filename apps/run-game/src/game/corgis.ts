@@ -6,11 +6,11 @@ import {
 	GRAVITY,
 	HITBOX_HALF_WIDTH,
 	VIEW_HEIGHT,
-	VIEW_WIDTH,
 } from './constants'
 import { CORGI_HEAD, CORGI_WIDTH } from './corgiArt'
 import { SCOOP_HEARD } from './pack'
-import type { World } from './world'
+import { scored } from './step'
+import type { Racer, World } from './world'
 
 /**
  * Furby Fields' corgis: sat on the path, barking for someone to hop on. Land
@@ -24,9 +24,10 @@ const BACK_GIVE = 8
 const BACK_REACH = CORGI_WIDTH / 2 + HITBOX_HALF_WIDTH - 4
 
 export function stepCorgis(world: World) {
-	const { corgis, body: b, terrain } = world
+	const { corgis, terrain } = world
 	if (!corgis.length) return
 	const running = world.phase() === 'running'
+	const racing = world.racers.filter((r) => !r.out)
 
 	for (const c of corgis) {
 		if (c.state === 'scooped') {
@@ -38,26 +39,33 @@ export function stepCorgis(world: World) {
 			continue
 		}
 		if (c.state === 'ridden') {
-			// Off: worn out, or jumped off.
-			if (b.mount === 0 || !running) c.state = 'tired'
-			else {
-				c.x = b.x
-				c.facing = b.facing
+			const rider = world.racers.find((r) => r.id === c.rider)
+			// Off: worn out, jumped off, or scooped.
+			if (!rider || rider.body.mount === 0 || !running || rider.out) {
+				c.state = 'tired'
+				c.rider = undefined
+			} else {
+				c.x = rider.body.x
+				c.facing = rider.body.facing
 			}
 		}
 		c.feetY = terrain.groundY(c.x)
-		const dx = b.x - c.x
+		// Barking at whoever's nearest.
+		let dx = Number.POSITIVE_INFINITY
+		for (const r of racing)
+			if (Math.abs(r.body.x - c.x) < Math.abs(dx)) dx = r.body.x - c.x
 		c.barking = running && c.state === 'waiting' && Math.abs(dx) < CORGI_CALL
 		// Watching you come, and go.
 		if (c.barking) c.facing = dx >= 0 ? 1 : -1
 	}
 
-	if (running && b.mount === 0) mount(world)
+	if (!running) return
+	for (const racer of racing) if (racer.body.mount === 0) mount(world, racer)
 }
 
 /** Coming down on a waiting corgi's back: on it, and off you go. */
-function mount(world: World) {
-	const b = world.body
+function mount(world: World, racer: Racer) {
+	const b = racer.body
 	if (b.grounded || b.vy <= 0) return
 	/** Where their feet were last tick. */
 	const was = b.feetY - b.vy
@@ -69,6 +77,7 @@ function mount(world: World) {
 		if (was > back || b.feetY < back) continue
 
 		c.state = 'ridden'
+		c.rider = racer.id
 		c.barking = false
 		b.mount = CORGI_RIDE_TICKS
 		b.combo = 0
@@ -80,7 +89,7 @@ function mount(world: World) {
 		b.stumble = 0
 		b.facing = 1
 		world.addBonus('corgis', CORGI_POINTS)
-		world.popup(`Giddy up! +${CORGI_POINTS}`, b.x, back - 40)
+		world.popup(scored(world, 'Giddy up!', `+${CORGI_POINTS}`), b.x, back - 40)
 		play('woof')
 		return
 	}
@@ -97,6 +106,7 @@ export function scoopCorgis(world: World) {
 		c.vy = -12 - Math.random() * 3
 		c.spin = 0
 		bus.scooping = 10
-		if (c.x > camera - SCOOP_HEARD && c.x < camera + VIEW_WIDTH) play('whoosh')
+		if (c.x > camera - SCOOP_HEARD && c.x < camera + world.viewWidth())
+			play('whoosh')
 	}
 }

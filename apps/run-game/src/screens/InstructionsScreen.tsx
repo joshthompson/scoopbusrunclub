@@ -3,6 +3,7 @@ import rockAsset from '@/assets/misc/rock1.png'
 import { For, type JSX } from 'solid-js'
 import { Pixels } from '../game/Pixels'
 import { FIKA_ART, FIKA_ITEMS } from '../game/fika'
+import { GooseIcon } from '../game/geeseArt'
 import { volunteerFrame } from '../game/sprites'
 import { MEMBERS } from '../playable'
 import { Menu, Panel } from '../ui/Menu'
@@ -58,6 +59,10 @@ export function InstructionsScreen(props: { onBack: () => void }) {
 				/>
 			),
 			text: 'Mud bogs you down. Jump over it.',
+		},
+		{
+			icon: <GooseIcon />,
+			text: 'Geese! Jump the ones on the path. Jump into flying ones for a lift.',
 		},
 		{
 			icon: (

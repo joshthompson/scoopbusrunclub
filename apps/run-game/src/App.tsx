@@ -1,4 +1,4 @@
-import { Match, Switch, createSignal } from 'solid-js'
+import { Match, Switch, createSignal, lazy } from 'solid-js'
 import { RunnerEditor } from './RunnerEditor'
 import type { CustomRunner } from './customRunners'
 import { Game, type Mode } from './game/Game'
@@ -10,6 +10,7 @@ import { CreditsScreen } from './screens/CreditsScreen'
 import { HighScoresScreen } from './screens/HighScoresScreen'
 import { InstructionsScreen } from './screens/InstructionsScreen'
 import { LevelSelect, type RunChoice } from './screens/LevelSelect'
+import { MultiPlayerScreen } from './screens/MultiPlayerScreen'
 import { OptionsScreen } from './screens/OptionsScreen'
 import { TitleScreen } from './screens/TitleScreen'
 import { MenuBackdrop } from './ui/MenuBackdrop'
@@ -22,14 +23,19 @@ type MenuScreen =
 	| 'instructions'
 	| 'options'
 	| 'credits'
+	| 'multi'
 
 type Screen =
 	| { kind: MenuScreen }
 	| { kind: 'edit'; runner?: CustomRunner }
 	| { kind: 'levels'; runner: Playable }
 	| { kind: 'play'; runner: Playable; level: Level; mode: Mode }
+	| { kind: 'party' }
 
 type Play = Extract<Screen, { kind: 'play' }>
+
+/** Multi Player, in a chunk of its own: trystero and all only load if it's picked. */
+const Party = lazy(() => import('./multiplayer/Party'))
 
 export function App() {
 	const [screen, setScreen] = createSignal<Screen>({ kind: 'title' })
@@ -73,6 +79,9 @@ export function App() {
 			 * The menus share one stage and one scene behind them, which keeps
 			 * running from screen to screen rather than starting over each time.
 			 */}
+			<Match when={screen().kind === 'party'}>
+				<Party onLeave={go('title')} />
+			</Match>
 			<Match when={screen().kind !== 'play'}>
 				<Stage>
 					<MenuBackdrop />
@@ -80,6 +89,7 @@ export function App() {
 						<Match when={screen().kind === 'title'}>
 							<TitleScreen
 								onSinglePlayer={go('select')}
+								onMultiPlayer={go('multi')}
 								onHighScores={go('highScores')}
 								onInstructions={go('instructions')}
 								onOptions={go('options')}
@@ -119,6 +129,12 @@ export function App() {
 									onBack={go('select')}
 								/>
 							)}
+						</Match>
+						<Match when={screen().kind === 'multi'}>
+							<MultiPlayerScreen
+								onHost={() => setScreen({ kind: 'party' })}
+								onBack={go('title')}
+							/>
 						</Match>
 						<Match when={screen().kind === 'highScores'}>
 							<HighScoresScreen onBack={go('title')} />
