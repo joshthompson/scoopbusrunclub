@@ -2,7 +2,7 @@ import type { RunnerName } from '@/data/runners'
 import { type Accessor, createSignal } from 'solid-js'
 import type { Level, Obstacle } from '../levels/types'
 import type { Playable } from '../playable'
-import { BUS_START_X, CAMERA_LEAD, START_X, VIEW_WIDTH } from './constants'
+import { BUS_START_X, START_LEAD, START_X, VIEW_WIDTH } from './constants'
 import { lineUp } from './pack'
 import type { Terrain } from './terrain'
 
@@ -117,12 +117,16 @@ export interface Bus {
 	speed: number
 	/** Ticks left of the scoop's flick, after scooping someone. */
 	scooping: number
+	/** How far behind the runner it's allowed to get: see `BUS_LEASH_FULL`. */
+	leash: number
 }
 
 /** An obstacle and what's happened to it: a rock's been tripped over, a fika had. */
 export interface ObstacleState {
 	obstacle: Obstacle
 	used: boolean
+	/** Scooped up by the bus, when, and how fast it flew off: rocks, and children. */
+	scooped?: { at: number; vx: number }
 	/** Ticks left of a cheerer's "Go!" bubble. */
 	cheering: Accessor<number>
 	setCheering: (ticks: number) => void
@@ -161,7 +165,7 @@ export function createWorld(level: Level, runner: Playable, startScore = 0) {
 	const [phase, setPhase] = createSignal<Phase>('countdown')
 	const [ticks, setTicks] = createSignal(0)
 	const [raceTicks, setRaceTicks] = createSignal(0)
-	const [camera, setCamera] = createSignal(START_X - VIEW_WIDTH * CAMERA_LEAD)
+	const [camera, setCamera] = createSignal(START_X - VIEW_WIDTH * START_LEAD)
 	const [playerX, setPlayerX] = createSignal(START_X)
 	const [busX, setBusX] = createSignal(BUS_START_X)
 	const [popups, setPopups] = createSignal<Popup[]>([])
@@ -200,9 +204,14 @@ export function createWorld(level: Level, runner: Playable, startScore = 0) {
 		combo: 0,
 		mount: 0,
 	}
-	const bus: Bus = { frontX: BUS_START_X, speed: 0, scooping: 0 }
+	const bus: Bus = {
+		frontX: BUS_START_X,
+		speed: 0,
+		scooping: 0,
+		leash: START_X - BUS_START_X,
+	}
 	/** How far across the screen the camera keeps the runner, swinging round as they turn. */
-	const view = { lead: CAMERA_LEAD }
+	const view = { lead: START_LEAD }
 
 	/** Nobody's out cheering for themselves: they're the one running. */
 	const notRunner = (member: RunnerName) => {

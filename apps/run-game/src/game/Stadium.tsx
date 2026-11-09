@@ -2,6 +2,7 @@ import { For, type JSX } from 'solid-js'
 import { seeded } from '../levels/seeded'
 import type { View } from './Backdrop'
 import { PATH_BACK, PX_PER_M, START_X, VERGE } from './constants'
+import { LANE_LINES, TRACK_INSIDE } from './trackArt'
 
 /**
  * A stadium behind the track, for Kristineberg: the grandstand, white with its
@@ -279,13 +280,13 @@ export const TRACK_GROUND: [number, string][] = [
 	[-PATH_BACK - 2, '#f2f2f2'],
 	[-PATH_BACK, '#a8442f'],
 	[-PATH_BACK + 2, '#cd5a40'],
-	...[-12, -3, 6, 15].flatMap((y): [number, string][] => [
+	...LANE_LINES.flatMap((y): [number, string][] => [
 		[y, '#f4efe8'],
 		[y + 2, '#cd5a40'],
 	]),
 	// Its inside edge, and the football pitch's turf, with a line on it.
-	[24, '#f4efe8'],
-	[26, '#59b448'],
+	[TRACK_INSIDE, '#f4efe8'],
+	[TRACK_INSIDE + 2, '#59b448'],
 	[34, '#f4efe8'],
 	[36, '#59b448'],
 ]

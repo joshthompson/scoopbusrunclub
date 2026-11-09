@@ -34,6 +34,12 @@ export const START_X = 200
  * behind for the bus to show up in, and this far from the right running left.
  */
 export const CAMERA_LEAD = 0.35
+/**
+ * Through the countdown, the runner's this far across instead, so the bus
+ * parked behind everyone's in view too. On "Go!" it swings round to
+ * `CAMERA_LEAD`.
+ */
+export const START_LEAD = 0.78
 /** How quickly the camera swings round to the other side on turning, a share a tick. */
 export const CAMERA_TURN = 0.04
 
@@ -83,7 +89,7 @@ export const PACER_FASTEST = 5.4
 /** Another one joins, just off the screen ahead, every this many ticks or so. */
 export const PACER_EVERY_TICKS = 80
 export const PACER_EVERY_SPREAD = 110
-/** How many of them are club members rather than anyone at all. */
+/** How many of them are someone the club knows, a member or a guest, rather than anyone at all. */
 export const MEMBER_SHARE = 0.25
 /** Bouncing off someone's head: as high as this, or higher holding jump. */
 export const STOMP_BOUNCE = 8.5
@@ -130,16 +136,30 @@ export const CORGI_SADDLE = 16
 export const CORGI_CALL = 320
 
 // --- The bus ------------------------------------------------------------
-/** Where the front of the scoop starts, off the screen behind the start. */
-export const BUS_START_X = -500
+/**
+ * Where the front of the scoop starts: parked a way back behind everyone on
+ * the start line, in view through the countdown.
+ */
+export const BUS_START_X = -260
 /** How long the bus waits after "Go!" before setting off. */
 export const BUS_HOLD_TICKS = 60
 export const BUS_START_SPEED = 3.8
 export const BUS_TOP_SPEED = 7
 /** How long the bus takes to get up to top speed. */
 export const BUS_RAMP_TICKS = 2400
-/** The bus is never further behind than this: get far enough ahead, and it keeps up. */
-export const BUS_MAX_GAP = 900
+/**
+ * The bus's leash: it's never further behind than this, however far ahead
+ * you get; it keeps up. It starts as long as the gap to it on the start line,
+ * and lengthens while you're pulling away at the end of it: quickly up to
+ * `BUS_LEASH_FULL`, so you get away from it off the line, then more and more
+ * slowly towards `BUS_LEASH_MAX`, so going well keeps you gaining on it, a
+ * little, but never with too big a lead.
+ */
+export const BUS_LEASH_FULL = 900
+export const BUS_LEASH_MAX = 1200
+/** How much the leash lengthens a tick at the end of it, up to `BUS_LEASH_FULL`, and just past it. */
+export const BUS_LEASH_GROWTH = 3
+export const BUS_LEASH_LATE_GROWTH = 0.6
 
 // --- Countdown ----------------------------------------------------------
 /** How long each of "3", "2", "1" and "Go!" is said for. */

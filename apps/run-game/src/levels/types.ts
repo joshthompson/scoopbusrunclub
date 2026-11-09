@@ -14,6 +14,8 @@ export type Obstacle =
 	| { kind: 'hurdle'; x: number }
 	/** A hole in the track, `width` across: jump it, or trip in it. */
 	| { kind: 'pothole'; x: number; width: number }
+	/** Children playing football on the track, `count` of them: jump the lot. */
+	| { kind: 'kids'; x: number; count: number }
 	/** Fika, for a speed boost, `height` off the ground: some you have to jump for. */
 	| { kind: 'fika'; x: number; height: number; item: FikaItem }
 	/** A club member out volunteering, cheering you on as you pass: another boost. */

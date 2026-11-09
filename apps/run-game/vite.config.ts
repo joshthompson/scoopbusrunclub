@@ -12,6 +12,8 @@ const web = path.resolve(__dirname, '../web/src')
 
 export default defineConfig({
 	base: '/run/',
+	// The website's env, for the same backend: the guests come from it.
+	envDir: path.resolve(__dirname, '../web'),
 	plugins: [solidPlugin()],
 	server: {
 		port: 3011,

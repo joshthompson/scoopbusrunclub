@@ -3,8 +3,10 @@ import rockAsset from '@/assets/misc/rock1.png'
 import { For, type JSX, Show, createSignal, onCleanup, onMount } from 'solid-js'
 import { Backdrop, Ground, HorizonTrees, type View } from '../game/Backdrop'
 import { PATH_BACK, START_X, VIEW_HEIGHT } from '../game/constants'
-import { CorgiArt } from '../game/corgiArt'
+import { CORGI_WIDTH, CorgiArt } from '../game/corgiArt'
+import { KidsArt, kidsWidth } from '../game/kidsArt'
 import {
+	HURDLE_LANES,
 	HurdleArt,
 	POTHOLE_ABOVE,
 	POTHOLE_HEIGHT,
@@ -42,6 +44,42 @@ const BUS_BEHIND = 230
 const FOLLOW = 0.08
 /** Scenery stands this far back from the path, as in the game. */
 const SET_BACK = 10
+/** How often the runner doesn't jump something, and runs into it instead. */
+const HIT_CHANCE = 0.2
+/** How high they jump, in the scene's pixels, and how far before something they take off. */
+const JUMP_HEIGHT = 70
+const TAKE_OFF = 26
+/** How much they clear something by, past its far side. */
+const CLEARANCE = 30
+/** Running into something: this long, at this share of their speed, flashing. */
+const STUMBLE_SECONDS = 0.7
+const STUMBLE_SPEED = 0.3
+
+/** Something on the course to jump, or run into: its near and far sides. */
+interface Hazard {
+	id: number
+	from: number
+	to: number
+	/** A hurdle's knocked over when it's run into. */
+	hurdle?: number
+}
+
+/** Everything the preview draws that the runner has to get past, in order. */
+function hazardsOf(level: Level): Hazard[] {
+	const hazards: Omit<Hazard, 'id'>[] = []
+	const across = (x: number, half: number) => ({ from: x - half, to: x + half })
+	for (const o of level.obstacles) {
+		if (o.kind === 'rock') hazards.push(across(o.x, 20))
+		if (o.kind === 'hurdle') hazards.push({ ...across(o.x, 14), hurdle: o.x })
+		if (o.kind === 'pothole') hazards.push(across(o.x, o.width / 2 - 4))
+		if (o.kind === 'kids') hazards.push(across(o.x, kidsWidth(o.count) / 2 - 6))
+	}
+	for (const x of level.corgis ?? []) hazards.push(across(x, CORGI_WIDTH / 2))
+	for (const furby of level.furbies ?? []) hazards.push(across(furby.x, 25))
+	return hazards
+		.sort((a, b) => a.from - b.from)
+		.map((hazard, id) => ({ ...hazard, id }))
+}
 
 export function CoursePreview(props: {
 	level: Level
@@ -71,16 +109,63 @@ export function CoursePreview(props: {
 		)
 	const [top, setTop] = createSignal(topFor(from))
 
+	// The runner getting past what's in the way: jumping it, mostly.
+	const hazards = hazardsOf(level)
+	/** For each hazard, once it's close: jump it, or run into it. */
+	const choices = new Map<number, 'jump' | 'hit' | 'done'>()
+	let jump: { at: number; seconds: number } | undefined
+	let stumbling = 0
+	const [lift, setLift] = createSignal(0)
+	const [flash, setFlash] = createSignal(false)
+	/** The hurdles run into, by where they are: knocked over. */
+	const [knocked, setKnocked] = createSignal(new Set<number>())
+
 	let frame = 0
 	let last = 0
+	let clock = 0
 	const tick = (now: number) => {
 		const seconds = last ? Math.min(0.1, (now - last) / 1000) : 0
 		last = now
-		// On round the course, and back to where it started at the finish.
-		let next = camera() + SPEED * seconds
-		if (next > to) next = START_X - sceneWidth * RUNNER_ACROSS
+		clock += seconds
+		// On round the course, and back to where it started at the finish,
+		// with everything stood back up.
+		const speed = stumbling > 0 ? SPEED * STUMBLE_SPEED : SPEED
+		let next = camera() + speed * seconds
+		if (next > to) {
+			next = START_X - sceneWidth * RUNNER_ACROSS
+			choices.clear()
+			setKnocked(new Set<number>())
+		}
 		setCamera(next)
 		setTop(top() + (topFor(next) - top()) * FOLLOW)
+
+		const x = next + runnerAcross
+		if (stumbling > 0) stumbling -= seconds
+		const ahead = hazards.find((hazard) => hazard.to > x)
+		if (ahead && !jump && stumbling <= 0) {
+			let choice = choices.get(ahead.id)
+			if (!choice) {
+				choice = Math.random() < HIT_CHANCE ? 'hit' : 'jump'
+				choices.set(ahead.id, choice)
+			}
+			if (choice === 'jump' && ahead.from - x < TAKE_OFF) {
+				// Long enough to be over its far side, and a bit.
+				jump = { at: clock, seconds: (ahead.to - x + CLEARANCE) / SPEED }
+				choices.set(ahead.id, 'done')
+			}
+			if (choice === 'hit' && x >= ahead.from) {
+				stumbling = STUMBLE_SECONDS
+				choices.set(ahead.id, 'done')
+				const { hurdle } = ahead
+				if (hurdle !== undefined) setKnocked((all) => new Set(all).add(hurdle))
+			}
+		}
+		if (jump) {
+			const t = (clock - jump.at) / jump.seconds
+			if (t >= 1) jump = undefined
+			setLift(t >= 1 ? 0 : 4 * JUMP_HEIGHT * t * (1 - t))
+		}
+		setFlash(stumbling > 0 && Math.floor(stumbling * 12) % 2 === 0)
 		frame = requestAnimationFrame(tick)
 	}
 	onMount(() => {
@@ -101,6 +186,7 @@ export function CoursePreview(props: {
 	const potholes = level.obstacles.flatMap((o) =>
 		o.kind === 'pothole' ? [o] : [],
 	)
+	const kids = level.obstacles.flatMap((o) => (o.kind === 'kids' ? [o] : []))
 
 	return (
 		<div
@@ -176,9 +262,21 @@ export function CoursePreview(props: {
 					</For>
 					<For each={hurdles}>
 						{(hurdle) => (
-							<div style={{ ...at(hurdle.x), transform: 'translateX(-50%)' }}>
-								<HurdleArt />
-							</div>
+							<For each={HURDLE_LANES}>
+								{(lane) => (
+									<div
+										style={{
+											...at(hurdle.x + lane.along, lane.sink),
+											transform: 'translateX(-50%)',
+											// The runner's lane's, knocked over if run into.
+											'--knocked':
+												lane.running && knocked().has(hurdle.x) ? 1 : 0,
+										}}
+									>
+										<HurdleArt depth={lane.depth} />
+									</div>
+								)}
+							</For>
 						)}
 					</For>
 					<For each={potholes}>
@@ -190,6 +288,13 @@ export function CoursePreview(props: {
 								}}
 							>
 								<PotholeArt width={hole.width} />
+							</div>
+						)}
+					</For>
+					<For each={kids}>
+						{(group) => (
+							<div style={{ ...at(group.x), transform: 'translateX(-50%)' }}>
+								<KidsArt count={group.count} />
 							</div>
 						)}
 					</For>
@@ -237,9 +342,10 @@ export function CoursePreview(props: {
 				</Show>
 				<div
 					style={{
-						...at(runnerX()),
+						...at(runnerX(), -lift()),
 						left: `${runnerAcross}px`,
 						transform: 'translateX(-50%)',
+						opacity: flash() ? 0.4 : 1,
 					}}
 				>
 					<RunStrip

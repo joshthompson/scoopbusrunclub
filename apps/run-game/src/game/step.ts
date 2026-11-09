@@ -3,7 +3,10 @@ import { play } from '../sfx'
 import {
 	AIR_PUSH,
 	BUS_HOLD_TICKS,
-	BUS_MAX_GAP,
+	BUS_LEASH_FULL,
+	BUS_LEASH_GROWTH,
+	BUS_LEASH_LATE_GROWTH,
+	BUS_LEASH_MAX,
 	BUS_RAMP_TICKS,
 	BUS_START_SPEED,
 	BUS_TOP_SPEED,
@@ -30,6 +33,7 @@ import {
 	RUN_TOP_SPEED,
 	SLIDE_KEEP,
 	STAND_HEIGHT,
+	START_LEAD,
 	START_X,
 	STUMBLE_SPEED,
 	STUMBLE_TICKS,
@@ -38,6 +42,7 @@ import {
 import { scoopCorgis, stepCorgis } from './corgis'
 import { FIKA_ART } from './fika'
 import { scoopFurbies, stepFurbies } from './furbies'
+import { KIDS_REACH_UP, kidsWidth } from './kidsArt'
 import { scoopPack, stepPack } from './pack'
 import type { World } from './world'
 
@@ -261,7 +266,8 @@ function collide(world: World) {
 				o.kind === 'branch' ||
 				o.kind === 'mud' ||
 				o.kind === 'hurdle' ||
-				o.kind === 'pothole')
+				o.kind === 'pothole' ||
+				o.kind === 'kids')
 		)
 			continue
 		const ground = terrain.groundY(o.x)
@@ -298,6 +304,18 @@ function collide(world: World) {
 					stumble('Clonk!')
 				}
 				break
+			case 'kids': {
+				const half = kidsWidth(o.count) / 2 - 6
+				if (
+					!state.used &&
+					b.stumble === 0 &&
+					overlaps(o.x - half, o.x + half, ground - KIDS_REACH_UP, ground)
+				) {
+					state.used = true
+					stumble('Oof!')
+				}
+				break
+			}
 			case 'pothole':
 				// Only underfoot, a little way in from its edges.
 				if (
@@ -380,10 +398,15 @@ function stepBus(world: World) {
 	scoopPack(world)
 	scoopFurbies(world)
 	scoopCorgis(world)
+	knockOver(world)
 
 	if (phase !== 'running') return
-	// Never too far behind, however far ahead the runner gets.
-	if (body.x - bus.frontX > BUS_MAX_GAP) bus.frontX = body.x - BUS_MAX_GAP
+	// Never more than its leash behind, however far ahead the runner gets:
+	// pulled along at the end of it, which lets it out a little.
+	if (body.x - bus.frontX > bus.leash) {
+		bus.leash += leashGrowth(bus.leash)
+		bus.frontX = body.x - bus.leash
+	}
 
 	if (bus.frontX >= body.x - HITBOX_HALF_WIDTH) {
 		bus.scooping = 10
@@ -399,11 +422,75 @@ function stepBus(world: World) {
 	}
 }
 
+/**
+ * What the bus does to what's in the way as its scoop reaches it. Hurdles it
+ * knocks over, left lying on the track; rocks and children playing football
+ * it scoops up, flying off like anyone else. Either way they're harmless
+ * after. Potholes, mud and the rest it just drives over. A hurdle here is the
+ * runner's lane's; the rest of the row go over as the scoop reaches them
+ * (see the hurdle's sprite).
+ */
+function knockOver(world: World) {
+	const { bus } = world
+	for (const state of world.obstacles) {
+		const o = state.obstacle
+		if (state.scooped || bus.frontX < o.x - 14) continue
+		if (o.kind === 'hurdle') state.used = true
+		if (o.kind === 'rock' || o.kind === 'kids') {
+			state.used = true
+			state.scooped = {
+				at: world.ticks(),
+				vx: Math.max(bus.speed, 2) + 2 + Math.random() * 2,
+			}
+			bus.scooping = 10
+			const camera = world.camera()
+			if (o.kind === 'kids' && o.x > camera && o.x < camera + VIEW_WIDTH)
+				play('whoosh')
+		}
+	}
+}
+
+/** How fast something scooped is flung up, and how fast it spins, in degrees a tick. */
+const SCOOP_FLING = 12
+const SCOOP_SPIN = 14
+
+/**
+ * Where something scooped up is, `ticks` after: off along the course, up and
+ * back down, spinning, from where it was. For drawing it.
+ */
+export function scoopFlight(scooped: { at: number; vx: number }, now: number) {
+	const t = now - scooped.at
+	return {
+		x: scooped.vx * t,
+		y: -SCOOP_FLING * t + (GRAVITY * t * t) / 2,
+		spin: t * SCOOP_SPIN,
+	}
+}
+
+/**
+ * How much the leash lets out, a tick, pulled at the end of it: quickly up to
+ * `BUS_LEASH_FULL`, then less and less, to nothing at `BUS_LEASH_MAX`.
+ */
+function leashGrowth(leash: number) {
+	if (leash < BUS_LEASH_FULL) return BUS_LEASH_GROWTH
+	const left = Math.max(
+		0,
+		(BUS_LEASH_MAX - leash) / (BUS_LEASH_MAX - BUS_LEASH_FULL),
+	)
+	return BUS_LEASH_LATE_GROWTH * left * left
+}
+
 function stepCamera(world: World) {
 	// Left where it is: to watch them fly off, or run off.
 	if (world.phase() === 'scooped' || world.phase() === 'finished') return
-	// More of the screen ahead, whichever way they're running.
-	const lead = world.body.facing === 1 ? CAMERA_LEAD : 1 - CAMERA_LEAD
+	// More of the screen ahead, whichever way they're running. Through the
+	// countdown, the bus parked behind everyone is in view too.
+	const lead =
+		world.phase() === 'countdown'
+			? START_LEAD
+			: world.body.facing === 1
+				? CAMERA_LEAD
+				: 1 - CAMERA_LEAD
 	world.view.lead += (lead - world.view.lead) * CAMERA_TURN
 	const target = Math.max(
 		LEFT_EDGE - VIEW_WIDTH * CAMERA_LEAD,

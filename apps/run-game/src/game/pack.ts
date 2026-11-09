@@ -1,9 +1,10 @@
+import { guests } from '../guests'
 import { isHeld } from '../input'
 import { DEFAULT_AVATAR, pickAny, randomAvatar } from '../looks'
 import { MEMBERS, type Playable, lookSprite } from '../playable'
 import { play } from '../sfx'
 import {
-	BUS_MAX_GAP,
+	BUS_LEASH_MAX,
 	CAMERA_LEAD,
 	DAZED_SPEED,
 	DAZED_TICKS,
@@ -26,6 +27,7 @@ import {
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
 } from './constants'
+import { kidsWidth } from './kidsArt'
 import { boost } from './step'
 import type { Terrain } from './terrain'
 import type { Pacer, World } from './world'
@@ -83,9 +85,9 @@ const HEAD_GIVE = 6
 const HEAD_REACH = HITBOX_HALF_WIDTH + 10
 /**
  * How far off the left of the screen someone being scooped is still heard:
- * as far back as the bus ever gets (`BUS_MAX_GAP`, less the runner's lead).
+ * as far back as the bus ever gets (`BUS_LEASH_MAX`, less the runner's lead).
  */
-export const SCOOP_HEARD = BUS_MAX_GAP - VIEW_WIDTH * CAMERA_LEAD + 50
+export const SCOOP_HEARD = BUS_LEASH_MAX - VIEW_WIDTH * CAMERA_LEAD + 50
 
 /** What `lineUp` needs: the world's still being made when it's called. */
 interface Lineup {
@@ -95,12 +97,14 @@ interface Lineup {
 	packState: { nextId: number; nextJoin: number }
 }
 
-/** Someone to join: a club member now and then, as long as they're not running already. */
+/**
+ * Someone to join: now and then someone the club knows, a member or one of
+ * its guests, as long as they're not running already (or the one running).
+ */
 function newcomer(world: Lineup): Pick<Pacer, 'name' | 'member' | 'sprite'> {
-	const members = MEMBERS.filter(
+	const members = [...MEMBERS, ...guests()].filter(
 		(m) =>
-			m.member !== world.runner.member &&
-			!world.pack.some((p) => p.member === m.member),
+			m.id !== world.runner.id && !world.pack.some((p) => p.name === m.name),
 	)
 	if (members.length && Math.random() < MEMBER_SHARE) {
 		const { name, member, sprite } = pickAny(members)
@@ -210,7 +214,9 @@ function hopAhead(world: World, x: number) {
 					? o.x - 16
 					: o.kind === 'mud' || o.kind === 'pothole'
 						? o.x - o.width / 2
-						: undefined
+						: o.kind === 'kids'
+							? o.x - kidsWidth(o.count) / 2
+							: undefined
 		return edge !== undefined && edge > x && edge - x < HOP_LOOKAHEAD
 	})
 }

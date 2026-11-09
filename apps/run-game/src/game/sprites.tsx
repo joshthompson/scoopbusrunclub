@@ -32,14 +32,15 @@ import {
 import { CORGI_HEIGHT, CORGI_WIDTH, CorgiArt, type CorgiPose } from './corgiArt'
 import { FIKA_ART } from './fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from './furbies'
-import { countdownWord, stepWorld } from './step'
+import { KIDS_HEIGHT, KidsArt, kidsWidth } from './kidsArt'
+import { countdownWord, scoopFlight, stepWorld } from './step'
 import {
-	HURDLE_HEIGHT,
-	HURDLE_WIDTH,
+	HURDLE_LANES,
 	HurdleArt,
 	POTHOLE_ABOVE,
 	POTHOLE_HEIGHT,
 	PotholeArt,
+	hurdleSize,
 } from './trackArt'
 import type { Corgi, Furby, ObstacleState, Pacer, World } from './world'
 
@@ -612,7 +613,13 @@ export function createParkrunSign(world: World, x: number) {
 
 /** How far along the course a banner's poles are either side of its line: its slant across the path. */
 const BANNER_SLANT = 56
-const POLE_HEIGHT = 146
+/**
+ * Tall enough for the bus to drive under: the cloth's lowest, at the near
+ * pole, is this less 50 px off the ground (it hangs 34 px from the pole's top,
+ * which stands on the path's near edge, 16 px below the line everyone runs
+ * along), and the bus's roof is 142 px up, bobbing.
+ */
+const POLE_HEIGHT = 200
 const POLE_WIDTH = 6
 const CLOTH_HEIGHT = 34
 
@@ -720,6 +727,37 @@ const POLE_STYLE: JSX.CSSProperties = {
 	'border-left': '2px solid #5f686d',
 }
 
+/**
+ * Something the bus can scoop up: where it stands until then, and flying off,
+ * spinning, after. `scooped` isn't a signal: reading the tick keeps it moving.
+ */
+function Scoopable(props: {
+	world: World
+	state: ObstacleState
+	children: JSX.Element
+}) {
+	const flight = () => {
+		const now = props.world.ticks()
+		const { scooped } = props.state
+		return scooped ? scoopFlight(scooped, now) : undefined
+	}
+	return (
+		<div
+			style={{
+				'transform-origin': 'center',
+				transform: (() => {
+					const f = flight()
+					return f
+						? `translate(${f.x}px, ${f.y}px) rotate(${f.spin}deg)`
+						: 'none'
+				})(),
+			}}
+		>
+			{props.children}
+		</div>
+	)
+}
+
 export function createObstacle(world: World, state: ObstacleState, i: number) {
 	const o = state.obstacle
 	const id = `${o.kind}-${i}`
@@ -733,7 +771,11 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: 56,
 				height: 29,
 				world,
-				frames: [rockAsset],
+				children: () => (
+					<Scoopable world={world} state={state}>
+						<img src={rockAsset} alt="" style={{ display: 'block' }} />
+					</Scoopable>
+				),
 			})
 		case 'branch':
 			return createFixture({
@@ -749,19 +791,44 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				style: () => ({ filter: world.level.look?.foliage }),
 			})
 		case 'hurdle':
+			// One in each lane, across the track. Only the runner's own is run into.
+			return HURDLE_LANES.map((lane, n) =>
+				createFixture({
+					id: `${id}-${n}`,
+					type: lane.front ? 'hazard-front' : 'hazard',
+					x: o.x + lane.along,
+					sink: lane.sink,
+					...hurdleSize(lane.depth),
+					world,
+					children: () => <HurdleArt depth={lane.depth} />,
+					// Knocked over: the runner's own once run into, or flattened by
+					// the bus (which sets `used` too), and every other lane's as the
+					// bus's scoop reaches it. Neither's a signal: reading the tick
+					// keeps it up to date.
+					style: () => ({
+						'--knocked':
+							world.ticks() >= 0 &&
+							(lane.running
+								? state.used
+								: world.bus.frontX >= o.x + lane.along - 14)
+								? 1
+								: 0,
+					}),
+				}),
+			)
+		case 'kids':
 			return createFixture({
 				id,
 				type: 'hazard',
 				x: o.x,
-				width: HURDLE_WIDTH,
-				height: HURDLE_HEIGHT,
+				width: kidsWidth(o.count),
+				height: KIDS_HEIGHT,
 				world,
-				children: () => <HurdleArt />,
-				// Knocked over once run into. `used` isn't a signal: reading the
-				// tick keeps it up to date.
-				style: () => ({
-					'--knocked': world.ticks() >= 0 && state.used ? 1 : 0,
-				}),
+				children: () => (
+					<Scoopable world={world} state={state}>
+						<KidsArt count={o.count} />
+					</Scoopable>
+				),
 			})
 		case 'pothole':
 			return createFixture({

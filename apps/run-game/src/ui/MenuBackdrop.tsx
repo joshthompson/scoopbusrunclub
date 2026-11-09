@@ -26,6 +26,7 @@ import { For, type JSX } from 'solid-js'
 import busAsset from '../assets/bus/bus-lettering-turned.png'
 import { customRunners } from '../customRunners'
 import { VIEW_HEIGHT } from '../game/constants'
+import { guests } from '../guests'
 import { MEMBERS, type Playable, customPlayable } from '../playable'
 import { RunStrip } from './RunStrip'
 
@@ -167,13 +168,15 @@ const standing = (asset: string, ground: number, jitter: number) => ({
 const PACK_SIZE = 5
 
 /**
- * Five runners at random: club members, and anyone's own runners too. Only
+ * Five runners at random: club members, guests, and anyone's own runners too. Only
  * those narrow enough to run in the gaps between each other.
  */
 function pickPack(): Playable[] {
-	const everyone = [...MEMBERS, ...customRunners().map(customPlayable)].filter(
-		(runner) => runner.sprite.width <= 30,
-	)
+	const everyone = [
+		...MEMBERS,
+		...guests(),
+		...customRunners().map(customPlayable),
+	].filter((runner) => runner.sprite.width <= 30)
 	const shuffled = everyone
 		.map((runner) => ({ runner, order: Math.random() }))
 		.sort((a, b) => a.order - b.order)

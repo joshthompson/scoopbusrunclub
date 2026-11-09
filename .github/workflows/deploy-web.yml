@@ -48,8 +48,11 @@ jobs:
       - name: Copy game dist into web dist
         run: cp -r apps/game/dist apps/web/dist/game
 
-      # Scoop Bus Run, the 2D runner, at scoopbus.run/run.
+      # Scoop Bus Run, the 2D runner, at scoopbus.run/run. The backend's URL
+      # is for the club's guests, who run in the background.
       - run: pnpm nx run run-game:build
+        env:
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
 
       - name: Copy run-game dist into web dist
         run: cp -r apps/run-game/dist apps/web/dist/run

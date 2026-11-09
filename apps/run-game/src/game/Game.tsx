@@ -132,15 +132,9 @@ export function Game(props: {
 				},
 				{ label: 'Stop here', choose: props.onCourses },
 			]
-		if (result?.kind === 'scooped')
-			return [
-				{ label: 'Run again ↵', choose: props.onRetry },
-				{ label: 'To menu', choose: props.onMenu },
-			]
 		return [
 			{ label: 'Run again ↵', choose: props.onRetry },
-			{ label: 'Change course', choose: props.onCourses },
-			{ label: 'Change runner', choose: props.onQuit },
+			{ label: 'To menu', choose: props.onMenu },
 		]
 	}
 
@@ -152,6 +146,8 @@ export function Game(props: {
 		assetOrder: [
 			// The near poles of the start and finish banners, which you run past.
 			'banner-front',
+			// Hurdles in the lanes nearer than the runner's.
+			'hazard-front',
 			// In front of the runner: one sits on their head.
 			'furby',
 			'player',
@@ -176,7 +172,9 @@ export function Game(props: {
 				createParkrunSign(world, START_X - 190),
 				...createBanner(world, world.terrain.finishX, 'FINISH'),
 				createRunDirector(world),
-				...world.obstacles.map((state, i) => createObstacle(world, state, i)),
+				...world.obstacles.flatMap((state, i) =>
+					createObstacle(world, state, i),
+				),
 				...createCorgis(world),
 				...createFurbies(world),
 				createBus(world),

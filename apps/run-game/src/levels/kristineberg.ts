@@ -9,7 +9,7 @@ import type { Level, LevelDefinition, Obstacle } from './types'
 /**
  * Kristineberg: round and round the running track at Kristinebergs IP, dead
  * flat, past the grandstand once a lap. No trees, no mud: hurdles to clear,
- * and potholes in the track.
+ * potholes in the track, and children playing football on it.
  */
 
 const VOLUNTEERS: RunnerName[] = [
@@ -35,18 +35,20 @@ function layOut(): Pick<Level, 'obstacles' | 'scenery'> {
 	let x = START_X + 700
 	while (x < terrain.finishX - 500) {
 		const roll = random()
-		if (roll < 0.45) {
+		if (roll < 0.38) {
 			// A flight of one to three hurdles.
 			const count = 1 + Math.floor(random() * 3)
 			for (let i = 0; i < count; i++)
 				obstacles.push({ kind: 'hurdle', x: x + i * HURDLE_GAP })
 			x += (count - 1) * HURDLE_GAP
-		} else if (roll < 0.68)
+		} else if (roll < 0.55)
 			obstacles.push({
 				kind: 'pothole',
 				x,
 				width: 40 + Math.round(random() * 14) * 2,
 			})
+		else if (roll < 0.7)
+			obstacles.push({ kind: 'kids', x, count: random() < 0.5 ? 2 : 3 })
 		else if (roll < 0.86)
 			obstacles.push({
 				kind: 'fika',
@@ -72,7 +74,7 @@ export const kristineberg: LevelDefinition = {
 	id: 'kristineberg',
 	name: 'Kristineberg',
 	blurb:
-		'Round and round the track, dead flat: hurdles to clear and potholes to miss.',
+		'Round and round the track, dead flat: hurdles, potholes, and children playing football.',
 	difficulty: 2,
 	terrain,
 	runDirectors: ['keith', 'claire'],
