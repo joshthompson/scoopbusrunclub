@@ -1,0 +1,175 @@
+@font-face {
+	font-family: "Remi Pop";
+	src: url("./assets/fonts/remi-pop.woff2") format("woff2");
+	font-display: block;
+}
+
+:root {
+	/* The website's palette (apps/web/src/styles.css) */
+	--grass-green: #77a15d;
+	--grass-dark-green: #61864a;
+	--grass-darker-green: #2f4323;
+	--sky-blue-top: #cdfbff;
+	--sky-blue-bottom: #5ae2ff;
+	--dirt-brown: #d1a671;
+	--dirt-dark-brown: #ad855a;
+	--dirt-darker-brown: #4a3215;
+	--color-white: #fff;
+	--overlay-black-7: rgba(0, 0, 0, 0.07);
+	--overlay-black-15: rgba(0, 0, 0, 0.15);
+	--overlay-black-30: rgba(0, 0, 0, 0.3);
+	--overlay-white-10: rgba(255, 255, 255, 0.1);
+	--ink: #0f1f29;
+	--bus-red: #e0382f;
+	/* The engine's modal backdrop, which is what dims the game while it's paused. */
+	--overlay-black-50: rgba(15, 31, 41, 0.5);
+	--font-pixel: "Remi Pop", system-ui, sans-serif;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: var(--ink);
+	color: white;
+	font-family: var(--font-pixel);
+	overflow: hidden;
+	overscroll-behavior: none;
+	-webkit-user-select: none;
+	user-select: none;
+	touch-action: none;
+}
+
+#root {
+	height: 100%;
+}
+
+[data-game-scene] *,
+.pixelated {
+	image-rendering: pixelated;
+}
+
+/*
+ * Run strips are drawn right to left (see `generateFrames(…, reverse)` in the
+ * web app), so they play by stepping the image to the right.
+ */
+@keyframes run-strip {
+	from {
+		background-position-x: var(--strip);
+	}
+	to {
+		background-position-x: 0;
+	}
+}
+
+/* The menus' scene (ui/MenuBackdrop.tsx) */
+@keyframes band-scroll {
+	to {
+		background-position-x: calc(-1 * var(--band));
+	}
+}
+
+@keyframes strip-scroll {
+	to {
+		transform: translateX(calc(-1 * var(--strip-width)));
+	}
+}
+
+@keyframes cloud-drift {
+	from {
+		transform: translateX(1000px);
+	}
+	to {
+		transform: translateX(-120px);
+	}
+}
+
+@keyframes sun-pulse {
+	50% {
+		transform: scale(1.06);
+	}
+}
+
+@keyframes bus-bob {
+	50% {
+		transform: translateY(-2px);
+	}
+}
+
+@keyframes wheel-bob {
+	50% {
+		transform: translateY(1px);
+	}
+}
+
+@keyframes scoop-flick {
+	0%,
+	80%,
+	100% {
+		transform: none;
+	}
+	86% {
+		transform: translateY(-14px) rotate(8deg);
+	}
+}
+
+@keyframes jostle {
+	50% {
+		transform: translateX(22px);
+	}
+}
+
+/* The menus (ui/Menu.tsx) */
+@keyframes logo-bounce {
+	0%,
+	60%,
+	100% {
+		transform: translateY(0) rotate(0);
+	}
+	30% {
+		transform: translateY(-10px) rotate(-3deg);
+	}
+}
+
+@keyframes cursor-bob {
+	to {
+		transform: translateX(5px);
+	}
+}
+
+@keyframes panel-in {
+	from {
+		opacity: 0;
+		transform: translateY(16px) scale(0.96);
+	}
+}
+
+@keyframes title-in {
+	from {
+		opacity: 0;
+		transform: translateY(-30px) scale(0.9);
+	}
+}
+
+@keyframes blink {
+	50% {
+		opacity: 0.35;
+	}
+}
+
+button {
+	font-family: inherit;
+	cursor: pointer;
+}
+
+/* A furby hopping on the spot. */
+@keyframes furby-hop {
+	0%,
+	60%,
+	100% {
+		transform: translateY(0);
+	}
+	75% {
+		transform: translateY(-14px);
+	}
+}

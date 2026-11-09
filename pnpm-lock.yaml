@@ -90,6 +90,34 @@ importers:
         specifier: ^4.19.0
         version: 4.21.0
 
+  apps/run-game:
+    dependencies:
+      solid-js:
+        specifier: ^1.9.5
+        version: 1.9.9
+      trystero:
+        specifier: ^0.23.1
+        version: 0.23.1
+      uqr:
+        specifier: ^0.1.3
+        version: 0.1.3
+    devDependencies:
+      '@pandacss/dev':
+        specifier: ^1.8.2
+        version: 1.8.2(supports-color@7.2.0)(typescript@5.9.3)
+      '@types/pngjs':
+        specifier: ^6.0.5
+        version: 6.0.5
+      '@vitejs/plugin-basic-ssl':
+        specifier: ^2.3.0
+        version: 2.3.0(vite@7.1.10(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+
   apps/web:
     dependencies:
       '@jsquash/webp':
@@ -1090,6 +1118,12 @@ packages:
 
   '@types/web-push@3.6.4':
     resolution: {integrity: sha512-GnJmSr40H3RAnj0s34FNTcJi1hmWFV5KXugE0mYWnYhgTAHLJ/dJKAwDmvPJYMke0RplY2XE9LnM4hqSqKIjhQ==}
+
+  '@vitejs/plugin-basic-ssl@2.3.0':
+    resolution: {integrity: sha512-bdyo8rB3NnQbikdMpHaML9Z1OZPBu6fFOBo+OtxsBlvMJtysWskmBcnbIDhUqgC8tcxNv/a+BcV5U+2nQMm1OQ==}
+    engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
+    peerDependencies:
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
 
   '@vue/compiler-core@3.5.25':
     resolution: {integrity: sha512-vay5/oQJdsNHmliWoZfHPoVZZRmnSWhug0BYT34njkYTPqClh3DNWLkZNJBVSjsNMrg0CCrBfoKkjZQPM/QVUw==}
@@ -2495,6 +2529,9 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
+  uqr@0.1.3:
+    resolution: {integrity: sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==}
+
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
@@ -3560,6 +3597,10 @@ snapshots:
   '@types/web-push@3.6.4':
     dependencies:
       '@types/node': 17.0.45
+
+  '@vitejs/plugin-basic-ssl@2.3.0(vite@7.1.10(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))':
+    dependencies:
+      vite: 7.1.10(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
   '@vue/compiler-core@3.5.25':
     dependencies:
@@ -4992,6 +5033,8 @@ snapshots:
       browserslist: 4.28.0
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  uqr@0.1.3: {}
 
   util-deprecate@1.0.2: {}
 

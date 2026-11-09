@@ -1,0 +1,15 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"jsx": "preserve",
+		"jsxImportSource": "solid-js",
+		"types": ["vite/client"],
+		"paths": {
+			"@/utils/seasons": ["./src/shims/seasons.ts"],
+			"@/*": ["../web/src/*"],
+			"@style/*": ["./styled-system/*"],
+			"@shared/*": ["../../libs/shared/*"]
+		}
+	},
+	"include": ["src", "../web/misc.d.ts"]
+}
