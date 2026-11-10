@@ -390,7 +390,12 @@ function generateFaceFrame(character: CharacterSpriteProps): string[] {
  */
 const HEAD_FACE_CENTRE: Vector = { x: 4, y: 3 }
 
-function generateCustomSpriteFrames(
+/**
+ * A sprite from one of the custom runner templates (`spritePixels`, of
+ * `frameCount` frames side by side), in `character`'s colours, with their
+ * head on: what the run game's tourists are made from, too.
+ */
+export function generateCustomSpriteFrames(
 	character: CharacterSpriteProps,
 	spritePixels: SpritePixelData | null,
 	frameCount: number,

@@ -1,9 +1,10 @@
 import type { RunnerName } from '@/data/runners'
 import { type Accessor, createSignal } from 'solid-js'
+import type { Boost, Course, Obstacle } from '../courses/types'
+import type { BusRide } from '../draw/busRide'
 import type { Controls } from '../input'
-import type { Level, Obstacle } from '../levels/types'
-import type { Avatar } from '../looks'
-import type { Playable } from '../playable'
+import type { Avatar } from '../runners/looks'
+import type { Playable } from '../runners/playable'
 import {
 	BUS_START_X,
 	PACK_SIZE,
@@ -18,15 +19,20 @@ import type { Terrain } from './terrain'
  * - `countdown`: the run director's "3, 2, 1", nobody moving yet
  * - `running`: "Go!", and the bus is coming
  * - `scooped`: the bus caught up
+ * - `fallen`: down a Gap
  * - `finished`: over the line ahead of it
  */
-export type Phase = 'countdown' | 'running' | 'scooped' | 'finished'
+export type Phase = 'countdown' | 'running' | 'scooped' | 'fallen' | 'finished'
 
 /**
- * Out of the race: caught by the bus, or over the line. Someone still running
- * when a multiplayer Round's decided isn't out: they won it.
+ * Out of the race: caught by the bus, down a Gap, or over the line. Someone
+ * still running when a multiplayer Round's decided isn't out: they won it.
  */
-export type Out = 'scooped' | 'finished'
+export type Out = 'scooped' | 'fallen' | 'finished'
+
+/** Out, and not by finishing: Scooped or Fallen, which count the same. */
+export const isCaught = (out: Out | undefined) =>
+	out === 'scooped' || out === 'fallen'
 
 /**
  * One runner in the race, steered by a person: the only one in single player,
@@ -61,13 +67,21 @@ export interface Body {
 	vy: number
 	grounded: boolean
 	ducking: boolean
+	/** How fast they went into the Tunnel they're in: they go through it no slower. */
+	tunnelSpeed?: number
 	/** Ticks left of a stumble, during which they can't speed up. */
 	stumble: number
 	muddy: boolean
+	/** The Pumpkin they're wearing, by its carving: 0 for none. */
+	pumpkin: number
+	/** The last one knocked off, flying, and when. */
+	lostPumpkin?: { carving: number; at: number }
 	/** Which way they last ran: 1 right, -1 left. */
 	facing: 1 | -1
 	/** Up was held last tick, so holding it doesn't keep jumping. */
 	wasUp: boolean
+	/** On the way up from a jump of their own: letting go of up cuts it short. */
+	jumping: boolean
 	/** Degrees, while flying out of the scoop. */
 	spin: number
 	/** Heads bounced off since last on the ground, for doubling the points. */
@@ -78,6 +92,14 @@ export interface Body {
 	carried: number
 	/** Ticks before another Player can bounce on their head again. */
 	stomped: number
+	/** The Platform they're stood on, by its index: on the Ground if none. */
+	on?: number
+	/** Ticks left of dropping through `on`'s Platform, ducked off it. */
+	dropping: number
+	/** Which one that is. */
+	droppingFrom?: number
+	/** The height they last stood at: what the camera follows, not every jump. */
+	floor: number
 }
 
 /**
@@ -92,6 +114,8 @@ export interface Pacer {
 	guest?: string
 	/** Anyone else's look, made up for them. */
 	look?: Avatar
+	/** Not anyone at all: a skeleton, running with you. */
+	skeleton?: boolean
 	sprite: Playable['sprite']
 	x: number
 	feetY: number
@@ -105,6 +129,10 @@ export interface Pacer {
 	/** Flying out of the scoop, spinning `spin` degrees. */
 	scooped: boolean
 	spin: number
+	/** The Platform they're stood on, by its index: on the Ground if none. */
+	on?: number
+	/** How fast they went into the Tunnel they're in: they go through it no slower. */
+	tunnelSpeed?: number
 }
 
 /**
@@ -176,6 +204,8 @@ export interface Flyer {
 	feetY: number
 	/** How high it flies, its feet off the ground. */
 	altitude: number
+	/** Where its feet are, flying along, before it bobs: gliding to `altitude` over what's below. */
+	cruise: number
 	/** Climbing away, once it's let go. */
 	vy: number
 	state: FlyerState
@@ -191,12 +221,19 @@ export interface Bus {
 	scooping: number
 	/** How far behind the runner it's allowed to get: see `BUS_LEASH_FULL`. */
 	leash: number
+	/**
+	 * How far up its Scoop Arm reaches, from the Ground's line, for someone
+	 * up on a Platform or a rooftop: negative is down.
+	 */
+	reach: number
+	/** How it's drawn going up and down: see `rideBus`. */
+	ride?: BusRide
 }
 
 /**
  * An obstacle and what's happened to it. Some are there for everyone: a rock
  * trips up each racer who runs into it, once. Others are used up by the first
- * to get to it: a hurdle knocked over, a fika had, geese flown off.
+ * to get to it: a hurdle knocked over, geese flown off.
  */
 export interface ObstacleState {
 	obstacle: Obstacle
@@ -205,9 +242,28 @@ export interface ObstacleState {
 	/** Which racers it's had its go at, for the ones that are there for everyone. */
 	hit: Set<string>
 	/** Scooped up by the bus, when, and how fast it flew off: rocks, and children. */
-	scooped?: { at: number; vx: number }
-	/** Geese, flying off, and when they took off. */
+	scooped?: { at: number; vx: number; x?: number }
+	/**
+	 * Geese, disturbed: when some of them first took off, and when the rest
+	 * did, disturbed again (see `gooseTakeoff`). A Steam Vent: when it last
+	 * puffed.
+	 */
 	flown?: number
+	flownAll?: number
+	/** A cyclist riding round a loop: how many times round it's been. */
+	lap?: number
+}
+
+/**
+ * A boost and what's happened to it. A fika's had by the first to get to it;
+ * a cheerer cheers on everyone who passes, once each.
+ */
+export interface BoostState {
+	boost: Boost
+	/** Had, by the first racer to it. */
+	used: boolean
+	/** Which racers it's cheered on. */
+	hit: Set<string>
 	/** Ticks left of a cheerer's "Go!" bubble. */
 	cheering: Accessor<number>
 	setCheering: (ticks: number) => void
@@ -234,10 +290,13 @@ export type BonusKind =
 	| 'cheers'
 	| 'corgis'
 	| 'geese'
+	| 'pumpkins'
+	| 'barcodes'
+	| 'speed'
 	| 'hazards'
 
 export interface Result {
-	kind: 'scooped' | 'finished'
+	kind: 'scooped' | 'fallen' | 'finished'
 	/** How far the runner got, in world pixels from the start line. */
 	distance: number
 	/** For a finish, how far back the bus was. */
@@ -265,13 +324,17 @@ export function startingBody(terrain: Terrain, x: number): Body {
 		ducking: false,
 		stumble: 0,
 		muddy: false,
+		pumpkin: 0,
 		facing: 1,
 		wasUp: false,
+		jumping: false,
 		spin: 0,
 		combo: 0,
 		mount: 0,
 		carried: 0,
 		stomped: 0,
+		dropping: 0,
+		floor: terrain.groundY(x),
 	}
 }
 
@@ -279,7 +342,7 @@ export function startingBody(terrain: Terrain, x: number): Body {
 export const START_GAP = 26
 
 /**
- * Everything about one attempt at a level. The physics is plain mutable state,
+ * Everything about one attempt at a course. The physics is plain mutable state,
  * stepped once a tick by the game controller; the signals are what the HUD and
  * the sprites follow.
  *
@@ -287,12 +350,12 @@ export const START_GAP = 26
  * score and summary are about.
  */
 export function createWorld(
-	level: Level,
+	course: Course,
 	entries: RacerEntry[],
 	options: WorldOptions = {},
 ) {
 	const { startScore = 0, round = false } = options
-	const terrain: Terrain = level.terrain
+	const terrain: Terrain = course.terrain
 	const racers: Racer[] = entries.map((entry, i) => ({
 		...entry,
 		body: startingBody(terrain, START_X - i * START_GAP),
@@ -305,6 +368,8 @@ export function createWorld(
 	const [ticks, setTicks] = createSignal(0)
 	const [raceTicks, setRaceTicks] = createSignal(0)
 	const [camera, setCamera] = createSignal(START_X - VIEW_WIDTH * START_LEAD)
+	/** How far up the camera's looking, from where it starts: negative is up. */
+	const [cameraY, setCameraY] = createSignal(0)
 	const [playerX, setPlayerX] = createSignal(START_X)
 	const [busX, setBusX] = createSignal(BUS_START_X)
 	const [popups, setPopups] = createSignal<Popup[]>([])
@@ -319,6 +384,9 @@ export function createWorld(
 		cheers: { count: 0, points: 0 },
 		corgis: { count: 0, points: 0 },
 		geese: { count: 0, points: 0 },
+		pumpkins: { count: 0, points: 0 },
+		barcodes: { count: 0, points: 0 },
+		speed: { count: 0, points: 0 },
 		hazards: { count: 0, points: 0 },
 	}
 	const addBonus = (kind: BonusKind, points: number) => {
@@ -335,6 +403,7 @@ export function createWorld(
 		speed: 0,
 		scooping: 0,
 		leash: START_X - BUS_START_X,
+		reach: 0,
 	}
 	/** How far across the screen the camera keeps the runner, swinging round as they turn. */
 	const view = { lead: START_LEAD }
@@ -342,26 +411,31 @@ export function createWorld(
 	/** Nobody's out cheering for themselves: they're the one running. */
 	const notRunner = (member: RunnerName) => {
 		if (!running.has(member)) return member
-		const { volunteers } = level
-		const at = volunteers.indexOf(member)
-		for (let i = 1; i <= volunteers.length; i++) {
-			const next = volunteers[(at + i) % volunteers.length]
+		const { cheerers } = course
+		const at = cheerers.indexOf(member)
+		for (let i = 1; i <= cheerers.length; i++) {
+			const next = cheerers[(at + i) % cheerers.length]
 			if (!running.has(next)) return next
 		}
 		return member
 	}
 	const runDirector =
-		level.runDirectors.find((member) => !running.has(member)) ??
-		level.runDirectors[0]
+		course.runDirectors.find((member) => !running.has(member)) ??
+		course.runDirectors[0]
 
-	const obstacles: ObstacleState[] = level.obstacles.map((placed) => {
-		const obstacle =
+	const obstacles: ObstacleState[] = course.obstacles.map((obstacle) => ({
+		obstacle,
+		used: false,
+		hit: new Set<string>(),
+	}))
+	const boosts: BoostState[] = course.boosts.map((placed) => {
+		const boost =
 			placed.kind === 'cheer'
 				? { ...placed, member: notRunner(placed.member) }
 				: placed
 		const [cheering, setCheering] = createSignal(0)
 		return {
-			obstacle,
+			boost,
 			used: false,
 			hit: new Set<string>(),
 			cheering,
@@ -380,7 +454,7 @@ export function createWorld(
 	const [order, setOrder] = createSignal<Racer[]>()
 
 	const world = {
-		level,
+		course,
 		/** Single player's runner, and their body: the first racer's. */
 		runner,
 		racers,
@@ -391,9 +465,10 @@ export function createWorld(
 		bus,
 		view,
 		obstacles,
+		boosts,
 		phase,
 		setPhase,
-		/** Ticks since the level loaded. */
+		/** Ticks since the course loaded. */
 		ticks,
 		setTicks,
 		/** Ticks since "Go!". */
@@ -401,6 +476,8 @@ export function createWorld(
 		setRaceTicks,
 		camera,
 		setCamera,
+		cameraY,
+		setCameraY,
 		zoom,
 		setZoom,
 		/** How wide the camera's view is, in world pixels. */
@@ -420,7 +497,7 @@ export function createWorld(
 		result,
 		setResult,
 		/** How far back the bus was as they crossed the line, for the summary once they've run off. */
-		finish: { busGap: 0 },
+		finish: { busGap: 0, ahead: 0 },
 		/** Everyone else on the path. Plain state, like the body. */
 		pack: [] as Pacer[],
 		/** At most this many of them: in a Round, fewer the more Players there are. */
@@ -434,8 +511,8 @@ export function createWorld(
 		courseScore,
 		/** The points so far, with any carried on from earlier courses in Endless. */
 		score: () => startScore + courseScore(),
-		/** The level's furbies and corgis, if it has any. Plain state, like the body. */
-		furbies: (level.furbies ?? []).map(
+		/** The course's furbies and corgis, if it has any. Plain state, like the body. */
+		furbies: (course.furbies ?? []).map(
 			({ x, asset }, id): Furby => ({
 				id,
 				asset,
@@ -453,10 +530,12 @@ export function createWorld(
 				spin: 0,
 			}),
 		),
-		/** Geese flying over, and which of the level's flyovers is next. Plain state. */
+		/** Geese flying over, and which of the course's flyovers is next. Plain state. */
 		flyers: [] as Flyer[],
 		flyerState: { next: 0, nextId: 0 },
-		corgis: (level.corgis ?? []).map(
+		/** The course's Platforms, which move with the tick: see `platformAt`. */
+		platforms: course.platforms ?? [],
+		corgis: (course.corgis ?? []).map(
 			(x, id): Corgi => ({
 				id,
 				x,

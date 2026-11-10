@@ -1,11 +1,14 @@
 import busEmoji from '@/assets/emoji/bus.png'
 import rockAsset from '@/assets/misc/rock1.png'
 import { For, type JSX } from 'solid-js'
-import { Pixels } from '../game/Pixels'
-import { FIKA_ART, FIKA_ITEMS } from '../game/fika'
-import { GooseIcon } from '../game/geeseArt'
-import { volunteerFrame } from '../game/sprites'
-import { MEMBERS } from '../playable'
+import branchIcon from '../assets/icons/branch.png'
+import mudIcon from '../assets/icons/mud.png'
+import { PixelArt } from '../draw/PixelArt'
+import { FikaArt } from '../draw/art/fika'
+import { GooseIcon } from '../draw/art/geese'
+import { volunteerFrame } from '../draw/sprites'
+import { FIKA_ITEMS } from '../game/fika'
+import { MEMBERS } from '../runners/playable'
 import { Menu, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 
@@ -16,9 +19,6 @@ const CONTROLS: { keys: string[]; does: string }[] = [
 	{ keys: ['↓', 'S'], does: 'Duck and slide' },
 	{ keys: ['Esc', 'P'], does: 'Pause' },
 ]
-
-const LEAF = '#61864a'
-const BARK = '#6b4a2f'
 
 export function InstructionsScreen(props: { onBack: () => void }) {
 	const marshal = volunteerFrame('rick')
@@ -33,31 +33,11 @@ export function InstructionsScreen(props: { onBack: () => void }) {
 			text: 'Rocks trip you up. Jump them.',
 		},
 		{
-			icon: (
-				<Pixels
-					width={44}
-					height={22}
-					rects={[
-						[0, 2, 44, 6, BARK],
-						[2, 8, 16, 12, LEAF],
-						[18, 8, 14, 8, LEAF],
-						[32, 6, 10, 10, LEAF],
-					]}
-				/>
-			),
+			icon: <PixelArt src={branchIcon} width={44} height={22} />,
 			text: 'Low branches. Duck under them.',
 		},
 		{
-			icon: (
-				<Pixels
-					width={44}
-					height={10}
-					rects={[
-						[4, 0, 36, 4, '#7a5634'],
-						[0, 2, 44, 8, '#5b3d22'],
-					]}
-				/>
-			),
+			icon: <PixelArt src={mudIcon} width={44} height={10} />,
 			text: 'Mud bogs you down. Jump over it.',
 		},
 		{
@@ -68,13 +48,7 @@ export function InstructionsScreen(props: { onBack: () => void }) {
 			icon: (
 				<div style={{ display: 'flex', gap: '4px', 'align-items': 'flex-end' }}>
 					<For each={FIKA_ITEMS.slice(0, 3)}>
-						{(item) => (
-							<Pixels
-								width={FIKA_ART[item].width}
-								height={FIKA_ART[item].height}
-								rects={FIKA_ART[item].rects}
-							/>
-						)}
+						{(item) => <FikaArt item={item} />}
 					</For>
 				</div>
 			),

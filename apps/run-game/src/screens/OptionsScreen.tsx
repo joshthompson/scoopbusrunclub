@@ -1,5 +1,11 @@
 import { type JSX, Match, Show, Switch, createSignal } from 'solid-js'
-import { clearLocalData, setSoundOn, soundOn } from '../settings'
+import {
+	clearLocalData,
+	effectsOn,
+	musicOn,
+	setEffectsOn,
+	setMusicOn,
+} from '../saved/settings'
 import { play } from '../sfx'
 import { Menu, Panel } from '../ui/Menu'
 
@@ -15,13 +21,18 @@ export function OptionsScreen(props: { onBack: () => void }) {
 						<Menu
 							items={[
 								{
-									label: 'Sound',
-									value: soundOn() ? 'On' : 'Off',
+									label: 'Sound effects',
+									value: effectsOn() ? 'On' : 'Off',
 									choose: () => {
-										setSoundOn(!soundOn())
+										setEffectsOn(!effectsOn())
 										// Let them hear it's back on.
 										play('select')
 									},
+								},
+								{
+									label: 'Music',
+									value: musicOn() ? 'On' : 'Off',
+									choose: () => setMusicOn(!musicOn()),
 								},
 								{
 									label: 'Clear local data',

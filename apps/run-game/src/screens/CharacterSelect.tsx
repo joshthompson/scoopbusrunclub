@@ -1,6 +1,6 @@
 import { For, type JSX, Show, createEffect, onCleanup } from 'solid-js'
-import { type CustomRunner, customRunners } from '../customRunners'
-import { MEMBERS, type Playable, customPlayable } from '../playable'
+import { type CustomRunner, customRunners } from '../runners/customRunners'
+import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
 import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'

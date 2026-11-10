@@ -11,12 +11,12 @@ import {
 	onMount,
 } from 'solid-js'
 import { type Room, joinRoom } from 'trystero'
-import { RunnerEditor } from '../RunnerEditor'
-import { type CustomRunner, customRunners } from '../customRunners'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { type Action, anyControls, packControls } from '../input'
-import { MEMBERS, type Playable, customPlayable } from '../playable'
-import { STORAGE_PREFIX } from '../settings'
+import { type CustomRunner, customRunners } from '../runners/customRunners'
+import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
+import { STORAGE_PREFIX } from '../saved/settings'
+import { RunnerEditor } from '../screens/RunnerEditor'
 import { RunStrip } from '../ui/RunStrip'
 import { nameSize } from '../ui/RunnerStage'
 import type { Feed } from './Mirror'
@@ -576,6 +576,8 @@ function statusText(view: PadView) {
 			return view.stage === 'results' ? `${view.points} pts` : 'Run!'
 		case 'scooped':
 			return view.place ? `Scooped! ${ordinal(view.place)}${of}` : 'Scooped!'
+		case 'fallen':
+			return view.place ? `Fell! ${ordinal(view.place)}${of}` : 'Fell!'
 		case 'finished':
 			return view.place
 				? `Beat the bus! ${ordinal(view.place)}${of}`

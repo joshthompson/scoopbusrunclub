@@ -9,8 +9,7 @@
 		"build": "pnpm prepare-web && vite build",
 		"serve": "vite preview",
 		"prepare-web": "tsx ../web/scripts/gen-custom-runner-pixels.ts && panda codegen --clean && panda cssgen",
-		"extract-profile": "tsx scripts/extract-profile.ts",
-		"turn-bus-lettering": "tsx scripts/turn-bus-lettering.ts"
+		"extract-profile": "tsx scripts/extract-profile.ts"
 	},
 	"dependencies": {
 		"jsqr": "^1.4.0",

@@ -109,7 +109,7 @@ body {
 		transform: none;
 	}
 	86% {
-		transform: translateY(-14px) rotate(8deg);
+		transform: translateY(-14px) rotate(-8deg);
 	}
 }
 
@@ -171,5 +171,76 @@ button {
 	}
 	75% {
 		transform: translateY(-14px);
+	}
+}
+
+/* Halloween Town's sky (draw/Backdrop.tsx) */
+@keyframes lightning-flash {
+	0%,
+	93%,
+	100% {
+		opacity: 0;
+	}
+	94% {
+		opacity: 0.75;
+	}
+	95% {
+		opacity: 0.1;
+	}
+	96.5% {
+		opacity: 0.6;
+	}
+	98% {
+		opacity: 0;
+	}
+}
+
+@keyframes sky-cross {
+	from {
+		transform: translateX(1040px);
+	}
+	to {
+		transform: translateX(-120px);
+	}
+}
+
+/* A sheet of frames side by side, stepped through: `--strip` is its width. */
+@keyframes flap {
+	to {
+		background-position-x: var(--strip);
+	}
+}
+
+@keyframes sky-bob {
+	50% {
+		transform: translateY(var(--bob));
+	}
+}
+
+/* Rock off the bus's drill, flying back along the hole it bores. */
+@keyframes dirt-fly {
+	0% {
+		transform: translate(0, 0);
+		opacity: 1;
+	}
+	50% {
+		transform: translate(calc(var(--dx) * 0.5), calc(var(--dy) * 0.85));
+		opacity: 1;
+	}
+	100% {
+		transform: translate(var(--dx), var(--dy));
+		opacity: 0;
+	}
+}
+
+/* Steam off a vent, rising and spreading as it goes. */
+@keyframes steam-rise {
+	from {
+		transform: translateY(0) scale(0.6);
+		opacity: 0.95;
+	}
+	to {
+		transform: translateY(-120px) scale(1.6);
+		opacity: 0;
 	}
 }

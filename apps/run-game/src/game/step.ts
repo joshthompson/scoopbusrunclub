@@ -1,6 +1,22 @@
+import {
+	GEESE_REACH_UP,
+	geeseLeft,
+	geeseWidth,
+	gooseSpan,
+} from '../draw/art/geese'
+import { KIDS_REACH_UP, kidsWidth } from '../draw/art/kids'
+import { TOURISTS_HEIGHT, touristsWidth } from '../draw/art/tourists'
+import { rideLook } from '../draw/rideLook'
+import { collect } from '../saved/collected'
 import { play } from '../sfx'
+import { ceilingAt, inTunnel, rockOver } from './cave'
 import {
 	AIR_PUSH,
+	BARCODE_BOOST,
+	BARCODE_POINTS,
+	BARCODE_TALL,
+	BARCODE_WIDTH,
+	BUS_HILL_PULL,
 	BUS_HOLD_TICKS,
 	BUS_LEASH_FULL,
 	BUS_LEASH_GROWTH,
@@ -8,6 +24,7 @@ import {
 	BUS_LEASH_MAX,
 	BUS_RAMP_TICKS,
 	BUS_START_SPEED,
+	BUS_START_X,
 	BUS_TOP_SPEED,
 	CAMERA_LEAD,
 	CAMERA_TURN,
@@ -26,13 +43,19 @@ import {
 	HAZARD_POINTS,
 	HILL_PULL,
 	HITBOX_HALF_WIDTH,
+	JUMP_CUT,
 	JUMP_SPEED,
 	MAX_SPEED,
 	MUD_TOP_SPEED,
+	PATH_FRONT,
+	PUMPKIN_BOOST,
+	PUMPKIN_POINTS,
+	PUMPKIN_SPEED,
 	PX_PER_M,
 	RUN_GRIP,
 	RUN_TOP_SPEED,
 	SLIDE_KEEP,
+	SPEED_POINTS,
 	STAND_HEIGHT,
 	START_LEAD,
 	START_X,
@@ -40,15 +63,26 @@ import {
 	STUMBLE_TICKS,
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
+	hillPull,
 } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
-import { FIKA_ART } from './fika'
-import { stepFlyers } from './flyers'
+import { cyclistAt } from './cyclists'
+import { FIKA_SIZE, FIKA_WORD } from './fika'
+import { flightFloor, glide, stepFlyers } from './flyers'
 import { scoopFurbies, stepFurbies } from './furbies'
-import { GEESE_REACH_UP, geeseWidth } from './geeseArt'
-import { KIDS_REACH_UP, kidsWidth } from './kidsArt'
 import { scoopPack, stepPack } from './pack'
-import type { Body, ObstacleState, Racer, World } from './world'
+import { landingOn, platformAt, platformMove } from './platforms'
+import { STEAM_LAUNCH, STEAM_REACH } from './steam'
+import { TOWER_DOOR, TOWER_HEIGHT, towerSpan } from './towers'
+import {
+	type Body,
+	type BoostState,
+	type ObstacleState,
+	type Racer,
+	type World,
+	isCaught,
+} from './world'
+import { zombieAt } from './zombies'
 
 /** How long a popup stays up. */
 export const POPUP_TICKS = 45
@@ -62,6 +96,23 @@ const RUN_OFF_SPEED = 6
 const RUN_OFF_PAST = 60
 /** How long the runner flies after being scooped before the result shows. */
 const SCOOPED_TICKS = 70
+/** How far down a Gap, below the Ground's line, a runner's Fallen. */
+const FALL_DEPTH = 160
+/** How long the runner falls before the result shows. */
+const FALLEN_TICKS = 60
+/** How long ducking drops through a Platform for, before it can be landed on again. */
+const DROP_TICKS = 14
+/**
+ * How far below the top of a Wall a runner's feet can be and still get up
+ * onto it, rather than run into it.
+ */
+const WALL_STEP = 10
+/** How fast a Wall throws a runner back. */
+const WALL_BOUNCE = 1
+/** How fast into a Wall a runner has to be going for it to throw them back. */
+const WALL_BOUNCE_SPEED = 4
+/** How far a step down the Ground can be before running off it is a drop, not a step. */
+const STEP_DOWN = 12
 
 /**
  * One tick of the whole game, in order: the phase, the runner, everyone else,
@@ -83,7 +134,7 @@ export function stepWorld(world: World) {
 	} else stepCamera(world)
 
 	// Not while flying out of the scoop: how far they got is where it got them.
-	if (world.racers[0].out !== 'scooped') world.setPlayerX(world.body.x)
+	if (!isCaught(world.racers[0].out)) world.setPlayerX(world.body.x)
 	// A point a metre, for the furthest they've got round.
 	const metres = Math.floor(
 		Math.min(world.terrain.length, world.playerX() - START_X) / PX_PER_M,
@@ -116,6 +167,7 @@ function stepPhase(world: World) {
 			if (racer === world.racers[0] && !world.round) {
 				world.setPhase('finished')
 				world.finish.busGap = racer.body.x - world.bus.frontX
+				speedBonus(world, racer)
 			}
 		}
 		return
@@ -138,6 +190,45 @@ function stepPhase(world: World) {
 			distance: Math.max(0, world.playerX() - START_X),
 			busGap: 0,
 		})
+	if (
+		phase === 'fallen' &&
+		!world.result() &&
+		world.ticks() - world.racers[0].outAt > FALLEN_TICKS
+	)
+		world.setResult({
+			kind: 'fallen',
+			distance: Math.max(0, world.playerX() - START_X),
+			busGap: 0,
+		})
+}
+
+/**
+ * How long the bus takes to drive from where it starts to the finish, at
+ * its own pace, held at the start, then speeding up, as it does when nobody's
+ * so far ahead it's pulled along: the time to beat.
+ */
+function busTicksToFinish(world: World) {
+	let x = BUS_START_X
+	let ticks = BUS_HOLD_TICKS
+	while (x < world.terrain.finishX) {
+		const ramp = Math.min(1, (ticks - BUS_HOLD_TICKS) / BUS_RAMP_TICKS)
+		x += BUS_START_SPEED + (BUS_TOP_SPEED - BUS_START_SPEED) * ramp
+		ticks++
+	}
+	return ticks
+}
+
+/**
+ * Over the line: points for how much quicker round than the bus they were,
+ * so the quicker the better, not just getting there.
+ */
+function speedBonus(world: World, racer: Racer) {
+	const ahead = busTicksToFinish(world) - world.raceTicks()
+	world.finish.ahead = ahead
+	if (ahead <= 0) return
+	const points = Math.round(ahead * SPEED_POINTS)
+	world.addBonus('speed', points)
+	world.popup(`Speedy! +${points}`, racer.body.x, racer.body.feetY - 90)
 }
 
 /**
@@ -162,14 +253,14 @@ function decideRound(world: World) {
 	if (running.length > 0 && !lastStanding) return
 
 	const rank = (r: Racer) =>
-		r.out === 'finished' ? 0 : r.out === 'scooped' ? 2 : 1
+		r.out === 'finished' ? 0 : isCaught(r.out) ? 2 : 1
 	world.setOrder(
 		[...racers].sort(
 			(a, b) =>
 				rank(a) - rank(b) ||
 				(a.out === 'finished'
 					? a.outAt - b.outAt
-					: a.out === 'scooped'
+					: isCaught(a.out)
 						? b.outAt - a.outAt
 						: 0) ||
 				b.body.x - a.body.x,
@@ -210,6 +301,14 @@ function stepRunner(world: World, racer: Racer) {
 		b.spin += 1
 		return
 	}
+	if (racer.out === 'fallen') {
+		// On down, out of sight.
+		b.vx *= 0.9
+		b.x += b.vx
+		b.vy = Math.min(b.vy + GRAVITY, 14)
+		b.feetY += b.vy
+		return
+	}
 
 	// On the start line until "Go!": Haga climbs from the start, and the hill
 	// would otherwise pull them back down it.
@@ -228,7 +327,17 @@ function stepRunner(world: World, racer: Racer) {
 		b.carried = 0
 	}
 	if (b.stomped > 0) b.stomped--
+	// A stumble knocks a Pumpkin off.
+	if (b.stumble > 0 && b.pumpkin) loseHat(world, b)
+	if (b.dropping > 0) b.dropping--
 
+	if (b.carried > 0 && up && !b.wasUp) {
+		// Jumping off a goose, or a dragon: up off it, as off the ground.
+		b.carried = 0
+		jump(b)
+		b.wasUp = up
+		return
+	}
 	if (b.carried > 0) {
 		// Carried by a goose: up and on, whatever's held, until it lets go,
 		// or they do, with down.
@@ -237,8 +346,16 @@ function stepRunner(world: World, racer: Racer) {
 		b.ducking = false
 		b.facing = 1
 		b.vx += (GOOSE_CARRY_SPEED - b.vx) * CORGI_GRIP
-		b.vy = (terrain.groundY(b.x) - GOOSE_CARRY_HEIGHT - b.feetY) * CARRY_LIFT
+		// Up over whatever's coming, as the goose flies.
+		b.vy = glide(
+			b.feetY,
+			flightFloor(world, b.x) - GOOSE_CARRY_HEIGHT,
+			CARRY_LIFT,
+		)
+		const carriedFrom = b.x
 		b.x += b.vx
+		// Carried into a tower's side: knocked off, and down.
+		if (racing) hitTower(world, racer, carriedFrom)
 		b.feetY += b.vy
 		// Let go: falling from here, not still rising.
 		if (b.carried === 0) b.vy = Math.max(0, b.vy)
@@ -246,9 +363,30 @@ function stepRunner(world: World, racer: Racer) {
 		return
 	}
 
+	// Ducking on a Platform: down through it, unless it's solid rock.
+	if (
+		b.grounded &&
+		b.on !== undefined &&
+		!world.platforms[b.on].solid &&
+		down &&
+		b.mount === 0
+	) {
+		b.droppingFrom = b.on
+		b.dropping = DROP_TICKS
+		b.on = undefined
+		b.grounded = false
+		b.vy = 1
+	}
+
 	if (b.grounded) {
-		const slope = terrain.slope(b.x)
-		b.ducking = down
+		// Platforms are flat.
+		const slope = b.on === undefined ? terrain.slope(b.x) : 0
+		// In a Tunnel: kept down in it, ducking or not, and going through it
+		// no slower than they went in.
+		const low = inTunnel(world, b.x, b.feetY)
+		if (!low) b.tunnelSpeed = undefined
+		else b.tunnelSpeed ??= Math.abs(b.vx)
+		b.ducking = down || low
 		if (b.stumble > 0) b.stumble--
 		const canDrive = b.stumble === 0
 
@@ -261,9 +399,24 @@ function stepRunner(world: World, racer: Racer) {
 		} else if (b.ducking) {
 			// A slide: hardly slows on the flat, and gathers speed downhill.
 			b.vx *= SLIDE_KEEP
-			b.vx += slope * HILL_PULL * (slope > 0 ? 2 : 1)
+			b.vx += hillPull(slope) * HILL_PULL * (slope > 0 ? 2 : 1)
+			// Holding a way too: crawling along that way, slowly, if they're
+			// not sliding any faster.
+			const crawl = canDrive ? Number(right) - Number(left) : 0
+			if (crawl && b.vx * crawl < CRAWL_SPEED)
+				b.vx += (crawl * CRAWL_SPEED - b.vx) * CRAWL_GRIP
+			if (b.tunnelSpeed !== undefined) {
+				// Through a Tunnel no slower than they went in, and holding a
+				// way, pushing on slowly up to a fair pace, however slowly
+				// they started.
+				if (crawl && b.tunnelSpeed < TUNNEL_PUSH_TO)
+					b.tunnelSpeed = Math.min(TUNNEL_PUSH_TO, b.tunnelSpeed + TUNNEL_PUSH)
+				b.vx = (b.vx < 0 ? -1 : 1) * Math.max(Math.abs(b.vx), b.tunnelSpeed)
+			}
 		} else {
-			const top = b.muddy ? MUD_TOP_SPEED : RUN_TOP_SPEED
+			const top = b.muddy
+				? MUD_TOP_SPEED
+				: RUN_TOP_SPEED + (b.pumpkin ? PUMPKIN_SPEED : 0)
 			// Holding both is standing still.
 			const drive = canDrive ? Number(right) - Number(left) : 0
 			if (finished) b.vx += (RUN_OFF_SPEED - b.vx) * RUN_GRIP * 2
@@ -273,20 +426,29 @@ function stepRunner(world: World, racer: Racer) {
 				const boosted = b.vx * drive > top
 				b.vx += (target - b.vx) * (boosted ? OVERSPEED_GRIP : RUN_GRIP)
 			} else b.vx *= COAST_KEEP
-			b.vx += slope * HILL_PULL
+			b.vx += hillPull(slope) * HILL_PULL
 			if (b.muddy && Math.abs(b.vx) > MUD_TOP_SPEED) b.vx *= 0.93
 		}
 
-		if (up && !b.wasUp) {
-			// Jumping off a corgi, if on one.
+		if (up && !b.wasUp && !low) {
+			// Off a corgi or a llama, if on one: up from its saddle.
+			if (b.mount > 0) b.feetY -= rideLook(world.course).saddle
 			b.mount = 0
-			b.vy = -JUMP_SPEED
-			play('jump')
-			b.grounded = false
+			jump(b)
 			b.ducking = false
+			b.on = undefined
 		}
 	} else {
+		// Off a corgi or a llama even with it in the air, up from its saddle.
+		if (up && !b.wasUp && b.mount > 0) {
+			b.feetY -= rideLook(world.course).saddle
+			b.mount = 0
+			jump(b)
+		}
 		b.vy += GRAVITY
+		// Let go of jump on the way up: cut short, a hop. Held: the whole jump.
+		if (b.jumping && !up && b.vy < -JUMP_CUT) b.vy = -JUMP_CUT
+		if (b.vy >= 0) b.jumping = false
 		if (right) b.vx += AIR_PUSH
 		if (left) b.vx -= AIR_PUSH
 	}
@@ -295,19 +457,220 @@ function stepRunner(world: World, racer: Racer) {
 	else if (b.vx < -0.5) b.facing = -1
 
 	b.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, b.vx))
+
+	// Carried along by a Moving Platform.
+	const ticks = world.ticks()
+	if (b.grounded && b.on !== undefined)
+		b.x += platformMove(terrain, world.platforms[b.on], ticks).x
+
 	// The bus is in the way long before this, but the ground runs out here.
+	const from = b.x
 	b.x = Math.max(LEFT_EDGE, b.x + b.vx)
+	if (racing) {
+		hitWall(world, racer, from)
+		hitTower(world, racer, from)
+		hitRockFace(world, racer, from)
+	}
 
 	const ground = terrain.groundY(b.x)
-	if (b.grounded) b.feetY = ground
-	else {
+	const overGap = terrain.inGap(b.x)
+	if (b.grounded) {
+		if (b.on !== undefined) {
+			const at = platformAt(terrain, world.platforms[b.on], ticks)
+			// Run off the end of it.
+			if (b.x < at.left || b.x > at.right) leaveFooting(b)
+			else b.feetY = at.top
+		} else if (overGap || stepsDown(world, from, b.x, ground - b.feetY))
+			leaveFooting(b)
+		else b.feetY = ground
+	}
+	if (!b.grounded) {
+		const wasFeetY = b.feetY
 		b.feetY += b.vy
-		if (b.feetY >= ground && b.vy >= 0) {
+		// Up into a Ceiling: a bump on the head, and no higher.
+		if (b.vy < 0) {
+			const height = b.ducking ? DUCK_HEIGHT : STAND_HEIGHT
+			const ceiling = ceilingAt(world, b.x, wasFeetY - height)
+			if (ceiling !== undefined && b.feetY - height < ceiling) {
+				b.feetY = ceiling + height
+				b.vy = 0
+				b.jumping = false
+			}
+		}
+		const platform =
+			b.vy >= 0
+				? landingOn(
+						terrain,
+						world.platforms,
+						ticks,
+						b.x,
+						wasFeetY,
+						b.feetY,
+						b.dropping > 0 ? b.droppingFrom : undefined,
+					)
+				: undefined
+		if (platform && (overGap || platform.top <= ground)) {
+			b.feetY = platform.top
+			b.on = platform.index
+			land(b)
+		} else if (!overGap && b.feetY >= ground && b.vy >= 0) {
 			b.feetY = ground
+			b.on = undefined
+			land(b)
+		} else if (racing && b.feetY > ground + FALL_DEPTH) fall(world, racer)
+	}
+	if (b.grounded) b.floor = b.feetY
+}
+
+/** A Pumpkin knocked off someone's head, flying. */
+function loseHat(world: World, b: Body) {
+	b.lostPumpkin = { carving: b.pumpkin, at: world.ticks() }
+	b.pumpkin = 0
+}
+
+/** A jump, off the ground or off a ride: a tap's a hop, held it's the whole jump. */
+function jump(b: Body) {
+	b.vy = -JUMP_SPEED
+	b.jumping = true
+	b.grounded = false
+	play('jump')
+}
+
+/** Off whatever they were stood on, and falling. */
+function leaveFooting(b: Body) {
+	b.on = undefined
+	b.grounded = false
+	b.vy = 0
+}
+
+function land(b: Body) {
+	b.vy = 0
+	b.grounded = true
+	b.jumping = false
+}
+
+/** Whether going from `from` to `to` crosses a step down in the Ground more than `drop` deep. */
+function stepsDown(world: World, from: number, to: number, drop: number) {
+	if (drop <= STEP_DOWN) return false
+	const [lo, hi] = from < to ? [from, to] : [to, from]
+	return world.terrain.walls.some((w) => w > lo && w <= hi)
+}
+
+/**
+ * Run into a Wall going from `from`: the side of higher Ground, or the far
+ * side of a Gap they've dropped into. Thrown back off it, stumbling.
+ */
+function hitWall(world: World, racer: Racer, from: number) {
+	const { terrain } = world
+	const b = racer.body
+	const dir = Math.sign(b.x - from)
+	if (!dir) return
+	const front = (x: number) => x + dir * HITBOX_HALF_WIDTH
+	const [lo, hi] =
+		dir > 0 ? [front(from), front(b.x)] : [front(b.x), front(from)]
+	for (const w of terrain.walls) {
+		if (w <= lo || w > hi) continue
+		// The Ground just past it, if there is any.
+		const beyond = w + dir
+		if (terrain.inGap(beyond)) continue
+		if (b.feetY <= terrain.groundY(beyond) + WALL_STEP) continue
+		thud(world, b, dir, w)
+		return
+	}
+}
+
+/**
+ * Into something solid at `edge`, going `dir`: stopped against it, and at a
+ * run thrown back off it, stumbling. Off whatever was carrying them, too.
+ */
+function thud(world: World, b: Body, dir: number, edge: number) {
+	b.x = edge - dir * (HITBOX_HALF_WIDTH + 1)
+	b.carried = 0
+	// Walked into, it just stops them: only at a run does it throw them back.
+	const fast = Math.abs(b.vx) >= WALL_BOUNCE_SPEED
+	b.vx = fast ? -dir * WALL_BOUNCE : 0
+	if (fast && b.stumble === 0) {
+		play('stumble')
+		b.stumble = STUMBLE_TICKS
+		world.addBonus('hazards', -HAZARD_POINTS)
+		world.popup(
+			scored(world, 'Thud!', `-${HAZARD_POINTS}`),
+			b.x,
+			b.feetY - STAND_HEIGHT,
+		)
+	}
+}
+
+/**
+ * A guard tower's walls: solid, all but its doorways. Into its side above
+ * the doorway, it stops them as a Wall does; jumping inside it, they hit
+ * their head on the top of the doorway. Over its top, nothing.
+ */
+function hitTower(world: World, racer: Racer, from: number) {
+	const b = racer.body
+	const head = b.feetY - (b.ducking ? DUCK_HEIGHT : STAND_HEIGHT)
+	const dir = Math.sign(b.x - from)
+	for (const x of world.course.towers ?? []) {
+		const { left, right } = towerSpan(x)
+		const line = world.terrain.groundY(x)
+		const doorTop = line - TOWER_DOOR
+		const top = line + PATH_FRONT - TOWER_HEIGHT
+		if (b.feetY < top || head >= doorTop) continue
+		const front = b.x + dir * HITBOX_HALF_WIDTH
+		const was = from + dir * HITBOX_HALF_WIDTH
+		if (dir > 0 && was <= left && front > left) return thud(world, b, 1, left)
+		if (dir < 0 && was >= right && front < right)
+			return thud(world, b, -1, right)
+		// In it, jumping: the top of the doorway. (Carried, they're flown up
+		// over it, not into it.)
+		if (b.x > left && b.x < right && b.vy < 0 && b.carried === 0) {
+			b.feetY = doorTop + (b.feetY - head)
 			b.vy = 0
-			b.grounded = true
+			play('stumble')
 		}
 	}
+}
+
+/**
+ * Into a Cave's rock lower than their head, going along: a Tunnel's mouth,
+ * run into standing up, or the rock over it, jumped into. Ducking, they go
+ * on under it.
+ */
+function hitRockFace(world: World, racer: Racer, from: number) {
+	const cave = world.course.cave
+	const b = racer.body
+	const dir = Math.sign(b.x - from)
+	if (!cave || !dir) return
+	const height = b.ducking ? DUCK_HEIGHT : STAND_HEIGHT
+	/** Whether, at `x`, their front's into the rock. */
+	const into = (x: number) => {
+		const front = x + dir * HITBOX_HALF_WIDTH
+		const feet =
+			b.grounded && b.on === undefined ? world.terrain.groundY(front) : b.feetY
+		const rock = rockOver(world, front, feet)
+		return rock !== undefined && rock > feet - height + 1
+	}
+	if (into(from) || !into(b.x)) return
+	let edge = from
+	while (!into(edge + dir)) edge += dir
+	thud(world, b, dir, edge + dir * (HITBOX_HALF_WIDTH + 1))
+}
+
+/** Down a Gap, and out. */
+function fall(world: World, racer: Racer) {
+	const b = racer.body
+	b.mount = 0
+	b.carried = 0
+	b.ducking = false
+	racer.out = 'fallen'
+	racer.outAt = world.ticks()
+	if (!world.round) world.setPhase('fallen')
+	play('fallen')
+	world.popup(
+		`${racer.runner.name} fell!`,
+		b.x,
+		world.terrain.groundY(b.x) - 80,
+	)
 }
 
 /** How quickly a goose lifts whoever it's carrying up to its height, a share a tick. */
@@ -357,28 +720,24 @@ function collide(world: World, racer: Racer) {
 	const riding = b.mount > 0 || b.carried > 0
 	/**
 	 * Not yet had its go at them. A rock, a branch, a pothole, mud and the
-	 * children are there for everyone, once each; a hurdle, a fika and geese
-	 * only for whoever gets to them first (see `firstTo`). Either way, not
+	 * children are there for everyone, once each; a hurdle and geese only for
+	 * whoever gets to them first (see `firstTo`). Either way, not
 	 * once the bus has been through.
 	 */
 	const freshFor = (state: ObstacleState) =>
 		!state.used && !state.hit.has(racer.id)
-	const hits = (state: ObstacleState) => state.hit.add(racer.id)
-	for (const state of world.obstacles) {
+	const hits = (state: ObstacleState | BoostState) => state.hit.add(racer.id)
+	for (const state of riding ? [] : world.obstacles) {
 		const o = state.obstacle
-		// Only what's near enough to touch.
-		if (Math.abs(o.x - b.x) > 200) continue
-		if (
-			riding &&
-			(o.kind === 'rock' ||
-				o.kind === 'branch' ||
-				o.kind === 'mud' ||
-				o.kind === 'hurdle' ||
-				o.kind === 'pothole' ||
-				o.kind === 'kids' ||
-				o.kind === 'geese')
-		)
-			continue
+		// Only what's near enough to touch: where it is now, for a cyclist
+		// or a Zombie on the move.
+		const at =
+			o.kind === 'cyclist'
+				? cyclistAt(world, { ...state, obstacle: o }).x
+				: o.kind === 'zombie'
+					? zombieAt(world, { ...state, obstacle: o }).x
+					: o.x
+		if (Math.abs(at - b.x) > 200) continue
 		const ground = terrain.groundY(o.x)
 
 		switch (o.kind) {
@@ -402,6 +761,92 @@ function collide(world: World, racer: Racer) {
 					stumble('Bonk!')
 				}
 				break
+			case 'vent':
+				if (
+					freshFor(state) &&
+					b.stumble === 0 &&
+					overlaps(o.x - 18, o.x + 18, ground - 26, ground)
+				) {
+					hits(state)
+					stumble('Clang!')
+				}
+				break
+			case 'tombstone':
+				if (
+					freshFor(state) &&
+					b.stumble === 0 &&
+					overlaps(o.x - 16, o.x + 16, ground - 48, ground)
+				) {
+					hits(state)
+					stumble('Clunk!')
+				}
+				break
+			case 'steam':
+				// Onto it: it puffs, and fires them up into the air, as from a
+				// jump, but much higher.
+				if (b.grounded && Math.abs(b.x - o.x) < STEAM_REACH) {
+					state.flown = world.ticks()
+					b.vy = -STEAM_LAUNCH
+					b.grounded = false
+					b.jumping = false
+					b.on = undefined
+					play('whoosh')
+				}
+				break
+			case 'tourists': {
+				const half = touristsWidth(o.count) / 2 - 4
+				if (
+					freshFor(state) &&
+					!state.scooped &&
+					b.stumble === 0 &&
+					overlaps(o.x - half, o.x + half, ground - TOURISTS_HEIGHT, ground)
+				) {
+					hits(state)
+					stumble('Excuse me!')
+				}
+				break
+			}
+			case 'cyclist': {
+				const cyclist = cyclistAt(world, { ...state, obstacle: o })
+				// Round again: there to be run into again.
+				if (cyclist.lap !== (state.lap ?? 0)) {
+					state.lap = cyclist.lap
+					state.hit.clear()
+				}
+				const at = terrain.groundY(cyclist.x)
+				if (
+					freshFor(state) &&
+					!state.scooped &&
+					b.stumble === 0 &&
+					overlaps(cyclist.x - 20, cyclist.x + 20, at - 40, at)
+				) {
+					hits(state)
+					play('honk')
+					stumble('Ding ding!')
+				}
+				break
+			}
+			case 'zombie': {
+				const zombie = zombieAt(world, { ...state, obstacle: o })
+				const zombieGround = terrain.groundY(zombie.x)
+				if (
+					freshFor(state) &&
+					!state.scooped &&
+					zombie.sunk === 0 &&
+					b.stumble === 0 &&
+					overlaps(
+						zombie.x - 12,
+						zombie.x + 12,
+						zombieGround - 52,
+						zombieGround,
+					)
+				) {
+					hits(state)
+					play('groan')
+					stumble('Braaains!')
+				}
+				break
+			}
 			case 'hurdle':
 				// Solid all the way down: over it, not under it. Knocked over by
 				// whoever runs into it first, and lying flat for the rest.
@@ -427,15 +872,25 @@ function collide(world: World, racer: Racer) {
 				break
 			}
 			case 'geese': {
-				const half = geeseWidth(o.count) / 2 - 4
-				// Into them first: they're off, and nobody else has to jump them.
-				if (
-					!state.used &&
-					b.stumble === 0 &&
-					overlaps(o.x - half, o.x + half, ground - GEESE_REACH_UP, ground)
-				) {
-					state.used = true
-					state.flown = world.ticks()
+				if (state.used || b.stumble > 0) break
+				// Into the ones still on the path: some of them are off, and into
+				// those left, the rest. Till they're all gone, they're still in
+				// everyone else's way.
+				const left = geeseLeft(o.x, o.count, state.flown, state.flownAll)
+				const into = left.some((i) => {
+					const goose = gooseSpan(o.x, o.count, i)
+					return overlaps(
+						goose.left + 4,
+						goose.right - 4,
+						ground - GEESE_REACH_UP,
+						ground,
+					)
+				})
+				if (into) {
+					if (state.flown === undefined) state.flown = world.ticks()
+					else state.flownAll = world.ticks()
+					if (!geeseLeft(o.x, o.count, state.flown, state.flownAll).length)
+						state.used = true
 					play('honk')
 					stumble('Honk!')
 				}
@@ -447,6 +902,7 @@ function collide(world: World, racer: Racer) {
 					freshFor(state) &&
 					b.stumble === 0 &&
 					b.grounded &&
+					b.on === undefined &&
 					Math.abs(b.x - o.x) < o.width / 2 - 4
 				) {
 					hits(state)
@@ -455,7 +911,11 @@ function collide(world: World, racer: Racer) {
 				break
 			case 'mud':
 				// Bogging everyone down, and costing each of them once.
-				if (b.grounded && Math.abs(b.x - o.x) < o.width / 2) {
+				if (
+					b.grounded &&
+					b.on === undefined &&
+					Math.abs(b.x - o.x) < o.width / 2
+				) {
 					if (!b.muddy && freshFor(state)) {
 						hits(state)
 						world.addBonus('hazards', -HAZARD_POINTS)
@@ -469,8 +929,16 @@ function collide(world: World, racer: Racer) {
 					b.muddy = true
 				}
 				break
+		}
+	}
+
+	for (const state of world.boosts) {
+		const o = state.boost
+		if (Math.abs(o.x - b.x) > 200) continue
+		const ground = terrain.groundY(o.x)
+		switch (o.kind) {
 			case 'fika': {
-				const { width, height } = FIKA_ART[o.item]
+				const { width, height } = FIKA_SIZE[o.item]
 				const y = ground - o.height
 				// A little bigger than the art, so grabbing it isn't fiddly.
 				const reach = width / 2 + 4
@@ -479,13 +947,55 @@ function collide(world: World, racer: Racer) {
 					overlaps(o.x - reach, o.x + reach, y - height - 2, y)
 				) {
 					state.used = true
+					collect(`fika:${o.item}`)
 					b.vx = boost(b.vx, b.facing, FIKA_BOOST)
 					world.addBonus('fika', FIKA_POINTS)
-					world.popup(scored(world, 'Fika!', `+${FIKA_POINTS}`), b.x, top)
+					world.popup(
+						scored(world, FIKA_WORD[o.item] ?? 'Fika!', `+${FIKA_POINTS}`),
+						b.x,
+						top,
+					)
 					play('fika')
 				}
 				break
 			}
+			case 'barcode': {
+				const y = ground - o.height
+				const reach = BARCODE_WIDTH / 2 + 4
+				if (
+					!state.used &&
+					overlaps(o.x - reach, o.x + reach, y - BARCODE_TALL - 2, y)
+				) {
+					state.used = true
+					collect('barcode')
+					b.vx = boost(b.vx, b.facing, BARCODE_BOOST)
+					world.addBonus('barcodes', BARCODE_POINTS)
+					world.popup(scored(world, 'Scanned!', `+${BARCODE_POINTS}`), b.x, top)
+					play('scan')
+				}
+				break
+			}
+			case 'pumpkin':
+				// Only with nothing on your head already.
+				if (
+					!state.used &&
+					!b.pumpkin &&
+					b.stumble === 0 &&
+					overlaps(o.x - 16, o.x + 16, ground - 30, ground)
+				) {
+					state.used = true
+					collect('pumpkin')
+					b.pumpkin = o.carving
+					b.vx = boost(b.vx, b.facing, PUMPKIN_BOOST)
+					world.addBonus('pumpkins', PUMPKIN_POINTS)
+					world.popup(
+						scored(world, 'Pumpkin head!', `+${PUMPKIN_POINTS}`),
+						b.x,
+						top,
+					)
+					play('fika')
+				}
+				break
 			case 'cheer':
 				// Passing them, either way: they cheer on everyone, once each.
 				if (
@@ -510,12 +1020,23 @@ function collide(world: World, racer: Racer) {
 	}
 }
 
+/** How far behind the scoop's front the middle of the bus is, where it feels the hill. */
+const BUS_MIDDLE_BEHIND = 145
+
+/** How fast holding a way in a Tunnel gets someone going through it, and how quickly. */
+const TUNNEL_PUSH_TO = 4
+const TUNNEL_PUSH = 0.04
+
+/** How fast someone crawls, ducking and holding a way, and how quickly they get going. */
+const CRAWL_SPEED = 1.6
+const CRAWL_GRIP = 0.2
+
 function stepBus(world: World) {
 	const { bus } = world
 	const phase = world.phase()
 	if (bus.scooping > 0) bus.scooping--
 	// Cheerers' bubbles run down here, once a tick, whoever set them going.
-	for (const state of world.obstacles)
+	for (const state of world.boosts)
 		if (state.cheering() > 0) state.setCheering(state.cheering() - 1)
 
 	if (phase === 'countdown') return
@@ -528,14 +1049,21 @@ function stepBus(world: World) {
 			const ramp = Math.min(1, driving / BUS_RAMP_TICKS)
 			bus.speed = BUS_START_SPEED + (BUS_TOP_SPEED - BUS_START_SPEED) * ramp
 		}
-		bus.frontX += bus.speed
+		// Slowed going uphill, as everyone is: its wheels' slope.
+		const slope = world.terrain.slope(bus.frontX - BUS_MIDDLE_BEHIND)
+		const uphill = Math.min(0, hillPull(slope)) * BUS_HILL_PULL
+		bus.frontX += bus.speed * Math.max(0.3, 1 + uphill)
 	}
 	scoopPack(world)
 	scoopFurbies(world)
 	scoopCorgis(world)
 	knockOver(world)
 
-	if (phase !== 'running') return
+	if (phase !== 'running') {
+		// Back in, once there's no one to reach for.
+		bus.reach *= 1 - ARM_EASE
+		return
+	}
 	const running = world.racers.filter((r) => !r.out)
 	if (!running.length) return
 	// Never more than its leash behind, however far ahead the runner gets:
@@ -547,11 +1075,38 @@ function stepBus(world: World) {
 		bus.frontX = leader - bus.leash
 	}
 
+	reachFor(world, running)
 	for (const racer of running) {
 		const body = racer.body
 		if (bus.frontX < body.x - HITBOX_HALF_WIDTH) continue
 		scoop(world, racer, body)
 	}
+}
+
+/** How far ahead of the bus the Scoop Arm starts reaching for someone. */
+const ARM_RANGE = 320
+/** How far off the Ground's line someone has to be to be reached for: less, and the scoop gets them as it is. */
+const ARM_FROM = 40
+/** How quickly the arm stretches or shrinks, a share a tick. */
+const ARM_EASE = 0.12
+
+/**
+ * The Scoop Arm, reaching up (or down) for the nearest racer ahead of the
+ * bus that's off the Ground's line: up on a Platform or a rooftop. The bus
+ * scoops whoever it reaches, whatever their height; this is how.
+ */
+function reachFor(world: World, running: Racer[]) {
+	const { bus, terrain } = world
+	let target = 0
+	let nearest = ARM_RANGE
+	for (const racer of running) {
+		const ahead = racer.body.x - bus.frontX
+		if (ahead < -HITBOX_HALF_WIDTH || ahead > nearest) continue
+		const off = (bus.ride?.y ?? terrain.groundY(bus.frontX)) - racer.body.feetY
+		nearest = ahead
+		target = Math.abs(off) > ARM_FROM ? off : 0
+	}
+	bus.reach += (target - bus.reach) * ARM_EASE
 }
 
 /** Caught by the bus: flung up out of the scoop, and out. */
@@ -585,20 +1140,55 @@ function knockOver(world: World) {
 	const { bus } = world
 	for (const state of world.obstacles) {
 		const o = state.obstacle
+		// Zombies walk into it: scooped, where they are, like anyone else.
+		if (o.kind === 'cyclist') {
+			if (state.scooped) continue
+			const cyclist = cyclistAt(world, { ...state, obstacle: o })
+			if (bus.frontX < cyclist.x - 16) continue
+			state.used = true
+			state.scooped = {
+				at: world.ticks(),
+				vx: Math.max(bus.speed, 2) + 2 + Math.random() * 2,
+				x: cyclist.x,
+			}
+			bus.scooping = 10
+			continue
+		}
+		if (o.kind === 'zombie') {
+			if (state.scooped) continue
+			const zombie = zombieAt(world, { ...state, obstacle: o })
+			if (zombie.sunk > 0 || bus.frontX < zombie.x - 12) continue
+			state.used = true
+			state.scooped = {
+				at: world.ticks(),
+				vx: Math.max(bus.speed, 2) + 2 + Math.random() * 2,
+				x: zombie.x,
+			}
+			bus.scooping = 10
+			const camera = world.camera()
+			if (zombie.x > camera && zombie.x < camera + world.viewWidth())
+				play('whoosh')
+			continue
+		}
 		// Geese see it coming, and are off before it gets to them.
 		if (
 			o.kind === 'geese' &&
-			state.flown === undefined &&
+			state.flownAll === undefined &&
 			bus.frontX > o.x - geeseWidth(o.count) / 2 - GEESE_SCARE
 		) {
 			state.used = true
-			state.flown = world.ticks()
+			state.flownAll = world.ticks()
 			const camera = world.camera()
 			if (o.x > camera && o.x < camera + world.viewWidth()) play('honk')
 		}
 		if (state.scooped || bus.frontX < o.x - 14) continue
 		if (o.kind === 'hurdle') state.used = true
-		if (o.kind === 'rock' || o.kind === 'kids') {
+		if (
+			o.kind === 'rock' ||
+			o.kind === 'kids' ||
+			o.kind === 'tombstone' ||
+			o.kind === 'tourists'
+		) {
 			state.used = true
 			state.scooped = {
 				at: world.ticks(),
@@ -606,7 +1196,11 @@ function knockOver(world: World) {
 			}
 			bus.scooping = 10
 			const camera = world.camera()
-			if (o.kind === 'kids' && o.x > camera && o.x < camera + VIEW_WIDTH)
+			if (
+				(o.kind === 'kids' || o.kind === 'tourists') &&
+				o.x > camera &&
+				o.x < camera + VIEW_WIDTH
+			)
 				play('whoosh')
 		}
 	}
@@ -645,9 +1239,36 @@ function leashGrowth(leash: number) {
 	return BUS_LEASH_LATE_GROWTH * left * left
 }
 
+/**
+ * The camera keeps the height someone last stood at at least this far down
+ * from the top of the screen, looking up once they're higher: and their feet
+ * this far up from the bottom, looking down.
+ */
+export const CAMERA_HEADROOM = 230
+export const CAMERA_FOOTROOM = 40
+/** How quickly the camera looks up or down, a share a tick. */
+const CAMERA_LIFT = 0.08
+
+/**
+ * How far up the camera wants to look for floors from `high` to `low`, at
+ * `zoom`: no further down than where it starts, which is the course's
+ * lowest.
+ */
+function cameraYFor(high: number, low: number, zoom = 1) {
+	const up = high - CAMERA_HEADROOM - VIEW_HEIGHT * (1 - zoom)
+	const down = low + CAMERA_FOOTROOM - VIEW_HEIGHT
+	return Math.min(0, Math.max(up, down))
+}
+
 function stepCamera(world: World) {
-	// Left where it is: to watch them fly off, or run off.
-	if (world.phase() === 'scooped' || world.phase() === 'finished') return
+	// Left where it is: to watch them fly off, fall, or run off.
+	const phase = world.phase()
+	if (phase === 'scooped' || phase === 'fallen' || phase === 'finished') return
+	const b = world.body
+	const targetY = cameraYFor(b.floor, Math.max(b.floor, b.feetY))
+	const cameraY = world.cameraY()
+	if (targetY !== cameraY)
+		world.setCameraY(cameraY + (targetY - cameraY) * CAMERA_LIFT)
 	// More of the screen ahead, whichever way they're running. Through the
 	// countdown, the bus parked behind everyone is in view too.
 	const lead =
@@ -697,9 +1318,19 @@ function frameEveryone(world: World) {
 		Math.max(world.bus.frontX - 80, last - BUS_IN_VIEW),
 	)
 	const front = Math.max(...xs) + ROUND_AHEAD
-	const want = Math.max(1, Math.min(MAX_ZOOM, (front - back) / VIEW_WIDTH))
+	// And up and down: from the highest anyone's stood to the lowest.
+	const floors = running.map((r) => r.body.floor)
+	const high = Math.min(...floors)
+	const low = Math.max(...floors)
+	const tall = (low + CAMERA_FOOTROOM - (high - CAMERA_HEADROOM)) / VIEW_HEIGHT
+	const want = Math.max(
+		1,
+		Math.min(MAX_ZOOM, Math.max((front - back) / VIEW_WIDTH, tall)),
+	)
 	const zoom = world.zoom() + (want - world.zoom()) * ZOOM_EASE
 	world.setZoom(zoom)
+	const targetY = cameraYFor(high, low, zoom)
+	world.setCameraY(world.cameraY() + (targetY - world.cameraY()) * CAMERA_LIFT)
 	const width = VIEW_WIDTH * zoom
 	// Room to spare goes behind the leader, evenly either side of everyone.
 	const spare = Math.max(0, width - (front - back))
@@ -714,11 +1345,14 @@ function frameEveryone(world: World) {
 	world.setCamera(camera + (target - camera) * 0.25)
 }
 
-/** Where a point in the world is on the screen, with the camera's zoom: it zooms out from the bottom left. */
+/**
+ * Where a point in the world is on the screen, with the camera's zoom and
+ * how far up it's looking: it zooms out from the bottom left.
+ */
 export function onScreen(world: World, x: number, y: number) {
 	const zoom = world.zoom()
 	return {
 		x: (x - world.camera()) / zoom,
-		y: VIEW_HEIGHT - (VIEW_HEIGHT - y) / zoom,
+		y: VIEW_HEIGHT - (VIEW_HEIGHT - (y - world.cameraY())) / zoom,
 	}
 }

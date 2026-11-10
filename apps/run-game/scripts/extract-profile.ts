@@ -1,7 +1,7 @@
 /**
- * Turns a course's GPX into the elevation profile its level's hills are built
+ * Turns a course's GPX into the elevation profile its course's hills are built
  * from: one height every `STEP_M` metres along the course, smoothed, written
- * out as a TypeScript module next to the level.
+ * out as a TypeScript module next to the course.
  *
  * The GPX files live in `apps/game/gpx`, which isn't committed, so the profile
  * is generated once here and the output is committed instead.
@@ -15,8 +15,8 @@ const STEP_M = 10
 /** Watch altitude moves in 0.2 m steps; averaging over this many metres either side smooths them out. */
 const SMOOTH_M = 40
 
-const level = process.argv[2] ?? 'haga'
-const gpxFile = process.argv[3] ?? `${level}-alt.gpx`
+const course = process.argv[2] ?? 'haga'
+const gpxFile = process.argv[3] ?? `${course}-alt.gpx`
 const gpx = readFileSync(
 	path.resolve(import.meta.dirname, '../../game/gpx', gpxFile),
 	'utf8',
@@ -80,7 +80,7 @@ export const heights = [${heights.join(', ')}]
 
 const outFile = path.resolve(
 	import.meta.dirname,
-	`../src/levels/${level}-profile.ts`,
+	`../src/courses/kit/${course}-profile.ts`,
 )
 writeFileSync(outFile, out)
 console.log(

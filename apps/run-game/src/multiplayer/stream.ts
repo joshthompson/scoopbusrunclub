@@ -7,6 +7,7 @@ import type {
 } from '../game/world'
 import { type Sound, overhear } from '../sfx'
 import {
+	PUMPKIN_FLAG,
 	type PacerIntro,
 	RACER_FLAGS,
 	type RaceFrame,
@@ -44,14 +45,15 @@ export const pacerIntro = (p: Pacer): PacerIntro => ({
 	name: p.name,
 	member: p.member,
 	guest: p.guest,
-	look: p.guest || p.member ? undefined : p.look,
+	look: p.guest || p.member || p.skeleton ? undefined : p.look,
+	skeleton: p.skeleton || undefined,
 })
 
 /** What a phone needs to draw Round `round`: who's racing, where, and who's in the pack. */
 export function raceStart(world: World, round: number): RaceStart {
 	return {
 		round,
-		level: world.level.id,
+		course: world.course.id,
 		racers: world.racers.map((r) => ({
 			id: r.id,
 			character: r.runner.id,
@@ -87,8 +89,13 @@ export function createRaceStream(
 			raceTicks: world.raceTicks(),
 			phase: world.phase(),
 			camera: tenth(world.camera()),
+			cameraY: tenth(world.cameraY()),
 			zoom: Math.round(world.zoom() * 1000) / 1000,
-			bus: [tenth(world.bus.frontX), world.bus.scooping],
+			bus: [
+				tenth(world.bus.frontX),
+				world.bus.scooping,
+				tenth(world.bus.reach),
+			],
 			racers: world.racers.map(
 				({ body: b, out, outAt }): RacerState => [
 					tenth(b.x),
@@ -98,10 +105,18 @@ export function createRaceStream(
 						(b.ducking ? RACER_FLAGS.ducking : 0) |
 						(b.mount > 0 ? RACER_FLAGS.mounted : 0) |
 						(b.facing === -1 ? RACER_FLAGS.left : 0) |
-						(b.carried > 0 ? RACER_FLAGS.carried : 0),
+						(b.carried > 0 ? RACER_FLAGS.carried : 0) |
+						(b.on !== undefined ? RACER_FLAGS.platform : 0) |
+						(b.pumpkin * PUMPKIN_FLAG),
 					b.stumble,
 					b.spin,
-					out === 'scooped' ? 1 : out === 'finished' ? 2 : 0,
+					out === 'scooped'
+						? 1
+						: out === 'finished'
+							? 2
+							: out === 'fallen'
+								? 3
+								: 0,
 					outAt,
 				],
 			),
@@ -142,7 +157,7 @@ export function createRaceStream(
 				state.used ||
 				state.scooped ||
 				state.flown !== undefined ||
-				state.cheering() > 0
+				state.flownAll !== undefined
 					? [
 							[
 								i,
@@ -150,9 +165,26 @@ export function createRaceStream(
 								state.flown ?? -1,
 								state.scooped?.at ?? -1,
 								tenth(state.scooped?.vx ?? 0),
+								// Where a Zombie was scooped, and when the rest of a
+								// gaggle took off, if they have.
+								...(state.scooped?.x === undefined &&
+								state.flownAll === undefined
+									? []
+									: [tenth(state.scooped?.x ?? 0)]),
+								...(state.flownAll === undefined ? [] : [state.flownAll]),
+							] as RaceFrame['obstacles'][number],
+						]
+					: [],
+			),
+			boosts: world.boosts.flatMap((state, i) =>
+				state.used || state.cheering() > 0
+					? [
+							[
+								i,
+								state.used ? 1 : 0,
 								state.cheering(),
 								state.cheered,
-							] as RaceFrame['obstacles'][number],
+							] as RaceFrame['boosts'][number],
 						]
 					: [],
 			),

@@ -207,7 +207,7 @@ const styles = {
 	menu: {
 		display: 'flex',
 		'flex-direction': 'column',
-		gap: '6px',
+		gap: '3px',
 	},
 	item: {
 		position: 'relative',
@@ -215,7 +215,7 @@ const styles = {
 		'align-items': 'center',
 		gap: '10px',
 		width: '100%',
-		padding: '8px 16px 4px 8px',
+		padding: '6px 16px 2px 8px',
 		background: 'transparent',
 		color: 'white',
 		border: '3px solid transparent',

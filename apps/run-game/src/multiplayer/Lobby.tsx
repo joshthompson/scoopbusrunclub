@@ -1,8 +1,10 @@
 import { For, type JSX, Show, onCleanup } from 'solid-js'
+import { COURSES } from '../courses'
 import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { nameSize } from '../ui/RunnerStage'
+import type { RoomMode } from './Party'
 import { QrCode } from './QrCode'
 import { createLocalPlayers } from './localPlayers'
 import { padLink } from './protocol'
@@ -14,6 +16,17 @@ import {
 	seatPlayable,
 } from './room'
 
+/** How a Room can go, for the Host to choose: M to go through them, or click. */
+const MODES: { mode: RoomMode; label: string; note: string }[] = [
+	{ mode: 'endless', label: 'Endless', note: 'Round and round' },
+	{
+		mode: 'marathon',
+		label: 'Marathon',
+		note: `All ${COURSES.length} courses`,
+	},
+	{ mode: 'half', label: 'Half Marathon', note: '5 at random' },
+]
+
 /**
  * Where a Room fills up: its Room Code and QR code for phones, and a card for
  * each Player as they join and pick who they'll be. It starts by itself once
@@ -21,6 +34,9 @@ import {
  */
 export function Lobby(props: {
 	room: HostRoom
+	/** How the Room goes, chosen by the Host. */
+	mode: RoomMode
+	onMode: (mode: RoomMode) => void
 	/** Seconds until the first Round, once everyone's ready. */
 	startingIn: number | undefined
 	/** Why it isn't starting yet. */
@@ -36,6 +52,12 @@ export function Lobby(props: {
 		if (event.key === 'Escape') {
 			play('back')
 			props.onLeave()
+		}
+		// M, for mode: the next one along.
+		if (event.key === 'm' || event.key === 'M') {
+			const at = MODES.findIndex((m) => m.mode === props.mode)
+			play('move')
+			props.onMode(MODES[(at + 1) % MODES.length].mode)
 		}
 	}
 	window.addEventListener('keydown', onKey)
@@ -103,6 +125,27 @@ export function Lobby(props: {
 										/>
 									)}
 								</Show>
+							)}
+						</For>
+					</div>
+
+					<div style={styles.modes}>
+						<For each={MODES}>
+							{(m) => (
+								<button
+									type="button"
+									style={{
+										...styles.mode,
+										...(props.mode === m.mode ? styles.modeOn : {}),
+									}}
+									onClick={() => {
+										play('select')
+										props.onMode(m.mode)
+									}}
+								>
+									<span>{m.label}</span>
+									<span style={styles.modeNote}>{m.note}</span>
+								</button>
 							)}
 						</For>
 					</div>
@@ -210,6 +253,34 @@ function SeatCard(props: {
 }
 
 const styles = {
+	modes: {
+		display: 'flex',
+		gap: '8px',
+		'justify-content': 'center',
+		'margin-top': '8px',
+	},
+	mode: {
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'center',
+		gap: '2px',
+		padding: '6px 12px 4px',
+		background: 'rgba(15, 31, 41, 0.75)',
+		color: 'white',
+		border: '3px solid rgba(255, 255, 255, 0.4)',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '18px',
+		cursor: 'pointer',
+	},
+	modeOn: {
+		background: '#ffd23f',
+		color: 'var(--ink)',
+		border: '3px solid white',
+	},
+	modeNote: {
+		'font-size': '12px',
+		opacity: 0.8,
+	},
 	screen: {
 		position: 'absolute',
 		inset: 0,

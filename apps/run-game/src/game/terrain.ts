@@ -9,6 +9,53 @@ export interface Terrain {
 	groundY: (x: number) => number
 	/** Its slope at `x`: how far down it goes for every pixel along, so negative is uphill. */
 	slope: (x: number) => number
+	/**
+	 * Stretches with no Ground, in order. `groundY` still runs straight
+	 * across them, as the line the bus and the Pacers keep to.
+	 */
+	gaps: Gap[]
+	/** Whether there's no Ground at `x`. */
+	inGap: (x: number) => boolean
+	/**
+	 * Where the Ground has a side to run into, in order: either edge of a
+	 * Gap, and anywhere it steps up or down.
+	 */
+	walls: number[]
+	/** The buildings, on a course over rooftops: drawn as buildings, not hills. */
+	blocks?: Block[]
+}
+
+/** A building, `from` to `to` along, its roof `height` px over the lowest the ground goes. */
+export interface Block {
+	from: number
+	to: number
+	height: number
+}
+
+/** A stretch of the course with no Ground, `from` to `to` along it. */
+export interface Gap {
+	from: number
+	to: number
+}
+
+/** A terrain's gaps and walls, from its gaps and where its ground steps. */
+export function withGaps(
+	ground: Pick<Terrain, 'length' | 'finishX' | 'groundY' | 'slope'>,
+	gaps: Gap[] = [],
+	steps: number[] = [],
+): Terrain {
+	const sorted = [...gaps].sort((a, b) => a.from - b.from)
+	const inGap = (x: number) => {
+		for (const gap of sorted) {
+			if (x < gap.from) return false
+			if (x < gap.to) return true
+		}
+		return false
+	}
+	const walls = [...sorted.flatMap((gap) => [gap.from, gap.to]), ...steps].sort(
+		(a, b) => a - b,
+	)
+	return { ...ground, gaps: sorted, inGap, walls }
 }
 
 /** Flat ground for this far around the start and the finish, for the countdown and the funnel. */
@@ -26,8 +73,20 @@ export function createTerrain(
 	heights: number[],
 	stepM: number,
 	distanceM: number,
-	/** Without the small bumps on top: a running track's dead flat. */
-	{ bumps = true }: { bumps?: boolean } = {},
+	{
+		bumps = true,
+		gaps = [],
+		stairs = 0,
+	}: {
+		/** Without the small bumps on top: a running track's dead flat. */
+		bumps?: boolean
+		gaps?: Gap[]
+		/**
+		 * Stone stairs, steps this many px high, in place of a smooth slope:
+		 * low enough to run up. Its slope, for speed, is still the hill's.
+		 */
+		stairs?: number
+	} = {},
 ): Terrain {
 	const length = distanceM * PX_PER_M
 	const finishX = START_X + length
@@ -61,6 +120,60 @@ export function createTerrain(
 	}
 
 	const slope = (x: number) => (groundY(x + 4) - groundY(x - 4)) / 8
+	const stepped = stairs
+		? (x: number) => Math.round(groundY(x) / stairs) * stairs
+		: groundY
 
-	return { length, finishX, groundY, slope }
+	return withGaps({ length, finishX, groundY: stepped, slope }, gaps)
+}
+
+/**
+ * Ground over rooftops: flat roofs at `blocks`' heights, a step up or down
+ * wherever one building meets the next (a Wall, going up), and a Gap
+ * wherever there's room between them. Across a Gap, `groundY` runs straight
+ * from one roof to the next, for the bus and the Pacers.
+ */
+export function createRooftops(blocks: Block[], distanceM: number): Terrain {
+	const sorted = [...blocks].sort((a, b) => a.from - b.from)
+	const length = distanceM * PX_PER_M
+	const finishX = START_X + length
+	const top = (block: Block) => GROUND_Y - block.height
+
+	/** The building at `x`, or the two either side of the gap it's in. */
+	const around = (x: number) => {
+		let before = sorted[0]
+		for (const block of sorted) {
+			if (x < block.from) return { before, after: block }
+			if (x < block.to) return { on: block }
+			before = block
+		}
+		return { on: before }
+	}
+	const groundY = (x: number) => {
+		const at = around(x)
+		if (at.on) return top(at.on)
+		const { before, after } = at as { before: Block; after: Block }
+		if (x < before.from) return top(before)
+		const t = (x - before.to) / (after.from - before.to)
+		return top(before) + (top(after) - top(before)) * t
+	}
+	const slope = (x: number) => {
+		const at = around(x)
+		if (at.on) return 0
+		const { before, after } = at as { before: Block; after: Block }
+		return (top(after) - top(before)) / (after.from - before.to)
+	}
+
+	const gaps: Gap[] = []
+	const steps: number[] = []
+	for (let i = 1; i < sorted.length; i++) {
+		const before = sorted[i - 1]
+		const after = sorted[i]
+		if (after.from > before.to) gaps.push({ from: before.to, to: after.from })
+		else if (after.height !== before.height) steps.push(after.from)
+	}
+	return {
+		...withGaps({ length, finishX, groundY, slope }, gaps, steps),
+		blocks: sorted,
+	}
 }

@@ -1,16 +1,26 @@
 import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
-import { type ScoreEntry, TABLE_SIZE, type TableId, table } from '../highScores'
-import { LEVELS } from '../levels'
+import { COURSES } from '../courses'
+import {
+	type ScoreEntry,
+	TABLE_SIZE,
+	type TableId,
+	table,
+} from '../saved/highScores'
 import { play } from '../sfx'
 import { Menu, Panel } from '../ui/Menu'
+
+/** How far ↑ and ↓ scroll the table: a row. */
+const ROW_STEP = 24
+/** How many rows the table shows at once. */
+const ROWS_SHOWN = 7
 
 /** Endless's table first, then each course's, in order. */
 const TABLES: { id: TableId; name: string; detail: string }[] = [
 	{ id: 'endless', name: 'Endless', detail: 'Every course in turn' },
-	...LEVELS.map((level) => ({
-		id: level.id,
-		name: level.name,
-		detail: `Level ${level.number} · points on the course in one go`,
+	...COURSES.map((course) => ({
+		id: course.id,
+		name: course.name,
+		detail: `Course ${course.number} · points on the course in one go`,
 	})),
 ]
 
@@ -34,9 +44,12 @@ export function HighScoresScreen(props: { onBack: () => void }) {
 	const current = () => TABLES[at()]
 	const endless = () => current().id === 'endless'
 
+	/** The rows, scrolled within the table rather than making it any taller. */
+	let rows: HTMLDivElement | undefined
 	const cycle = (by: number) => {
 		play('move')
 		setAt((i) => (i + by + TABLES.length) % TABLES.length)
+		rows?.scrollTo({ top: 0 })
 	}
 	const onKey = (event: KeyboardEvent) => {
 		const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
@@ -48,6 +61,9 @@ export function HighScoresScreen(props: { onBack: () => void }) {
 			event.preventDefault()
 			cycle(1)
 		}
+		// Up and down the table, a row at a time.
+		if (key === 'ArrowUp' || key === 'w') rows?.scrollBy({ top: -ROW_STEP })
+		if (key === 'ArrowDown' || key === 's') rows?.scrollBy({ top: ROW_STEP })
 	}
 	window.addEventListener('keydown', onKey)
 	onCleanup(() => window.removeEventListener('keydown', onKey))
@@ -106,38 +122,41 @@ export function HighScoresScreen(props: { onBack: () => void }) {
 						</Show>
 						<span style={styles.date}>When</span>
 					</div>
-					<Show
-						when={table(current().id).length}
-						fallback={
-							<div style={styles.empty}>No runs yet. Get out there!</div>
-						}
-					>
-						<For each={table(current().id)}>
-							{(entry, i) => (
-								<div
-									style={{
-										...styles.row,
-										...(i() === 0 ? styles.first : {}),
-									}}
-								>
-									<span style={styles.rank}>{i() + 1}</span>
-									<span style={styles.runner}>{entry.runner}</span>
-									<span style={styles.score}>
-										{entry.score.toLocaleString('en')}
-									</span>
-									<Show when={!endless()}>
-										<span style={styles.extra}>{extra(entry)}</span>
-									</Show>
-									<span style={styles.date}>{day(entry.date)}</span>
-								</div>
-							)}
-						</For>
-					</Show>
+					<div style={styles.rows} ref={rows}>
+						<Show
+							when={table(current().id).length}
+							fallback={
+								<div style={styles.empty}>No runs yet. Get out there!</div>
+							}
+						>
+							<For each={table(current().id)}>
+								{(entry, i) => (
+									<div
+										style={{
+											...styles.row,
+											...(i() === 0 ? styles.first : {}),
+										}}
+									>
+										<span style={styles.rank}>{i() + 1}</span>
+										<span style={styles.runner}>{entry.runner}</span>
+										<span style={styles.score}>
+											{entry.score.toLocaleString('en')}
+										</span>
+										<Show when={!endless()}>
+											<span style={styles.extra}>{extra(entry)}</span>
+										</Show>
+										<span style={styles.date}>{day(entry.date)}</span>
+									</div>
+								)}
+							</For>
+						</Show>
+					</div>
 				</div>
 
 				<div style={styles.footer}>
 					<span style={styles.hint}>
-						← → to change table · top {TABLE_SIZE}, in this browser
+						← → to change table · ↑ ↓ to scroll · top {TABLE_SIZE}, in this
+						browser
 					</span>
 					<div style={{ width: '160px' }}>
 						<Menu
@@ -206,16 +225,26 @@ const styles = {
 		display: 'flex',
 		'flex-direction': 'column',
 		gap: '2px',
-		'min-height': '262px',
 		padding: '8px 10px',
 		border: '3px solid rgba(255, 255, 255, 0.3)',
+	},
+	/** A few rows tall, however many there are: the rest scroll, a row at a time. */
+	rows: {
+		display: 'flex',
+		'flex-direction': 'column',
+		gap: '2px',
+		height: `${ROWS_SHOWN * ROW_STEP - 2}px`,
+		'overflow-y': 'auto',
+		'scroll-snap-type': 'y mandatory',
 	},
 	row: {
 		display: 'flex',
 		'align-items': 'center',
 		gap: '10px',
 		height: '22px',
+		'flex-shrink': 0,
 		'font-size': '16px',
+		'scroll-snap-align': 'start',
 	},
 	header: {
 		'font-size': '12px',

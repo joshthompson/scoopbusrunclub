@@ -1,7 +1,7 @@
 import type { Room } from 'trystero'
-import type { CustomRunner } from '../customRunners'
 import type { Phase } from '../game/world'
-import type { Avatar } from '../looks'
+import type { CustomRunner } from '../runners/customRunners'
+import type { Avatar } from '../runners/looks'
 import type { Sound } from '../sfx'
 
 /**
@@ -95,6 +95,7 @@ export type PlayerStatus =
 	| 'ready'
 	| 'racing'
 	| 'scooped'
+	| 'fallen'
 	| 'finished'
 	| 'won'
 
@@ -118,7 +119,7 @@ export interface PadView {
 	/** Their Standings. */
 	points: number
 	paused: boolean
-	level: string
+	course: string
 }
 
 /**
@@ -151,6 +152,7 @@ export interface PacerIntro {
 	member?: string
 	guest?: string
 	look?: Avatar
+	skeleton?: boolean
 }
 
 /**
@@ -159,14 +161,14 @@ export interface PacerIntro {
  */
 export interface RaceStart {
 	round: number
-	/** The level's id. */
-	level: string
+	/** The course's id. */
+	course: string
 	racers: RacerIntro[]
 	/** Who's in the pack so far. Anyone joining later comes in a frame. */
 	pack: PacerIntro[]
 }
 
-/** [x, feetY, vx, flags (see `RACER_FLAGS`), stumble, spin, out (0 running, 1 scooped, 2 finished), outAt] */
+/** [x, feetY, vx, flags (see `RACER_FLAGS`), stumble, spin, out (0 running, 1 scooped, 2 finished, 3 fallen), outAt] */
 export type RacerState = [
 	number,
 	number,
@@ -183,7 +185,11 @@ export const RACER_FLAGS = {
 	mounted: 4,
 	left: 8,
 	carried: 16,
+	/** Stood on a Platform, which is flat, rather than on the Ground. */
+	platform: 32,
 }
+/** The Pumpkin a racer's wearing, by its carving, is the flags over this. */
+export const PUMPKIN_FLAG = 64
 /** [id, x, feetY, vx, flags (1 grounded, 2 scooped), dazed, spin] */
 export type PacerState = [
 	number,
@@ -208,16 +214,21 @@ export type FurbyStateFrame = [
 export type CorgiStateFrame = [number, number, number, number, number, number]
 /** [id, x, feetY, state (0 flying, 1 carrying, 2 leaving)] */
 export type FlyerFrame = [number, number, number, number]
-/** [index, used, flown (-1 if not), scooped at (-1 if not), scooped vx, cheering, cheered] */
+/**
+ * [index, used, flown (-1 if not), scooped at (-1 if not), scooped vx,
+ * scooped where (a Zombie's), the rest flown (a gaggle's)]
+ */
 export type ObstacleFrame = [
 	number,
 	number,
 	number,
 	number,
 	number,
-	number,
-	string,
+	number?,
+	number?,
 ]
+/** [index, used, cheering, cheered] */
+export type BoostFrame = [number, number, number, string]
 
 /**
  * Host → remote phones, on the `frame` action, every other tick: where
@@ -230,9 +241,11 @@ export interface RaceFrame {
 	raceTicks: number
 	phase: Phase
 	camera: number
+	/** How far up the camera's looking. */
+	cameraY: number
 	zoom: number
-	/** [front, scooping] */
-	bus: [number, number]
+	/** [front, scooping, the Scoop Arm's reach] */
+	bus: [number, number, number]
 	/** In the same order as the `RaceStart`'s. */
 	racers: RacerState[]
 	pack: PacerState[]
@@ -242,8 +255,10 @@ export interface RaceFrame {
 	corgis: CorgiStateFrame[]
 	/** Geese flying over. */
 	flyers: FlyerFrame[]
-	/** Every obstacle that's been used, scooped, flown off or is cheering. */
+	/** Every obstacle that's been used, scooped or flown off. */
 	obstacles: ObstacleFrame[]
+	/** Every boost that's been had or is cheering. */
+	boosts: BoostFrame[]
 	popups: { id: number; text: string; x: number; y: number; born: number }[]
 	/** Racers' ids in the order they came, once the Round's decided. */
 	order?: string[]

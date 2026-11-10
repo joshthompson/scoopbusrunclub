@@ -1,4 +1,5 @@
-import { soundOn } from './settings'
+import { audioContext } from './audio'
+import { effectsOn } from './saved/settings'
 
 /**
  * The game's sound effects: little chiptune blips, made on the spot with Web
@@ -12,10 +13,13 @@ export type Sound =
 	| 'go'
 	| 'jump'
 	| 'fika'
+	| 'scan'
 	| 'cheer'
 	| 'stumble'
 	| 'squelch'
 	| 'scooped'
+	| 'fallen'
+	| 'groan'
 	| 'finished'
 	| 'stomp'
 	| 'whoosh'
@@ -54,6 +58,8 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 			],
 			volume: 0.12,
 		},
+		/** A barcode scanned: the scanner's beep. */
+		scan: { notes: [[1760, 0.16, 'square']], volume: 0.05 },
 		cheer: {
 			notes: [
 				[523, 0.06, 'triangle'],
@@ -64,6 +70,10 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 		stumble: { notes: [[140, 0.18, 'sawtooth']], volume: 0.07, slide: 0.5 },
 		squelch: { notes: [[110, 0.2, 'sine']], volume: 0.15, slide: 0.6 },
 		scooped: { notes: [[700, 0.6, 'square']], volume: 0.07, slide: 0.15 },
+		/** Down a Gap: a long whistle, falling away. */
+		fallen: { notes: [[1200, 0.9, 'triangle']], volume: 0.08, slide: 0.12 },
+		/** Into a Zombie: a low moan. */
+		groan: { notes: [[150, 0.5, 'sawtooth']], volume: 0.06, slide: 0.7 },
 		/** Bouncing off someone's head. */
 		stomp: {
 			notes: [
@@ -113,8 +123,6 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 		},
 	}
 
-let context: AudioContext | undefined
-
 /** Told of every sound played, sound on or off: a Room's Host passes them on. */
 let overheard: ((sound: Sound) => void) | undefined
 export function overhear(listener: ((sound: Sound) => void) | undefined) {
@@ -123,9 +131,9 @@ export function overhear(listener: ((sound: Sound) => void) | undefined) {
 
 export function play(sound: Sound) {
 	overheard?.(sound)
-	if (!soundOn()) return
+	if (!effectsOn()) return
 	try {
-		context ??= new AudioContext()
+		const context = audioContext()
 		if (context.state === 'suspended') void context.resume()
 		const { notes, volume, slide } = SOUNDS[sound]
 		let at = context.currentTime

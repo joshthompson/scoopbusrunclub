@@ -1,10 +1,10 @@
 import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
-import { PauseMenu } from '../game/PauseMenu'
-import { RaceCanvas, createRaceScene } from '../game/RaceView'
+import type { Course } from '../courses/types'
+import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { PX_PER_M } from '../game/constants'
 import { POPUP_TICKS, onScreen, roundOver } from '../game/step'
 import { type Racer, type RacerEntry, createWorld } from '../game/world'
-import type { Level } from '../levels/types'
+import { PauseMenu, SOUND_ITEMS } from '../screens/PauseMenu'
 import { Stage } from '../ui/Stage'
 
 /**
@@ -12,7 +12,7 @@ import { Stage } from '../ui/Stage'
  * until only one's left. `onOver` is told the order they came in.
  */
 export function Round(props: {
-	level: Level
+	course: Course
 	number: number
 	racers: RacerEntry[]
 	onPause: (paused: boolean) => void
@@ -24,7 +24,7 @@ export function Round(props: {
 	onLobby: () => void
 	onEnd: () => void
 }) {
-	const world = createWorld(props.level, props.racers, { round: true })
+	const world = createWorld(props.course, props.racers, { round: true })
 	props.onWorld(world)
 	const scene = createRaceScene(world)
 
@@ -43,7 +43,7 @@ export function Round(props: {
 		setPaused(next)
 		props.onPause(next)
 		scene.modal.set(next ? document.createElement('span') : undefined)
-		// Jumping to pick "Carry on" shouldn't jump on the way back in.
+		// Jumping to pick "Resume" shouldn't jump on the way back in.
 		if (!next) for (const r of world.racers) r.body.wasUp = true
 	}
 	const onKey = (event: KeyboardEvent) => {
@@ -71,10 +71,13 @@ export function Round(props: {
 						/>
 						<Show when={paused()}>
 							<PauseMenu
-								items={[
-									{ label: 'Carry on', choose: () => pause(false) },
-									{ label: 'Back to the lobby', choose: props.onLobby },
-									{ label: 'End the Room', choose: props.onEnd },
+								groups={[
+									[{ label: 'Resume', choose: () => pause(false) }],
+									SOUND_ITEMS,
+									[
+										{ label: 'Back to the lobby', choose: props.onLobby },
+										{ label: 'End the Room', choose: props.onEnd },
+									],
 								]}
 							/>
 						</Show>
@@ -127,7 +130,7 @@ export function RoundHud(props: {
 		<div style={styles.hud}>
 			<div style={styles.topLeft}>
 				<div style={{ 'font-size': size(18), opacity: 0.8 }}>
-					Round {props.number} · {world.level.name}
+					Round {props.number} · {world.course.name}
 				</div>
 				<div style={{ 'font-size': size(28) }}>
 					{left()} of {world.racers.length} running
@@ -209,10 +212,13 @@ const styles = {
 		'font-family': 'var(--font-pixel)',
 		'line-height': 1,
 	},
+	/** The words over the sky: in the course's own ink over a dark one, and only them. */
 	topLeft: {
 		position: 'absolute',
 		top: '16px',
 		left: '20px',
+		color: 'var(--hud-ink, var(--ink))',
+		'text-shadow': 'var(--hud-shadow, none)',
 	},
 	topRight: {
 		position: 'absolute',

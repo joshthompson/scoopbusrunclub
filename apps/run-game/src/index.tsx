@@ -3,7 +3,9 @@ import { render } from 'solid-js/web'
 import '../styled-system/styles.css'
 import './styles.css'
 import { App } from './App'
-import { loadGuests } from './guests'
+import { loadGuests } from './runners/guests'
+// `unlockAll()` and the like, in the console.
+import './debug'
 
 const root = document.getElementById('root')
 /** Opened from a Room's QR code: this phone's a controller, not the game. */

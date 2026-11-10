@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js'
-import { RaceCanvas, createRaceScene } from '../game/RaceView'
+import { COURSES } from '../courses'
+import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import {
 	type Flyer,
@@ -8,14 +9,25 @@ import {
 	type World,
 	createWorld,
 } from '../game/world'
-import { guests } from '../guests'
 import { NOTHING_HELD } from '../input'
-import { LEVELS } from '../levels'
-import { DEFAULT_AVATAR } from '../looks'
-import { MEMBERS, type Playable, customPlayable, lookSprite } from '../playable'
+import { guests } from '../runners/guests'
+import { DEFAULT_AVATAR } from '../runners/looks'
+import {
+	MEMBERS,
+	type Playable,
+	customPlayable,
+	lookSprite,
+} from '../runners/playable'
+import { SKELETON_SPRITE } from '../runners/skeleton'
 import { play } from '../sfx'
 import { RoundHud } from './Round'
-import type { PacerIntro, RaceFrame, RaceStart, RacerIntro } from './protocol'
+import {
+	PUMPKIN_FLAG,
+	type PacerIntro,
+	type RaceFrame,
+	type RaceStart,
+	type RacerIntro,
+} from './protocol'
 import { CORGI_STATES, FLYER_STATES, FURBY_STATES } from './stream'
 
 /**
@@ -53,7 +65,10 @@ function pacerFrom(intro: PacerIntro): Pacer {
 	return {
 		id: intro.id,
 		name: intro.name,
-		sprite: known?.sprite ?? lookSprite(intro.look ?? DEFAULT_AVATAR),
+		skeleton: intro.skeleton,
+		sprite: intro.skeleton
+			? SKELETON_SPRITE
+			: (known?.sprite ?? lookSprite(intro.look ?? DEFAULT_AVATAR)),
 		x: -10_000,
 		feetY: 0,
 		vx: 0,
@@ -66,7 +81,7 @@ function pacerFrom(intro: PacerIntro): Pacer {
 	}
 }
 
-const OUTS: (Out | undefined)[] = [undefined, 'scooped', 'finished']
+const OUTS: (Out | undefined)[] = [undefined, 'scooped', 'finished', 'fallen']
 
 /** Round `start`, drawn from `feed`, as big as fits in `width` × `height`. */
 export default function Mirror(props: {
@@ -76,9 +91,9 @@ export default function Mirror(props: {
 	height: number
 }) {
 	const { start, feed } = props
-	const level = LEVELS.find((l) => l.id === start.level) ?? LEVELS[0]
+	const course = COURSES.find((l) => l.id === start.course) ?? COURSES[0]
 	const world = createWorld(
-		level,
+		course,
 		start.racers.map((intro) => ({
 			id: intro.id,
 			runner: playableFor(intro),
@@ -134,9 +149,11 @@ export default function Mirror(props: {
 		world.setRaceTicks(a.raceTicks)
 		if (world.phase() !== a.phase) world.setPhase(a.phase)
 		world.setCamera(mix(a.camera, b.camera))
+		world.setCameraY(mix(a.cameraY, b.cameraY))
 		world.setZoom(mix(a.zoom, b.zoom))
 		world.bus.frontX = mix(a.bus[0], b.bus[0])
 		world.bus.scooping = a.bus[1]
+		world.bus.reach = mix(a.bus[2], b.bus[2])
 		world.setBusX(world.bus.frontX)
 
 		world.racers.forEach((racer, i) => {
@@ -153,6 +170,13 @@ export default function Mirror(props: {
 			body.mount = flags & 4 ? 1 : 0
 			body.facing = flags & 8 ? -1 : 1
 			body.carried = flags & 16 ? 1 : 0
+			// Which one doesn't matter here: only that it's flat.
+			body.on = flags & 32 ? 0 : undefined
+			// Knocked off since the last frame: flying.
+			const pumpkin = Math.floor(flags / PUMPKIN_FLAG)
+			if (body.pumpkin && !pumpkin)
+				body.lostPumpkin = { carving: body.pumpkin, at: world.ticks() }
+			body.pumpkin = pumpkin
 			body.stumble = from[4]
 			body.spin = mix(from[5], to[5])
 			racer.out = OUTS[from[6]]
@@ -215,6 +239,7 @@ export default function Mirror(props: {
 				id,
 				x: from[1],
 				feetY: from[2],
+				cruise: from[2],
 				altitude: 0,
 				vy: 0,
 				state: 'flying',
@@ -232,21 +257,27 @@ export default function Mirror(props: {
 			flown,
 			scoopedAt,
 			scoopedVx,
-			cheering,
-			cheered,
+			scoopedX,
+			flownAll,
 		] of a.obstacles) {
 			const state = world.obstacles[i]
 			if (!state) continue
 			state.used = !!used
 			state.flown = flown >= 0 ? flown : undefined
+			state.flownAll = flownAll
 			if (scoopedAt >= 0 && !state.scooped)
-				state.scooped = { at: scoopedAt, vx: scoopedVx }
+				state.scooped = { at: scoopedAt, vx: scoopedVx, x: scoopedX }
+		}
+		for (const [i, used, cheering, cheered] of a.boosts) {
+			const state = world.boosts[i]
+			if (!state) continue
+			state.used = !!used
 			if (state.cheering() !== cheering) state.setCheering(cheering)
 			state.cheered = cheered
 		}
 		// Cheering that's run out isn't in the frame any more.
-		const cheering = new Set(a.obstacles.map((o) => o[0]))
-		world.obstacles.forEach((state, i) => {
+		const cheering = new Set(a.boosts.map((o) => o[0]))
+		world.boosts.forEach((state, i) => {
 			if (!cheering.has(i) && state.cheering() > 0) state.setCheering(0)
 		})
 

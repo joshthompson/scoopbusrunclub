@@ -1,21 +1,30 @@
-import { guests } from '../guests'
-import { DEFAULT_AVATAR, pickAny, randomAvatar } from '../looks'
-import { MEMBERS, type Playable, lookSprite } from '../playable'
+import type { Course } from '../courses/types'
+import { geeseWidth } from '../draw/art/geese'
+import { kidsWidth } from '../draw/art/kids'
+import { touristsWidth } from '../draw/art/tourists'
+import { guests } from '../runners/guests'
+import { DEFAULT_AVATAR, pickAny, randomAvatar } from '../runners/looks'
+import { MEMBERS, type Playable, lookSprite } from '../runners/playable'
+import { SKELETON_SPRITE } from '../runners/skeleton'
 import { play } from '../sfx'
+import { ceilingAt, inTunnel, rockOver } from './cave'
 import {
 	BUS_LEASH_MAX,
 	CAMERA_LEAD,
 	DAZED_SPEED,
 	DAZED_TICKS,
+	DUCK_HEIGHT,
 	GRAVITY,
 	HILL_PULL,
 	HITBOX_HALF_WIDTH,
+	JUMP_SPEED,
 	MEMBER_SHARE,
 	PACER_EVERY_SPREAD,
 	PACER_EVERY_TICKS,
 	PACER_FASTEST,
 	PACER_SLOWEST,
 	RUNNER_SCALE,
+	STAND_HEIGHT,
 	START_X,
 	STOMP_BOOST,
 	STOMP_BOUNCE,
@@ -24,12 +33,15 @@ import {
 	STOMP_POINTS_MAX,
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
+	hillPull,
 } from './constants'
-import { geeseWidth } from './geeseArt'
-import { kidsWidth } from './kidsArt'
+import { cyclistAt } from './cyclists'
+import { landingOn, platformAt, platformMove } from './platforms'
+import { STEAM_LAUNCH, STEAM_REACH } from './steam'
 import { boost } from './step'
 import type { Terrain } from './terrain'
 import { type Pacer, type Racer, START_GAP, type World } from './world'
+import { zombieAt } from './zombies'
 
 /**
  * The pack: everyone else out running Haga. They plod along slower than you,
@@ -90,6 +102,7 @@ export const SCOOP_HEARD = BUS_LEASH_MAX - VIEW_WIDTH * CAMERA_LEAD + 50
 
 /** What `lineUp` needs: the world's still being made when it's called. */
 interface Lineup {
+	course: Pick<Course, 'skeletons'>
 	racers: { runner: Playable }[]
 	terrain: Terrain
 	pack: Pacer[]
@@ -103,7 +116,9 @@ interface Lineup {
  */
 function newcomer(
 	world: Lineup,
-): Pick<Pacer, 'name' | 'member' | 'guest' | 'look' | 'sprite'> {
+): Pick<Pacer, 'name' | 'member' | 'guest' | 'look' | 'sprite' | 'skeleton'> {
+	if (Math.random() < (world.course.skeletons ?? 0))
+		return { name: 'Skeleton', skeleton: true, sprite: SKELETON_SPRITE }
 	const members = [...MEMBERS, ...guests()].filter(
 		(m) =>
 			!world.racers.some(
@@ -190,24 +205,93 @@ function movePacer(world: World, p: Pacer) {
 		return
 	}
 
+	const ticks = world.ticks()
 	if (p.dazed > 0) p.dazed--
 	if (p.grounded) {
 		const pace = p.dazed > 0 ? DAZED_SPEED : p.pace
-		p.vx += (pace - p.vx) * PACER_GRIP + terrain.slope(p.x) * PACER_HILL_PULL
-		if (p.dazed === 0 && hopAhead(world, p.x)) {
-			p.vy = -HOP_SPEED
+		const slope = p.on === undefined ? terrain.slope(p.x) : 0
+		p.vx += (pace - p.vx) * PACER_GRIP + hillPull(slope) * PACER_HILL_PULL
+		// Carried along by a Moving Platform.
+		if (p.on !== undefined)
+			p.x += platformMove(terrain, world.platforms[p.on], ticks).x
+		// Onto a Steam Vent: it puffs, and fires them up, as anyone.
+		const vent = world.obstacles.find(
+			({ obstacle: o }) =>
+				o.kind === 'steam' && Math.abs(p.x - o.x) < STEAM_REACH,
+		)
+		if (vent) {
+			vent.flown = ticks
+			p.vy = -STEAM_LAUNCH
 			p.grounded = false
+			p.on = undefined
+		}
+		// In a Tunnel, down and through it no slower than they went in, as
+		// anyone is: nothing to decide till they're out.
+		else if (inTunnel(world, p.x, p.feetY)) {
+			p.tunnelSpeed ??= p.vx
+			p.vx = Math.max(p.vx, p.tunnelSpeed)
+		} else {
+			p.tunnelSpeed = undefined
+			decide(world, p)
 		}
 	}
+	const from = p.x
 	p.x += p.vx
+	// Never through a Wall: stopped at its foot, like anyone.
+	const wall = wallCrossed(world, from, p.x, p.feetY)
+	if (wall !== undefined) {
+		p.x = wall - 12
+		p.vx = 0
+	}
+	// Nor into a Cave's rock with no room under it even ducking: a terrace's
+	// face. Stopped at it, to climb up it.
+	const rock = rockOver(world, p.x + 12, p.feetY)
+	if (rock !== undefined && rock > p.feetY - DUCK_HEIGHT && p.x > from) {
+		p.x = from
+		p.vx = 0
+	}
 
 	const ground = terrain.groundY(p.x)
-	if (p.grounded) p.feetY = ground
-	else {
+	if (p.grounded) {
+		if (p.on !== undefined) {
+			const at = platformAt(terrain, world.platforms[p.on], ticks)
+			if (p.x < at.left || p.x > at.right) {
+				// Off the end of it.
+				p.on = undefined
+				p.grounded = false
+				p.vy = 0
+			} else p.feetY = at.top
+		} else if (ground - p.feetY > STEP_DOWN && !terrain.inGap(p.x)) {
+			// Off a roof, down onto a lower one.
+			p.grounded = false
+			p.vy = 0
+		} else p.feetY = ground
+	}
+	if (!p.grounded) {
+		const wasFeetY = p.feetY
 		p.vy += GRAVITY
 		p.feetY += p.vy
-		if (p.feetY >= ground && p.vy >= 0) {
+		// Up into a Ceiling: no higher.
+		if (p.vy < 0) {
+			const ceiling = ceilingAt(world, p.x, wasFeetY - STAND_HEIGHT)
+			if (ceiling !== undefined && p.feetY - STAND_HEIGHT < ceiling) {
+				p.feetY = ceiling + STAND_HEIGHT
+				p.vy = 0
+			}
+		}
+		const platform =
+			p.vy >= 0
+				? landingOn(terrain, world.platforms, ticks, p.x, wasFeetY, p.feetY)
+				: undefined
+		if (platform && platform.top <= ground) {
+			p.feetY = platform.top
+			p.on = platform.index
+			p.vy = 0
+			p.grounded = true
+		} else if (p.feetY >= ground && p.vy >= 0) {
+			// Over a Gap too: Pacers never fall.
 			p.feetY = ground
+			p.on = undefined
 			p.vy = 0
 			p.grounded = true
 		}
@@ -215,23 +299,210 @@ function movePacer(world: World, p: Pacer) {
 }
 
 /**
+ * What a Pacer does next, stood on something: as a runner would. Hop what's
+ * in the way; leap a Gap they can; jump a step up they can. A Gap too wide, or
+ * a Wall too high, they wait at, for a girder or a lift to take them, or climb
+ * scaffolding a plank at a time. Waiting on one, they get off once it's
+ * somewhere they can.
+ */
+function decide(world: World, p: Pacer) {
+	const { terrain } = world
+	const ticks = world.ticks()
+	const jump = (rise: number) => {
+		p.vy = -jumpSpeed(rise)
+		p.grounded = false
+		p.on = undefined
+	}
+
+	// Something to get up onto, right here: a Platform within a jump.
+	const board = world.platforms.findIndex((platform, i) => {
+		if (i === p.on) return false
+		const at = platformAt(terrain, platform, ticks)
+		return (
+			at.top < p.feetY - 3 &&
+			at.top > p.feetY - PACER_REACH &&
+			p.x + 50 >= at.left + 8 &&
+			p.x + 10 <= at.right - 8
+		)
+	})
+	if (board >= 0) {
+		const at = platformAt(terrain, world.platforms[board], ticks)
+		p.vx = Math.min(p.vx, 2.5)
+		return jump(p.feetY - at.top)
+	}
+
+	if (p.on !== undefined) {
+		// Off the end, once that's somewhere to go; till then, along for the ride.
+		const at = platformAt(terrain, world.platforms[p.on], ticks)
+		// Along to the end of it, at most: for the next plank up, or ready.
+		if (!canStepOff(world, at.right, at.top))
+			p.vx = Math.max(0, Math.min(p.vx, at.right - 12 - p.x))
+		// Off, at a run: enough to carry them onto what's ahead.
+		else p.vx = Math.max(p.vx, p.pace)
+		return
+	}
+
+	const gap = terrain.gaps.find(
+		(g) => g.from > p.x && g.from - p.x < LOOKAHEAD + p.vx,
+	)
+	if (gap) {
+		const far = terrain.groundY(gap.to + 1)
+		if (gap.to - gap.from <= LEAP_WIDTH && far > p.feetY - PACER_REACH + 20) {
+			// Well up, and fast enough to come down past its far side.
+			const rise = Math.max(0, p.feetY - far)
+			const vy = jumpSpeed(rise)
+			const airborne = (vy + Math.sqrt(vy * vy - 2 * GRAVITY * rise)) / GRAVITY
+			p.vy = -vy
+			p.vx = Math.max(p.vx, (gap.to + LEAP_PAST - p.x) / airborne)
+			p.grounded = false
+			return
+		}
+		// Too wide: waiting at its edge, for a girder.
+		if (p.x + p.vx >= gap.from - 8) p.vx = Math.max(0, gap.from - 8 - p.x)
+		return
+	}
+
+	const wall = terrain.walls.find(
+		(w) =>
+			w > p.x &&
+			w - p.x < WALL_LOOKAHEAD &&
+			!terrain.inGap(w + 1) &&
+			terrain.groundY(w + 1) < p.feetY - WALL_STEP,
+	)
+	if (wall !== undefined) {
+		const rise = p.feetY - terrain.groundY(wall + 1)
+		if (rise < PACER_REACH - 10) {
+			// Off in time to be up over its top as they get to it.
+			const vy = jumpSpeed(rise)
+			const over = rise + WALL_CLEAR
+			const rising = (vy - Math.sqrt(vy * vy - 2 * GRAVITY * over)) / GRAVITY
+			if (wall - 12 - p.x <= Math.max(p.vx, 2) * rising) jump(rise)
+			else if (p.dazed === 0 && hopAhead(world, p.x)) {
+				p.vy = -HOP_SPEED
+				p.grounded = false
+			}
+			return
+		}
+		// Too high: under a lift up it, to wait for it, or the lowest plank of
+		// scaffolding up it within a jump, to climb; or at its foot.
+		const near = world.platforms.filter(
+			(platform) =>
+				platform.x + platform.width <= wall + 4 &&
+				platform.x + platform.width > wall - 560,
+		)
+		const lift = near.find((platform) => platform.move?.y)
+		const plank = near
+			.map((platform) => ({
+				platform,
+				top: platformAt(terrain, platform, ticks).top,
+			}))
+			.filter(({ top }) => top > p.feetY - PACER_REACH)
+			.sort((a, b) => b.top - a.top)[0]?.platform
+		const waitAt = lift
+			? lift.x + lift.width - 30
+			: plank
+				? plank.x + plank.width / 2
+				: wall - 14
+		// Under it, then: back a step, if they've gone past it.
+		if (p.x > waitAt + 4) p.vx = -1.2
+		else if (p.x + p.vx >= waitAt) p.vx = Math.max(0, waitAt - p.x)
+		return
+	}
+
+	if (p.dazed === 0 && hopAhead(world, p.x)) {
+		p.vy = -HOP_SPEED
+		p.grounded = false
+	}
+}
+
+/**
+ * Whether stepping off a Platform's right end, at its height, gets anywhere:
+ * Ground just past it no higher than they are, and nothing past that too
+ * high to get up.
+ */
+function canStepOff(world: World, right: number, top: number) {
+	const { terrain } = world
+	/** The highest they'd come down on, going off it. */
+	let landing: number | undefined
+	for (let x = right + 6; x <= right + 60; x += 6) {
+		if (terrain.inGap(x)) continue
+		const y = terrain.groundY(x)
+		// Nothing higher than their feet: a lift goes all the way up first.
+		if (y < top - 1) return false
+		landing = Math.min(landing ?? y, y)
+	}
+	if (landing === undefined) return false
+	// And from there, on: not straight into a Wall they can't get up.
+	for (let x = right + 66; x <= right + 220; x += 6) {
+		if (terrain.inGap(x)) continue
+		if (terrain.groundY(x) < landing - PACER_REACH + 10) return false
+	}
+	return true
+}
+
+/** A Wall `from` to `to` runs into, at `feetY`: where, if it does. */
+function wallCrossed(world: World, from: number, to: number, feetY: number) {
+	const { terrain } = world
+	if (to <= from) return undefined
+	return terrain.walls.find(
+		(w) =>
+			w > from + 10 &&
+			w <= to + 10 &&
+			!terrain.inGap(w + 1) &&
+			feetY > terrain.groundY(w + 1) + WALL_STEP,
+	)
+}
+
+/** How high a Pacer gets jumping, near enough: what they'll jump up onto. */
+const PACER_REACH = 92
+/** How far ahead they look for a Gap or a Wall. */
+const LOOKAHEAD = HOP_LOOKAHEAD
+/** How high over a Wall's top a Pacer means to be as they get to it. */
+const WALL_CLEAR = 16
+
+/**
+ * How hard a Pacer jumps to get `rise` up: well over it, as anyone does, not
+ * just enough, and at least as hard as a runner jumps.
+ */
+const jumpSpeed = (rise: number) =>
+	Math.max(JUMP_SPEED, Math.sqrt(2 * GRAVITY * (rise + 48)))
+
+/** How far ahead they see a Wall: far enough to wait under whatever goes up it, or go back to scaffolding up it. */
+const WALL_LOOKAHEAD = 600
+/** The widest Gap they'll leap: wider, they wait for a girder. */
+const LEAP_WIDTH = 240
+/** As for a runner: how far below a Wall's top they can still get up it, and a step down that's a drop. */
+const WALL_STEP = 10
+const STEP_DOWN = 12
+
+/** How far past a Gap they land. */
+const LEAP_PAST = 40
+
+/**
  * A rock, a hurdle, a puddle, a pothole or geese just ahead of `x`. Branches they
  * just run under: they're shorter than you.
  */
 function hopAhead(world: World, x: number) {
-	return world.obstacles.some(({ obstacle: o, used }) => {
+	return world.obstacles.some((state) => {
+		const { obstacle: o, used } = state
 		const edge =
-			o.kind === 'rock'
+			o.kind === 'rock' || o.kind === 'tombstone' || o.kind === 'vent'
 				? o.x - 20
-				: o.kind === 'hurdle'
-					? o.x - 16
-					: o.kind === 'mud' || o.kind === 'pothole'
-						? o.x - o.width / 2
-						: o.kind === 'kids'
-							? o.x - kidsWidth(o.count) / 2
-							: o.kind === 'geese' && !used
-								? o.x - geeseWidth(o.count) / 2
-								: undefined
+				: o.kind === 'zombie'
+					? zombieAt(world, { ...state, obstacle: o }).x - 14
+					: o.kind === 'hurdle'
+						? o.x - 16
+						: o.kind === 'mud' || o.kind === 'pothole'
+							? o.x - o.width / 2
+							: o.kind === 'kids'
+								? o.x - kidsWidth(o.count) / 2
+								: o.kind === 'geese' && !used
+									? o.x - geeseWidth(o.count) / 2
+									: o.kind === 'tourists' && !state.scooped
+										? o.x - touristsWidth(o.count) / 2
+										: o.kind === 'cyclist' && !state.scooped
+											? cyclistAt(world, { ...state, obstacle: o }).x - 30
+											: undefined
 		return edge !== undefined && edge > x && edge - x < HOP_LOOKAHEAD
 	})
 }
@@ -295,6 +566,8 @@ export function bounceOff(world: World, racer: Racer, head: number, x: number) {
 	const b = racer.body
 	b.feetY = head
 	b.vy = -(racer.controls().up ? STOMP_BOUNCE_HELD : STOMP_BOUNCE)
+	// A bounce, not a jump of their own: letting go doesn't cut it short.
+	b.jumping = false
 	b.vx = boost(b.vx, b.facing, STOMP_BOOST)
 
 	const points = Math.min(STOMP_POINTS_MAX, STOMP_POINTS * 2 ** b.combo)

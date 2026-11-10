@@ -1,7 +1,6 @@
 import { createSignal, onCleanup } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import { type Room, joinRoom } from 'trystero'
-import { type CustomRunner, customRunners } from '../customRunners'
 import {
 	type Controls,
 	NOTHING_HELD,
@@ -10,7 +9,8 @@ import {
 	touchControls,
 	unpackControls,
 } from '../input'
-import { MEMBERS, type Playable, customPlayable } from '../playable'
+import { type CustomRunner, customRunners } from '../runners/customRunners'
+import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
 import {
 	APP_ID,
 	type PadMessage,
@@ -117,7 +117,7 @@ export function createRoom(code: string) {
 	const [seats, setSeats] = createStore<Seat[]>([])
 	const [stage, setStage] = createSignal<RoomStage>('lobby')
 	const [paused, setPaused] = createSignal(false)
-	const [level, setLevel] = createSignal('')
+	const [course, setCourse] = createSignal('')
 	/** How each seat's doing in the Round, for their phone: the Party says. */
 	let statusOf: (
 		seat: Seat,
@@ -275,7 +275,7 @@ export function createRoom(code: string) {
 		status: 'picking',
 		points: 0,
 		paused: false,
-		level: level(),
+		course: course(),
 	})
 
 	function viewFor(seat: Seat): PadView {
@@ -301,7 +301,7 @@ export function createRoom(code: string) {
 			of: round?.of,
 			points: seat.points,
 			paused: paused(),
-			level: level(),
+			course: course(),
 		}
 	}
 
@@ -352,8 +352,8 @@ export function createRoom(code: string) {
 			setPaused(next)
 			tellPhones()
 		},
-		level,
-		setLevel,
+		course,
+		setCourse,
 		taken,
 		addSeat,
 		removeSeat,

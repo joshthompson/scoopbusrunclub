@@ -23,6 +23,12 @@ export const GROUND_Y = 490
 export const PATH_BACK = 18
 export const PATH_FRONT = 18
 /**
+ * How far along a line straight back across the path leans, from its near
+ * edge to its far one: the slant everything going back into the scene is
+ * drawn at, the start and finish banners, buildings' sides.
+ */
+export const DEPTH_SLANT = 56
+/**
  * Grass drawn behind the path, for what's set back from it to stand on: on
  * high stretches, the scenery behind would otherwise be distant hills.
  */
@@ -56,8 +62,24 @@ export const COAST_KEEP = 0.97
 export const SLIDE_KEEP = 0.996
 /** How strongly a slope speeds you up or slows you down. Doubled while sliding downhill. */
 export const HILL_PULL = 0.3
+/** How much harder going up a hill pulls back than going down one pushes on: for everyone, the bus too. */
+export const UPHILL_HARDER = 1.4
+/**
+ * How much of its speed a hill takes off the bus going up it, for its slope:
+ * as much as it takes off a runner, so up a pyramid it's half its speed too.
+ */
+export const BUS_HILL_PULL = 1.45
+
+/** A hill's pull, for its `slope`: harder going up. */
+export const hillPull = (slope: number) =>
+	slope < 0 ? slope * UPHILL_HARDER : slope
 export const MAX_SPEED = 12
 export const JUMP_SPEED = 9.5
+/**
+ * How fast they're still going up, at most, once they let go of jump: a tap
+ * is a hop, held is the whole jump.
+ */
+export const JUMP_CUT = 2
 export const GRAVITY = 0.45
 /** Air control, a little either way. */
 export const AIR_PUSH = 0.04
@@ -72,9 +94,23 @@ export const STUMBLE_SPEED = 1.5
 export const MUD_TOP_SPEED = 2.5
 export const FIKA_BOOST = 3
 export const CHEER_BOOST = 2.5
+/** A parkrun's barcode token: the last boost, and a big one. */
+export const BARCODE_BOOST = 6
+/** How far before a parkrun's finish its barcode token is, and how high, to run straight through. */
+export const BARCODE_BEFORE = 320
+export const BARCODE_HEIGHT = 22
+/** Its art's size: 24 by 13 cells, twice the size of a screen pixel. */
+export const BARCODE_WIDTH = 48
+export const BARCODE_TALL = 26
 
 // --- Points: one a metre, and these on top ----------------------------------
 export const FIKA_POINTS = 100
+export const BARCODE_POINTS = 250
+/**
+ * Finishing, points for every tick quicker round than the bus would be at
+ * its own pace: 120 a second.
+ */
+export const SPEED_POINTS = 2
 export const CHEER_POINTS = 50
 export const CORGI_POINTS = 250
 /** Taken off for each hazard hit: a rock, a branch, the mud, a furby on your head. */
@@ -179,3 +215,11 @@ export const BUS_LEASH_LATE_GROWTH = 0.6
 // --- Countdown ----------------------------------------------------------
 /** How long each of "3", "2", "1" and "Go!" is said for. */
 export const COUNTDOWN_STEP_TICKS = 50
+
+// --- Halloween Town ----------------------------------------------------------
+/** A Pumpkin's boost, and how much faster than top speed wearing one keeps you. */
+export const PUMPKIN_BOOST = 2
+export const PUMPKIN_SPEED = 1.5
+export const PUMPKIN_POINTS = 100
+/** How fast Zombies walk towards you. */
+export const ZOMBIE_SPEED = 0.7

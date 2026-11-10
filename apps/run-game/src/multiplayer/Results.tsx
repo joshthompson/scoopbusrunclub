@@ -1,4 +1,4 @@
-import { For, type JSX, Show, onCleanup } from 'solid-js'
+import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
 import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
@@ -9,11 +9,19 @@ export interface Placing {
 	seatId: string
 	place: number
 	points: number
-	how: 'won' | 'finished' | 'scooped'
+	how: 'won' | 'finished' | 'scooped' | 'fallen'
 }
 
 const ordinal = (n: number) =>
 	`${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`
+
+/** The keys that move between the buttons, and which way. */
+const MOVES: Record<string, number> = {
+	ArrowLeft: -1,
+	ArrowUp: -1,
+	ArrowRight: 1,
+	ArrowDown: 1,
+}
 
 /**
  * Between Rounds: the Standings so far, with what each Player got in the
@@ -21,8 +29,8 @@ const ordinal = (n: number) =>
  */
 export function Results(props: {
 	round: number
-	level: string
-	nextLevel: string
+	course: string
+	nextCourse: string
 	placings: Placing[]
 	seats: Seat[]
 	nextIn: number
@@ -42,15 +50,36 @@ export function Results(props: {
 						(placing(b)?.place ?? Number.POSITIVE_INFINITY),
 			)
 
+	/** Which button's picked: going on, to begin with. */
+	const [picked, setPicked] = createSignal(0)
+	const buttons = [
+		{
+			label: 'Go now',
+			choose: () => {
+				play('select')
+				props.onNext()
+			},
+		},
+		{
+			label: 'Back to the lobby',
+			choose: () => {
+				play('back')
+				props.onLobby()
+			},
+		},
+	]
 	const onKey = (event: KeyboardEvent) => {
-		if (event.key === 'Enter') {
-			play('select')
-			props.onNext()
+		const move = MOVES[event.key]
+		if (move) {
+			const next = Math.max(0, Math.min(buttons.length - 1, picked() + move))
+			if (next !== picked()) {
+				play('move')
+				setPicked(next)
+			}
+			event.preventDefault()
 		}
-		if (event.key === 'Escape') {
-			play('back')
-			props.onLobby()
-		}
+		if (event.key === 'Enter') buttons[picked()].choose()
+		if (event.key === 'Escape') buttons[1].choose()
 	}
 	window.addEventListener('keydown', onKey)
 	onCleanup(() => window.removeEventListener('keydown', onKey))
@@ -58,59 +87,61 @@ export function Results(props: {
 	return (
 		<div style={styles.screen}>
 			<div style={styles.title}>
-				Round {props.round} · {props.level}
+				Round {props.round} · {props.course}
 			</div>
 			<Panel title="Standings" style={styles.panel}>
-				<For each={standings()}>
-					{(seat, i) => (
-						<Row seat={seat} lead={`${i() + 1}.`}>
-							<Show when={placing(seat)}>
-								{(p) => (
-									<span style={styles.how}>
-										{ordinal(p().place)} ·{' '}
-										{p().how === 'won'
-											? 'Last standing'
-											: p().how === 'finished'
-												? 'Beat the bus'
-												: 'Scooped'}
+				<div style={styles.standings}>
+					<For each={standings()}>
+						{(seat, i) => (
+							<Row seat={seat} lead={`${i() + 1}.`}>
+								<Show when={placing(seat)}>
+									{(p) => (
+										<span style={styles.how}>
+											{ordinal(p().place)} ·{' '}
+											{p().how === 'won'
+												? 'Last standing'
+												: p().how === 'finished'
+													? 'Beat the bus'
+													: p().how === 'fallen'
+														? 'Fell'
+														: 'Scooped'}
+										</span>
+									)}
+								</Show>
+								<span style={styles.points}>
+									{seat.points}
+									<span style={styles.gained}>
+										{' '}
+										(+{placing(seat)?.points ?? 0})
 									</span>
-								)}
-							</Show>
-							<span style={styles.points}>
-								{seat.points}
-								<span style={styles.gained}>
-									{' '}
-									(+{placing(seat)?.points ?? 0})
 								</span>
-							</span>
-						</Row>
-					)}
-				</For>
+							</Row>
+						)}
+					</For>
+				</div>
 			</Panel>
 			<div style={styles.next}>
-				Next: {props.nextLevel} in {props.nextIn}…
+				Next: {props.nextCourse} in {props.nextIn}…
 			</div>
 			<div style={styles.buttons}>
-				<button
-					type="button"
-					style={styles.button}
-					onClick={() => {
-						play('select')
-						props.onNext()
-					}}
-				>
-					Go now ↵
-				</button>
-				<button
-					type="button"
-					style={styles.button}
-					onClick={() => {
-						play('back')
-						props.onLobby()
-					}}
-				>
-					Back to the lobby
-				</button>
+				<For each={buttons}>
+					{(button, i) => (
+						<button
+							type="button"
+							style={{
+								...styles.button,
+								...(i() === picked()
+									? { background: '#ffd23f', color: 'var(--ink)' }
+									: {}),
+							}}
+							onMouseEnter={() => setPicked(i())}
+							onClick={button.choose}
+						>
+							{button.label}
+							{i() === picked() ? ' ↵' : ''}
+						</button>
+					)}
+				</For>
 			</div>
 		</div>
 	)
@@ -159,11 +190,21 @@ const styles = {
 		padding: '14px 18px',
 		overflow: 'hidden',
 	},
+	/** However many there are, in the panel: scrolled, if there are too many. */
+	standings: {
+		display: 'flex',
+		'flex-direction': 'column',
+		gap: '4px',
+		'min-height': 0,
+		flex: 1,
+		'overflow-y': 'auto',
+	},
 	row: {
 		display: 'flex',
 		'align-items': 'center',
 		gap: '8px',
 		height: '28px',
+		'flex-shrink': 0,
 		'font-size': '18px',
 	},
 	lead: { width: '38px', color: '#ffd23f' },
