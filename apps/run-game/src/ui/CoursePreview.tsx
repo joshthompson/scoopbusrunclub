@@ -195,7 +195,7 @@ export function CoursePreview(props: {
 											'--knocked': 0,
 										}}
 									>
-										<HurdleArt depth={lane.depth} />
+										<HurdleArt depth={lane.depth} tall={hurdle.tall} />
 									</div>
 								)}
 							</For>

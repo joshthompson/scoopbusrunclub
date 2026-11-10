@@ -7,7 +7,6 @@ import ghost4 from '@/assets/halloween/ghost4.png'
 import pumpkin2 from '@/assets/halloween/pumpkin2.png'
 import skeletonSit from '@/assets/halloween/skeleton-sit.png'
 import tombstone from '@/assets/halloween/tombstone.png'
-import purpleSignHalloween from '@/assets/misc/purple-sign-halloween.png'
 import shrub1 from '@/assets/misc/shrub1.png'
 import tree1Halloween from '@/assets/misc/tree1-halloween.png'
 import tree2Halloween from '@/assets/misc/tree2-halloween.png'
@@ -15,8 +14,9 @@ import type { RunnerName } from '@/data/runners'
 import busHalloween from '../assets/bus/bus-halloween.png'
 import scoopHalloween from '../assets/bus/scoop-halloween.png'
 import windowsHalloween from '../assets/bus/windows-halloween.png'
+import purpleSignHalloween from '../assets/signs/purple-sign-halloween.png'
 import { START_X } from '../game/constants'
-import { FIKA_ITEMS } from '../game/fika'
+import { HALLOWEEN_FIKA } from '../game/fika'
 import { type Gap, createTerrain } from '../game/terrain'
 import { seeded } from './kit/seeded'
 import type {
@@ -102,7 +102,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 				kind: 'fika',
 				x,
 				height: random() < 0.5 ? 26 : 95,
-				item: FIKA_ITEMS[fika++ % FIKA_ITEMS.length],
+				item: HALLOWEEN_FIKA[fika++ % HALLOWEEN_FIKA.length],
 			})
 		else
 			boosts.push({

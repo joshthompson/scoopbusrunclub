@@ -3,7 +3,7 @@ import pyramidsFar from '../assets/horizons/pyramids-far.png'
 import pyramidsNear from '../assets/horizons/pyramids-near.png'
 import palm from '../assets/scenery/palm.png'
 import { START_X } from '../game/constants'
-import { FIKA_ITEMS } from '../game/fika'
+import { PYRAMIDS_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
@@ -108,7 +108,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 					kind: 'fika',
 					x,
 					height: random() < 0.5 ? 26 : 95,
-					item: FIKA_ITEMS[fika++ % FIKA_ITEMS.length],
+					item: PYRAMIDS_FIKA[fika++ % PYRAMIDS_FIKA.length],
 				}
 			return {
 				kind: 'cheer',
@@ -123,7 +123,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			kind: 'fika',
 			x: pyramid.x,
 			height: 26,
-			item: FIKA_ITEMS[fika++ % FIKA_ITEMS.length],
+			item: PYRAMIDS_FIKA[fika++ % PYRAMIDS_FIKA.length],
 		})
 	boosts.sort((a, b) => a.x - b.x)
 	// A palm now and then, an oasis, but not on a pyramid.

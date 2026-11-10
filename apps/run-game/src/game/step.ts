@@ -6,6 +6,7 @@ import {
 } from '../draw/art/geese'
 import { KIDS_REACH_UP, kidsWidth } from '../draw/art/kids'
 import { TOURISTS_HEIGHT, touristsWidth } from '../draw/art/tourists'
+import { TALL_HURDLE_CLEAR, TALL_HURDLE_HEIGHT } from '../draw/art/track'
 import { rideLook } from '../draw/rideLook'
 import { collect } from '../saved/collected'
 import { play } from '../sfx'
@@ -56,6 +57,7 @@ import {
 	RUN_TOP_SPEED,
 	SLIDE_KEEP,
 	SPEED_POINTS,
+	SQUASHED_TOP_SPEED,
 	STAND_HEIGHT,
 	START_LEAD,
 	START_X,
@@ -80,6 +82,7 @@ import {
 	type ObstacleState,
 	type Racer,
 	type World,
+	bodyHeight,
 	isCaught,
 } from './world'
 import { zombieAt } from './zombies'
@@ -388,6 +391,7 @@ function stepRunner(world: World, racer: Racer) {
 		else b.tunnelSpeed ??= Math.abs(b.vx)
 		b.ducking = down || low
 		if (b.stumble > 0) b.stumble--
+		if (b.squashed > 0) b.squashed--
 		const canDrive = b.stumble === 0
 
 		if (b.mount > 0) {
@@ -414,9 +418,12 @@ function stepRunner(world: World, racer: Racer) {
 				b.vx = (b.vx < 0 ? -1 : 1) * Math.max(Math.abs(b.vx), b.tunnelSpeed)
 			}
 		} else {
-			const top = b.muddy
+			const running = b.muddy
 				? MUD_TOP_SPEED
 				: RUN_TOP_SPEED + (b.pumpkin ? PUMPKIN_SPEED : 0)
+			// Squashed by a furby: slower, till they spring back up.
+			const top =
+				b.squashed > 0 ? Math.min(running, SQUASHED_TOP_SPEED) : running
 			// Holding both is standing still.
 			const drive = canDrive ? Number(right) - Number(left) : 0
 			if (finished) b.vx += (RUN_OFF_SPEED - b.vx) * RUN_GRIP * 2
@@ -428,6 +435,7 @@ function stepRunner(world: World, racer: Racer) {
 			} else b.vx *= COAST_KEEP
 			b.vx += hillPull(slope) * HILL_PULL
 			if (b.muddy && Math.abs(b.vx) > MUD_TOP_SPEED) b.vx *= 0.93
+			if (b.squashed > 0 && Math.abs(b.vx) > SQUASHED_TOP_SPEED) b.vx *= 0.95
 		}
 
 		if (up && !b.wasUp && !low) {
@@ -489,7 +497,7 @@ function stepRunner(world: World, racer: Racer) {
 		b.feetY += b.vy
 		// Up into a Ceiling: a bump on the head, and no higher.
 		if (b.vy < 0) {
-			const height = b.ducking ? DUCK_HEIGHT : STAND_HEIGHT
+			const height = bodyHeight(b)
 			const ceiling = ceilingAt(world, b.x, wasFeetY - height)
 			if (ceiling !== undefined && b.feetY - height < ceiling) {
 				b.feetY = ceiling + height
@@ -608,7 +616,7 @@ function thud(world: World, b: Body, dir: number, edge: number) {
  */
 function hitTower(world: World, racer: Racer, from: number) {
 	const b = racer.body
-	const head = b.feetY - (b.ducking ? DUCK_HEIGHT : STAND_HEIGHT)
+	const head = b.feetY - bodyHeight(b)
 	const dir = Math.sign(b.x - from)
 	for (const x of world.course.towers ?? []) {
 		const { left, right } = towerSpan(x)
@@ -641,7 +649,7 @@ function hitRockFace(world: World, racer: Racer, from: number) {
 	const b = racer.body
 	const dir = Math.sign(b.x - from)
 	if (!cave || !dir) return
-	const height = b.ducking ? DUCK_HEIGHT : STAND_HEIGHT
+	const height = bodyHeight(b)
 	/** Whether, at `x`, their front's into the rock. */
 	const into = (x: number) => {
 		const front = x + dir * HITBOX_HALF_WIDTH
@@ -701,7 +709,7 @@ function collide(world: World, racer: Racer) {
 	const left = b.x - HITBOX_HALF_WIDTH
 	const right = b.x + HITBOX_HALF_WIDTH
 	const bottom = b.feetY
-	const top = b.feetY - (b.ducking ? DUCK_HEIGHT : STAND_HEIGHT)
+	const top = b.feetY - bodyHeight(b)
 	/** Where they were last tick. */
 	const wasAt = b.x - b.vx
 	const overlaps = (x0: number, x1: number, y0: number, y1: number) =>
@@ -753,9 +761,12 @@ function collide(world: World, racer: Racer) {
 				break
 			case 'branch':
 				if (
+					!state.scooped &&
 					freshFor(state) &&
 					b.stumble === 0 &&
-					overlaps(o.x - 30, o.x + 30, ground - 90, ground - 34)
+					// Only where its limb crosses the line everyone runs along:
+					// either side of that, it's nearer or further than them.
+					overlaps(o.x - 16, o.x + 16, ground - 62, ground - 34)
 				) {
 					hits(state)
 					stumble('Bonk!')
@@ -848,12 +859,20 @@ function collide(world: World, racer: Racer) {
 				break
 			}
 			case 'hurdle':
-				// Solid all the way down: over it, not under it. Knocked over by
-				// whoever runs into it first, and lying flat for the rest.
+				// Solid all the way down: over it, not under it. A tall one's
+				// board stops short: under it, sliding. Knocked over by whoever
+				// runs into it first, and lying flat for the rest.
 				if (
 					!state.used &&
 					b.stumble === 0 &&
-					overlaps(o.x - 14, o.x + 14, ground - 40, ground)
+					(o.tall
+						? overlaps(
+								o.x - 14,
+								o.x + 14,
+								ground - TALL_HURDLE_HEIGHT,
+								ground - TALL_HURDLE_CLEAR,
+							)
+						: overlaps(o.x - 14, o.x + 14, ground - 40, ground))
 				) {
 					state.used = true
 					stumble('Clonk!')
@@ -1185,6 +1204,8 @@ function knockOver(world: World) {
 		if (o.kind === 'hurdle') state.used = true
 		if (
 			o.kind === 'rock' ||
+			// A low branch's limb, knocked off its tree.
+			o.kind === 'branch' ||
 			o.kind === 'kids' ||
 			o.kind === 'tombstone' ||
 			o.kind === 'tourists'

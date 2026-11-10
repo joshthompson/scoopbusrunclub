@@ -107,6 +107,7 @@ export function createRaceStream(
 						(b.facing === -1 ? RACER_FLAGS.left : 0) |
 						(b.carried > 0 ? RACER_FLAGS.carried : 0) |
 						(b.on !== undefined ? RACER_FLAGS.platform : 0) |
+						(b.squashed > 0 ? RACER_FLAGS.squashed : 0) |
 						(b.pumpkin * PUMPKIN_FLAG),
 					b.stumble,
 					b.spin,

@@ -5,6 +5,7 @@ import facade3 from '../assets/buildings/facade-3.png'
 import facade4 from '../assets/buildings/facade-4.png'
 import cityFar from '../assets/horizons/city-far.png'
 import cityNear from '../assets/horizons/city-near.png'
+import cityNearer from '../assets/horizons/city-nearer.png'
 import antenna from '../assets/rooftop/antenna.png'
 import chimney1 from '../assets/rooftop/chimney-1.png'
 import chimney2 from '../assets/rooftop/chimney-2.png'
@@ -248,10 +249,16 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		scenery.push({
 			x,
 			asset: piece === 'chimney' ? CHIMNEYS[on % CHIMNEYS.length] : piece,
+			// Stood on the roof, a little in from its far edge: the roof
+			// ends there, with nothing behind it to stand on.
+			setBack: -ON_ROOF,
 		})
 	}
 	return { obstacles, boosts, scenery }
 }
+
+/** How far in from a roof's far edge what's on it stands. */
+const ON_ROOF = 8
 
 /**
  * Each building in turn: its wall's colour, the front it's faced with (a
@@ -293,6 +300,8 @@ export const cityRooftop: CourseDefinition = {
 			far: cityFar,
 			near: cityNear,
 			fill: '#5a4f80',
+			// The streets nearer, filling the haze down to the rooftops.
+			nearer: { asset: cityNearer, fill: '#1f1833' },
 		},
 		buildings: {
 			roof: '#5b5e68',

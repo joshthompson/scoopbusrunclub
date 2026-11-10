@@ -187,9 +187,11 @@ export const RACER_FLAGS = {
 	carried: 16,
 	/** Stood on a Platform, which is flat, rather than on the Ground. */
 	platform: 32,
+	/** Squashed by a furby. */
+	squashed: 64,
 }
 /** The Pumpkin a racer's wearing, by its carving, is the flags over this. */
-export const PUMPKIN_FLAG = 64
+export const PUMPKIN_FLAG = 128
 /** [id, x, feetY, vx, flags (1 grounded, 2 scooped), dazed, spin] */
 export type PacerState = [
 	number,

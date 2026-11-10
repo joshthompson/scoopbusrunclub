@@ -4,7 +4,6 @@ import pumpkin3Asset from '@/assets/halloween/pumpkin3.png'
 import pumpkin4Asset from '@/assets/halloween/pumpkin4.png'
 import pumpkin5Asset from '@/assets/halloween/pumpkin5.png'
 import tombstoneAsset from '@/assets/halloween/tombstone.png'
-import purpleSignAsset from '@/assets/misc/purple-sign.png'
 import rockAsset from '@/assets/misc/rock1.png'
 import { type RunnerName, runners } from '@/data/runners'
 import {
@@ -24,11 +23,14 @@ import wheel2Asset from '../assets/bus/wheel2.png'
 import wheel3Asset from '../assets/bus/wheel3.png'
 import wheel4Asset from '../assets/bus/wheel4.png'
 import windowAsset from '../assets/bus/windows.png'
-import branchAsset from '../assets/obstacles/branch.png'
 import cyclist1Asset from '../assets/obstacles/cyclist-1.png'
 import cyclist2Asset from '../assets/obstacles/cyclist-2.png'
+import lowBranchLimbAsset from '../assets/obstacles/low-branch-limb.png'
+import lowBranchTreeAsset from '../assets/obstacles/low-branch-tree.png'
+import mudAsset from '../assets/obstacles/mud.png'
 import steamVentAsset from '../assets/obstacles/steam-vent.png'
 import ventAsset from '../assets/rooftop/vent.png'
+import purpleSignAsset from '../assets/signs/purple-sign.png'
 import { seeded } from '../courses/kit/seeded'
 import type { Obstacle } from '../courses/types'
 import { inTunnel } from '../game/cave'
@@ -40,6 +42,7 @@ import {
 	PATH_FRONT,
 	PX_PER_M,
 	RUNNER_SCALE,
+	SQUASHED,
 	START_X,
 	VIEW_HEIGHT,
 } from '../game/constants'
@@ -58,6 +61,7 @@ import {
 	TOWER_WIDTH,
 } from '../game/towers'
 import type {
+	Body,
 	BoostState,
 	Corgi,
 	Flyer,
@@ -199,13 +203,9 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				$.setState('pause')
 				return
 			}
-			$.setXScale(body.facing === 1 ? -1 : 1)
-			// Leaning with the hill, but upright on a Platform: they're flat.
-			$.setRotation(
-				body.grounded && body.on === undefined
-					? (Math.atan(world.terrain.slope(body.x)) * 180) / Math.PI
-					: 0,
-			)
+			const xScale = body.facing === 1 ? -1 : 1
+			$.setXScale(xScale)
+			$.setRotation(runnerLean(world, body))
 			// Sat down, the one sit frame: switching to it from a run frame
 			// would otherwise leave the engine on a frame it doesn't have. In
 			// the air, legs out in one stride.
@@ -218,9 +218,26 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			$.setFrameInterval(Math.max(45, 190 - speed * 22))
 			$.setStyle({
 				opacity: body.stumble > 0 && body.stumble % 8 < 4 ? '0.4' : '1',
+				// Squashed by a furby: half as tall, from their feet.
+				...(body.squashed > 0
+					? {
+							transform: `scale(${xScale}, ${SQUASHED})`,
+							'transform-origin': '50% 100%',
+						}
+					: {}),
 			})
 		},
 	})
+}
+
+/**
+ * How far a runner leans with the hill, in degrees: upright on a Platform,
+ * which is flat, and in the air.
+ */
+function runnerLean(world: World, body: Body) {
+	return body.grounded && body.on === undefined
+		? (Math.atan(world.terrain.slope(body.x)) * 180) / Math.PI
+		: 0
 }
 
 /**
@@ -1354,6 +1371,8 @@ function Scoopable(props: {
 	world: World
 	state: ObstacleState
 	children: JSX.Element
+	/** What it spins round, flying: its middle, unless it's somewhere else in its art. */
+	spin?: string
 }) {
 	const flight = () => {
 		const now = props.world.ticks()
@@ -1363,7 +1382,7 @@ function Scoopable(props: {
 	return (
 		<div
 			style={{
-				'transform-origin': 'center',
+				'transform-origin': props.spin ?? 'center',
 				transform: (() => {
 					const f = flight()
 					return f
@@ -1396,19 +1415,115 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					</Scoopable>
 				),
 			})
-		case 'branch':
-			return createFixture({
-				id,
-				type: 'hazard',
-				// Its branch reaches back over `o.x` from a trunk beyond it.
-				x: o.x + BRANCH_TREE_ALONG,
-				sink: 2,
-				width: BRANCH_TREE_WIDTH,
-				height: 260,
-				world,
-				children: () => <BranchArt />,
-				style: () => ({ filter: world.course.look?.foliage }),
-			})
+		case 'branch': {
+			// Sheared to the slope under it, so its limb lies across the path
+			// on a hill too, its trunk still upright; and its row on the line
+			// everyone runs along on the ground where the limb crosses it.
+			const { groundY } = world.terrain
+			const from = o.x - BRANCH_CROSS
+			const to = from + BRANCH_TREE_WIDTH
+			const slope = (groundY(to) - groundY(from)) / (to - from)
+			const settle = groundY(o.x) - groundY(o.x + BRANCH_TREE_ALONG)
+			const lie = `translateY(${settle}px) skewY(${Math.atan(slope)}rad)`
+			const knocked = () => world.ticks() >= 0 && !!state.scooped
+			// Jumping it: its near end's drawn behind you, not over you.
+			const over = () =>
+				world.ticks() >= 0 &&
+				Math.abs(world.body.x - o.x) < BRANCH_OVER_REACH &&
+				world.body.feetY < groundY(o.x) - BRANCH_LIMB_HEIGHT
+			const part = (options: {
+				suffix: string
+				type: string
+				src: string
+				clip?: string
+				shown: () => boolean
+			}) =>
+				createFixture({
+					id: `${id}${options.suffix}`,
+					type: options.type,
+					x: o.x + BRANCH_TREE_ALONG,
+					width: BRANCH_TREE_WIDTH,
+					height: BRANCH_TREE_HEIGHT,
+					sink: BRANCH_TREE_HEIGHT - BRANCH_LINE_ROW,
+					world,
+					children: () => (
+						<Scoopable
+							world={world}
+							state={state}
+							spin={`${BRANCH_CROSS}px ${BRANCH_LINE_ROW - BRANCH_LIMB_HEIGHT}px`}
+						>
+							<PixelArt
+								src={options.src}
+								width={BRANCH_TREE_WIDTH}
+								height={BRANCH_TREE_HEIGHT}
+							/>
+						</Scoopable>
+					),
+					style: () => ({
+						filter: world.course.look?.foliage,
+						transform: lie,
+						'transform-origin': `${BRANCH_CROSS}px ${BRANCH_LINE_ROW}px`,
+						'clip-path': options.clip,
+						visibility: options.shown() ? 'visible' : 'hidden',
+					}),
+				})
+			const back = `inset(0 0 0 ${BRANCH_CROSS}px)`
+			const near = `inset(0 ${BRANCH_TREE_WIDTH - BRANCH_CROSS}px 0 0)`
+			return [
+				// The tree, behind the path: behind everyone, the bus too.
+				createFixture({
+					id: `${id}-tree`,
+					type: 'hazard',
+					x: o.x + BRANCH_TREE_ALONG,
+					width: BRANCH_TREE_WIDTH,
+					height: BRANCH_TREE_HEIGHT,
+					sink: BRANCH_TREE_HEIGHT - BRANCH_LINE_ROW,
+					world,
+					children: () => (
+						<PixelArt
+							src={lowBranchTreeAsset}
+							width={BRANCH_TREE_WIDTH}
+							height={BRANCH_TREE_HEIGHT}
+						/>
+					),
+					style: () => ({
+						filter: world.course.look?.foliage,
+						transform: lie,
+						'transform-origin': `${BRANCH_CROSS}px ${BRANCH_LINE_ROW}px`,
+					}),
+				}),
+				// Its limb: the back of it behind everyone; its near end over a
+				// runner under it, or behind one jumping it. Knocked off by the
+				// bus, all of it, flying, in front.
+				part({
+					suffix: '-limb',
+					type: 'hazard',
+					src: lowBranchLimbAsset,
+					clip: back,
+					shown: () => !knocked(),
+				}),
+				part({
+					suffix: '-limb-near',
+					type: 'hazard-front',
+					src: lowBranchLimbAsset,
+					clip: near,
+					shown: () => !knocked() && !over(),
+				}),
+				part({
+					suffix: '-limb-near-behind',
+					type: 'hazard',
+					src: lowBranchLimbAsset,
+					clip: near,
+					shown: () => !knocked() && over(),
+				}),
+				part({
+					suffix: '-limb-flying',
+					type: 'hazard-front',
+					src: lowBranchLimbAsset,
+					shown: knocked,
+				}),
+			]
+		}
 		case 'hurdle':
 			// One in each lane, across the track. Only the runner's own is run into.
 			return HURDLE_LANES.map((lane, n) =>
@@ -1417,9 +1532,9 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					type: lane.front ? 'hazard-front' : 'hazard',
 					x: o.x + lane.along,
 					sink: lane.sink,
-					...hurdleSize(lane.depth),
+					...hurdleSize(lane.depth, o.tall),
 					world,
-					children: () => <HurdleArt depth={lane.depth} />,
+					children: () => <HurdleArt depth={lane.depth} tall={o.tall} />,
 					// Knocked over: the runner's own once run into, or flattened by
 					// the bus (which sets `used` too), and every other lane's as the
 					// bus's scoop reaches it. Neither's a signal: reading the tick
@@ -1640,27 +1755,71 @@ export function createBoost(world: World, state: BoostState, i: number) {
  * the back of the path (the art's foot, 258, is the middle of it), so the
  * runner goes past it, not through it.
  */
-const BranchArt = () => <PixelArt src={branchAsset} width={104} height={260} />
 
 /** A puddle of mud, following the ground under it. */
+/**
+ * Mud's art, `assets/obstacles/mud.png`: its left end, a middle that repeats,
+ * and its right end, side by side, in cells twice the size of a screen pixel.
+ */
+const MUD_CAP = 24
+const MUD_TILE = 32
+const MUD_ART_HEIGHT = 28
+
+/**
+ * A muddy puddle across the path: its art, a column 4 px wide at a time,
+ * each on the Ground under it, so the puddle lies along the slope. Its
+ * ends, and as much of its middle as it takes between them. Drawn onto one
+ * canvas, so it's scaled as one picture, without seams between the columns.
+ */
 function MudArt(props: {
 	world: World
 	obstacle: Extract<Obstacle, { kind: 'mud' }>
 }) {
 	const { obstacle: o, world } = props
-	const left = o.x - o.width / 2
-	const top = world.terrain.groundY(o.x) - 40 + 20
-	const rects: [number, number, number, number, string][] = []
-	for (let x = 0; x < o.width; x += 4) {
-		const surface = Math.round(world.terrain.groundY(left + x) - top)
-		const edge = Math.min(x, o.width - x)
-		const depth = Math.min(10, 2 + Math.floor(edge / 4) * 2)
-		rects.push([x, surface - 2, 4, depth, '#5b3d22'])
-		if (edge > 8) rects.push([x, surface - 2, 4, 2, '#7a5634'])
-		if (edge > 14 && (x / 4) % 5 === 0)
-			rects.push([x, surface + 2, 4, 2, '#8e6a44'])
+	const width = Math.max(2 * MUD_CAP, Math.round(o.width / 4) * 4)
+	const left = o.x - width / 2
+	const top = world.terrain.groundY(o.x) - 20
+	const canvas = (
+		<canvas
+			width={width}
+			height={40 + MUD_ART_HEIGHT}
+			style={{
+				display: 'block',
+				'margin-top': `${-MUD_ART_HEIGHT / 2}px`,
+				'image-rendering': 'pixelated',
+			}}
+		/>
+	) as HTMLCanvasElement
+	const art = new Image()
+	art.onload = () => {
+		const context = canvas.getContext('2d')
+		if (!context) return
+		context.imageSmoothingEnabled = false
+		for (let x = 0; x < width; x += 4) {
+			const from =
+				x < MUD_CAP
+					? x
+					: x >= width - MUD_CAP
+						? MUD_CAP + MUD_TILE + x - (width - MUD_CAP)
+						: MUD_CAP + ((x - MUD_CAP) % MUD_TILE)
+			// Its middle row on the Ground's line, the canvas starting half the art higher.
+			const ground = Math.round(world.terrain.groundY(left + x + 2) - top)
+			// The art's in cells of 2 px: half as many of its own pixels.
+			context.drawImage(
+				art,
+				from / 2,
+				0,
+				2,
+				MUD_ART_HEIGHT / 2,
+				x,
+				ground,
+				4,
+				MUD_ART_HEIGHT,
+			)
+		}
 	}
-	return <Pixels width={o.width} height={40} rects={rects} />
+	art.src = mudAsset
+	return canvas
 }
 
 const PUMPKINS = [
@@ -1716,19 +1875,27 @@ export function createHats(world: World) {
 				)
 				if (!carving()) return
 				const sitting = (body.ducking || body.mount > 0) && !!sprite.sit
-				const height = sitting
-					? poseSize(sprite.sit, sprite).height
-					: sprite.height * RUNNER_SCALE
-				const head =
-					body.feetY -
-					height -
-					(body.mount > 0 ? rideLook(world.course).saddle : 0)
-				const x = body.x - PUMPKIN_WIDTH / 2
-				const y = head - PUMPKIN_HEIGHT + PUMPKIN_ON
+				const height =
+					(sitting
+						? poseSize(sprite.sit, sprite).height
+						: sprite.height * RUNNER_SCALE) * (body.squashed > 0 ? SQUASHED : 1)
+				const feet =
+					body.feetY - (body.mount > 0 ? rideLook(world.course).saddle : 0)
+				// On their head as they lean with the hill, as the runner's drawn
+				// (see `createPlayer`): leaning round their middle, or squashed,
+				// round their feet.
+				const lean = runnerLean(world, body)
+				const pivot = body.squashed > 0 ? 0 : height / 2
+				const reach = height - pivot
+				const radians = (lean * Math.PI) / 180
+				const headX = body.x + reach * Math.sin(radians)
+				const headY = feet - pivot - reach * Math.cos(radians)
+				const x = headX - PUMPKIN_WIDTH / 2
+				const y = headY - PUMPKIN_HEIGHT + PUMPKIN_ON
 				if (body.pumpkin) {
 					$.setX(x)
 					$.setY(y)
-					$.setRotation(racer.out === 'scooped' ? body.spin * 14 : 0)
+					$.setRotation(racer.out === 'scooped' ? body.spin * 14 : lean)
 					$.setStyle({ opacity: 1 })
 					return
 				}
@@ -1862,9 +2029,22 @@ function Carved(props: {
 	)
 }
 
-/** A low-branch tree's middle, past the `x` its branch reaches back over, and how wide it is. */
-const BRANCH_TREE_ALONG = 22
-const BRANCH_TREE_WIDTH = 104
+/**
+ * A low-branch tree, `assets/obstacles/low-branch-tree.png`, and its limb,
+ * `low-branch-limb.png`, over it: its trunk behind the path, its limb
+ * reaching forward across it, crossing the line everyone runs along
+ * `BRANCH_CROSS` px into its art and on its row `BRANCH_LINE_ROW`, at `x`,
+ * `BRANCH_LIMB_HEIGHT` up. Its art's middle is `BRANCH_TREE_ALONG` past that
+ * `x`. Jumping over its limb, within `BRANCH_OVER_REACH` of `x`, it's drawn
+ * behind you.
+ */
+const BRANCH_TREE_WIDTH = 190
+const BRANCH_TREE_HEIGHT = 260
+const BRANCH_CROSS = 70
+const BRANCH_LINE_ROW = 249
+const BRANCH_TREE_ALONG = BRANCH_TREE_WIDTH / 2 - BRANCH_CROSS
+const BRANCH_LIMB_HEIGHT = 50
+const BRANCH_OVER_REACH = 80
 
 const KM_SIGN_WIDTH = 64
 const KM_SIGN_HEIGHT = 84

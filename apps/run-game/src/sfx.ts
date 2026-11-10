@@ -1,4 +1,4 @@
-import { audioContext } from './audio'
+import { audioContext, wake } from './audio'
 import { effectsOn } from './saved/settings'
 
 /**
@@ -131,10 +131,11 @@ export function overhear(listener: ((sound: Sound) => void) | undefined) {
 
 export function play(sound: Sound) {
 	overheard?.(sound)
-	if (!effectsOn()) return
+	// Not while the tab's hidden: held, they'd all play at once on coming back.
+	if (!effectsOn() || document.hidden) return
 	try {
 		const context = audioContext()
-		if (context.state === 'suspended') void context.resume()
+		wake(context)
 		const { notes, volume, slide } = SOUNDS[sound]
 		let at = context.currentTime
 		for (const [frequency, length, wave = 'square'] of notes) {

@@ -172,6 +172,7 @@ export default function Mirror(props: {
 			body.carried = flags & 16 ? 1 : 0
 			// Which one doesn't matter here: only that it's flat.
 			body.on = flags & 32 ? 0 : undefined
+			body.squashed = flags & 64 ? 1 : 0
 			// Knocked off since the last frame: flying.
 			const pumpkin = Math.floor(flags / PUMPKIN_FLAG)
 			if (body.pumpkin && !pumpkin)

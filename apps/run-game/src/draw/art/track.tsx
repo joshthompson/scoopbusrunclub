@@ -16,6 +16,12 @@ export const TRACK_INSIDE = 24
 export const ACROSS_SLANT = 3.5
 /** A hurdle's height, its feet to the top of its bar. */
 export const HURDLE_HEIGHT = 42
+/**
+ * A tall hurdle's: its board coming down to `TALL_HURDLE_CLEAR` off the
+ * track, so there's room under it only sliding.
+ */
+export const TALL_HURDLE_HEIGHT = 90
+export const TALL_HURDLE_CLEAR = 34
 /** How deep a pothole's drawn, and how far of that is above the line everyone runs along. */
 export const POTHOLE_HEIGHT = 10
 export const POTHOLE_ABOVE = 4
@@ -49,20 +55,23 @@ export const HURDLE_LANES = (() => {
 	}))
 })()
 
-/** A hurdle `depth` deep's size, as drawn. */
-export const hurdleSize = (depth: number) => ({
+/** A hurdle `depth` deep's size, as drawn: a tall one, if `tall`. */
+export const hurdleSize = (depth: number, tall = false) => ({
 	width: Math.round(depth * ACROSS_SLANT) + 10,
-	height: HURDLE_HEIGHT + depth,
+	height: (tall ? TALL_HURDLE_HEIGHT : HURDLE_HEIGHT) + depth,
 })
 
 /**
  * A hurdle across a lane, `depth` deep: its near leg at the left, its far
  * one further along and further up, the bar between them striped red and
- * white, its underside in shadow.
+ * white, its underside in shadow. A tall one's bar is a deep board, down
+ * to sliding height.
  */
-function hurdleRects(depth: number) {
+function hurdleRects(depth: number, tall: boolean) {
 	const run = Math.round(depth * ACROSS_SLANT)
-	const { height } = hurdleSize(depth)
+	const { height } = hurdleSize(depth, tall)
+	/** How deep its bar is, shadow and all. */
+	const bar = tall ? TALL_HURDLE_HEIGHT - TALL_HURDLE_CLEAR : 10
 	/** The top of the bar, `x` along. */
 	const top = (x: number) => Math.round(depth - ((x - 4) * depth) / run)
 	const rects: [number, number, number, number, string][] = []
@@ -70,13 +79,22 @@ function hurdleRects(depth: number) {
 	for (let x = 1; x < length + 1; x += 2) {
 		const y = top(x + 1)
 		const stripe = Math.floor(((x - 1) * 4) / length) % 2
-		rects.push([x, y, 2, 8, stripe ? WHITE : RED], [x, y + 8, 2, 2, RED_DARK])
+		rects.push(
+			[x, y, 2, bar - 2, stripe ? WHITE : RED],
+			[x, y + bar - 2, 2, 2, RED_DARK],
+		)
+		// A tall one's board, edged top and bottom in the other colour.
+		if (tall)
+			rects.push(
+				[x, y, 2, 3, stripe ? RED : WHITE],
+				[x, y + bar - 5, 2, 3, stripe ? RED : WHITE],
+			)
 	}
 	for (const [leg, foot] of [
 		[3, height],
 		[3 + run, height - depth],
 	]) {
-		const under = top(leg + 1) + 10
+		const under = top(leg + 1) + bar
 		rects.push(
 			[leg, under, 3, foot - 2 - under, LEG],
 			[leg - 3, foot - 2, 10, 2, FOOT],
@@ -90,8 +108,8 @@ function hurdleRects(depth: number) {
  * the track, the way it was run into: set `--knocked` to 1 on something round
  * it to knock it over, which a sprite's style can do every tick.
  */
-export function HurdleArt(props: { depth: number }) {
-	const size = hurdleSize(props.depth)
+export function HurdleArt(props: { depth: number; tall?: boolean }) {
+	const size = hurdleSize(props.depth, props.tall)
 	return (
 		<div
 			style={{
@@ -106,7 +124,7 @@ export function HurdleArt(props: { depth: number }) {
 			<Pixels
 				width={size.width}
 				height={size.height}
-				rects={hurdleRects(props.depth)}
+				rects={hurdleRects(props.depth, props.tall ?? false)}
 			/>
 		</div>
 	)

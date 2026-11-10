@@ -1,5 +1,5 @@
 import { createEffect, createRoot, createSignal } from 'solid-js'
-import { audioContext } from '../audio'
+import { audioContext, wake } from '../audio'
 import { musicOn } from '../saved/settings'
 import { type Parsed, isDrum, parse, playVoice } from './synth'
 import {
@@ -120,7 +120,7 @@ function start() {
 	if (playing) return
 	try {
 		const context = audioContext()
-		if (context.state === 'suspended') void context.resume()
+		wake(context)
 		const master = context.createGain()
 		master.gain.setValueAtTime(0, context.currentTime)
 		master.gain.linearRampToValueAtTime(VOLUME, context.currentTime + 0.4)

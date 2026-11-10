@@ -10,8 +10,11 @@ export type Obstacle =
 	| { kind: 'branch'; x: number }
 	/** Slows you right down while you're in it. Jump it. */
 	| { kind: 'mud'; x: number; width: number }
-	/** On a running track: jump it, or knock it over and stumble. */
-	| { kind: 'hurdle'; x: number }
+	/**
+	 * On a running track: jump it, or knock it over and stumble. A `tall`
+	 * one, slide under.
+	 */
+	| { kind: 'hurdle'; x: number; tall?: boolean }
 	/** A hole in the track, `width` across: jump it, or trip in it. */
 	| { kind: 'pothole'; x: number; width: number }
 	/** Children playing football on the track, `count` of them: jump the lot. */
@@ -149,6 +152,11 @@ export interface CourseLook {
 		fill: string
 		/** Spires and towers rising out of the far band's roofs, behind it: a strip as wide as you like. */
 		spires?: string
+		/**
+		 * A third band, nearer still, lower down and going by faster, and its
+		 * colour on down below it: so the view's full right down to the course.
+		 */
+		nearer?: { asset: string; fill: string }
 	}
 	/**
 	 * A bridge the course ends on, from `from` on: over water, its underside
@@ -303,7 +311,8 @@ export interface Scenery {
 	/**
 	 * How far back from the path it stands, up the field behind it, if not
 	 * the usual: a crystal on a Cave's floor, with no field, stands right
-	 * on the path's back edge.
+	 * on the path's back edge. Below 0, it's on the path itself, that far in
+	 * from its back edge: a chimney on a roof.
 	 */
 	setBack?: number
 	/**

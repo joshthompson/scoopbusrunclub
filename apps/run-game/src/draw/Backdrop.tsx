@@ -89,6 +89,9 @@ const SPIRES_HEIGHT = 300
 
 /** How tall a band of a course's own horizon is drawn. */
 const SKYLINE_HEIGHT = 160
+/** And its nearer band, if it has one: taller, and starting lower. */
+const NEARER_HEIGHT = 200
+const NEARER_TOP = 70
 
 /** Where the middle band of hills starts, which the far scenery peeks over. */
 const HORIZON = 216
@@ -377,6 +380,27 @@ export function Backdrop(props: { world: View }) {
 								background: 'var(--grass-green)',
 							}}
 						/>
+						<Show when={horizon().nearer}>
+							{(nearer) => (
+								<>
+									{band(
+										nearer().asset,
+										HORIZON + NEARER_TOP,
+										NEARER_HEIGHT,
+										0.26,
+										undefined,
+									)}
+									<div
+										style={{
+											...layer,
+											top: `${HORIZON + NEARER_TOP + NEARER_HEIGHT - 1}px`,
+											bottom: 0,
+											background: nearer().fill,
+										}}
+									/>
+								</>
+							)}
+						</Show>
 					</>
 				)}
 			</Show>

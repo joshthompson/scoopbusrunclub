@@ -3,6 +3,7 @@ import flower2 from '@/assets/misc/flower2.png'
 import shrub1 from '@/assets/misc/shrub1.png'
 import shrub2 from '@/assets/misc/shrub2.png'
 import type { RunnerName } from '@/data/runners'
+import copperTents from '../assets/scenery/copper-tents.png'
 import tree1 from '../assets/scenery/tree1.png'
 import tree2 from '../assets/scenery/tree2.png'
 import { START_X } from '../game/constants'
@@ -62,13 +63,27 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	const scenery: Course['scenery'] = []
 	const assets = [tree1, tree2, tree1, shrub1, shrub2, flower1, flower2]
 	for (let at = -400; at < terrain.finishX + 900; at += 90 + random() * 260) {
+		// Nothing in front of the Copper Tents.
+		if (Math.abs(at - TENTS_X) < TENTS_ROOM) continue
 		scenery.push({
 			x: Math.round(at),
 			asset: assets[Math.floor(random() * assets.length)],
 		})
 	}
+	// Koppartälten, the Copper Tents, at the top of the hill.
+	scenery.push({ x: TENTS_X, asset: copperTents, setBack: 18 })
 	return { obstacles, boosts, scenery }
 }
+
+/** Where the course is highest: the Copper Tents stand there, back from the path. */
+const TENTS_X = (() => {
+	let top = START_X
+	for (let x = START_X; x < terrain.finishX; x += 10)
+		if (terrain.groundY(x) < terrain.groundY(top)) top = x
+	return top
+})()
+/** Half the Copper Tents' width, and a little more: no trees in front of them. */
+const TENTS_ROOM = 150
 
 /** Room either side of geese, to land a jump between them and whatever's next. */
 const GEESE_ROOM = 320

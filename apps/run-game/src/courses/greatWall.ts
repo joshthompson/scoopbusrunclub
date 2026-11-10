@@ -3,7 +3,7 @@ import wallFar from '../assets/horizons/great-wall-far.png'
 import wallNear from '../assets/horizons/great-wall-near.png'
 import lantern from '../assets/scenery/lantern.png'
 import { PATH_BACK, PATH_FRONT, START_X } from '../game/constants'
-import { FIKA_ITEMS } from '../game/fika'
+import { GREAT_WALL_FIKA } from '../game/fika'
 import {
 	type Gap,
 	type Terrain,
@@ -162,7 +162,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 					kind: 'fika',
 					x,
 					height: random() < 0.5 ? 26 : 95,
-					item: FIKA_ITEMS[fika++ % FIKA_ITEMS.length],
+					item: GREAT_WALL_FIKA[fika++ % GREAT_WALL_FIKA.length],
 				}
 			return {
 				kind: 'cheer',

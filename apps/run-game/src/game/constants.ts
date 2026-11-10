@@ -158,8 +158,15 @@ export const FURBY_STEER = 0.06
 export const FURBY_REACH = 6
 /** How far from where it aims it can land. */
 export const FURBY_AIM_ERROR = 20
-/** How long one sits on your head, slowing you right down, before hopping off. */
+/** How long one sits on your head before hopping off. */
 export const FURBY_RIDE_TICKS = 35
+/**
+ * Landed on, you're squashed: half your height, and slower, this long, till
+ * you spring back up.
+ */
+export const FURBY_SQUASH_TICKS = 180
+export const SQUASHED = 0.5
+export const SQUASHED_TOP_SPEED = 3.6
 
 /**
  * Geese flying over Haga, from behind: this fast, overtaking you, and this

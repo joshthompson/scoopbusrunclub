@@ -7,7 +7,10 @@ import type { Avatar } from '../runners/looks'
 import type { Playable } from '../runners/playable'
 import {
 	BUS_START_X,
+	DUCK_HEIGHT,
 	PACK_SIZE,
+	SQUASHED,
+	STAND_HEIGHT,
 	START_LEAD,
 	START_X,
 	VIEW_WIDTH,
@@ -60,6 +63,10 @@ export type RacerEntry = Pick<
 >
 
 /** The runner, as the physics sees them: `x` is the middle of their feet. */
+/** How tall someone is, for running into things: ducking or not, squashed or not. */
+export const bodyHeight = (b: Body) =>
+	(b.ducking ? DUCK_HEIGHT : STAND_HEIGHT) * (b.squashed > 0 ? SQUASHED : 1)
+
 export interface Body {
 	x: number
 	feetY: number
@@ -71,6 +78,8 @@ export interface Body {
 	tunnelSpeed?: number
 	/** Ticks left of a stumble, during which they can't speed up. */
 	stumble: number
+	/** Ticks left of being squashed by a furby: half their height, and slower. */
+	squashed: number
 	muddy: boolean
 	/** The Pumpkin they're wearing, by its carving: 0 for none. */
 	pumpkin: number
@@ -323,6 +332,7 @@ export function startingBody(terrain: Terrain, x: number): Body {
 		grounded: true,
 		ducking: false,
 		stumble: 0,
+		squashed: 0,
 		muddy: false,
 		pumpkin: 0,
 		facing: 1,

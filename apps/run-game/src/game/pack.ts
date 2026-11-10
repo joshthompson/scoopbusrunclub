@@ -479,8 +479,8 @@ const STEP_DOWN = 12
 const LEAP_PAST = 40
 
 /**
- * A rock, a hurdle, a puddle, a pothole or geese just ahead of `x`. Branches they
- * just run under: they're shorter than you.
+ * A rock, a hurdle, a puddle, a pothole or geese just ahead of `x`. Branches and
+ * tall hurdles they just run under: they're shorter than you.
  */
 function hopAhead(world: World, x: number) {
 	return world.obstacles.some((state) => {
@@ -490,7 +490,7 @@ function hopAhead(world: World, x: number) {
 				? o.x - 20
 				: o.kind === 'zombie'
 					? zombieAt(world, { ...state, obstacle: o }).x - 14
-					: o.kind === 'hurdle'
+					: o.kind === 'hurdle' && !o.tall
 						? o.x - 16
 						: o.kind === 'mud' || o.kind === 'pothole'
 							? o.x - o.width / 2
