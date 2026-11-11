@@ -1,4 +1,5 @@
 import alphabetIcon from '@/assets/misc/alphabet-icon.png'
+import dateIcon from '@/assets/misc/date-icon.png'
 import graphIcon from '@/assets/misc/graph-icon.png'
 import positionIcon from '@/assets/misc/position-icon.png'
 import rock1Asset from '@/assets/misc/rock1.png'
@@ -581,6 +582,12 @@ export function MemberPage(props: MemberPageProps) {
 									<img src={snowyAsset(rock1Asset)} width={59} alt="" />
 									<img src={positionIcon} class={styles.challengeIcon} alt="" />
 									<span class={styles.challengeName}>Position Bingo</span>
+								</A>
+
+								<A href="./dates" class={styles.challengeLink}>
+									<img src={snowyAsset(rock1Asset)} width={59} alt="" />
+									<img src={dateIcon} class={styles.challengeIcon} alt="" />
+									<span class={styles.challengeName}>Date Bingo</span>
 								</A>
 
 								{/* No pixel icon drawn for this one yet, so it wears the flag

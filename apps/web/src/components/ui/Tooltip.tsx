@@ -10,7 +10,20 @@ export function Tooltip(props: {
 }) {
 	const [visible, setVisible] = createSignal(false)
 	const [pos, setPos] = createSignal({ x: 0, y: 0 })
+	// How far to nudge the tooltip sideways to keep it on screen, for anything
+	// near the edge of a phone.
+	const [nudge, setNudge] = createSignal(0)
 	let ref: HTMLSpanElement | undefined
+
+	const keepOnScreen = (tip: HTMLDivElement) => {
+		requestAnimationFrame(() => {
+			const rect = tip.getBoundingClientRect()
+			const margin = 4
+			if (rect.left < margin) setNudge(margin - rect.left)
+			else if (rect.right > window.innerWidth - margin)
+				setNudge(window.innerWidth - margin - rect.right)
+		})
+	}
 
 	const updatePos = () => {
 		if (!ref) return
@@ -27,6 +40,7 @@ export function Tooltip(props: {
 			class={cx(styles.wrapper, props.class)}
 			onMouseEnter={() => {
 				updatePos()
+				setNudge(0)
 				setVisible(true)
 			}}
 			onMouseLeave={() => setVisible(false)}
@@ -35,9 +49,10 @@ export function Tooltip(props: {
 			<Show when={visible()}>
 				<Portal>
 					<div
+						ref={keepOnScreen}
 						class={styles.tooltip}
 						style={{
-							left: `${pos().x}px`,
+							left: `${pos().x + nudge()}px`,
 							top: `${pos().y}px`,
 						}}
 					>

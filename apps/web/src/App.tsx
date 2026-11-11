@@ -43,6 +43,7 @@ import { ComparePage } from './pages/ComparePage'
 import { ConnectionsPage } from './pages/ConnectionsPage'
 import { CustomRacerAddPage } from './pages/CustomRacerAddPage'
 import { CustomRacersPage } from './pages/CustomRacersPage'
+import { DateBingoPage } from './pages/DateBingoPage'
 import { EventPage } from './pages/EventPage'
 import { EveryonePage } from './pages/EveryonePage'
 import { FaqPage } from './pages/FaqPage'
@@ -331,6 +332,20 @@ const App: Component = () => {
 							fallback={<div class={styles.loading}>Loading...</div>}
 						>
 							<PositionBingoPage
+								results={results() ?? []}
+								runners={runners() ?? []}
+							/>
+						</Show>
+					)}
+				/>
+				<Route
+					path="/member/:name/dates"
+					component={() => (
+						<Show
+							when={!results.loading && !runners.loading}
+							fallback={<div class={styles.loading}>Loading...</div>}
+						>
+							<DateBingoPage
 								results={results() ?? []}
 								runners={runners() ?? []}
 							/>

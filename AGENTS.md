@@ -105,6 +105,7 @@ mixpanel.init(MIXPANEL_TOKEN, {
 | `halloween_mode_enabled` | A pumpkin beside a Halloween (31 October) parkrun's name turns Halloween mode on | none | `components/PumpkinButton.tsx` |
 | `pumpkin_carved` | A carved pumpkin is saved on `/pumpkins/carve` (after the API succeeds; its names are free text and not sent) | `carved_pixel_count` | `pages/PumpkinPage.tsx` |
 | `list_expanded` | A "show all" / "+N more" list is opened | `list_name` (`latest_results`, `member_celebration`, `poker_hand`, `stopwatch_bingo`, `position_bingo`, `alphabet`, `sweden`) | `components/LatestResults.tsx`, `pages/MemberPage.tsx`, `pages/PokerPage.tsx`, the bingo pages |
+| `date_bingo_leap_day_toggled` | The "Include 29 February" checkbox on Date Bingo is switched | `is_leap_day_included` | `pages/DateBingoPage.tsx` |
 | `graph_option_changed` | A checkbox under the member graph | `graph_option` (`personal_bests`, `course_personal_bests`, `other_celebrations`, `walks_filtered`), `is_enabled` | `components/GraphSVG.tsx` |
 | `graph_club_added` / `graph_club_removed` | A club is added to or removed from the largest clubs graph | `club_name` | `components/LargestClubsGraph.tsx` |
 | `graph_clubs_reset` | The largest clubs graph is reset | none | `components/LargestClubsGraph.tsx` |

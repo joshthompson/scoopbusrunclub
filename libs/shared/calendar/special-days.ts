@@ -119,6 +119,49 @@ function appliesTo(day: SpecialDay, country: string, year: number): boolean {
 	return !day.exceptYears?.includes(year)
 }
 
+/** A special day as it falls in one year, with every country holding it. */
+export interface SpecialDayOccurrence {
+	date: string // YYYY-MM-DD
+	name: string
+	/** Country codes as in DOMAIN_TO_COUNTRY, or 'all' */
+	countries: readonly string[] | 'all'
+}
+
+/**
+ * Every special day held somewhere in the world in `year`, in date order. A day
+ * two lists give the same name (Ascension Day) comes back once, with the
+ * countries of both.
+ */
+export function specialDaysInYear(year: number): SpecialDayOccurrence[] {
+	const byDate: Record<string, SpecialDay[]> = { ...FIXED_SPECIAL_DAYS }
+	for (const [mmdd, days] of Object.entries(getDynamicSpecialDays(year))) {
+		byDate[mmdd] = [...(byDate[mmdd] ?? []), ...days]
+	}
+
+	const occurrences: SpecialDayOccurrence[] = []
+	for (const [mmdd, days] of Object.entries(byDate)) {
+		const date = `${year}-${mmdd}`
+		for (const day of days) {
+			if (day.fromYear != null && year < day.fromYear) continue
+			if (day.untilYear != null && year > day.untilYear) continue
+			if (day.exceptYears?.includes(year)) continue
+
+			const same = occurrences.find(
+				(o) => o.date === date && o.name === day.name,
+			)
+			if (!same) {
+				occurrences.push({ date, name: day.name, countries: day.countries })
+			} else if (same.countries !== 'all') {
+				same.countries =
+					day.countries === 'all'
+						? 'all'
+						: [...new Set([...same.countries, ...day.countries])]
+			}
+		}
+	}
+	return occurrences.sort((a, b) => a.date.localeCompare(b.date))
+}
+
 /**
  * Given a date string (YYYY-MM-DD) and the country of the parkrun, returns
  * the special event name or null. Without a country it answers for Sweden.
