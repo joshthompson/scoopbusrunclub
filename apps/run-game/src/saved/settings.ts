@@ -2,10 +2,12 @@ import { createSignal } from 'solid-js'
 import { forgetCustomRunners } from '../runners/customRunners'
 import { forgetCollected } from './collected'
 import { forgetHighScores } from './highScores'
+import { forgetIdentity } from './identity'
 import { forgetProgress } from './progress'
 
-/** Everything the game keeps in this browser starts with this. */
-export const STORAGE_PREFIX = 'scoopbus-run:'
+import { STORAGE_PREFIX } from './storagePrefix'
+
+export { STORAGE_PREFIX }
 const SETTINGS_KEY = `${STORAGE_PREFIX}settings`
 
 interface Settings {
@@ -65,7 +67,7 @@ export const lastRun = () => settings().lastRun
 export const rememberRun = (lastRun: string) =>
 	store({ ...settings(), lastRun })
 
-/** Forgets everything the game's kept here: settings, custom runners, Endless progress and high scores. */
+/** Forgets everything the game's kept here: settings, custom runners, Endless progress, high scores and high score name. */
 export function clearLocalData() {
 	try {
 		for (const key of Object.keys(localStorage))
@@ -78,4 +80,5 @@ export function clearLocalData() {
 	forgetProgress()
 	forgetHighScores()
 	forgetCollected()
+	forgetIdentity()
 }

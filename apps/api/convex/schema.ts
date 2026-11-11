@@ -446,6 +446,57 @@ export default defineSchema({
 		.index('by_status', ['status'])
 		.index('by_createdAt', ['createdAt']),
 
+	// --- The run game's online high scores (apps/run-game) ---
+
+	/**
+	 * A Ticket: one for each Run (of Endless) and each Practice (of one
+	 * course) as it starts, so a score can only be sent for a go that really
+	 * started, long enough ago to have got it (see runScores.ts).
+	 */
+	runTickets: defineTable({
+		/** Which table: `endless`, or a course's id. */
+		table: v.string(),
+		startedAt: v.number(),
+		ip: v.string(),
+		/** The score it went on the table with, if it has. An Endless run's goes up as it goes on. */
+		scoreId: v.optional(v.id('runScores')),
+	})
+		.index('by_startedAt', ['startedAt'])
+		.index('by_ip', ['ip', 'startedAt']),
+
+	/** A player's best on a table: one each, kept to their best. */
+	runScores: defineTable({
+		table: v.string(),
+		score: v.number(),
+		/** The name they put it under. */
+		name: v.string(),
+		/** Whose head goes by it: a club member's, or a look's (a custom runner's or a guest's). */
+		icon: v.union(
+			v.object({ member: v.string() }),
+			v.object({ look: v.any() }),
+		),
+		/**
+		 * The player, a random id their browser keeps: never sent back out, only
+		 * used to keep them to one entry, and to point theirs out to them.
+		 */
+		playerId: v.string(),
+		/** The day, as YYYY-MM-DD, as the player had it. */
+		date: v.string(),
+		/** On a course, how far round they got, and whether they finished. */
+		metres: v.optional(v.number()),
+		finished: v.optional(v.boolean()),
+		/** In Endless, how many courses they got round. */
+		courses: v.optional(v.number()),
+		ip: v.string(),
+		/** `hidden` for a name that trips the profanity filter: never shown. */
+		status: v.union(v.literal('active'), v.literal('hidden')),
+		flagReason: v.optional(v.string()),
+		updatedAt: v.number(),
+	})
+		.index('by_table', ['table', 'status', 'score'])
+		.index('by_player', ['playerId', 'table'])
+		.index('by_ip', ['ip', 'updatedAt']),
+
 	// --- App-level key/value store ---
 
 	appData: defineTable({

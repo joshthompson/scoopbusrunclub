@@ -65,6 +65,9 @@ export function Menu(props: {
 	}
 
 	const onKey = (event: KeyboardEvent) => {
+		// Typing in a box: W, S and space are letters, not moves.
+		const typing = event.target instanceof HTMLInputElement
+		if (typing && event.key.length === 1) return
 		if (['ArrowUp', 'w', 'W'].includes(event.key)) {
 			event.preventDefault()
 			move(-1)

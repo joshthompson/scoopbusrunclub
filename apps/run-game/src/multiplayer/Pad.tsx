@@ -29,10 +29,12 @@ import {
 	type PadView,
 	type RaceFrame,
 	type RaceStart,
+	type RoomMode,
 	action,
 	cleanCode,
 	trysteroRoom,
 } from './protocol'
+import { ROOM_MODES } from './roomModes'
 
 /** The race on the phone, for Remote Play: the game itself, so only loaded then. */
 const Mirror = lazy(() => import('./Mirror'))
@@ -507,16 +509,41 @@ function Controller(props: {
 									}
 								>
 									<div style={styles.lobby}>
-										<button
-											type="button"
-											style={{
-												...styles.bigButton,
-												...(v().ready ? styles.readyOn : {}),
-											}}
-											onClick={() => send({ type: 'ready', ready: !v().ready })}
+										<Show
+											when={v().starter}
+											fallback={
+												<>
+													<button
+														type="button"
+														style={{
+															...styles.bigButton,
+															...(v().ready ? styles.readyOn : {}),
+														}}
+														onClick={() =>
+															send({ type: 'ready', ready: !v().ready })
+														}
+													>
+														{v().ready ? 'Ready!' : 'I’m ready'}
+													</button>
+													<Show when={v().ready && v().starterNumber}>
+														<div style={styles.text}>
+															P{v().starterNumber} starts the race
+														</div>
+													</Show>
+												</>
+											}
 										>
-											{v().ready ? 'Ready!' : 'I’m ready'}
-										</button>
+											{(starter) => (
+												<Starter
+													starter={starter()}
+													onMode={(mode) => send({ type: 'roomMode', mode })}
+													onStart={() => {
+														navigator.vibrate?.(15)
+														send({ type: 'start' })
+													}}
+												/>
+											)}
+										</Show>
 										<Show when={!v().ready}>
 											<button
 												type="button"
@@ -563,11 +590,63 @@ function Controller(props: {
 	)
 }
 
+/**
+ * The Starter's own: how the Room goes, and Start, once everyone else who's
+ * picked is ready.
+ */
+function Starter(props: {
+	starter: NonNullable<PadView['starter']>
+	onMode: (mode: RoomMode) => void
+	onStart: () => void
+}) {
+	return (
+		<>
+			<div style={styles.roomModes}>
+				<For each={ROOM_MODES}>
+					{(m) => (
+						<button
+							type="button"
+							style={{
+								...styles.roomMode,
+								...(props.starter.roomMode === m.mode ? styles.readyOn : {}),
+							}}
+							onClick={() => props.onMode(m.mode)}
+						>
+							<span>{m.label}</span>
+							<span style={styles.roomModeNote}>{m.note}</span>
+						</button>
+					)}
+				</For>
+			</div>
+			<button
+				type="button"
+				style={{
+					...styles.bigButton,
+					...(props.starter.canStart ? styles.readyOn : styles.startOff),
+				}}
+				disabled={!props.starter.canStart}
+				onClick={props.onStart}
+			>
+				Start
+			</button>
+			<Show when={!props.starter.canStart}>
+				<div style={styles.text}>{props.starter.why}</div>
+			</Show>
+		</>
+	)
+}
+
 function statusText(view: PadView) {
 	const of = view.of ? ` of ${view.of}` : ''
 	switch (view.status) {
 		case 'picking':
-			return view.character ? 'Not ready yet' : 'Pick a runner'
+			return !view.character
+				? 'Pick a runner'
+				: view.starter
+					? view.stage === 'starting'
+						? 'Get ready…'
+						: 'You start it'
+					: 'Not ready yet'
 		case 'waiting':
 			return 'In from the next Round'
 		case 'ready':
@@ -891,6 +970,26 @@ const styles = {
 		'font-size': '24px',
 	},
 	readyOn: { background: '#ffd23f', color: 'var(--ink)' },
+	startOff: { opacity: 0.45 },
+	roomModes: {
+		display: 'flex',
+		gap: '8px',
+		'flex-wrap': 'wrap',
+		'justify-content': 'center',
+	},
+	roomMode: {
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'center',
+		gap: '4px',
+		padding: '8px 10px 5px',
+		background: 'var(--ink)',
+		color: 'white',
+		border: '3px solid white',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '16px',
+	},
+	roomModeNote: { 'font-size': '11px', opacity: 0.8 },
 	modeButton: {
 		display: 'flex',
 		'flex-direction': 'column',

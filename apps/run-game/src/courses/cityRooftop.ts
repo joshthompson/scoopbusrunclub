@@ -6,6 +6,7 @@ import facade4 from '../assets/buildings/facade-4.png'
 import cityFar from '../assets/horizons/city-far.png'
 import cityNear from '../assets/horizons/city-near.png'
 import cityNearer from '../assets/horizons/city-nearer.png'
+import cityNearest from '../assets/horizons/city-nearest.png'
 import antenna from '../assets/rooftop/antenna.png'
 import chimney1 from '../assets/rooftop/chimney-1.png'
 import chimney2 from '../assets/rooftop/chimney-2.png'
@@ -300,8 +301,12 @@ export const cityRooftop: CourseDefinition = {
 			far: cityFar,
 			near: cityNear,
 			fill: '#5a4f80',
-			// The streets nearer, filling the haze down to the rooftops.
-			nearer: { asset: cityNearer, fill: '#1f1833' },
+			// The streets nearer, and nearer again, filling the haze down to
+			// the rooftops.
+			nearer: [
+				{ asset: cityNearer, height: 200, fill: '#1f1833' },
+				{ asset: cityNearest, height: 240, fill: '#150f25' },
+			],
 		},
 		buildings: {
 			roof: '#5b5e68',

@@ -2,6 +2,7 @@ import {
 	type SpritePixelData,
 	runPixels,
 	sitPixels,
+	standPixels,
 	zombiePixels,
 } from '@/assets/runners/custom/pixel-data.generated'
 import { generateFrames } from '@/utils'
@@ -41,6 +42,9 @@ export function createRunnerFrames(
 > {
 	const run = generateCustomSpriteFrames(character, runPixels, FRAME_COUNT)
 	const sit = generateCustomSpriteFrames(character, sitPixels, 1)
+	// Its first frame: stood, arms down (the other's a phone up). The strip
+	// comes back last frame first, so that's the last of them.
+	const stand = generateCustomSpriteFrames(character, standPixels, 2)
 	const zombie = generateCustomSpriteFrames(
 		character,
 		zombiePixels,
@@ -52,6 +56,7 @@ export function createRunnerFrames(
 			run: run?.frames,
 			zombie: zombie?.frames,
 			sit: sit?.frames,
+			stand: stand?.frames.slice(-1),
 			face,
 			tailWalk: undefined,
 			tailSit: undefined,

@@ -1910,6 +1910,93 @@ http.route({
 	}),
 })
 
+// --- The run game's high scores (public, rate limited by IP) ---
+// Posted as plain text, as the pumpkins are, so the browser sends them
+// without asking first (no CORS preflight).
+
+/** A request's JSON body, or nothing if it isn't any. */
+async function jsonBody(request: Request): Promise<Record<string, unknown>> {
+	try {
+		const body = await request.json()
+		return body && typeof body === 'object' ? body : {}
+	} catch {
+		return {}
+	}
+}
+
+// POST /api/run/start { table } → { ticket }
+http.route({
+	path: '/api/run/start',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await jsonBody(request)
+		const result = await ctx.runMutation(internal.runScores.start, {
+			table: typeof body.table === 'string' ? body.table : '',
+			ip: clientIp(request),
+		})
+		if ('error' in result)
+			return jsonResponse(result, result.error === 'limit' ? 429 : 400)
+		return jsonResponse(result)
+	}),
+})
+
+// POST /api/run/score { ticket, table, playerId, name, icon, ... } → { rank }
+http.route({
+	path: '/api/run/score',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await jsonBody(request)
+		const text = (key: string) =>
+			typeof body[key] === 'string' ? (body[key] as string) : ''
+		const number = (key: string) =>
+			typeof body[key] === 'number' ? (body[key] as number) : -1
+		const icon = body.icon as { member?: unknown; look?: unknown } | undefined
+		const bonuses: Record<string, { count: number; points: number }> = {}
+		for (const [kind, bonus] of Object.entries(
+			(body.bonuses as Record<string, unknown>) ?? {},
+		)) {
+			const { count, points } = (bonus ?? {}) as Record<string, unknown>
+			if (typeof count === 'number' && typeof points === 'number')
+				bonuses[kind] = { count, points }
+		}
+		const result = await ctx.runMutation(internal.runScores.submit, {
+			ticket: text('ticket'),
+			table: text('table'),
+			playerId: text('playerId'),
+			name: text('name'),
+			icon:
+				typeof icon?.member === 'string'
+					? { member: icon.member }
+					: { look: icon?.look ?? null },
+			date: text('date'),
+			score: number('score'),
+			metres: number('metres'),
+			ticks: number('ticks'),
+			courses: Math.max(0, number('courses')),
+			finished: body.finished === true,
+			bonuses,
+			ip: clientIp(request),
+		})
+		if ('error' in result)
+			return jsonResponse(result, result.error === 'limit' ? 429 : 400)
+		return jsonResponse(result)
+	}),
+})
+
+// GET /api/run/scores?table=<id>[&player=<id>] → { entries, mine }
+http.route({
+	path: '/api/run/scores',
+	method: 'GET',
+	handler: httpAction(async (ctx, request) => {
+		const url = new URL(request.url)
+		const table = url.searchParams.get('table') ?? ''
+		const playerId = url.searchParams.get('player') ?? undefined
+		return jsonResponse(
+			await ctx.runQuery(internal.runScores.list, { table, playerId }),
+		)
+	}),
+})
+
 // --- Admin: GET /api/admin/custom-racers ---
 
 http.route({

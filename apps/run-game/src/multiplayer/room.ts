@@ -19,6 +19,7 @@ import {
 	type PlayerStatus,
 	type RaceFrame,
 	type RaceStart,
+	type RoomMode,
 	type RoomStage,
 	action,
 	trysteroRoom,
@@ -124,6 +125,15 @@ export function createRoom(code: string) {
 	) => { status: PlayerStatus; place?: number; of?: number } | undefined = () =>
 		undefined
 
+	/** The lobby, for its Starter's phone: the Party says. */
+	let lobby: () => { roomMode: RoomMode; canStart: boolean; why: string } =
+		() => ({ roomMode: 'endless', canStart: false, why: '' })
+	/** What the Starter's asked for: the Party does it. */
+	let onStarter: {
+		start: () => void
+		roomMode: (mode: RoomMode) => void
+	} = { start: () => {}, roomMode: () => {} }
+
 	/** What each phone's holding, as it last said. */
 	const held = new Map<string, Controls>()
 
@@ -143,6 +153,18 @@ export function createRoom(code: string) {
 		)
 
 	const seatOf = (peer: string) => seats.find((s) => s.peer === peer)
+	/**
+	 * The Starter: the first Player in the Room, if they're a Remote Player.
+	 * Nobody at the big screen may be able to start it, so it's theirs to,
+	 * and to choose how it goes. Anyone else first, it starts itself once
+	 * everyone's ready.
+	 */
+	const starter = () => {
+		const first = seats.find((s) => !s.lostAt)
+		return first?.kind === 'phone' && first.mode === 'remote'
+			? first
+			: undefined
+	}
 	const update = (id: string, change: (seat: Seat) => void) =>
 		setSeats(
 			(s) => s.id === id,
@@ -237,6 +259,9 @@ export function createRoom(code: string) {
 			if (message.mode === 'remote') onWatch(peer)
 		}
 		if (message.type === 'ready') setReady(seat.id, message.ready)
+		if (message.type === 'start' && seat === starter()) onStarter.start()
+		if (message.type === 'roomMode' && seat === starter())
+			onStarter.roomMode(message.mode)
 		if (message.type === 'leave') removeSeat(seat.id)
 		tellPhones()
 	})
@@ -280,7 +305,14 @@ export function createRoom(code: string) {
 
 	function viewFor(seat: Seat): PadView {
 		const round = statusOf(seat)
+		const inLobby = stage() === 'lobby' || stage() === 'starting'
+		const first = inLobby ? starter() : undefined
 		return {
+			...(first === seat
+				? { starter: lobby() }
+				: first
+					? { starterNumber: seats.indexOf(first) + 1 }
+					: {}),
 			mode: seat.mode ?? 'controller',
 			number: seats.indexOf(seat) + 1,
 			colour: seat.colour,
@@ -375,6 +407,15 @@ export function createRoom(code: string) {
 		/** What to do when a phone starts watching. */
 		setOnWatch(next: (peer: string) => void) {
 			onWatch = next
+		},
+		starter,
+		/** Tells the Room how the lobby's going, for the Starter's phone. */
+		setLobby(next: typeof lobby) {
+			lobby = next
+		},
+		/** What to do when the Starter starts the Room, or chooses how it goes. */
+		setOnStarter(next: typeof onStarter) {
+			onStarter = next
 		},
 		/** Tells the Room how seats are doing in the Round, for their phones. */
 		setStatusOf(next: typeof statusOf) {

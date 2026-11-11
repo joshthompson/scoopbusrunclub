@@ -9,7 +9,7 @@ import {
 	VIEW_WIDTH,
 } from '../game/constants'
 import type { World } from '../game/world'
-import { Backdrop, Ground, HorizonTrees } from './Backdrop'
+import { Backdrop, CaveCover, Ground, HorizonTrees } from './Backdrop'
 import {
 	createBanner,
 	createBoost,
@@ -169,6 +169,8 @@ export function RaceCanvas(props: {
 						<Ground world={props.world} />
 					</>
 				}
+				// A Cave's rock over everyone in it, till someone racing goes in.
+				overlay={<CaveCover world={props.world} />}
 				loading={() => (
 					<div style={styles.loading}>Loading {props.world.course.name}…</div>
 				)}

@@ -29,9 +29,10 @@ export interface FlyerLook {
 	/**
 	 * Ridden on top instead, sat on its back: how far ahead of its middle,
 	 * and how far up from its bottom its back is there, `now` ticks in, as
-	 * it ripples.
+	 * it ripples; and how far down into it they sit, astride it, its body
+	 * over their lap.
 	 */
-	seat?: { ahead: number; back: (now: number) => number }
+	seat?: { ahead: number; back: (now: number) => number; sink: number }
 }
 
 const GOOSE: FlyerLook = {
@@ -57,6 +58,7 @@ const DRAGON: FlyerLook = {
 	seat: {
 		ahead: DRAGON_NECK - DRAGON_WIDTH / 2,
 		back: (now) => DRAGON_HEIGHT - dragonBack(DRAGON_NECK, now),
+		sink: 12,
 	},
 }
 

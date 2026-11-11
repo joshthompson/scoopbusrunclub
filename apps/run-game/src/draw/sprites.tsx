@@ -28,6 +28,7 @@ import cyclist2Asset from '../assets/obstacles/cyclist-2.png'
 import lowBranchLimbAsset from '../assets/obstacles/low-branch-limb.png'
 import lowBranchTreeAsset from '../assets/obstacles/low-branch-tree.png'
 import mudAsset from '../assets/obstacles/mud.png'
+import mummyAsset from '../assets/obstacles/mummy.png'
 import steamVentAsset from '../assets/obstacles/steam-vent.png'
 import ventAsset from '../assets/rooftop/vent.png'
 import purpleSignAsset from '../assets/signs/purple-sign.png'
@@ -49,6 +50,7 @@ import {
 import { cyclistAt } from '../game/cyclists'
 import { FIKA_SIZE } from '../game/fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from '../game/furbies'
+import { mummyAt } from '../game/mummies'
 import { platformAt } from '../game/platforms'
 import { steamPuff } from '../game/steam'
 import { countdownWord, scoopFlight, stepWorld } from '../game/step'
@@ -158,22 +160,36 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const { sprite } = racer.runner
 	const run = sprite.run
 	const sit = sprite.sit
+	const stand = sprite.stand
 	const runSize = {
 		width: sprite.width * RUNNER_SCALE,
 		height: sprite.height * RUNNER_SCALE,
 	}
 
+	const { body } = racer
+	// Sat down, ducking or riding a corgi. `body` isn't a signal: reading
+	// the tick keeps this up to date.
+	const ducking = () =>
+		world.ticks() >= 0 &&
+		(body.ducking || body.mount > 0 || (seated && body.carried > 0)) &&
+		!!sit
+	// Stood still, on their feet: on the start line, or stopped.
+	const standing = () =>
+		world.ticks() >= 0 &&
+		!!stand &&
+		!ducking() &&
+		body.grounded &&
+		body.carried === 0 &&
+		racer.out !== 'scooped' &&
+		Math.abs(body.vx) < STILL_SPEED
+
 	return createController({
-		frames: [...run, ...(sit ? [sit] : [])],
+		frames: [...run, ...(sit ? [sit] : []), ...(stand ? [stand] : [])],
 		init() {
-			const { body } = racer
-			// Sat down, ducking or riding a corgi. `body` isn't a signal: reading
-			// the tick keeps this up to date.
-			const ducking = () =>
-				world.ticks() >= 0 &&
-				(body.ducking || body.mount > 0 || (seated && body.carried > 0)) &&
-				!!sit
-			const size = () => (ducking() ? poseSize(sit, sprite) : runSize)
+			const size = () =>
+				// Stood, as tall and wide as a run frame: a custom runner's stand
+				// is one frame of a strip, not a picture of its own.
+				ducking() ? poseSize(sit, sprite) : runSize
 			return {
 				id: `player-${racer.id}`,
 				type: 'player',
@@ -181,7 +197,8 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				...createObjectSignal(0, 'y'),
 				width: () => size().width,
 				height: () => size().height,
-				frames: () => (ducking() && sit ? [sit] : run),
+				frames: () =>
+					ducking() && sit ? [sit] : standing() && stand ? [stand] : run,
 				...createObjectSignal(undefined as number | undefined, 'frame'),
 				// Run sprites face left, the way the header's runners run.
 				...createObjectSignal(-1, 'xScale'),
@@ -212,7 +229,8 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			const sitting =
 				(body.ducking || body.mount > 0 || (seated && body.carried > 0)) &&
 				!!sit
-			$.setFrame(sitting ? 0 : body.grounded ? undefined : 1)
+			// Stood still: the one stand frame.
+			$.setFrame(sitting || standing() ? 0 : body.grounded ? undefined : 1)
 			const speed = Math.abs(body.vx)
 			$.setState(body.grounded && speed > 0.3 ? 'play' : 'pause')
 			$.setFrameInterval(Math.max(45, 190 - speed * 22))
@@ -230,12 +248,17 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	})
 }
 
+/** Slower than this, on their feet, someone's stood still, not running. */
+const STILL_SPEED = 0.3
+
 /**
- * How far a runner leans with the hill, in degrees: upright on a Platform,
- * which is flat, and in the air.
+ * How far a runner leans with the hill, in degrees, running up or down it:
+ * upright stood still, on a Platform, which is flat, and in the air.
  */
 function runnerLean(world: World, body: Body) {
-	return body.grounded && body.on === undefined
+	return body.grounded &&
+		body.on === undefined &&
+		Math.abs(body.vx) >= STILL_SPEED
 		? (Math.atan(world.terrain.slope(body.x)) * 180) / Math.PI
 		: 0
 }
@@ -251,12 +274,21 @@ function createPacer(world: World, p: Pacer) {
 		height: sprite.height * RUNNER_SCALE,
 	}
 	const sit = sprite.sit
+	const stand = sprite.stand
 	/** Ducked down, going through a Tunnel. `p` isn't a signal: reading the tick keeps this up to date. */
 	const ducked = () =>
 		world.ticks() >= 0 && !!sit && p.grounded && inTunnel(world, p.x, p.feetY)
+	/** Stood still, on the start line or stopped. */
+	const standing = () =>
+		world.ticks() >= 0 &&
+		!!stand &&
+		!ducked() &&
+		p.grounded &&
+		!p.scooped &&
+		Math.abs(p.vx) < STILL_SPEED
 	const size = () => (ducked() ? poseSize(sit, sprite) : runSize)
 	return createController({
-		frames: [...sprite.run, ...(sit ? [sit] : [])],
+		frames: [...sprite.run, ...(sit ? [sit] : []), ...(stand ? [stand] : [])],
 		randomStartFrame: true,
 		init: () => ({
 			id: `pacer-${p.id}`,
@@ -265,7 +297,8 @@ function createPacer(world: World, p: Pacer) {
 			...createObjectSignal(p.feetY - runSize.height, 'y'),
 			width: () => size().width,
 			height: () => size().height,
-			frames: () => (ducked() && sit ? [sit] : sprite.run),
+			frames: () =>
+				ducked() && sit ? [sit] : standing() && stand ? [stand] : sprite.run,
 			...createObjectSignal(undefined as number | undefined, 'frame'),
 			// Facing right, the way they're running.
 			xScale: () => -1,
@@ -282,12 +315,15 @@ function createPacer(world: World, p: Pacer) {
 				$.setState('pause')
 				return
 			}
+			// Leaning with the hill, running; upright, stood still.
 			$.setRotation(
-				p.grounded ? (Math.atan(world.terrain.slope(p.x)) * 180) / Math.PI : 0,
+				p.grounded && !standing()
+					? (Math.atan(world.terrain.slope(p.x)) * 180) / Math.PI
+					: 0,
 			)
-			// Ducked through a Tunnel: the one sit frame.
+			// Ducked through a Tunnel: the one sit frame. Stood still: the one stand frame.
 			const down = ducked()
-			$.setFrame(down ? 0 : p.grounded ? undefined : 1)
+			$.setFrame(down || standing() ? 0 : p.grounded ? undefined : 1)
 			const speed = Math.abs(p.vx)
 			$.setState(p.grounded && !down && speed > 0.3 ? 'play' : 'pause')
 			$.setFrameInterval(Math.max(45, 190 - speed * 22))
@@ -729,14 +765,21 @@ export function createBusBore(world: World) {
 	const columns: { x: number; top: number; bottom: number; rim: boolean }[] = []
 	for (let x = cave.from; x < cave.to; x += 4) {
 		const ground = groundY(x)
-		const top = Math.round((ground - BORE_HEIGHT + random() * 6) / 2) * 2
+		const rough = Math.round((ground - BORE_HEIGHT + random() * 6) / 2) * 2
+		// No higher than the rock goes: over a low hill, or the Sphinx's
+		// haunches, the bus is out in the open, not boring a hole.
+		const surface = cave.surface(x)
+		const top = surface === undefined ? rough : Math.max(rough, surface + 2)
+		const bottom = Math.round(ground - PATH_BACK + 1)
+		if (top >= bottom) continue
 		const ceiling = cave.ceiling(x)
 		columns.push({
 			x: x - cave.from,
 			top,
 			bottom: Math.round(ground - PATH_BACK + 1),
-			// Only where it's cut the Cave's rock back: bigger than the space was.
-			rim: ceiling !== undefined && ceiling > top,
+			// Only where it's cut the Cave's rock back: bigger than the space
+			// was, and under the hill's top, not along it.
+			rim: ceiling !== undefined && ceiling > top && top === rough,
 		})
 	}
 	const highest = Math.min(...columns.map((c) => c.top)) - 4
@@ -1411,7 +1454,11 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				world,
 				children: () => (
 					<Scoopable world={world} state={state}>
-						<img src={rockAsset} alt="" style={{ display: 'block' }} />
+						<img
+							src={rockAsset}
+							alt=""
+							style={{ display: 'block', filter: world.course.look?.rock }}
+						/>
 					</Scoopable>
 				),
 			})
@@ -1619,6 +1666,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			})
 		case 'zombie':
 			return createZombie(world, state, o, id)
+		case 'mummy':
+			return createMummy(world, state, o, id)
 		case 'geese':
 			return createFixture({
 				id,
@@ -1964,6 +2013,61 @@ function createZombie(
 				'clip-path': `inset(0 0 ${Math.min(ZOMBIE_HEIGHT, zombie.sunk)}px 0)`,
 				visibility: zombie.sunk >= ZOMBIE_SINK_GONE ? 'hidden' : 'visible',
 			})
+		},
+	})
+}
+
+/** A Mummy's frames: two, side by side, in cells twice the size of a screen pixel. */
+const MUMMY_CELLS = { width: 18, height: 29 }
+const MUMMY_WIDTH = MUMMY_CELLS.width * 2
+const MUMMY_DRAWN = MUMMY_CELLS.height * 2
+/** How many ticks each of its shuffling frames lasts. */
+const MUMMY_STEP = 22
+
+/** A Mummy, shuffling to and fro in its tomb, or scooped and flying. */
+function createMummy(
+	world: World,
+	state: ObstacleState,
+	o: Extract<Obstacle, { kind: 'mummy' }>,
+	id: string,
+) {
+	const [frame, setFrame] = createSignal(0)
+	return createController({
+		init: () => ({
+			id,
+			type: 'zombie',
+			...createObjectSignal(o.x - MUMMY_WIDTH / 2, 'x'),
+			...createObjectSignal(world.terrain.groundY(o.x) - MUMMY_DRAWN, 'y'),
+			width: () => MUMMY_WIDTH,
+			height: () => MUMMY_DRAWN,
+			...createObjectSignal(0, 'rotation'),
+			...createObjectSignal(1, 'xScale'),
+			children: () => (
+				<div
+					style={{
+						width: '100%',
+						height: '100%',
+						background: `url("${mummyAsset}") ${-frame() * MUMMY_WIDTH}px 0 / ${MUMMY_WIDTH * 2}px ${MUMMY_DRAWN}px no-repeat`,
+						'image-rendering': 'pixelated',
+					}}
+				/>
+			),
+		}),
+		onEnterFrame({ $ }) {
+			const mummy = mummyAt(world, { ...state, obstacle: o })
+			const floor = world.terrain.groundY(mummy.x)
+			if (state.scooped) {
+				const flight = scoopFlight(state.scooped, world.ticks())
+				$.setX(mummy.x - MUMMY_WIDTH / 2 + flight.x)
+				$.setY(floor - MUMMY_DRAWN + flight.y)
+				$.setRotation(flight.spin)
+				return
+			}
+			$.setX(mummy.x - MUMMY_WIDTH / 2)
+			$.setY(floor - MUMMY_DRAWN)
+			// Drawn facing left: turned round, going right.
+			$.setXScale(mummy.facing === 1 ? -1 : 1)
+			setFrame(Math.floor(world.ticks() / MUMMY_STEP) % 2)
 		},
 	})
 }

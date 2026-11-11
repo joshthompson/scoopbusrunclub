@@ -458,7 +458,7 @@ export function createWorld(
 	const popup = (text: string, x: number, y: number) =>
 		setPopups((all) => [...all, { id: popupId++, text, x, y, born: ticks() }])
 
-	/** How much of the course the camera shows: 1, or up to 2 zoomed out to frame a Round. */
+	/** How much of the course the camera shows: 1, or up to `MAX_ZOOM` zoomed out to frame a Round. */
 	const [zoom, setZoom] = createSignal(1)
 	/** Who's won a Round, and in what order everyone came, once it's decided. */
 	const [order, setOrder] = createSignal<Racer[]>()

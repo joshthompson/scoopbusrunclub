@@ -21,6 +21,11 @@ export interface Terrain {
 	 * Gap, and anywhere it steps up or down.
 	 */
 	walls: number[]
+	/**
+	 * Which of the Walls are a Ledge: a step that stops a runner against it,
+	 * to jump up, but never throws them back off it.
+	 */
+	ledges?: number[]
 	/** The buildings, on a course over rooftops: drawn as buildings, not hills. */
 	blocks?: Block[]
 }
@@ -38,11 +43,12 @@ export interface Gap {
 	to: number
 }
 
-/** A terrain's gaps and walls, from its gaps and where its ground steps. */
+/** A terrain's gaps and walls, from its gaps, where its ground steps, and its Ledges. */
 export function withGaps(
 	ground: Pick<Terrain, 'length' | 'finishX' | 'groundY' | 'slope'>,
 	gaps: Gap[] = [],
 	steps: number[] = [],
+	ledges: number[] = [],
 ): Terrain {
 	const sorted = [...gaps].sort((a, b) => a.from - b.from)
 	const inGap = (x: number) => {
@@ -52,10 +58,12 @@ export function withGaps(
 		}
 		return false
 	}
-	const walls = [...sorted.flatMap((gap) => [gap.from, gap.to]), ...steps].sort(
-		(a, b) => a - b,
-	)
-	return { ...ground, gaps: sorted, inGap, walls }
+	const walls = [
+		...sorted.flatMap((gap) => [gap.from, gap.to]),
+		...steps,
+		...ledges,
+	].sort((a, b) => a - b)
+	return { ...ground, gaps: sorted, inGap, walls, ledges }
 }
 
 /** Flat ground for this far around the start and the finish, for the countdown and the funnel. */

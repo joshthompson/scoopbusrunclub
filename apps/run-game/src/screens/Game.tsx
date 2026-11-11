@@ -14,13 +14,31 @@ import { PX_PER_M, START_X } from '../game/constants'
 import { POPUP_TICKS } from '../game/step'
 import { type World, createWorld } from '../game/world'
 import { type Action, anyControls, setTouch } from '../input'
+import {
+	type Tally,
+	addTallies,
+	beatsOwn,
+	courseTally,
+	endlessRun,
+	fetchTable,
+	startRun,
+	submitScore,
+	wouldPlace,
+} from '../online/runScores'
 import type { Playable } from '../runners/playable'
 import { record, today, topScore } from '../saved/highScores'
+import { named } from '../saved/identity'
 import { reach } from '../saved/progress'
 import { play } from '../sfx'
 import { Stage } from '../ui/Stage'
+import { IdentityEditor } from './IdentityEditor'
 import { PauseMenu, SOUND_ITEMS } from './PauseMenu'
-import { type Placing, Summary, type SummaryAction } from './Summary'
+import {
+	type OnlineOffer,
+	type Placing,
+	Summary,
+	type SummaryAction,
+} from './Summary'
 
 /**
  * - `practice`: one course, on its own
@@ -70,6 +88,88 @@ export function Game(props: {
 	const index = COURSES.findIndex((course) => course.id === props.course.id)
 	const following = index + 1 < COURSES.length ? index + 1 : undefined
 
+	// Online, a ticket for this course's table as it starts, and in Endless
+	// the run's, the first time it's seen.
+	const courseTicket = startRun(props.course.id)
+	const endless = mode.kind === 'endless' ? endlessRun(mode.runId) : undefined
+
+	/** A score that could go on an online table, and how sending it's going. */
+	const [offer, setOffer] = createSignal<OnlineOffer>()
+	/** Choosing a name and runner, before sending. */
+	const [naming, setNaming] = createSignal(false)
+
+	/** Sends them, each with its ticket: where each came, or why not. */
+	async function send(scores: OnlineOffer['scores']) {
+		setOffer((was) => was && { ...was, state: 'sending' })
+		const ranks: Record<string, number> = {}
+		let problem: string | undefined
+		for (const score of scores) {
+			const ticket = await score.ticket
+			if (!ticket) {
+				problem = 'Couldn’t reach the high score tables'
+				continue
+			}
+			const result = await submitScore({ ...score, ticket, date: today() })
+			if (result.error) problem = result.error
+			else if (result.rank !== undefined) ranks[score.table] = result.rank
+		}
+		setOffer(
+			(was) =>
+				was && {
+					...was,
+					state: Object.keys(ranks).length ? 'sent' : 'failed',
+					ranks,
+					problem,
+				},
+		)
+	}
+
+	/**
+	 * The end of a course, online: whichever of its scores would go on an
+	 * online table, offered to be sent. An Endless run that's been sent once
+	 * is sent again as it goes on, without asking.
+	 */
+	async function offerOnline(courseScore: number, tally: Tally) {
+		const scores: OnlineOffer['scores'] = []
+		const candidates: OnlineOffer['scores'] = [
+			{
+				table: props.course.id,
+				label: props.course.name,
+				score: courseScore,
+				tally,
+				ticket: courseTicket,
+			},
+		]
+		if (endless) {
+			endless.tally = addTallies(endless.tally, tally)
+			const run = {
+				table: 'endless',
+				label: 'Endless',
+				score: world.score(),
+				tally: endless.tally,
+				ticket: endless.ticket,
+			}
+			candidates.push(run)
+		}
+		// With a High Score Name, every score better than their own goes, on
+		// its own. Without one yet, they're asked, if it'd make a table.
+		const auto = named()
+		for (const candidate of candidates) {
+			if (!(await candidate.ticket)) continue
+			const table = await fetchTable(candidate.table)
+			if (!table) continue
+			if (
+				auto
+					? beatsOwn(table, candidate.score)
+					: wouldPlace(table, candidate.score)
+			)
+				scores.push(candidate)
+		}
+		if (!scores.length) return
+		setOffer({ scores, state: 'ready' })
+		if (auto) send(scores)
+	}
+
 	// The end of a course: its points go in its table, and in Endless the
 	// run so far goes in Endless's. Finished, in Endless or practising, the
 	// course after it is unlocked for practice.
@@ -78,6 +178,7 @@ export function Game(props: {
 		const result = world.result()
 		if (!result) return
 		untrack(() => {
+			offerOnline(world.courseScore(), courseTally(world))
 			const finished = result.kind === 'finished'
 			const entry = { runner: props.runner.name, date: today() }
 			const courseBestBefore = topScore(props.course.id)
@@ -105,7 +206,19 @@ export function Game(props: {
 		})
 	})
 
-	const actions = (): SummaryAction[] => {
+	/** Sending a score online, the first time, once there's one to send. */
+	const sending = (): SummaryAction[] => {
+		const ready = offer()
+		if (ready?.state !== 'ready') return []
+		// Only ever there the first time: after that, they go on their own.
+		return [
+			{ label: 'Send high score', choose: () => setNaming(true), send: true },
+		]
+	}
+
+	// After the rest, so the likeliest next thing is picked to begin with.
+	const actions = (): SummaryAction[] => [...runActions(), ...sending()]
+	const runActions = (): SummaryAction[] => {
 		const result = world.result()
 		if (result?.kind === 'finished' && mode.kind === 'endless')
 			return [
@@ -129,7 +242,7 @@ export function Game(props: {
 			...next,
 			{ label: 'Run again', choose: props.onRetry },
 			{ label: 'Change course', choose: props.onCourses },
-			{ label: 'To menu', choose: props.onMenu },
+			{ label: 'Menu', choose: props.onMenu },
 		]
 	}
 
@@ -157,6 +270,8 @@ export function Game(props: {
 	/** Which of the summary's buttons is picked: the first, to begin with. */
 	const [picked, setPicked] = createSignal(0)
 	const onKey = (event: KeyboardEvent) => {
+		// Typing a name: the editor's keys, not the summary's.
+		if (naming()) return
 		if (world.result()) {
 			const count = actions().length
 			const move = SUMMARY_MOVES[event.key]
@@ -201,8 +316,23 @@ export function Game(props: {
 							picked={picked()}
 							onPick={setPicked}
 							placing={placing()}
+							online={offer()}
 							onPause={() => canPause() && setPaused(true)}
 						/>
+						<Show when={naming()}>
+							<div style={styles.naming}>
+								<IdentityEditor
+									runner={props.runner}
+									saveLabel="Save and send"
+									onSave={() => {
+										setNaming(false)
+										const ready = offer()
+										if (ready?.state === 'ready') send(ready.scores)
+									}}
+									onCancel={() => setNaming(false)}
+								/>
+							</div>
+						</Show>
 						<Show when={paused()}>
 							<PauseMenu
 								groups={[
@@ -245,6 +375,7 @@ function Hud(props: {
 	picked: number
 	onPick: (i: number) => void
 	placing: Placing | undefined
+	online: OnlineOffer | undefined
 	onPause: () => void
 }) {
 	const { world } = props
@@ -322,6 +453,7 @@ function Hud(props: {
 						mode={props.mode}
 						result={result()}
 						placing={props.placing}
+						online={props.online}
 						actions={props.actions}
 						picked={props.picked}
 						onPick={props.onPick}
@@ -365,6 +497,15 @@ function TouchControls() {
 }
 
 const styles = {
+	/** Over the summary, choosing a name to send a score under. */
+	naming: {
+		position: 'absolute',
+		inset: 0,
+		display: 'grid',
+		'place-items': 'center',
+		background: 'rgba(15, 31, 41, 0.6)',
+		'pointer-events': 'auto',
+	},
 	hud: {
 		position: 'absolute',
 		inset: 0,

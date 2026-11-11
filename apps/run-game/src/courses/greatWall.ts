@@ -69,7 +69,10 @@ const TOWERS = (() => {
 	return at
 })()
 
-/** The staircase: steps too high to run up, hopped one at a time. */
+/**
+ * The staircase: steps too high to run up, hopped one at a time. Each is a
+ * Ledge: it stops you, but never throws you back.
+ */
 const STAIRS = 11
 const TREAD = 44
 const RISER = 20
@@ -106,6 +109,7 @@ function withStaircase(ground: Terrain, tower: number): Terrain {
 	return withGaps(
 		{ length: ground.length, finishX: ground.finishX, groundY, slope },
 		ground.gaps,
+		[],
 		steps,
 	)
 }

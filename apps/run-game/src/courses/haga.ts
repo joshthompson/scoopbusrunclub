@@ -75,12 +75,18 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	return { obstacles, boosts, scenery }
 }
 
-/** Where the course is highest: the Copper Tents stand there, back from the path. */
+/** How far short of the top the Copper Tents stand. */
+const TENTS_SHORT = 160
+/**
+ * Where the Copper Tents stand, back from the path: just short of where the
+ * course is highest, on the field, not out past its brow where the field
+ * behind falls away.
+ */
 const TENTS_X = (() => {
 	let top = START_X
 	for (let x = START_X; x < terrain.finishX; x += 10)
 		if (terrain.groundY(x) < terrain.groundY(top)) top = x
-	return top
+	return top - TENTS_SHORT
 })()
 /** Half the Copper Tents' width, and a little more: no trees in front of them. */
 const TENTS_ROOM = 150

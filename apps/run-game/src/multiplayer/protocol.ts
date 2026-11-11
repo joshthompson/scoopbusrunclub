@@ -64,6 +64,14 @@ export function codeFromScan(text: string) {
  */
 export type PadMode = 'controller' | 'remote'
 
+/**
+ * How a Room goes, as the Host (or its Starter) chooses in the lobby:
+ * - `endless`: every course, shuffled, and round again, for ever
+ * - `marathon`: every course, shuffled, once
+ * - `half`: a Half Marathon, five of them, chosen at random, shuffled
+ */
+export type RoomMode = 'endless' | 'marathon' | 'half'
+
 /** Phone → Host, on the `pad` action. Its controls go on `input`, as packed bits. */
 export type PadMessage =
 	/** Hello, or hello again: the same device gets the same seat back. */
@@ -74,6 +82,10 @@ export type PadMessage =
 	| { type: 'pick'; character: string; custom?: CustomRunner }
 	| { type: 'ready'; ready: boolean }
 	| { type: 'leave' }
+	/** The Starter, choosing how the Room goes. */
+	| { type: 'roomMode'; mode: RoomMode }
+	/** The Starter, starting the first Round. */
+	| { type: 'start' }
 
 /**
  * Where the Room's got to:
@@ -120,6 +132,13 @@ export interface PadView {
 	points: number
 	paused: boolean
 	course: string
+	/**
+	 * In the lobby, if they're the Starter: how the Room's set to go, and
+	 * whether it can start yet, and if not, why.
+	 */
+	starter?: { roomMode: RoomMode; canStart: boolean; why: string }
+	/** If someone else is the Starter, their Player number. */
+	starterNumber?: number
 }
 
 /**

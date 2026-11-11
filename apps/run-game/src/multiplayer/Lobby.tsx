@@ -1,13 +1,11 @@
 import { For, type JSX, Show, onCleanup } from 'solid-js'
-import { COURSES } from '../courses'
 import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { nameSize } from '../ui/RunnerStage'
-import type { RoomMode } from './Party'
 import { QrCode } from './QrCode'
 import { createLocalPlayers } from './localPlayers'
-import { padLink } from './protocol'
+import { type RoomMode, padLink } from './protocol'
 import {
 	type HostRoom,
 	MAX_PLAYERS,
@@ -15,22 +13,16 @@ import {
 	seatLabel,
 	seatPlayable,
 } from './room'
+import { ROOM_MODES } from './roomModes'
 
 /** How a Room can go, for the Host to choose: M to go through them, or click. */
-const MODES: { mode: RoomMode; label: string; note: string }[] = [
-	{ mode: 'endless', label: 'Endless', note: 'Round and round' },
-	{
-		mode: 'marathon',
-		label: 'Marathon',
-		note: `All ${COURSES.length} courses`,
-	},
-	{ mode: 'half', label: 'Half Marathon', note: '5 at random' },
-]
+const MODES = ROOM_MODES
 
 /**
  * Where a Room fills up: its Room Code and QR code for phones, and a card for
  * each Player as they join and pick who they'll be. It starts by itself once
- * everyone who's picked is ready, on every course in a shuffled order.
+ * everyone who's picked is ready, on every course in a shuffled order; or,
+ * if the first to join is a Remote Player, when they press Start.
  */
 export function Lobby(props: {
 	room: HostRoom
@@ -114,6 +106,7 @@ export function Lobby(props: {
 										<SeatCard
 											seat={seat()}
 											number={i + 1}
+											starter={room.starter() === seat()}
 											onCycle={(by) => {
 												play('move')
 												local.cycle(seat(), by)
@@ -168,6 +161,8 @@ export function Lobby(props: {
 function SeatCard(props: {
 	seat: Seat
 	number: number
+	/** Whether they're the Starter: they start the Room, from their phone. */
+	starter: boolean
 	onCycle: (by: number) => void
 	onReady: () => void
 }) {
@@ -182,7 +177,10 @@ function SeatCard(props: {
 		>
 			<div style={{ ...styles.cardTop, background: props.seat.colour }}>
 				<span>P{props.number}</span>
-				<span style={{ 'font-size': '13px' }}>{seatLabel(props.seat)}</span>
+				<span style={{ 'font-size': '13px' }}>
+					{props.starter ? 'Starter · ' : ''}
+					{seatLabel(props.seat)}
+				</span>
 			</div>
 			<div style={styles.cardRunner}>
 				<Show when={local() && !props.seat.ready}>

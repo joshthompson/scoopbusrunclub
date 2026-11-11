@@ -3,6 +3,7 @@ import type { JSX } from 'solid-js'
 import barcodeAsset from '../../assets/boosts/barcode.png'
 import type { Collectable } from '../../game/collectables'
 import type { FikaItem } from '../../game/fika'
+import { CamelArt } from './camel'
 import { CorgiArt } from './corgi'
 import { DragonArt } from './dragon'
 import { FikaArt } from './fika'
@@ -19,6 +20,8 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <CorgiArt pose="sit" />
 		case 'ride:llama':
 			return <LlamaArt pose="sit" />
+		case 'ride:camel':
+			return <CamelArt pose="sit" />
 		case 'ride:goose':
 			return <GooseIcon />
 		case 'ride:dragon':

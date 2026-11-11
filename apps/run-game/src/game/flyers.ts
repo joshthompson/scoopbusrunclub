@@ -3,6 +3,7 @@ import { collect } from '../saved/collected'
 import { play } from '../sfx'
 import {
 	GOOSE_ALTITUDES,
+	GOOSE_CARRY_HEIGHT,
 	GOOSE_CARRY_TICKS,
 	GOOSE_FLY_SPEED,
 	GOOSE_POINTS,
@@ -43,6 +44,18 @@ const ROOF_ROOM = 24
 const GLIDE = 0.08
 /** ...but never steeper than this, in pixels a tick: a glide, not a leap. */
 export const GLIDE_MAX = 6
+
+/**
+ * A dragon's own heights over the ground, its feet: low, its back where a
+ * jump comes down onto it.
+ */
+const DRAGON_ALTITUDES = [24, 34, 44]
+/**
+ * Ridden through a tower's doorway, how far over the ground there whoever's
+ * sat on a dragon has their feet: low enough that, sat up, they clear the
+ * top of it.
+ */
+const SEATED_THROUGH_DOOR = 56
 
 /** A tick's glide from `from` towards `to`. */
 export const glide = (from: number, to: number, rate = GLIDE) =>
@@ -115,7 +128,10 @@ export function stepFlyers(world: World) {
 			world.flyerState.next++
 			for (let i = 0; i < next.count; i++) {
 				const x = world.camera() - ENTER_BEHIND - i * FLOCK_GAP
-				const altitude = GOOSE_ALTITUDES[i % GOOSE_ALTITUDES.length]
+				const altitudes = flyerLook(world.course).seat
+					? DRAGON_ALTITUDES
+					: GOOSE_ALTITUDES
+				const altitude = altitudes[i % altitudes.length]
 				const cruise = flightFloor(world, x, false) - altitude
 				flyers.push({
 					id: world.flyerState.nextId++,
@@ -143,12 +159,12 @@ export function stepFlyers(world: World) {
 				const b = rider.body
 				const look = flyerLook(world.course)
 				if (look.seat) {
-					// Sat on its back, at its seat: it ripples along under them,
+					// Sat astride its back, at its seat: it ripples along under them,
 					// its back there always under their feet. Its ripple's as it's
 					// drawn, `now` ticks in.
 					const now = world.ticks() + goose.id * 3
 					goose.x = b.x - look.seat.ahead
-					goose.feetY = b.feetY + look.seat.back(now)
+					goose.feetY = b.feetY + look.seat.back(now) - look.seat.sink
 				} else {
 					// Hanging on underneath it, arms up.
 					goose.x = b.x
@@ -185,7 +201,24 @@ export function stepFlyers(world: World) {
 		if (racer.body.carried === 0 && racer.body.mount === 0) grab(world, racer)
 }
 
-/** Jumping into a goose: it grabs you, and off you go. */
+/**
+ * Where whoever's being carried has their feet: up over everything coming
+ * on a goose; on a dragon, through a tower's doorway, low, and otherwise
+ * that high over the ground.
+ */
+export function carryHeight(world: World, x: number) {
+	if (!flyerLook(world.course).seat)
+		return flightFloor(world, x) - GOOSE_CARRY_HEIGHT
+	const tower = towerAt(world, x)
+	if (tower !== undefined)
+		return world.terrain.groundY(tower) - SEATED_THROUGH_DOOR
+	return flightFloor(world, x, false) - GOOSE_CARRY_HEIGHT
+}
+
+/**
+ * Jumping into a goose: it grabs you, and off you go. A dragon you come
+ * down onto, onto its back, and sit on.
+ */
 function grab(world: World, racer: Racer) {
 	const b = racer.body
 	if (b.grounded) return
@@ -197,8 +230,15 @@ function grab(world: World, racer: Racer) {
 		if (Math.abs(b.x - goose.x) > reach) continue
 		// Not in a tower's doorway: there's no flying up out of it.
 		if (towerAt(world, goose.x, 0) !== undefined) continue
+		if (look.seat) {
+			// Coming down onto its back, from over it.
+			const back = goose.feetY - look.seat.back(world.ticks() + goose.id * 3)
+			if (b.vy <= 0 || b.feetY < back - 4 || b.feetY - b.vy > back + 10)
+				continue
+		}
 		// Their head, or their hands above it, up into it.
-		if (top > goose.feetY + 6 || b.feetY < goose.feetY - look.height) continue
+		else if (top > goose.feetY + 6 || b.feetY < goose.feetY - look.height)
+			continue
 
 		goose.state = 'carrying'
 		goose.rider = racer.id

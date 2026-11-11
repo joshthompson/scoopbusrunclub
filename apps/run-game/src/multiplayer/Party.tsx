@@ -15,7 +15,7 @@ import { Stage } from '../ui/Stage'
 import { Lobby } from './Lobby'
 import { type Placing, Results } from './Results'
 import { Round } from './Round'
-import { newRoomCode } from './protocol'
+import { type RoomMode, newRoomCode } from './protocol'
 import { createRoom, seatPlayable } from './room'
 import { type RaceStream, createRaceStream, raceStart } from './stream'
 
@@ -52,13 +52,7 @@ function shuffledCourses(after?: number) {
  * after Round, as the Host chose (see `RoomMode`), until they've all been
  * raced, or the Host goes back to the lobby or ends it.
  */
-/**
- * How a Room goes, as the Host chooses in the lobby:
- * - `endless`: every course, shuffled, and round again, for ever
- * - `marathon`: every course, shuffled, once
- * - `half`: a Half Marathon, five of them, chosen at random, shuffled
- */
-export type RoomMode = 'endless' | 'marathon' | 'half'
+export type { RoomMode }
 
 /** How many courses a Half Marathon is. */
 const HALF_MARATHON = 5
@@ -135,13 +129,47 @@ export default function Party(props: { onLeave: () => void }) {
 	const everyoneReady = createMemo(
 		() => picked().length >= MIN_PLAYERS && picked().every((s) => s.ready),
 	)
+	/**
+	 * With a Starter, everyone else who's picked is ready, and so can they
+	 * start it: pressing Start is their being ready.
+	 */
+	const canStart = createMemo(() => {
+		const starter = room.starter()
+		return (
+			!!starter?.character &&
+			picked().length >= MIN_PLAYERS &&
+			picked().every((s) => s.ready || s === starter)
+		)
+	})
+	/** The Starter's pressed Start: counting down, unless someone changes their mind. */
+	const [startPressed, setStartPressed] = createSignal(false)
 	const waitingFor = () => {
 		const short = MIN_PLAYERS - picked().length
+		const starter = room.starter()
 		if (!room.seats.length) return 'Waiting for Players to join…'
 		if (short > 0)
 			return `Waiting for ${short} more Player${short === 1 ? '' : 's'}…`
+		if (starter && canStart())
+			return `Waiting for P${room.seats.indexOf(starter) + 1} to start…`
+		if (starter && !starter.character)
+			return `Waiting for P${room.seats.indexOf(starter) + 1} to pick…`
 		return 'Waiting for everyone to be ready…'
 	}
+	// The Starter's phone: how the Room's set, and whether it can start.
+	room.setLobby(() => ({
+		roomMode: mode(),
+		canStart: canStart(),
+		why: waitingFor(),
+	}))
+	room.setOnStarter({
+		start: () => {
+			if (room.stage() === 'lobby' && canStart()) setStartPressed(true)
+		},
+		roomMode: (next) => {
+			if (room.stage() === 'lobby') chooseMode(next)
+			room.tellPhones()
+		},
+	})
 
 	/** One timer at a time: the lobby's countdown, or the results'. */
 	let timer: number | undefined
@@ -151,15 +179,17 @@ export default function Party(props: { onLeave: () => void }) {
 	}
 	onCleanup(stopTimer)
 
-	// Everyone ready: counting down to the first Round. Anyone changing their
-	// mind stops it.
+	// Everyone ready, or with a Starter, them pressing Start: counting down
+	// to the first Round. Anyone changing their mind stops it.
 	createEffect(() => {
 		const stage = room.stage()
 		if (stage !== 'lobby' && stage !== 'starting') return
-		if (!everyoneReady()) {
+		const go = room.starter() ? startPressed() && canStart() : everyoneReady()
+		if (!go) {
 			untrack(() => {
 				stopTimer()
 				setStartingIn(undefined)
+				setStartPressed(false)
 				if (stage === 'starting') room.setStage('lobby')
 			})
 			return
@@ -179,6 +209,7 @@ export default function Party(props: { onLeave: () => void }) {
 	function startRound() {
 		stopTimer()
 		setStartingIn(undefined)
+		setStartPressed(false)
 		// Anyone who's still picking sits this one out.
 		for (const seat of room.seats)
 			room.update(seat.id, (s) => {

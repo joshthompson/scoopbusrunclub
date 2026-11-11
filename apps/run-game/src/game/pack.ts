@@ -36,6 +36,7 @@ import {
 	hillPull,
 } from './constants'
 import { cyclistAt } from './cyclists'
+import { mummyAt } from './mummies'
 import { landingOn, platformAt, platformMove } from './platforms'
 import { STEAM_LAUNCH, STEAM_REACH } from './steam'
 import { boost } from './step'
@@ -490,19 +491,21 @@ function hopAhead(world: World, x: number) {
 				? o.x - 20
 				: o.kind === 'zombie'
 					? zombieAt(world, { ...state, obstacle: o }).x - 14
-					: o.kind === 'hurdle' && !o.tall
-						? o.x - 16
-						: o.kind === 'mud' || o.kind === 'pothole'
-							? o.x - o.width / 2
-							: o.kind === 'kids'
-								? o.x - kidsWidth(o.count) / 2
-								: o.kind === 'geese' && !used
-									? o.x - geeseWidth(o.count) / 2
-									: o.kind === 'tourists' && !state.scooped
-										? o.x - touristsWidth(o.count) / 2
-										: o.kind === 'cyclist' && !state.scooped
-											? cyclistAt(world, { ...state, obstacle: o }).x - 30
-											: undefined
+					: o.kind === 'mummy' && !state.scooped
+						? mummyAt(world, { ...state, obstacle: o }).x - 14
+						: o.kind === 'hurdle' && !o.tall
+							? o.x - 16
+							: o.kind === 'mud' || o.kind === 'pothole'
+								? o.x - o.width / 2
+								: o.kind === 'kids'
+									? o.x - kidsWidth(o.count) / 2
+									: o.kind === 'geese' && !used
+										? o.x - geeseWidth(o.count) / 2
+										: o.kind === 'tourists' && !state.scooped
+											? o.x - touristsWidth(o.count) / 2
+											: o.kind === 'cyclist' && !state.scooped
+												? cyclistAt(world, { ...state, obstacle: o }).x - 30
+												: undefined
 		return edge !== undefined && edge > x && edge - x < HOP_LOOKAHEAD
 	})
 }
@@ -568,7 +571,7 @@ export function bounceOff(world: World, racer: Racer, head: number, x: number) {
 	b.vy = -(racer.controls().up ? STOMP_BOUNCE_HELD : STOMP_BOUNCE)
 	// A bounce, not a jump of their own: letting go doesn't cut it short.
 	b.jumping = false
-	b.vx = boost(b.vx, b.facing, STOMP_BOOST)
+	b.vx = boost(world, b.vx, b.facing, STOMP_BOOST)
 
 	const points = Math.min(STOMP_POINTS_MAX, STOMP_POINTS * 2 ** b.combo)
 	b.combo++

@@ -61,6 +61,18 @@ function Card(props: { id: Collectable }) {
 	)
 }
 
+/** A dark outline round text, so it reads over the art. */
+const OUTLINE = [
+	'2px 0 0 #0f1f29',
+	'-2px 0 0 #0f1f29',
+	'0 2px 0 #0f1f29',
+	'0 -2px 0 #0f1f29',
+	'2px 2px 0 #0f1f29',
+	'-2px 2px 0 #0f1f29',
+	'2px -2px 0 #0f1f29',
+	'-2px -2px 0 #0f1f29',
+].join(', ')
+
 const styles = {
 	screen: {
 		position: 'absolute',
@@ -96,13 +108,19 @@ const styles = {
 		'align-items': 'center',
 		'justify-content': 'center',
 	},
+	// In front of the art, outlined: a tall ride, a llama or a camel, comes
+	// down over them.
 	name: {
+		position: 'relative',
 		'font-size': '12px',
 		'text-align': 'center',
 		'line-height': 1.1,
+		'text-shadow': OUTLINE,
 	},
 	count: {
+		position: 'relative',
 		'font-size': '11px',
 		opacity: 0.7,
+		'text-shadow': OUTLINE,
 	},
 } satisfies Record<string, JSX.CSSProperties>

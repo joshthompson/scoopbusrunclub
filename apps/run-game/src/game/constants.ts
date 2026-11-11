@@ -74,6 +74,15 @@ export const BUS_HILL_PULL = 1.45
 export const hillPull = (slope: number) =>
 	slope < 0 ? slope * UPHILL_HARDER : slope
 export const MAX_SPEED = 12
+/**
+ * The top speed in a multiplayer Round instead, boosts and all: much lower,
+ * so a few boosts at once can't take one Player so far ahead that the bus
+ * scoops everyone else off the back of the screen.
+ */
+export const ROUND_MAX_SPEED = 8
+/** How fast anyone can go: lower in a multiplayer Round. */
+export const topSpeed = (world: { round: boolean }) =>
+	world.round ? ROUND_MAX_SPEED : MAX_SPEED
 export const JUMP_SPEED = 9.5
 /**
  * How fast they're still going up, at most, once they let go of jump: a tap
@@ -215,6 +224,12 @@ export const BUS_RAMP_TICKS = 2400
  */
 export const BUS_LEASH_FULL = 900
 export const BUS_LEASH_MAX = 1200
+/**
+ * In a multiplayer Round, longer: 450 m. It's the leader that pulls the
+ * bus along, so this is how far behind them anyone can be before it's got
+ * them.
+ */
+export const ROUND_BUS_LEASH_MAX = 1800
 /** How much the leash lengthens a tick at the end of it, up to `BUS_LEASH_FULL`, and just past it. */
 export const BUS_LEASH_GROWTH = 3
 export const BUS_LEASH_LATE_GROWTH = 0.6
@@ -228,5 +243,7 @@ export const COUNTDOWN_STEP_TICKS = 50
 export const PUMPKIN_BOOST = 2
 export const PUMPKIN_SPEED = 1.5
 export const PUMPKIN_POINTS = 100
+/** How tall a Mummy is, to run into: jump it. */
+export const MUMMY_HEIGHT = 50
 /** How fast Zombies walk towards you. */
 export const ZOMBIE_SPEED = 0.7

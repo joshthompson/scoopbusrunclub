@@ -40,6 +40,11 @@ export type Obstacle =
 	 * on it as it does is fired up into the air.
 	 */
 	| { kind: 'steam'; x: number }
+	/**
+	 * A Mummy, in a tomb, shuffling to and fro `pace` either side of `x`,
+	 * arms out: jump it, or stumble. The bus scoops any it reaches.
+	 */
+	| { kind: 'mummy'; x: number; pace: number }
 	/** Tourists, `count` of them, stood about in the way: jump them, or stumble. */
 	| { kind: 'tourists'; x: number; count: number }
 	/**
@@ -105,6 +110,8 @@ export interface CourseLook {
 	foliage?: string
 	/** Over the mud. */
 	mud?: string
+	/** Over the rocks, recoloured: the Pyramids' sandstone. */
+	rock?: string
 	/** A stadium behind the course, in place of hills and scenery: see `StadiumBackdrop`. */
 	stadium?: boolean
 	/**
@@ -153,10 +160,11 @@ export interface CourseLook {
 		/** Spires and towers rising out of the far band's roofs, behind it: a strip as wide as you like. */
 		spires?: string
 		/**
-		 * A third band, nearer still, lower down and going by faster, and its
-		 * colour on down below it: so the view's full right down to the course.
+		 * More bands, nearer still, each lower down and going by faster than
+		 * the last, `height` tall, and its colour on down below it: so the
+		 * view's full right down to the course.
 		 */
-		nearer?: { asset: string; fill: string }
+		nearer?: { asset: string; height: number; fill: string }[]
 	}
 	/**
 	 * A bridge the course ends on, from `from` on: over water, its underside
@@ -218,6 +226,27 @@ export interface Cave {
 	/** Where it starts and ends: its mouth, and the way out. */
 	from: number
 	to: number
+	/** How much of its way in shows from outside it, if not the usual. */
+	mouth?: number
+	/**
+	 * Pictures on it, each its middle at `x`, `sink` down into what it's on:
+	 * on the hill's top (the Sphinx's head), just behind the path, or just
+	 * in front of it (its paws, either side of its way in).
+	 */
+	features?: {
+		asset: string
+		x: number
+		width: number
+		height: number
+		sink?: number
+		on?: 'surface' | 'behind' | 'in front' | 'path'
+	}[]
+	/**
+	 * Where it's dug down under the sand, rather than through a hill: the
+	 * sand's top, `x` along. Under it, it's sand, drawn as the ground; over
+	 * it, it's rock.
+	 */
+	sand?: (x: number) => number | undefined
 }
 
 /** Buildings' roofs, the parapet along their front edge, and their fronts, taken in turn. */
@@ -364,8 +393,8 @@ export interface Course {
 	furbies?: { x: number; asset: string }[]
 	/** Where corgis sit, waiting for someone to hop on and ride them. */
 	corgis?: number[]
-	/** What those are: corgis, or on Machu Picchu, llamas. */
-	ride?: 'corgi' | 'llama'
+	/** What those are: corgis, or on Machu Picchu, llamas, or at the Pyramids, camels. */
+	ride?: 'corgi' | 'llama' | 'camel'
 	/**
 	 * Geese flying over, from behind, `count` of them, as whoever's in front
 	 * gets to `x`. Jump into one and it carries you.

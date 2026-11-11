@@ -89,9 +89,15 @@ const SPIRES_HEIGHT = 300
 
 /** How tall a band of a course's own horizon is drawn. */
 const SKYLINE_HEIGHT = 160
-/** And its nearer band, if it has one: taller, and starting lower. */
-const NEARER_HEIGHT = 200
-const NEARER_TOP = 70
+/**
+ * And its nearer bands, if it has any: the first starting this far below
+ * the middle hills' line, each after it this much lower, and going by this
+ * much faster.
+ */
+const NEARER_TOP = 30
+const NEARER_STEP = 90
+const NEARER_PARALLAX = 0.26
+const NEARER_FASTER = 0.14
 
 /** Where the middle band of hills starts, which the far scenery peeks over. */
 const HORIZON = 216
@@ -380,27 +386,30 @@ export function Backdrop(props: { world: View }) {
 								background: 'var(--grass-green)',
 							}}
 						/>
-						<Show when={horizon().nearer}>
-							{(nearer) => (
-								<>
-									{band(
-										nearer().asset,
-										HORIZON + NEARER_TOP,
-										NEARER_HEIGHT,
-										0.26,
-										undefined,
-									)}
-									<div
-										style={{
-											...layer,
-											top: `${HORIZON + NEARER_TOP + NEARER_HEIGHT - 1}px`,
-											bottom: 0,
-											background: nearer().fill,
-										}}
-									/>
-								</>
-							)}
-						</Show>
+						<For each={horizon().nearer ?? []}>
+							{(nearer, i) => {
+								const top = HORIZON + NEARER_TOP + i() * NEARER_STEP
+								return (
+									<>
+										{band(
+											nearer.asset,
+											top,
+											nearer.height,
+											NEARER_PARALLAX + i() * NEARER_FASTER,
+											undefined,
+										)}
+										<div
+											style={{
+												...layer,
+												top: `${top + nearer.height - 1}px`,
+												bottom: 0,
+												background: nearer.fill,
+											}}
+										/>
+									</>
+								)
+							}}
+						</For>
 					</>
 				)}
 			</Show>
@@ -746,6 +755,14 @@ export function Ground(props: { world: View }) {
 				? undefined
 				: [ground + PATH_FRONT + 2, Math.min(VIEW_HEIGHT, foot)]
 		}, false),
+		/** Under the sand's top, where it's dug down under it: drawn as sand, not rock. */
+		sand: columns((x) => {
+			const sand = cave.sand?.(x)
+			const ceiling = cave.ceiling(x)
+			return sand === undefined || ceiling === undefined
+				? undefined
+				: [sand, ceiling]
+		}),
 		grass: columns((x) => {
 			const surface = cave.surface(x)
 			return surface === undefined || surface < -SKY_ROOM
@@ -1040,12 +1057,28 @@ export function Ground(props: { world: View }) {
 									<rect x={10} y={18} width={2} height={2} fill={look().edge} />
 									<rect x={40} y={30} width={2} height={2} fill={look().edge} />
 								</pattern>
+								<SandPattern id="cave-sand" />
 							</defs>
 							<path d={caveParts?.wall} fill={look().wall} />
 							<path d={caveParts?.front} fill="url(#cave-rock)" />
 							<path d={caveParts?.rock} fill="url(#cave-rock)" />
 							<path d={caveParts?.underside} fill={look().edge} />
 							<path d={caveParts?.grass} fill={look().grass} />
+							{/* Its sand, where it's dug down under it, on its rock. */}
+							<path d={caveParts?.sand} fill="url(#cave-sand)" />
+							{/* Pictures on it: the Sphinx's head, its paws. */}
+							<For each={cave?.features ?? []}>
+								{(feature) => (
+									<image
+										href={feature.asset}
+										x={feature.x - DRAWN_FROM - feature.width / 2}
+										y={featureTop(props.world, feature)}
+										width={feature.width}
+										height={feature.height}
+										style={{ 'image-rendering': 'pixelated' }}
+									/>
+								)}
+							</For>
 						</>
 					)}
 				</Show>
@@ -1133,5 +1166,163 @@ function Buildings(props: { world: View; blocks: Block[] }) {
 				)
 			}}
 		</For>
+	)
+}
+
+/** How much of a Cave's way in, and its way out, the cover leaves showing. */
+const MOUTH_SHOWN = 56
+/** How long the cover takes to go, or come back. */
+const COVER_FADE = '350ms'
+
+/**
+ * A Cave's rock over the inside of it, in front of everything in there:
+ * till someone racing goes in, it's solid ground, its way in and its way
+ * out showing; with them inside, it's gone, the cave opened up.
+ */
+export function CaveCover(props: {
+	world: View & Pick<World, 'racers' | 'ticks'>
+}) {
+	const { cave } = props.world.course
+	const look = props.world.course.look?.cave
+	if (!cave || !look) return null
+	const { terrain } = props.world
+	const drawnTo = terrain.finishX + 1600
+	const width = drawnTo - DRAWN_FROM
+	// Its rock, and under the sand's top, where it's dug down under it, sand.
+	let rock = ''
+	let sand = ''
+	const column = (x: number, top: number, bottom: number) =>
+		bottom > top
+			? ` M${x - DRAWN_FROM},${Math.round(top / 2) * 2} H${x - DRAWN_FROM + STEP} V${Math.round(bottom / 2) * 2} H${x - DRAWN_FROM} Z`
+			: ''
+	const mouth = cave.mouth ?? MOUTH_SHOWN
+	for (let x = cave.from + mouth; x < cave.to - MOUTH_SHOWN; x += STEP) {
+		const middle = x + STEP / 2
+		const ceiling = cave.ceiling(middle)
+		const foot = cave.foot(middle)
+		if (ceiling === undefined || foot === undefined) continue
+		const top = ceiling - 4
+		const under = cave.sand?.(middle)
+		if (under === undefined) rock += column(x, top, foot)
+		else {
+			rock += column(x, top, Math.min(foot, under))
+			sand += column(x, Math.max(top, under), foot)
+		}
+	}
+	/** Whether anyone racing's in it, under its hill: it's opened up. */
+	const inside = () =>
+		props.world.ticks() >= 0 &&
+		props.world.racers.some(({ body, out }) => {
+			if (out || body.x < cave.from || body.x > cave.to) return false
+			const surface = cave.surface(body.x)
+			return surface === undefined || body.feetY > surface
+		})
+	return (
+		<div
+			style={{
+				position: 'absolute',
+				top: 0,
+				left: 0,
+				width: `${width}px`,
+				height: `${VIEW_HEIGHT}px`,
+				transform: `translateX(${Math.round(DRAWN_FROM - props.world.camera())}px)`,
+				'will-change': 'transform',
+				'pointer-events': 'none',
+				opacity: inside() ? 0 : 1,
+				transition: `opacity ${COVER_FADE}`,
+			}}
+		>
+			<svg
+				style={{ position: 'absolute', top: `${-SKY_ROOM}px`, left: 0 }}
+				width={width}
+				height={VIEW_HEIGHT + SKY_ROOM}
+				viewBox={`0 ${-SKY_ROOM} ${width} ${VIEW_HEIGHT + SKY_ROOM}`}
+				shape-rendering="crispEdges"
+				aria-hidden="true"
+			>
+				<defs>
+					<SandPattern id="cave-cover-sand" />
+					<pattern
+						id="cave-cover-rock"
+						patternUnits="userSpaceOnUse"
+						width={48}
+						height={36}
+					>
+						<rect width={48} height={36} fill={look.rock} />
+						<rect x={2} y={6} width={16} height={2} fill={look.seam} />
+						<rect x={16} y={8} width={6} height={2} fill={look.seam} />
+						<rect x={28} y={18} width={14} height={2} fill={look.seam} />
+						<rect x={24} y={20} width={4} height={4} fill={look.seam} />
+						<rect x={6} y={28} width={10} height={2} fill={look.seam} />
+						<rect x={36} y={4} width={4} height={2} fill={look.edge} />
+						<rect x={10} y={18} width={2} height={2} fill={look.edge} />
+						<rect x={40} y={30} width={2} height={2} fill={look.edge} />
+					</pattern>
+				</defs>
+				<path d={rock} fill="url(#cave-cover-rock)" />
+				<path d={sand} fill="url(#cave-cover-sand)" />
+			</svg>
+		</div>
+	)
+}
+
+/** Sand, in layers: the ground's own colours, for a Cave dug under it. */
+function SandPattern(props: { id: string }) {
+	return (
+		<pattern id={props.id} patternUnits="userSpaceOnUse" width={64} height={40}>
+			<rect width={64} height={40} style={{ fill: 'var(--grass-green)' }} />
+			<rect
+				y={12}
+				width={40}
+				height={2}
+				style={{ fill: 'var(--grass-dark-green)' }}
+			/>
+			<rect
+				x={44}
+				y={14}
+				width={20}
+				height={2}
+				style={{ fill: 'var(--grass-dark-green)' }}
+			/>
+			<rect
+				x={8}
+				y={30}
+				width={30}
+				height={2}
+				style={{ fill: 'var(--grass-dark-green)' }}
+			/>
+			<rect
+				x={50}
+				y={4}
+				width={4}
+				height={2}
+				style={{ fill: 'var(--dirt-brown)' }}
+			/>
+			<rect
+				x={22}
+				y={22}
+				width={2}
+				height={2}
+				style={{ fill: 'var(--dirt-brown)' }}
+			/>
+		</pattern>
+	)
+}
+
+/** Where a Cave's picture's top is: on the hill, or either side of the path. */
+function featureTop(
+	world: View,
+	feature: NonNullable<
+		NonNullable<World['course']['cave']>['features']
+	>[number],
+) {
+	const sink = feature.sink ?? 0
+	const ground = world.terrain.groundY(feature.x)
+	if (feature.on === 'behind') return ground - PATH_BACK - feature.height + sink
+	if (feature.on === 'in front') return ground + PATH_FRONT - sink
+	// Over the path, down to its near edge.
+	if (feature.on === 'path') return ground + PATH_FRONT - feature.height + sink
+	return (
+		(world.course.cave?.surface(feature.x) ?? ground) - feature.height + sink
 	)
 }

@@ -7,6 +7,7 @@ import {
 import { KIDS_REACH_UP, kidsWidth } from '../draw/art/kids'
 import { TOURISTS_HEIGHT, touristsWidth } from '../draw/art/tourists'
 import { TALL_HURDLE_CLEAR, TALL_HURDLE_HEIGHT } from '../draw/art/track'
+import { flyerLook } from '../draw/flyerLook'
 import { rideLook } from '../draw/rideLook'
 import { collect } from '../saved/collected'
 import { play } from '../sfx'
@@ -46,13 +47,13 @@ import {
 	HITBOX_HALF_WIDTH,
 	JUMP_CUT,
 	JUMP_SPEED,
-	MAX_SPEED,
 	MUD_TOP_SPEED,
 	PATH_FRONT,
 	PUMPKIN_BOOST,
 	PUMPKIN_POINTS,
 	PUMPKIN_SPEED,
 	PX_PER_M,
+	ROUND_BUS_LEASH_MAX,
 	RUN_GRIP,
 	RUN_TOP_SPEED,
 	SLIDE_KEEP,
@@ -66,12 +67,15 @@ import {
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
 	hillPull,
+	topSpeed,
 } from './constants'
+import { MUMMY_HEIGHT } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
 import { cyclistAt } from './cyclists'
 import { FIKA_SIZE, FIKA_WORD } from './fika'
-import { flightFloor, glide, stepFlyers } from './flyers'
+import { carryHeight, glide, stepFlyers } from './flyers'
 import { scoopFurbies, stepFurbies } from './furbies'
+import { mummyAt } from './mummies'
 import { scoopPack, stepPack } from './pack'
 import { landingOn, platformAt, platformMove } from './platforms'
 import { STEAM_LAUNCH, STEAM_REACH } from './steam'
@@ -349,16 +353,15 @@ function stepRunner(world: World, racer: Racer) {
 		b.ducking = false
 		b.facing = 1
 		b.vx += (GOOSE_CARRY_SPEED - b.vx) * CORGI_GRIP
-		// Up over whatever's coming, as the goose flies.
-		b.vy = glide(
-			b.feetY,
-			flightFloor(world, b.x) - GOOSE_CARRY_HEIGHT,
-			CARRY_LIFT,
-		)
+		// Up over whatever's coming, as a goose flies; through a tower's
+		// doorway, low, on a dragon.
+		b.vy = glide(b.feetY, carryHeight(world, b.x), CARRY_LIFT)
 		const carriedFrom = b.x
 		b.x += b.vx
-		// Carried into a tower's side: knocked off, and down.
-		if (racing) hitTower(world, racer, carriedFrom)
+		// Carried into a tower's side: knocked off, and down. Not on a
+		// dragon: it takes you through.
+		if (racing && !flyerLook(world.course).seat)
+			hitTower(world, racer, carriedFrom)
 		b.feetY += b.vy
 		// Let go: falling from here, not still rising.
 		if (b.carried === 0) b.vy = Math.max(0, b.vy)
@@ -464,7 +467,8 @@ function stepRunner(world: World, racer: Racer) {
 	if (b.vx > 0.5) b.facing = 1
 	else if (b.vx < -0.5) b.facing = -1
 
-	b.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, b.vx))
+	const top = topSpeed(world)
+	b.vx = Math.max(-top, Math.min(top, b.vx))
 
 	// Carried along by a Moving Platform.
 	const ticks = world.ticks()
@@ -566,7 +570,8 @@ function stepsDown(world: World, from: number, to: number, drop: number) {
 
 /**
  * Run into a Wall going from `from`: the side of higher Ground, or the far
- * side of a Gap they've dropped into. Thrown back off it, stumbling.
+ * side of a Gap they've dropped into. Thrown back off it, stumbling; or, a
+ * Ledge, just stopped.
  */
 function hitWall(world: World, racer: Racer, from: number) {
 	const { terrain } = world
@@ -582,7 +587,11 @@ function hitWall(world: World, racer: Racer, from: number) {
 		const beyond = w + dir
 		if (terrain.inGap(beyond)) continue
 		if (b.feetY <= terrain.groundY(beyond) + WALL_STEP) continue
-		thud(world, b, dir, w)
+		// A Ledge just stops them against it, to jump up.
+		if (terrain.ledges?.includes(w)) {
+			b.x = w - dir * (HITBOX_HALF_WIDTH + 1)
+			b.vx = 0
+		} else thud(world, b, dir, w)
 		return
 	}
 }
@@ -687,10 +696,10 @@ const CARRY_LIFT = 0.05
 /** As far back as the ground goes (see `Ground`). */
 const LEFT_EDGE = START_X - 1300
 
-/** `speed` faster the way they're going, up to `MAX_SPEED`. */
-export function boost(vx: number, facing: 1 | -1, speed: number) {
+/** `speed` faster the way they're going, up to the top speed (lower in a Round). */
+export function boost(world: World, vx: number, facing: 1 | -1, speed: number) {
 	const along = Math.max(0, vx * facing)
-	return facing * Math.min(MAX_SPEED, along + speed)
+	return facing * Math.min(topSpeed(world), along + speed)
 }
 
 /**
@@ -737,14 +746,16 @@ function collide(world: World, racer: Racer) {
 	const hits = (state: ObstacleState | BoostState) => state.hit.add(racer.id)
 	for (const state of riding ? [] : world.obstacles) {
 		const o = state.obstacle
-		// Only what's near enough to touch: where it is now, for a cyclist
-		// or a Zombie on the move.
+		// Only what's near enough to touch: where it is now, for a cyclist,
+		// a Zombie or a Mummy on the move.
 		const at =
 			o.kind === 'cyclist'
 				? cyclistAt(world, { ...state, obstacle: o }).x
 				: o.kind === 'zombie'
 					? zombieAt(world, { ...state, obstacle: o }).x
-					: o.x
+					: o.kind === 'mummy'
+						? mummyAt(world, { ...state, obstacle: o }).x
+						: o.x
 		if (Math.abs(at - b.x) > 200) continue
 		const ground = terrain.groundY(o.x)
 
@@ -858,6 +869,21 @@ function collide(world: World, racer: Racer) {
 				}
 				break
 			}
+			case 'mummy': {
+				const mummy = mummyAt(world, { ...state, obstacle: o })
+				const floor = terrain.groundY(mummy.x)
+				if (
+					freshFor(state) &&
+					!state.scooped &&
+					b.stumble === 0 &&
+					overlaps(mummy.x - 12, mummy.x + 12, floor - MUMMY_HEIGHT, floor)
+				) {
+					hits(state)
+					play('groan')
+					stumble('Mmmf!')
+				}
+				break
+			}
 			case 'hurdle':
 				// Solid all the way down: over it, not under it. A tall one's
 				// board stops short: under it, sliding. Knocked over by whoever
@@ -891,7 +917,9 @@ function collide(world: World, racer: Racer) {
 				break
 			}
 			case 'geese': {
-				if (state.used || b.stumble > 0) break
+				// Once each: having run into a flock, the rest of it, flown or
+				// not, doesn't trip them again.
+				if (state.used || b.stumble > 0 || state.hit.has(racer.id)) break
 				// Into the ones still on the path: some of them are off, and into
 				// those left, the rest. Till they're all gone, they're still in
 				// everyone else's way.
@@ -906,6 +934,7 @@ function collide(world: World, racer: Racer) {
 					)
 				})
 				if (into) {
+					hits(state)
 					if (state.flown === undefined) state.flown = world.ticks()
 					else state.flownAll = world.ticks()
 					if (!geeseLeft(o.x, o.count, state.flown, state.flownAll).length)
@@ -967,7 +996,7 @@ function collide(world: World, racer: Racer) {
 				) {
 					state.used = true
 					collect(`fika:${o.item}`)
-					b.vx = boost(b.vx, b.facing, FIKA_BOOST)
+					b.vx = boost(world, b.vx, b.facing, FIKA_BOOST)
 					world.addBonus('fika', FIKA_POINTS)
 					world.popup(
 						scored(world, FIKA_WORD[o.item] ?? 'Fika!', `+${FIKA_POINTS}`),
@@ -987,7 +1016,7 @@ function collide(world: World, racer: Racer) {
 				) {
 					state.used = true
 					collect('barcode')
-					b.vx = boost(b.vx, b.facing, BARCODE_BOOST)
+					b.vx = boost(world, b.vx, b.facing, BARCODE_BOOST)
 					world.addBonus('barcodes', BARCODE_POINTS)
 					world.popup(scored(world, 'Scanned!', `+${BARCODE_POINTS}`), b.x, top)
 					play('scan')
@@ -1005,7 +1034,7 @@ function collide(world: World, racer: Racer) {
 					state.used = true
 					collect('pumpkin')
 					b.pumpkin = o.carving
-					b.vx = boost(b.vx, b.facing, PUMPKIN_BOOST)
+					b.vx = boost(world, b.vx, b.facing, PUMPKIN_BOOST)
 					world.addBonus('pumpkins', PUMPKIN_POINTS)
 					world.popup(
 						scored(world, 'Pumpkin head!', `+${PUMPKIN_POINTS}`),
@@ -1026,7 +1055,7 @@ function collide(world: World, racer: Racer) {
 					state.cheered = racer.runner.name
 					state.setCheering(CHEER_TICKS)
 					play('cheer')
-					b.vx = boost(b.vx, b.facing, CHEER_BOOST)
+					b.vx = boost(world, b.vx, b.facing, CHEER_BOOST)
 					world.addBonus('cheers', CHEER_POINTS)
 					world.popup(
 						scored(world, world.round ? 'Go!' : '', `+${CHEER_POINTS}`),
@@ -1090,7 +1119,10 @@ function stepBus(world: World) {
 	// it's the leader that pulls it, and anyone that far back is scooped.
 	const leader = Math.max(...running.map((r) => r.body.x))
 	if (leader - bus.frontX > bus.leash) {
-		bus.leash += leashGrowth(bus.leash)
+		bus.leash += leashGrowth(
+			bus.leash,
+			world.round ? ROUND_BUS_LEASH_MAX : BUS_LEASH_MAX,
+		)
 		bus.frontX = leader - bus.leash
 	}
 
@@ -1173,6 +1205,19 @@ function knockOver(world: World) {
 			bus.scooping = 10
 			continue
 		}
+		if (o.kind === 'mummy') {
+			if (state.scooped) continue
+			const mummy = mummyAt(world, { ...state, obstacle: o })
+			if (bus.frontX < mummy.x - 12) continue
+			state.used = true
+			state.scooped = {
+				at: world.ticks(),
+				vx: Math.max(bus.speed, 2) + 2 + Math.random() * 2,
+				x: mummy.x,
+			}
+			bus.scooping = 10
+			continue
+		}
 		if (o.kind === 'zombie') {
 			if (state.scooped) continue
 			const zombie = zombieAt(world, { ...state, obstacle: o })
@@ -1249,15 +1294,15 @@ export function scoopFlight(scooped: { at: number; vx: number }, now: number) {
 
 /**
  * How much the leash lets out, a tick, pulled at the end of it: quickly up to
- * `BUS_LEASH_FULL`, then less and less, to nothing at `BUS_LEASH_MAX`.
+ * `BUS_LEASH_FULL`, then less and less, to nothing at `max` (longer in a Round).
  */
-function leashGrowth(leash: number) {
+function leashGrowth(leash: number, max: number) {
 	if (leash < BUS_LEASH_FULL) return BUS_LEASH_GROWTH
-	const left = Math.max(
-		0,
-		(BUS_LEASH_MAX - leash) / (BUS_LEASH_MAX - BUS_LEASH_FULL),
-	)
-	return BUS_LEASH_LATE_GROWTH * left * left
+	const range = max - BUS_LEASH_FULL
+	const left = Math.max(0, (max - leash) / range)
+	// A longer leash lets out faster too, to get there in the same time.
+	const faster = range / (BUS_LEASH_MAX - BUS_LEASH_FULL)
+	return BUS_LEASH_LATE_GROWTH * faster * left * left
 }
 
 /**
@@ -1316,14 +1361,14 @@ const ROUND_AHEAD = 420
 /** The bus is framed too once it's this near the last Player. */
 const BUS_IN_VIEW = 520
 /** How far the camera zooms out to keep everyone in, at most. */
-export const MAX_ZOOM = 2
+export const MAX_ZOOM = 3
 /** How quickly it zooms, a share a tick. */
 const ZOOM_EASE = 0.04
 
 /**
  * A Round's camera: everyone still running in view, zoomed out up to
  * `MAX_ZOOM` to fit them all, the leader with room ahead. Anyone further
- * back than that, the bus has got (see `BUS_LEASH_MAX`). Through the
+ * back than that, the bus has got (see `ROUND_BUS_LEASH_MAX`). Through the
  * countdown, the bus parked behind is in too.
  */
 function frameEveryone(world: World) {

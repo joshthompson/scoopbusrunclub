@@ -42,6 +42,7 @@ export const COLLECTABLE_NAMES = {
 	'fika:spiderCupcake': 'Spider cupcake',
 	'ride:corgi': 'Corgi',
 	'ride:llama': 'Llama',
+	'ride:camel': 'Camel',
 	'ride:goose': 'Goose',
 	'ride:dragon': 'Dragon',
 	pumpkin: 'Pumpkin',

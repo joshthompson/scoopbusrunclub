@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import type { Collectable } from '../game/collectables'
-import { STORAGE_PREFIX } from './settings'
+import { STORAGE_PREFIX } from './storagePrefix'
 
 /**
  * What's been collected, kept in this browser, and how many times each:

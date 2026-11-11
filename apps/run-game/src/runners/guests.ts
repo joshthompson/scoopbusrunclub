@@ -36,6 +36,7 @@ export async function loadGuests() {
 				.map((guest) => ({
 					id: `guest:${guest._id}`,
 					name: guest.name,
+					look: guest.avatar as unknown as CharacterSpriteProps,
 					sprite: lookSprite(guest.avatar as unknown as CharacterSpriteProps),
 				})),
 		)

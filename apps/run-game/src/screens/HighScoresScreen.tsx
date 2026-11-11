@@ -1,13 +1,23 @@
-import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
+import {
+	For,
+	type JSX,
+	Show,
+	createEffect,
+	createSignal,
+	onCleanup,
+} from 'solid-js'
 import { COURSES } from '../courses'
 import {
-	type ScoreEntry,
-	TABLE_SIZE,
-	type TableId,
-	table,
-} from '../saved/highScores'
+	ONLINE,
+	ONLINE_TABLE_SIZE,
+	type OnlineEntry,
+	fetchTable,
+	onlineTable,
+} from '../online/runScores'
+import type { TableId } from '../saved/highScores'
 import { play } from '../sfx'
 import { Menu, Panel } from '../ui/Menu'
+import { ScoreFace } from '../ui/ScoreFace'
 
 /** How far ↑ and ↓ scroll the table: a row. */
 const ROW_STEP = 24
@@ -35,21 +45,49 @@ function day(date: string) {
 	})
 }
 
+/** A row of a table: someone's score, by their face. */
+interface Row {
+	rank: number
+	entry: OnlineEntry
+	mine: boolean
+}
+
 /**
- * The high score tables, kept in this browser: left and right (or A and D)
- * to go from one to the next.
+ * The online high score tables, everyone's, with yours highlighted: left
+ * and right (or A and D) to go from one to the next.
  */
 export function HighScoresScreen(props: { onBack: () => void }) {
 	const [at, setAt] = createSignal(0)
 	const current = () => TABLES[at()]
 	const endless = () => current().id === 'endless'
+	/** Whether the table's been asked for and couldn't be got. */
+	const [failed, setFailed] = createSignal(!ONLINE)
+	createEffect(() => {
+		if (!ONLINE) return
+		const id = current().id
+		setFailed(false)
+		fetchTable(id).then((table) => {
+			if (!table && current().id === id) setFailed(true)
+		})
+	})
+	/** The table's rows, and the player's own too if it's further down. */
+	const rows = (): Row[] | undefined => {
+		const fetched = onlineTable(current().id)
+		if (!fetched) return undefined
+		const top = fetched.entries.map((entry, rank) => ({
+			rank,
+			entry,
+			mine: entry.mine,
+		}))
+		return fetched.mine ? [...top, { ...fetched.mine, mine: true }] : top
+	}
 
 	/** The rows, scrolled within the table rather than making it any taller. */
-	let rows: HTMLDivElement | undefined
+	let rowsBox: HTMLDivElement | undefined
 	const cycle = (by: number) => {
 		play('move')
 		setAt((i) => (i + by + TABLES.length) % TABLES.length)
-		rows?.scrollTo({ top: 0 })
+		rowsBox?.scrollTo({ top: 0 })
 	}
 	const onKey = (event: KeyboardEvent) => {
 		const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
@@ -62,14 +100,14 @@ export function HighScoresScreen(props: { onBack: () => void }) {
 			cycle(1)
 		}
 		// Up and down the table, a row at a time.
-		if (key === 'ArrowUp' || key === 'w') rows?.scrollBy({ top: -ROW_STEP })
-		if (key === 'ArrowDown' || key === 's') rows?.scrollBy({ top: ROW_STEP })
+		if (key === 'ArrowUp' || key === 'w') rowsBox?.scrollBy({ top: -ROW_STEP })
+		if (key === 'ArrowDown' || key === 's') rowsBox?.scrollBy({ top: ROW_STEP })
 	}
 	window.addEventListener('keydown', onKey)
 	onCleanup(() => window.removeEventListener('keydown', onKey))
 
 	/** How far round a course they got. Endless's table is just the points. */
-	const extra = (entry: ScoreEntry) =>
+	const extra = (entry: OnlineEntry) =>
 		entry.finished
 			? 'Finished'
 			: `${(entry.metres ?? 0).toLocaleString('en')} m`
@@ -122,23 +160,35 @@ export function HighScoresScreen(props: { onBack: () => void }) {
 						</Show>
 						<span style={styles.date}>When</span>
 					</div>
-					<div style={styles.rows} ref={rows}>
+					<div style={styles.rows} ref={rowsBox}>
 						<Show
-							when={table(current().id).length}
+							when={rows()?.length}
 							fallback={
-								<div style={styles.empty}>No runs yet. Get out there!</div>
+								<div style={styles.empty}>
+									{!rows()
+										? failed()
+											? ONLINE
+												? 'Couldn’t get the high scores. Try again later'
+												: 'High scores are online, and there’s no connection here'
+											: 'Loading…'
+										: 'No runs yet. Get out there!'}
+								</div>
 							}
 						>
-							<For each={table(current().id)}>
-								{(entry, i) => (
+							<For each={rows()}>
+								{({ rank, entry, mine }) => (
 									<div
 										style={{
 											...styles.row,
-											...(i() === 0 ? styles.first : {}),
+											...(rank === 0 ? styles.first : {}),
+											...(mine ? styles.mine : {}),
 										}}
 									>
-										<span style={styles.rank}>{i() + 1}</span>
-										<span style={styles.runner}>{entry.runner}</span>
+										<span style={styles.rank}>{rank + 1}</span>
+										<span style={styles.runner}>
+											<ScoreFace icon={entry.icon} />
+											<span style={styles.runnerName}>{entry.name}</span>
+										</span>
 										<span style={styles.score}>
 											{entry.score.toLocaleString('en')}
 										</span>
@@ -155,10 +205,10 @@ export function HighScoresScreen(props: { onBack: () => void }) {
 
 				<div style={styles.footer}>
 					<span style={styles.hint}>
-						← → to change table · ↑ ↓ to scroll · top {TABLE_SIZE}, in this
-						browser
+						← → to change table · ↑ ↓ to scroll · top {ONLINE_TABLE_SIZE},
+						everyone's, yours highlighted
 					</span>
-					<div style={{ width: '160px' }}>
+					<div style={{ width: '220px' }}>
 						<Menu
 							items={[{ label: 'Back', choose: props.onBack }]}
 							onBack={props.onBack}
@@ -257,9 +307,20 @@ const styles = {
 	rank: { width: '28px', 'text-align': 'right' },
 	runner: {
 		flex: 1,
+		display: 'flex',
+		'align-items': 'center',
+		gap: '8px',
+		'min-width': 0,
+	},
+	runnerName: {
 		overflow: 'hidden',
 		'text-overflow': 'ellipsis',
 		'white-space': 'nowrap',
+	},
+	/** The player's own, online. */
+	mine: {
+		background: '#ffd23f',
+		color: 'var(--ink)',
 	},
 	score: { width: '90px', 'text-align': 'right' },
 	extra: { width: '110px', 'text-align': 'right' },

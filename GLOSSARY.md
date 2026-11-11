@@ -39,6 +39,17 @@ _Avoid_: Game, attempt; calling a Practice a Run
 **Practice**:
 One go at a single Unlocked Course on its own, outside Endless.
 
+**High Score Table**:
+The best scores for Endless, or for one Course (its points in one go, in a Run or in Practice). Each is kept in this browser, and online, where everyone's best goes on it, one each.
+_Avoid_: Leaderboard (that's club results), Standings (that's a Room's)
+
+**High Score Name**:
+The name a player's scores go under on the online High Score Tables, and the Character whose face goes by it. Chosen the first time they send a score, and kept in this browser.
+
+**Ticket**:
+What the backend hands each Run and each Practice as it starts. A score is only taken onto an online High Score Table with its Ticket, and only if it adds up for the time it's taken.
+_Avoid_: Signature, signing (nothing's signed: whatever signed it would be in the player's browser to copy)
+
 **Unlocked**:
 Said of a Course that can be Practised on this device: the first always, and any other once the Course before it has been finished here, in a Run or in Practice. Unlocking has nothing to do with Rounds.
 
@@ -48,6 +59,9 @@ _Avoid_: Floor, terrain (in prose), level
 
 **Wall**:
 The side of higher Ground, such as the next rooftop along or the far side of a Gap. A runner who runs into one at a run bounces back and stumbles (walked into, it just stops them), and drops down whatever is below: into a Gap, they are Fallen. Platforms have no Walls: runners pass through them from below.
+
+**Ledge**:
+A Wall that only stops a runner, never throws them back: each step of the Great Wall's staircase. They jump up it.
 
 **Gap**:
 A stretch of a Course with no Ground and no Platform underneath: going down one leaves a runner Fallen.
@@ -61,7 +75,7 @@ _Avoid_: Level, layer, floor
 A Platform that moves, such as a girder swinging from a crane.
 
 **Cave**:
-A stretch of a Course under a hill, with rock over the Ground. Some Platforms in a Cave are shelves of solid rock: there's no jumping up through those from below.
+A stretch of a Course under a hill, with rock over the Ground, or dug down under the sand, as through the Sphinx on the Pyramids. Some Platforms in a Cave are shelves of solid rock: there's no jumping up through those from below. From outside, a Cave is solid rock, only its way in and its way out showing; it opens up once someone racing goes in.
 
 **Ceiling**:
 The underside of the rock over the Ground in a Cave, or of a solid rock shelf. A runner who jumps into it bumps their head and comes back down.
@@ -86,6 +100,10 @@ No longer in the race, either Scooped or Fallen.
 Something on a Course that a runner has to jump or duck, or else stumble: a rock, a branch, mud, a hurdle, a pothole, children playing football, geese on the path, a furby, or a Zombie.
 _Avoid_: Hazard
 
+**Mummy**:
+A bandaged mummy in the Sphinx's tomb on the Pyramids, shuffling to and fro, arms out: an Obstacle. The Scoop Bus Scoops any it reaches.
+_Avoid_: Zombie (Zombies walk Halloween Town)
+
 **Zombie**:
 A club member risen from the grave, now and then just a skeleton, walking the wrong way along Halloween Town: an Obstacle. One that walks into an open grave is gone, and the Scoop Bus Scoops any it reaches. (Skeletons also run the right way, as Pacers.)
 _Avoid_: Pacer (Pacers race the right way)
@@ -105,7 +123,7 @@ A parkrun barcode, floating in the run-in just before every parkrun Course's fin
 _Avoid_: Barcode (on its own: a real parkrunner's barcode is theirs, not a thing on a Course)
 
 **Ride**:
-Something that carries a runner along for a while: a corgi, or on Machu Picchu a llama; or flying over, a goose, or on the Great Wall a dragon.
+Something that carries a runner along for a while: a corgi, or on Machu Picchu a llama, or at the Pyramids a camel; or flying over, a goose, or on the Great Wall a dragon.
 _Avoid_: Mount, vehicle
 
 **Cheerer**:
@@ -151,8 +169,12 @@ _Avoid_: Pad, remote, controller app
 A Player on another device, usually over the internet, that shows the race itself and has its own controls.
 _Avoid_: Online player, guest (guests are club visitors), client
 
+**Starter**:
+The first Player in a Room, when they're a Remote Player: nobody may be at the Host to start it, so from their phone they choose how the Room goes and press Start, once everyone else is ready. With anyone else first, a Room has no Starter and starts by itself once everyone's ready.
+_Avoid_: Host (that's the device), leader, captain, admin
+
 **Endless**, **Marathon**, **Half Marathon** (of a Room):
-How the Host has a Room go, chosen in its lobby: every Course, shuffled, round and round for ever; every Course once, shuffled; or five of them, at random, shuffled.
+How the Host (or its Starter) has a Room go, chosen in its lobby: every Course, shuffled, round and round for ever; every Course once, shuffled; or five of them, at random, shuffled.
 _Avoid_: Playlist, mode (in prose)
 
 **Round**:
