@@ -185,6 +185,25 @@ export function DateBingoPage(props: DateBingoPageProps) {
 												{formatLongDate(card().completionDate ?? '')}
 											</strong>
 										</div>
+										<Show
+											when={
+												card().completionDateWithSpecials !==
+												card().completionDate
+											}
+										>
+											<div>
+												With special events:{' '}
+												<strong>
+													{formatLongDate(
+														card().completionDateWithSpecials ?? '',
+													)}
+												</strong>
+											</div>
+											<div class={styles.subtle}>
+												The first counts Saturdays only. The second also counts
+												special events around the world, like New Year's Day.
+											</div>
+										</Show>
 										<Show when={mustMakeSquare()}>
 											{(square) => (
 												<div>
@@ -218,22 +237,6 @@ export function DateBingoPage(props: DateBingoPageProps) {
 												29 February is a Saturday once every 28 years
 											</div>
 										</Show>
-										<Show when={card().closerSpecial}>
-											{(closer) => (
-												<div>
-													Run <strong>{specialLabel(closer().special)}</strong>{' '}
-													on {formatLongDate(closer().special.date)} to finish
-													by{' '}
-													<strong>
-														{formatLongDate(closer().completionDate)}
-													</strong>
-												</div>
-											)}
-										</Show>
-										<div class={styles.subtle}>
-											Counting Saturdays only. Special days can fill a square
-											sooner.
-										</div>
 									</div>
 								}
 							>

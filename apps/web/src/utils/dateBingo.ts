@@ -87,13 +87,11 @@ export interface DateBingoCard<R> {
 	 */
 	mustMake: string | null
 	/**
-	 * A special day that would bring the finish forward, and the new finish.
-	 * Only a special day on the last square to come round can do that.
+	 * The soonest the card can be finished going to special days too: each
+	 * square on whichever comes first, its special day or its Saturday. Null if
+	 * done.
 	 */
-	closerSpecial: {
-		special: SpecialDayOccurrence
-		completionDate: string
-	} | null
+	completionDateWithSpecials: string | null
 }
 
 /**
@@ -173,16 +171,13 @@ export function buildDateBingo<R extends { date: string }>(
 		}
 	}
 
-	// Filling the last square early leaves the one before it as the finish,
-	// unless the special day itself is later still.
-	let closerSpecial: DateBingoCard<R>['closerSpecial'] = null
-	if (last?.nextSpecial) {
-		const runnerUp = empty.at(-2)?.nextSaturday ?? ''
-		const special = last.nextSpecial
-		closerSpecial = {
-			special,
-			completionDate: runnerUp > special.date ? runnerUp : special.date,
-		}
+	// A square's special day is only kept when it beats its Saturday, so it's
+	// that square's first chance whenever there is one.
+	let completionDateWithSpecials: string | null = null
+	for (const square of empty) {
+		const firstChance = square.nextSpecial?.date ?? square.nextSaturday
+		if (!completionDateWithSpecials || firstChance > completionDateWithSpecials)
+			completionDateWithSpecials = firstChance
 	}
 
 	return {
@@ -192,6 +187,6 @@ export function buildDateBingo<R extends { date: string }>(
 		completedOn,
 		completionDate,
 		mustMake,
-		closerSpecial,
+		completionDateWithSpecials,
 	}
 }
