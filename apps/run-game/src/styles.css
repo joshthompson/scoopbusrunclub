@@ -109,7 +109,7 @@ body {
 		transform: none;
 	}
 	86% {
-		transform: translateY(-14px) rotate(8deg);
+		transform: translateY(-14px) rotate(-8deg);
 	}
 }
 
@@ -144,6 +144,28 @@ body {
 	}
 }
 
+/* The multiplayer Podium (multiplayer/Podium.tsx): its steps rising, and confetti. */
+@keyframes podium-rise {
+	from {
+		transform: scaleY(0);
+	}
+}
+
+@keyframes confetti-fall {
+	from {
+		transform: translate(0, -40px) rotate(0);
+	}
+	to {
+		transform: translate(var(--drift), 600px) rotate(var(--turn));
+	}
+}
+
+@keyframes medal-swing {
+	50% {
+		transform: rotate(-8deg);
+	}
+}
+
 @keyframes title-in {
 	from {
 		opacity: 0;
@@ -171,5 +193,145 @@ button {
 	}
 	75% {
 		transform: translateY(-14px);
+	}
+}
+
+/* Halloween Town's sky (draw/Backdrop.tsx) */
+@keyframes lightning-flash {
+	0%,
+	93%,
+	100% {
+		opacity: 0;
+	}
+	94% {
+		opacity: 0.75;
+	}
+	95% {
+		opacity: 0.1;
+	}
+	96.5% {
+		opacity: 0.6;
+	}
+	98% {
+		opacity: 0;
+	}
+}
+
+@keyframes sky-cross {
+	from {
+		transform: translateX(1040px);
+	}
+	to {
+		transform: translateX(-120px);
+	}
+}
+
+/* A sheet of frames side by side, stepped through: `--strip` is its width. */
+@keyframes flap {
+	to {
+		background-position-x: var(--strip);
+	}
+}
+
+@keyframes sky-bob {
+	50% {
+		transform: translateY(var(--bob));
+	}
+}
+
+/* Rock off the bus's drill, flying back along the hole it bores. */
+@keyframes dirt-fly {
+	0% {
+		transform: translate(0, 0);
+		opacity: 1;
+	}
+	50% {
+		transform: translate(calc(var(--dx) * 0.5), calc(var(--dy) * 0.85));
+		opacity: 1;
+	}
+	100% {
+		transform: translate(var(--dx), var(--dy));
+		opacity: 0;
+	}
+}
+
+/* Steam off a vent, rising and spreading as it goes. */
+@keyframes steam-rise {
+	from {
+		transform: translateY(0) scale(0.6);
+		opacity: 0.95;
+	}
+	to {
+		transform: translateY(-120px) scale(1.6);
+		opacity: 0;
+	}
+}
+
+/* Joined remotely on a computer: where the keyboard's got to, clearly. */
+.pad-computer button:focus-visible {
+	outline: 4px solid #ffd23f;
+	outline-offset: 2px;
+}
+
+/* A Player's arrows in the lobby: lit up under the pointer, pushed in when pressed. */
+.seat-arrow:hover {
+	filter: brightness(1.15);
+}
+.seat-arrow:active {
+	transform: translate(3px, 3px);
+	box-shadow: none !important;
+}
+
+/* Fire down a pit into hell: each flame licking up and dying back. */
+@keyframes hell-flame {
+	from {
+		transform: scaleY(0.8) scaleX(1.05);
+	}
+	to {
+		transform: scaleY(1.3) scaleX(0.9);
+	}
+}
+
+/* An ember rising out of the fire, and going out. */
+@keyframes hell-ember {
+	from {
+		transform: translate(0, 0);
+		opacity: 1;
+	}
+	to {
+		transform: translate(6px, -80px);
+		opacity: 0;
+	}
+}
+
+/*
+ * The engine shades its canvas while a race is paused; but the race's
+ * canvas moves with the camera, zoomed out and looking up, so its shade
+ * misses part of the screen. `RaceCanvas` shades the whole screen instead.
+ */
+[data-game-scene="run-game"] > .bg_var\(--overlay-black-50\) {
+	background: transparent;
+}
+
+/* Wind streaking by, up high over the sea: see `SeaFront`. */
+@keyframes wind-streak {
+	from {
+		transform: translateX(0);
+		opacity: 0;
+	}
+	15%,
+	85% {
+		opacity: var(--wind);
+	}
+	to {
+		transform: translateX(-360px);
+		opacity: 0;
+	}
+}
+
+/* The sea's crests rolling in: see `SeaFront`. */
+@keyframes wave-roll {
+	to {
+		background-position-x: -64px;
 	}
 }

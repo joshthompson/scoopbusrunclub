@@ -7,6 +7,7 @@ export function TitleScreen(props: {
 	onHighScores: () => void
 	onInstructions: () => void
 	onOptions: () => void
+	onCollectables: () => void
 	onCredits: () => void
 	/** The item to start on: whichever was last chosen. */
 	initial: number
@@ -32,12 +33,16 @@ export function TitleScreen(props: {
 						{ label: 'Single Player', choose: props.onSinglePlayer },
 						{ label: 'Multi Player', choose: props.onMultiPlayer },
 						{ label: 'High Scores', choose: props.onHighScores },
+						{ label: 'Collectables', choose: props.onCollectables },
 						{ label: 'Instructions', choose: props.onInstructions },
 						{ label: 'Options', choose: props.onOptions },
-						{ label: 'Credits', choose: props.onCredits },
 					]}
 				/>
 			</Panel>
+			{/* Credits, down in the corner, as the website's link is in the other. */}
+			<button type="button" style={styles.credits} onClick={props.onCredits}>
+				Credits
+			</button>
 			<a
 				href="https://scoopbus.run"
 				target="_blank"
@@ -64,6 +69,17 @@ const styles = {
 		'margin-top': '10px',
 		'font-size': '20px',
 		'white-space': 'nowrap',
+	},
+	credits: {
+		...OUTLINED,
+		position: 'absolute',
+		left: '16px',
+		bottom: '10px',
+		'font-size': '14px',
+		background: 'none',
+		border: 'none',
+		padding: 0,
+		cursor: 'pointer',
 	},
 	footer: {
 		...OUTLINED,

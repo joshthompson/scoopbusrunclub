@@ -1,8 +1,44 @@
-/**
- * The fika on the course, which speeds you up: pixel art drawn in cells
- * twice the size of a screen pixel, the same as the runners.
- */
-export type FikaItem = 'coffee' | 'kanelbulle' | 'chokladboll' | 'prinsesstarta'
+/** The fika on the course, which speeds you up (drawn by `FikaArt`). */
+export type FikaItem =
+	| 'coffee'
+	| 'kanelbulle'
+	| 'chokladboll'
+	| 'prinsesstarta'
+	/** Gamla Stan's own, on top of the usual round of them. */
+	| 'kardemummabulle'
+	| 'semla'
+	| 'dammsugare'
+	/** Machu Picchu's, not in the usual round of them: a can of Inca Cola. */
+	| 'incaCola'
+	/** The Pyramids'. */
+	| 'falafel'
+	| 'knafeh'
+	| 'koshary'
+	/** The Great Wall's. */
+	| 'dumplings'
+	| 'bubbleTea'
+	| 'mooncake'
+	/** Halloween Town's. */
+	| 'candyfloss'
+	| 'toffeeApple'
+	| 'spiderCupcake'
+	/** Furby Fields': sweets, and a tiny furby, to keep. */
+	| 'tinyFurby'
+	| 'lollipop'
+	| 'rainbowCake'
+	/** The Sewers': not fika, but what's been lost down the drains. */
+	| 'rubberDuck'
+	| 'goldRing'
+	| 'oldCoin'
+	| 'lostPhone'
+	/** Scoop Cruises': off the buffet, out of the tax-free, and in Turku, from its bakeries. */
+	| 'kladdkaka'
+	| 'lingondricka'
+	| 'pickAndMix'
+	| 'salmiakki'
+	| 'karelianPie'
+	/** Not fika at all: up on Scoop Cruises' roof, a captain's hat. */
+	| 'captainsHat'
 
 export const FIKA_ITEMS: FikaItem[] = [
 	'coffee',
@@ -11,146 +47,136 @@ export const FIKA_ITEMS: FikaItem[] = [
 	'prinsesstarta',
 ]
 
+/** Gamla Stan's, from its old cafés: the usual round, and more besides. */
+export const GAMLA_STAN_FIKA: FikaItem[] = [
+	'coffee',
+	'semla',
+	'kanelbulle',
+	'dammsugare',
+	'kardemummabulle',
+	'chokladboll',
+	'prinsesstarta',
+]
+
+/** The Pyramids', from Cairo's street food and sweet shops, and a coffee and a bun. */
+export const PYRAMIDS_FIKA: FikaItem[] = [
+	'falafel',
+	'coffee',
+	'knafeh',
+	'koshary',
+	'kanelbulle',
+]
+
+/** The Great Wall's: dim sum, tea and mooncakes, and a coffee and a bun. */
+export const GREAT_WALL_FIKA: FikaItem[] = [
+	'dumplings',
+	'bubbleTea',
+	'coffee',
+	'mooncake',
+	'kanelbulle',
+]
+
+/** Halloween Town's: sweets, a toffee apple, and a chokladboll and a coffee. */
+export const HALLOWEEN_FIKA: FikaItem[] = [
+	'candyfloss',
+	'toffeeApple',
+	'coffee',
+	'spiderCupcake',
+	'chokladboll',
+]
+
+/** Furby Fields': a tiny furby of your own, and sweets, candyfloss among them. */
+export const FURBY_FIKA: FikaItem[] = [
+	'tinyFurby',
+	'lollipop',
+	'candyfloss',
+	'rainbowCake',
+]
+
+/**
+ * The Sewers': no fika down there, but what's been lost down the drains,
+ * found, and just as good for a bit of speed.
+ */
+export const SEWER_FINDS: FikaItem[] = [
+	'rubberDuck',
+	'goldRing',
+	'oldCoin',
+	'lostPhone',
+]
+
+/** On the ferry: the buffet's, the tax-free shop's, and a coffee and a bun. */
+export const FERRY_FIKA: FikaItem[] = [
+	'kladdkaka',
+	'pickAndMix',
+	'coffee',
+	'lingondricka',
+	'salmiakki',
+	'kanelbulle',
+]
+
+/** In Turku: a Karelian pie, a coffee, salmiakki. */
+export const TURKU_FIKA: FikaItem[] = ['karelianPie', 'coffee', 'salmiakki']
+
 /** A cell's size, in screen pixels. */
 const CELL = 2
 
-const INK = '#0f1f29'
-
-/** [x, y, width, height, colour], in cells. */
-type Cells = [number, number, number, number, string][]
-
-const CUP = '#f6f1e7'
-const CUP_SHADE = '#d9d0c0'
-const COFFEE = '#6b4226'
-const STEAM = 'rgba(255, 255, 255, 0.85)'
-
-const coffee: Cells = [
-	// Two wisps of steam, wavering the same way
-	[3, 0, 1, 1, STEAM],
-	[4, 1, 1, 1, STEAM],
-	[3, 2, 1, 1, STEAM],
-	[6, 0, 1, 1, STEAM],
-	[7, 1, 1, 1, STEAM],
-	[6, 2, 1, 1, STEAM],
-	// Cup, with the coffee showing at the top
-	[1, 3, 9, 6, INK],
-	[2, 4, 7, 4, CUP],
-	[2, 4, 7, 1, COFFEE],
-	[8, 5, 1, 3, CUP_SHADE],
-	// Handle
-	[10, 4, 1, 1, INK],
-	[11, 5, 1, 2, INK],
-	[10, 7, 1, 1, INK],
-	// Saucer
-	[0, 9, 12, 2, INK],
-	[1, 9, 10, 1, CUP_SHADE],
-]
-
-const BUN = '#c98a3d'
-const BUN_DARK = '#8a5524'
-const BUN_LIGHT = '#e0a95a'
-const SUGAR = '#ffffff'
-
-const kanelbulle: Cells = [
-	// Outline, then the bun inside it
-	[3, 0, 6, 1, INK],
-	[2, 1, 8, 1, INK],
-	[1, 2, 10, 1, INK],
-	[0, 3, 12, 4, INK],
-	[1, 7, 10, 1, INK],
-	[2, 8, 8, 1, INK],
-	[3, 1, 6, 1, BUN],
-	[2, 2, 8, 1, BUN],
-	[1, 3, 10, 4, BUN],
-	[2, 7, 8, 1, BUN],
-	[3, 2, 4, 1, BUN_LIGHT],
-	// The cinnamon swirl
-	[3, 3, 5, 1, BUN_DARK],
-	[8, 4, 1, 2, BUN_DARK],
-	[4, 6, 4, 1, BUN_DARK],
-	[3, 4, 1, 2, BUN_DARK],
-	[5, 5, 2, 1, BUN_DARK],
-	// Pearl sugar
-	[4, 2, 1, 1, SUGAR],
-	[7, 2, 1, 1, SUGAR],
-	[2, 4, 1, 1, SUGAR],
-	[6, 4, 1, 1, SUGAR],
-	[9, 6, 1, 1, SUGAR],
-	[5, 7, 1, 1, SUGAR],
-]
-
-const CHOC = '#5b3420'
-const CHOC_LIGHT = '#7a4a2e'
-const COCONUT = '#fffaf0'
-
-const chokladboll: Cells = [
-	[2, 0, 5, 1, INK],
-	[1, 1, 7, 1, INK],
-	[0, 2, 9, 5, INK],
-	[1, 7, 7, 1, INK],
-	[2, 8, 5, 1, INK],
-	[2, 1, 5, 1, CHOC],
-	[1, 2, 7, 5, CHOC],
-	[2, 7, 5, 1, CHOC],
-	[2, 2, 2, 1, CHOC_LIGHT],
-	[2, 3, 1, 1, CHOC_LIGHT],
-	// Coconut
-	[4, 1, 1, 1, COCONUT],
-	[6, 2, 1, 1, COCONUT],
-	[2, 5, 1, 1, COCONUT],
-	[5, 4, 1, 1, COCONUT],
-	[7, 5, 1, 1, COCONUT],
-	[4, 6, 1, 1, COCONUT],
-	[3, 3, 1, 1, COCONUT],
-]
-
-const MARZIPAN = '#9fd18b'
-const MARZIPAN_DARK = '#7fb56b'
-const SPONGE = '#f2d27a'
-const CREAM = '#fff8e6'
-const JAM = '#d23c5a'
-const ROSE = '#f08cb4'
-const ROSE_DARK = '#d0628f'
-const LEAF = '#5f9a4a'
-
-const prinsesstarta: Cells = [
-	// The rose on top
-	[6, 0, 1, 1, ROSE],
-	[5, 1, 3, 2, ROSE],
-	[5, 1, 1, 1, ROSE_DARK],
-	[7, 2, 1, 1, ROSE_DARK],
-	[8, 2, 1, 1, LEAF],
-	// The slice: green marzipan over sponge, cream and jam
-	[0, 3, 12, 8, INK],
-	[1, 4, 10, 1, MARZIPAN],
-	[10, 4, 1, 6, MARZIPAN_DARK],
-	[1, 5, 9, 1, SPONGE],
-	[1, 6, 9, 1, CREAM],
-	[1, 7, 9, 1, JAM],
-	[1, 8, 9, 1, CREAM],
-	[1, 9, 9, 1, SPONGE],
-]
-
-function art(cells: Cells) {
-	const width = Math.max(...cells.map(([x, , w]) => x + w)) * CELL
-	const height = Math.max(...cells.map(([, y, , h]) => y + h)) * CELL
-	return {
-		width,
-		height,
-		rects: cells.map(
-			([x, y, w, h, colour]) =>
-				[x * CELL, y * CELL, w * CELL, h * CELL, colour] as Cells[number],
-		),
-	}
+/** Each item's size on the screen: its art, in cells twice the size of a screen pixel. */
+export const FIKA_SIZE: Record<FikaItem, { width: number; height: number }> = {
+	coffee: { width: 12 * CELL, height: 11 * CELL },
+	kanelbulle: { width: 12 * CELL, height: 9 * CELL },
+	chokladboll: { width: 9 * CELL, height: 9 * CELL },
+	prinsesstarta: { width: 12 * CELL, height: 11 * CELL },
+	kardemummabulle: { width: 12 * CELL, height: 9 * CELL },
+	semla: { width: 12 * CELL, height: 11 * CELL },
+	dammsugare: { width: 14 * CELL, height: 7 * CELL },
+	incaCola: { width: 8 * CELL, height: 13 * CELL },
+	falafel: { width: 12 * CELL, height: 10 * CELL },
+	knafeh: { width: 12 * CELL, height: 9 * CELL },
+	koshary: { width: 10 * CELL, height: 11 * CELL },
+	dumplings: { width: 13 * CELL, height: 9 * CELL },
+	bubbleTea: { width: 9 * CELL, height: 12 * CELL },
+	mooncake: { width: 11 * CELL, height: 9 * CELL },
+	candyfloss: { width: 10 * CELL, height: 14 * CELL },
+	toffeeApple: { width: 10 * CELL, height: 10 * CELL },
+	spiderCupcake: { width: 12 * CELL, height: 10 * CELL },
+	tinyFurby: { width: 9 * CELL, height: 10 * CELL },
+	lollipop: { width: 8 * CELL, height: 14 * CELL },
+	rainbowCake: { width: 11 * CELL, height: 10 * CELL },
+	rubberDuck: { width: 11 * CELL, height: 10 * CELL },
+	goldRing: { width: 9 * CELL, height: 9 * CELL },
+	oldCoin: { width: 9 * CELL, height: 9 * CELL },
+	lostPhone: { width: 7 * CELL, height: 12 * CELL },
+	kladdkaka: { width: 12 * CELL, height: 8 * CELL },
+	lingondricka: { width: 8 * CELL, height: 12 * CELL },
+	pickAndMix: { width: 9 * CELL, height: 12 * CELL },
+	salmiakki: { width: 10 * CELL, height: 9 * CELL },
+	karelianPie: { width: 12 * CELL, height: 7 * CELL },
+	captainsHat: { width: 12 * CELL, height: 8 * CELL },
 }
 
-/** Each item's art, in screen pixels, and its size. */
-export const FIKA_ART: Record<
-	FikaItem,
-	{ width: number; height: number; rects: Cells }
-> = {
-	coffee: art(coffee),
-	kanelbulle: art(kanelbulle),
-	chokladboll: art(chokladboll),
-	prinsesstarta: art(prinsesstarta),
+/** What's said, having it: "Fika!", or the drink's name. */
+export const FIKA_WORD: Partial<Record<FikaItem, string>> = {
+	incaCola: 'Inca Cola!',
+	falafel: 'Falafel!',
+	knafeh: 'Knafeh!',
+	koshary: 'Koshary!',
+	dumplings: 'Dumplings!',
+	bubbleTea: 'Bubble tea!',
+	mooncake: 'Mooncake!',
+	candyfloss: 'Candyfloss!',
+	toffeeApple: 'Toffee apple!',
+	spiderCupcake: 'Spider cupcake!',
+	tinyFurby: 'A tiny furby!',
+	lollipop: 'Lollipop!',
+	rainbowCake: 'Rainbow cake!',
+	rubberDuck: 'Rubber duck!',
+	goldRing: 'A gold ring!',
+	oldCoin: 'An old coin!',
+	lostPhone: 'A lost phone!',
+	kladdkaka: 'Kladdkaka!',
+	lingondricka: 'Lingondricka!',
+	pickAndMix: 'Lösgodis!',
+	salmiakki: 'Salmiakki!',
+	karelianPie: 'Karjalanpiirakka!',
+	captainsHat: 'Aye aye, Captain!',
 }

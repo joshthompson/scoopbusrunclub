@@ -1,10 +1,10 @@
 import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
-import { PauseMenu } from '../game/PauseMenu'
-import { RaceCanvas, createRaceScene } from '../game/RaceView'
+import type { Course } from '../courses/types'
+import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { PX_PER_M } from '../game/constants'
 import { POPUP_TICKS, onScreen, roundOver } from '../game/step'
 import { type Racer, type RacerEntry, createWorld } from '../game/world'
-import type { Level } from '../levels/types'
+import { PauseMenu, SOUND_ITEMS } from '../screens/PauseMenu'
 import { Stage } from '../ui/Stage'
 
 /**
@@ -12,20 +12,25 @@ import { Stage } from '../ui/Stage'
  * until only one's left. `onOver` is told the order they came in.
  */
 export function Round(props: {
-	level: Level
+	course: Course
 	number: number
+	/** How many Rounds there are, if it isn't a Backyard Ultra. */
+	of?: number
 	racers: RacerEntry[]
 	onPause: (paused: boolean) => void
 	onOver: (order: Racer[]) => void
 	/** The world, for the Room to tell phones how their Player's doing. */
 	onWorld: (world: ReturnType<typeof createWorld>) => void
+	/** Every tick, once it's moved on: for sending it to remote phones. */
+	onTick?: () => void
 	onLobby: () => void
 	onEnd: () => void
 }) {
-	const world = createWorld(props.level, props.racers, { round: true })
+	const world = createWorld(props.course, props.racers, { round: true })
 	props.onWorld(world)
 	const scene = createRaceScene(world)
 
+	if (props.onTick) scene.tickers.add(props.onTick)
 	let told = false
 	scene.tickers.add(() => {
 		if (told || !roundOver(world)) return
@@ -40,7 +45,7 @@ export function Round(props: {
 		setPaused(next)
 		props.onPause(next)
 		scene.modal.set(next ? document.createElement('span') : undefined)
-		// Jumping to pick "Carry on" shouldn't jump on the way back in.
+		// Jumping to pick "Resume" shouldn't jump on the way back in.
 		if (!next) for (const r of world.racers) r.body.wasUp = true
 	}
 	const onKey = (event: KeyboardEvent) => {
@@ -64,14 +69,18 @@ export function Round(props: {
 						<RoundHud
 							world={world}
 							number={props.number}
+							of={props.of}
 							onPause={() => pause(true)}
 						/>
 						<Show when={paused()}>
 							<PauseMenu
-								items={[
-									{ label: 'Carry on', choose: () => pause(false) },
-									{ label: 'Back to the lobby', choose: props.onLobby },
-									{ label: 'End the Room', choose: props.onEnd },
+								groups={[
+									[{ label: 'Resume', choose: () => pause(false) }],
+									SOUND_ITEMS,
+									[
+										{ label: 'Back to the lobby', choose: props.onLobby },
+										{ label: 'End the Room', choose: props.onEnd },
+									],
 								]}
 							/>
 						</Show>
@@ -82,13 +91,19 @@ export function Round(props: {
 	)
 }
 
-/** Everyone's name over their head, in their colour, and what's popping up. */
-function RoundHud(props: {
+/**
+ * Everyone's name over their head, in their colour, and what's popping up.
+ * On a phone, with no pause button, and its words `textScale` times bigger.
+ */
+export function RoundHud(props: {
 	world: ReturnType<typeof createWorld>
 	number: number
-	onPause: () => void
+	of?: number
+	onPause?: () => void
+	textScale?: number
 }) {
 	const { world } = props
+	const size = (px: number) => `${px * (props.textScale ?? 1)}px`
 	const tag = (racer: Racer) => {
 		// Read the tick, so this keeps up: bodies aren't signals.
 		world.ticks()
@@ -118,29 +133,33 @@ function RoundHud(props: {
 	return (
 		<div style={styles.hud}>
 			<div style={styles.topLeft}>
-				<div style={{ 'font-size': '18px', opacity: 0.8 }}>
-					Round {props.number} · {world.level.name}
+				<div style={{ 'font-size': size(18), opacity: 0.8 }}>
+					Round {props.number}
+					{props.of ? ` of ${props.of}` : ''} · {world.course.name}
 				</div>
-				<div style={{ 'font-size': '28px' }}>
+				<div style={{ 'font-size': size(28) }}>
 					{left()} of {world.racers.length} running
 				</div>
 			</div>
-			<div style={styles.topRight}>
-				<button
-					type="button"
-					aria-label="Pause"
-					style={styles.pauseButton}
-					onClick={props.onPause}
-				>
-					II
-				</button>
-			</div>
+			<Show when={props.onPause}>
+				<div style={styles.topRight}>
+					<button
+						type="button"
+						aria-label="Pause"
+						style={styles.pauseButton}
+						onClick={() => props.onPause?.()}
+					>
+						II
+					</button>
+				</div>
+			</Show>
 
 			<Show when={busBehind()}>
 				{(metres) => (
 					<div
 						style={{
 							...styles.busWarning,
+							'font-size': size(20),
 							background: metres() < 125 ? 'var(--bus-red)' : 'var(--ink)',
 						}}
 					>
@@ -155,6 +174,7 @@ function RoundHud(props: {
 						<div
 							style={{
 								...styles.tag,
+								'font-size': size(13),
 								left: `${tag(racer).x}px`,
 								top: `${tag(racer).y}px`,
 								background: racer.colour,
@@ -173,6 +193,7 @@ function RoundHud(props: {
 						<div
 							style={{
 								...styles.popup,
+								'font-size': size(22),
 								left: `${at().x}px`,
 								top: `${at().y - 24 - (world.ticks() - popup.born) * 0.8}px`,
 								opacity: 1 - (world.ticks() - popup.born) / POPUP_TICKS,
@@ -196,10 +217,13 @@ const styles = {
 		'font-family': 'var(--font-pixel)',
 		'line-height': 1,
 	},
+	/** The words over the sky: in the course's own ink over a dark one, and only them. */
 	topLeft: {
 		position: 'absolute',
 		top: '16px',
 		left: '20px',
+		color: 'var(--hud-ink, var(--ink))',
+		'text-shadow': 'var(--hud-shadow, none)',
 	},
 	topRight: {
 		position: 'absolute',

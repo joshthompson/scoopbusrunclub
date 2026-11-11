@@ -45,6 +45,16 @@ export function Menu(props: {
 	initial?: number
 	/** Told whenever the selection moves, for coming back to the same place. */
 	onChange?: (index: number) => void
+	/**
+	 * Whether the keys are the menu's: not while they're moving about
+	 * something else on the screen, a grid over it. On, if not said.
+	 */
+	active?: boolean
+	/**
+	 * Up off its top, or down off its bottom: to whatever's above or below
+	 * it on the screen, rather than round to its other end.
+	 */
+	onLeave?: (way: -1 | 1) => void
 }) {
 	const [selected, setSelected] = createSignal(props.initial ?? 0)
 	createEffect(() => props.onChange?.(selected()))
@@ -53,8 +63,10 @@ export function Menu(props: {
 		setSelected((i) => Math.min(i, Math.max(0, props.items.length - 1))),
 	)
 
-	const move = (by: number) => {
+	const move = (by: -1 | 1) => {
 		const count = props.items.length
+		const off = by < 0 ? selected() === 0 : selected() === count - 1
+		if (props.onLeave && off) return props.onLeave(by)
 		setSelected((i) => (i + by + count) % count)
 		play('move')
 	}
@@ -65,6 +77,10 @@ export function Menu(props: {
 	}
 
 	const onKey = (event: KeyboardEvent) => {
+		if (props.active === false) return
+		// Typing in a box: W, S and space are letters, not moves.
+		const typing = event.target instanceof HTMLInputElement
+		if (typing && event.key.length === 1) return
 		if (['ArrowUp', 'w', 'W'].includes(event.key)) {
 			event.preventDefault()
 			move(-1)
@@ -89,7 +105,7 @@ export function Menu(props: {
 		<div style={styles.menu}>
 			<For each={props.items}>
 				{(item, i) => {
-					const isSelected = () => selected() === i()
+					const isSelected = () => props.active !== false && selected() === i()
 					return (
 						<button
 							type="button"
@@ -207,7 +223,7 @@ const styles = {
 	menu: {
 		display: 'flex',
 		'flex-direction': 'column',
-		gap: '6px',
+		gap: '3px',
 	},
 	item: {
 		position: 'relative',
@@ -215,7 +231,7 @@ const styles = {
 		'align-items': 'center',
 		gap: '10px',
 		width: '100%',
-		padding: '8px 16px 4px 8px',
+		padding: '6px 16px 2px 8px',
 		background: 'transparent',
 		color: 'white',
 		border: '3px solid transparent',

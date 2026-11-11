@@ -2,13 +2,14 @@ import {
 	type SpritePixelData,
 	runPixels,
 	sitPixels,
+	standPixels,
 	zombiePixels,
 } from '@/assets/runners/custom/pixel-data.generated'
 import { generateFrames } from '@/utils'
 import type { RunnerData } from '../data/runners'
 
 type HexColor = string
-type SkinColor = 'light' | 'medium' | 'dark'
+type SkinColor = 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark'
 
 export interface CharacterSpriteProps {
 	topType: 'vest' | 'tshirt' | 'longsleeve'
@@ -41,6 +42,9 @@ export function createRunnerFrames(
 > {
 	const run = generateCustomSpriteFrames(character, runPixels, FRAME_COUNT)
 	const sit = generateCustomSpriteFrames(character, sitPixels, 1)
+	// Its first frame: stood, arms down (the other's a phone up). The strip
+	// comes back last frame first, so that's the last of them.
+	const stand = generateCustomSpriteFrames(character, standPixels, 2)
 	const zombie = generateCustomSpriteFrames(
 		character,
 		zombiePixels,
@@ -52,6 +56,7 @@ export function createRunnerFrames(
 			run: run?.frames,
 			zombie: zombie?.frames,
 			sit: sit?.frames,
+			stand: stand?.frames.slice(-1),
 			face,
 			tailWalk: undefined,
 			tailSit: undefined,
@@ -390,7 +395,12 @@ function generateFaceFrame(character: CharacterSpriteProps): string[] {
  */
 const HEAD_FACE_CENTRE: Vector = { x: 4, y: 3 }
 
-function generateCustomSpriteFrames(
+/**
+ * A sprite from one of the custom runner templates (`spritePixels`, of
+ * `frameCount` frames side by side), in `character`'s colours, with their
+ * head on: what the run game's tourists are made from, too.
+ */
+export function generateCustomSpriteFrames(
 	character: CharacterSpriteProps,
 	spritePixels: SpritePixelData | null,
 	frameCount: number,
@@ -546,8 +556,14 @@ function skinColor(skin: SkinColor): HexColor {
 	switch (skin) {
 		case 'light':
 			return '#F2C09A'
+		// Halfway between light and medium.
+		case 'medium-light':
+			return '#C49971'
 		case 'medium':
 			return '#957147'
+		// Halfway between medium and dark.
+		case 'medium-dark':
+			return '#825B37'
 		case 'dark':
 			return '#6E4426'
 	}

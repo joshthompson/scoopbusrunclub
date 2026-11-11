@@ -1,26 +1,42 @@
-import busEmoji from '@/assets/emoji/bus.png'
+import tombstoneAsset from '@/assets/halloween/tombstone.png'
 import rockAsset from '@/assets/misc/rock1.png'
 import { For, type JSX, Show, createSignal, onCleanup, onMount } from 'solid-js'
-import { Backdrop, Ground, HorizonTrees, type View } from '../game/Backdrop'
-import { PATH_BACK, START_X, VIEW_HEIGHT } from '../game/constants'
-import { CORGI_WIDTH, CorgiArt } from '../game/corgiArt'
-import { KidsArt, kidsWidth } from '../game/kidsArt'
+import type { Course, Obstacle } from '../courses/types'
+import { Backdrop, Ground, HorizonTrees, type View } from '../draw/Backdrop'
+import { GeeseArt, geeseWidth } from '../draw/art/geese'
+import { KidsArt, kidsWidth } from '../draw/art/kids'
+import {
+	BalloonArt,
+	GullArt,
+	RingArt,
+	StormArt,
+	TurbineArt,
+	WhaleArt,
+} from '../draw/art/sky'
 import {
 	HURDLE_LANES,
 	HurdleArt,
 	POTHOLE_ABOVE,
 	POTHOLE_HEIGHT,
 	PotholeArt,
-} from '../game/trackArt'
-import type { Level } from '../levels/types'
-import type { Playable } from '../playable'
-import { RunStrip } from './RunStrip'
+} from '../draw/art/track'
+import { PlatformArt, platformLook } from '../draw/platformArt'
+import { rideLook } from '../draw/rideLook'
+import { PATH_BACK, START_X, VIEW_HEIGHT } from '../game/constants'
+import { platformAt } from '../game/platforms'
+import {
+	TURBINE_BLADE,
+	balloonAt,
+	gullsAt,
+	stormAt,
+	turbineAt,
+} from '../game/sky'
+import { zombieSprite } from '../runners/skeleton'
 
 /**
  * A course, seen through a little window onto it: its own sky, hills, path
- * and scenery, drawn by the game's own backdrop, scrolling by with the runner
- * running along it, up and down its real hills. And with the bus behind them,
- * for Endless.
+ * and scenery, drawn by the game's own backdrop, panning along it, up and
+ * down its real hills.
  */
 
 /** The game's scene, at this size in the window: small enough to see its hills. */
@@ -29,143 +45,61 @@ const SCALE = 0.5
 const SPEED = 130
 /** Where it starts, as a share of the way round: somewhere with hills, past the flat start. */
 const START_AT = 0.35
-/** Where the runner is across the window, and as far down it as their feet go. */
-const RUNNER_ACROSS = 0.55
-const RUNNER_DOWN = 0.92
+/** Where across the window it follows the ground up and down, and how far down the window that is. */
+const FOLLOW_ACROSS = 0.55
+const GROUND_DOWN = 0.92
 /**
  * The window's top, where it can be: a strip of sky above the far hills, so
  * they and the scenery on them are in it. It only goes lower to keep the
- * runner in.
+ * ground in.
  */
 const HORIZON_TOP = 120
-/** How far behind them the bus is, in the scene's pixels. */
-const BUS_BEHIND = 230
-/** How quickly the window follows them up and down the hills. */
+/** How quickly the window follows the ground up and down the hills. */
 const FOLLOW = 0.08
 /** Scenery stands this far back from the path, as in the game. */
 const SET_BACK = 10
-/** How often the runner doesn't jump something, and runs into it instead. */
-const HIT_CHANCE = 0.2
-/** How high they jump, in the scene's pixels, and how far before something they take off. */
-const JUMP_HEIGHT = 70
-const TAKE_OFF = 26
-/** How much they clear something by, past its far side. */
-const CLEARANCE = 30
-/** Running into something: this long, at this share of their speed, flashing. */
-const STUMBLE_SECONDS = 0.7
-const STUMBLE_SPEED = 0.3
-
-/** Something on the course to jump, or run into: its near and far sides. */
-interface Hazard {
-	id: number
-	from: number
-	to: number
-	/** A hurdle's knocked over when it's run into. */
-	hurdle?: number
-}
-
-/** Everything the preview draws that the runner has to get past, in order. */
-function hazardsOf(level: Level): Hazard[] {
-	const hazards: Omit<Hazard, 'id'>[] = []
-	const across = (x: number, half: number) => ({ from: x - half, to: x + half })
-	for (const o of level.obstacles) {
-		if (o.kind === 'rock') hazards.push(across(o.x, 20))
-		if (o.kind === 'hurdle') hazards.push({ ...across(o.x, 14), hurdle: o.x })
-		if (o.kind === 'pothole') hazards.push(across(o.x, o.width / 2 - 4))
-		if (o.kind === 'kids') hazards.push(across(o.x, kidsWidth(o.count) / 2 - 6))
-	}
-	for (const x of level.corgis ?? []) hazards.push(across(x, CORGI_WIDTH / 2))
-	for (const furby of level.furbies ?? []) hazards.push(across(furby.x, 25))
-	return hazards
-		.sort((a, b) => a.from - b.from)
-		.map((hazard, id) => ({ ...hazard, id }))
-}
 
 export function CoursePreview(props: {
-	level: Level
-	runner: Playable
-	/** The bus, chasing them: for Endless. */
-	bus?: boolean
+	course: Course
 	width: number
 	height: number
 }) {
-	const { level, runner } = props
-	const { terrain } = level
+	const { course } = props
+	const { terrain } = course
 	const sceneWidth = props.width / SCALE
-	const sceneHeight = props.height / SCALE
-	const runnerAcross = sceneWidth * RUNNER_ACROSS
+	/** As tall as it's given room for, which can change: see `CourseSelect`. */
+	const sceneHeight = () => props.height / SCALE
+	const followAcross = sceneWidth * FOLLOW_ACROSS
 
-	const from = START_X + terrain.length * START_AT
+	const from = course.look?.previewFrom ?? START_X + terrain.length * START_AT
 	const to = terrain.finishX - sceneWidth
 	const [camera, setCamera] = createSignal(from)
-	/** The window's top, in the scene: down with the runner, low on the course. */
+	/** The window's top, in the scene: down with the ground, low on the course. */
 	const topFor = (cameraX: number) =>
 		Math.min(
-			VIEW_HEIGHT - sceneHeight,
+			VIEW_HEIGHT - sceneHeight(),
 			Math.max(
 				HORIZON_TOP,
-				terrain.groundY(cameraX + runnerAcross) - sceneHeight * RUNNER_DOWN,
+				terrain.groundY(cameraX + followAcross) - sceneHeight() * GROUND_DOWN,
 			),
 		)
 	const [top, setTop] = createSignal(topFor(from))
 
-	// The runner getting past what's in the way: jumping it, mostly.
-	const hazards = hazardsOf(level)
-	/** For each hazard, once it's close: jump it, or run into it. */
-	const choices = new Map<number, 'jump' | 'hit' | 'done'>()
-	let jump: { at: number; seconds: number } | undefined
-	let stumbling = 0
-	const [lift, setLift] = createSignal(0)
-	const [flash, setFlash] = createSignal(false)
-	/** The hurdles run into, by where they are: knocked over. */
-	const [knocked, setKnocked] = createSignal(new Set<number>())
-
 	let frame = 0
 	let last = 0
 	let clock = 0
+	/** The game's ticks, for what's animated by them: the geese, pecking. */
+	const [ticks, setTicks] = createSignal(0)
 	const tick = (now: number) => {
 		const seconds = last ? Math.min(0.1, (now - last) / 1000) : 0
 		last = now
 		clock += seconds
-		// On round the course, and back to where it started at the finish,
-		// with everything stood back up.
-		const speed = stumbling > 0 ? SPEED * STUMBLE_SPEED : SPEED
-		let next = camera() + speed * seconds
-		if (next > to) {
-			next = START_X - sceneWidth * RUNNER_ACROSS
-			choices.clear()
-			setKnocked(new Set<number>())
-		}
+		setTicks(Math.floor(clock * 60))
+		// On round the course, and back to the start from the finish.
+		let next = camera() + SPEED * seconds
+		if (next > to) next = START_X - followAcross
 		setCamera(next)
 		setTop(top() + (topFor(next) - top()) * FOLLOW)
-
-		const x = next + runnerAcross
-		if (stumbling > 0) stumbling -= seconds
-		const ahead = hazards.find((hazard) => hazard.to > x)
-		if (ahead && !jump && stumbling <= 0) {
-			let choice = choices.get(ahead.id)
-			if (!choice) {
-				choice = Math.random() < HIT_CHANCE ? 'hit' : 'jump'
-				choices.set(ahead.id, choice)
-			}
-			if (choice === 'jump' && ahead.from - x < TAKE_OFF) {
-				// Long enough to be over its far side, and a bit.
-				jump = { at: clock, seconds: (ahead.to - x + CLEARANCE) / SPEED }
-				choices.set(ahead.id, 'done')
-			}
-			if (choice === 'hit' && x >= ahead.from) {
-				stumbling = STUMBLE_SECONDS
-				choices.set(ahead.id, 'done')
-				const { hurdle } = ahead
-				if (hurdle !== undefined) setKnocked((all) => new Set(all).add(hurdle))
-			}
-		}
-		if (jump) {
-			const t = (clock - jump.at) / jump.seconds
-			if (t >= 1) jump = undefined
-			setLift(t >= 1 ? 0 : 4 * JUMP_HEIGHT * t * (1 - t))
-		}
-		setFlash(stumbling > 0 && Math.floor(stumbling * 12) % 2 === 0)
 		frame = requestAnimationFrame(tick)
 	}
 	onMount(() => {
@@ -173,25 +107,47 @@ export function CoursePreview(props: {
 	})
 	onCleanup(() => cancelAnimationFrame(frame))
 
-	const view: View = { level, terrain, camera }
+	const view: View = { course, terrain, camera }
 	/** Stood on the ground at `x`, `sink` px into it, in the scene. */
 	const at = (x: number, sink = 0): JSX.CSSProperties => ({
 		position: 'absolute',
 		left: `${x}px`,
 		bottom: `${VIEW_HEIGHT - terrain.groundY(x) - sink}px`,
 	})
-	const runnerX = () => camera() + runnerAcross
-	const rocks = level.obstacles.filter((o) => o.kind === 'rock')
-	const hurdles = level.obstacles.filter((o) => o.kind === 'hurdle')
-	const potholes = level.obstacles.flatMap((o) =>
+	const rocks = course.obstacles.filter((o) => o.kind === 'rock')
+	const hurdles = course.obstacles.filter((o) => o.kind === 'hurdle')
+	const potholes = course.obstacles.flatMap((o) =>
 		o.kind === 'pothole' ? [o] : [],
 	)
-	const kids = level.obstacles.flatMap((o) => (o.kind === 'kids' ? [o] : []))
+	const kids = course.obstacles.flatMap((o) => (o.kind === 'kids' ? [o] : []))
+	const geese = course.obstacles.flatMap((o) => (o.kind === 'geese' ? [o] : []))
+	const tombstones = course.obstacles.filter((o) => o.kind === 'tombstone')
+	// Stood where they start: they only walk in a race.
+	const zombies = course.obstacles.flatMap((o) =>
+		o.kind === 'zombie' ? [o] : [],
+	)
+	const rings = course.boosts.flatMap((b) => (b.kind === 'ring' ? [b] : []))
+	const sky = course.obstacles.flatMap((o) =>
+		o.kind === 'gulls' ||
+		o.kind === 'balloon' ||
+		o.kind === 'storm' ||
+		o.kind === 'turbine' ||
+		o.kind === 'whale'
+			? [o]
+			: [],
+	)
+	/** Its middle `height` over the Ground's line at `x`, in the scene. */
+	const above = (x: number, height: number): JSX.CSSProperties => ({
+		position: 'absolute',
+		left: `${x}px`,
+		top: `${terrain.groundY(x) - height}px`,
+		transform: 'translate(-50%, -50%)',
+	})
 
 	return (
 		<div
 			style={{
-				...level.look?.palette,
+				...course.look?.palette,
 				...styles.window,
 				width: `${props.width}px`,
 				height: `${props.height}px`,
@@ -215,7 +171,7 @@ export function CoursePreview(props: {
 						transform: `translateX(${Math.round(-camera())}px)`,
 					}}
 				>
-					<For each={level.scenery}>
+					<For each={course.scenery}>
 						{(item, i) => (
 							<div
 								style={{
@@ -252,13 +208,25 @@ export function CoursePreview(props: {
 						)}
 					</For>
 					<For each={rocks}>
-						{(rock) => (
-							<img
-								src={rockAsset}
-								alt=""
-								style={{ ...at(rock.x, 3), transform: 'translateX(-50%)' }}
-							/>
-						)}
+						{(rock, i) => {
+							// Or the course's own, in its place, taken in turn.
+							const own = course.look?.rocks
+							const art = own?.length ? own[i() % own.length] : undefined
+							return (
+								<img
+									src={art?.asset ?? rockAsset}
+									alt=""
+									class={art ? 'pixelated' : undefined}
+									width={art?.width}
+									height={art?.height}
+									style={{
+										...at(rock.x, 3),
+										transform: 'translateX(-50%)',
+										filter: course.look?.rock,
+									}}
+								/>
+							)
+						}}
 					</For>
 					<For each={hurdles}>
 						{(hurdle) => (
@@ -268,12 +236,10 @@ export function CoursePreview(props: {
 										style={{
 											...at(hurdle.x + lane.along, lane.sink),
 											transform: 'translateX(-50%)',
-											// The runner's lane's, knocked over if run into.
-											'--knocked':
-												lane.running && knocked().has(hurdle.x) ? 1 : 0,
+											'--knocked': 0,
 										}}
 									>
-										<HurdleArt depth={lane.depth} />
+										<HurdleArt depth={lane.depth} tall={hurdle.tall} />
 									</div>
 								)}
 							</For>
@@ -298,16 +264,101 @@ export function CoursePreview(props: {
 							</div>
 						)}
 					</For>
-					<For each={level.corgis ?? []}>
-						{(x) => (
-							<div
-								style={{ ...at(x), transform: 'translateX(-50%) scaleX(-1)' }}
-							>
-								<CorgiArt pose="sit" />
+					<For each={geese}>
+						{(group) => (
+							<div style={{ ...at(group.x), transform: 'translateX(-50%)' }}>
+								<GeeseArt
+									x={group.x}
+									count={group.count}
+									now={ticks()}
+									flown={undefined}
+								/>
 							</div>
 						)}
 					</For>
-					<For each={level.furbies ?? []}>
+					<For each={tombstones}>
+						{(o) => (
+							<img
+								src={tombstoneAsset}
+								alt=""
+								style={{ ...at(o.x, 4), transform: 'translateX(-50%)' }}
+							/>
+						)}
+					</For>
+					<For each={zombies}>
+						{(o) => {
+							const { sprite, filter } = zombieSprite(o)
+							return (
+								<div
+									class="pixelated"
+									style={{
+										...at(o.x),
+										transform: 'translateX(-50%)',
+										width: `${sprite.width * 2}px`,
+										height: `${sprite.height * 2}px`,
+										'background-image': `url(${(sprite.run[0] ?? '').split('#')[0]})`,
+										'background-size': 'auto 100%',
+										filter,
+									}}
+								/>
+							)
+						}}
+					</For>
+					<For each={course.corgis ?? []}>
+						{(x) => (
+							<div
+								style={{
+									...at(x),
+									// Facing the way they're coming from; a glider, the way it'll fly.
+									transform:
+										course.ride === 'glider'
+											? 'translateX(-50%)'
+											: 'translateX(-50%) scaleX(-1)',
+								}}
+							>
+								{rideLook(course).Art({ pose: 'sit' })}
+							</div>
+						)}
+					</For>
+					<For each={course.platforms ?? []}>
+						{(platform) => {
+							const at = platformAt(terrain, platform, 0)
+							const look = platformLook(course)
+							return (
+								<div
+									style={{
+										position: 'absolute',
+										left: `${at.left}px`,
+										top: `${at.top}px`,
+										width: `${platform.width}px`,
+										height: `${platform.depth ?? look.depth}px`,
+									}}
+								>
+									<Show
+										when={platform.art}
+										fallback={<PlatformArt look={look} />}
+									>
+										{(art) => (
+											<img
+												src={art().asset}
+												alt=""
+												class="pixelated"
+												width={art().width}
+												height={art().height}
+												style={{
+													position: 'absolute',
+													left: `${(platform.width - art().width) / 2}px`,
+													top: `${-art().top}px`,
+													'max-width': 'none',
+												}}
+											/>
+										)}
+									</Show>
+								</div>
+							)
+						}}
+					</For>
+					<For each={course.furbies ?? []}>
 						{(furby, i) => (
 							<div style={{ ...at(furby.x), transform: 'translateX(-50%)' }}>
 								<div
@@ -325,40 +376,90 @@ export function CoursePreview(props: {
 							</div>
 						)}
 					</For>
-				</div>
-
-				<Show when={props.bus}>
-					<img
-						src={busEmoji}
-						alt=""
-						class="pixelated"
-						style={{
-							...at(runnerX() - BUS_BEHIND, 6),
-							left: `${runnerAcross - BUS_BEHIND}px`,
-							width: '120px',
-							transform: 'translateX(-50%) scaleX(-1)',
-						}}
-					/>
-				</Show>
-				<div
-					style={{
-						...at(runnerX(), -lift()),
-						left: `${runnerAcross}px`,
-						transform: 'translateX(-50%)',
-						opacity: flash() ? 0.4 : 1,
-					}}
-				>
-					<RunStrip
-						frame={runner.sprite.run[0] ?? ''}
-						width={runner.sprite.width}
-						height={runner.sprite.height}
-						stride={0.38}
-					/>
+					{/* Out over the sea: its Rings, and what's in the sky, still. */}
+					<For each={rings}>
+						{(ring) => (
+							<div style={above(ring.x, ring.height)}>
+								<div style={{ position: 'relative' }}>
+									<RingArt half="far" lit={false} />
+									<div style={{ position: 'absolute', inset: 0 }}>
+										<RingArt half="near" lit={false} />
+									</div>
+								</div>
+							</div>
+						)}
+					</For>
+					<For each={sky}>{(o) => <SkyThing course={course} o={o} />}</For>
 				</div>
 			</div>
 		</div>
 	)
 }
+
+/** One of the sky's Obstacles, still, where it is at the start of a race. */
+function SkyThing(props: { course: Course; o: SkyObstacle }) {
+	const { o } = props
+	const line = props.course.terrain.groundY(o.x)
+	const place = (x: number, y: number): JSX.CSSProperties => ({
+		position: 'absolute',
+		left: `${x}px`,
+		top: `${y}px`,
+	})
+	switch (o.kind) {
+		case 'gulls':
+			return (
+				<For each={gullsAt(o, line, 0)}>
+					{(gull) => (
+						<div style={place(gull.x - 12, gull.y - 7)}>
+							<GullArt up={gull.flap} />
+						</div>
+					)}
+				</For>
+			)
+		case 'balloon':
+			return (
+				<div style={place(o.x - 36, balloonAt(o, line, 0).top)}>
+					<BalloonArt x={o.x} />
+				</div>
+			)
+		case 'storm': {
+			const { top } = stormAt(o, line, 0)
+			return (
+				<div style={place(o.x - 80, top)}>
+					<StormArt brewing={false} striking={false} now={0} reach={0} />
+				</div>
+			)
+		}
+		case 'turbine':
+			return (
+				<div
+					style={place(
+						o.x - TURBINE_BLADE - 4,
+						line - o.height - TURBINE_BLADE - 4,
+					)}
+				>
+					<TurbineArt angles={turbineAt(o, line, 0).angles} tall={o.height} />
+				</div>
+			)
+		case 'whale':
+			return (
+				<div style={place(o.x - 52, line - o.height)}>
+					<WhaleArt
+						up={1}
+						spout={0}
+						bubbling={false}
+						height={o.height}
+						now={0}
+					/>
+				</div>
+			)
+	}
+}
+
+type SkyObstacle = Extract<
+	Obstacle,
+	{ kind: 'gulls' | 'balloon' | 'storm' | 'turbine' | 'whale' }
+>
 
 const styles = {
 	window: {

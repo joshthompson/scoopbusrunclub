@@ -23,6 +23,12 @@ export const GROUND_Y = 490
 export const PATH_BACK = 18
 export const PATH_FRONT = 18
 /**
+ * How far along a line straight back across the path leans, from its near
+ * edge to its far one: the slant everything going back into the scene is
+ * drawn at, the start and finish banners, buildings' sides.
+ */
+export const DEPTH_SLANT = 56
+/**
  * Grass drawn behind the path, for what's set back from it to stand on: on
  * high stretches, the scenery behind would otherwise be distant hills.
  */
@@ -56,8 +62,33 @@ export const COAST_KEEP = 0.97
 export const SLIDE_KEEP = 0.996
 /** How strongly a slope speeds you up or slows you down. Doubled while sliding downhill. */
 export const HILL_PULL = 0.3
+/** How much harder going up a hill pulls back than going down one pushes on: for everyone, the bus too. */
+export const UPHILL_HARDER = 1.4
+/**
+ * How much of its speed a hill takes off the bus going up it, for its slope:
+ * as much as it takes off a runner, so up a pyramid it's half its speed too.
+ */
+export const BUS_HILL_PULL = 1.45
+
+/** A hill's pull, for its `slope`: harder going up. */
+export const hillPull = (slope: number) =>
+	slope < 0 ? slope * UPHILL_HARDER : slope
 export const MAX_SPEED = 12
+/**
+ * The top speed in a multiplayer Round instead, boosts and all: much lower,
+ * so a few boosts at once can't take one Player so far ahead that the bus
+ * scoops everyone else off the back of the screen.
+ */
+export const ROUND_MAX_SPEED = 8
+/** How fast anyone can go: lower in a multiplayer Round. */
+export const topSpeed = (world: { round: boolean }) =>
+	world.round ? ROUND_MAX_SPEED : MAX_SPEED
 export const JUMP_SPEED = 9.5
+/**
+ * How fast they're still going up, at most, once they let go of jump: a tap
+ * is a hop, held is the whole jump.
+ */
+export const JUMP_CUT = 2
 export const GRAVITY = 0.45
 /** Air control, a little either way. */
 export const AIR_PUSH = 0.04
@@ -72,9 +103,23 @@ export const STUMBLE_SPEED = 1.5
 export const MUD_TOP_SPEED = 2.5
 export const FIKA_BOOST = 3
 export const CHEER_BOOST = 2.5
+/** A parkrun's barcode token: the last boost, and a big one. */
+export const BARCODE_BOOST = 6
+/** How far before a parkrun's finish its barcode token is, and how high, to run straight through. */
+export const BARCODE_BEFORE = 320
+export const BARCODE_HEIGHT = 22
+/** Its art's size: 24 by 13 cells, twice the size of a screen pixel. */
+export const BARCODE_WIDTH = 48
+export const BARCODE_TALL = 26
 
 // --- Points: one a metre, and these on top ----------------------------------
 export const FIKA_POINTS = 100
+export const BARCODE_POINTS = 250
+/**
+ * Finishing, points for every tick quicker round than the bus would be at
+ * its own pace: 120 a second.
+ */
+export const SPEED_POINTS = 2
 export const CHEER_POINTS = 50
 export const CORGI_POINTS = 250
 /** Taken off for each hazard hit: a rock, a branch, the mud, a furby on your head. */
@@ -122,8 +167,30 @@ export const FURBY_STEER = 0.06
 export const FURBY_REACH = 6
 /** How far from where it aims it can land. */
 export const FURBY_AIM_ERROR = 20
-/** How long one sits on your head, slowing you right down, before hopping off. */
+/** How long one sits on your head before hopping off. */
 export const FURBY_RIDE_TICKS = 35
+/**
+ * Landed on, you're squashed: half your height, and slower, this long, till
+ * you spring back up.
+ */
+export const FURBY_SQUASH_TICKS = 180
+export const SQUASHED = 0.5
+export const SQUASHED_TOP_SPEED = 3.6
+
+/**
+ * Geese flying over Haga, from behind: this fast, overtaking you, and this
+ * high, their feet off the ground, low enough to jump into.
+ */
+export const GOOSE_FLY_SPEED = 8.5
+export const GOOSE_ALTITUDES = [96, 120, 142]
+/**
+ * Jump into one and it carries you this long, at this speed, your feet this
+ * high off the ground, over everything. Press down to let go.
+ */
+export const GOOSE_CARRY_TICKS = 150
+export const GOOSE_CARRY_SPEED = 10
+export const GOOSE_CARRY_HEIGHT = 120
+export const GOOSE_POINTS = 250
 
 /** Land on a corgi and you ride it this long, galloping at this speed, over everything. */
 export const CORGI_RIDE_TICKS = 200
@@ -134,6 +201,47 @@ export const CORGI_GRIP = 0.08
 export const CORGI_SADDLE = 16
 /** It barks for you to hop on when you're this near. */
 export const CORGI_CALL = 320
+/**
+ * How hard a Ride leaps, up off the ground with you on its back: a little
+ * higher than you jump.
+ */
+export const RIDE_LEAP = 10.5
+
+// --- The Cliff: gliders and Rings ------------------------------------------
+/**
+ * On a glider: cruising as fast as the bus's top speed, so it's the Rings
+ * that get you away from it; quicker diving, slower climbing, and how
+ * quickly it gets to that.
+ */
+export const GLIDER_SPEED = 7
+export const GLIDER_DIVE = 1.6
+/**
+ * Boosted past that, by a Ring, how quickly it bleeds back down: much
+ * quicker than running, so a Ring's a burst, not a lead.
+ */
+export const GLIDER_BOOST_GRIP = 0.025
+/** Holding right on one, this much faster; left, this much slower. */
+export const GLIDER_PUSH = 1.6
+export const GLIDER_BRAKE = 2.5
+export const GLIDER_CLIMB_DRAG = 1.2
+export const GLIDER_GRIP = 0.03
+/**
+ * How fast it climbs or dives, held, and how quickly it answers; and how
+ * fast it sinks, left to it.
+ */
+export const GLIDER_CLIMB = 4.5
+export const GLIDER_STEER = 0.12
+export const GLIDER_SINK = 0.5
+/** How far over the Ground a glider keeps, at least: its rider's feet. Not over the sea. */
+export const GLIDER_CLEARANCE = 46
+/** Into something on one: down to this speed, and knocked this much down. */
+export const GLIDER_KNOCK_SPEED = 2.5
+export const GLIDER_KNOCK_DROP = 3
+/** How far over a glider's rider's head its wing is, to fly into things. */
+export const GLIDER_WING = 16
+/** Through a Ring: this much faster, and these points. */
+export const RING_BOOST = 1.8
+export const RING_POINTS = 50
 
 // --- The bus ------------------------------------------------------------
 /**
@@ -157,6 +265,12 @@ export const BUS_RAMP_TICKS = 2400
  */
 export const BUS_LEASH_FULL = 900
 export const BUS_LEASH_MAX = 1200
+/**
+ * In a multiplayer Round, longer: 450 m. It's the leader that pulls the
+ * bus along, so this is how far behind them anyone can be before it's got
+ * them.
+ */
+export const ROUND_BUS_LEASH_MAX = 1800
 /** How much the leash lengthens a tick at the end of it, up to `BUS_LEASH_FULL`, and just past it. */
 export const BUS_LEASH_GROWTH = 3
 export const BUS_LEASH_LATE_GROWTH = 0.6
@@ -164,3 +278,13 @@ export const BUS_LEASH_LATE_GROWTH = 0.6
 // --- Countdown ----------------------------------------------------------
 /** How long each of "3", "2", "1" and "Go!" is said for. */
 export const COUNTDOWN_STEP_TICKS = 50
+
+// --- Halloween Town ----------------------------------------------------------
+/** A Pumpkin's boost, and how much faster than top speed wearing one keeps you. */
+export const PUMPKIN_BOOST = 2
+export const PUMPKIN_SPEED = 1.5
+export const PUMPKIN_POINTS = 100
+/** How tall a Mummy is, to run into: jump it. */
+export const MUMMY_HEIGHT = 50
+/** How fast Zombies walk towards you. */
+export const ZOMBIE_SPEED = 0.7

@@ -31,6 +31,8 @@ export interface RunnerData extends MemberFacts {
 		/** Halloween's undead run, arms out in front, for getting up after a scoop. */
 		zombie: string[] | undefined
 		sit: string[] | undefined
+		/** Stood still, for runners made from a custom look: the game's stand pose. */
+		stand?: string[]
 		face: string[] | undefined
 		tailWalk: string[] | undefined // and Park Walker
 		tailSit: string[] | undefined

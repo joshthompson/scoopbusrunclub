@@ -1,27 +1,52 @@
 import { type JSX, Match, Show, Switch, createSignal } from 'solid-js'
-import { clearLocalData, setSoundOn, soundOn } from '../settings'
+import { identity } from '../saved/identity'
+import {
+	clearLocalData,
+	effectsOn,
+	musicOn,
+	setEffectsOn,
+	setMusicOn,
+} from '../saved/settings'
 import { play } from '../sfx'
 import { Menu, Panel } from '../ui/Menu'
+import { IdentityEditor } from './IdentityEditor'
 
 export function OptionsScreen(props: { onBack: () => void }) {
 	const [confirming, setConfirming] = createSignal(false)
+	const [naming, setNaming] = createSignal(false)
 	const [cleared, setCleared] = createSignal(false)
 
 	return (
 		<div style={styles.screen}>
 			<Switch>
+				<Match when={naming()}>
+					<IdentityEditor
+						onSave={() => setNaming(false)}
+						onCancel={() => setNaming(false)}
+					/>
+				</Match>
 				<Match when={!confirming()}>
 					<Panel title="Options" style={{ width: '440px' }}>
 						<Menu
 							items={[
 								{
-									label: 'Sound',
-									value: soundOn() ? 'On' : 'Off',
+									label: 'Sound effects',
+									value: effectsOn() ? 'On' : 'Off',
 									choose: () => {
-										setSoundOn(!soundOn())
+										setEffectsOn(!effectsOn())
 										// Let them hear it's back on.
 										play('select')
 									},
+								},
+								{
+									label: 'Music',
+									value: musicOn() ? 'On' : 'Off',
+									choose: () => setMusicOn(!musicOn()),
+								},
+								{
+									label: 'High score name',
+									value: identity().name ?? 'Not set',
+									choose: () => setNaming(true),
 								},
 								{
 									label: 'Clear local data',
@@ -40,8 +65,8 @@ export function OptionsScreen(props: { onBack: () => void }) {
 					<Panel title="Clear local data?" style={{ width: '480px' }}>
 						<p style={styles.warning}>
 							This forgets every runner you've made, your options, how far
-							you've got in Endless and your high scores, in this browser. It
-							can't be undone.
+							you've got in Endless, your high scores and your high score name,
+							in this browser. It can't be undone.
 						</p>
 						<Menu
 							items={[

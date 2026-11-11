@@ -31,6 +31,7 @@ import type * as profanity from "../profanity.js";
 import type * as pumpkins from "../pumpkins.js";
 import type * as queries from "../queries.js";
 import type * as races from "../races.js";
+import type * as runScores from "../runScores.js";
 import type * as snapshots from "../snapshots.js";
 import type * as weather from "../weather.js";
 
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   pumpkins: typeof pumpkins;
   queries: typeof queries;
   races: typeof races;
+  runScores: typeof runScores;
   snapshots: typeof snapshots;
   weather: typeof weather;
 }>;

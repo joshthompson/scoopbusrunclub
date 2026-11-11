@@ -1,92 +1,84 @@
 import busEmoji from '@/assets/emoji/bus.png'
 import rockAsset from '@/assets/misc/rock1.png'
 import { For, type JSX } from 'solid-js'
-import { Pixels } from '../game/Pixels'
-import { FIKA_ART, FIKA_ITEMS } from '../game/fika'
-import { volunteerFrame } from '../game/sprites'
-import { MEMBERS } from '../playable'
+import mudAsset from '../assets/obstacles/mud.png'
+import mummyAsset from '../assets/obstacles/mummy.png'
+import { CollectableArt } from '../draw/art/collectable'
+import type { Collectable } from '../game/collectables'
+import { MEMBERS } from '../runners/playable'
 import { Menu, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 
 const CONTROLS: { keys: string[]; does: string }[] = [
 	{ keys: ['→', 'D'], does: 'Run' },
 	{ keys: ['←', 'A'], does: 'Run back' },
-	{ keys: ['↑', 'W', 'Space'], does: 'Jump' },
-	{ keys: ['↓', 'S'], does: 'Duck and slide' },
+	{ keys: ['↑', 'W', 'Space'], does: 'Jump (hold to go higher)' },
+	{ keys: ['↓', 'S'], does: 'Duck, slide, drop down' },
 	{ keys: ['Esc', 'P'], does: 'Pause' },
 ]
 
-const LEAF = '#61864a'
-const BARK = '#6b4a2f'
+/** A few of a kind, side by side, to stand for all of them. */
+function Examples(props: { children: JSX.Element; zoom?: number }) {
+	return (
+		<div style={{ ...styles.examples, zoom: props.zoom ?? 1 }}>
+			{props.children}
+		</div>
+	)
+}
 
+/** Fika and rides, as they're seen on the course. */
+function Pictures(props: { ids: Collectable[]; zoom?: number }) {
+	return (
+		<Examples zoom={props.zoom}>
+			<For each={props.ids}>{(id) => <CollectableArt id={id} />}</For>
+		</Examples>
+	)
+}
+
+/**
+ * How to play: the controls and what's on a course, in
+ * kinds (Obstacles, Boosts, Rides) rather than one by one: there are too many
+ * of each to go through.
+ */
 export function InstructionsScreen(props: { onBack: () => void }) {
-	const marshal = volunteerFrame('rick')
 	const member = MEMBERS[0]
 	const course: { icon: JSX.Element; text: string }[] = [
 		{
 			icon: <img src={busEmoji} alt="" style={{ width: '48px' }} />,
-			text: 'The Scoop Bus is coming. Stay ahead of it!',
-		},
-		{
-			icon: <img src={rockAsset} alt="" style={{ height: '26px' }} />,
-			text: 'Rocks trip you up. Jump them.',
+			text: "The Scoop Bus is right behind you. Get caught, or fall down a gap, and you're out.",
 		},
 		{
 			icon: (
-				<Pixels
-					width={44}
-					height={22}
-					rects={[
-						[0, 2, 44, 6, BARK],
-						[2, 8, 16, 12, LEAF],
-						[18, 8, 14, 8, LEAF],
-						[32, 6, 10, 10, LEAF],
-					]}
-				/>
+				<Examples>
+					<img src={rockAsset} alt="" style={{ height: '22px' }} />
+					<img
+						src={mudAsset}
+						alt=""
+						class="pixelated"
+						style={{ height: '14px' }}
+					/>
+					{/* Its first frame: the sheet has two, side by side. */}
+					<div
+						style={{
+							width: '27px',
+							height: '43.5px',
+							background: `url("${mummyAsset}") 0 0 / 54px 43.5px no-repeat`,
+							'image-rendering': 'pixelated',
+						}}
+					/>
+				</Examples>
 			),
-			text: 'Low branches. Duck under them.',
+			text: 'Obstacles: jump over them or duck under them. Hit one and you stumble.',
+		},
+		{
+			icon: <Pictures ids={['fika:kanelbulle']} />,
+			text: 'Boosts, like fika, give you a burst of speed.',
 		},
 		{
 			icon: (
-				<Pixels
-					width={44}
-					height={10}
-					rects={[
-						[4, 0, 36, 4, '#7a5634'],
-						[0, 2, 44, 8, '#5b3d22'],
-					]}
-				/>
+				<Pictures ids={['ride:corgi', 'ride:goose', 'ride:llama']} zoom={0.6} />
 			),
-			text: 'Mud bogs you down. Jump over it.',
-		},
-		{
-			icon: (
-				<div style={{ display: 'flex', gap: '4px', 'align-items': 'flex-end' }}>
-					<For each={FIKA_ITEMS.slice(0, 3)}>
-						{(item) => (
-							<Pixels
-								width={FIKA_ART[item].width}
-								height={FIKA_ART[item].height}
-								rects={FIKA_ART[item].rects}
-							/>
-						)}
-					</For>
-				</div>
-			),
-			text: 'Fika! Grab it for a burst of speed.',
-		},
-		{
-			icon: marshal ? (
-				<img
-					src={marshal}
-					alt=""
-					class="pixelated"
-					style={{ height: '48px' }}
-				/>
-			) : (
-				<span />
-			),
-			text: 'Volunteers cheer you on as you pass.',
+			text: 'Rides: run or jump into one to climb on. Duck to get off.',
 		},
 		{
 			icon: member ? (
@@ -99,13 +91,13 @@ export function InstructionsScreen(props: { onBack: () => void }) {
 			) : (
 				<span />
 			),
-			text: 'Runners! Bounce on their heads for points.',
+			text: 'Runners: bounce on their heads.',
 		},
 	]
 
 	return (
 		<div style={styles.screen}>
-			<Panel title="How to play" style={{ width: '860px' }}>
+			<Panel title="How to play" style={{ width: '880px' }}>
 				<div style={styles.columns}>
 					<div style={styles.column}>
 						<div style={styles.heading}>Controls</div>
@@ -121,6 +113,9 @@ export function InstructionsScreen(props: { onBack: () => void }) {
 								</div>
 							)}
 						</For>
+						<div style={styles.note}>
+							Or a gamepad: stick to run, A to jump, B to duck.
+						</div>
 					</div>
 					<div style={styles.column}>
 						<div style={styles.heading}>On the course</div>
@@ -154,7 +149,7 @@ const styles = {
 	},
 	columns: {
 		display: 'grid',
-		'grid-template-columns': '320px 1fr',
+		'grid-template-columns': '340px 1fr',
 		gap: '28px',
 	},
 	column: {
@@ -171,7 +166,7 @@ const styles = {
 		display: 'flex',
 		'align-items': 'center',
 		gap: '14px',
-		'min-height': '34px',
+		'min-height': '38px',
 		'font-family': '"Cabin", sans-serif',
 		'font-size': '16px',
 		'line-height': 1.25,
@@ -192,12 +187,22 @@ const styles = {
 		'font-size': '15px',
 		'text-align': 'center',
 	},
+	note: {
+		'font-family': '"Cabin", sans-serif',
+		'font-size': '14px',
+		opacity: 0.75,
+	},
 	icon: {
-		width: '84px',
+		width: '120px',
 		'flex-shrink': 0,
 		display: 'flex',
 		'justify-content': 'center',
 		'align-items': 'center',
 		'image-rendering': 'pixelated',
+	},
+	examples: {
+		display: 'flex',
+		gap: '8px',
+		'align-items': 'flex-end',
 	},
 } satisfies Record<string, JSX.CSSProperties>

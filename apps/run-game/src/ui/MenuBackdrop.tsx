@@ -1,11 +1,3 @@
-import busBackAsset from '@/assets/bus/bus-back.png'
-import scoopAsset from '@/assets/bus/scoop.png'
-import shadowAsset from '@/assets/bus/shadow.png'
-import wheel1Asset from '@/assets/bus/wheel1.png'
-import wheel2Asset from '@/assets/bus/wheel2.png'
-import wheel3Asset from '@/assets/bus/wheel3.png'
-import wheel4Asset from '@/assets/bus/wheel4.png'
-import windowAsset from '@/assets/bus/windows.png'
 import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
@@ -18,16 +10,22 @@ import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
 import shrub1Asset from '@/assets/misc/shrub1.png'
 import sunAsset from '@/assets/misc/sun.png'
-import tree1Asset from '@/assets/misc/tree1.png'
-import tree2Asset from '@/assets/misc/tree2.png'
 import { For, type JSX } from 'solid-js'
-// The website's bus, with its lettering reversed so it reads right turned
-// round (see scripts/turn-bus-lettering.ts).
-import busAsset from '../assets/bus/bus-lettering-turned.png'
-import { customRunners } from '../customRunners'
+// The website's bus, turned round to chase to the right.
+import busBackAsset from '../assets/bus/bus-back.png'
+import busAsset from '../assets/bus/bus.png'
+import scoopAsset from '../assets/bus/scoop.png'
+import wheel1Asset from '../assets/bus/wheel1.png'
+import wheel2Asset from '../assets/bus/wheel2.png'
+import wheel3Asset from '../assets/bus/wheel3.png'
+import wheel4Asset from '../assets/bus/wheel4.png'
+import windowAsset from '../assets/bus/windows.png'
+import tree1Asset from '../assets/scenery/tree1.png'
+import tree2Asset from '../assets/scenery/tree2.png'
 import { VIEW_HEIGHT } from '../game/constants'
-import { guests } from '../guests'
-import { MEMBERS, type Playable, customPlayable } from '../playable'
+import { customRunners } from '../runners/customRunners'
+import { guests } from '../runners/guests'
+import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
 import { RunStrip } from './RunStrip'
 
 /**
@@ -213,21 +211,19 @@ function Bus(props: { style?: JSX.CSSProperties }) {
 				position: 'absolute',
 				width: '247px',
 				height: '127px',
-				transform: 'scaleX(-1)',
 				...props.style,
 			}}
 		>
 			<div style={{ animation: 'bus-bob 0.48s steps(2) infinite' }}>
-				{part(shadowAsset, -20, 107, { width: '270px', opacity: 0.1 })}
 				{part(busBackAsset, 0, 0)}
-				{wheel(wheel1Asset, 73, 105, 0)}
-				{wheel(wheel2Asset, 5, 103, 0.06)}
-				{wheel(wheel3Asset, 160, 105, 0.12)}
-				{wheel(wheel4Asset, 197, 102, 0.18)}
-				{part(windowAsset, 26, 26, { opacity: 0.75 })}
+				{wheel(wheel1Asset, 140, 105, 0)}
+				{wheel(wheel2Asset, 208, 103, 0.06)}
+				{wheel(wheel3Asset, 68, 105, 0.12)}
+				{wheel(wheel4Asset, 24, 102, 0.18)}
+				{part(windowAsset, 9, 26, { opacity: 0.75 })}
 				{part(busAsset, 0, 0)}
-				{part(scoopAsset, -22, 94, {
-					'transform-origin': '80% 80%',
+				{part(scoopAsset, 181, 94, {
+					'transform-origin': '20% 80%',
 					animation: 'scoop-flick 3.2s ease-in-out infinite',
 				})}
 			</div>

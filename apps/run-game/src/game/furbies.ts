@@ -11,6 +11,7 @@ import {
 	FURBY_RIDE_TICKS,
 	FURBY_ROAM,
 	FURBY_SPOT,
+	FURBY_SQUASH_TICKS,
 	FURBY_STEER,
 	FURBY_WANDER,
 	GRAVITY,
@@ -22,7 +23,7 @@ import {
 } from './constants'
 import { SCOOP_HEARD, bounceOff } from './pack'
 import { scored } from './step'
-import type { Furby, Racer, World } from './world'
+import { type Furby, type Racer, type World, bodyHeight } from './world'
 
 /** Whoever a furby's after: the nearest racer still running. */
 function nearest(world: World, x: number): Racer | undefined {
@@ -77,7 +78,7 @@ export function stepFurbies(world: World) {
 			const rider = world.racers.find((r) => r.id === f.rider)
 			const b = (rider ?? world.racers[0]).body
 			f.x = b.x
-			f.feetY = b.feetY - (b.ducking ? DUCK_HEIGHT : STAND_HEIGHT)
+			f.feetY = b.feetY - bodyHeight(b)
 			f.facing = b.facing
 			if (--f.timer <= 0 || !running || rider?.out) {
 				f.state = 'hopping'
@@ -126,7 +127,7 @@ export function stepFurbies(world: World) {
 
 	if (!running) return
 	for (const racer of world.racers) {
-		if (racer.out || racer.body.mount > 0) continue
+		if (racer.out || racer.body.mount > 0 || racer.body.carried > 0) continue
 		stompFurbies(world, racer)
 		landOnRunner(world, racer)
 	}
@@ -201,16 +202,19 @@ function stompFurbies(world: World, racer: Racer) {
 	}
 }
 
-/** A furby coming down on a racer's head: it sits there, and slows them right down. */
+/**
+ * A furby coming down on a racer's head: it sits there a moment, squashing
+ * them down to half their height, and slower, for a few seconds.
+ */
 function landOnRunner(world: World, racer: Racer) {
 	const b = racer.body
-	// Only one on their head at once, and not while they're still reeling.
+	// Only one on their head at once, and not while they're still squashed.
 	if (
-		b.stumble > 0 ||
+		b.squashed > 0 ||
 		world.furbies.some((f) => f.state === 'riding' && f.rider === racer.id)
 	)
 		return
-	const top = b.feetY - (b.ducking ? DUCK_HEIGHT : STAND_HEIGHT)
+	const top = b.feetY - bodyHeight(b)
 
 	for (const f of world.furbies) {
 		if (f.state !== 'hopping' || f.grounded || f.vy <= 0) continue
@@ -224,8 +228,7 @@ function landOnRunner(world: World, racer: Racer) {
 		f.timer = FURBY_RIDE_TICKS
 		f.vx = 0
 		f.vy = 0
-		b.stumble = FURBY_RIDE_TICKS
-		b.vx = Math.sign(b.vx) * Math.min(Math.abs(b.vx), STUMBLE_SPEED)
+		b.squashed = FURBY_SQUASH_TICKS
 		world.addBonus('hazards', -HAZARD_POINTS)
 		world.popup(
 			scored(world, 'Furby!', `-${HAZARD_POINTS}`),

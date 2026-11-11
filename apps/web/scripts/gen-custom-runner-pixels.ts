@@ -25,6 +25,8 @@ const sprites: SpriteData[] = [
 	{ name: 'run', filename: 'run.png' },
 	{ name: 'zombie', filename: 'zombie.png' },
 	{ name: 'sit', filename: 'sit.png' },
+	// Stood still: the run game's tourists.
+	{ name: 'stand', filename: 'stand.png' },
 	{ name: 'head', filename: 'head.png' },
 ]
 

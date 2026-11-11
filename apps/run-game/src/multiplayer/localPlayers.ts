@@ -3,19 +3,29 @@ import {
 	type Controls,
 	connectedGamepads,
 	gamepadControls,
+	gamepadSelect,
+	gamepadStart,
 	keyDown,
 	keyboardControls,
 } from '../input'
 import { play } from '../sfx'
+import type { RoomMode } from './protocol'
 import { type HostRoom, type Seat, localCharacters } from './room'
+import { ROOM_MODES } from './roomModes'
 
 /**
  * Local Players in the lobby: anyone at the Host's keyboard or gamepads
  * taking a seat by pressing jump on theirs, then picking who they'll be with
  * left and right, jump to say they're ready, and duck to change their mind
- * (or, not ready, to give their seat up).
+ * (or, not ready, to give their seat up). The Starter's jump starts the
+ * Room instead, and their duck stops its countdown; on a gamepad, Start
+ * starts it too, and Select goes through how it can go.
  */
-export function createLocalPlayers(room: HostRoom) {
+export function createLocalPlayers(
+	room: HostRoom,
+	/** How the Room's set to go, for Select to go on from. */
+	mode: () => RoomMode,
+) {
 	/** What each source held last frame, for telling a press from a hold. */
 	const before = new Map<string, Controls>()
 	const pressed = (key: string, now: Controls) => {
@@ -54,6 +64,7 @@ export function createLocalPlayers(room: HostRoom) {
 
 	/** One seat's presses, once it's taken. */
 	function steer(seat: Seat, press: Controls) {
+		if (room.starter()?.id === seat.id) return steerAsStarter(seat, press)
 		if (press.left || press.right) {
 			if (seat.ready) return
 			const next = cycle(seat, press.right ? 1 : -1)
@@ -72,6 +83,40 @@ export function createLocalPlayers(room: HostRoom) {
 			else room.removeSeat(seat.id)
 		}
 	}
+
+	/** The Starter's: picking, then starting it rather than being ready. */
+	function steerAsStarter(seat: Seat, press: Controls) {
+		const starting = room.stage() === 'starting'
+		if ((press.left || press.right) && !starting) {
+			const next = cycle(seat, press.right ? 1 : -1)
+			if (next && next !== seat.character) {
+				room.pick(seat.id, next)
+				play('move')
+			}
+		}
+		if (press.up && !starting) play(room.startAs(seat.id) ? 'select' : 'back')
+		if (press.down) {
+			play('back')
+			if (starting) room.cancelAs(seat.id)
+			else room.removeSeat(seat.id)
+		}
+	}
+
+	/** A gamepad's Start and Select, for its Player being the Starter. */
+	function starterButtons(seat: Seat, index: number) {
+		const key = `gamepad:${index}:menu`
+		const now = { start: gamepadStart(index), select: gamepadSelect(index) }
+		const was = menuBefore.get(key) ?? now
+		menuBefore.set(key, now)
+		if (room.starter()?.id !== seat.id || room.stage() !== 'lobby') return
+		if (now.start && !was.start) play(room.startAs(seat.id) ? 'select' : 'back')
+		if (now.select && !was.select) {
+			const at = ROOM_MODES.findIndex((m) => m.mode === mode())
+			play('move')
+			room.chooseModeAs(seat.id, ROOM_MODES[(at + 1) % ROOM_MODES.length].mode)
+		}
+	}
+	const menuBefore = new Map<string, { start: boolean; select: boolean }>()
 
 	let frame = 0
 	const poll = () => {
@@ -92,8 +137,10 @@ export function createLocalPlayers(room: HostRoom) {
 			const id = `gamepad:${index}`
 			const press = pressed(id, gamepadControls(index)())
 			const seat = seatOf(id)
-			if (seat) steer(seat, press)
-			else if (press.up) seatUp({ id, kind: 'gamepad', gamepad: index })
+			if (seat) {
+				steer(seat, press)
+				starterButtons(seat, index)
+			} else if (press.up) seatUp({ id, kind: 'gamepad', gamepad: index })
 		}
 	}
 	poll()
