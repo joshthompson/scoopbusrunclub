@@ -10,6 +10,7 @@ import { DragonArt } from './dragon'
 import { FikaArt } from './fika'
 import { GooseIcon } from './geese'
 import { GliderArt } from './glider'
+import { GoatArt } from './goat'
 import { LlamaArt } from './llama'
 import { UnicornArt } from './unicorn'
 
@@ -31,6 +32,8 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <DeerArt pose="sit" />
 		case 'ride:unicorn':
 			return <UnicornArt pose="sit" />
+		case 'ride:goat':
+			return <GoatArt pose="sit" />
 		case 'ride:glider':
 			return (
 				<div style={{ transform: 'scale(0.6)' }}>

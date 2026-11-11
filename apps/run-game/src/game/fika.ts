@@ -39,6 +39,12 @@ export type FikaItem =
 	| 'karelianPie'
 	/** Not fika at all: up on Scoop Cruises' roof, a captain's hat. */
 	| 'captainsHat'
+	/**
+	 * Everest's: Kendal Mint Cake, as went up it on the first ascent, and
+	 * a bowl of Sherpa butter tea.
+	 */
+	| 'mintCake'
+	| 'butterTea'
 
 export const FIKA_ITEMS: FikaItem[] = [
 	'coffee',
@@ -114,6 +120,15 @@ export const FERRY_FIKA: FikaItem[] = [
 	'kanelbulle',
 ]
 
+/** Up Everest: mint cake and butter tea, and a coffee and a bun from base camp. */
+export const EVEREST_FIKA: FikaItem[] = [
+	'mintCake',
+	'butterTea',
+	'coffee',
+	'mintCake',
+	'kanelbulle',
+]
+
 /** In Turku: a Karelian pie, a coffee, salmiakki. */
 export const TURKU_FIKA: FikaItem[] = ['karelianPie', 'coffee', 'salmiakki']
 
@@ -152,31 +167,6 @@ export const FIKA_SIZE: Record<FikaItem, { width: number; height: number }> = {
 	salmiakki: { width: 10 * CELL, height: 9 * CELL },
 	karelianPie: { width: 12 * CELL, height: 7 * CELL },
 	captainsHat: { width: 12 * CELL, height: 8 * CELL },
-}
-
-/** What's said, having it: "Fika!", or the drink's name. */
-export const FIKA_WORD: Partial<Record<FikaItem, string>> = {
-	incaCola: 'Inca Cola!',
-	falafel: 'Falafel!',
-	knafeh: 'Knafeh!',
-	koshary: 'Koshary!',
-	dumplings: 'Dumplings!',
-	bubbleTea: 'Bubble tea!',
-	mooncake: 'Mooncake!',
-	candyfloss: 'Candyfloss!',
-	toffeeApple: 'Toffee apple!',
-	spiderCupcake: 'Spider cupcake!',
-	tinyFurby: 'A tiny furby!',
-	lollipop: 'Lollipop!',
-	rainbowCake: 'Rainbow cake!',
-	rubberDuck: 'Rubber duck!',
-	goldRing: 'A gold ring!',
-	oldCoin: 'An old coin!',
-	lostPhone: 'A lost phone!',
-	kladdkaka: 'Kladdkaka!',
-	lingondricka: 'Lingondricka!',
-	pickAndMix: 'Lösgodis!',
-	salmiakki: 'Salmiakki!',
-	karelianPie: 'Karjalanpiirakka!',
-	captainsHat: 'Aye aye, Captain!',
+	mintCake: { width: 12 * CELL, height: 8 * CELL },
+	butterTea: { width: 11 * CELL, height: 11 * CELL },
 }

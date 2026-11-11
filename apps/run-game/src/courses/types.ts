@@ -191,22 +191,56 @@ export interface CourseLook {
 	 * with, as `url(#id)`: each stop a colour from `x` on, till the next.
 	 * A ferry's carpet indoors, its decking out on deck, a quay's granite.
 	 */
-	strips?: { id: string; stops: [x: number, colour: string][] }[]
+	strips?: {
+		id: string
+		stops: [x: number, colour: string][]
+		/** Blended from each colour to the next, rather than changing at once: grass to rock to snow. */
+		blend?: boolean
+	}[]
 	/** A stadium behind the course, in place of hills and scenery: see `StadiumBackdrop`. */
 	stadium?: boolean
 	/**
 	 * The ground's layers, in place of Haga's path and grass: offsets from
 	 * the line everyone runs along, each filled from there on down.
 	 */
-	ground?: [number, string][]
+	ground?: [offset: number, fill: string, smooth?: boolean][]
+	/**
+	 * Its Ledges, the steps up it a jump high, drawn as rock: a buttress of
+	 * it, its strata, snow on top, and a fixed rope down it, or a ladder up
+	 * it if it's a big one.
+	 */
+	ledgeRock?: {
+		rock: string
+		shade: string
+		lit: string
+		snow: string
+		rope: string
+		ladder: string
+	}
 	/** What peeks over the far hills, in place of Haga's houses and pines. */
 	far?: BackdropPiece[]
 	/** What stands on the field behind the course, in place of Haga's trees. */
 	near?: BackdropPiece[]
 	/** How far apart those stand, from and to: closer for a forest. */
 	nearGap?: [number, number]
+	/**
+	 * SVG `<defs>` of the course's own, for the Ground's layers to fill with
+	 * as `url(#id)`: patterns, a mountain's rock and snow.
+	 */
+	groundDefs?: string
+	/**
+	 * Snow falling, over everything, fading in from `from` along the course
+	 * to as thick as it gets by `full`.
+	 */
+	snow?: { from: number; full: number }
 	/** What a Gap's drop looks like: a CSS background, from the path down; `none` to see through it. */
 	gap?: string
+	/**
+	 * What its Gaps look like inside, drawn over `gap`: ragged walls going
+	 * down either side, darker and darker the deeper, so it's plain it's a
+	 * drop. See `PitLook`.
+	 */
+	pit?: PitLook
 	/** Its Gaps on fire: pits down into hell, flames licking up out of them, embers rising. */
 	pitFire?: boolean
 	/** In place of the sun, `scale` times its size, through the `sun` filter: a moon. */
@@ -247,6 +281,12 @@ export interface CourseLook {
 		 * view's full right down to the course.
 		 */
 		nearer?: { asset: string; height: number; fill: string }[]
+		/**
+		 * Its own sky, top to bottom, in place of the course's: deeper blue
+		 * the higher up a mountain it is. On up over the top of the screen,
+		 * as the backdrop sinks away under a climb.
+		 */
+		sky?: [top: string, bottom: string]
 	}
 	/**
 	 * How much the backdrop goes with the camera looking up or down, in
@@ -255,6 +295,12 @@ export interface CourseLook {
 	 * sun deck, the sea's still there over its rail.
 	 */
 	horizonLift?: number
+	/**
+	 * Up a mountain: the horizon rises with the camera looking up, rather
+	 * than sinking, up to this much and no more, so it's still over the
+	 * path, not behind the mountain, however high it climbs.
+	 */
+	horizonRise?: number
 	/**
 	 * More horizons, one after another along the course, each fading in
 	 * over the last as the camera gets to `from`: what goes by on a voyage,
@@ -352,6 +398,21 @@ export interface CourseLook {
 		 */
 		bore?: false
 	}
+}
+
+/**
+ * Inside a Gap: its walls, either side, lit on the far side and in shadow
+ * on the near; seams across them; and what's at its rims, and down it.
+ */
+export interface PitLook {
+	wall: string
+	shade: string
+	/** Lines across the walls: bricks' mortar, cracks in ice. */
+	seams?: string
+	/** A crevasse's: snow over its lips, icicles hanging off them. */
+	ice?: { snow: string; icicle: string }
+	/** A sewer's: slime running down its walls, and sludge glinting far down it. */
+	slime?: { drip: string; sludge: string; shine: string }
 }
 
 /**
@@ -456,6 +517,11 @@ export interface BusLook {
 	drill?: [string, string]
 	/** Where the drill goes on, the scoop till then: from the start, if not said. */
 	drillFrom?: number
+	/**
+	 * Legs in place of its wheels, crawling: four of them, a spider's, to
+	 * climb a mountain on. Their metal, the joints' bolts, and their feet.
+	 */
+	legs?: { metal: string; shade: string; bolt: string; foot: string }
 }
 
 /**
@@ -592,6 +658,17 @@ export interface Course {
 	skeletons?: number
 	/** Guard towers over the walkway, where they stand: see `createTower`. */
 	towers?: number[]
+	/**
+	 * How much hills slow the bus going up them, out of how much they
+	 * usually do: less, up a mountain, on legs, gripping, so it gains on
+	 * you up the steepest of it.
+	 */
+	busHillPull?: number
+	/**
+	 * How far ahead up the hill the camera looks, up a mountain, so what's
+	 * coming is in view, not off the top of the screen.
+	 */
+	lookAhead?: number
 	/** Platforms over the Ground, in order along the course. */
 	platforms?: PlatformDefinition[]
 	/** A Cave it runs through, under a hill. */
@@ -602,10 +679,10 @@ export interface Course {
 	corgis?: number[]
 	/**
 	 * What those are: corgis, or on Machu Picchu, llamas, at the Pyramids,
-	 * camels, in Huddinge's forest, deer, in Furby Fields, unicorns, or on
-	 * The Cliff, gliders, parked along its top.
+	 * camels, in Huddinge's forest, deer, in Furby Fields, unicorns, on
+	 * The Cliff, gliders, parked along its top, or up Everest, mountain goats.
 	 */
-	ride?: 'corgi' | 'llama' | 'camel' | 'deer' | 'glider' | 'unicorn'
+	ride?: 'corgi' | 'llama' | 'camel' | 'deer' | 'glider' | 'unicorn' | 'goat'
 	/**
 	 * The sea, from the foot of a cliff, `from`, to an island's shore, `to`:
 	 * a Gap, the Ground's line across it at its surface, `level`. Down into

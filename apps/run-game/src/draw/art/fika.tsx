@@ -14,6 +14,7 @@ import prinsesstarta from '../../assets/boosts/prinsesstarta.png'
 import semla from '../../assets/boosts/semla.png'
 import spiderCupcake from '../../assets/boosts/spider-cupcake.png'
 import toffeeApple from '../../assets/boosts/toffee-apple.png'
+import { butterTea, mintCake } from '../../courses/kit/everestFika'
 import {
 	captainsHat,
 	karelianPie,
@@ -156,6 +157,8 @@ const ART: Record<FikaItem, string> = {
 	salmiakki,
 	karelianPie,
 	captainsHat,
+	mintCake,
+	butterTea,
 }
 
 /** A fika item, at its size. */

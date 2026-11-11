@@ -1,6 +1,7 @@
 import { flyerLook } from '../draw/flyerLook'
 import { collect } from '../saved/collected'
 import { play } from '../sfx'
+import { PICKUP_WORD } from './collectables'
 import {
 	GOOSE_ALTITUDES,
 	GOOSE_CARRY_HEIGHT,
@@ -243,14 +244,15 @@ function grab(world: World, racer: Racer) {
 		goose.state = 'carrying'
 		goose.rider = racer.id
 		b.carried = GOOSE_CARRY_TICKS
-		collect(`ride:${world.course.flyer ?? 'goose'}`)
+		const kind = `ride:${world.course.flyer ?? 'goose'}` as const
+		collect(kind)
 		b.combo = 0
 		b.stumble = 0
 		b.facing = 1
 		b.ducking = false
 		world.addBonus('geese', GOOSE_POINTS)
 		world.popup(
-			scored(world, look.word, `+${GOOSE_POINTS}`),
+			scored(world, PICKUP_WORD[kind], `+${GOOSE_POINTS}`),
 			b.x,
 			goose.feetY - look.height - 10,
 		)

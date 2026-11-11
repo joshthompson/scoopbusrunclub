@@ -24,6 +24,7 @@ export type Sound =
 	| 'stomp'
 	| 'whoosh'
 	| 'woof'
+	| 'bleat'
 	| 'honk'
 	| 'furby'
 
@@ -111,6 +112,17 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 			],
 			volume: 0.06,
 			slide: 0.8,
+		},
+		/** A mountain goat, calling to be ridden: a wavering bleat. */
+		bleat: {
+			notes: [
+				[620, 0.07, 'sawtooth'],
+				[560, 0.07, 'sawtooth'],
+				[640, 0.07, 'sawtooth'],
+				[540, 0.12, 'sawtooth'],
+			],
+			volume: 0.045,
+			slide: 0.9,
 		},
 		finished: {
 			notes: [

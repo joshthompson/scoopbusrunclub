@@ -17,6 +17,7 @@ import {
 	HorizonTrees,
 } from './Backdrop'
 import { SeaFront } from './Sea'
+import { Snow } from './Snow'
 import {
 	createBanner,
 	createBoost,
@@ -167,6 +168,9 @@ export function RaceCanvas(props: {
 			<div style={styles.sky} />
 			<Canvas
 				scene={props.scene}
+				// Looking up a mountain, the canvas goes right down off the
+				// screen, its scene still showing over the top of it.
+				runOffScreen
 				// Zoomed out to fit a Round's Players in, and looking up (or down)
 				// at them: everything on it goes, the backdrop putting itself back.
 				style={{
@@ -200,6 +204,8 @@ export function RaceCanvas(props: {
 					<div style={styles.loading}>Loading {props.world.course.name}…</div>
 				)}
 			/>
+			{/* Snow falling up a mountain, over the whole screen. */}
+			<Snow world={props.world} />
 			{/* Paused, or between Rounds: the whole screen shaded, not just the
 			    canvas, which goes with the camera (see `styles.css`). */}
 			<Show when={props.scene.modal.get()}>

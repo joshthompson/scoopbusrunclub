@@ -70,6 +70,7 @@ import {
 } from '../game/sky'
 import { steamPuff } from '../game/steam'
 import { countdownWord, scoopFlight, stepWorld } from '../game/step'
+import { tiltAt } from '../game/terrain'
 import {
 	TOWER_ARCH,
 	TOWER_DOOR,
@@ -99,6 +100,7 @@ import { WallBricks } from './Backdrop'
 import { Bubble } from './Bubble'
 import { PixelArt } from './PixelArt'
 import { Pixels } from './Pixels'
+import { BusLegs, LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH } from './art/busLegs'
 import type { CorgiPose } from './art/corgi'
 import { FikaArt } from './art/fika'
 import { GEESE_HEIGHT, GeeseArt, geeseWidth } from './art/geese'
@@ -348,9 +350,19 @@ function runnerLean(world: World, body: Body) {
 	return body.grounded &&
 		body.on === undefined &&
 		Math.abs(body.vx) >= STILL_SPEED
-		? (Math.atan(world.terrain.slope(body.x)) * 180) / Math.PI
+		? leanOn(world, body.x)
 		: 0
 }
+
+/** The most a runner leans with a hill: up a mountain, into it, not over with it. */
+const MOST_LEAN = 16
+
+/** How far someone running up or down the hill at `x` leans with it, in degrees. */
+const leanOn = (world: World, x: number) =>
+	Math.max(
+		-MOST_LEAN,
+		Math.min(MOST_LEAN, (Math.atan(tiltAt(world.terrain, x)) * 180) / Math.PI),
+	)
 
 /**
  * Someone in the pack, drawn the way the runner is, and kept on the scene for
@@ -422,7 +434,7 @@ function createPacer(world: World, p: Pacer) {
 				p.gliding
 					? GLIDING_LEAN + tilt
 					: p.grounded && !standing()
-						? (Math.atan(world.terrain.slope(p.x)) * 180) / Math.PI
+						? leanOn(world, p.x)
 						: 0,
 			)
 			// Ducked through a Tunnel: the one sit frame. Stood still: the one stand frame.
@@ -791,7 +803,7 @@ function createCorgi(world: World, c: Corgi) {
 					? c.spin * 14
 					: airborne
 						? 0
-						: (Math.atan(world.terrain.slope(c.x)) * 180) / Math.PI,
+						: (Math.atan(tiltAt(world.terrain, c.x)) * 180) / Math.PI,
 			)
 		},
 	})
@@ -972,7 +984,7 @@ export function createBus(world: World) {
 	const slope = (x: number) => {
 		const dug = world.course.busFloor
 		const here = dug?.(x)
-		if (here === undefined) return world.terrain.slope(x)
+		if (here === undefined) return tiltAt(world.terrain, x)
 		return ((dug?.(x + 4) ?? here) - (dug?.(x - 4) ?? here)) / 8
 	}
 	const bus = createController({
@@ -1030,10 +1042,72 @@ export function createBus(world: World) {
 		(_: unknown, $age: number): number =>
 			Math.cos(10 + $age / 2 + phase) * -1
 
-	part('bus-wheel1', wheel1Asset, 34, 38, { x: 140, y: 105 }, { y: bounce(0) })
-	part('bus-wheel2', wheel2Asset, 34, 38, { x: 208, y: 103 }, { y: bounce(5) })
-	part('bus-wheel3', wheel3Asset, 19, 23, { x: 68, y: 105 }, { y: bounce(10) })
-	part('bus-wheel4', wheel4Asset, 26, 30, { x: 24, y: 102 }, { y: bounce(15) })
+	/**
+	 * Its legs, in place of its wheels, up a mountain: the far side's behind
+	 * it, where its wheels go, and the near side's over it, once it's drawn.
+	 * Stepping with every tick, so they're drawn again every tick.
+	 */
+	const legs = (type: string, far: boolean) => {
+		if (!look.legs) return
+		const legsLook = look.legs
+		bus.attach(
+			createConnectedController({
+				type,
+				base: bus,
+				width: () => LEGS_WIDTH,
+				height: () => LEGS_HEIGHT,
+				offset: { x: -LEGS_OUT, y: 0 },
+				init: () => ({
+					children: () => (
+						<BusLegs
+							look={legsLook}
+							far={far}
+							ground={WHEEL_BOTTOM}
+							travelled={() => {
+								world.ticks()
+								return world.bus.frontX
+							}}
+						/>
+					),
+				}),
+			}),
+		)
+	}
+	if (look.legs) legs('bus-legs-far', true)
+	else {
+		part(
+			'bus-wheel1',
+			wheel1Asset,
+			34,
+			38,
+			{ x: 140, y: 105 },
+			{ y: bounce(0) },
+		)
+		part(
+			'bus-wheel2',
+			wheel2Asset,
+			34,
+			38,
+			{ x: 208, y: 103 },
+			{ y: bounce(5) },
+		)
+		part(
+			'bus-wheel3',
+			wheel3Asset,
+			19,
+			23,
+			{ x: 68, y: 105 },
+			{ y: bounce(10) },
+		)
+		part(
+			'bus-wheel4',
+			wheel4Asset,
+			26,
+			30,
+			{ x: 24, y: 102 },
+			{ y: bounce(15) },
+		)
+	}
 	part(
 		'bus-window',
 		look.windows,
@@ -1045,6 +1119,7 @@ export function createBus(world: World) {
 		},
 	)
 	part('bus-body', look.body, BUS_WIDTH, BUS_HEIGHT, { x: 0, y: 0 })
+	legs('bus-legs', false)
 	// Its own glider, bolted to its roof, out over the sea.
 	if (world.course.sea)
 		part(

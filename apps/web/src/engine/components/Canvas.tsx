@@ -26,6 +26,12 @@ export interface CanvasProps {
 	underlay?: JSX.Element
 	style?: JSX.CSSProperties
 	class?: string
+	/**
+	 * Keeps the scene running even with its canvas off the screen: for one
+	 * that moves its own canvas about, as the run game's camera does,
+	 * looking a long way up a mountain.
+	 */
+	runOffScreen?: boolean
 	onClick?: (event: Vector) => void
 	onMouseDown?: (event: Vector) => void
 	onMouseUp?: (event: Vector) => void
@@ -51,6 +57,7 @@ export function Canvas<T extends CanvasControllers = CanvasControllers>(
 	// The scene only runs while some of it is on the screen, not while it's
 	// scrolled away.
 	onMount(() => {
+		if (props.runOffScreen) return
 		const observer = new IntersectionObserver(([entry]) =>
 			props.scene.visible.set(entry.isIntersecting),
 		)

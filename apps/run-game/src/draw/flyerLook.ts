@@ -19,8 +19,7 @@ export interface FlyerLook {
 	width: number
 	height: number
 	Art: Component<{ now: number; carrying: boolean }>
-	/** Said, and heard, grabbing hold of one. */
-	word: string
+	/** Heard, grabbing hold of one. What's said is its `PICKUP_WORD`. */
 	sound: Sound
 	/** What its rides are called in the summary. */
 	rides: string
@@ -39,7 +38,6 @@ const GOOSE: FlyerLook = {
 	width: FLYING_GOOSE_WIDTH,
 	height: FLYING_GOOSE_HEIGHT,
 	Art: FlyingGooseArt,
-	word: 'Honk honk!',
 	sound: 'honk',
 	rides: 'Goose rides',
 	grip: 10,
@@ -49,7 +47,6 @@ const DRAGON: FlyerLook = {
 	width: DRAGON_WIDTH,
 	height: DRAGON_HEIGHT,
 	Art: DragonArt,
-	word: 'Dragon ride!',
 	sound: 'whoosh',
 	rides: 'Dragon rides',
 	grip: DRAGON_HEIGHT / 2 + 4,

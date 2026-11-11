@@ -11,7 +11,7 @@ import { COURSES } from '../courses'
 import type { Course } from '../courses/types'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { PX_PER_M, START_X } from '../game/constants'
-import { POPUP_TICKS } from '../game/step'
+import { POPUP_TICKS, onScreen } from '../game/step'
 import { type World, createWorld } from '../game/world'
 import { type Action, anyControls, setTouch } from '../input'
 import {
@@ -441,18 +441,23 @@ function Hud(props: {
 			</Show>
 
 			<For each={world.popups()}>
-				{(popup) => (
-					<div
-						style={{
-							...styles.popup,
-							left: `${popup.x - world.camera()}px`,
-							top: `${popup.y - 24 - (world.ticks() - popup.born) * 0.8}px`,
-							opacity: 1 - (world.ticks() - popup.born) / POPUP_TICKS,
-						}}
-					>
-						{popup.text}
-					</div>
-				)}
+				{(popup) => {
+					// Where it is on the screen, however far up the camera's
+					// looking: up a mountain, or a building.
+					const at = () => onScreen(world, popup.x, popup.y)
+					return (
+						<div
+							style={{
+								...styles.popup,
+								left: `${at().x}px`,
+								top: `${at().y - 24 - (world.ticks() - popup.born) * 0.8}px`,
+								opacity: 1 - (world.ticks() - popup.born) / POPUP_TICKS,
+							}}
+						>
+							{popup.text}
+						</div>
+					)
+				}}
 			</For>
 
 			<Show when={world.phase() === 'countdown'}>

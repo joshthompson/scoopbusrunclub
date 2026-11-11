@@ -54,6 +54,8 @@ const GROUND_DOWN = 0.92
  * ground in.
  */
 const HORIZON_TOP = 120
+/** Up a mountain, the ground's never higher up the window than this: it follows it up. */
+const GROUND_HIGHEST = 0.45
 /** How quickly the window follows the ground up and down the hills. */
 const FOLLOW = 0.08
 /** Scenery stands this far back from the path, as in the game. */
@@ -74,15 +76,21 @@ export function CoursePreview(props: {
 	const from = course.look?.previewFrom ?? START_X + terrain.length * START_AT
 	const to = terrain.finishX - sceneWidth
 	const [camera, setCamera] = createSignal(from)
-	/** The window's top, in the scene: down with the ground, low on the course. */
-	const topFor = (cameraX: number) =>
-		Math.min(
+	/**
+	 * The window's top, in the scene: down with the ground, low on the
+	 * course; and up with it, up a mountain, keeping it at least
+	 * `GROUND_HIGHEST` of the way down the window.
+	 */
+	const topFor = (cameraX: number) => {
+		const ground = terrain.groundY(cameraX + followAcross)
+		return Math.min(
 			VIEW_HEIGHT - sceneHeight(),
 			Math.max(
-				HORIZON_TOP,
-				terrain.groundY(cameraX + followAcross) - sceneHeight() * GROUND_DOWN,
+				Math.min(HORIZON_TOP, ground - sceneHeight() * GROUND_HIGHEST),
+				ground - sceneHeight() * GROUND_DOWN,
 			),
 		)
+	}
 	const [top, setTop] = createSignal(topFor(from))
 
 	let frame = 0
@@ -107,7 +115,17 @@ export function CoursePreview(props: {
 	})
 	onCleanup(() => cancelAnimationFrame(frame))
 
-	const view: View = { course, terrain, camera }
+	/**
+	 * How far up it's looking, as the game's camera would be, for a backdrop
+	 * that rises with it, up a mountain: from where it looks at the start.
+	 */
+	const cameraY = () => Math.min(0, top() + sceneHeight() - VIEW_HEIGHT)
+	const view: View = {
+		course,
+		terrain,
+		camera,
+		...(course.look?.horizonRise !== undefined && { cameraY }),
+	}
 	/** Stood on the ground at `x`, `sink` px into it, in the scene. */
 	const at = (x: number, sink = 0): JSX.CSSProperties => ({
 		position: 'absolute',
@@ -194,6 +212,8 @@ export function CoursePreview(props: {
 										class={item.scale ? 'pixelated' : undefined}
 										style={{
 											display: 'block',
+											// Its own size, however far along the course it's stood.
+											'max-width': 'none',
 											filter: item.filter,
 											...(item.scale
 												? {
@@ -475,7 +495,10 @@ const styles = {
 		top: 0,
 		height: `${VIEW_HEIGHT}px`,
 		'transform-origin': '0 0',
-		overflow: 'hidden',
+		// Clipped either side, but not over the top: up a mountain, the
+		// window looks a long way up over it. The window clips the rest.
+		'overflow-x': 'clip',
+		'overflow-y': 'visible',
 	},
 	course: {
 		position: 'absolute',

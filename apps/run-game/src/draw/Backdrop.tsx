@@ -12,7 +12,7 @@ import tree1Asset from '../assets/scenery/tree1.png'
 import tree2Asset from '../assets/scenery/tree2.png'
 import { svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
-import type { BackdropPiece, SkyFlyer } from '../courses/types'
+import type { BackdropPiece, PitLook, SkyFlyer } from '../courses/types'
 import {
 	CAMERA_LEAD,
 	DEPTH_SLANT,
@@ -49,6 +49,8 @@ const BACKDROP_LIFT = 0.3
  * a course can climb.
  */
 export const SKY_ROOM = 1200
+/** Over the top of a mountain, as much again as the top of the screen has over a course's highest. */
+const MOUNTAIN_ROOM = 240
 
 const layer: JSX.CSSProperties = { position: 'absolute', left: 0, right: 0 }
 
@@ -103,6 +105,12 @@ const NEARER_TOP = 30
 const NEARER_STEP = 90
 const NEARER_PARALLAX = 0.26
 const NEARER_FASTER = 0.14
+
+/** Up a mountain, how much of the camera looking up the horizon rises with, till it's risen as far as it goes. */
+const HORIZON_RISE_RATE = 0.4
+
+/** How far a horizon's own sky goes on up over the top of the screen. */
+const HORIZON_SKY_OVER = 1200
 
 /** Where the middle band of hills starts, which the far scenery peeks over. */
 const HORIZON = 216
@@ -299,6 +307,20 @@ export function Backdrop(props: { world: View }) {
 	/** A horizon's bands, far to near, each its colour on down below it. */
 	const horizonBands = (horizon: NonNullable<typeof look.horizon>) => (
 		<>
+			{/* Its own sky, solid on up over the top of the screen, for the
+			    backdrop sinking away under a climb. */}
+			<Show when={horizon.sky}>
+				{(sky) => (
+					<div
+						style={{
+							...layer,
+							top: `${-HORIZON_SKY_OVER}px`,
+							bottom: 0,
+							background: `linear-gradient(to bottom, ${sky()[0]} ${HORIZON_SKY_OVER}px, ${sky()[1]} ${HORIZON_SKY_OVER + HORIZON}px)`,
+						}}
+					/>
+				)}
+			</Show>
 			{/* Spires and towers rising out of the far roofs, behind them. */}
 			<Show when={horizon.spires}>
 				{(spires) =>
@@ -362,18 +384,33 @@ export function Backdrop(props: { world: View }) {
 
 	// The whole canvas goes with the camera looking up or down: this goes
 	// back the other way, all but a little of it.
-	const lift = () =>
-		`translateY(${Math.round((props.world.cameraY?.() ?? 0) * (1 - (look.horizonLift ?? BACKDROP_LIFT)))}px)`
+	const lift = () => {
+		const cameraY = props.world.cameraY?.() ?? 0
+		// Up a mountain, it rises as far as it goes, then stays put.
+		if (look.horizonRise !== undefined)
+			return `translateY(${Math.round(cameraY - Math.min(look.horizonRise, -cameraY * HORIZON_RISE_RATE))}px)`
+		return `translateY(${Math.round(cameraY * (1 - (look.horizonLift ?? BACKDROP_LIFT)))}px)`
+	}
 
 	return (
-		<div style={{ position: 'absolute', inset: 0, transform: lift() }}>
+		<div
+			style={{
+				position: 'absolute',
+				inset: 0,
+				// Risen up a mountain, on down as far again, so it's still
+				// there at the bottom of the screen.
+				bottom: `${-(look.horizonRise ?? 0)}px`,
+				transform: lift(),
+			}}
+		>
+			{/* On up over the top of the screen too, the same colour as its
+			    top, so nothing shows a line where it starts. */}
 			<div
 				style={{
 					...layer,
-					top: 0,
+					top: `${-HORIZON_SKY_OVER}px`,
 					bottom: 0,
-					background:
-						'linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))',
+					background: `linear-gradient(to bottom, var(--sky-blue-top) ${HORIZON_SKY_OVER}px, var(--sky-blue-bottom))`,
 				}}
 			/>
 			<img
@@ -745,6 +782,8 @@ export function HorizonTrees(props: { world: View }) {
 }
 
 const STEP = 4
+/** How many columns either way a smoothed layer of the ground's averaged over. */
+const SMOOTH_COLUMNS = 30
 /** How much water the Ground draws behind a bridge's path, over its verge: the backdrop has the rest (see `BridgeWater`). */
 const BRIDGE_BEHIND = VERGE + 6
 /** A bridge's quay walls: how wide, how far over the water they come, and how tall. */
@@ -789,23 +828,52 @@ export function Ground(props: { world: View }) {
 				: Math.round(terrain.groundY(middle) / 2) * 2,
 		)
 	}
+	/** Room over the top of the screen for it: more, up a mountain, to its top. */
+	const skyRoom = Math.max(
+		SKY_ROOM,
+		MOUNTAIN_ROOM -
+			Math.min(...tops.map((top) => top ?? Number.POSITIVE_INFINITY)),
+	)
 
 	/**
 	 * The ground's outline, `offset` px down from it, closed off along the
 	 * bottom: a piece either side of each Gap.
 	 */
-	const outline = (offset: number) => {
+	/**
+	 * The tops, smoothed: for layers deep under the path, so its steps and
+	 * the corners where its slope changes don't show right down through them.
+	 * Not across a Gap.
+	 */
+	let smoothed: (number | undefined)[] | undefined
+	const smoothTops = () => {
+		if (smoothed) return smoothed
+		smoothed = tops.map((top, i) => {
+			if (top === undefined) return undefined
+			let sum = 0
+			let count = 0
+			for (let k = i - SMOOTH_COLUMNS; k <= i + SMOOTH_COLUMNS; k++) {
+				const near = tops[k]
+				if (near === undefined) continue
+				sum += near
+				count++
+			}
+			return Math.round(sum / count / 2) * 2
+		})
+		return smoothed
+	}
+	const outline = (offset: number, smooth = false) => {
+		const along = smooth ? smoothTops() : tops
 		let d = ''
 		let run: number[] = []
 		/** Along its tops, and back along its bottoms. */
 		const flush = () => {
 			if (!run.length) return
-			d += ` M${run[0] * STEP},${(tops[run[0]] ?? 0) + offset}`
+			d += ` M${run[0] * STEP},${(along[run[0]] ?? 0) + offset}`
 			for (const i of run)
-				d += ` V${(tops[i] ?? 0) + offset} H${(i + 1) * STEP}`
+				d += ` V${(along[i] ?? 0) + offset} H${(i + 1) * STEP}`
 			for (let k = run.length - 1; k >= 0; k--) {
 				const i = run[k]
-				d += ` V${Math.max((tops[i] ?? 0) + offset, bottoms[i])} H${i * STEP}`
+				d += ` V${Math.max((along[i] ?? 0) + offset, bottoms[i])} H${i * STEP}`
 			}
 			d += ' Z'
 			run = []
@@ -836,13 +904,20 @@ export function Ground(props: { world: View }) {
 	 * Down each Gap, from the back of the path on its lower side: a drop,
 	 * behind the ground either side.
 	 */
-	const pits = terrain.gaps.map((gap) => ({
-		left: gap.from - DRAWN_FROM,
-		width: gap.to - gap.from,
-		top:
-			Math.max(terrain.groundY(gap.from - 1), terrain.groundY(gap.to)) -
-			PATH_BACK,
-	}))
+	const pits = terrain.gaps.map((gap) => {
+		const near = terrain.groundY(gap.from - 1) - PATH_BACK
+		const far = terrain.groundY(gap.to) - PATH_BACK
+		const pitLook = props.world.course.look?.pit
+		return {
+			left: gap.from - DRAWN_FROM,
+			width: gap.to - gap.from,
+			// From the lower bank's back edge; or, with walls drawn in it,
+			// from the higher one's, its top cut across from one to the other.
+			top: pitLook ? Math.min(near, far) : Math.max(near, far),
+			near,
+			far,
+		}
+	})
 	const pitLook =
 		props.world.course.look?.gap ??
 		'linear-gradient(to bottom, var(--dirt-darker-brown), #140b05 90px)'
@@ -1024,7 +1099,8 @@ export function Ground(props: { world: View }) {
 
 	// The path, with the line everyone runs along down its middle, and the
 	// grass on down to the bottom of the screen in front of it.
-	const layers: [number, string][] = props.world.course.look?.ground ?? [
+	const layers: [number, string, boolean?][] = props.world.course.look
+		?.ground ?? [
 		// The verge: the same green as the field, so it only shows where
 		// the course runs higher than the field does.
 		[-PATH_BACK - VERGE, 'var(--grass-green)'],
@@ -1057,10 +1133,25 @@ export function Ground(props: { world: View }) {
 							bottom: 0,
 							background: pitLook,
 							overflow: 'hidden',
+							// Its top straight across from one bank to the other.
+							'clip-path': props.world.course.look?.pit
+								? `polygon(0 ${pit.near - pit.top}px, 100% ${pit.far - pit.top}px, 100% 100%, 0 100%)`
+								: undefined,
 						}}
 					>
 						<Show when={props.world.course.look?.pitFire}>
 							<HellFire width={pit.width} seed={pit.left} />
+						</Show>
+						<Show when={props.world.course.look?.pit}>
+							{(look) => (
+								<PitInside
+									look={look()}
+									width={pit.width}
+									near={pit.near - pit.top}
+									far={pit.far - pit.top}
+									seed={pit.left}
+								/>
+							)}
 						</Show>
 					</div>
 				)}
@@ -1071,16 +1162,20 @@ export function Ground(props: { world: View }) {
 			<svg
 				style={{
 					position: 'absolute',
-					top: `${-SKY_ROOM}px`,
+					top: `${-skyRoom}px`,
 					left: 0,
 					display: terrain.blocks ? 'none' : undefined,
 				}}
 				width={width}
-				height={VIEW_HEIGHT + SKY_ROOM}
-				viewBox={`0 ${-SKY_ROOM} ${width} ${VIEW_HEIGHT + SKY_ROOM}`}
+				height={VIEW_HEIGHT + skyRoom}
+				viewBox={`0 ${-skyRoom} ${width} ${VIEW_HEIGHT + skyRoom}`}
 				shape-rendering="crispEdges"
 				aria-hidden="true"
 			>
+				{/* The course's own patterns, for its layers. */}
+				<Show when={props.world.course.look?.groundDefs}>
+					{(defs) => <defs innerHTML={defs()} />}
+				</Show>
 				{/* Colours that change along the course, for its layers. */}
 				<defs>
 					<For each={props.world.course.look?.strips ?? []}>
@@ -1101,10 +1196,13 @@ export function Ground(props: { world: View }) {
 										return (
 											<>
 												<stop offset={at(x)} stop-color={colour} />
-												<stop
-													offset={next === undefined ? 1 : at(next)}
-													stop-color={colour}
-												/>
+												{/* Held till the next, unless it blends into it. */}
+												<Show when={!strip.blend}>
+													<stop
+														offset={next === undefined ? 1 : at(next)}
+														stop-color={colour}
+													/>
+												</Show>
 											</>
 										)
 									}}
@@ -1137,8 +1235,25 @@ export function Ground(props: { world: View }) {
 					)}
 				</Show>
 				<For each={layers}>
-					{([offset, fill]) => <path d={outline(offset)} fill={fill} />}
+					{([offset, fill, smooth]) => (
+						<path d={outline(offset, smooth)} fill={fill} />
+					)}
 				</For>
+				{/* Its Ledges, drawn as rock. */}
+				<Show when={props.world.course.look?.ledgeRock}>
+					{(look) => (
+						<For each={terrain.ledges ?? []}>
+							{(x) => (
+								<LedgeRock
+									look={look()}
+									x={x - DRAWN_FROM}
+									low={terrain.groundY(x - 1)}
+									high={terrain.groundY(x + 1)}
+								/>
+							)}
+						</For>
+					)}
+				</Show>
 				{/* A rainbow's bands, under the path over it. */}
 				<For each={rainbow ? RAINBOW : []}>
 					{(colour, k) => (
@@ -1797,6 +1912,271 @@ const FLAME: [number, number, number, number, string][] = [
 	[1, 5, 4, 5, '#ff8a1c'],
 	[2, 7, 2, 3, '#ffe066'],
 ]
+
+/** How far a Ledge's rock goes on under the path over it, tapering away into the ground. */
+const LEDGE_WEDGE = 64
+
+/**
+ * A Ledge, as rock: an outcrop, its face where the ground steps up at `x`,
+ * from the path at its foot, `low`, up to its top, `high`, jagged; and on
+ * under the path over it, a wedge of it tapering away into the ground. In
+ * chunky blocks, its strata broken, lit along its face, snow lying on top
+ * and drifted at its foot. A fixed rope down it, from a piton on top; or a
+ * big one, a ladder up it. In the Ground's own pixels.
+ */
+function LedgeRock(props: {
+	look: NonNullable<NonNullable<World['course']['look']>['ledgeRock']>
+	x: number
+	low: number
+	high: number
+}) {
+	const { look, x, low, high } = props
+	const random = seeded(Math.round(x))
+	const snap = (n: number) => Math.round(n / 2) * 2
+	const top = snap(high - PATH_BACK - 2)
+	const foot = snap(low + PATH_FRONT + 8)
+	const under = snap(high + PATH_FRONT)
+	/** Each strata line's own wobble, and where it's broken. */
+	const strata = Array.from({ length: 64 }, () => ({
+		wobble: snap(random() * 4),
+		gap: random() < 0.3,
+	}))
+	const rects: [number, number, number, number, string][] = []
+	/** A column of rock, 2 px wide, from `from` down to `to`, in runs of one colour. */
+	const column = (cx: number, from: number, to: number, face: boolean) => {
+		let run = from
+		let colour: string | undefined
+		const flush = (y: number) => {
+			if (colour && y > run) rects.push([cx, run, 2, y - run, colour])
+			run = y
+		}
+		for (let y = from; y < to; y += 2) {
+			const line = Math.floor((y - top + strata[(cx >> 3) & 63].wobble) / 10)
+			const onLine = (y - top + strata[(cx >> 3) & 63].wobble) % 10 < 2
+			let here = look.rock
+			if (face && y - from < 2) here = look.lit
+			else if (onLine && !strata[(line + (cx >> 4)) & 63].gap) here = look.shade
+			else {
+				const roll = random()
+				if (roll < 0.07) here = look.shade
+				else if (roll < 0.13) here = look.lit
+			}
+			if (here !== colour) {
+				flush(y)
+				colour = here
+			}
+		}
+		flush(to)
+	}
+	// Its face, jagged, where the ground steps up.
+	for (let cx = snap(x - 10); cx < x + 4; cx += 2) {
+		const jag = snap(random() * 6)
+		column(cx, top + (cx < x - 6 ? jag : 0), foot, cx < x - 6)
+		if (cx === snap(x - 10))
+			rects.push([cx, top + jag, 2, foot - top - jag, look.lit])
+	}
+	// On under the path over it, tapering away.
+	for (let cx = snap(x + 4); cx < x + LEDGE_WEDGE; cx += 2) {
+		const t = (cx - x) / LEDGE_WEDGE
+		const bottom = snap(foot + (under + 6 - foot) * t + random() * 10 - 4)
+		if (bottom > under) column(cx, under, bottom, false)
+	}
+	// Snow on top of it, in lumps, and drifted at its foot.
+	for (let cx = snap(x - 12); cx < x + 4; cx += 2) {
+		const lump = snap(random() * 4)
+		rects.push([cx, top - 4 - lump, 2, 6 + lump, look.snow])
+	}
+	for (let cx = snap(x - 20); cx < x - 10; cx += 2) {
+		const drift = snap((cx - (x - 22)) / 2)
+		rects.push([cx, snap(low - PATH_BACK + 4 - drift), 2, drift + 2, look.snow])
+	}
+	const tall = low - high > 48
+	return (
+		<g>
+			<For each={rects}>
+				{([rx, ry, w, h, fill]) => (
+					<rect x={rx} y={ry} width={w} height={h} fill={fill} />
+				)}
+			</For>
+			<Show
+				when={tall}
+				fallback={
+					// A fixed rope, from a piton on top, down its face and off
+					// along the path, sagging.
+					<>
+						<rect
+							x={x + 2}
+							y={top - 8}
+							width={4}
+							height={6}
+							fill={look.shade}
+						/>
+						<polyline
+							points={`${x + 4},${top - 4} ${x - 6},${top + 10} ${x - 10},${snap(low - 6)} ${x - 46},${snap(low - 2)}`}
+							fill="none"
+							stroke={look.rope}
+							stroke-width={2}
+						/>
+					</>
+				}
+			>
+				{/* A ladder up it, its feet on the path, leaning on its top. */}
+				<polyline
+					points={`${x - 26},${snap(low)} ${x - 4},${top - 6}`}
+					fill="none"
+					stroke={look.ladder}
+					stroke-width={3}
+				/>
+				<polyline
+					points={`${x - 16},${snap(low)} ${x + 6},${top - 6}`}
+					fill="none"
+					stroke={look.ladder}
+					stroke-width={3}
+				/>
+				<For each={[0.15, 0.3, 0.45, 0.6, 0.75, 0.9]}>
+					{(t) => {
+						const y = snap(low + (top - 6 - low) * t)
+						const left = x - 26 + 22 * t
+						return (
+							<rect x={left} y={y} width={10} height={2} fill={look.ladder} />
+						)
+					}}
+				</For>
+			</Show>
+		</g>
+	)
+}
+
+/** How far down a pit its walls are drawn, from its rims: under that, it's all dark. */
+const PIT_WALLS = 240
+/** How far down from its rims a pit's gone dark. */
+const PIT_DARK = 150
+
+/**
+ * Inside a Gap: its walls going down either side, ragged, the far one lit
+ * and the near one in shadow, seams across them, darker and darker the
+ * deeper, so it's plain it's somewhere to fall. Snow over a crevasse's lips
+ * and icicles off them; slime running down a sewer's, and its sludge
+ * glinting far below. `near` and `far` are its rims, the tops of its banks'
+ * back edges, down from its top.
+ */
+function PitInside(props: {
+	look: PitLook
+	width: number
+	near: number
+	far: number
+	seed: number
+}) {
+	const { look, width, near, far } = props
+	const random = seeded(Math.round(props.seed) + 17)
+	const snap = (n: number) => Math.round(n / 2) * 2
+	const rim = Math.min(near, far)
+	const bottom = Math.max(near, far) + PIT_WALLS
+	const rects: [number, number, number, number, string][] = []
+	// Seams across the back of it: bricks' mortar, or cracks in the ice.
+	const seams = look.seams
+	if (seams) {
+		if (look.slime)
+			for (let y = snap(rim + 6); y < bottom; y += 8) {
+				rects.push([0, y, width, 2, seams])
+				for (let x = (y / 8) % 2 ? 0 : 8; x < width; x += 16)
+					rects.push([x, y + 2, 2, 6, seams])
+			}
+		else
+			for (let i = 0; i < Math.max(2, width / 30); i++) {
+				let x = snap(10 + random() * (width - 20))
+				for (let y = snap(rim + 14 + random() * 30); y < bottom; y += 4) {
+					rects.push([x, y, 2, 4, seams])
+					x += random() < 0.5 ? -2 : 2
+				}
+			}
+	}
+	/** A wall, down from `top`, out from its side: ragged, every few px a different depth. */
+	const wall = (side: 'near' | 'far', top: number, fill: string) => {
+		for (let y = snap(top); y < bottom; y += 6) {
+			const out = snap(6 + random() * 10 + Math.max(0, (y - top) / 40))
+			rects.push(
+				side === 'near' ? [0, y, out, 6, fill] : [width - out, y, out, 6, fill],
+			)
+			// Its edge, in deeper shadow, or catching the light.
+			rects.push(
+				side === 'near'
+					? [out, y, 2, 6, 'rgba(0,0,0,0.25)']
+					: [width - out - 2, y, 2, 6, 'rgba(255,255,255,0.18)'],
+			)
+		}
+	}
+	wall('near', near, look.shade)
+	wall('far', far, look.wall)
+	const { slime, ice } = look
+	if (slime) {
+		// Slime, running down the walls from the rims.
+		for (const side of ['near', 'far'] as const) {
+			const top = side === 'near' ? near : far
+			for (let i = 0; i < 2; i++) {
+				const x =
+					side === 'near'
+						? snap(2 + random() * 8)
+						: width - snap(6 + random() * 8)
+				const length = snap(14 + random() * 40)
+				rects.push([x, top, 2, length, slime.drip])
+				rects.push([x - 1, top + length, 4, 4, slime.drip])
+			}
+		}
+		// The sludge, far down, glinting.
+		const surface = snap(Math.max(near, far) + 56)
+		rects.push([0, surface, width, bottom - surface, slime.sludge])
+		for (
+			let x = snap(random() * 12);
+			x < width - 8;
+			x += 18 + snap(random() * 14)
+		)
+			rects.push([x, surface + 2 + snap(random() * 4), 8, 2, slime.shine])
+	}
+	if (ice) {
+		// Snow over each lip, overhanging it, and icicles hanging off it.
+		for (const side of ['near', 'far'] as const) {
+			const top = side === 'near' ? near : far
+			const over = snap(10 + random() * 6)
+			const at = (x: number, w: number) => (side === 'near' ? x : width - x - w)
+			rects.push([at(0, over), top - 2, over, 8, ice.snow])
+			rects.push([at(0, over - 4), top + 6, over - 4, 4, ice.snow])
+			for (let i = 0; i < 3; i++) {
+				const x = snap(2 + random() * (over - 4))
+				const length = snap(6 + random() * 14)
+				for (let k = 0; k < length; k += 2) {
+					const w = k < length / 2 ? 4 : 2
+					rects.push([at(x, w), top + 10 + k, w, 2, ice.icicle])
+				}
+			}
+		}
+	}
+	return (
+		<>
+			<svg
+				width={width}
+				height={bottom}
+				shape-rendering="crispEdges"
+				aria-hidden="true"
+				style={{ position: 'absolute', left: 0, top: 0 }}
+			>
+				<For each={rects}>
+					{([x, y, w, h, fill]) => (
+						<rect x={x} y={y} width={w} height={h} fill={fill} />
+					)}
+				</For>
+			</svg>
+			{/* Darker and darker, the deeper. */}
+			<div
+				style={{
+					position: 'absolute',
+					inset: 0,
+					background: `linear-gradient(to bottom, transparent ${rim + 20}px, rgba(4, 6, 12, 0.6) ${rim + PIT_DARK / 2}px, rgba(4, 6, 12, 0.94) ${rim + PIT_DARK}px)`,
+				}}
+			/>
+		</>
+	)
+}
 
 /**
  * Fire down a pit into hell: flames along its bottom, each its own size and

@@ -10,6 +10,12 @@ export interface Terrain {
 	/** Its slope at `x`: how far down it goes for every pixel along, so negative is uphill. */
 	slope: (x: number) => number
 	/**
+	 * How steep it looks at `x`, where that's steeper than it is to run up:
+	 * up a mountain, drawn steep, but no harder going than a hill. What
+	 * whoever's on it leans with. Its `slope`, if not said.
+	 */
+	tilt?: (x: number) => number
+	/**
 	 * Stretches with no Ground, in order. `groundY` still runs straight
 	 * across them, as the line the bus and the Pacers keep to.
 	 */
@@ -43,9 +49,13 @@ export interface Gap {
 	to: number
 }
 
+/** How steep the ground looks at `x`: see `Terrain['tilt']`. */
+export const tiltAt = (terrain: Terrain, x: number) =>
+	(terrain.tilt ?? terrain.slope)(x)
+
 /** A terrain's gaps and walls, from its gaps, where its ground steps, and its Ledges. */
 export function withGaps(
-	ground: Pick<Terrain, 'length' | 'finishX' | 'groundY' | 'slope'>,
+	ground: Pick<Terrain, 'length' | 'finishX' | 'groundY' | 'slope' | 'tilt'>,
 	gaps: Gap[] = [],
 	steps: number[] = [],
 	ledges: number[] = [],

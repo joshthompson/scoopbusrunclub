@@ -613,8 +613,15 @@ export const sewers: CourseDefinition = {
 				[4, KERB],
 			],
 		},
-		// Down a channel: sludge, and on down into the dark.
-		gap: 'linear-gradient(to bottom, #5b7a22 0 8px, #34481a 8px, #10160a 140px)',
+		// Down a channel: its brick going on down into the dark, slime
+		// running down it, and the sludge, glinting, a long way down.
+		gap: 'linear-gradient(to bottom, #4a2c20, #2a1912 60px, #0c0806 140px)',
+		pit: {
+			wall: BRICK,
+			shade: '#5a3424',
+			seams: 'rgba(0, 0, 0, 0.35)',
+			slime: { drip: '#6f9a2a', sludge: '#1f2c0e', shine: '#7fae34' },
+		},
 		// Puddles of sludge, green, not mud.
 		mud: 'hue-rotate(55deg) saturate(1.2) brightness(0.8)',
 		// Rubble, not rocks.

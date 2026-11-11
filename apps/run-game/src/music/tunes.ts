@@ -516,6 +516,52 @@ export const TUNES: Record<string, Tune> = {
 			},
 		],
 	},
+
+	// Up Everest: D minor pentatonic over a low drone, a bansuri's line
+	// climbing a little higher every bar, and a singing bowl ringing out.
+	everest: {
+		bars: 4,
+		tracks: [
+			{
+				voice: 'sub',
+				pattern: bars(
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ C2 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'F2 _ _ _ _ _ _ _ G2 _ _ _ A2 _ _ _',
+				),
+				gain: 0.13,
+			},
+			{
+				voice: 'pluck',
+				pattern: bars(
+					'D3 - A3 - D4 - A3 - D3 - A3 - D4 - A3 -',
+					'D3 - A3 - D4 - A3 - C3 - G3 - C4 - G3 -',
+					'D3 - A3 - D4 - A3 - D3 - A3 - D4 - A3 -',
+					'F3 - C4 - F4 - C4 - G3 - D4 - A3 - E4 -',
+				),
+				gain: 0.05,
+			},
+			{
+				voice: 'whistle',
+				pattern: bars(
+					'D5 _ _ - F5 - G5 _ A5 _ _ _ G5 - F5 -',
+					'G5 _ _ - A5 - C6 _ A5 _ _ _ G5 - F5 -',
+					'A5 _ _ - C6 - D6 _ C6 _ _ _ A5 - G5 -',
+					'C6 _ _ - D6 - F6 _ E6 _ _ _ D6 _ _ -',
+				),
+				gain: 0.06,
+			},
+			{
+				voice: 'bell',
+				pattern: bars(
+					'D6 - - - - - - - - - - - - - - -',
+					'- - - - - - - - A5 - - - - - - -',
+				),
+				gain: 0.035,
+			},
+		],
+	},
 }
 
 /** A course with no tune of its own yet gets Haga's. */

@@ -12,6 +12,7 @@ import { rideLook } from '../draw/rideLook'
 import { collect } from '../saved/collected'
 import { play } from '../sfx'
 import { ceilingAt, inTunnel, rockOver } from './cave'
+import { PICKUP_WORD } from './collectables'
 import {
 	AIR_PUSH,
 	BARCODE_BOOST,
@@ -78,7 +79,7 @@ import {
 import { MUMMY_HEIGHT } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
 import { cyclistAt } from './cyclists'
-import { FIKA_SIZE, FIKA_WORD } from './fika'
+import { FIKA_SIZE } from './fika'
 import { carryHeight, glide, stepFlyers } from './flyers'
 import { scoopFurbies, stepFurbies } from './furbies'
 import { atSea, glidingBox, stepGliding } from './gliders'
@@ -1249,7 +1250,7 @@ function collide(world: World, racer: Racer) {
 					b.vx = boost(world, b.vx, b.facing, FIKA_BOOST)
 					world.addBonus('fika', FIKA_POINTS)
 					world.popup(
-						scored(world, FIKA_WORD[o.item] ?? 'Fika!', `+${FIKA_POINTS}`),
+						scored(world, PICKUP_WORD[`fika:${o.item}`], `+${FIKA_POINTS}`),
 						b.x,
 						top,
 					)
@@ -1268,7 +1269,11 @@ function collide(world: World, racer: Racer) {
 					collect('barcode')
 					b.vx = boost(world, b.vx, b.facing, BARCODE_BOOST)
 					world.addBonus('barcodes', BARCODE_POINTS)
-					world.popup(scored(world, 'Scanned!', `+${BARCODE_POINTS}`), b.x, top)
+					world.popup(
+						scored(world, PICKUP_WORD.barcode, `+${BARCODE_POINTS}`),
+						b.x,
+						top,
+					)
 					play('scan')
 				}
 				break
@@ -1287,7 +1292,7 @@ function collide(world: World, racer: Racer) {
 					b.vx = boost(world, b.vx, b.facing, PUMPKIN_BOOST)
 					world.addBonus('pumpkins', PUMPKIN_POINTS)
 					world.popup(
-						scored(world, 'Pumpkin head!', `+${PUMPKIN_POINTS}`),
+						scored(world, PICKUP_WORD.pumpkin, `+${PUMPKIN_POINTS}`),
 						b.x,
 						top,
 					)
@@ -1372,7 +1377,10 @@ function stepBus(world: World) {
 		}
 		// Slowed going uphill, as everyone is: its wheels' slope.
 		const slope = world.terrain.slope(bus.frontX - BUS_MIDDLE_BEHIND)
-		const uphill = Math.min(0, hillPull(slope)) * BUS_HILL_PULL
+		const uphill =
+			Math.min(0, hillPull(slope)) *
+			BUS_HILL_PULL *
+			(world.course.busHillPull ?? 1)
 		bus.frontX += bus.speed * Math.max(0.3, 1 + uphill)
 	}
 	scoopPack(world)
@@ -1614,6 +1622,23 @@ const lookAt = (b: Body) =>
 		: { high: b.floor, low: Math.max(b.floor, b.feetY) }
 
 /**
+ * The highest the Ground goes from `x` to the course's `lookAhead` past it,
+ * the way they're facing: up a mountain, what the camera looks up to, so
+ * the climb ahead's in view. Where they stood, `high`, otherwise.
+ */
+function upAhead(world: World, x: number, facing: number, high: number) {
+	const ahead = world.course.lookAhead
+	if (!ahead) return high
+	const { terrain } = world
+	let top = high
+	for (let along = 40; along <= ahead; along += 40) {
+		const at = x + along * facing
+		if (!terrain.inGap(at)) top = Math.min(top, terrain.groundY(at))
+	}
+	return top
+}
+
+/**
  * How far up the camera wants to look for floors from `high` to `low`, at
  * `zoom`: no further down than where it starts, which is the course's
  * lowest.
@@ -1658,6 +1683,9 @@ function stepCamera(world: World) {
 	if (Math.abs(wantZoom - zoom) > 0.001)
 		world.setZoom(zoom + (wantZoom - zoom) * ZOOM_EASE)
 	const view = gliding ?? lookAt(b)
+	// Up a mountain, up the climb ahead too.
+	if (!gliding && !flyingHigh(b))
+		view.high = upAhead(world, b.x, b.facing, view.high)
 	const targetY = cameraYFor(view.high, view.low, world.zoom())
 	const cameraY = world.cameraY()
 	// Quick after them, flying high, or dropping a long way.
@@ -1725,7 +1753,11 @@ function frameEveryone(world: World) {
 		: undefined
 	const high = Math.min(
 		glide?.high ?? Number.POSITIVE_INFINITY,
-		...running.map((r) => lookAt(r.body).high),
+		...running.map((r) =>
+			flyingHigh(r.body)
+				? lookAt(r.body).high
+				: upAhead(world, r.body.x, r.body.facing, lookAt(r.body).high),
+		),
 	)
 	const low = Math.max(
 		glide?.low ?? Number.NEGATIVE_INFINITY,

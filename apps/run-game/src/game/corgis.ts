@@ -1,6 +1,7 @@
 import { rideLook } from '../draw/rideLook'
 import { collect } from '../saved/collected'
 import { play } from '../sfx'
+import { PICKUP_WORD } from './collectables'
 import {
 	CORGI_CALL,
 	CORGI_POINTS,
@@ -169,9 +170,9 @@ function mount(world: World, racer: Racer) {
 		c.rider = racer.id
 		c.barking = false
 		b.mount = CORGI_RIDE_TICKS
-		collect(
-			`ride:${c.rare && ride.rare ? ride.rare.kind : (world.course.ride ?? 'corgi')}`,
-		)
+		const kind =
+			c.rare && ride.rare ? ride.rare.kind : (world.course.ride ?? 'corgi')
+		collect(`ride:${kind}`)
 		b.combo = 0
 		// Sat on its back: its feet are theirs now.
 		b.x = c.x
@@ -182,7 +183,7 @@ function mount(world: World, racer: Racer) {
 		b.facing = 1
 		world.addBonus('corgis', CORGI_POINTS)
 		world.popup(
-			scored(world, c.rare ? 'Two humps!' : 'Giddy up!', `+${CORGI_POINTS}`),
+			scored(world, PICKUP_WORD[`ride:${kind}`], `+${CORGI_POINTS}`),
 			b.x,
 			back - 40,
 		)

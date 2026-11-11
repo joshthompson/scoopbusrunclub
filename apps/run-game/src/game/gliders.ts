@@ -1,6 +1,7 @@
 import { rideLook } from '../draw/rideLook'
 import { collect } from '../saved/collected'
 import { play } from '../sfx'
+import { PICKUP_WORD } from './collectables'
 import {
 	CORGI_POINTS,
 	GLIDER_BOOST_GRIP,
@@ -130,7 +131,7 @@ export function grabGlider(world: World, racer: Racer) {
 		collect('ride:glider')
 		world.addBonus('corgis', CORGI_POINTS)
 		world.popup(
-			scored(world, 'Wheee!', `+${CORGI_POINTS}`),
+			scored(world, PICKUP_WORD['ride:glider'], `+${CORGI_POINTS}`),
 			b.x,
 			b.feetY - STAND_HEIGHT - 40,
 		)

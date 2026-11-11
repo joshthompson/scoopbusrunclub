@@ -26,6 +26,13 @@ import {
 } from './art/deer'
 import { GLIDER_HEIGHT, GLIDER_WIDTH, GliderArt } from './art/glider'
 import {
+	GOAT_BACK,
+	GOAT_HEIGHT,
+	GOAT_SADDLE,
+	GOAT_WIDTH,
+	GoatArt,
+} from './art/goat'
+import {
 	LLAMA_BACK,
 	LLAMA_HEIGHT,
 	LLAMA_SADDLE,
@@ -129,6 +136,17 @@ const UNICORN: RideLook = {
 	rides: 'Unicorn rides',
 }
 
+const GOAT: RideLook = {
+	width: GOAT_WIDTH,
+	height: GOAT_HEIGHT,
+	back: GOAT_BACK,
+	saddle: GOAT_SADDLE,
+	Art: GoatArt,
+	call: 'Meh-eh-eh!',
+	sound: 'bleat',
+	rides: 'Goat rides',
+}
+
 /** Hung under, not sat on: run into it. See `gliders`. */
 const GLIDER: RideLook = {
 	width: GLIDER_WIDTH,
@@ -148,6 +166,7 @@ const RIDES = {
 	deer: DEER,
 	unicorn: UNICORN,
 	glider: GLIDER,
+	goat: GOAT,
 }
 
 export const rideLook = (course: Pick<Course, 'ride'>) =>
