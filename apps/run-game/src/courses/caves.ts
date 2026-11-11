@@ -372,6 +372,42 @@ const PLATFORMS = SECTIONS.flatMap((s) =>
 			: [],
 )
 
+/** How far along a Tunnel's way in its warning stripes go. */
+const WARNING = 64
+
+/**
+ * Each Tunnel's way in: where it is, and, under a shelf of rock rather than
+ * the cave's roof, the shelf's underside.
+ */
+const MOUTHS: { x: number; roof?: number }[] = [
+	// Tunnels along the floor.
+	...SECTIONS.flatMap((s) => (s.kind === 'slide' ? [{ x: s.from }] : [])),
+	// Along a stack's top level, under the cave's roof.
+	...SECTIONS.flatMap((s) => {
+		if (s.kind !== 'stack') return []
+		const slide = stackSlide(s, s.levels - 1)
+		return slide ? [{ x: slide.from }] : []
+	}),
+	// Under a shelf of rock, thick down to the Tunnel's roof.
+	...PLATFORMS.flatMap((p) =>
+		p.solid === OVER_TUNNEL
+			? [
+					{
+						x: p.x,
+						roof: terrain.groundY(p.x) - p.height + p.solid,
+					},
+				]
+			: [],
+	),
+]
+
+/** Yellow and black stripes over each Tunnel's way in. */
+const WARNINGS: NonNullable<Cave['warnings']> = MOUTHS.map(({ x, roof }) => ({
+	from: x,
+	to: x + WARNING,
+	roof,
+}))
+
 /**
  * Whether `x` is too near a Tunnel's mouth, or a chamber's ledge, for
  * anything to be in the way; or in a stack of tunnels, too low to jump
@@ -483,7 +519,7 @@ export const caves: CourseDefinition = {
 	blurb:
 		'Into the hill and through its caves: duck into the low tunnels, and choose your level, up through the shelves or along under them.',
 	terrain,
-	cave,
+	cave: { ...cave, warnings: WARNINGS },
 	platforms: PLATFORMS,
 	runDirectors: ['keith', 'rick'],
 	cheerers: CHEERERS,

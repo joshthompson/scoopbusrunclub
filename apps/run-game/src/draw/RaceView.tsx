@@ -1,6 +1,6 @@
 import { Scene } from '@/engine'
 import { Canvas } from '@/engine/components'
-import type { JSX } from 'solid-js'
+import { type JSX, Show } from 'solid-js'
 import {
 	HITBOX_HALF_WIDTH,
 	START_X,
@@ -9,7 +9,14 @@ import {
 	VIEW_WIDTH,
 } from '../game/constants'
 import type { World } from '../game/world'
-import { Backdrop, CaveCover, Ground, HorizonTrees } from './Backdrop'
+import {
+	Backdrop,
+	CaveCover,
+	DRAWN_FROM,
+	Ground,
+	HorizonTrees,
+} from './Backdrop'
+import { SeaFront } from './Sea'
 import {
 	createBanner,
 	createBoost,
@@ -21,6 +28,7 @@ import {
 	createForeground,
 	createFurbies,
 	createGameController,
+	createGiantFurby,
 	createHats,
 	createKmSigns,
 	createObstacle,
@@ -31,7 +39,9 @@ import {
 	createRunDirector,
 	createScenery,
 	createScoopArm,
+	createSplashes,
 	createTowers,
+	createWarnings,
 } from './sprites'
 
 /**
@@ -80,6 +90,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			'bus-wheel3',
 			'bus-wheel2',
 			'bus-wheel1',
+			// The bus's glider: its struts' feet behind its roof.
+			'bus-glider',
 			'bus',
 			// The back of a guard tower: behind whoever's coming out of it.
 			'tower-back',
@@ -102,6 +114,7 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createBanner(world, START_X + HITBOX_HALF_WIDTH + 4, 'START'),
 				createParkrunSign(world, START_X - 190),
 				...createKmSigns(world),
+				...createWarnings(world),
 				...createBanner(world, world.terrain.finishX, 'FINISH'),
 				createRunDirector(world),
 				...createPlatforms(world),
@@ -109,7 +122,7 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...world.obstacles.flatMap((state, i) =>
 					createObstacle(world, state, i),
 				),
-				...world.boosts.map((state, i) => createBoost(world, state, i)),
+				...world.boosts.flatMap((state, i) => createBoost(world, state, i)),
 				...createCorgis(world),
 				...createFurbies(world),
 				createBus(world),
@@ -117,6 +130,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createBusDirt(world),
 				...createPack(world),
 				createFlyers(world),
+				...createSplashes(world),
+				...createGiantFurby(world),
 				...createHats(world),
 				...createForeground(world),
 				...createTowers(world),
@@ -169,12 +184,27 @@ export function RaceCanvas(props: {
 						<Ground world={props.world} />
 					</>
 				}
-				// A Cave's rock over everyone in it, till someone racing goes in.
-				overlay={<CaveCover world={props.world} />}
+				// A Cave's rock over everyone in it, till someone racing goes in;
+				// the sea's waves over everyone in it.
+				overlay={
+					<>
+						<CaveCover world={props.world} />
+						<SeaFront
+							world={props.world}
+							from={DRAWN_FROM}
+							to={props.world.terrain.finishX + 1600}
+						/>
+					</>
+				}
 				loading={() => (
 					<div style={styles.loading}>Loading {props.world.course.name}…</div>
 				)}
 			/>
+			{/* Paused, or between Rounds: the whole screen shaded, not just the
+			    canvas, which goes with the camera (see `styles.css`). */}
+			<Show when={props.scene.modal.get()}>
+				<div style={styles.shade} />
+			</Show>
 			{props.overlay}
 		</div>
 	)
@@ -185,6 +215,11 @@ const styles = {
 		position: 'absolute',
 		inset: 0,
 		background: 'var(--sky-blue-top)',
+	},
+	shade: {
+		position: 'absolute',
+		inset: 0,
+		background: 'var(--overlay-black-50)',
 	},
 	loading: {
 		position: 'absolute',

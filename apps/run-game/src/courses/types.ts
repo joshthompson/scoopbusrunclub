@@ -39,7 +39,15 @@ export type Obstacle =
 	 * A Steam Vent, a grate in the ground: now and then it puffs, and whoever's
 	 * on it as it does is fired up into the air.
 	 */
-	| { kind: 'steam'; x: number }
+	| {
+			kind: 'steam'
+			x: number
+			/**
+			 * A Giant Vent: a sewer's way out, firing whoever's on it up and on,
+			 * out of the ground and back up onto the street.
+			 */
+			giant?: boolean
+	  }
 	/**
 	 * A Mummy, in a tomb, shuffling to and fro `pace` either side of `x`,
 	 * arms out: jump it, or stumble. The bus scoops any it reaches.
@@ -51,7 +59,59 @@ export type Obstacle =
 	 * A cyclist, riding towards you from `x`: jump them, or stumble. Riding
 	 * round `loop`, from its far end to its near one, over and over, if it has one.
 	 */
-	| { kind: 'cyclist'; x: number; loop?: [from: number, to: number] }
+	| {
+			kind: 'cyclist'
+			x: number
+			loop?: [from: number, to: number]
+			/** Or riding back and forth between these, turning round at each. */
+			shuttle?: [from: number, to: number]
+	  }
+	/**
+	 * A Swamp Man, in a pool of sludge at `x`: now and then he rises out of
+	 * it, and grabs whoever's in reach, holding them still till he sinks
+	 * back. Jump him.
+	 */
+	| { kind: 'swampman'; x: number }
+	/**
+	 * A Sewage Drain, a grate in the Ceiling at `x`, under the street: in
+	 * waves, everything washed down off the street pours out of it. Through
+	 * it while it's pouring, and you're splattered.
+	 */
+	| { kind: 'sewage'; x: number }
+	/**
+	 * Hands under a graveyard, at `x`: only their fingertips showing, till
+	 * someone steps on them, and they burst up and grab their ankles, holding
+	 * them still a moment. Jump them.
+	 */
+	| { kind: 'hands'; x: number }
+	/**
+	 * Gulls, `count` of them, wheeling about over the sea, `height` over it:
+	 * fly round them, or into them and stumble, scattering them for whoever
+	 * comes after.
+	 */
+	| { kind: 'gulls'; x: number; height: number; count: number }
+	/**
+	 * A hot-air balloon over the sea, its middle drifting slowly up and down
+	 * between `low` and `high` over it: over it or under it, or bump into it.
+	 */
+	| { kind: 'balloon'; x: number; low: number; high: number }
+	/**
+	 * A Storm Cloud, its middle `height` over the sea: now and then lightning
+	 * strikes down out of it into the sea. Into the cloud, or under it as
+	 * it strikes, and you're zapped.
+	 */
+	| { kind: 'storm'; x: number; height: number }
+	/**
+	 * A wind turbine out at sea, its hub `height` over it, its blades
+	 * turning: between them, or over the lot. Into a blade, or its tower,
+	 * and you stumble.
+	 */
+	| { kind: 'turbine'; x: number; height: number }
+	/**
+	 * A whale, surfacing now and then, and spouting `height` up into the
+	 * air: through the spout as it blows, and you're soaked.
+	 */
+	| { kind: 'whale'; x: number; height: number }
 
 /** Something on the course, at `x` along it, that speeds you up. */
 export type Boost =
@@ -69,6 +129,11 @@ export type Boost =
 	 * finish: one last big boost, as at a real parkrun, where it's scanned at the end.
 	 */
 	| { kind: 'barcode'; x: number; height: number }
+	/**
+	 * A Ring in the sky, its middle `height` over the sea: glide through it
+	 * for a boost. There for everyone, once each.
+	 */
+	| { kind: 'ring'; x: number; height: number }
 
 /** The game's colours a course can change: the sky, the grass and the path. */
 export type PaletteVar =
@@ -108,10 +173,25 @@ export interface CourseLook {
 	sun?: string
 	/** Over the trees and leaves on and over the course: the branches, the trees on the brow. */
 	foliage?: string
+	/** A Pothole's colours: a road's, in place of a running track's. */
+	pothole?: PotholeLook
 	/** Over the mud. */
 	mud?: string
+	/** What's said, stepping in it, in place of "Squelch!": a spilt drink's. */
+	mudWord?: string
 	/** Over the rocks, recoloured: the Pyramids' sandstone. */
 	rock?: string
+	/**
+	 * Pictures in place of the rock, taken in turn along the course, each
+	 * drawn `width` by `height`: luggage on a ferry. Still jumped as a rock.
+	 */
+	rocks?: { asset: string; width: number; height: number }[]
+	/**
+	 * Colours that change along the course, for the Ground's layers to fill
+	 * with, as `url(#id)`: each stop a colour from `x` on, till the next.
+	 * A ferry's carpet indoors, its decking out on deck, a quay's granite.
+	 */
+	strips?: { id: string; stops: [x: number, colour: string][] }[]
 	/** A stadium behind the course, in place of hills and scenery: see `StadiumBackdrop`. */
 	stadium?: boolean
 	/**
@@ -127,6 +207,8 @@ export interface CourseLook {
 	nearGap?: [number, number]
 	/** What a Gap's drop looks like: a CSS background, from the path down; `none` to see through it. */
 	gap?: string
+	/** Its Gaps on fire: pits down into hell, flames licking up out of them, embers rising. */
+	pitFire?: boolean
 	/** In place of the sun, `scale` times its size, through the `sun` filter: a moon. */
 	sunAsset?: string
 	sunScale?: number
@@ -167,6 +249,19 @@ export interface CourseLook {
 		nearer?: { asset: string; height: number; fill: string }[]
 	}
 	/**
+	 * How much the backdrop goes with the camera looking up or down, in
+	 * place of the usual little: below 0, it rises as the camera does, as
+	 * the horizon at sea stays level with your eye. High up on a ferry's
+	 * sun deck, the sea's still there over its rail.
+	 */
+	horizonLift?: number
+	/**
+	 * More horizons, one after another along the course, each fading in
+	 * over the last as the camera gets to `from`: what goes by on a voyage,
+	 * from one city out through the islands and over the sea to the next.
+	 */
+	voyage?: { from: number; horizon: NonNullable<CourseLook['horizon']> }[]
+	/**
 	 * A bridge the course ends on, from `from` on: over water, its underside
 	 * this colour, the water in front of it and behind.
 	 */
@@ -185,9 +280,36 @@ export interface CourseLook {
 		 * the water: drawn as at the far end, and turned round at the near one.
 		 */
 		quay?: string
+		/**
+		 * Open water, out to the horizon, all along the course, under
+		 * whatever's across it: no quay along its far side.
+		 */
+		open?: boolean
+		/** The quay's stone under the path before it too, not only past it: a quay at either end. */
+		stoneBefore?: boolean
 	}
+	/**
+	 * A rainbow the path goes up and over, `from` to `to`: its bands under
+	 * the path, nothing under it but the field, its ground `base` there.
+	 */
+	rainbow?: { from: number; to: number; base: (x: number) => number }
+	/** Its Steam Vents as bouncy toadstools, rather than grates. */
+	bouncers?: boolean
 	/** How buildings look, on a course over rooftops: see `BuildingLook`. */
 	buildings?: BuildingLook
+	/** The sea's colours, and its island's sand, if it has a sea: see `Course['sea']`. */
+	sea?: SeaLook
+	/**
+	 * How much nearer than the path's middle Tourists stand, down the
+	 * screen: in front of what's on a ferry's floor, a lorry, a shelf,
+	 * rather than stood on the same line as its foot.
+	 */
+	touristsNearer?: number
+	/**
+	 * Where the course select's preview of it starts, along it, if not a
+	 * third of the way round: at a ferry's stern, to see inside it.
+	 */
+	previewFrom?: number
 	/** Over the geese: pigeons, in a city. */
 	geese?: string
 	/**
@@ -208,7 +330,45 @@ export interface CourseLook {
 		edge: string
 		wall: string
 		grass: string
+		/**
+		 * In place of the grass, bands down from its top, each `height` deep,
+		 * one under another: a street's pavement and road, over a sewer.
+		 */
+		road?: [height: number, colour: string][]
+		/**
+		 * Laid in brick, rather than rock: `rock` the bricks, `seam` the
+		 * mortar, `edge` their lit top edges; its back wall too, in `wall`.
+		 */
+		bricks?: boolean
+		/**
+		 * Pictures tiled over it, in place of rock or brick (see
+		 * `CaveTiles`): a ship's plated side, its hull under the decks, its
+		 * bulkheads inside.
+		 */
+		tiles?: CaveTiles
+		/**
+		 * No hole bored behind the bus: it fits through, all the way, as on a
+		 * ferry's decks, and what's on its back wall stays there.
+		 */
+		bore?: false
 	}
+}
+
+/**
+ * Pictures tiled over a Cave, each `width` by `height`, lined up with the
+ * world from its top left, so a band in one is always at the same height:
+ * its rock, over it and as seen from outside; its front, under the path;
+ * and its back wall.
+ */
+export interface CaveTiles {
+	rock: CaveTile
+	front?: CaveTile
+	wall?: CaveTile
+}
+export interface CaveTile {
+	asset: string
+	width: number
+	height: number
 }
 
 /**
@@ -247,6 +407,34 @@ export interface Cave {
 	 * it, it's rock.
 	 */
 	sand?: (x: number) => number | undefined
+	/**
+	 * Over each Tunnel's way in, `from` to `to`: yellow and black stripes
+	 * along the edge of the rock over it, so it's plain there's no standing
+	 * up in it. Along the Ceiling; or level at `roof` (a y), under a shelf of
+	 * solid rock, drawn over its face.
+	 */
+	warnings?: { from: number; to: number; roof?: number }[]
+	/**
+	 * A ship's hull: its front drawn on down under the path wherever it has
+	 * a `foot`, Ceiling or not, under its open decks too. Anyone aboard,
+	 * up on its roof too, has it opened up.
+	 */
+	hull?: boolean
+}
+
+/**
+ * The sea: its water, the light on it and its depths, and the foam along
+ * its edges; and the island's sand, its path through it, and its wet edge
+ * where the sea meets it.
+ */
+export interface SeaLook {
+	water: string
+	light: string
+	deep: string
+	foam: string
+	sand: string
+	path: string
+	wet: string
 }
 
 /** Buildings' roofs, the parapet along their front edge, and their fronts, taken in turn. */
@@ -266,6 +454,8 @@ export interface BusLook {
 	scoop: string
 	/** A drill in place of the scoop, turning: its two frames, one after the other. */
 	drill?: [string, string]
+	/** Where the drill goes on, the scoop till then: from the start, if not said. */
+	drillFrom?: number
 }
 
 /**
@@ -287,6 +477,16 @@ export interface SkyFlyer {
 	opacity?: number
 }
 
+/** A Pothole's colours: its broken rim, the hole, its shadowed far wall, and rain lying in it. */
+export interface PotholeLook {
+	rim?: string
+	hole?: string
+	deep?: string
+	/** Rain in its bottom, and the light on it. None on a running track. */
+	water?: string
+	shine?: string
+}
+
 /** A Platform's colours: its top, its face, and the darker edge under it. */
 export interface PlatformLook {
 	top: string
@@ -296,6 +496,8 @@ export interface PlatformLook {
 	depth?: number
 	/** A Moving Platform hangs from a crane, on a cable this colour. */
 	cable?: string
+	/** Candyfloss clouds, puffy, not slabs. */
+	cloud?: boolean
 }
 
 /**
@@ -325,6 +527,11 @@ export interface PlatformDefinition {
 	 * Ceiling over whoever's under it. No jumping up through it.
 	 */
 	solid?: number
+	/**
+	 * A picture in place of the slab, `width` by `height`, its top `top` px
+	 * down from the picture's: a little ferry, its deck to stand on.
+	 */
+	art?: { asset: string; width: number; height: number; top: number }
 }
 
 /** Scenery along the course: a tree, a shrub, a flower, or a furby. */
@@ -393,8 +600,27 @@ export interface Course {
 	furbies?: { x: number; asset: string }[]
 	/** Where corgis sit, waiting for someone to hop on and ride them. */
 	corgis?: number[]
-	/** What those are: corgis, or on Machu Picchu, llamas, or at the Pyramids, camels. */
-	ride?: 'corgi' | 'llama' | 'camel'
+	/**
+	 * What those are: corgis, or on Machu Picchu, llamas, at the Pyramids,
+	 * camels, in Huddinge's forest, deer, in Furby Fields, unicorns, or on
+	 * The Cliff, gliders, parked along its top.
+	 */
+	ride?: 'corgi' | 'llama' | 'camel' | 'deer' | 'glider' | 'unicorn'
+	/**
+	 * The sea, from the foot of a cliff, `from`, to an island's shore, `to`:
+	 * a Gap, the Ground's line across it at its surface, `level`. Down into
+	 * it is Fallen, there and then; the bus floats across it, at `busSpeed`
+	 * at least, under full steam. A glider comes down on the island, past it.
+	 */
+	sea?: { from: number; to: number; level: number; busSpeed: number }
+	/** How high a glider can go, at most: a y, its rider's feet. */
+	sky?: number
+	/**
+	 * A Giant Furby, its head a Cave (see `cave`), its mouth the way in at
+	 * `x`, and out the back at `to`: its face on the front, looking at
+	 * whoever's coming, its beak swung open as they get near.
+	 */
+	giantFurby?: { x: number; to: number }
 	/**
 	 * Geese flying over, from behind, `count` of them, as whoever's in front
 	 * gets to `x`. Jump into one and it carries you.
@@ -402,6 +628,12 @@ export interface Course {
 	flyovers?: { x: number; count: number }[]
 	/** What those are: geese, or on the Great Wall, a dragon. */
 	flyer?: 'goose' | 'dragon'
+	/**
+	 * Where the bus digs its own way, its wheels on this rather than the
+	 * Ground: down through the street after whoever's dropped down a
+	 * manhole, and back up out of it. The Ground, where it's undefined.
+	 */
+	busFloor?: (x: number) => number | undefined
 }
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */

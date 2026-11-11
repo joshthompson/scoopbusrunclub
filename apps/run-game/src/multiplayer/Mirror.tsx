@@ -89,6 +89,8 @@ export default function Mirror(props: {
 	feed: Feed
 	width: number
 	height: number
+	/** How much bigger its words are than the Host's: on a phone, bigger the smaller it is. */
+	textScale?: number
 }) {
 	const { start, feed } = props
 	const course = COURSES.find((l) => l.id === start.course) ?? COURSES[0]
@@ -173,6 +175,7 @@ export default function Mirror(props: {
 			// Which one doesn't matter here: only that it's flat.
 			body.on = flags & 32 ? 0 : undefined
 			body.squashed = flags & 64 ? 1 : 0
+			body.gliding = !!(flags & 128)
 			// Knocked off since the last frame: flying.
 			const pumpkin = Math.floor(flags / PUMPKIN_FLAG)
 			if (body.pumpkin && !pumpkin)
@@ -201,6 +204,7 @@ export default function Mirror(props: {
 			pacer.vx = mix(from[3], to[3])
 			pacer.grounded = !!(from[4] & 1)
 			pacer.scooped = !!(from[4] & 2)
+			pacer.gliding = !!(from[4] & 4)
 			pacer.dazed = from[5]
 			pacer.spin = mix(from[6], to[6])
 			world.pack.push(pacer)
@@ -228,6 +232,7 @@ export default function Mirror(props: {
 			corgi.state = CORGI_STATES[from[3]] ?? 'waiting'
 			corgi.barking = !!from[4]
 			corgi.spin = mix(from[5], to[5])
+			corgi.rare = !!from[6] || undefined
 		})
 
 		// The geese flying over: the same objects from frame to frame, for their sprites.
@@ -316,7 +321,7 @@ export default function Mirror(props: {
 							world={world}
 							number={start.round}
 							// Small on a phone: everything on it bigger.
-							textScale={Math.min(2.2, 0.9 / scale())}
+							textScale={props.textScale ?? Math.min(2.2, 0.9 / scale())}
 						/>
 					}
 				/>

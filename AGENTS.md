@@ -1,3 +1,9 @@
+# Testing in a Browser — Always Muted
+
+Launch every browser you test with muted: pass `--mute-audio` to Chrome (or Chrome for Testing), headless or not. The games play music and sound effects, and a multiplayer test opens a tab per player, all playing at once out of the owner's speakers.
+
+---
+
 # Analytics Tracking — Mixpanel
 
 The website (`apps/web`) uses **Mixpanel** for all product analytics. Don't introduce any other analytics tools, SDKs or tracking libraries without explicit instruction. The game (`apps/game`) and the results-scraper extension aren't tracked.

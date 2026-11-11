@@ -131,6 +131,17 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		const progress = (at - START_X) / terrain.length
 		at += 900 + shamble() * (600 - progress * 300)
 	}
+	// Hands under the graveyard, here and there: their own random numbers
+	// too, and clear of the graves and of anything else in the way.
+	const grasp = seeded(1666)
+	for (let at = START_X + 2400; at < terrain.finishX - 800; ) {
+		const x = Math.round(at)
+		const crowded = [...obstacles, ...boosts].some(
+			(o) => Math.abs(o.x - x) < 100,
+		)
+		if (!nearGrave(x) && !crowded) obstacles.push({ kind: 'hands', x })
+		at += 900 + grasp() * 900
+	}
 	obstacles.sort((a, b) => a.x - b.x)
 
 	// A graveyard along the path: dead trees, headstones, a pumpkin patch,
@@ -228,7 +239,10 @@ export const halloweenTown: CourseDefinition = {
 			ghost(ghost4),
 		],
 		foliage: DEAD,
-		gap: 'linear-gradient(to bottom, #2a1d12, #050302 70px)',
+		// Open graves, down into hell: earth at their rim, then fire, glowing
+		// brighter the further down.
+		gap: 'linear-gradient(to bottom, #2a1d12 0 8px, #3a0805 8px, #8a1a08 34px, #e0480f 70px, #ff9a1f 110px)',
+		pitFire: true,
 		far: [
 			{ asset: tree2Halloween, height: 110, filter: 'brightness(0.3)' },
 			{ asset: tree1Halloween, height: 120, filter: 'brightness(0.3)' },

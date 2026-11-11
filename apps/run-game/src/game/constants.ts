@@ -201,6 +201,47 @@ export const CORGI_GRIP = 0.08
 export const CORGI_SADDLE = 16
 /** It barks for you to hop on when you're this near. */
 export const CORGI_CALL = 320
+/**
+ * How hard a Ride leaps, up off the ground with you on its back: a little
+ * higher than you jump.
+ */
+export const RIDE_LEAP = 10.5
+
+// --- The Cliff: gliders and Rings ------------------------------------------
+/**
+ * On a glider: cruising as fast as the bus's top speed, so it's the Rings
+ * that get you away from it; quicker diving, slower climbing, and how
+ * quickly it gets to that.
+ */
+export const GLIDER_SPEED = 7
+export const GLIDER_DIVE = 1.6
+/**
+ * Boosted past that, by a Ring, how quickly it bleeds back down: much
+ * quicker than running, so a Ring's a burst, not a lead.
+ */
+export const GLIDER_BOOST_GRIP = 0.025
+/** Holding right on one, this much faster; left, this much slower. */
+export const GLIDER_PUSH = 1.6
+export const GLIDER_BRAKE = 2.5
+export const GLIDER_CLIMB_DRAG = 1.2
+export const GLIDER_GRIP = 0.03
+/**
+ * How fast it climbs or dives, held, and how quickly it answers; and how
+ * fast it sinks, left to it.
+ */
+export const GLIDER_CLIMB = 4.5
+export const GLIDER_STEER = 0.12
+export const GLIDER_SINK = 0.5
+/** How far over the Ground a glider keeps, at least: its rider's feet. Not over the sea. */
+export const GLIDER_CLEARANCE = 46
+/** Into something on one: down to this speed, and knocked this much down. */
+export const GLIDER_KNOCK_SPEED = 2.5
+export const GLIDER_KNOCK_DROP = 3
+/** How far over a glider's rider's head its wing is, to fly into things. */
+export const GLIDER_WING = 16
+/** Through a Ring: this much faster, and these points. */
+export const RING_BOOST = 1.8
+export const RING_POINTS = 50
 
 // --- The bus ------------------------------------------------------------
 /**

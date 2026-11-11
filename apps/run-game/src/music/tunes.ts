@@ -401,6 +401,121 @@ export const TUNES: Record<string, Tune> = {
 			},
 		],
 	},
+
+	// Down the drain: E minor, a dripping, plodding bass, and a creepy
+	// whistle overhead.
+	sewers: {
+		bars: 4,
+		tracks: [
+			{
+				voice: 'bass',
+				pattern: bars(
+					'E2 - - E2 - - G2 - E2 - - B1 - - D2 -',
+					'E2 - - E2 - - G2 - A2 - - G2 - F#2 -',
+					'C2 - - C2 - - E2 - C2 - - G1 - - B1 -',
+					'B1 - - B1 - - D#2 - F#2 - - D#2 - B1 -',
+				),
+				gain: 0.12,
+				gate: 0.5,
+			},
+			{
+				voice: 'pluck',
+				pattern: bars(
+					'- - B4 - - - - - - - G4 - - - - -',
+					'- - A4 - - - - - - - B4 - - - - -',
+					'- - G4 - - - - - - - E4 - - - - -',
+					'- - F#4 - - - - - - - D#4 - - - - -',
+				),
+				gain: 0.08,
+			},
+			{
+				voice: 'whistle',
+				pattern: bars(
+					'- - - - - - - - - - - - - - E6 -',
+					'- - - - - - B5 - - - - - - - - -',
+					'- - - - - - - - - - - - - - G6 -',
+					'- - - - - - F#5 - - - - - D#6 - -',
+				),
+				gain: 0.03,
+			},
+		],
+	},
+	// On the ferry to Turku: D major, a dansband's, an oom-pah bass and a
+	// bouncing tune, as in the dance bar on every crossing.
+	'scoop-line': {
+		bars: 4,
+		tracks: [
+			{
+				voice: 'bass',
+				pattern: bars(
+					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
+					'G1 - D2 - G1 - D2 - G1 - D2 - G1 - B1 -',
+					'A1 - E2 - A1 - E2 - A1 - E2 - A1 - C#2 -',
+					'D2 - A2 - D2 - A2 - D2 - - - A1 - - -',
+				),
+				gain: 0.12,
+				gate: 0.45,
+			},
+			{
+				voice: 'square',
+				pattern: bars(
+					'F#5 - F#5 - A5 - F#5 - E5 - D5 - E5 _ _ -',
+					'D5 - D5 - G5 - B5 - A5 - G5 - F#5 _ _ -',
+					'E5 - E5 - A5 - C#6 - B5 - A5 - G5 - E5 -',
+					'F#5 - A5 - D6 _ _ - A5 - F#5 - D5 _ _ -',
+				),
+				gain: 0.04,
+				gate: 0.6,
+			},
+			{
+				voice: 'bell',
+				pattern: bars(
+					'- - - - - - - - - - - - - - A5 -',
+					'- - - - - - - - - - - - - - B5 -',
+					'- - - - - - - - - - - - - - C#6 -',
+					'- - - - - - - - D6 - - - - - - -',
+				),
+				gain: 0.025,
+			},
+		],
+	},
+	// Off the cliff and out to sea: G major, soaring, a bass that rocks
+	// like the waves and a bright melody gliding over it.
+	cliff: {
+		bars: 4,
+		tracks: [
+			{
+				voice: 'bass',
+				pattern: bars(
+					'G1 - - G2 - - D2 - G1 - - G2 - - B1 -',
+					'E1 - - E2 - - B1 - E1 - - E2 - - G1 -',
+					'C2 - - C3 - - G2 - C2 - - C3 - - E2 -',
+					'D2 - - D3 - - A2 - D2 - - F#2 - - A2 -',
+				),
+				gain: 0.12,
+				gate: 0.5,
+			},
+			{
+				voice: 'square',
+				pattern: bars(
+					'B5 _ _ - D6 _ _ - G6 _ _ _ _ _ - -',
+					'G6 - F#6 - E6 _ _ - B5 _ _ _ _ _ - -',
+					'C6 - E6 - G6 _ _ - E6 - C6 - G5 _ _ -',
+					'A5 - B5 - C6 - D6 _ _ _ F#5 _ _ _ - -',
+				),
+				gain: 0.03,
+				gate: 0.7,
+			},
+			{
+				voice: 'bell',
+				pattern: bars(
+					'- - - - - - - - - - - - - - D6 -',
+					'- - - - - - - - - - - - - - B5 -',
+				),
+				gain: 0.03,
+			},
+		],
+	},
 }
 
 /** A course with no tune of its own yet gets Haga's. */

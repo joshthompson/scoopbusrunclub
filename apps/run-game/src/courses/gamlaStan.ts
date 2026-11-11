@@ -45,6 +45,12 @@ const island = createTerrain(heights, STEP_M, DISTANCE_M)
  */
 const BRIDGE = island.finishX - 1700
 const BRIDGE_END = island.finishX + 260
+/**
+ * Katarinahissen, at Slussen, just off the end of the bridge: its middle,
+ * its lift tower in the picture's right half, near enough the finish that
+ * the camera, which stops 500 px past it, has it in view.
+ */
+const KATARINAHISSEN = BRIDGE_END + 110
 /** How steeply it rises on over the water to Slussen: a little. */
 const BRIDGE_RISE = 0.03
 
@@ -79,6 +85,16 @@ const stretchAt = (x: number): Stretch => {
 				: 'skeppsbron'
 }
 
+/**
+ * Where fika goes over a Steam Vent: as far on past it, and as high, as
+ * anyone fired up off it at a run is at the top of the jump, however fast
+ * they were going, from a jog to boosted.
+ */
+const VENT_FIKA_AHEAD = 130
+/** How much room a corgi waits in, clear of anything else either side. */
+const CORGI_ROOM = 160
+const VENT_FIKA_HEIGHT = 200
+
 /** How likely each thing is, in each stretch: tourists, pigeons, a steam vent, fika; and the rest, a cheer. */
 const MIX: Record<Stretch, [number, number, number, number]> = {
 	västerlånggatan: [0.55, 0.12, 0, 0.2],
@@ -96,7 +112,7 @@ const CYCLISTS = [0, 0.25, 0.5, 0.75].map(
 	(along) => CYCLE_LOOP[0] + (CYCLE_LOOP[1] - CYCLE_LOOP[0]) * along,
 )
 
-function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
+function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	const random = seeded(1252)
 	let fika = 0
 	const nextFika = () => GAMLA_STAN_FIKA[fika++ % GAMLA_STAN_FIKA.length]
@@ -114,9 +130,15 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			if (roll < tourists + pigeons)
 				return { kind: 'geese', x, count: 2 + Math.floor(random() * 3) }
 			if (roll < tourists + pigeons + steam) {
-				// Fika up over some of them, for whoever's fired up to it.
+				// Fika up past some of them, for whoever's fired up to it: where
+				// they'll be at the top of the jump, running on, quick or slow.
 				if (random() < 0.5)
-					extra.push({ kind: 'fika', x, height: 190, item: nextFika() })
+					extra.push({
+						kind: 'fika',
+						x: x + VENT_FIKA_AHEAD,
+						height: VENT_FIKA_HEIGHT,
+						item: nextFika(),
+					})
 				return { kind: 'steam', x }
 			}
 			// A café on every corner.
@@ -149,17 +171,31 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	// Slussen, past it, by Katarinahissen.
 	const scenery: Course['scenery'] = []
 	for (let at = -300; at < terrain.finishX + 1600; at += 300 + random() * 120)
-		if (at < BRIDGE - 60 || at > BRIDGE_END + 40)
+		if (
+			(at < BRIDGE - 60 || at > BRIDGE_END + 40) &&
+			Math.abs(at - KATARINAHISSEN) > 100
+		)
 			scenery.push({ x: Math.round(at), asset: lamp })
-	scenery.push({ x: BRIDGE_END + 420, asset: katarinahissen })
-	return { obstacles, boosts, scenery }
+	scenery.push({ x: KATARINAHISSEN, asset: katarinahissen })
+	// Corgis, out for a walk in the old town, waiting to be ridden: in a
+	// clear bit of street, each, well before the bridge.
+	const corgis: number[] = []
+	for (const share of [0.18, 0.47, 0.76]) {
+		let x = START_X + (BRIDGE - START_X) * share
+		while (
+			[...obstacles, ...boosts].some((o) => Math.abs(o.x - x) < CORGI_ROOM)
+		)
+			x += 20
+		corgis.push(Math.round(x))
+	}
+	return { obstacles, boosts, scenery, corgis }
 }
 
 export const gamlaStan: CourseDefinition = {
 	id: 'gamla-stan',
 	name: 'Gamla Stan',
 	blurb:
-		'Through Stockholm’s old town and over Guldbron: tourists, pigeons, steam vents, and cyclists on the bridge.',
+		'Through Stockholm’s old town and over Guldbron: tourists, pigeons, steam vents, corgis to ride, and cyclists on the bridge.',
 	terrain,
 	runDirectors: ['keith', 'josh'],
 	cheerers: CHEERERS,

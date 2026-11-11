@@ -24,7 +24,8 @@ export function scatter(options: {
 				placed.kind === 'fika' ||
 				placed.kind === 'cheer' ||
 				placed.kind === 'pumpkin' ||
-				placed.kind === 'barcode'
+				placed.kind === 'barcode' ||
+				placed.kind === 'ring'
 			)
 				boosts.push(placed)
 			else obstacles.push(placed)

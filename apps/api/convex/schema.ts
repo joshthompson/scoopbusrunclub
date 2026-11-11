@@ -1,6 +1,12 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 
+/** Whose head goes by a run game score: a club member's, or a look's. */
+export const runIconValidator = v.union(
+	v.object({ member: v.string() }),
+	v.object({ look: v.any() }),
+)
+
 export default defineSchema({
 	runners: defineTable({
 		parkrunId: v.string(),
@@ -163,7 +169,9 @@ export default defineSchema({
 				),
 				skin: v.union(
 					v.literal('light'),
+					v.literal('medium-light'),
 					v.literal('medium'),
+					v.literal('medium-dark'),
 					v.literal('dark'),
 				),
 				topColor: v.string(),
@@ -254,7 +262,13 @@ export default defineSchema({
 				v.literal('shorts'),
 				v.literal('trousers'),
 			),
-			skin: v.union(v.literal('light'), v.literal('medium'), v.literal('dark')),
+			skin: v.union(
+				v.literal('light'),
+				v.literal('medium-light'),
+				v.literal('medium'),
+				v.literal('medium-dark'),
+				v.literal('dark'),
+			),
 			topColor: v.string(),
 			bottomColor: v.string(),
 			showColor: v.string(),
@@ -464,22 +478,47 @@ export default defineSchema({
 		.index('by_startedAt', ['startedAt'])
 		.index('by_ip', ['ip', 'startedAt']),
 
-	/** A player's best on a table: one each, kept to their best. */
+	/**
+	 * A player of the run game, as the tables show them: the name their
+	 * scores go under, and whose head goes by them. Changed once here, it's
+	 * changed on every table they're on.
+	 */
+	runProfiles: defineTable({
+		/**
+		 * The player, a random id their browser keeps: never sent back out, only
+		 * used to find their profile, and to point their scores out to them.
+		 */
+		playerId: v.string(),
+		name: v.string(),
+		/** Whose head goes by their scores: a club member's, or a look's (a custom runner's or a guest's). */
+		icon: runIconValidator,
+		/** Where it was last saved from. */
+		ip: v.string(),
+		/** `hidden` for a name that trips the profanity filter: none of their scores shown. */
+		status: v.union(v.literal('active'), v.literal('hidden')),
+		flagReason: v.optional(v.string()),
+		updatedAt: v.number(),
+	})
+		.index('by_player', ['playerId'])
+		.index('by_ip', ['ip', 'updatedAt']),
+
+	/** A player's best on a table: one each, kept to their best, under their profile. */
 	runScores: defineTable({
 		table: v.string(),
 		score: v.number(),
-		/** The name they put it under. */
-		name: v.string(),
-		/** Whose head goes by it: a club member's, or a look's (a custom runner's or a guest's). */
-		icon: v.union(
-			v.object({ member: v.string() }),
-			v.object({ look: v.any() }),
-		),
 		/**
-		 * The player, a random id their browser keeps: never sent back out, only
-		 * used to keep them to one entry, and to point theirs out to them.
+		 * Whose it is: their name and head come from their profile. Missing
+		 * only from scores sent before there were profiles, until
+		 * `runScores:migrateToProfiles` has moved them onto one.
 		 */
-		playerId: v.string(),
+		profileId: v.optional(v.id('runProfiles')),
+		/**
+		 * Before there were profiles, each score kept its own copy of these:
+		 * kept only until it's moved onto a profile, then cleared.
+		 */
+		name: v.optional(v.string()),
+		icon: v.optional(runIconValidator),
+		playerId: v.optional(v.string()),
 		/** The day, as YYYY-MM-DD, as the player had it. */
 		date: v.string(),
 		/** On a course, how far round they got, and whether they finished. */
@@ -488,12 +527,14 @@ export default defineSchema({
 		/** In Endless, how many courses they got round. */
 		courses: v.optional(v.number()),
 		ip: v.string(),
-		/** `hidden` for a name that trips the profanity filter: never shown. */
+		/** Its profile's, kept here too so a table can be listed without it. */
 		status: v.union(v.literal('active'), v.literal('hidden')),
 		flagReason: v.optional(v.string()),
 		updatedAt: v.number(),
 	})
 		.index('by_table', ['table', 'status', 'score'])
+		.index('by_profile', ['profileId', 'table'])
+		// Scores from before there were profiles, by their old copy of the player.
 		.index('by_player', ['playerId', 'table'])
 		.index('by_ip', ['ip', 'updatedAt']),
 

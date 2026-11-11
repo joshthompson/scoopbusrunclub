@@ -1,3 +1,4 @@
+import type { PotholeLook } from '../../courses/types'
 import { Pixels } from '../Pixels'
 
 /**
@@ -130,18 +131,48 @@ export function HurdleArt(props: { depth: number; tall?: boolean }) {
 	)
 }
 
-/** A pothole, `width` across: a dark hole with a broken rim. */
-export function PotholeArt(props: { width: number }) {
+/** A pothole's colours: in a running track's, unless its course says. */
+const TRACK_POTHOLE: Required<Pick<PotholeLook, 'rim' | 'hole' | 'deep'>> = {
+	rim: '#8f3a29',
+	hole: '#3b1f17',
+	deep: '#22110b',
+}
+
+/**
+ * A pothole, `width` across: a ragged hole broken out of the surface, its
+ * far rim catching the light, crumbs of it about its near lip, and on a
+ * road, rain lying in its bottom.
+ */
+export function PotholeArt(props: { width: number; look?: PotholeLook }) {
 	const w = props.width
+	const look = { ...TRACK_POTHOLE, ...props.look }
+	const at = (share: number) => Math.round(w * share)
 	return (
 		<Pixels
 			width={w}
 			height={POTHOLE_HEIGHT}
 			rects={[
-				[4, 0, w - 8, 2, '#8f3a29'],
-				[0, 2, w, 6, '#3b1f17'],
-				[6, 3, w - 12, 3, '#22110b'],
-				[4, 8, w - 8, 2, '#8f3a29'],
+				// The hole, ragged: narrower at its ends, its far wall in shadow.
+				[at(0.12), 1, w - at(0.24), 1, look.hole],
+				[2, 2, w - 4, 5, look.hole],
+				[0, 3, w, 3, look.hole],
+				[at(0.1), 7, w - at(0.2), 1, look.hole],
+				[at(0.08), 2, w - at(0.16), 2, look.deep],
+				// Its far rim, broken, catching the light.
+				[at(0.1), 0, at(0.3), 1, look.rim],
+				[at(0.48), 0, at(0.36), 1, look.rim],
+				// Rain lying in it, the sky in it.
+				...(look.water
+					? ([
+							[at(0.22), 5, at(0.48), 2, look.water],
+							[at(0.3), 5, at(0.16), 1, look.shine ?? look.water],
+						] as [number, number, number, number, string][])
+					: []),
+				// Its near lip, and crumbs of the surface about it.
+				[at(0.14), 8, w - at(0.28), 1, look.rim],
+				[1, 9, 3, 1, look.rim],
+				[at(0.58), 9, 3, 1, look.rim],
+				[w - 4, 9, 2, 1, look.rim],
 			]}
 		/>
 	)

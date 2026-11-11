@@ -2,6 +2,7 @@ import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
 import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
+import { ordinal } from './Medal'
 import { type Seat, seatPlayable } from './room'
 
 /** One Player's place in a Round, and the points it got them. */
@@ -12,8 +13,18 @@ export interface Placing {
 	how: 'won' | 'finished' | 'scooped' | 'fallen'
 }
 
-const ordinal = (n: number) =>
-	`${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`
+/**
+ * Everyone who's picked, most points first; level on points, whoever did
+ * better in the last Round. The Podium goes by this too.
+ */
+export function standingsOf(seats: Seat[], placings: Placing[]) {
+	const place = (seat: Seat) =>
+		placings.find((p) => p.seatId === seat.id)?.place ??
+		Number.POSITIVE_INFINITY
+	return [...seats]
+		.filter((s) => s.character)
+		.sort((a, b) => b.points - a.points || place(a) - place(b))
+}
 
 /** The keys that move between the buttons, and which way. */
 const MOVES: Record<string, number> = {
@@ -25,48 +36,65 @@ const MOVES: Record<string, number> = {
 
 /**
  * Between Rounds: the Standings so far, with what each Player got in the
- * last one. The next starts by itself, or straight away with Enter.
+ * last one. What's next (the next Round, or the Podium after the last)
+ * comes by itself, or straight away with Enter. A Backyard Ultra can be
+ * finished here, and only here. On a computer that's joined the Room, only
+ * the Starter's button is there: the rest are the Host's.
  */
 export function Results(props: {
 	round: number
+	/** How many Rounds there are, if it isn't a Backyard Ultra. */
+	of?: number
 	course: string
-	nextCourse: string
+	/** What's next, and in how long: the next course, or the Podium. */
+	next: string
+	nextIn: number
+	/** The button for going straight on. */
+	nextLabel?: string
 	placings: Placing[]
 	seats: Seat[]
-	nextIn: number
-	onNext: () => void
-	onLobby: () => void
+	onNext?: () => void
+	/** Finishing a Backyard Ultra here: to the Podium. */
+	onFinish?: () => void
+	onLobby?: () => void
 }) {
 	const placing = (seat: Seat) =>
 		props.placings.find((p) => p.seatId === seat.id)
-	/** Most points first; level on points, whoever did better this Round. */
-	const standings = () =>
-		[...props.seats]
-			.filter((s) => s.character)
-			.sort(
-				(a, b) =>
-					b.points - a.points ||
-					(placing(a)?.place ?? Number.POSITIVE_INFINITY) -
-						(placing(b)?.place ?? Number.POSITIVE_INFINITY),
-			)
+	const standings = () => standingsOf(props.seats, props.placings)
 
 	/** Which button's picked: going on, to begin with. */
 	const [picked, setPicked] = createSignal(0)
+	const lobby = props.onLobby && {
+		label: 'Back to the lobby',
+		choose: () => {
+			play('back')
+			props.onLobby?.()
+		},
+	}
 	const buttons = [
-		{
-			label: 'Go now',
-			choose: () => {
-				play('select')
-				props.onNext()
-			},
-		},
-		{
-			label: 'Back to the lobby',
-			choose: () => {
-				play('back')
-				props.onLobby()
-			},
-		},
+		...(props.onNext
+			? [
+					{
+						label: props.nextLabel ?? 'Go now',
+						choose: () => {
+							play('select')
+							props.onNext?.()
+						},
+					},
+				]
+			: []),
+		...(props.onFinish
+			? [
+					{
+						label: 'Finish here',
+						choose: () => {
+							play('select')
+							props.onFinish?.()
+						},
+					},
+				]
+			: []),
+		...(lobby ? [lobby] : []),
 	]
 	const onKey = (event: KeyboardEvent) => {
 		const move = MOVES[event.key]
@@ -78,8 +106,8 @@ export function Results(props: {
 			}
 			event.preventDefault()
 		}
-		if (event.key === 'Enter') buttons[picked()].choose()
-		if (event.key === 'Escape') buttons[1].choose()
+		if (event.key === 'Enter') buttons[picked()]?.choose()
+		if (event.key === 'Escape') lobby?.choose()
 	}
 	window.addEventListener('keydown', onKey)
 	onCleanup(() => window.removeEventListener('keydown', onKey))
@@ -87,7 +115,8 @@ export function Results(props: {
 	return (
 		<div style={styles.screen}>
 			<div style={styles.title}>
-				Round {props.round} · {props.course}
+				Round {props.round}
+				{props.of ? ` of ${props.of}` : ''} · {props.course}
 			</div>
 			<Panel title="Standings" style={styles.panel}>
 				<div style={styles.standings}>
@@ -121,7 +150,7 @@ export function Results(props: {
 				</div>
 			</Panel>
 			<div style={styles.next}>
-				Next: {props.nextCourse} in {props.nextIn}…
+				{props.next} in {props.nextIn}…
 			</div>
 			<div style={styles.buttons}>
 				<For each={buttons}>

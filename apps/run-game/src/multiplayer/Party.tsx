@@ -13,15 +13,21 @@ import { playMenu, playTune } from '../music/music'
 import { MenuBackdrop } from '../ui/MenuBackdrop'
 import { Stage } from '../ui/Stage'
 import { Lobby } from './Lobby'
-import { type Placing, Results } from './Results'
+import { Podium } from './Podium'
+import { type Placing, Results, standingsOf } from './Results'
 import { Round } from './Round'
 import { type RoomMode, newRoomCode } from './protocol'
 import { createRoom, seatPlayable } from './room'
+import { roomModeInfo } from './roomModes'
 import { type RaceStream, createRaceStream, raceStart } from './stream'
 
-/** How long the lobby counts down once everyone's ready, and the results stay up. */
+/**
+ * How long the lobby counts down once everyone's ready, the results stay up,
+ * and the Podium.
+ */
 const START_SECONDS = 3
 const RESULTS_SECONDS = 8
+const PODIUM_SECONDS = 30
 
 /**
  * Two Players at least, for a Round to be worth having: one on their own,
@@ -49,29 +55,30 @@ function shuffledCourses(after?: number) {
 
 /**
  * Multi Player, hosted on this device: a Room, its lobby, and then Round
- * after Round, as the Host chose (see `RoomMode`), until they've all been
- * raced, or the Host goes back to the lobby or ends it.
+ * after Round, as its Starter chose (see `RoomMode`), until they've all been
+ * raced, or a Backyard Ultra's called, and then the Podium. Or until the Host
+ * goes back to the lobby or ends it.
  */
 export type { RoomMode }
 
-/** How many courses a Half Marathon is. */
-const HALF_MARATHON = 5
-
 export default function Party(props: { onLeave: () => void }) {
 	const room = createRoom(newRoomCode())
-	const [mode, setMode] = createSignal<RoomMode>('endless')
-	/** The courses for a go in `mode`: every one, or five of them, shuffled. */
+	const [mode, setMode] = createSignal<RoomMode>('backyard')
+	const info = () => roomModeInfo(mode())
+	/** The courses for a go in `mode`: so many of them at random, or every one, shuffled. */
 	const coursesFor = (mode: RoomMode, after?: number) => {
 		const all = shuffledCourses(after)
-		return mode === 'half' ? all.slice(0, HALF_MARATHON) : all
+		const count = roomModeInfo(mode).courses
+		return count ? all.slice(0, count) : all
 	}
-	const [courses, setCourses] = createSignal(coursesFor('endless'))
+	const [courses, setCourses] = createSignal(coursesFor(mode()))
 	/** How far through `courses` the Room's got. */
 	const [courseAt, setCourseAt] = createSignal(0)
 	const courseIndex = () => courses()[courseAt()]
-	/** Whether this is the last course of a Marathon or a Half Marathon. */
-	const lastCourse = () =>
-		mode() !== 'endless' && courseAt() + 1 >= courses().length
+	/** How many Rounds this go has, unless it's a Backyard Ultra. */
+	const roundsOf = () => (info().repeats ? undefined : courses().length)
+	/** Whether this is the last course of the go: never, in a Backyard Ultra. */
+	const lastCourse = () => !info().repeats && courseAt() + 1 >= courses().length
 	/** The course after this one: the next in the shuffle, or the first of the next shuffle. */
 	const advance = () => {
 		if (courseAt() + 1 < courses().length) setCourseAt(courseAt() + 1)
@@ -82,7 +89,16 @@ export default function Party(props: { onLeave: () => void }) {
 	}
 	const nextCourseIndex = () =>
 		courseAt() + 1 < courses().length ? courses()[courseAt() + 1] : undefined
-	/** The Host choosing how the Room goes, in the lobby: its courses chosen afresh. */
+	/** What's next, between Rounds. */
+	const nextText = () => {
+		const next = nextCourseIndex()
+		return lastCourse()
+			? 'That was the last! The Podium'
+			: next === undefined
+				? 'Next: a new shuffle'
+				: `Next: ${COURSES[next].name}`
+	}
+	/** The Starter choosing how the Room goes, in the lobby: its courses chosen afresh. */
 	const chooseMode = (next: RoomMode) => {
 		setMode(next)
 		setCourses(coursesFor(next))
@@ -92,6 +108,7 @@ export default function Party(props: { onLeave: () => void }) {
 	const [startingIn, setStartingIn] = createSignal<number>()
 	const [placings, setPlacings] = createSignal<Placing[]>([])
 	const [nextIn, setNextIn] = createSignal(RESULTS_SECONDS)
+	const [lobbyIn, setLobbyIn] = createSignal(PODIUM_SECONDS)
 	let world: World | undefined
 	/** The Round, as it's sent to phones playing remotely. */
 	let stream: RaceStream | undefined
@@ -126,11 +143,8 @@ export default function Party(props: { onLeave: () => void }) {
 
 	/** Everyone who's picked who they'll be, and hasn't dropped out. */
 	const picked = () => room.seats.filter((s) => s.character && !s.lostAt)
-	const everyoneReady = createMemo(
-		() => picked().length >= MIN_PLAYERS && picked().every((s) => s.ready),
-	)
 	/**
-	 * With a Starter, everyone else who's picked is ready, and so can they
+	 * Everyone but the Starter who's picked is ready, and so the Starter can
 	 * start it: pressing Start is their being ready.
 	 */
 	const canStart = createMemo(() => {
@@ -149,10 +163,14 @@ export default function Party(props: { onLeave: () => void }) {
 		if (!room.seats.length) return 'Waiting for Players to join…'
 		if (short > 0)
 			return `Waiting for ${short} more Player${short === 1 ? '' : 's'}…`
+		const number = starter ? room.seats.indexOf(starter) + 1 : 0
+		if (starter && !starter.character) return `Waiting for P${number} to pick…`
 		if (starter && canStart())
-			return `Waiting for P${room.seats.indexOf(starter) + 1} to start…`
-		if (starter && !starter.character)
-			return `Waiting for P${room.seats.indexOf(starter) + 1} to pick…`
+			return starter.kind === 'phone'
+				? `Waiting for P${number} to start…`
+				: starter.kind === 'touch'
+					? `P${number}: tap Start`
+					: `P${number}: jump to start`
 		return 'Waiting for everyone to be ready…'
 	}
 	// The Starter's phone: how the Room's set, and whether it can start.
@@ -161,13 +179,33 @@ export default function Party(props: { onLeave: () => void }) {
 		canStart: canStart(),
 		why: waitingFor(),
 	}))
+	room.setProgress(() => ({ round: roundNumber(), rounds: roundsOf() }))
+	// Everything else its screens show, for computers that have joined.
+	room.setScreenView(() => ({
+		canStart: canStart(),
+		startingIn: startingIn(),
+		waitingFor: waitingFor(),
+		placings: placings(),
+		next: nextText(),
+		nextIn: nextIn(),
+		lobbyIn: lobbyIn(),
+	}))
 	room.setOnStarter({
 		start: () => {
-			if (room.stage() === 'lobby' && canStart()) setStartPressed(true)
+			if (room.stage() !== 'lobby' || !canStart()) return false
+			setStartPressed(true)
+			return true
 		},
+		cancel: () => setStartPressed(false),
 		roomMode: (next) => {
 			if (room.stage() === 'lobby') chooseMode(next)
 			room.tellPhones()
+		},
+		finish: () => {
+			if (room.stage() === 'results' && info().repeats) toPodium()
+		},
+		lobby: () => {
+			if (room.stage() === 'podium') toLobby()
 		},
 	})
 
@@ -179,13 +217,12 @@ export default function Party(props: { onLeave: () => void }) {
 	}
 	onCleanup(stopTimer)
 
-	// Everyone ready, or with a Starter, them pressing Start: counting down
-	// to the first Round. Anyone changing their mind stops it.
+	// The Starter pressing Start: counting down to the first Round. Anyone
+	// changing their mind, or the Starter stopping it, stops it.
 	createEffect(() => {
 		const stage = room.stage()
 		if (stage !== 'lobby' && stage !== 'starting') return
-		const go = room.starter() ? startPressed() && canStart() : everyoneReady()
-		if (!go) {
+		if (!startPressed() || !canStart()) {
 			untrack(() => {
 				stopTimer()
 				setStartingIn(undefined)
@@ -283,24 +320,36 @@ export default function Party(props: { onLeave: () => void }) {
 		stopTimer()
 		room.dropLost()
 		if (picked().length < MIN_PLAYERS) return toLobby()
-		// The last of a Marathon's, or a Half Marathon's, courses: back to the
-		// lobby for another go.
-		if (lastCourse()) return toLobby()
+		// The last of the go's courses: on to the Podium.
+		if (lastCourse()) return toPodium()
 		advance()
 		startRound()
+	}
+
+	/** All done: the top three on the Podium, then back to the lobby. */
+	function toPodium() {
+		stopTimer()
+		room.setStage('podium')
+		setLobbyIn(PODIUM_SECONDS)
+		timer = window.setInterval(() => {
+			setLobbyIn(lobbyIn() - 1)
+			if (lobbyIn() <= 0) toLobby()
+		}, 1000)
 	}
 
 	function toLobby() {
 		stopTimer()
 		world = undefined
 		stopStream()
-		// A fresh shuffle for the next go.
+		// A fresh shuffle for the next go, and a fresh start to its Standings.
 		setCourses(coursesFor(mode(), roundNumber() ? courseIndex() : undefined))
 		setCourseAt(0)
+		setRoundNumber(0)
 		for (const seat of room.seats)
 			room.update(seat.id, (s) => {
 				s.ready = false
 				s.waiting = false
+				s.points = 0
 			})
 		room.setPaused(false)
 		room.setStage('lobby')
@@ -341,6 +390,16 @@ export default function Party(props: { onLeave: () => void }) {
 				of: placings().length,
 			}
 		}
+		if (room.stage() === 'podium') {
+			const standings = standingsOf(room.seats, placings())
+			const place = standings.findIndex((s) => s.id === seat.id) + 1
+			if (!place) return undefined
+			return {
+				status: place === 1 ? 'won' : 'finished',
+				place,
+				of: standings.length,
+			}
+		}
 		return undefined
 	})
 
@@ -351,6 +410,7 @@ export default function Party(props: { onLeave: () => void }) {
 					<Round
 						course={COURSES[courseIndex()]}
 						number={number}
+						of={roundsOf()}
 						racers={untrack(racersNow)}
 						onWorld={streamRound}
 						onTick={() => stream?.tick()}
@@ -368,19 +428,27 @@ export default function Party(props: { onLeave: () => void }) {
 						<Match when={room.stage() === 'results'}>
 							<Results
 								round={roundNumber()}
+								of={roundsOf()}
 								course={COURSES[courseIndex()].name}
-								nextCourse={
-									lastCourse()
-										? 'the lobby: that was the last'
-										: nextCourseIndex() === undefined
-											? 'a new shuffle'
-											: COURSES[nextCourseIndex() as number].name
-								}
+								next={nextText()}
+								nextLabel={lastCourse() ? 'To the Podium' : 'Go now'}
 								placings={placings()}
 								seats={room.seats}
 								nextIn={nextIn()}
 								onNext={nextRound}
+								onFinish={info().repeats ? toPodium : undefined}
 								onLobby={toLobby}
+							/>
+						</Match>
+						<Match when={room.stage() === 'podium'}>
+							<Podium
+								title={info().label}
+								rounds={roundNumber()}
+								seats={room.seats}
+								placings={placings()}
+								lobbyIn={lobbyIn()}
+								onLobby={toLobby}
+								onEnd={end}
 							/>
 						</Match>
 						<Match when={true}>
@@ -388,6 +456,7 @@ export default function Party(props: { onLeave: () => void }) {
 								room={room}
 								mode={mode()}
 								onMode={chooseMode}
+								canStart={canStart()}
 								startingIn={startingIn()}
 								waitingFor={waitingFor()}
 								onLeave={end}

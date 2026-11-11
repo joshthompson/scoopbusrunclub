@@ -1,5 +1,10 @@
-import type { JSX } from 'solid-js'
+import { For, type JSX } from 'solid-js'
 import { Menu, Panel } from '../ui/Menu'
+
+const CREDITS: { role: string; names: string[] }[] = [
+	{ role: 'Made by', names: ['Josh Thompson'] },
+	{ role: 'Play Testing', names: ['Alisa Vasileva'] },
+]
 
 export function CreditsScreen(props: { onBack: () => void }) {
 	return (
@@ -8,8 +13,16 @@ export function CreditsScreen(props: { onBack: () => void }) {
 				title="Credits"
 				style={{ width: '440px', 'align-items': 'center' }}
 			>
-				<div style={styles.role}>Made by</div>
-				<div style={styles.name}>Josh Thompson</div>
+				<For each={CREDITS}>
+					{(credit) => (
+						<div style={styles.credit}>
+							<div style={styles.role}>{credit.role}</div>
+							<For each={credit.names}>
+								{(name) => <div style={styles.name}>{name}</div>}
+							</For>
+						</div>
+					)}
+				</For>
 				<div style={{ width: '200px', 'margin-top': '14px' }}>
 					<Menu
 						items={[{ label: 'Back', choose: props.onBack }]}
@@ -28,15 +41,20 @@ const styles = {
 		display: 'grid',
 		'place-items': 'center',
 	},
+	credit: {
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'center',
+		'margin-bottom': '10px',
+	},
 	role: {
 		'font-size': '16px',
 		opacity: 0.75,
 		'letter-spacing': '0.1em',
 	},
 	name: {
-		'font-size': '40px',
+		'font-size': '32px',
 		color: 'white',
 		'text-shadow': '3px 3px 0 var(--bus-red)',
-		animation: 'logo-bounce 2.6s ease-in-out infinite',
 	},
 } satisfies Record<string, JSX.CSSProperties>

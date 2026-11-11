@@ -99,7 +99,9 @@ export const ROWS: Row[] = [
 		label: 'Skin',
 		options: [
 			{ value: 'light', label: 'Light' },
+			{ value: 'medium-light', label: 'Medium light' },
 			{ value: 'medium', label: 'Medium' },
+			{ value: 'medium-dark', label: 'Medium dark' },
 			{ value: 'dark', label: 'Dark' },
 		],
 		get: (a) => a.skin,

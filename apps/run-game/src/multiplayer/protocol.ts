@@ -3,6 +3,8 @@ import type { Phase } from '../game/world'
 import type { CustomRunner } from '../runners/customRunners'
 import type { Avatar } from '../runners/looks'
 import type { Sound } from '../sfx'
+import type { Placing } from './Results'
+import type { Seat } from './room'
 
 /**
  * What the Host and the phones in its Room say to each other, over trystero.
@@ -65,17 +67,24 @@ export function codeFromScan(text: string) {
 export type PadMode = 'controller' | 'remote'
 
 /**
- * How a Room goes, as the Host (or its Starter) chooses in the lobby:
- * - `endless`: every course, shuffled, and round again, for ever
- * - `marathon`: every course, shuffled, once
- * - `half`: a Half Marathon, five of them, chosen at random, shuffled
+ * How a Room goes, as its Starter chooses in the lobby. Its courses are
+ * always chosen at random, and shuffled:
+ * - `parkrun`: five of them
+ * - `half`: a Half Marathon, ten of them
+ * - `marathon`: every course, once
+ * - `backyard`: a Backyard Ultra, every course and round again, till the
+ *   Starter (or the Host) calls it after a Round
  */
-export type RoomMode = 'endless' | 'marathon' | 'half'
+export type RoomMode = 'parkrun' | 'half' | 'marathon' | 'backyard'
 
 /** Phone → Host, on the `pad` action. Its controls go on `input`, as packed bits. */
 export type PadMessage =
-	/** Hello, or hello again: the same device gets the same seat back. */
-	| { type: 'hello'; device: string; mode: PadMode }
+	/**
+	 * Hello, or hello again: the same device gets the same seat back.
+	 * `screen`: a computer, showing the Room just as the Host does, so it's
+	 * sent the whole Room (see `RoomView`), not just its own Player.
+	 */
+	| { type: 'hello'; device: string; mode: PadMode; screen?: boolean }
 	/** Switching between playing on the big screen and on the phone. */
 	| { type: 'mode'; mode: PadMode }
 	/** Who they'll run as. A custom runner comes with its look, which only the phone has. */
@@ -86,6 +95,12 @@ export type PadMessage =
 	| { type: 'roomMode'; mode: RoomMode }
 	/** The Starter, starting the first Round. */
 	| { type: 'start' }
+	/** The Starter, stopping the countdown to it. */
+	| { type: 'cancel' }
+	/** The Starter, between Rounds of a Backyard Ultra: that's enough, to the Podium. */
+	| { type: 'finish' }
+	/** The Starter, at the Podium: back to the lobby for another go. */
+	| { type: 'lobby' }
 
 /**
  * Where the Room's got to:
@@ -93,8 +108,9 @@ export type PadMessage =
  * - `starting`: everyone's ready, and the first Round's about to start
  * - `round`: a Round's on
  * - `results`: between Rounds, the Standings up
+ * - `podium`: all done, the top three on the Podium
  */
-export type RoomStage = 'lobby' | 'starting' | 'round' | 'results'
+export type RoomStage = 'lobby' | 'starting' | 'round' | 'results' | 'podium'
 
 /**
  * How a Player's doing, for their phone:
@@ -125,13 +141,20 @@ export interface PadView {
 	taken: string[]
 	stage: RoomStage
 	status: PlayerStatus
-	/** In the last Round, out of how many. */
+	/** In the last Round, out of how many; at the Podium, overall. */
 	place?: number
 	of?: number
 	/** Their Standings. */
 	points: number
 	paused: boolean
 	course: string
+	/** How the Room's set to go, for everyone to see. */
+	roomMode: RoomMode
+	/** Whether they're the Starter, whatever the stage. */
+	isStarter: boolean
+	/** Which Round the Room's on, or just had, and out of how many, unless it's a Backyard Ultra. */
+	round: number
+	rounds?: number
 	/**
 	 * In the lobby, if they're the Starter: how the Room's set to go, and
 	 * whether it can start yet, and if not, why.
@@ -139,6 +162,31 @@ export interface PadView {
 	starter?: { roomMode: RoomMode; canStart: boolean; why: string }
 	/** If someone else is the Starter, their Player number. */
 	starterNumber?: number
+	/** Joined from a computer: the whole Room, to show it as the Host does. */
+	room?: RoomView
+}
+
+/**
+ * Everything the Host's own screens show, but the race and how to join:
+ * for a computer that's joined, to show the same.
+ */
+export interface RoomView {
+	/** Everyone in the Room, in seat order: all but which device and peer they are. */
+	seats: Seat[]
+	/** The Starter's seat. */
+	starter?: string
+	canStart: boolean
+	/** Seconds until the first Round, once the Starter's started it. */
+	startingIn?: number
+	/** Why it isn't starting yet. */
+	waitingFor: string
+	/** The last Round's. */
+	placings: Placing[]
+	/** Between Rounds: what's next, and in how long. */
+	next: string
+	nextIn: number
+	/** At the Podium: how long till it's back to the lobby. */
+	lobbyIn: number
 }
 
 /**
@@ -208,10 +256,12 @@ export const RACER_FLAGS = {
 	platform: 32,
 	/** Squashed by a furby. */
 	squashed: 64,
+	/** On a glider. */
+	gliding: 128,
 }
 /** The Pumpkin a racer's wearing, by its carving, is the flags over this. */
-export const PUMPKIN_FLAG = 128
-/** [id, x, feetY, vx, flags (1 grounded, 2 scooped), dazed, spin] */
+export const PUMPKIN_FLAG = 256
+/** [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding), dazed, spin] */
 export type PacerState = [
 	number,
 	number,
@@ -231,8 +281,16 @@ export type FurbyStateFrame = [
 	number,
 	number,
 ]
-/** [x, feetY, facing, state, barking, spin] */
-export type CorgiStateFrame = [number, number, number, number, number, number]
+/** [x, feetY, facing, state, barking, spin, rare (1 if it's the rarer one)] */
+export type CorgiStateFrame = [
+	number,
+	number,
+	number,
+	number,
+	number,
+	number,
+	number,
+]
 /** [id, x, feetY, state (0 flying, 1 carrying, 2 leaving)] */
 export type FlyerFrame = [number, number, number, number]
 /**

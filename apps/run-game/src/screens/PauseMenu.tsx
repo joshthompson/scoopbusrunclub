@@ -33,7 +33,13 @@ export const SOUND_ITEMS: MenuItem[] = [
  * right flip a setting too. Esc and P to resume are the game's, which also
  * opened it.
  */
-export function PauseMenu(props: { groups: MenuItem[][] }) {
+export function PauseMenu(props: {
+	groups: MenuItem[][]
+	/** Over it: Paused, unless it isn't. */
+	title?: string
+	/** Under it: how to close it. */
+	hint?: string
+}) {
 	const items = () => props.groups.flat()
 	const [selected, setSelected] = createSignal(0)
 
@@ -67,7 +73,7 @@ export function PauseMenu(props: { groups: MenuItem[][] }) {
 	return (
 		<div style={styles.backdrop}>
 			<div style={styles.panel}>
-				<div style={styles.title}>Paused</div>
+				<div style={styles.title}>{props.title ?? 'Paused'}</div>
 				<For each={props.groups}>
 					{(group, g) => (
 						<>
@@ -100,7 +106,7 @@ export function PauseMenu(props: { groups: MenuItem[][] }) {
 						</>
 					)}
 				</For>
-				<div style={styles.hint}>Esc or P to resume</div>
+				<div style={styles.hint}>{props.hint ?? 'Esc or P to resume'}</div>
 			</div>
 		</div>
 	)

@@ -9,7 +9,7 @@ import { generateFrames } from '@/utils'
 import type { RunnerData } from '../data/runners'
 
 type HexColor = string
-type SkinColor = 'light' | 'medium' | 'dark'
+type SkinColor = 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark'
 
 export interface CharacterSpriteProps {
 	topType: 'vest' | 'tshirt' | 'longsleeve'
@@ -556,8 +556,14 @@ function skinColor(skin: SkinColor): HexColor {
 	switch (skin) {
 		case 'light':
 			return '#F2C09A'
+		// Halfway between light and medium.
+		case 'medium-light':
+			return '#C49971'
 		case 'medium':
 			return '#957147'
+		// Halfway between medium and dark.
+		case 'medium-dark':
+			return '#825B37'
 		case 'dark':
 			return '#6E4426'
 	}

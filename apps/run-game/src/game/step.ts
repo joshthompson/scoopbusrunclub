@@ -39,6 +39,9 @@ import {
 	DUCK_HEIGHT,
 	FIKA_BOOST,
 	FIKA_POINTS,
+	GLIDER_KNOCK_DROP,
+	GLIDER_KNOCK_SPEED,
+	GLIDER_WING,
 	GOOSE_CARRY_HEIGHT,
 	GOOSE_CARRY_SPEED,
 	GRAVITY,
@@ -53,6 +56,9 @@ import {
 	PUMPKIN_POINTS,
 	PUMPKIN_SPEED,
 	PX_PER_M,
+	RIDE_LEAP,
+	RING_BOOST,
+	RING_POINTS,
 	ROUND_BUS_LEASH_MAX,
 	RUN_GRIP,
 	RUN_TOP_SPEED,
@@ -75,10 +81,33 @@ import { cyclistAt } from './cyclists'
 import { FIKA_SIZE, FIKA_WORD } from './fika'
 import { carryHeight, glide, stepFlyers } from './flyers'
 import { scoopFurbies, stepFurbies } from './furbies'
+import { atSea, glidingBox, stepGliding } from './gliders'
 import { mummyAt } from './mummies'
 import { scoopPack, stepPack } from './pack'
 import { landingOn, platformAt, platformMove } from './platforms'
-import { STEAM_LAUNCH, STEAM_REACH } from './steam'
+import {
+	HANDS_HOLD,
+	HANDS_REACH,
+	SEWAGE_FALL,
+	SEWAGE_REACH,
+	SWAMP_HEIGHT,
+	SWAMP_REACH,
+	sewageAt,
+	swampManAt,
+} from './sewer'
+import {
+	GULL_HEIGHT,
+	GULL_WIDTH,
+	RING_ROOM,
+	balloonAt,
+	gullsAt,
+	overlap,
+	stormAt,
+	turbineAt,
+	turbineHits,
+	whaleAt,
+} from './sky'
+import { steamFires } from './steam'
 import { TOWER_DOOR, TOWER_HEIGHT, towerSpan } from './towers'
 import {
 	type Body,
@@ -95,8 +124,10 @@ import { zombieAt } from './zombies'
 export const POPUP_TICKS = 45
 /** How long a cheerer's bubble stays up. */
 const CHEER_TICKS = 70
+/** How long a Ring stays lit up, flown through. */
+const RING_GLOW_TICKS = 30
 /** Speed bleeds back down to top speed this much slower than it builds, so a boost lasts. */
-const OVERSPEED_GRIP = 0.008
+export const OVERSPEED_GRIP = 0.008
 /** Running on over the finish line, and off the right of the screen. */
 const RUN_OFF_SPEED = 6
 /** How far past the right of the screen they get before the summary comes up. */
@@ -219,11 +250,27 @@ function busTicksToFinish(world: World) {
 	let ticks = BUS_HOLD_TICKS
 	while (x < world.terrain.finishX) {
 		const ramp = Math.min(1, (ticks - BUS_HOLD_TICKS) / BUS_RAMP_TICKS)
-		x += BUS_START_SPEED + (BUS_TOP_SPEED - BUS_START_SPEED) * ramp
+		x += Math.max(
+			BUS_START_SPEED + (BUS_TOP_SPEED - BUS_START_SPEED) * ramp,
+			seaPace(world, x),
+		)
 		ticks++
 	}
 	return ticks
 }
+
+/**
+ * How fast the bus goes out at sea, at `x`, at least: none, on land. In a
+ * Round, a little under its top speed, whatever the sea's, so a Player
+ * going all out can still keep ahead of it.
+ */
+function seaPace(world: World, x: number) {
+	const { sea } = world.course
+	if (!sea || !atSea(world, x)) return 0
+	return Math.min(sea.busSpeed, topSpeed(world) - ROUND_SEA_SLACK)
+}
+/** How much slower than anyone can go the bus goes at sea, in a Round. */
+const ROUND_SEA_SLACK = 0.6
 
 /**
  * Over the line: points for how much quicker round than the bus they were,
@@ -324,7 +371,10 @@ function stepRunner(world: World, racer: Racer) {
 	const racing = phase === 'running' && !racer.out
 	// Over the line, or the last one standing: running on.
 	const finished = !racing
-	const held = racing ? racer.controls() : undefined
+	// Held by a Swamp Man: nothing they press does anything till he lets go.
+	const grabbed = racing && b.held > 0
+	if (grabbed) b.held--
+	const held = racing && !grabbed ? racer.controls() : undefined
 	const right = !!held?.right
 	const left = !!held?.left
 	const up = !!held?.up
@@ -337,6 +387,12 @@ function stepRunner(world: World, racer: Racer) {
 	// A stumble knocks a Pumpkin off.
 	if (b.stumble > 0 && b.pumpkin) loseHat(world, b)
 	if (b.dropping > 0) b.dropping--
+	// A Ride wears out as it goes, leaping too, so it's only ever a while:
+	// worn out in the air, they're off it, from its saddle, falling.
+	if (b.mount > 0 && racing) {
+		b.mount--
+		if (b.mount === 0 && !b.grounded) b.feetY -= rideLook(world.course).saddle
+	}
 
 	if (b.carried > 0 && up && !b.wasUp) {
 		// Jumping off a goose, or a dragon: up off it, as off the ground.
@@ -368,6 +424,13 @@ function stepRunner(world: World, racer: Racer) {
 		b.wasUp = up
 		return
 	}
+	if (b.gliding) {
+		// On a glider: up and down as they steer it, till it comes down.
+		const crashed = stepGliding(world, racer, { up, down, left, right })
+		b.wasUp = up
+		if (crashed && racing) fall(world, racer)
+		return
+	}
 
 	// Ducking on a Platform: down through it, unless it's solid rock.
 	if (
@@ -396,10 +459,11 @@ function stepRunner(world: World, racer: Racer) {
 		if (b.stumble > 0) b.stumble--
 		if (b.squashed > 0) b.squashed--
 		const canDrive = b.stumble === 0
+		// Ducking, off a Ride: slid off its back, going as fast as it was.
+		if (b.mount > 0 && down) b.mount = 0
 
 		if (b.mount > 0) {
 			// On a corgi: galloping on, whatever's held.
-			b.mount--
 			b.ducking = false
 			b.facing = 1
 			b.vx += (CORGI_GALLOP - b.vx) * CORGI_GRIP
@@ -442,19 +506,16 @@ function stepRunner(world: World, racer: Racer) {
 		}
 
 		if (up && !b.wasUp && !low) {
-			// Off a corgi or a llama, if on one: up from its saddle.
-			if (b.mount > 0) b.feetY -= rideLook(world.course).saddle
-			b.mount = 0
-			jump(b)
+			// On a Ride, it leaps, with them on its back; otherwise, a jump.
+			jump(b, b.mount > 0 ? RIDE_LEAP : JUMP_SPEED)
 			b.ducking = false
 			b.on = undefined
 		}
 	} else {
-		// Off a corgi or a llama even with it in the air, up from its saddle.
-		if (up && !b.wasUp && b.mount > 0) {
+		// Ducking off a Ride, even with it in the air: from its saddle, falling.
+		if (down && b.mount > 0) {
 			b.feetY -= rideLook(world.course).saddle
 			b.mount = 0
-			jump(b)
 		}
 		b.vy += GRAVITY
 		// Let go of jump on the way up: cut short, a hop. Held: the whole jump.
@@ -468,7 +529,7 @@ function stepRunner(world: World, racer: Racer) {
 	else if (b.vx < -0.5) b.facing = -1
 
 	const top = topSpeed(world)
-	b.vx = Math.max(-top, Math.min(top, b.vx))
+	b.vx = grabbed ? 0 : Math.max(-top, Math.min(top, b.vx))
 
 	// Carried along by a Moving Platform.
 	const ticks = world.ticks()
@@ -529,7 +590,12 @@ function stepRunner(world: World, racer: Racer) {
 			b.feetY = ground
 			b.on = undefined
 			land(b)
-		} else if (racing && b.feetY > ground + FALL_DEPTH) fall(world, racer)
+		} else if (
+			racing &&
+			b.feetY > ground + (atSea(world, b.x) ? 0 : FALL_DEPTH)
+		)
+			// Down a Gap, out of sight; into the sea, as they hit it.
+			fall(world, racer)
 	}
 	if (b.grounded) b.floor = b.feetY
 }
@@ -540,9 +606,12 @@ function loseHat(world: World, b: Body) {
 	b.pumpkin = 0
 }
 
-/** A jump, off the ground or off a ride: a tap's a hop, held it's the whole jump. */
-function jump(b: Body) {
-	b.vy = -JUMP_SPEED
+/**
+ * A jump, off the ground or off a goose, or a Ride's leap with them on it,
+ * `speed` up: a tap's a hop, held it's the whole jump.
+ */
+function jump(b: Body, speed = JUMP_SPEED) {
+	b.vy = -speed
 	b.jumping = true
 	b.grounded = false
 	play('jump')
@@ -676,15 +745,21 @@ function hitRockFace(world: World, racer: Racer, from: number) {
 /** Down a Gap, and out. */
 function fall(world: World, racer: Racer) {
 	const b = racer.body
+	const crashed = b.gliding
 	b.mount = 0
 	b.carried = 0
+	b.gliding = false
 	b.ducking = false
 	racer.out = 'fallen'
 	racer.outAt = world.ticks()
 	if (!world.round) world.setPhase('fallen')
 	play('fallen')
 	world.popup(
-		`${racer.runner.name} fell!`,
+		crashed
+			? `Splash! ${racer.runner.name} crashed!`
+			: atSea(world, b.x)
+				? `Splash! ${racer.runner.name} fell in!`
+				: `${racer.runner.name} fell!`,
 		b.x,
 		world.terrain.groundY(b.x) - 80,
 	)
@@ -715,19 +790,29 @@ function collide(world: World, racer: Racer) {
 	const b = racer.body
 	if (world.phase() !== 'running' || racer.out) return
 
-	const left = b.x - HITBOX_HALF_WIDTH
-	const right = b.x + HITBOX_HALF_WIDTH
-	const bottom = b.feetY
-	const top = b.feetY - bodyHeight(b)
+	// On a glider: lying along under its wing, it over them.
+	const box = b.gliding
+		? glidingBox(b)
+		: {
+				left: b.x - HITBOX_HALF_WIDTH,
+				right: b.x + HITBOX_HALF_WIDTH,
+				top: b.feetY - bodyHeight(b),
+				bottom: b.feetY,
+			}
+	const { top } = box
 	/** Where they were last tick. */
 	const wasAt = b.x - b.vx
 	const overlaps = (x0: number, x1: number, y0: number, y1: number) =>
-		right > x0 && left < x1 && bottom > y0 && top < y1
+		box.right > x0 && box.left < x1 && box.bottom > y0 && box.top < y1
 
 	const stumble = (word: string) => {
 		play('stumble')
 		b.stumble = STUMBLE_TICKS
-		b.vx = Math.sign(b.vx) * Math.min(Math.abs(b.vx), STUMBLE_SPEED)
+		if (b.gliding) {
+			// Knocked about on a glider: slowed, and down a little, but flying on.
+			b.vx = Math.min(b.vx, GLIDER_KNOCK_SPEED)
+			b.vy += GLIDER_KNOCK_DROP
+		} else b.vx = Math.sign(b.vx) * Math.min(Math.abs(b.vx), STUMBLE_SPEED)
 		world.addBonus('hazards', -HAZARD_POINTS)
 		world.popup(scored(world, word, `-${HAZARD_POINTS}`), b.x, top)
 	}
@@ -803,18 +888,102 @@ function collide(world: World, racer: Racer) {
 					stumble('Clunk!')
 				}
 				break
-			case 'steam':
+			case 'steam': {
 				// Onto it: it puffs, and fires them up into the air, as from a
-				// jump, but much higher.
-				if (b.grounded && Math.abs(b.x - o.x) < STEAM_REACH) {
+				// jump, but much higher. A Giant Vent, on too, out of the sewer.
+				const fires = steamFires(o)
+				if (b.grounded && Math.abs(b.x - o.x) < fires.reach) {
 					state.flown = world.ticks()
-					b.vy = -STEAM_LAUNCH
+					b.vy = -fires.up
+					if (fires.on) {
+						b.vx = Math.max(b.vx, fires.on)
+						b.facing = 1
+					}
 					b.grounded = false
 					b.jumping = false
 					b.on = undefined
 					play('whoosh')
 				}
 				break
+			}
+			case 'swampman': {
+				// Up out of his sludge, he grabs whoever's in reach, once a
+				// round, and holds them still till he sinks back.
+				const man = swampManAt(o.x, world.ticks())
+				if (man.round !== (state.lap ?? 0)) {
+					state.lap = man.round
+					state.hit.clear()
+				}
+				if (
+					man.grabs &&
+					freshFor(state) &&
+					b.held === 0 &&
+					overlaps(
+						o.x - SWAMP_REACH,
+						o.x + SWAMP_REACH,
+						ground - SWAMP_HEIGHT * man.rise,
+						ground,
+					)
+				) {
+					hits(state)
+					play('groan')
+					b.held = man.hold
+					b.vx = 0
+					b.ducking = false
+					b.stumble = 0
+					world.addBonus('hazards', -HAZARD_POINTS)
+					world.popup(scored(world, 'Gotcha!', `-${HAZARD_POINTS}`), b.x, top)
+				}
+				break
+			}
+			case 'hands':
+				// Stepped on: they burst up and grab their ankles, once each.
+				if (
+					b.grounded &&
+					b.on === undefined &&
+					b.held === 0 &&
+					freshFor(state) &&
+					Math.abs(b.x - o.x) < HANDS_REACH
+				) {
+					hits(state)
+					state.flown = world.ticks()
+					play('groan')
+					b.held = HANDS_HOLD
+					// Pulled into their grip, between them.
+					b.x = o.x
+					b.vx = 0
+					b.ducking = false
+					b.stumble = 0
+					world.addBonus('hazards', -HAZARD_POINTS)
+					world.popup(scored(world, 'Grabbed!', `-${HAZARD_POINTS}`), b.x, top)
+				}
+				break
+			case 'sewage': {
+				// Under it while it's pouring, anywhere from the grate down:
+				// splattered, once a wave.
+				const drain = sewageAt(o.x, world.ticks())
+				if (drain.wave !== (state.lap ?? 0)) {
+					state.lap = drain.wave
+					state.hit.clear()
+				}
+				// From its grate, as far down as the pour's got.
+				const grate = world.course.cave?.ceiling(o.x) ?? ground - 400
+				const reached = Math.min(
+					ground,
+					grate + (drain.poured + 1) * SEWAGE_FALL,
+				)
+				if (
+					drain.pouring &&
+					freshFor(state) &&
+					b.stumble === 0 &&
+					overlaps(o.x - SEWAGE_REACH, o.x + SEWAGE_REACH, grate, reached)
+				) {
+					hits(state)
+					play('squelch')
+					stumble('Splat!')
+				}
+				break
+			}
 			case 'tourists': {
 				const half = touristsWidth(o.count) / 2 - 4
 				if (
@@ -881,6 +1050,83 @@ function collide(world: World, racer: Racer) {
 					hits(state)
 					play('groan')
 					stumble('Mmmf!')
+				}
+				break
+			}
+			case 'gulls':
+				// Into a flock: they scatter, for whoever comes after too.
+				if (
+					!state.used &&
+					b.stumble === 0 &&
+					gullsAt(o, ground, world.ticks()).some((g) =>
+						overlaps(
+							g.x - GULL_WIDTH / 2 + 3,
+							g.x + GULL_WIDTH / 2 - 3,
+							g.y - GULL_HEIGHT / 2,
+							g.y + GULL_HEIGHT / 2,
+						),
+					)
+				) {
+					state.used = true
+					state.flown = world.ticks()
+					play('honk')
+					stumble('Squawk!')
+				}
+				break
+			case 'balloon':
+				if (
+					freshFor(state) &&
+					b.stumble === 0 &&
+					balloonAt(o, ground, world.ticks()).parts.some((part) =>
+						overlap(part, box),
+					)
+				) {
+					hits(state)
+					stumble('Bump!')
+				}
+				break
+			case 'storm': {
+				// Its cloud, and a bolt out of it as it strikes: once a strike.
+				const storm = stormAt(o, ground, world.ticks())
+				if (storm.round !== (state.lap ?? 0)) {
+					state.lap = storm.round
+					state.hit.clear()
+				}
+				if (
+					freshFor(state) &&
+					b.stumble === 0 &&
+					storm.parts.some((part) => overlap(part, box))
+				) {
+					hits(state)
+					stumble('Zap!')
+				}
+				break
+			}
+			case 'turbine':
+				if (
+					freshFor(state) &&
+					b.stumble === 0 &&
+					turbineHits(turbineAt(o, ground, world.ticks()), box)
+				) {
+					hits(state)
+					stumble('Clang!')
+				}
+				break
+			case 'whale': {
+				// Its spout, as it blows: once a spout.
+				const whale = whaleAt(o, ground, world.ticks())
+				if (whale.round !== (state.lap ?? 0)) {
+					state.lap = whale.round
+					state.hit.clear()
+				}
+				if (
+					freshFor(state) &&
+					b.stumble === 0 &&
+					whale.parts.some((part) => overlap(part, box))
+				) {
+					hits(state)
+					play('squelch')
+					stumble('Splosh!')
 				}
 				break
 			}
@@ -968,7 +1214,11 @@ function collide(world: World, racer: Racer) {
 						hits(state)
 						world.addBonus('hazards', -HAZARD_POINTS)
 						world.popup(
-							scored(world, 'Squelch!', `-${HAZARD_POINTS}`),
+							scored(
+								world,
+								world.course.look?.mudWord ?? 'Squelch!',
+								`-${HAZARD_POINTS}`,
+							),
 							b.x,
 							top,
 						)
@@ -1044,6 +1294,25 @@ function collide(world: World, racer: Racer) {
 					play('fika')
 				}
 				break
+			case 'ring': {
+				// Through it, either way, their middle through its: faster,
+				// once each. It lights up.
+				const middle = ground - o.height
+				if (
+					!state.hit.has(racer.id) &&
+					b.x - o.x !== 0 &&
+					b.x - o.x > 0 !== wasAt - o.x > 0 &&
+					Math.abs(b.feetY - bodyHeight(b) / 2 - middle) < RING_ROOM
+				) {
+					hits(state)
+					state.setCheering(RING_GLOW_TICKS)
+					b.vx = boost(world, b.vx, b.facing, RING_BOOST)
+					world.addBonus('rings', RING_POINTS)
+					world.popup(scored(world, 'Ring!', `+${RING_POINTS}`), b.x, top)
+					play('scan')
+				}
+				break
+			}
 			case 'cheer':
 				// Passing them, either way: they cheer on everyone, once each.
 				if (
@@ -1095,7 +1364,11 @@ function stepBus(world: World) {
 		if (phase === 'finished') bus.speed *= 0.97
 		else {
 			const ramp = Math.min(1, driving / BUS_RAMP_TICKS)
-			bus.speed = BUS_START_SPEED + (BUS_TOP_SPEED - BUS_START_SPEED) * ramp
+			// Out at sea, it's under full steam, whatever its pace on land.
+			bus.speed = Math.max(
+				BUS_START_SPEED + (BUS_TOP_SPEED - BUS_START_SPEED) * ramp,
+				seaPace(world, bus.frontX),
+			)
 		}
 		// Slowed going uphill, as everyone is: its wheels' slope.
 		const slope = world.terrain.slope(bus.frontX - BUS_MIDDLE_BEHIND)
@@ -1166,6 +1439,7 @@ function scoop(world: World, racer: Racer, body: Body) {
 	bus.scooping = 10
 	body.mount = 0
 	body.carried = 0
+	body.gliding = false
 	body.grounded = false
 	body.ducking = false
 	body.vx = Math.max(bus.speed, 2) + 2
@@ -1314,6 +1588,30 @@ export const CAMERA_HEADROOM = 230
 export const CAMERA_FOOTROOM = 40
 /** How quickly the camera looks up or down, a share a tick. */
 const CAMERA_LIFT = 0.08
+/**
+ * How far over where they last stood someone can be in the air before the
+ * camera looks up after them, rather than at where they stood: higher than
+ * any jump, or a Steam Vent, goes; up a Giant Vent, out of a sewer. Flying
+ * that high, it keeps them this far under the top of the screen, as if
+ * they were stood this far under where they are.
+ */
+const CAMERA_FLY_ROOM = 220
+const CAMERA_FLY_UNDER = 120
+/** How far under where they last stood someone can drop before the camera hurries down after them. */
+const CAMERA_DROP_ROOM = 60
+/** How quickly it looks up, after someone flying that high: quick enough to keep up. */
+const CAMERA_FLY_LIFT = 0.25
+/** Whether someone's flying high, over where they last stood: see `CAMERA_FLY_ROOM`. */
+const flyingHigh = (b: Body) => b.feetY < b.floor - CAMERA_FLY_ROOM
+/**
+ * What the camera keeps in view, for someone, highest and lowest: where they
+ * last stood, and their feet, falling; or up after them, flying high,
+ * leaving where they stood behind.
+ */
+const lookAt = (b: Body) =>
+	flyingHigh(b)
+		? { high: b.feetY + CAMERA_FLY_UNDER, low: b.feetY + CAMERA_FLY_UNDER }
+		: { high: b.floor, low: Math.max(b.floor, b.feetY) }
 
 /**
  * How far up the camera wants to look for floors from `high` to `low`, at
@@ -1326,15 +1624,51 @@ function cameraYFor(high: number, low: number, zoom = 1) {
 	return Math.min(0, Math.max(up, down))
 }
 
+/** How much sky over a glider's highest, and sea under the surface, the camera shows gliding. */
+const GLIDE_SKY_ROOM = 90
+const GLIDE_SEA_ROOM = 40
+
+/**
+ * Out over the sea on a glider, the whole sky's in view, from the waves up
+ * to as high as a glider goes, so whichever way through is open can be
+ * seen coming: the highest and lowest a camera looking up from `high` to
+ * `low` would show it, zoomed out to fit.
+ */
+function glideView(world: World) {
+	const { sea, sky } = world.course
+	if (!sea || sky === undefined) return undefined
+	const top = sky - GLIDE_SKY_ROOM
+	const bottom = sea.level + GLIDE_SEA_ROOM
+	return {
+		high: top + CAMERA_HEADROOM,
+		low: bottom - CAMERA_FOOTROOM,
+		zoom: Math.min(MAX_ZOOM, Math.max(1, (bottom - top) / VIEW_HEIGHT)),
+	}
+}
+
 function stepCamera(world: World) {
 	// Left where it is: to watch them fly off, fall, or run off.
 	const phase = world.phase()
 	if (phase === 'scooped' || phase === 'fallen' || phase === 'finished') return
 	const b = world.body
-	const targetY = cameraYFor(b.floor, Math.max(b.floor, b.feetY))
+	// Zoomed out to the whole sky, gliding; back in, once down.
+	const gliding = b.gliding ? glideView(world) : undefined
+	const zoom = world.zoom()
+	const wantZoom = gliding?.zoom ?? 1
+	if (Math.abs(wantZoom - zoom) > 0.001)
+		world.setZoom(zoom + (wantZoom - zoom) * ZOOM_EASE)
+	const view = gliding ?? lookAt(b)
+	const targetY = cameraYFor(view.high, view.low, world.zoom())
 	const cameraY = world.cameraY()
-	if (targetY !== cameraY)
-		world.setCameraY(cameraY + (targetY - cameraY) * CAMERA_LIFT)
+	// Quick after them, flying high, or dropping a long way.
+	const dropping = b.feetY > b.floor + CAMERA_DROP_ROOM
+	const lift = flyingHigh(b) || dropping ? CAMERA_FLY_LIFT : CAMERA_LIFT
+	if (targetY !== cameraY) {
+		const eased = cameraY + (targetY - cameraY) * lift
+		// And never so slow their feet go off the bottom of the screen.
+		const keepFeet = b.feetY + CAMERA_FOOTROOM - VIEW_HEIGHT
+		world.setCameraY(Math.min(0, Math.max(eased, keepFeet)))
+	}
 	// More of the screen ahead, whichever way they're running. Through the
 	// countdown, the bus parked behind everyone is in view too.
 	const lead =
@@ -1384,10 +1718,21 @@ function frameEveryone(world: World) {
 		Math.max(world.bus.frontX - 80, last - BUS_IN_VIEW),
 	)
 	const front = Math.max(...xs) + ROUND_AHEAD
-	// And up and down: from the highest anyone's stood to the lowest.
-	const floors = running.map((r) => r.body.floor)
-	const high = Math.min(...floors)
-	const low = Math.max(...floors)
+	// And up and down: from the highest anyone's stood to the lowest; the
+	// whole sky, with anyone gliding.
+	const glide = running.some((r) => r.body.gliding)
+		? glideView(world)
+		: undefined
+	const high = Math.min(
+		glide?.high ?? Number.POSITIVE_INFINITY,
+		...running.map((r) => lookAt(r.body).high),
+	)
+	const low = Math.max(
+		glide?.low ?? Number.NEGATIVE_INFINITY,
+		...running.map((r) =>
+			flyingHigh(r.body) ? lookAt(r.body).low : r.body.floor,
+		),
+	)
 	const tall = (low + CAMERA_FOOTROOM - (high - CAMERA_HEADROOM)) / VIEW_HEIGHT
 	const want = Math.max(
 		1,

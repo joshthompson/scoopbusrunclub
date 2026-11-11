@@ -49,6 +49,8 @@ type Action = 'save' | 'random' | 'cancel' | 'delete'
 export function RunnerEditor(props: {
 	/** The runner being changed, or none for a new one. */
 	runner?: CustomRunner
+	/** What the way back says: back to the runners, unless it's come from elsewhere. */
+	backLabel?: string
 	/** Saved: the runner as it now is. */
 	onSave: (runner: CustomRunner) => void
 	onCancel: () => void
@@ -219,7 +221,7 @@ export function RunnerEditor(props: {
 		<div style={styles.screen}>
 			<div style={styles.top}>
 				<button type="button" style={styles.back} onClick={cancel}>
-					← Runners
+					{props.backLabel ?? '← Runners'}
 				</button>
 				<div style={styles.title}>
 					{props.runner ? 'Change your runner' : 'Make a runner'}

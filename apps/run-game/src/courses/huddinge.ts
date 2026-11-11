@@ -41,6 +41,12 @@ const terrain = createTerrain(heights, STEP_M, 5000)
 const SHADE = 'brightness(0.78) saturate(1.15)'
 const DEEP_SHADE = 'brightness(0.62) saturate(1.2) hue-rotate(-8deg)'
 
+/** A couple of deer, lying in the bracken by the path, waiting to be ridden. */
+const DEER = [START_X + 3600, START_X + 11600]
+/** How far either side of a deer the path's kept clear, to hop on and get going. */
+const DEER_ROOM = 180
+const nearDeer = (x: number) => DEER.some((d) => Math.abs(d - x) < DEER_ROOM)
+
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	const random = seeded(1410)
 	const obstacles: Obstacle[] = []
@@ -85,7 +91,11 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			filter: random() < 0.4 ? DEEP_SHADE : SHADE,
 		})
 	}
-	return { obstacles, boosts, scenery }
+	return {
+		obstacles: obstacles.filter((o) => !nearDeer(o.x)),
+		boosts: boosts.filter((b) => !nearDeer(b.x)),
+		scenery,
+	}
 }
 
 const piece = (
@@ -136,4 +146,6 @@ export const huddinge: CourseDefinition = {
 		nearGap: [24, 90],
 	},
 	...layOut(),
+	corgis: DEER,
+	ride: 'deer',
 }

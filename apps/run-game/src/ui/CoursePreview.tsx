@@ -1,10 +1,18 @@
 import tombstoneAsset from '@/assets/halloween/tombstone.png'
 import rockAsset from '@/assets/misc/rock1.png'
 import { For, type JSX, Show, createSignal, onCleanup, onMount } from 'solid-js'
-import type { Course } from '../courses/types'
+import type { Course, Obstacle } from '../courses/types'
 import { Backdrop, Ground, HorizonTrees, type View } from '../draw/Backdrop'
 import { GeeseArt, geeseWidth } from '../draw/art/geese'
 import { KidsArt, kidsWidth } from '../draw/art/kids'
+import {
+	BalloonArt,
+	GullArt,
+	RingArt,
+	StormArt,
+	TurbineArt,
+	WhaleArt,
+} from '../draw/art/sky'
 import {
 	HURDLE_LANES,
 	HurdleArt,
@@ -16,6 +24,13 @@ import { PlatformArt, platformLook } from '../draw/platformArt'
 import { rideLook } from '../draw/rideLook'
 import { PATH_BACK, START_X, VIEW_HEIGHT } from '../game/constants'
 import { platformAt } from '../game/platforms'
+import {
+	TURBINE_BLADE,
+	balloonAt,
+	gullsAt,
+	stormAt,
+	turbineAt,
+} from '../game/sky'
 import { zombieSprite } from '../runners/skeleton'
 
 /**
@@ -56,7 +71,7 @@ export function CoursePreview(props: {
 	const sceneHeight = () => props.height / SCALE
 	const followAcross = sceneWidth * FOLLOW_ACROSS
 
-	const from = START_X + terrain.length * START_AT
+	const from = course.look?.previewFrom ?? START_X + terrain.length * START_AT
 	const to = terrain.finishX - sceneWidth
 	const [camera, setCamera] = createSignal(from)
 	/** The window's top, in the scene: down with the ground, low on the course. */
@@ -111,6 +126,23 @@ export function CoursePreview(props: {
 	const zombies = course.obstacles.flatMap((o) =>
 		o.kind === 'zombie' ? [o] : [],
 	)
+	const rings = course.boosts.flatMap((b) => (b.kind === 'ring' ? [b] : []))
+	const sky = course.obstacles.flatMap((o) =>
+		o.kind === 'gulls' ||
+		o.kind === 'balloon' ||
+		o.kind === 'storm' ||
+		o.kind === 'turbine' ||
+		o.kind === 'whale'
+			? [o]
+			: [],
+	)
+	/** Its middle `height` over the Ground's line at `x`, in the scene. */
+	const above = (x: number, height: number): JSX.CSSProperties => ({
+		position: 'absolute',
+		left: `${x}px`,
+		top: `${terrain.groundY(x) - height}px`,
+		transform: 'translate(-50%, -50%)',
+	})
 
 	return (
 		<div
@@ -176,13 +208,25 @@ export function CoursePreview(props: {
 						)}
 					</For>
 					<For each={rocks}>
-						{(rock) => (
-							<img
-								src={rockAsset}
-								alt=""
-								style={{ ...at(rock.x, 3), transform: 'translateX(-50%)' }}
-							/>
-						)}
+						{(rock, i) => {
+							// Or the course's own, in its place, taken in turn.
+							const own = course.look?.rocks
+							const art = own?.length ? own[i() % own.length] : undefined
+							return (
+								<img
+									src={art?.asset ?? rockAsset}
+									alt=""
+									class={art ? 'pixelated' : undefined}
+									width={art?.width}
+									height={art?.height}
+									style={{
+										...at(rock.x, 3),
+										transform: 'translateX(-50%)',
+										filter: course.look?.rock,
+									}}
+								/>
+							)
+						}}
 					</For>
 					<For each={hurdles}>
 						{(hurdle) => (
@@ -263,7 +307,14 @@ export function CoursePreview(props: {
 					<For each={course.corgis ?? []}>
 						{(x) => (
 							<div
-								style={{ ...at(x), transform: 'translateX(-50%) scaleX(-1)' }}
+								style={{
+									...at(x),
+									// Facing the way they're coming from; a glider, the way it'll fly.
+									transform:
+										course.ride === 'glider'
+											? 'translateX(-50%)'
+											: 'translateX(-50%) scaleX(-1)',
+								}}
 							>
 								{rideLook(course).Art({ pose: 'sit' })}
 							</div>
@@ -283,7 +334,26 @@ export function CoursePreview(props: {
 										height: `${platform.depth ?? look.depth}px`,
 									}}
 								>
-									<PlatformArt look={look} />
+									<Show
+										when={platform.art}
+										fallback={<PlatformArt look={look} />}
+									>
+										{(art) => (
+											<img
+												src={art().asset}
+												alt=""
+												class="pixelated"
+												width={art().width}
+												height={art().height}
+												style={{
+													position: 'absolute',
+													left: `${(platform.width - art().width) / 2}px`,
+													top: `${-art().top}px`,
+													'max-width': 'none',
+												}}
+											/>
+										)}
+									</Show>
 								</div>
 							)
 						}}
@@ -306,11 +376,90 @@ export function CoursePreview(props: {
 							</div>
 						)}
 					</For>
+					{/* Out over the sea: its Rings, and what's in the sky, still. */}
+					<For each={rings}>
+						{(ring) => (
+							<div style={above(ring.x, ring.height)}>
+								<div style={{ position: 'relative' }}>
+									<RingArt half="far" lit={false} />
+									<div style={{ position: 'absolute', inset: 0 }}>
+										<RingArt half="near" lit={false} />
+									</div>
+								</div>
+							</div>
+						)}
+					</For>
+					<For each={sky}>{(o) => <SkyThing course={course} o={o} />}</For>
 				</div>
 			</div>
 		</div>
 	)
 }
+
+/** One of the sky's Obstacles, still, where it is at the start of a race. */
+function SkyThing(props: { course: Course; o: SkyObstacle }) {
+	const { o } = props
+	const line = props.course.terrain.groundY(o.x)
+	const place = (x: number, y: number): JSX.CSSProperties => ({
+		position: 'absolute',
+		left: `${x}px`,
+		top: `${y}px`,
+	})
+	switch (o.kind) {
+		case 'gulls':
+			return (
+				<For each={gullsAt(o, line, 0)}>
+					{(gull) => (
+						<div style={place(gull.x - 12, gull.y - 7)}>
+							<GullArt up={gull.flap} />
+						</div>
+					)}
+				</For>
+			)
+		case 'balloon':
+			return (
+				<div style={place(o.x - 36, balloonAt(o, line, 0).top)}>
+					<BalloonArt x={o.x} />
+				</div>
+			)
+		case 'storm': {
+			const { top } = stormAt(o, line, 0)
+			return (
+				<div style={place(o.x - 80, top)}>
+					<StormArt brewing={false} striking={false} now={0} reach={0} />
+				</div>
+			)
+		}
+		case 'turbine':
+			return (
+				<div
+					style={place(
+						o.x - TURBINE_BLADE - 4,
+						line - o.height - TURBINE_BLADE - 4,
+					)}
+				>
+					<TurbineArt angles={turbineAt(o, line, 0).angles} tall={o.height} />
+				</div>
+			)
+		case 'whale':
+			return (
+				<div style={place(o.x - 52, line - o.height)}>
+					<WhaleArt
+						up={1}
+						spout={0}
+						bubbling={false}
+						height={o.height}
+						now={0}
+					/>
+				</div>
+			)
+	}
+}
+
+type SkyObstacle = Extract<
+	Obstacle,
+	{ kind: 'gulls' | 'balloon' | 'storm' | 'turbine' | 'whale' }
+>
 
 const styles = {
 	window: {

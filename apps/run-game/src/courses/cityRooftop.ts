@@ -14,10 +14,11 @@ import chimney3 from '../assets/rooftop/chimney-3.png'
 import chimney4 from '../assets/rooftop/chimney-4.png'
 import dish from '../assets/rooftop/dish.png'
 import waterTower from '../assets/rooftop/water-tower.png'
-import { COUNTDOWN_STEP_TICKS, GROUND_Y, START_X } from '../game/constants'
+import { GROUND_Y, START_X } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { type Block, createRooftops } from '../game/terrain'
 import { seeded } from './kit/seeded'
+import { swing } from './kit/swing'
 import type {
 	Boost,
 	Course,
@@ -58,24 +59,6 @@ const CROSSING_GIRDER = 180
 
 /** How far round, out of 1, it's only hops and steps. */
 const EASY_START = 0.12
-
-/** How far along a runner's likely got, a tick, from "Go!", and when "Go!" is. */
-const LIKELY_PACE = 5.5
-const GO_TICKS = COUNTDOWN_STEP_TICKS * 3
-
-/**
- * A Moving Platform's swing, timed to be back at its start, ready, as
- * someone running about as fast as most do gets to `x`: so it's there for
- * them, and missing it means a shorter wait the quicker it swings.
- */
-function swing(
-	x: number,
-	by: { x?: number; y?: number },
-	ticks: number,
-): NonNullable<PlatformDefinition['move']> {
-	const arrives = GO_TICKS + (x - START_X) / LIKELY_PACE
-	return { ...by, ticks, phase: 1 - ((arrives / ticks) % 1) }
-}
 
 /** A building, and what's needed to get from it onto the next. */
 interface Plan {

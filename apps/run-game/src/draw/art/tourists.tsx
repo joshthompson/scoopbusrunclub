@@ -11,6 +11,13 @@ import { touristSprite } from '../../runners/tourists'
 
 /** How far apart they stand, and how tall they are, for running into. */
 const TOURIST_SPACING = 26
+/**
+ * How far either side of the path's middle they stand, nearer or further
+ * back, each their own: room for it under the group's feet, as drawn.
+ */
+const NEARER = 8
+const FURTHER = 6
+export const TOURISTS_DEPTH_ROOM = NEARER
 export const TOURISTS_HEIGHT = 52
 const TOURIST_WIDTH = 23 * RUNNER_SCALE
 
@@ -24,14 +31,36 @@ const chance = (x: number, i: number) => {
 	return n - Math.floor(n)
 }
 
-export function TouristsArt(props: { x: number; count: number }) {
+/** Where tourist `i` of a group of `count` stands, from the group's middle. */
+export const touristAlong = (count: number, i: number) =>
+	i * TOURIST_SPACING + TOURIST_WIDTH / 2 - touristsWidth(count) / 2
+
+/**
+ * A group of tourists, its feet on the path's middle, `TOURISTS_DEPTH_ROOM`
+ * up from the drawing's bottom: each stood a little nearer or further back,
+ * the nearer in front, and `drop` lower where the ground is, along from the
+ * group's middle.
+ */
+export function TouristsArt(props: {
+	x: number
+	count: number
+	drop?: (along: number) => number
+}) {
 	const tourists = Array.from({ length: props.count }, (_, i) => ({
 		sprite: touristSprite(1 + Math.floor(chance(props.x, i) * 1e6)),
 		facing: chance(props.x, i + 50) < 0.5 ? 1 : -1,
 		phone: chance(props.x, i + 90) < 0.5,
+		/** Nearer (down the screen), or further back (up it). */
+		depth: Math.round(-FURTHER + chance(props.x, i + 130) * (NEARER + FURTHER)),
+		drop: props.drop?.(touristAlong(props.count, i)) ?? 0,
 	}))
 	return (
-		<div style={{ position: 'relative', height: `${TOURISTS_HEIGHT}px` }}>
+		<div
+			style={{
+				position: 'relative',
+				height: `${TOURISTS_HEIGHT + TOURISTS_DEPTH_ROOM}px`,
+			}}
+		>
 			<For each={tourists}>
 				{(tourist, i) => {
 					const sprite = tourist.sprite
@@ -48,7 +77,8 @@ export function TouristsArt(props: { x: number; count: number }) {
 							style={{
 								position: 'absolute',
 								left: `${i() * TOURIST_SPACING}px`,
-								bottom: '0px',
+								bottom: `${TOURISTS_DEPTH_ROOM - tourist.depth - tourist.drop}px`,
+								'z-index': tourist.depth + FURTHER,
 								width: `${width}px`,
 								height: `${height}px`,
 								background: `url("${src}") ${offset}px 0 / auto 100% repeat-x`,

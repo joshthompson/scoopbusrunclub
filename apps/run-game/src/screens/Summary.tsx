@@ -3,7 +3,7 @@ import { flyerLook } from '../draw/flyerLook'
 import { rideLook } from '../draw/rideLook'
 import { PX_PER_M } from '../game/constants'
 import type { BonusKind, Result, World } from '../game/world'
-import type { Tally } from '../online/runScores'
+import { ONLINE, type Tally } from '../online/runScores'
 import { identity } from '../saved/identity'
 import { ScoreFace } from '../ui/ScoreFace'
 import type { Mode } from './Game'
@@ -52,6 +52,7 @@ const BONUS_LABELS: Record<BonusKind, string> = {
 	geese: 'Goose rides',
 	pumpkins: 'Pumpkins',
 	barcodes: 'Barcode',
+	rings: 'Rings',
 	speed: 'Speed',
 	hazards: 'Hazards hit',
 }
@@ -71,6 +72,8 @@ export function Summary(props: {
 	result: Result
 	placing: Placing | undefined
 	online: OnlineOffer | undefined
+	/** Still finding out whether there's anything to send online. */
+	checkingOnline?: boolean
 	actions: SummaryAction[]
 	/** Which of them is picked. */
 	picked: number
@@ -197,19 +200,35 @@ export function Summary(props: {
 					</Show>
 				</div>
 
-				<Show when={props.online || props.placing?.unlocked}>
+				{/* Online, its line's always there, the same height, whatever it
+				    turns out to say, or nothing: so the panel doesn't jump when
+				    the tables answer. */}
+				<Show when={ONLINE || props.online || props.placing?.unlocked}>
 					<div style={styles.notes}>
-						<Show when={props.online}>
-							{(online) => (
-								<Online
-									offer={online()}
-									send={
-										<Show when={sendAction()}>
-											{(send) => button(send(), styles.send, styles.sendOn)}
+						<Show when={ONLINE || props.online}>
+							<div style={styles.onlineLine}>
+								<Show
+									when={props.online}
+									fallback={
+										<Show when={props.checkingOnline}>
+											<span style={styles.checking}>
+												Checking the online high scores…
+											</span>
 										</Show>
 									}
-								/>
-							)}
+								>
+									{(online) => (
+										<Online
+											offer={online()}
+											send={
+												<Show when={sendAction()}>
+													{(send) => button(send(), styles.send, styles.sendOn)}
+												</Show>
+											}
+										/>
+									)}
+								</Show>
+							</div>
 						</Show>
 						<Show when={props.placing?.unlocked}>
 							{(name) => <div style={styles.unlocked}>{name()} unlocked!</div>}
@@ -334,6 +353,19 @@ const styles = {
 		'align-items': 'center',
 		gap: '4px',
 		'font-size': '14px',
+	},
+	/** As tall as the tallest it holds: a face, or the send button. */
+	onlineLine: {
+		display: 'flex',
+		'align-items': 'center',
+		'justify-content': 'center',
+		'min-height': '30px',
+		'align-self': 'stretch',
+	},
+	checking: {
+		opacity: 0.6,
+		'font-family': '"Cabin", sans-serif',
+		'font-size': '13px',
 	},
 	online: {
 		display: 'flex',

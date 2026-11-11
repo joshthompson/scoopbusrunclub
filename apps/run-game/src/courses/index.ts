@@ -8,6 +8,7 @@ import { platformAt } from '../game/platforms'
 import { CAMERA_FOOTROOM, CAMERA_HEADROOM, MAX_ZOOM } from '../game/step'
 import { caves } from './caves'
 import { cityRooftop } from './cityRooftop'
+import { cliff } from './cliff'
 import { furbyFields } from './furbyFields'
 import { gamlaStan } from './gamlaStan'
 import { greatWall } from './greatWall'
@@ -17,6 +18,8 @@ import { huddinge } from './huddinge'
 import { kristineberg } from './kristineberg'
 import { machuPicchu } from './machuPicchu'
 import { pyramids } from './pyramids'
+import { scoopLine } from './scoopLine'
+import { sewers } from './sewers'
 import type { Course, CourseDefinition } from './types'
 
 /**
@@ -53,16 +56,19 @@ export function climbOf(course: CourseDefinition) {
  */
 export const COURSES: Course[] = [
 	haga,
-	huddinge,
 	kristineberg,
 	gamlaStan,
+	huddinge,
 	pyramids,
-	greatWall,
-	machuPicchu,
 	halloweenTown,
-	furbyFields,
+	scoopLine,
 	caves,
+	greatWall,
+	furbyFields,
+	machuPicchu,
+	sewers,
 	cityRooftop,
+	cliff,
 ].map((course, i) => {
 	const climb = climbOf(course)
 	// So a Round can always get everyone on the screen.

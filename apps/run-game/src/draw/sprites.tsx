@@ -12,7 +12,7 @@ import {
 	createObjectSignal,
 } from '@/engine'
 import { imageSize } from '@/utils/imageSize'
-import { For, type JSX, Show, createSignal } from 'solid-js'
+import { For, Index, type JSX, Show, createSignal } from 'solid-js'
 import barcodeAsset from '../assets/boosts/barcode.png'
 // The website's bus, turned round to chase to the right.
 import busBackAsset from '../assets/bus/bus-back.png'
@@ -32,8 +32,9 @@ import mummyAsset from '../assets/obstacles/mummy.png'
 import steamVentAsset from '../assets/obstacles/steam-vent.png'
 import ventAsset from '../assets/rooftop/vent.png'
 import purpleSignAsset from '../assets/signs/purple-sign.png'
+import { bouncyToadstool } from '../courses/kit/furbyScenery'
 import { seeded } from '../courses/kit/seeded'
-import type { Obstacle } from '../courses/types'
+import type { Obstacle, PlatformDefinition } from '../courses/types'
 import { inTunnel } from '../game/cave'
 import {
 	BARCODE_TALL,
@@ -51,7 +52,22 @@ import { cyclistAt } from '../game/cyclists'
 import { FIKA_SIZE } from '../game/fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from '../game/furbies'
 import { mummyAt } from '../game/mummies'
-import { platformAt } from '../game/platforms'
+import { type PlatformAt, platformAt } from '../game/platforms'
+import {
+	BALLOON_HEIGHT,
+	BALLOON_WIDTH,
+	GULL_HEIGHT,
+	GULL_WIDTH,
+	RING_HEIGHT,
+	RING_WIDTH,
+	STORM_WIDTH,
+	TURBINE_BLADE,
+	balloonAt,
+	gullsAt,
+	stormAt,
+	turbineAt,
+	whaleAt,
+} from '../game/sky'
 import { steamPuff } from '../game/steam'
 import { countdownWord, scoopFlight, stepWorld } from '../game/step'
 import {
@@ -78,14 +94,57 @@ import { customRunners } from '../runners/customRunners'
 import { guests } from '../runners/guests'
 import { MEMBERS } from '../runners/playable'
 import { SKELETON_FILTER, zombieSprite } from '../runners/skeleton'
+import { play } from '../sfx'
+import { WallBricks } from './Backdrop'
 import { Bubble } from './Bubble'
 import { PixelArt } from './PixelArt'
 import { Pixels } from './Pixels'
 import type { CorgiPose } from './art/corgi'
 import { FikaArt } from './art/fika'
 import { GEESE_HEIGHT, GeeseArt, geeseWidth } from './art/geese'
+import {
+	FACE_FRONT,
+	FACE_HEIGHT,
+	FACE_WIDTH,
+	GiantFurbyFace,
+} from './art/giantFurby'
+import { BUS_GLIDER_HEIGHT, BUS_GLIDER_WIDTH, busGlider } from './art/glider'
+import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt } from './art/hands'
 import { KIDS_HEIGHT, KidsArt, kidsWidth } from './art/kids'
-import { TouristsArt, touristsWidth } from './art/tourists'
+import {
+	GIANT_VENT_HEIGHT,
+	GIANT_VENT_WIDTH,
+	GiantVentArt,
+	SEWAGE_WIDTH,
+	SWAMP_DRAWN,
+	SWAMP_POOL_HEIGHT,
+	SWAMP_POOL_WIDTH,
+	SewageArt,
+	SwampManArt,
+} from './art/sewer'
+import {
+	BalloonArt,
+	GullArt,
+	RingArt,
+	StormArt,
+	TurbineArt,
+	WHALE_HEIGHT,
+	WHALE_WIDTH,
+	WhaleArt,
+} from './art/sky'
+import {
+	SPLASH_HEIGHT,
+	SPLASH_TICKS,
+	SPLASH_UP,
+	SPLASH_WIDTH,
+	SplashArt,
+} from './art/splash'
+import {
+	TOURISTS_DEPTH_ROOM,
+	TOURISTS_HEIGHT,
+	TouristsArt,
+	touristsWidth,
+} from './art/tourists'
 import {
 	HURDLE_LANES,
 	HurdleArt,
@@ -95,7 +154,7 @@ import {
 	hurdleSize,
 } from './art/track'
 import { frontParapet } from './battlements'
-import { rideBus, startRide } from './busRide'
+import { atSea, rideBus, startRide } from './busRide'
 import { flyerLook } from './flyerLook'
 import { PlatformArt, platformLook } from './platformArt'
 import { rideLook } from './rideLook'
@@ -182,6 +241,12 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		body.carried === 0 &&
 		racer.out !== 'scooped' &&
 		Math.abs(body.vx) < STILL_SPEED
+	// On a glider, lying along under its wing, head first, legs together:
+	// the stand frame, turned over.
+	const lying = () => world.ticks() >= 0 && body.gliding
+	/** How they're tipped, lying on a glider: nose up climbing, down diving. */
+	let was = body.feetY
+	let tilt = 0
 
 	return createController({
 		frames: [...run, ...(sit ? [sit] : []), ...(stand ? [stand] : [])],
@@ -198,7 +263,11 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				width: () => size().width,
 				height: () => size().height,
 				frames: () =>
-					ducking() && sit ? [sit] : standing() && stand ? [stand] : run,
+					ducking() && sit
+						? [sit]
+						: (standing() || lying()) && stand
+							? [stand]
+							: run,
 				...createObjectSignal(undefined as number | undefined, 'frame'),
 				// Run sprites face left, the way the header's runners run.
 				...createObjectSignal(-1, 'xScale'),
@@ -222,7 +291,12 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			}
 			const xScale = body.facing === 1 ? -1 : 1
 			$.setXScale(xScale)
-			$.setRotation(runnerLean(world, body))
+			const dy = body.feetY - was
+			was = body.feetY
+			tilt += (Math.max(-12, Math.min(12, dy * 3)) - tilt) * 0.2
+			$.setRotation(
+				body.gliding ? GLIDING_LEAN + tilt : runnerLean(world, body),
+			)
 			// Sat down, the one sit frame: switching to it from a run frame
 			// would otherwise leave the engine on a frame it doesn't have. In
 			// the air, legs out in one stride.
@@ -230,12 +304,24 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				(body.ducking || body.mount > 0 || (seated && body.carried > 0)) &&
 				!!sit
 			// Stood still: the one stand frame.
-			$.setFrame(sitting || standing() ? 0 : body.grounded ? undefined : 1)
+			$.setFrame(
+				sitting || standing() || (lying() && stand)
+					? 0
+					: body.grounded
+						? undefined
+						: 1,
+			)
 			const speed = Math.abs(body.vx)
 			$.setState(body.grounded && speed > 0.3 ? 'play' : 'pause')
 			$.setFrameInterval(Math.max(45, 190 - speed * 22))
+			const { sea } = world.course
 			$.setStyle({
 				opacity: body.stumble > 0 && body.stumble % 8 < 4 ? '0.4' : '1',
+				// Fallen into the sea: gone under.
+				visibility:
+					racer.out === 'fallen' && sea && body.feetY > sea.level + 30
+						? 'hidden'
+						: undefined,
 				// Squashed by a furby: half as tall, from their feet.
 				...(body.squashed > 0
 					? {
@@ -247,6 +333,9 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		},
 	})
 }
+
+/** How far over a glider's rider is turned, lying along under it, head first. */
+const GLIDING_LEAN = 80
 
 /** Slower than this, on their feet, someone's stood still, not running. */
 const STILL_SPEED = 0.3
@@ -287,6 +376,11 @@ function createPacer(world: World, p: Pacer) {
 		!p.scooped &&
 		Math.abs(p.vx) < STILL_SPEED
 	const size = () => (ducked() ? poseSize(sit, sprite) : runSize)
+	/** On a glider, lying along under it, as a racer does. */
+	const lying = () => world.ticks() >= 0 && !!p.gliding
+	let was = p.feetY
+	let tilt = 0
+	const { sea } = world.course
 	return createController({
 		frames: [...sprite.run, ...(sit ? [sit] : []), ...(stand ? [stand] : [])],
 		randomStartFrame: true,
@@ -298,7 +392,11 @@ function createPacer(world: World, p: Pacer) {
 			width: () => size().width,
 			height: () => size().height,
 			frames: () =>
-				ducked() && sit ? [sit] : standing() && stand ? [stand] : sprite.run,
+				ducked() && sit
+					? [sit]
+					: (standing() || lying()) && stand
+						? [stand]
+						: sprite.run,
 			...createObjectSignal(undefined as number | undefined, 'frame'),
 			// Facing right, the way they're running.
 			xScale: () => -1,
@@ -315,15 +413,27 @@ function createPacer(world: World, p: Pacer) {
 				$.setState('pause')
 				return
 			}
-			// Leaning with the hill, running; upright, stood still.
+			// Leaning with the hill, running; upright, stood still; lying
+			// along under a glider, tipped as it climbs and dives.
+			const dy = p.feetY - was
+			was = p.feetY
+			tilt += (Math.max(-12, Math.min(12, dy * 3)) - tilt) * 0.2
 			$.setRotation(
-				p.grounded && !standing()
-					? (Math.atan(world.terrain.slope(p.x)) * 180) / Math.PI
-					: 0,
+				p.gliding
+					? GLIDING_LEAN + tilt
+					: p.grounded && !standing()
+						? (Math.atan(world.terrain.slope(p.x)) * 180) / Math.PI
+						: 0,
 			)
 			// Ducked through a Tunnel: the one sit frame. Stood still: the one stand frame.
 			const down = ducked()
-			$.setFrame(down || standing() ? 0 : p.grounded ? undefined : 1)
+			$.setFrame(
+				down || standing() || (lying() && stand)
+					? 0
+					: p.grounded
+						? undefined
+						: 1,
+			)
 			const speed = Math.abs(p.vx)
 			$.setState(p.grounded && !down && speed > 0.3 ? 'play' : 'pause')
 			$.setFrameInterval(Math.max(45, 190 - speed * 22))
@@ -331,6 +441,9 @@ function createPacer(world: World, p: Pacer) {
 			$.setStyle({
 				opacity: p.dazed > 0 && p.dazed % 8 < 4 ? '0.4' : '1',
 				filter: p.skeleton ? SKELETON_FILTER : undefined,
+				// Off the cliff into the sea: gone under.
+				visibility:
+					sea && !p.scooped && p.feetY > sea.level + 30 ? 'hidden' : undefined,
 			})
 		},
 	})
@@ -424,9 +537,194 @@ export function createFlyers(world: World) {
 	})
 }
 
+/** A splash's height into the sea, under its surface, that anyone's feet go in at. */
+const SPLASH_DEPTH = 14
+
+/**
+ * Splashes, as anyone goes into the sea: off the cliff with no glider, or
+ * crashed into it on one. Seen from where they are, so the same on every
+ * screen; each added as it happens, and gone once it's over.
+ */
+export function createSplashes(world: World) {
+	const { sea } = world.course
+	if (!sea) return []
+	const line = sea.level + SPLASH_DEPTH
+	/** Where everyone's feet were last tick. */
+	const was = new Map<string, number>()
+	const live: { id: string; at: number }[] = []
+	let next = 0
+	return [
+		createController({
+			init: () => ({
+				id: 'splashes',
+				type: 'game',
+				x: () => 0,
+				y: () => 0,
+				width: () => 0,
+				height: () => 0,
+			}),
+			onEnterFrame({ $scene }) {
+				const now = world.ticks()
+				/** Into the water, this tick, at `x`, not flying over it. */
+				const into = (
+					key: string,
+					x: number,
+					feetY: number,
+					flying: boolean,
+				) => {
+					const before = was.get(key)
+					was.set(key, feetY)
+					if (flying || before === undefined || !atSea(world, x)) return
+					if (before >= line || feetY < line) return
+					const id = `splash-${next++}`
+					live.push({ id, at: now })
+					$scene.addController(createSplash(world, id, x, now))
+				}
+				for (const r of world.racers)
+					into(
+						r.id,
+						r.body.x,
+						r.body.feetY,
+						r.body.gliding || r.out === 'scooped',
+					)
+				for (const p of world.pack)
+					into(`pacer-${p.id}`, p.x, p.feetY, !!p.gliding || p.scooped)
+				while (live.length && now - live[0].at > SPLASH_TICKS) {
+					const done = live.shift()
+					if (done) $scene.removeController(done.id)
+				}
+			},
+		}),
+	]
+}
+
+function createSplash(world: World, id: string, x: number, at: number) {
+	const surface = world.course.sea?.level ?? world.terrain.groundY(x)
+	return createController({
+		init: () => ({
+			id,
+			type: 'flyer',
+			x: () => x - SPLASH_WIDTH / 2,
+			y: () => surface + 6 - SPLASH_UP,
+			width: () => SPLASH_WIDTH,
+			height: () => SPLASH_HEIGHT,
+			children: () => <SplashArt age={world.ticks() - at} />,
+		}),
+	})
+}
+
+/** How near anyone gets to a Giant Furby's mouth before it opens wide. */
+const GIANT_OPENS = 520
+/** How often it blinks, and for how long. */
+const GIANT_BLINKS = 230
+const GIANT_BLINK = 9
+
+/**
+ * A Giant Furby's face, on the front of its head: its beak swung open as
+ * anyone, or the bus, comes near its mouth, and shut again once they've
+ * all gone through; its eye on whoever's nearest coming, blinking now and
+ * then. All from where everyone is, so the same on every screen.
+ */
+export function createGiantFurby(world: World) {
+	const giant = world.course.giantFurby
+	if (!giant) return []
+	const ground = world.terrain.groundY(giant.x)
+	const [open, setOpen] = createSignal(0)
+	const [blink, setBlink] = createSignal(false)
+	const [look, setLook] = createSignal({ x: -1, y: 0 })
+	let said = false
+	return [
+		createController({
+			init: () => ({
+				id: 'giant-furby',
+				// Behind everyone going in at its mouth.
+				type: 'scenery',
+				x: () => giant.x - FACE_FRONT,
+				y: () => Math.round(ground - FACE_HEIGHT),
+				width: () => FACE_WIDTH,
+				height: () => FACE_HEIGHT,
+				children: () => (
+					<GiantFurbyFace open={open()} blink={blink()} look={look()} />
+				),
+			}),
+			onEnterFrame() {
+				const now = Math.max(0, world.ticks())
+				const coming = [
+					...world.racers.filter((r) => !r.out).map((r) => r.body),
+					...world.pack.filter((p) => !p.scooped),
+				]
+				const near =
+					world.bus.frontX > giant.x - GIANT_OPENS &&
+					world.bus.frontX < giant.to
+				const anyone = coming.some(
+					(b) => b.x > giant.x - GIANT_OPENS && b.x < giant.to,
+				)
+				const target = near || anyone ? 1 : 0
+				const next = open() + (target - open()) * 0.12
+				if (Math.abs(next - open()) > 0.001) setOpen(next)
+				// Heard, opening up, the first time.
+				if (!said && next > 0.5 && world.ticks() >= 0) {
+					said = true
+					play('furby')
+				}
+				setBlink(now % GIANT_BLINKS < GIANT_BLINK)
+				// On whoever's nearest, coming.
+				const watched = world.racers
+					.filter((r) => !r.out && r.body.x < giant.x)
+					.sort((a, b) => b.body.x - a.body.x)[0]?.body
+				const dx = watched ? watched.x - giant.x : -400
+				const dy = watched ? watched.feetY - (ground - 285) : 0
+				setLook({
+					x: Math.max(-1, Math.min(0.3, dx / 400)),
+					y: Math.max(-0.6, Math.min(1, dy / 260)),
+				})
+			},
+		}),
+	]
+}
+
 /** The course's corgis, if it has any. */
 export function createCorgis(world: World) {
+	if (world.course.ride === 'glider')
+		return world.corgis.map((c) => createGlider(world, c))
 	return world.corgis.map((c) => createCorgi(world, c))
+}
+
+/**
+ * A glider: parked on the cliff top, nose down; flying, over whoever's
+ * hanging on under it, nose up climbing and down diving; or come down with
+ * no one on it, off and away.
+ */
+function createGlider(world: World, c: Corgi) {
+	const { width, height, Art } = rideLook(world.course)
+	/** Where it was last tick, for which way it's going, and how far it's tipped. */
+	let was = c.feetY
+	let tilt = 0
+	return createController({
+		init: () => ({
+			id: `corgi-${c.id}`,
+			// In front of its rider, hanging on to its bar.
+			type: 'flyer',
+			...createObjectSignal(c.x - width / 2, 'x'),
+			...createObjectSignal(c.feetY - height, 'y'),
+			width: () => width,
+			height: () => height,
+			...createObjectSignal(0, 'rotation'),
+			children: () => <Art pose="sit" />,
+		}),
+		onEnterFrame({ $ }) {
+			$.setX(c.x - width / 2)
+			$.setY(c.feetY - height)
+			if (c.state === 'scooped') {
+				$.setRotation(c.spin * 14)
+				return
+			}
+			const dy = c.feetY - was
+			was = c.feetY
+			tilt += (Math.max(-12, Math.min(12, dy * 3)) - tilt) * 0.2
+			$.setRotation(c.state === 'waiting' ? 6 : tilt)
+		},
+	})
 }
 
 function createCorgi(world: World, c: Corgi) {
@@ -436,9 +734,12 @@ function createCorgi(world: World, c: Corgi) {
 		Art,
 		call,
 	} = rideLook(world.course)
+	const { rare: rarer } = rideLook(world.course)
 	const [pose, setPose] = createSignal<CorgiPose>('sit')
 	const [facing, setFacing] = createSignal<1 | -1>(c.facing)
 	const [barking, setBarking] = createSignal(false)
+	/** The rarer one: on a Remote Player's screen, known once the Host says. */
+	const [rare, setRare] = createSignal(!!c.rare)
 	return createController({
 		init: () => ({
 			id: `corgi-${c.id}`,
@@ -452,7 +753,12 @@ function createCorgi(world: World, c: Corgi) {
 			...createObjectSignal(0, 'rotation'),
 			children: () => (
 				<>
-					<Art pose={pose()} />
+					<Show when={rare() && rarer} fallback={<Art pose={pose()} />}>
+						{(look) => {
+							const RareArt = look().Art
+							return <RareArt pose={pose()} />
+						}}
+					</Show>
 					<Show when={barking()}>
 						<Bubble size={16} mirrored={facing() === -1}>
 							{call}
@@ -465,10 +771,13 @@ function createCorgi(world: World, c: Corgi) {
 			$.setX(c.x - CORGI_WIDTH / 2)
 			$.setY(c.feetY - CORGI_HEIGHT)
 			setFacing(c.facing)
+			setRare(!!c.rare)
 			// Barking on and off, rather than one long bark.
 			setBarking(c.barking && world.ticks() % 50 < 30)
+			/** Up off the ground: leaping, with someone on its back, or coming down after. */
+			const airborne = c.feetY < world.terrain.groundY(c.x) - 2
 			setPose(
-				c.state === 'scooped'
+				c.state === 'scooped' || airborne
 					? 'leap'
 					: c.state === 'ridden'
 						? // Galloping.
@@ -480,7 +789,9 @@ function createCorgi(world: World, c: Corgi) {
 			$.setRotation(
 				c.state === 'scooped'
 					? c.spin * 14
-					: (Math.atan(world.terrain.slope(c.x)) * 180) / Math.PI,
+					: airborne
+						? 0
+						: (Math.atan(world.terrain.slope(c.x)) * 180) / Math.PI,
 			)
 		},
 	})
@@ -537,6 +848,8 @@ function createFurby(world: World, f: Furby) {
 
 const BUS_WIDTH = 247
 const BUS_HEIGHT = 127
+/** How far down into the bus's roof its glider's struts' feet go. */
+const BUS_GLIDER_ROOF = 10
 /** The scoop's front edge, this far in from the bus's left. */
 const SCOOP_FRONT = BUS_WIDTH + 22
 /** How long a bit of rock takes to fly off the drill, and the bits: up and back over the roof, or down ahead onto the floor. */
@@ -617,7 +930,11 @@ function drilling(world: World, front: number) {
 	const { cave } = world.course
 	if (!cave) return false
 	const x = front - 6
-	const ground = world.terrain.groundY(x)
+	const terrain = world.terrain.groundY(x)
+	const dug = world.course.busFloor?.(x)
+	// Under the Ground, digging its own way.
+	if (dug !== undefined && dug > terrain + 1) return true
+	const ground = dug ?? terrain
 	const roof = ground - BORE_HEIGHT
 	const ceiling = cave.ceiling(x)
 	if (ceiling !== undefined && ceiling > roof) return true
@@ -645,8 +962,19 @@ const busLook = (world: World) =>
 
 export function createBus(world: World) {
 	const look = busLook(world)
+	/** Whether it's got its drill on yet: from the start, or once it's got to where it goes on. */
+	const drillOn = () =>
+		!!look.drill &&
+		(look.drillFrom === undefined || world.bus.frontX >= look.drillFrom)
 	/** A drill reaches further out than a scoop: the bus is that much further back, its tip where it scoops. */
-	const drillOut = look.drill ? DRILL_OUT : 0
+	const drillOut = () => (drillOn() ? DRILL_OUT : 0)
+	/** Its floor's slope, at `x`: digging its own way, or the Ground's. */
+	const slope = (x: number) => {
+		const dug = world.course.busFloor
+		const here = dug?.(x)
+		if (here === undefined) return world.terrain.slope(x)
+		return ((dug?.(x + 4) ?? here) - (dug?.(x - 4) ?? here)) / 8
+	}
 	const bus = createController({
 		frames: [busBackAsset],
 		init: () => ({
@@ -654,23 +982,23 @@ export function createBus(world: World) {
 			type: 'bus',
 			width: () => BUS_WIDTH,
 			height: () => BUS_HEIGHT,
-			...createObjectSignal(world.bus.frontX - SCOOP_FRONT - drillOut, 'x'),
+			...createObjectSignal(world.bus.frontX - SCOOP_FRONT - drillOut(), 'x'),
 			...createObjectSignal(0, 'y'),
 			...createObjectSignal(0, 'rotation'),
 		}),
 		onEnterFrame({ $, $age }) {
-			const middle = world.bus.frontX - SCOOP_FRONT - drillOut + BUS_WIDTH / 2
+			const middle = world.bus.frontX - SCOOP_FRONT - drillOut() + BUS_WIDTH / 2
 			world.bus.ride ??= startRide(world, middle)
 			const ride = world.bus.ride
 			rideBus(world, ride, middle)
-			$.setX(world.bus.frontX - SCOOP_FRONT - drillOut)
+			$.setX(world.bus.frontX - SCOOP_FRONT - drillOut())
 			$.setY(
 				ride.y - WHEEL_BOTTOM + (ride.grounded ? Math.cos(10 + $age / 2) : 0),
 			)
 			// Nose up as it jumps, down as it drops; with the hill, on it.
 			$.setRotation(
 				ride.grounded
-					? (Math.atan(world.terrain.slope(middle)) * 180) / Math.PI +
+					? (Math.atan(slope(middle)) * 180) / Math.PI +
 							(Math.random() - 0.5) * 0.8
 					: Math.max(-14, Math.min(14, ride.vy * 1.4)),
 			)
@@ -717,32 +1045,64 @@ export function createBus(world: World) {
 		},
 	)
 	part('bus-body', look.body, BUS_WIDTH, BUS_HEIGHT, { x: 0, y: 0 })
-	part(
-		'bus-scoop',
-		look.scoop,
-		88,
-		57,
-		look.drill ? { x: 181 + DRILL_OUT, y: 94 - DRILL_UP } : { x: 181, y: 94 },
-		{
-			// A drill, in a Cave, turning as it goes.
-			...(look.drill && {
-				frames: look.drill,
-				frame: () => Math.floor(Math.max(0, world.ticks()) / 2) % 2,
-			}),
-			// `scooping` and `reach` aren't signals: reading the tick redraws
-			// it every tick. Gone up the Scoop Arm while that's out.
-			style: () => ({
-				transition: 'transform 60ms linear',
-				// Lifted about its top front corner.
-				'transform-origin': '88px 0px',
-				visibility: world.ticks() >= 0 && armOut(world) ? 'hidden' : 'visible',
-				transform:
-					world.ticks() >= 0 && world.bus.scooping > 0
-						? 'translateY(-45px) rotate(-10deg)'
-						: 'translateY(0px) rotate(0deg)',
-			}),
-		},
-	)
+	// Its own glider, bolted to its roof, out over the sea.
+	if (world.course.sea)
+		part(
+			'bus-glider',
+			busGlider,
+			BUS_GLIDER_WIDTH,
+			BUS_GLIDER_HEIGHT,
+			{
+				x: (BUS_WIDTH - BUS_GLIDER_WIDTH) / 2 + 10,
+				y: BUS_GLIDER_ROOF - BUS_GLIDER_HEIGHT,
+			},
+			{
+				style: () => ({
+					'image-rendering': 'pixelated',
+					visibility:
+						world.ticks() >= 0 &&
+						atSea(world, world.bus.frontX - SCOOP_FRONT + BUS_WIDTH / 2)
+							? 'visible'
+							: 'hidden',
+				}),
+			},
+		)
+	/**
+	 * The scoop, or a drill in place of it, turning as it goes: `drill`, which
+	 * this is. `scooping` and `reach` aren't signals: reading the tick redraws
+	 * it every tick. Gone up the Scoop Arm while that's out.
+	 */
+	const front = (drill: boolean) =>
+		part(
+			'bus-scoop',
+			look.scoop,
+			88,
+			57,
+			drill ? { x: 181 + DRILL_OUT, y: 94 - DRILL_UP } : { x: 181, y: 94 },
+			{
+				...(drill &&
+					look.drill && {
+						frames: look.drill,
+						frame: () => Math.floor(Math.max(0, world.ticks()) / 2) % 2,
+					}),
+				style: () => ({
+					transition: 'transform 60ms linear',
+					// Lifted about its top front corner.
+					'transform-origin': '88px 0px',
+					visibility:
+						world.ticks() >= 0 && (armOut(world) || drillOn() !== drill)
+							? 'hidden'
+							: 'visible',
+					transform:
+						world.ticks() >= 0 && world.bus.scooping > 0
+							? 'translateY(-45px) rotate(-10deg)'
+							: 'translateY(0px) rotate(0deg)',
+				}),
+			},
+		)
+	if (look.drill) front(true)
+	// The scoop, till the drill goes on, if it doesn't from the start.
+	if (!look.drill || look.drillFrom !== undefined) front(false)
 
 	return bus
 }
@@ -759,24 +1119,37 @@ const BORE_HEIGHT = 150
 export function createBusBore(world: World) {
 	const { cave } = world.course
 	const look = world.course.look?.cave
-	if (!cave || !look) return []
+	if (!cave || !look || look.bore === false) return []
 	const { groundY } = world.terrain
+	const { busFloor } = world.course
 	const random = seeded(4404)
 	const columns: { x: number; top: number; bottom: number; rim: boolean }[] = []
-	for (let x = cave.from; x < cave.to; x += 4) {
+	/** From the Cave's mouth, or from where the drill goes on, if that's sooner. */
+	const start = Math.min(
+		cave.from,
+		world.course.look?.bus?.drillFrom ?? cave.from,
+	)
+	for (let x = start; x < world.terrain.finishX; x += 4) {
 		const ground = groundY(x)
-		const rough = Math.round((ground - BORE_HEIGHT + random() * 6) / 2) * 2
+		// Digging its own way, down under the Ground: through the street, and
+		// the earth under it.
+		const dug = busFloor?.(x)
+		const under = dug !== undefined && dug > ground + 1
+		if (!under && (x < cave.from || x >= cave.to)) continue
+		const floor = under ? dug : ground
+		const rough = Math.round((floor - BORE_HEIGHT + random() * 6) / 2) * 2
 		// No higher than the rock goes: over a low hill, or the Sphinx's
-		// haunches, the bus is out in the open, not boring a hole.
-		const surface = cave.surface(x)
+		// haunches, the bus is out in the open, not boring a hole. Nor up
+		// out of the street it's digging down through.
+		const surface = under ? ground - PATH_BACK : cave.surface(x)
 		const top = surface === undefined ? rough : Math.max(rough, surface + 2)
-		const bottom = Math.round(ground - PATH_BACK + 1)
+		const bottom = Math.round(under ? floor + 2 : ground - PATH_BACK + 1)
 		if (top >= bottom) continue
 		const ceiling = cave.ceiling(x)
 		columns.push({
-			x: x - cave.from,
+			x: x - start,
 			top,
-			bottom: Math.round(ground - PATH_BACK + 1),
+			bottom,
 			// Only where it's cut the Cave's rock back: bigger than the space
 			// was, and under the hill's top, not along it.
 			rim: ceiling !== undefined && ceiling > top && top === rough,
@@ -784,7 +1157,7 @@ export function createBusBore(world: World) {
 	}
 	const highest = Math.min(...columns.map((c) => c.top)) - 4
 	const lowest = Math.max(...columns.map((c) => c.bottom))
-	const width = cave.to - cave.from
+	const width = Math.max(...columns.map((c) => c.x)) + 4
 	const band = (
 		part: (c: (typeof columns)[number]) => [number, number] | undefined,
 	) =>
@@ -804,7 +1177,7 @@ export function createBusBore(world: World) {
 			init: () => ({
 				id: 'bus-bore',
 				type: 'bus-bore',
-				x: () => cave.from,
+				x: () => start,
 				y: () => highest,
 				width: () => shown(),
 				height: () => lowest - highest,
@@ -817,16 +1190,29 @@ export function createBusBore(world: World) {
 							aria-hidden="true"
 							style={{ display: 'block' }}
 						>
-							<path d={hole} fill={look.wall} />
+							{/* The Cave's back wall, through it: brick, its courses in
+							    line with the wall's, where it's laid in brick. */}
+							<Show when={look.bricks}>
+								<defs>
+									<WallBricks
+										id="bus-bore-bricks"
+										wall={look.wall}
+										x={start}
+										y={highest}
+									/>
+								</defs>
+							</Show>
+							<path
+								d={hole}
+								fill={look.bricks ? 'url(#bus-bore-bricks)' : look.wall}
+							/>
 							<path d={rim} fill={look.seam} />
 						</svg>
 					</div>
 				),
 			}),
 			onEnterFrame() {
-				setShown(
-					Math.max(0, Math.min(width, world.bus.frontX - 40 - cave.from)),
-				)
+				setShown(Math.max(0, Math.min(width, world.bus.frontX - 40 - start)))
 			},
 		}),
 	]
@@ -921,8 +1307,20 @@ const SLING_HEIGHT = 34
 /** The course's Platforms, drawn where they are each tick. */
 export function createPlatforms(world: World) {
 	const look = platformLook(world.course)
+	const { cave } = world.course
+	/**
+	 * How long a girder's cable is, `at` where it is: up out of sight, or in
+	 * a Cave, up to its rock.
+	 */
+	const cableTo = (platform: PlatformDefinition, at: PlatformAt) => {
+		const ceiling = cave?.ceiling(at.left + platform.width / 2)
+		return ceiling === undefined
+			? 1400
+			: Math.max(0, at.top - SLING_HEIGHT - ceiling)
+	}
 	return world.platforms.map((platform, i) => {
 		const start = platformAt(world.terrain, platform, world.ticks())
+		const [cable, setCable] = createSignal(cableTo(platform, start))
 		return createController({
 			init: () => ({
 				id: `platform-${i}`,
@@ -933,7 +1331,24 @@ export function createPlatforms(world: World) {
 				height: () => platform.depth ?? look.depth,
 				children: () => (
 					<>
-						<PlatformArt look={look} />
+						<Show when={platform.art} fallback={<PlatformArt look={look} />}>
+							{/* Its own picture: its top on the Platform's. */}
+							{(art) => (
+								<img
+									src={art().asset}
+									alt=""
+									class="pixelated"
+									width={art().width}
+									height={art().height}
+									style={{
+										position: 'absolute',
+										left: `${(platform.width - art().width) / 2}px`,
+										top: `${-art().top}px`,
+										'max-width': 'none',
+									}}
+								/>
+							)}
+						</Show>
 						{/* Hung from a crane, out of sight above. */}
 						<Show when={platform.move && look.cable}>
 							{/* The crane's cable, down to its hook; from the hook, a
@@ -944,7 +1359,7 @@ export function createPlatforms(world: World) {
 									left: `${platform.width / 2 - 2}px`,
 									bottom: `calc(100% + ${SLING_HEIGHT}px)`,
 									width: '4px',
-									height: '1400px',
+									height: `${cable()}px`,
 									background: look.cable,
 								}}
 							/>
@@ -982,6 +1397,7 @@ export function createPlatforms(world: World) {
 						const at = platformAt(world.terrain, platform, world.ticks())
 						$.setX(at.left)
 						$.setY(at.top)
+						if (cave) setCable(cableTo(platform, at))
 					}
 				: undefined,
 		})
@@ -1082,6 +1498,34 @@ function SteamVent(props: { world: World; state: ObstacleState }) {
 	)
 }
 
+/**
+ * A bouncy toadstool, a Steam Vent's job: squashed flat as it fires
+ * whoever's on it up, and springing back, wobbling. When it last fired
+ * isn't a signal: reading the tick keeps it up to date.
+ */
+function Bouncer(props: { world: World; state: ObstacleState }) {
+	const squash = () => {
+		const puff = steamPuff(props.state.flown, props.world.ticks())
+		if (puff === undefined) return 1
+		// Down flat, then up past where it was, and settling.
+		return 1 - 0.45 * Math.cos(puff * Math.PI * 3) * (1 - puff)
+	}
+	return (
+		<img
+			src={bouncyToadstool}
+			alt=""
+			class="pixelated"
+			width={44}
+			height={32}
+			style={{
+				display: 'block',
+				transform: `scale(${2 - squash()}, ${squash()})`,
+				'transform-origin': '50% 100%',
+			}}
+		/>
+	)
+}
+
 /** A Steam Vent's clouds: each its own size, rising from its own place, one after another. */
 const STEAM_CLOUDS = [
 	{ x: -8, size: 14, delay: 0 },
@@ -1112,9 +1556,12 @@ function createCyclist(
 			...createObjectSignal(0, 'rotation'),
 			...createObjectSignal(110, 'frameInterval'),
 			...createObjectSignal('pause' as 'play' | 'pause', 'state'),
+			// Drawn riding left: turned round, riding the other way.
+			...createObjectSignal(1, 'xScale'),
 		}),
 		onEnterFrame({ $ }) {
 			const cyclist = cyclistAt(world, { ...state, obstacle: o })
+			$.setXScale(-(cyclist.facing ?? -1))
 			const ground = world.terrain.groundY(cyclist.x)
 			if (state.scooped) {
 				const flight = scoopFlight(state.scooped, world.ticks())
@@ -1165,6 +1612,13 @@ export function createScenery(world: World) {
 						groundY(x + width() / 2),
 					)) - PATH_BACK
 		const top = () => pathTop() - setBack - height()
+		/** How steep the floor is under it, end to end, as an angle. */
+		const floorLean = () => {
+			const half = width() / 2
+			return half
+				? Math.atan((groundY(x + half) - groundY(x - half)) / (half * 2))
+				: 0
+		}
 		/** Each hopper on its own beat. */
 		const beat = (i * 37) % HOP_EVERY
 		const [lift, setLift] = createSignal(0)
@@ -1183,6 +1637,12 @@ export function createScenery(world: World) {
 				style: () => ({
 					filter,
 					'image-rendering': scale > 1 ? 'pixelated' : undefined,
+					// Stood on the floor, leant with its slope, so both its feet
+					// are on it, uphill and down.
+					...(piece.onFloor && {
+						transform: `skewY(${floorLean()}rad)`,
+						'transform-origin': '50% 100%',
+					}),
 				}),
 			}),
 			// Only what hops needs anything doing every tick.
@@ -1443,25 +1903,38 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 	const o = state.obstacle
 	const id = `${o.kind}-${i}`
 	switch (o.kind) {
-		case 'rock':
+		case 'rock': {
+			// Or the course's own, in its place, taken in turn.
+			const own = world.course.look?.rocks
+			const art = own?.length
+				? own[
+						world.obstacles
+							.filter((s) => s.obstacle.kind === 'rock')
+							.indexOf(state) % own.length
+					]
+				: undefined
 			return createFixture({
 				id,
 				type: 'hazard',
 				x: o.x,
 				sink: 3,
-				width: 56,
-				height: 29,
+				width: art?.width ?? 56,
+				height: art?.height ?? 29,
 				world,
 				children: () => (
 					<Scoopable world={world} state={state}>
 						<img
-							src={rockAsset}
+							src={art?.asset ?? rockAsset}
 							alt=""
+							class={art ? 'pixelated' : undefined}
+							width={art?.width}
+							height={art?.height}
 							style={{ display: 'block', filter: world.course.look?.rock }}
 						/>
 					</Scoopable>
 				),
 			})
+		}
 		case 'branch': {
 			// Sheared to the slope under it, so its limb lies across the path
 			// on a hill too, its trunk still upright; and its row on the line
@@ -1623,6 +2096,35 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				children: () => <VentArt />,
 			})
 		case 'steam':
+			if (o.giant)
+				return createFixture({
+					id,
+					type: 'hazard',
+					x: o.x,
+					sink: 10,
+					width: GIANT_VENT_WIDTH,
+					height: GIANT_VENT_HEIGHT,
+					world,
+					// When it puffed isn't a signal: reading the tick keeps it up to date.
+					children: () => (
+						<GiantVentArt
+							now={() => Math.max(0, world.ticks())}
+							puffed={() => (world.ticks() >= 0 ? state.flown : undefined)}
+						/>
+					),
+				})
+			// A bouncy toadstool, squashing as it fires whoever's on it up.
+			if (world.course.look?.bouncers)
+				return createFixture({
+					id,
+					type: 'hazard',
+					x: o.x,
+					sink: 2,
+					width: 44,
+					height: 32,
+					world,
+					children: () => <Bouncer world={world} state={state} />,
+				})
 			return createFixture({
 				id,
 				type: 'hazard',
@@ -1633,20 +2135,82 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				world,
 				children: () => <SteamVent world={world} state={state} />,
 			})
-		case 'tourists':
+		case 'hands':
+			// In front of whoever's on them: clutching their ankles.
+			return createFixture({
+				id,
+				type: 'hazard-front',
+				x: o.x,
+				sink: CELL_SINK,
+				width: HANDS_WIDTH,
+				height: HANDS_HEIGHT,
+				world,
+				// When they grabbed isn't a signal: reading the tick keeps it up to date.
+				children: () => (
+					<HandsArt
+						now={() => Math.max(0, world.ticks())}
+						grabbed={() => (world.ticks() >= 0 ? state.flown : undefined)}
+					/>
+				),
+			})
+		case 'swampman':
+			return createFixture({
+				id,
+				type: 'hazard',
+				x: o.x,
+				sink: SWAMP_POOL_HEIGHT / 2,
+				width: SWAMP_POOL_WIDTH,
+				height: SWAMP_DRAWN,
+				world,
+				children: () => (
+					<SwampManArt x={o.x} now={() => Math.max(0, world.ticks())} />
+				),
+			})
+		case 'sewage': {
+			// From the street over it, down through the rock, to the floor.
+			const floor = world.terrain.groundY(o.x)
+			const ceiling = world.course.cave?.ceiling(o.x) ?? floor - 300
+			const street = world.course.cave?.surface(o.x)
+			const top = street === undefined ? ceiling - 60 : street + STREET_GRATE
+			return createFixture({
+				id,
+				type: 'hazard',
+				x: o.x,
+				width: SEWAGE_WIDTH,
+				height: floor - top,
+				world,
+				children: () => (
+					<SewageArt
+						x={o.x}
+						now={() => Math.max(0, world.ticks())}
+						ceiling={ceiling - top}
+						floor={floor - top}
+					/>
+				),
+			})
+		}
+		case 'tourists': {
+			// Their feet on the path's middle, each on the ground where they are.
+			const { groundY } = world.terrain
+			const drop = (along: number) =>
+				Math.round(groundY(o.x + along) - groundY(o.x))
+			// Nearer, down the path, if the course has them so.
+			const nearer = world.course.look?.touristsNearer ?? 0
 			return createFixture({
 				id,
 				type: 'hazard',
 				x: o.x,
 				width: touristsWidth(o.count),
-				height: 60,
+				height: TOURISTS_HEIGHT + TOURISTS_DEPTH_ROOM,
+				sink: TOURISTS_DEPTH_ROOM - nearer,
 				world,
 				children: () => (
 					<Scoopable world={world} state={state}>
-						<TouristsArt x={o.x} count={o.count} />
+						<TouristsArt x={o.x} count={o.count} drop={drop} />
 					</Scoopable>
 				),
 			})
+		}
 		case 'cyclist':
 			return createCyclist(world, state, o, id)
 		case 'tombstone':
@@ -1699,7 +2263,9 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				// Into the track, around the line everyone runs along.
 				sink: POTHOLE_HEIGHT - POTHOLE_ABOVE,
 				world,
-				children: () => <PotholeArt width={o.width} />,
+				children: () => (
+					<PotholeArt width={o.width} look={world.course.look?.pothole} />
+				),
 			})
 		case 'mud':
 			return createFixture({
@@ -1713,6 +2279,142 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				children: () => <MudArt world={world} obstacle={o} />,
 				style: () => ({ filter: world.course.look?.mud }),
 			})
+		case 'gulls':
+		case 'balloon':
+		case 'storm':
+		case 'turbine':
+		case 'whale':
+			return createSkyThing(world, state, o, id)
+	}
+}
+
+/** The sky's Obstacles' kinds, out over the sea: see `sky`. */
+type SkyObstacle = Extract<
+	Obstacle,
+	{ kind: 'gulls' | 'balloon' | 'storm' | 'turbine' | 'whale' }
+>
+
+/**
+ * Something in the sky over the sea, drawn where `sky` says it is by the
+ * tick, which is a signal: reading it keeps it moving.
+ */
+function createSkyThing(
+	world: World,
+	state: ObstacleState,
+	o: SkyObstacle,
+	id: string,
+) {
+	const line = world.terrain.groundY(o.x)
+	const now = () => Math.max(0, world.ticks())
+	const at = (
+		box: { x: number; y: number; width: number; height: number },
+		children: () => JSX.Element,
+		y?: () => number,
+	) =>
+		createController({
+			init: () => ({
+				id,
+				type: 'hazard',
+				x: () => box.x,
+				...createObjectSignal(box.y, 'y'),
+				width: () => box.width,
+				height: () => box.height,
+				children,
+			}),
+			onEnterFrame: y ? ({ $ }) => $.setY(y()) : undefined,
+		})
+	switch (o.kind) {
+		case 'gulls': {
+			// Room round them to wheel about in, and to scatter out of.
+			const width = o.count * 34 + 80
+			const left = o.x - width / 2
+			const top = line - o.height - 60
+			const gulls = () =>
+				gullsAt(o, line, now(), world.ticks() >= 0 ? state.flown : undefined)
+			return at({ x: left, y: top, width, height: 120 }, () => (
+				<Index each={gulls()}>
+					{(gull) => (
+						<div
+							style={{
+								position: 'absolute',
+								left: `${gull().x - left - GULL_WIDTH / 2}px`,
+								top: `${gull().y - top - GULL_HEIGHT / 2}px`,
+							}}
+						>
+							<GullArt up={gull().flap} />
+						</div>
+					)}
+				</Index>
+			))
+		}
+		case 'balloon':
+			return at(
+				{
+					x: o.x - BALLOON_WIDTH / 2,
+					y: balloonAt(o, line, 0).top,
+					width: BALLOON_WIDTH,
+					height: BALLOON_HEIGHT,
+				},
+				() => <BalloonArt x={o.x} />,
+				() => balloonAt(o, line, now()).top,
+			)
+		case 'storm': {
+			const { top, bottom } = stormAt(o, line, 0)
+			const storm = () => stormAt(o, line, now())
+			return at(
+				{
+					x: o.x - STORM_WIDTH / 2,
+					y: top,
+					width: STORM_WIDTH,
+					height: line - top,
+				},
+				() => (
+					<StormArt
+						brewing={storm().brewing}
+						striking={storm().striking}
+						now={now()}
+						reach={line - bottom + 18}
+					/>
+				),
+			)
+		}
+		case 'turbine': {
+			const reach = TURBINE_BLADE + 4
+			return at(
+				{
+					x: o.x - reach,
+					y: line - o.height - reach,
+					width: reach * 2,
+					height: reach + o.height,
+				},
+				() => (
+					<TurbineArt
+						angles={turbineAt(o, line, now()).angles}
+						tall={o.height + 10}
+					/>
+				),
+			)
+		}
+		case 'whale': {
+			const whale = () => whaleAt(o, line, now())
+			return at(
+				{
+					x: o.x - WHALE_WIDTH / 2,
+					y: line - o.height,
+					width: WHALE_WIDTH,
+					height: o.height + WHALE_HEIGHT,
+				},
+				() => (
+					<WhaleArt
+						up={whale().up}
+						spout={whale().spout}
+						bubbling={whale().bubbling}
+						height={o.height}
+						now={now()}
+					/>
+				),
+			)
+		}
 	}
 }
 
@@ -1794,6 +2496,22 @@ export function createBoost(world: World, state: BoostState, i: number) {
 					</Show>
 				),
 			})
+		}
+		case 'ring': {
+			// Its far half behind whoever's going through it, its near half in
+			// front of them; lit up, as someone does.
+			const half = (side: 'near' | 'far') =>
+				createFixture({
+					id: `${id}-${side}`,
+					type: side === 'near' ? 'hazard-front' : 'boost',
+					x: o.x,
+					width: RING_WIDTH,
+					height: RING_HEIGHT,
+					sink: RING_HEIGHT / 2 - o.height,
+					world,
+					children: () => <RingArt half={side} lit={state.cheering() > 0} />,
+				})
+			return [half('far'), half('near')]
 		}
 	}
 }
@@ -2072,6 +2790,12 @@ function createMummy(
 	})
 }
 
+/** How far Hands' earth sinks into the path, so they poke up out of it. */
+const CELL_SINK = 4
+
+/** How far down from the top of a street over a Cave a Sewage Drain's grate is: in the road. */
+const STREET_GRATE = 26
+
 const VENT_WIDTH = 40
 const VENT_HEIGHT = 30
 /** An air vent on a roof: a grey box with a grille, and its cowl on top. */
@@ -2150,6 +2874,30 @@ const BRANCH_TREE_ALONG = BRANCH_TREE_WIDTH / 2 - BRANCH_CROSS
 const BRANCH_LIMB_HEIGHT = 50
 const BRANCH_OVER_REACH = 80
 
+/** How far down into the sea a km sign's buoy floats. */
+const BUOY_SINK = 22
+const BUOY_HEIGHT = 30
+
+/** A km sign's buoy, out at sea: red and white, its post up out of it. */
+function Buoy() {
+	return (
+		<div
+			style={{
+				position: 'absolute',
+				left: `${KM_SIGN_WIDTH / 2 - 15}px`,
+				bottom: 0,
+				width: '30px',
+				height: `${BUOY_HEIGHT}px`,
+				background:
+					'linear-gradient(to bottom, #e8473c 0 10px, #f6f7f8 10px 18px, #e8473c 18px)',
+				border: '3px solid #1d1d1d',
+				'border-radius': '6px 6px 2px 2px',
+				'box-sizing': 'border-box',
+			}}
+		/>
+	)
+}
+
 const KM_SIGN_WIDTH = 64
 const KM_SIGN_HEIGHT = 84
 const KM_BOARD_HEIGHT = 34
@@ -2160,12 +2908,78 @@ const KM_BOARD_HEIGHT = 34
  * back of the path. Off a Gap, onto the Ground just past it; and out from
  * behind a low-branch tree, to whichever side is nearer, so it can be read.
  */
+/** How deep a Tunnel's warning stripes are, along the edge of the rock over its way in. */
+const WARNING_DEPTH = 10
+
+/**
+ * Yellow and black stripes along the edge of the rock over each Tunnel's way
+ * in (see the Cave's `warnings`): following the Ceiling down, or level along
+ * a shelf of rock's underside, in front of it.
+ */
+export function createWarnings(world: World) {
+	const { cave } = world.course
+	if (!cave?.warnings) return []
+	return cave.warnings.map((warning, i) => {
+		/** The rock's edge at `x`, a y. */
+		const edge = (x: number) => warning.roof ?? cave.ceiling(x) ?? 0
+		const xs: number[] = []
+		for (let x = warning.from; x <= warning.to; x += 4) xs.push(x)
+		const top = Math.min(...xs.map(edge)) - WARNING_DEPTH
+		const bottom = Math.max(...xs.map(edge))
+		const width = warning.to - warning.from
+		// Its band, a column at a time, down to the edge.
+		const band = xs
+			.slice(0, -1)
+			.map((x) => {
+				const y = Math.round(edge(x + 2)) - top
+				return `M${x - warning.from},${y - WARNING_DEPTH}h4v${WARNING_DEPTH}h-4Z`
+			})
+			.join('')
+		return createController({
+			init: () => ({
+				id: `warning-${i}`,
+				type: 'sign',
+				x: () => warning.from,
+				y: () => top,
+				width: () => width,
+				height: () => bottom - top,
+				children: () => (
+					<svg
+						width={width}
+						height={bottom - top}
+						shape-rendering="crispEdges"
+						aria-hidden="true"
+						style={{ display: 'block', overflow: 'visible' }}
+					>
+						<defs>
+							<pattern
+								id={`warning-stripes-${i}`}
+								patternUnits="userSpaceOnUse"
+								width={16}
+								height={16}
+								patternTransform="rotate(45)"
+							>
+								<rect width={16} height={16} fill="#ffc21a" />
+								<rect width={8} height={16} fill="#1d1d1d" />
+							</pattern>
+						</defs>
+						<path d={band} fill={`url(#warning-stripes-${i})`} />
+					</svg>
+				),
+			}),
+		})
+	})
+}
+
 export function createKmSigns(world: World) {
 	const { terrain } = world
+	const { sea } = world.course
 	return [1, 2, 3, 4].map((km) => {
 		let x = START_X + km * 1000 * PX_PER_M
+		// Out at sea, on a buoy, bobbing.
+		const afloat = !!sea && x > sea.from + 100 && x < sea.to - 200
 		const gap = terrain.gaps.find((g) => x > g.from - 30 && x < g.to + 30)
-		if (gap) x = gap.to + 40
+		if (gap && !afloat) x = gap.to + 40
 		const clear = (BRANCH_TREE_WIDTH + KM_SIGN_WIDTH) / 2 + 8
 		const tree = world.course.obstacles.find(
 			(o) =>
@@ -2179,12 +2993,18 @@ export function createKmSigns(world: World) {
 			id: `km-sign-${km}`,
 			type: 'sign',
 			x,
-			sink: 4 - PATH_BACK,
+			sink: afloat ? BUOY_SINK : 4 - PATH_BACK,
 			width: KM_SIGN_WIDTH,
 			height: KM_SIGN_HEIGHT,
 			world,
+			lift: afloat
+				? (age) => Math.round(Math.sin(age / 20 + km) * 3)
+				: undefined,
 			children: () => (
 				<div style={{ position: 'relative', width: '100%', height: '100%' }}>
+					<Show when={afloat}>
+						<Buoy />
+					</Show>
 					<div
 						style={{
 							position: 'absolute',

@@ -133,7 +133,12 @@ export function CourseSelect(props: {
 					'endless',
 					0,
 					<>
-						<img src={busEmoji} alt="" style={styles.busIcon} />
+						<img
+							src={busEmoji}
+							alt=""
+							class="pixelated"
+							style={styles.busIcon}
+						/>
 						<span style={styles.rowText}>
 							<span style={{ ...styles.rowName, 'font-size': '24px' }}>
 								Endless
@@ -146,7 +151,7 @@ export function CourseSelect(props: {
 						</span>
 					</>,
 				)}
-				<div style={styles.section}>Practice</div>
+				<div style={styles.section}>Courses</div>
 				<For each={COURSES}>
 					{(course, i) =>
 						row(
@@ -155,7 +160,14 @@ export function CourseSelect(props: {
 							<>
 								<span style={styles.number}>{course.number}</span>
 								<span style={styles.rowText}>
-									<span style={styles.rowName}>{course.name}</span>
+									<span
+										style={{
+											...styles.rowName,
+											'font-size': `${rowNameSize(course.name)}px`,
+										}}
+									>
+										{course.name}
+									</span>
 									<span style={styles.rowDetail}>
 										{!open(course.id)
 											? 'Locked'
@@ -172,8 +184,9 @@ export function CourseSelect(props: {
 
 			<Panel style={styles.preview}>
 				<div ref={measure} style={styles.window}>
-					{/* Rebuilt for each: a whole other course. */}
-					<Show when={picked() ?? COURSES[0]} keyed>
+					{/* Rebuilt for each: a whole other course. None of one that's
+					    still locked: no seeing it till it's been got to. */}
+					<Show when={open(props.selected) && (picked() ?? COURSES[0])} keyed>
 						{(course) => (
 							<CoursePreview
 								course={course}
@@ -188,7 +201,8 @@ export function CourseSelect(props: {
 							<div style={styles.lock}>
 								<span>Locked</span>
 								<span style={styles.lockedNote}>
-									Finish {before(picked() as Course)} to practise this one
+									Finish {before(picked() as Course)} to unlock{' '}
+									{(picked() as Course).name}
 								</span>
 							</div>
 						}
@@ -237,7 +251,7 @@ function TopScores(props: { id: TableId }) {
 		Array.from({ length: SHOWN_SCORES }, (_, i) => table(props.id)[i])
 	return (
 		<div style={styles.scores}>
-			<div style={styles.scoresLabel}>Top scores</div>
+			<div style={styles.scoresLabel}>Your Top scores</div>
 			<For each={rows()}>
 				{(entry, i) => (
 					<div
@@ -260,6 +274,12 @@ function TopScores(props: { id: TableId }) {
 		</div>
 	)
 }
+
+/**
+ * A course's name in the list, on its one line: smaller if it's long, so
+ * it all fits ("Great Wall of China"), rather than being cut off.
+ */
+const rowNameSize = (name: string) => (name.length > 15 ? 16 : 20)
 
 const styles = {
 	screen: {
@@ -338,8 +358,10 @@ const styles = {
 		background: 'rgba(255, 255, 255, 0.35)',
 		color: 'rgba(15, 31, 41, 0.6)',
 	},
+	/** Pixel art, 24 by 16: twice its size exactly, or it blurs. */
 	busIcon: {
-		width: '40px',
+		width: '48px',
+		height: '32px',
 		transform: 'scaleX(-1)',
 	},
 	number: {
@@ -409,7 +431,9 @@ const styles = {
 		'align-items': 'center',
 		'justify-content': 'center',
 		gap: '8px',
-		background: 'rgba(15, 31, 41, 0.7)',
+		// Nothing behind it: no preview of a course that's still locked.
+		background: 'rgb(15, 31, 41)',
+		border: '3px solid white',
 		color: 'white',
 		'font-size': '30px',
 	},

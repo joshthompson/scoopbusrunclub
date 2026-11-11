@@ -36,9 +36,11 @@ import {
 	hillPull,
 } from './constants'
 import { cyclistAt } from './cyclists'
+import { atSea, flyPacer } from './gliders'
 import { mummyAt } from './mummies'
 import { landingOn, platformAt, platformMove } from './platforms'
-import { STEAM_LAUNCH, STEAM_REACH } from './steam'
+import { swampManAt } from './sewer'
+import { steamFires } from './steam'
 import { boost } from './step'
 import type { Terrain } from './terrain'
 import { type Pacer, type Racer, START_GAP, type World } from './world'
@@ -175,10 +177,16 @@ export function stepPack(world: World) {
 
 	if (phase === 'running' && --packState.nextJoin <= 0) {
 		packState.nextJoin = PACER_EVERY_TICKS + Math.random() * PACER_EVERY_SPREAD
-		// Just off the screen ahead, to be caught up with.
+		// Just off the screen ahead, to be caught up with: on the Ground, not
+		// over a Gap, nor out at sea.
 		const x = world.camera() + world.viewWidth() + 80
 		const running = pack.filter((p) => !p.scooped).length
-		if (running < world.packSize && x < terrain.finishX - 300) join(world, x)
+		if (
+			running < world.packSize &&
+			x < terrain.finishX - 300 &&
+			!terrain.inGap(x)
+		)
+			join(world, x)
 	}
 
 	for (const pacer of pack) movePacer(world, pacer)
@@ -206,6 +214,8 @@ function movePacer(world: World, p: Pacer) {
 		return
 	}
 
+	// On a glider, out over the sea.
+	if (p.gliding) return flyPacer(world, p)
 	const ticks = world.ticks()
 	if (p.dazed > 0) p.dazed--
 	if (p.grounded) {
@@ -218,11 +228,13 @@ function movePacer(world: World, p: Pacer) {
 		// Onto a Steam Vent: it puffs, and fires them up, as anyone.
 		const vent = world.obstacles.find(
 			({ obstacle: o }) =>
-				o.kind === 'steam' && Math.abs(p.x - o.x) < STEAM_REACH,
+				o.kind === 'steam' && Math.abs(p.x - o.x) < steamFires(o).reach,
 		)
-		if (vent) {
+		if (vent && vent.obstacle.kind === 'steam') {
+			const fires = steamFires(vent.obstacle)
 			vent.flown = ticks
-			p.vy = -STEAM_LAUNCH
+			p.vy = -fires.up
+			p.vx = Math.max(p.vx, fires.on)
 			p.grounded = false
 			p.on = undefined
 		}
@@ -262,8 +274,12 @@ function movePacer(world: World, p: Pacer) {
 				p.grounded = false
 				p.vy = 0
 			} else p.feetY = at.top
-		} else if (ground - p.feetY > STEP_DOWN && !terrain.inGap(p.x)) {
-			// Off a roof, down onto a lower one.
+		} else if (
+			(ground - p.feetY > STEP_DOWN && !terrain.inGap(p.x)) ||
+			atSea(world, p.x)
+		) {
+			// Off a roof, down onto a lower one; or off the cliff, with no
+			// glider, down into the sea.
 			p.grounded = false
 			p.vy = 0
 		} else p.feetY = ground
@@ -289,8 +305,9 @@ function movePacer(world: World, p: Pacer) {
 			p.on = platform.index
 			p.vy = 0
 			p.grounded = true
-		} else if (p.feetY >= ground && p.vy >= 0) {
-			// Over a Gap too: Pacers never fall.
+		} else if (p.feetY >= ground && p.vy >= 0 && !atSea(world, p.x)) {
+			// Over a Gap too: Pacers never fall. Into the sea, they do: down,
+			// out of sight, and gone.
 			p.feetY = ground
 			p.on = undefined
 			p.vy = 0
@@ -346,6 +363,8 @@ function decide(world: World, p: Pacer) {
 	const gap = terrain.gaps.find(
 		(g) => g.from > p.x && g.from - p.x < LOOKAHEAD + p.vx,
 	)
+	// The cliff, with no glider: they run on, off it, and they're gone.
+	if (gap && atSea(world, gap.from + 1)) return
 	if (gap) {
 		const far = terrain.groundY(gap.to + 1)
 		if (gap.to - gap.from <= LEAP_WIDTH && far > p.feetY - PACER_REACH + 20) {
@@ -356,6 +375,19 @@ function decide(world: World, p: Pacer) {
 			p.vy = -vy
 			p.vx = Math.max(p.vx, (gap.to + LEAP_PAST - p.x) / airborne)
 			p.grounded = false
+			return
+		}
+		// A girder level with them, there against its edge: on, and across.
+		const level = world.platforms.findIndex((platform) => {
+			const at = platformAt(terrain, platform, ticks)
+			return (
+				Math.abs(at.top - p.feetY) < 3 &&
+				at.left <= gap.from + 4 &&
+				at.right > gap.from + 40
+			)
+		})
+		if (level >= 0) {
+			if (p.x >= gap.from - 4) p.on = level
 			return
 		}
 		// Too wide: waiting at its edge, for a girder.
@@ -505,7 +537,13 @@ function hopAhead(world: World, x: number) {
 											? o.x - touristsWidth(o.count) / 2
 											: o.kind === 'cyclist' && !state.scooped
 												? cyclistAt(world, { ...state, obstacle: o }).x - 30
-												: undefined
+												: // Over Hands under a graveyard, or a Swamp Man coming up out of his sludge.
+													o.kind === 'hands'
+													? o.x - 16
+													: o.kind === 'swampman' &&
+															swampManAt(o.x, world.ticks()).rise > 0
+														? o.x - 20
+														: undefined
 		return edge !== undefined && edge > x && edge - x < HOP_LOOKAHEAD
 	})
 }
@@ -518,12 +556,12 @@ const STOMPED_GUARD = 60
 /** Coming down on someone's head: bounce off it, faster, and score. */
 function bounceOffHeads(world: World, racer: Racer) {
 	const b = racer.body
-	if (b.grounded || b.vy <= 0 || b.carried > 0) return
+	if (b.grounded || b.vy <= 0 || b.carried > 0 || b.gliding) return
 	/** Where their feet were last tick. */
 	const was = b.feetY - b.vy
 
 	for (const p of world.pack) {
-		if (p.scooped || p.dazed > 0) continue
+		if (p.scooped || p.dazed > 0 || p.gliding) continue
 		if (Math.abs(b.x - p.x) > HEAD_REACH) continue
 		const head = p.feetY - p.sprite.height * RUNNER_SCALE + HEAD_GIVE
 		// From above it, onto it.
@@ -591,6 +629,8 @@ export function scoopPack(world: World) {
 	const camera = world.camera()
 	for (const p of world.pack) {
 		if (p.scooped || bus.frontX < p.x - HITBOX_HALF_WIDTH) continue
+		// Off the cliff with no glider, down into the sea: nothing to scoop.
+		if (!p.gliding && atSea(world, p.x)) continue
 		p.scooped = true
 		p.grounded = false
 		p.vx = Math.max(bus.speed, 2) + 2 + Math.random() * 2

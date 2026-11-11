@@ -2,6 +2,7 @@ import type { RunnerName } from '@/data/runners'
 import { type Accessor, createSignal } from 'solid-js'
 import type { Boost, Course, Obstacle } from '../courses/types'
 import type { BusRide } from '../draw/busRide'
+import { rideLook } from '../draw/rideLook'
 import type { Controls } from '../input'
 import type { Avatar } from '../runners/looks'
 import type { Playable } from '../runners/playable'
@@ -80,6 +81,8 @@ export interface Body {
 	stumble: number
 	/** Ticks left of being squashed by a furby: half their height, and slower. */
 	squashed: number
+	/** Ticks left of being held still by a Swamp Man. */
+	held: number
 	muddy: boolean
 	/** The Pumpkin they're wearing, by its carving: 0 for none. */
 	pumpkin: number
@@ -97,6 +100,11 @@ export interface Body {
 	combo: number
 	/** Ticks left riding a corgi. */
 	mount: number
+	/**
+	 * On a glider, out over the sea, steering it up and down, until it comes
+	 * down on the island.
+	 */
+	gliding: boolean
 	/** Ticks left being carried by a flying goose. */
 	carried: number
 	/** Ticks before another Player can bounce on their head again. */
@@ -142,6 +150,8 @@ export interface Pacer {
 	on?: number
 	/** How fast they went into the Tunnel they're in: they go through it no slower. */
 	tunnelSpeed?: number
+	/** On a glider, out over the sea, as anyone: see `flyPacer`. */
+	gliding?: boolean
 }
 
 /**
@@ -183,7 +193,10 @@ export interface Furby {
  */
 export type CorgiState = 'waiting' | 'ridden' | 'tired' | 'scooped'
 
-/** A corgi, in Furby Fields, to ride. `x` is the middle of its feet. */
+/**
+ * A Ride, a corgi or whatever the course's are, waiting to be ridden. `x` is
+ * the middle of its feet; a glider's, the middle of its control bar.
+ */
 export interface Corgi {
 	id: number
 	x: number
@@ -197,6 +210,10 @@ export interface Corgi {
 	spin: number
 	/** Who's on its back, while `ridden`. */
 	rider?: string
+	/** The rarer one of them, if the course's Rides have one: see `RideLook`. */
+	rare?: boolean
+	/** A glider's, flying off with no one on it: how long it's been going. */
+	adrift?: number
 }
 
 /**
@@ -301,6 +318,7 @@ export type BonusKind =
 	| 'geese'
 	| 'pumpkins'
 	| 'barcodes'
+	| 'rings'
 	| 'speed'
 	| 'hazards'
 
@@ -333,6 +351,7 @@ export function startingBody(terrain: Terrain, x: number): Body {
 		ducking: false,
 		stumble: 0,
 		squashed: 0,
+		held: 0,
 		muddy: false,
 		pumpkin: 0,
 		facing: 1,
@@ -341,6 +360,7 @@ export function startingBody(terrain: Terrain, x: number): Body {
 		spin: 0,
 		combo: 0,
 		mount: 0,
+		gliding: false,
 		carried: 0,
 		stomped: 0,
 		dropping: 0,
@@ -396,6 +416,7 @@ export function createWorld(
 		geese: { count: 0, points: 0 },
 		pumpkins: { count: 0, points: 0 },
 		barcodes: { count: 0, points: 0 },
+		rings: { count: 0, points: 0 },
 		speed: { count: 0, points: 0 },
 		hazards: { count: 0, points: 0 },
 	}
@@ -418,20 +439,35 @@ export function createWorld(
 	/** How far across the screen the camera keeps the runner, swinging round as they turn. */
 	const view = { lead: START_LEAD }
 
-	/** Nobody's out cheering for themselves: they're the one running. */
+	const runDirector =
+		course.runDirectors.find((member) => !running.has(member)) ??
+		course.runDirectors[0]
+	/**
+	 * Nobody's out cheering for themselves, they're the one running; nor
+	 * the run director, who's at the start, counting everyone down.
+	 */
+	const busy = (member: RunnerName) =>
+		running.has(member) || member === runDirector
 	const notRunner = (member: RunnerName) => {
-		if (!running.has(member)) return member
+		if (!busy(member)) return member
 		const { cheerers } = course
 		const at = cheerers.indexOf(member)
 		for (let i = 1; i <= cheerers.length; i++) {
 			const next = cheerers[(at + i) % cheerers.length]
-			if (!running.has(next)) return next
+			if (!busy(next)) return next
 		}
 		return member
 	}
-	const runDirector =
-		course.runDirectors.find((member) => !running.has(member)) ??
-		course.runDirectors[0]
+
+	/**
+	 * Which of the course's Rides is the rarer one, this time, if its Rides
+	 * have one and it's turned up: now and then, one in place of any of them.
+	 * A Remote Player's is the Host's, sent with the rest (see `Mirror`).
+	 */
+	const share = rideLook(course).rare?.share ?? 0
+	const rides = course.corgis?.length ?? 0
+	const rareAt =
+		rides && Math.random() < share ? Math.floor(Math.random() * rides) : -1
 
 	const obstacles: ObstacleState[] = course.obstacles.map((obstacle) => ({
 		obstacle,
@@ -556,6 +592,7 @@ export function createWorld(
 				state: 'waiting',
 				barking: false,
 				spin: 0,
+				rare: id === rareAt || undefined,
 			}),
 		),
 	}

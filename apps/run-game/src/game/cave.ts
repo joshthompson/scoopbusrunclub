@@ -10,12 +10,21 @@ import type { World } from './world'
 type Overhead = Pick<World, 'course' | 'terrain' | 'platforms' | 'ticks'>
 
 /**
+ * The Ceiling at `x`, if it's over `y`: not if they're up over it, on a
+ * Route along the top of the rock (a ferry's roof), where it's under them.
+ */
+function overhead(world: Overhead, x: number, y: number) {
+	const ceiling = world.course.cave?.ceiling(x)
+	return ceiling !== undefined && ceiling <= y + 1 ? ceiling : undefined
+}
+
+/**
  * The lowest thing over `head` at `x`: the Ceiling, or the underside of a
  * solid Platform, if one's over them. Not one they're already above: that
  * one's under them.
  */
 export function ceilingAt(world: Overhead, x: number, head: number) {
-	let ceiling = world.course.cave?.ceiling(x)
+	let ceiling = overhead(world, x, head)
 	const ticks = world.ticks()
 	for (const platform of world.platforms) {
 		if (!platform.solid) continue
@@ -35,7 +44,7 @@ export function ceilingAt(world: Overhead, x: number, head: number) {
  * standing, and it's a wall.
  */
 export function rockOver(world: Overhead, x: number, feetY: number) {
-	let ceiling = world.course.cave?.ceiling(x)
+	let ceiling = overhead(world, x, feetY - 1)
 	const ticks = world.ticks()
 	for (const platform of world.platforms) {
 		if (!platform.solid) continue

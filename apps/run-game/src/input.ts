@@ -114,6 +114,10 @@ export const gamepadControls = (index: number) => (): Controls => {
 export const gamepadStart = (index: number) =>
 	!!navigator.getGamepads?.()[index]?.buttons[9]?.pressed
 
+/** Select (or Back, or View), on a gamepad. */
+export const gamepadSelect = (index: number) =>
+	!!navigator.getGamepads?.()[index]?.buttons[8]?.pressed
+
 /** Which gamepads are plugged in, by index. */
 export function connectedGamepads() {
 	return [...(navigator.getGamepads?.() ?? [])]
@@ -142,6 +146,12 @@ export function unpackControls(bits: number): Controls {
 		down: (bits & 8) !== 0,
 	}
 }
+
+/** Which action a key is, on the whole keyboard (arrows or WASD), if any. */
+export const actionOfKey = (key: string): Action | undefined =>
+	(Object.keys(KEYS.all) as Action[]).find((action) =>
+		KEYS.all[action].includes(key),
+	)
 
 // The arrows and space would otherwise scroll the page. Not while typing,
 // though: WASD and space are letters in a runner's name.

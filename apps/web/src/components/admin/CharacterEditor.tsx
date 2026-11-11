@@ -148,7 +148,9 @@ export const CharacterEditor: Component<{
 							}
 						>
 							<option value="light">Light</option>
+							<option value="medium-light">Medium light</option>
 							<option value="medium">Medium</option>
+							<option value="medium-dark">Medium dark</option>
 							<option value="dark">Dark</option>
 						</AdminSelect>
 					</div>

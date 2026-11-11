@@ -21,6 +21,7 @@ import {
 	type RaceStart,
 	type RoomMode,
 	type RoomStage,
+	type RoomView,
 	action,
 	trysteroRoom,
 } from './protocol'
@@ -57,6 +58,8 @@ export interface Seat {
 	peer?: string
 	/** For a phone: watching the big screen, or the race on the phone too. */
 	mode?: PadMode
+	/** Not a phone but a computer, showing the Room as the Host does (see `RoomView`). */
+	screen?: boolean
 	colour: string
 	/** Who they'll run as: a `Playable`'s id. */
 	character?: string
@@ -107,7 +110,9 @@ export const seatLabel = (seat: Seat) =>
 					? 'Touch'
 					: seat.mode === 'remote'
 						? 'Remote'
-						: 'Phone'
+						: seat.screen
+							? 'Keyboard'
+							: 'Phone'
 
 /**
  * A Room, run by this device as its Host: who's in it, how they're playing,
@@ -127,12 +132,38 @@ export function createRoom(code: string) {
 
 	/** The lobby, for its Starter's phone: the Party says. */
 	let lobby: () => { roomMode: RoomMode; canStart: boolean; why: string } =
-		() => ({ roomMode: 'endless', canStart: false, why: '' })
-	/** What the Starter's asked for: the Party does it. */
+		() => ({ roomMode: 'backyard', canStart: false, why: '' })
+	/** What the Starter's asked for: the Party does it. Start says whether it's starting. */
 	let onStarter: {
-		start: () => void
+		start: () => boolean
+		cancel: () => void
 		roomMode: (mode: RoomMode) => void
-	} = { start: () => {}, roomMode: () => {} }
+		/** Calling a Backyard Ultra, between Rounds. */
+		finish: () => void
+		/** Leaving the Podium for the lobby. */
+		lobby: () => void
+	} = {
+		start: () => false,
+		cancel: () => {},
+		roomMode: () => {},
+		finish: () => {},
+		lobby: () => {},
+	}
+
+	/** What the Host's screens show, for computers that have joined: the Party says. */
+	let screenView: () => Omit<RoomView, 'seats' | 'starter'> = () => ({
+		canStart: false,
+		waitingFor: '',
+		placings: [],
+		next: '',
+		nextIn: 0,
+		lobbyIn: 0,
+	})
+
+	/** How far through its go the Room is: the Party says. */
+	let progress: () => { round: number; rounds?: number } = () => ({
+		round: 0,
+	})
 
 	/** What each phone's holding, as it last said. */
 	const held = new Map<string, Controls>()
@@ -154,17 +185,11 @@ export function createRoom(code: string) {
 
 	const seatOf = (peer: string) => seats.find((s) => s.peer === peer)
 	/**
-	 * The Starter: the first Player in the Room, if they're a Remote Player.
-	 * Nobody at the big screen may be able to start it, so it's theirs to,
-	 * and to choose how it goes. Anyone else first, it starts itself once
-	 * everyone's ready.
+	 * The Starter: the first Player in the Room who's still in it, however
+	 * they're playing. They choose how it goes, and start it: it never
+	 * starts by itself. Dropping out or leaving hands it to the next.
 	 */
-	const starter = () => {
-		const first = seats.find((s) => !s.lostAt)
-		return first?.kind === 'phone' && first.mode === 'remote'
-			? first
-			: undefined
-	}
+	const starter = (): Seat | undefined => seats.find((s) => !s.lostAt)
 	const update = (id: string, change: (seat: Seat) => void) =>
 		setSeats(
 			(s) => s.id === id,
@@ -189,7 +214,7 @@ export function createRoom(code: string) {
 			colour: freeColour(),
 			points: 0,
 			ready: false,
-			waiting: stage() === 'round' || stage() === 'results',
+			waiting: stage() !== 'lobby' && stage() !== 'starting',
 		}
 		setSeats(seats.length, added)
 		return added
@@ -218,6 +243,26 @@ export function createRoom(code: string) {
 		})
 	}
 
+	const isStarter = (id: string) => starter()?.id === id
+	/** `id` pressing Start: only the Starter can. Whether it's starting. */
+	const startAs = (id: string) => isStarter(id) && onStarter.start()
+	/** `id` stopping the countdown: only the Starter can. */
+	const cancelAs = (id: string) => {
+		if (isStarter(id)) onStarter.cancel()
+	}
+	/** `id` choosing how the Room goes: only the Starter can. */
+	const chooseModeAs = (id: string, mode: RoomMode) => {
+		if (isStarter(id)) onStarter.roomMode(mode)
+	}
+	/** `id` calling a Backyard Ultra between Rounds: only the Starter can. */
+	const finishAs = (id: string) => {
+		if (isStarter(id)) onStarter.finish()
+	}
+	/** `id` leaving the Podium for the lobby: only the Starter can. */
+	const lobbyAs = (id: string) => {
+		if (isStarter(id)) onStarter.lobby()
+	}
+
 	pad.on((message, peer) => {
 		if (message.type === 'hello') {
 			const id = `phone:${message.device}`
@@ -227,6 +272,7 @@ export function createRoom(code: string) {
 					s.peer = peer
 					s.lostAt = undefined
 					s.mode = message.mode
+					s.screen = message.screen
 				})
 			else if (
 				!addSeat({
@@ -235,6 +281,7 @@ export function createRoom(code: string) {
 					device: message.device,
 					peer,
 					mode: message.mode,
+					screen: message.screen,
 				})
 			)
 				void view.send(fullView(), peer)
@@ -259,9 +306,11 @@ export function createRoom(code: string) {
 			if (message.mode === 'remote') onWatch(peer)
 		}
 		if (message.type === 'ready') setReady(seat.id, message.ready)
-		if (message.type === 'start' && seat === starter()) onStarter.start()
-		if (message.type === 'roomMode' && seat === starter())
-			onStarter.roomMode(message.mode)
+		if (message.type === 'start') startAs(seat.id)
+		if (message.type === 'cancel') cancelAs(seat.id)
+		if (message.type === 'roomMode') chooseModeAs(seat.id, message.mode)
+		if (message.type === 'finish') finishAs(seat.id)
+		if (message.type === 'lobby') lobbyAs(seat.id)
 		if (message.type === 'leave') removeSeat(seat.id)
 		tellPhones()
 	})
@@ -301,6 +350,9 @@ export function createRoom(code: string) {
 		points: 0,
 		paused: false,
 		course: course(),
+		roomMode: lobby().roomMode,
+		isStarter: false,
+		...progress(),
 	})
 
 	function viewFor(seat: Seat): PadView {
@@ -334,8 +386,19 @@ export function createRoom(code: string) {
 			points: seat.points,
 			paused: paused(),
 			course: course(),
+			roomMode: lobby().roomMode,
+			isStarter: starter() === seat,
+			...progress(),
+			...(seat.screen ? { room: roomView() } : {}),
 		}
 	}
+
+	/** The whole Room, for a computer that's joined it. */
+	const roomView = (): RoomView => ({
+		seats: seats.map(({ peer, device, ...seat }) => seat),
+		starter: starter()?.id,
+		...screenView(),
+	})
 
 	/** Every phone told what to show. */
 	function tellPhones() {
@@ -409,13 +472,26 @@ export function createRoom(code: string) {
 			onWatch = next
 		},
 		starter,
+		startAs,
+		cancelAs,
+		chooseModeAs,
+		finishAs,
+		lobbyAs,
 		/** Tells the Room how the lobby's going, for the Starter's phone. */
 		setLobby(next: typeof lobby) {
 			lobby = next
 		},
-		/** What to do when the Starter starts the Room, or chooses how it goes. */
+		/** What to do when the Starter starts the Room, stops its countdown, chooses how it goes, calls it, or leaves the Podium. */
 		setOnStarter(next: typeof onStarter) {
 			onStarter = next
+		},
+		/** Tells the Room what its screens show, for computers that have joined. */
+		setScreenView(next: typeof screenView) {
+			screenView = next
+		},
+		/** Tells the Room how far through its go it is, for phones. */
+		setProgress(next: typeof progress) {
+			progress = next
 		},
 		/** Tells the Room how seats are doing in the Round, for their phones. */
 		setStatusOf(next: typeof statusOf) {

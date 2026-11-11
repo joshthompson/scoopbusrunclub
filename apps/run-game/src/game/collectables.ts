@@ -11,6 +11,8 @@ export type RideKind =
 	| NonNullable<Course['flyer']>
 	| 'corgi'
 	| 'goose'
+	/** The Pyramids' rarer camel, with two humps, now and then. */
+	| 'bactrian'
 
 export type Collectable =
 	| `fika:${FikaItem}`
@@ -37,12 +39,29 @@ export const COLLECTABLE_NAMES = {
 	'fika:dumplings': 'Dumplings',
 	'fika:bubbleTea': 'Bubble tea',
 	'fika:mooncake': 'Mooncake',
-	'fika:candyCorn': 'Candy corn',
+	'fika:candyfloss': 'Candyfloss',
 	'fika:toffeeApple': 'Toffee apple',
 	'fika:spiderCupcake': 'Spider cupcake',
+	'fika:tinyFurby': 'Tiny furby',
+	'fika:lollipop': 'Lollipop',
+	'fika:rainbowCake': 'Rainbow cake',
+	'fika:rubberDuck': 'Rubber duck',
+	'fika:goldRing': 'Gold ring',
+	'fika:oldCoin': 'Old coin',
+	'fika:lostPhone': 'Lost phone',
+	'fika:kladdkaka': 'Kladdkaka',
+	'fika:lingondricka': 'Lingondricka',
+	'fika:pickAndMix': 'Lösgodis',
+	'fika:salmiakki': 'Salmiakki',
+	'fika:karelianPie': 'Karjalanpiirakka',
+	'fika:captainsHat': "Captain's hat",
 	'ride:corgi': 'Corgi',
 	'ride:llama': 'Llama',
 	'ride:camel': 'Camel',
+	'ride:bactrian': 'Bactrian camel',
+	'ride:deer': 'Deer',
+	'ride:unicorn': 'Unicorn',
+	'ride:glider': 'Glider',
 	'ride:goose': 'Goose',
 	'ride:dragon': 'Dragon',
 	pumpkin: 'Pumpkin',

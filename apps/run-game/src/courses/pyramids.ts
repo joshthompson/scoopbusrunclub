@@ -7,9 +7,10 @@ import sphinxHead from '../assets/sphinx/head.png'
 import sphinxPaw from '../assets/sphinx/paw.png'
 import sarcophagus from '../assets/sphinx/sarcophagus.png'
 import { START_X } from '../game/constants'
-import { PATH_BACK, PATH_FRONT } from '../game/constants'
+import { PATH_BACK, PATH_FRONT, STAND_HEIGHT } from '../game/constants'
 import { PYRAMIDS_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
+import { duckPost } from './kit/duckSigns'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
 import type { Cave, Course, CourseDefinition } from './types'
@@ -179,6 +180,16 @@ function sphinxHeight(x: number) {
 	return 50 + 45 * ease((length - t) / 260)
 }
 
+/**
+ * Where the Tunnel up out of the tomb's way in is: where its roof comes
+ * down too low to stand under, at the tomb's far end.
+ */
+const EXIT_MOUTH = (() => {
+	for (let x = TOMB_TO - TOMB_RAMP; x < TOMB_TO; x++)
+		if ((headroom(x) ?? TOMB_ROOM) < STAND_HEIGHT + 8) return x
+	return TOMB_TO
+})()
+
 /** The Sphinx, as a Cave: its body over the way through it. */
 const sphinx: Cave = {
 	from: SPHINX - PORCH,
@@ -205,6 +216,8 @@ const sphinx: Cave = {
 		if (x < SPHINX || x >= SPHINX_END) return undefined
 		return dunes.groundY(x) - dune(x) - PATH_BACK
 	},
+	// Yellow and black stripes over the Tunnel up out of the tomb.
+	warnings: [{ from: EXIT_MOUTH - 8, to: EXIT_MOUTH + 56 }],
 	features: [
 		// Its head, forward over its chest.
 		{ asset: sphinxHead, x: SPHINX + 170, width: 120, height: 130, sink: 14 },
@@ -306,6 +319,8 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 		setBack: 0,
 		onFloor: true,
 	})
+	// A signpost on the sand before its way in, telling you to duck.
+	scenery.push({ x: SPHINX - PORCH - 80, asset: duckPost, setBack: 0 })
 	return { obstacles, boosts, scenery, corgis }
 }
 

@@ -10,6 +10,7 @@ import sunAsset from '@/assets/misc/sun.png'
 import { For, type JSX, Show } from 'solid-js'
 import tree1Asset from '../assets/scenery/tree1.png'
 import tree2Asset from '../assets/scenery/tree2.png'
+import { svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
 import type { BackdropPiece, SkyFlyer } from '../courses/types'
 import {
@@ -24,7 +25,8 @@ import {
 	VIEW_WIDTH,
 } from '../game/constants'
 import type { Block } from '../game/terrain'
-import type { World } from '../game/world'
+import { type World, isCaught } from '../game/world'
+import { SeaGround } from './Sea'
 import { StadiumBackdrop } from './Stadium'
 import { backMerlons } from './battlements'
 
@@ -83,6 +85,9 @@ const standing = (
 	standsAt: (random) => ground - random() * jitter,
 	...look,
 })
+
+/** How far a voyage's next horizon fades in over, before the camera gets to it. */
+const VOYAGE_FADE = 700
 
 /** How tall a horizon's strip of spires is: up from the bottom of its far band. */
 const SPIRES_HEIGHT = 300
@@ -282,7 +287,8 @@ export function Backdrop(props: { world: View }) {
 				...layer,
 				top: `${top}px`,
 				height: `${height}px`,
-				'background-image': `url(${asset})`,
+				// Quoted: a picture drawn in code can have brackets in it.
+				'background-image': `url("${asset}")`,
 				'background-repeat': 'repeat-x',
 				'background-position-x': scroll(parallax),
 				filter,
@@ -290,10 +296,74 @@ export function Backdrop(props: { world: View }) {
 		/>
 	)
 
+	/** A horizon's bands, far to near, each its colour on down below it. */
+	const horizonBands = (horizon: NonNullable<typeof look.horizon>) => (
+		<>
+			{/* Spires and towers rising out of the far roofs, behind them. */}
+			<Show when={horizon.spires}>
+				{(spires) =>
+					band(
+						spires(),
+						HORIZON - 100 + SKYLINE_HEIGHT - SPIRES_HEIGHT,
+						SPIRES_HEIGHT,
+						0.08,
+						undefined,
+					)
+				}
+			</Show>
+			{band(horizon.far, HORIZON - 100, SKYLINE_HEIGHT, 0.08, undefined)}
+			{/* The far band's own colour on down behind the near one, so no sky shows between. */}
+			<div
+				style={{
+					...layer,
+					top: `${HORIZON - 100 + SKYLINE_HEIGHT - 1}px`,
+					bottom: 0,
+					background: horizon.fill,
+				}}
+			/>
+			{band(horizon.near, HORIZON - 40, SKYLINE_HEIGHT, 0.16, undefined)}
+			<div
+				style={{
+					...layer,
+					top: `${HORIZON - 40 + SKYLINE_HEIGHT - 1}px`,
+					bottom: 0,
+					background: 'var(--grass-green)',
+				}}
+			/>
+			<For each={horizon.nearer ?? []}>
+				{(nearer, i) => {
+					const top = HORIZON + NEARER_TOP + i() * NEARER_STEP
+					return (
+						<>
+							{band(
+								nearer.asset,
+								top,
+								nearer.height,
+								NEARER_PARALLAX + i() * NEARER_FASTER,
+								undefined,
+							)}
+							<div
+								style={{
+									...layer,
+									top: `${top + nearer.height - 1}px`,
+									bottom: 0,
+									background: nearer.fill,
+								}}
+							/>
+						</>
+					)
+				}}
+			</For>
+		</>
+	)
+	/** How far a voyage's next horizon takes to fade in, as the camera gets to it. */
+	const fadeIn = (from: number) =>
+		Math.max(0, Math.min(1, (props.world.camera() - from) / VOYAGE_FADE + 1))
+
 	// The whole canvas goes with the camera looking up or down: this goes
 	// back the other way, all but a little of it.
 	const lift = () =>
-		`translateY(${Math.round((props.world.cameraY?.() ?? 0) * (1 - BACKDROP_LIFT))}px)`
+		`translateY(${Math.round((props.world.cameraY?.() ?? 0) * (1 - (look.horizonLift ?? BACKDROP_LIFT)))}px)`
 
 	return (
 		<div style={{ position: 'absolute', inset: 0, transform: lift() }}>
@@ -343,73 +413,45 @@ export function Backdrop(props: { world: View }) {
 			<Show when={look.horizon}>
 				{(horizon) => (
 					<>
-						{/* Spires and towers rising out of the far roofs, behind them. */}
-						<Show when={horizon().spires}>
-							{(spires) =>
-								band(
-									spires(),
-									HORIZON - 100 + SKYLINE_HEIGHT - SPIRES_HEIGHT,
-									SPIRES_HEIGHT,
-									0.08,
-									undefined,
-								)
-							}
-						</Show>
-						{band(
-							horizon().far,
-							HORIZON - 100,
-							SKYLINE_HEIGHT,
-							0.08,
-							undefined,
-						)}
-						{/* The far band's own colour on down behind the near one, so no sky shows between. */}
-						<div
-							style={{
-								...layer,
-								top: `${HORIZON - 100 + SKYLINE_HEIGHT - 1}px`,
-								bottom: 0,
-								background: horizon().fill,
-							}}
-						/>
-						{band(
-							horizon().near,
-							HORIZON - 40,
-							SKYLINE_HEIGHT,
-							0.16,
-							undefined,
-						)}
-						<div
-							style={{
-								...layer,
-								top: `${HORIZON - 40 + SKYLINE_HEIGHT - 1}px`,
-								bottom: 0,
-								background: 'var(--grass-green)',
-							}}
-						/>
-						<For each={horizon().nearer ?? []}>
-							{(nearer, i) => {
-								const top = HORIZON + NEARER_TOP + i() * NEARER_STEP
+						{/* On a voyage, one after another, each fading in as the
+						    last fades out. */}
+						<For
+							each={[
+								{ from: undefined, horizon: horizon() },
+								...(look.voyage ?? []),
+							]}
+						>
+							{(leg, i) => {
+								const next = look.voyage?.[i()]
+								const shown = () =>
+									(leg.from === undefined ? 1 : fadeIn(leg.from)) *
+									(next ? 1 - fadeIn(next.from) : 1)
 								return (
-									<>
-										{band(
-											nearer.asset,
-											top,
-											nearer.height,
-											NEARER_PARALLAX + i() * NEARER_FASTER,
-											undefined,
-										)}
-										<div
-											style={{
-												...layer,
-												top: `${top + nearer.height - 1}px`,
-												bottom: 0,
-												background: nearer.fill,
-											}}
-										/>
-									</>
+									<div
+										style={{
+											position: 'absolute',
+											inset: 0,
+											opacity: shown(),
+											visibility: shown() > 0 ? 'visible' : 'hidden',
+										}}
+									>
+										{horizonBands(leg.horizon)}
+									</div>
 								)
 							}}
 						</For>
+						{/* Over a bridge, the water, from it right back to the
+						    buildings' feet across it, on their quay: where the
+						    bridge is, going by as the course does. */}
+						<Show when={look.bridge}>
+							{(bridge) => (
+								<BridgeWater
+									world={props.world}
+									bridge={bridge()}
+									top={HORIZON - 40 + SKYLINE_HEIGHT - 1}
+								/>
+							)}
+						</Show>
 					</>
 				)}
 			</Show>
@@ -439,6 +481,95 @@ export function Backdrop(props: { world: View }) {
 			</Show>
 		</div>
 	)
+}
+
+/** How deep the quay is, along the buildings' feet over a bridge's water, and its stones' colours. */
+const QUAY_EDGE = 6
+const QUAY_STONE = '#8a8278'
+const QUAY_LIT = '#b3ab9f'
+
+/**
+ * Over a bridge, its water: from the bridge right back to the buildings'
+ * feet across it, `top` down the screen, on a quay along them, with stone
+ * edges where the land either end meets it. Where the bridge is, going by
+ * as the course does: its ends are the ground's. Ripples on it, lined up
+ * with the water the Ground draws behind the bridge, so they're one.
+ */
+function BridgeWater(props: {
+	world: View
+	bridge: NonNullable<NonNullable<World['course']['look']>['bridge']>
+	top: number
+}) {
+	const { bridge } = props
+	/** Out on open water, all along the course; or across under the bridge. */
+	const from = bridge.open ? DRAWN_FROM : bridge.from
+	const to = bridge.open ? props.world.terrain.finishX + 1600 : bridge.to
+	const width = to - from
+	const ripples = svgUrl(
+		64,
+		18,
+		[
+			`<rect width="64" height="18" fill="${bridge.water}"/>`,
+			'<rect x="4" y="3" width="14" height="2" fill="rgba(255,255,255,0.28)"/>',
+			'<rect x="34" y="9" width="10" height="2" fill="rgba(255,255,255,0.2)"/>',
+			'<rect x="22" y="14" width="18" height="2" fill="rgba(0,20,40,0.25)"/>',
+			'<rect x="50" y="5" width="8" height="2" fill="rgba(0,20,40,0.2)"/>',
+		].join(''),
+	)
+	/** Lined up with the Ground's ripples, from its own left edge, along and down. */
+	const along = (((DRAWN_FROM - from) % 64) + 64) % 64
+	const down = ((-(props.top + QUAY_EDGE) % 18) + 18) % 18
+	const left = () => Math.round(from - props.world.camera())
+	return (
+		<div
+			style={{
+				position: 'absolute',
+				top: `${props.top}px`,
+				bottom: 0,
+				left: `${left()}px`,
+				width: `${width}px`,
+			}}
+		>
+			<div
+				style={{
+					position: 'absolute',
+					inset: 0,
+					top: bridge.open ? 0 : `${QUAY_EDGE}px`,
+					'background-color': bridge.water,
+					'background-image': `url("${ripples}")`,
+					'background-position': `${along}px ${down}px`,
+				}}
+			/>
+			{/* The quay along the buildings' feet, lit along its top: none
+			    out on open water. */}
+			<div
+				hidden={bridge.open}
+				style={{
+					position: 'absolute',
+					left: 0,
+					right: 0,
+					top: 0,
+					height: `${QUAY_EDGE}px`,
+					background: QUAY_STONE,
+					'border-top': `2px solid ${QUAY_LIT}`,
+					'box-sizing': 'border-box',
+				}}
+			/>
+			{/* The land's stone edges, either end, down into the water. */}
+			<Show when={!bridge.open}>
+				<div style={{ ...quayEnd, left: 0 }} />
+				<div style={{ ...quayEnd, right: 0 }} />
+			</Show>
+		</div>
+	)
+}
+
+const quayEnd: JSX.CSSProperties = {
+	position: 'absolute',
+	top: 0,
+	bottom: 0,
+	width: '4px',
+	background: QUAY_STONE,
 }
 
 /**
@@ -614,10 +745,8 @@ export function HorizonTrees(props: { world: View }) {
 }
 
 const STEP = 4
-/** How much water shows behind a bridge's path, and how deep its underside is. */
-const BRIDGE_BEHIND = 70
-/** How far out from each end the far shore comes in, the water behind narrowing to nothing. */
-const SHORE = 240
+/** How much water the Ground draws behind a bridge's path, over its verge: the backdrop has the rest (see `BridgeWater`). */
+const BRIDGE_BEHIND = VERGE + 6
 /** A bridge's quay walls: how wide, how far over the water they come, and how tall. */
 const QUAY_WIDTH = 64
 const QUAY_OVER = 4
@@ -627,8 +756,18 @@ const BRIDGE_DEEP = 56
 const BRIDGE_SLIM = 16
 /** How tall a wall's parapet behind the path is: see `ground` in the Great Wall's look. */
 const BACK_PARAPET = 10
+/** A rainbow's bands, top to bottom, and how deep each is. */
+const RAINBOW = [
+	'#ff5f7e',
+	'#ffa34d',
+	'#ffe14d',
+	'#5fd68a',
+	'#4fb3ff',
+	'#9b7bff',
+]
+const RAINBOW_BAND = 10
 /** Drawn from this far behind the start, for the bus to drive out of. */
-const DRAWN_FROM = START_X - 1400
+export const DRAWN_FROM = START_X - 1400
 
 /**
  * The course's ground, drawn once, in steps 4 px wide so its slopes come out
@@ -657,18 +796,41 @@ export function Ground(props: { world: View }) {
 	 */
 	const outline = (offset: number) => {
 		let d = ''
-		let open = false
+		let run: number[] = []
+		/** Along its tops, and back along its bottoms. */
+		const flush = () => {
+			if (!run.length) return
+			d += ` M${run[0] * STEP},${(tops[run[0]] ?? 0) + offset}`
+			for (const i of run)
+				d += ` V${(tops[i] ?? 0) + offset} H${(i + 1) * STEP}`
+			for (let k = run.length - 1; k >= 0; k--) {
+				const i = run[k]
+				d += ` V${Math.max((tops[i] ?? 0) + offset, bottoms[i])} H${i * STEP}`
+			}
+			d += ' Z'
+			run = []
+		}
 		tops.forEach((top, i) => {
-			if (top === undefined) {
-				if (open) d += ` H${i * STEP} V${VIEW_HEIGHT} Z`
-				open = false
-			} else if (!open) {
-				d += ` M${i * STEP},${VIEW_HEIGHT} V${top + offset}`
-				open = true
-			} else d += ` H${i * STEP} V${top + offset}`
+			if (top === undefined) flush()
+			else run.push(i)
 		})
-		return open ? `${d} H${width} V${VIEW_HEIGHT} Z` : d
+		flush()
+		return d
 	}
+
+	/**
+	 * Where the ground stops, under the path, every `STEP`: the bottom of the
+	 * screen, or under a rainbow, its bands' underside, nothing under it.
+	 */
+	const rainbow = props.world.course.look?.rainbow
+	const overRainbow = (x: number) =>
+		!!rainbow && x > rainbow.from && x < rainbow.to
+	const bottoms = tops.map((top, i) => {
+		const x = DRAWN_FROM + i * STEP + STEP / 2
+		return top !== undefined && overRainbow(x)
+			? top + PATH_FRONT + RAINBOW.length * RAINBOW_BAND
+			: VIEW_HEIGHT
+	})
 
 	/**
 	 * Down each Gap, from the back of the path on its lower side: a drop,
@@ -751,7 +913,7 @@ export function Ground(props: { world: View }) {
 		}),
 		front: columns((x, ground) => {
 			const foot = cave.foot(x)
-			return foot === undefined || cave.ceiling(x) === undefined
+			return foot === undefined || (cave.ceiling(x) === undefined && !cave.hull)
 				? undefined
 				: [ground + PATH_FRONT + 2, Math.min(VIEW_HEIGHT, foot)]
 		}, false),
@@ -769,6 +931,21 @@ export function Ground(props: { world: View }) {
 				? undefined
 				: [surface, surface + 6]
 		}),
+		/** In place of the grass, a street's bands, one under another. */
+		road: (props.world.course.look?.cave?.road ?? []).map(
+			([height, fill], i, all) => {
+				const down = all.slice(0, i).reduce((sum, [h]) => sum + h, 0)
+				return {
+					fill,
+					d: columns((x) => {
+						const surface = cave.surface(x)
+						return surface === undefined || surface < -SKY_ROOM
+							? undefined
+							: [surface + down, surface + down + height]
+					}),
+				}
+			},
+		),
 	}
 
 	/**
@@ -787,31 +964,18 @@ export function Ground(props: { world: View }) {
 		return Math.round(BRIDGE_SLIM + (BRIDGE_DEEP - BRIDGE_SLIM) * fromMiddle)
 	}
 	/**
-	 * How much water shows behind the path, `x` along the bridge: all of it
-	 * out in the middle, and less towards its ends, where the far shore
-	 * comes in to meet the land.
+	 * How much water shows behind the path along the bridge: right back to
+	 * the water behind, in the backdrop (see `BridgeWater`), all the way to
+	 * its ends, where the land's quay is.
 	 */
-	const waterBehind = (x: number) => {
-		if (!bridge) return 0
-		const fromEnd = Math.min(x - bridge.from, bridge.to - x)
-		return Math.round(BRIDGE_BEHIND * Math.min(1, Math.max(0, fromEnd) / SHORE))
-	}
+	const waterBehind = () => (bridge ? BRIDGE_BEHIND : 0)
 	/** Off the bridge, at `x`: before it, or on land again past it. */
 	const offBridge = (x: number) => !bridge || x < bridge.from || x >= bridge.to
 	const bridgeParts = bridge && {
 		behind: columns((x, ground) =>
-			offBridge(x)
+			offBridge(x) || bridge.open
 				? undefined
-				: [ground - PATH_BACK - waterBehind(x), ground - PATH_BACK],
-		),
-		/** The far shore's edge, where it comes in towards the ends. */
-		shore: columns((x, ground) =>
-			offBridge(x) || waterBehind(x) >= BRIDGE_BEHIND
-				? undefined
-				: [
-						ground - PATH_BACK - waterBehind(x) - 4,
-						ground - PATH_BACK - waterBehind(x),
-					],
+				: [ground - PATH_BACK - waterBehind(), ground - PATH_BACK],
 		),
 		rail: columns((x, ground) =>
 			offBridge(x)
@@ -845,6 +1009,16 @@ export function Ground(props: { world: View }) {
 			offBridge(x)
 				? undefined
 				: [ground + PATH_FRONT + bridgeDepth(x), VIEW_HEIGHT],
+		),
+		/** Slussen, past the bridge: its stone, from the path's front edge down. */
+		slussen: columns(
+			(x, ground) =>
+				x >= bridge.to + QUAY_WIDTH - QUAY_OVER ||
+				(bridge.stoneBefore && x < bridge.from - QUAY_WIDTH + QUAY_OVER)
+					? [ground + PATH_FRONT, VIEW_HEIGHT]
+					: undefined,
+			// Not down a Gap: a river, past it, is the river.
+			false,
 		),
 	}
 
@@ -882,8 +1056,13 @@ export function Ground(props: { world: View }) {
 							top: `${pit.top}px`,
 							bottom: 0,
 							background: pitLook,
+							overflow: 'hidden',
 						}}
-					/>
+					>
+						<Show when={props.world.course.look?.pitFire}>
+							<HellFire width={pit.width} seed={pit.left} />
+						</Show>
+					</div>
 				)}
 			</For>
 			<Show when={terrain.blocks}>
@@ -902,9 +1081,82 @@ export function Ground(props: { world: View }) {
 				shape-rendering="crispEdges"
 				aria-hidden="true"
 			>
+				{/* Colours that change along the course, for its layers. */}
+				<defs>
+					<For each={props.world.course.look?.strips ?? []}>
+						{(strip) => (
+							<linearGradient
+								id={strip.id}
+								gradientUnits="userSpaceOnUse"
+								x1={0}
+								y1={0}
+								x2={width}
+								y2={0}
+							>
+								<For each={strip.stops}>
+									{([x, colour], i) => {
+										const at = (stop: number) =>
+											Math.max(0, Math.min(1, (stop - DRAWN_FROM) / width))
+										const next = strip.stops[i() + 1]?.[0]
+										return (
+											<>
+												<stop offset={at(x)} stop-color={colour} />
+												<stop
+													offset={next === undefined ? 1 : at(next)}
+													stop-color={colour}
+												/>
+											</>
+										)
+									}}
+								</For>
+							</linearGradient>
+						)}
+					</For>
+				</defs>
+				{/* Under a rainbow: the field going on under it, its own ground. */}
+				<Show when={rainbow}>
+					{(arch) => (
+						<>
+							<path
+								d={columns((x) =>
+									overRainbow(x)
+										? [arch().base(x) - PATH_BACK - VERGE, VIEW_HEIGHT]
+										: undefined,
+								)}
+								fill={layers[0][1]}
+							/>
+							<path
+								d={columns((x) =>
+									overRainbow(x)
+										? [arch().base(x) + PATH_FRONT, VIEW_HEIGHT]
+										: undefined,
+								)}
+								fill={layers[layers.length - 1][1]}
+							/>
+						</>
+					)}
+				</Show>
 				<For each={layers}>
 					{([offset, fill]) => <path d={outline(offset)} fill={fill} />}
 				</For>
+				{/* A rainbow's bands, under the path over it. */}
+				<For each={rainbow ? RAINBOW : []}>
+					{(colour, k) => (
+						<path
+							d={columns((x, ground) =>
+								overRainbow(x)
+									? [
+											ground + PATH_FRONT + k() * RAINBOW_BAND,
+											ground + PATH_FRONT + (k() + 1) * RAINBOW_BAND,
+										]
+									: undefined,
+							)}
+							fill={colour}
+						/>
+					)}
+				</For>
+				{/* The sea, and its island, over the Ground's own layers. */}
+				<SeaGround world={props.world} left={DRAWN_FROM} right={drawnTo} />
 				{/* Pyramids' faces, in front of the path, in courses of blocks. */}
 				<Show when={props.world.course.look?.pyramids}>
 					{(pyramids) => (
@@ -989,7 +1241,6 @@ export function Ground(props: { world: View }) {
 								</linearGradient>
 							</defs>
 							<path d={bridgeParts?.behind} fill="url(#water-ripples)" />
-							<path d={bridgeParts?.shore} fill="var(--grass-darker-green)" />
 							<path d={bridgeParts?.posts} fill={look().rail} />
 							<path d={bridgeParts?.rail} fill={look().rail} />
 							<path d={bridgeParts?.water} fill="url(#water-ripples)" />
@@ -997,6 +1248,36 @@ export function Ground(props: { world: View }) {
 							<path d={bridgeParts?.side} fill={look().underside} />
 							<path d={bridgeParts?.highlight} fill={look().highlight} />
 							<path d={bridgeParts?.underbelly} fill={look().underbelly} />
+							{/* Slussen's stone, on from its quay wall along all of it, past
+							    the bridge, under the path: not just the one wall. */}
+							<Show when={look().quay}>
+								{(quay) => (
+									<>
+										<defs>
+											<pattern
+												id="slussen-stone"
+												patternUnits="userSpaceOnUse"
+												x={look().to - DRAWN_FROM - QUAY_OVER}
+												y={
+													Math.round(terrain.groundY(look().to) / 2) * 2 +
+													PATH_FRONT
+												}
+												width={QUAY_WIDTH}
+												height={QUAY_HEIGHT}
+											>
+												<image
+													href={quay()}
+													width={QUAY_WIDTH}
+													height={QUAY_HEIGHT}
+													preserveAspectRatio="none"
+													style={{ 'image-rendering': 'pixelated' }}
+												/>
+											</pattern>
+										</defs>
+										<path d={bridgeParts?.slussen} fill="url(#slussen-stone)" />
+									</>
+								)}
+							</Show>
 							{/* The quay walls at its ends, facing the water: at Slussen's
 							    end, and turned round, at Gamla Stan's. */}
 							<Show when={look().quay}>
@@ -1035,35 +1316,130 @@ export function Ground(props: { world: View }) {
 					{(look) => (
 						<>
 							<defs>
-								<pattern
-									id="cave-rock"
-									patternUnits="userSpaceOnUse"
-									width={48}
-									height={36}
+								<Show
+									when={look().bricks}
+									fallback={
+										<pattern
+											id="cave-rock"
+											patternUnits="userSpaceOnUse"
+											width={48}
+											height={36}
+										>
+											<rect width={48} height={36} fill={look().rock} />
+											<rect
+												x={2}
+												y={6}
+												width={16}
+												height={2}
+												fill={look().seam}
+											/>
+											<rect
+												x={16}
+												y={8}
+												width={6}
+												height={2}
+												fill={look().seam}
+											/>
+											<rect
+												x={28}
+												y={18}
+												width={14}
+												height={2}
+												fill={look().seam}
+											/>
+											<rect
+												x={24}
+												y={20}
+												width={4}
+												height={4}
+												fill={look().seam}
+											/>
+											<rect
+												x={6}
+												y={28}
+												width={10}
+												height={2}
+												fill={look().seam}
+											/>
+											<rect
+												x={36}
+												y={4}
+												width={4}
+												height={2}
+												fill={look().edge}
+											/>
+											<rect
+												x={10}
+												y={18}
+												width={2}
+												height={2}
+												fill={look().edge}
+											/>
+											<rect
+												x={40}
+												y={30}
+												width={2}
+												height={2}
+												fill={look().edge}
+											/>
+										</pattern>
+									}
 								>
-									<rect width={48} height={36} fill={look().rock} />
-									<rect x={2} y={6} width={16} height={2} fill={look().seam} />
-									<rect x={16} y={8} width={6} height={2} fill={look().seam} />
-									<rect
-										x={28}
-										y={18}
-										width={14}
-										height={2}
-										fill={look().seam}
+									<BrickPattern
+										id="cave-rock"
+										brick={look().rock}
+										mortar={look().seam}
+										lit={look().edge}
 									/>
-									<rect x={24} y={20} width={4} height={4} fill={look().seam} />
-									<rect x={6} y={28} width={10} height={2} fill={look().seam} />
-									<rect x={36} y={4} width={4} height={2} fill={look().edge} />
-									<rect x={10} y={18} width={2} height={2} fill={look().edge} />
-									<rect x={40} y={30} width={2} height={2} fill={look().edge} />
-								</pattern>
+									<WallBricks id="cave-wall" wall={look().wall} />
+								</Show>
 								<SandPattern id="cave-sand" />
+								<Show when={look().tiles}>
+									{(tiles) => (
+										<>
+											<TilePattern id="cave-tile-rock" tile={tiles().rock} />
+											<TilePattern
+												id="cave-tile-front"
+												tile={tiles().front ?? tiles().rock}
+											/>
+											<Show when={tiles().wall}>
+												{(wall) => (
+													<TilePattern id="cave-tile-wall" tile={wall()} />
+												)}
+											</Show>
+										</>
+									)}
+								</Show>
 							</defs>
-							<path d={caveParts?.wall} fill={look().wall} />
-							<path d={caveParts?.front} fill="url(#cave-rock)" />
-							<path d={caveParts?.rock} fill="url(#cave-rock)" />
+							<path
+								d={caveParts?.wall}
+								fill={
+									look().tiles?.wall
+										? 'url(#cave-tile-wall)'
+										: look().bricks
+											? 'url(#cave-wall)'
+											: look().wall
+								}
+							/>
+							<path
+								d={caveParts?.front}
+								fill={
+									look().tiles ? 'url(#cave-tile-front)' : 'url(#cave-rock)'
+								}
+							/>
+							<path
+								d={caveParts?.rock}
+								fill={look().tiles ? 'url(#cave-tile-rock)' : 'url(#cave-rock)'}
+							/>
 							<path d={caveParts?.underside} fill={look().edge} />
-							<path d={caveParts?.grass} fill={look().grass} />
+							<Show
+								when={look().road}
+								fallback={<path d={caveParts?.grass} fill={look().grass} />}
+							>
+								<For each={caveParts?.road}>
+									{(band) => <path d={band.d} fill={band.fill} />}
+								</For>
+							</Show>
 							{/* Its sand, where it's dug down under it, on its rock. */}
 							<path d={caveParts?.sand} fill="url(#cave-sand)" />
 							{/* Pictures on it: the Sphinx's head, its paws. */}
@@ -1191,6 +1567,8 @@ export function CaveCover(props: {
 	// Its rock, and under the sand's top, where it's dug down under it, sand.
 	let rock = ''
 	let sand = ''
+	/** With tiles, its front under the path, as the hull's, apart from its side over it. */
+	let front = ''
 	const column = (x: number, top: number, bottom: number) =>
 		bottom > top
 			? ` M${x - DRAWN_FROM},${Math.round(top / 2) * 2} H${x - DRAWN_FROM + STEP} V${Math.round(bottom / 2) * 2} H${x - DRAWN_FROM} Z`
@@ -1203,20 +1581,36 @@ export function CaveCover(props: {
 		if (ceiling === undefined || foot === undefined) continue
 		const top = ceiling - 4
 		const under = cave.sand?.(middle)
-		if (under === undefined) rock += column(x, top, foot)
+		if (look.tiles) {
+			const path = Math.round(terrain.groundY(middle) / 2) * 2 + PATH_FRONT + 2
+			rock += column(x, top, Math.min(foot, path))
+			front += column(x, path, foot)
+		} else if (under === undefined) rock += column(x, top, foot)
 		else {
 			rock += column(x, top, Math.min(foot, under))
 			sand += column(x, Math.max(top, under), foot)
 		}
 	}
-	/** Whether anyone racing's in it, under its hill: it's opened up. */
-	const inside = () =>
-		props.world.ticks() >= 0 &&
+	/** Whether someone racing's in it, under its hill. */
+	const anyoneInside = () =>
 		props.world.racers.some(({ body, out }) => {
 			if (out || body.x < cave.from || body.x > cave.to) return false
+			// Aboard a ship, anywhere: up on its roof too.
+			if (cave.hull) return true
 			const surface = cave.surface(body.x)
 			return surface === undefined || body.feetY > surface
 		})
+	/**
+	 * Whether it's opened up: someone racing's in it, or was, till they were
+	 * Scooped or Fallen in there. Then it stays open, to see where.
+	 */
+	let opened = false
+	const inside = () => {
+		if (props.world.ticks() < 0) return false
+		const caught = props.world.racers.some(({ out }) => isCaught(out))
+		opened = anyoneInside() || (opened && caught)
+		return opened
+	}
 	return (
 		<div
 			style={{
@@ -1242,6 +1636,30 @@ export function CaveCover(props: {
 			>
 				<defs>
 					<SandPattern id="cave-cover-sand" />
+					<Show when={look.tiles}>
+						{(tiles) => (
+							<>
+								<TilePattern
+									id="cave-cover-tile"
+									tile={tiles().rock}
+									x={DRAWN_FROM}
+								/>
+								<TilePattern
+									id="cave-cover-front"
+									tile={tiles().front ?? tiles().rock}
+									x={DRAWN_FROM}
+								/>
+							</>
+						)}
+					</Show>
+					<Show when={look.bricks}>
+						<BrickPattern
+							id="cave-cover-bricks"
+							brick={look.rock}
+							mortar={look.seam}
+							lit={look.edge}
+						/>
+					</Show>
 					<pattern
 						id="cave-cover-rock"
 						patternUnits="userSpaceOnUse"
@@ -1259,10 +1677,190 @@ export function CaveCover(props: {
 						<rect x={40} y={30} width={2} height={2} fill={look.edge} />
 					</pattern>
 				</defs>
-				<path d={rock} fill="url(#cave-cover-rock)" />
+				<path
+					d={rock}
+					fill={
+						look.tiles
+							? 'url(#cave-cover-tile)'
+							: look.bricks
+								? 'url(#cave-cover-bricks)'
+								: 'url(#cave-cover-rock)'
+					}
+				/>
+				<path d={front} fill="url(#cave-cover-front)" />
 				<path d={sand} fill="url(#cave-cover-sand)" />
 			</svg>
 		</div>
+	)
+}
+
+/**
+ * A picture, tiled, lined up with the world: `x` is the world's own x at
+ * the drawing's left edge, so it's lined up the same in every drawing of it.
+ */
+function TilePattern(props: {
+	id: string
+	tile: { asset: string; width: number; height: number }
+	x?: number
+}) {
+	return (
+		<pattern
+			id={props.id}
+			patternUnits="userSpaceOnUse"
+			width={props.tile.width}
+			height={props.tile.height}
+			x={
+				(((DRAWN_FROM - (props.x ?? DRAWN_FROM)) % props.tile.width) +
+					props.tile.width) %
+				props.tile.width
+			}
+		>
+			<image
+				href={props.tile.asset}
+				width={props.tile.width}
+				height={props.tile.height}
+				preserveAspectRatio="none"
+				style={{ 'image-rendering': 'pixelated' }}
+			/>
+		</pattern>
+	)
+}
+
+/**
+ * Bricks, laid in courses, each course half a brick along from the last:
+ * `mortar` between, and a lit top edge to each.
+ */
+function BrickPattern(props: {
+	id: string
+	brick: string
+	mortar: string
+	lit: string
+	/** Where its courses start, to line up with bricks drawn elsewhere. */
+	x?: number
+	y?: number
+}) {
+	return (
+		<pattern
+			id={props.id}
+			patternUnits="userSpaceOnUse"
+			width={32}
+			height={20}
+			x={props.x ?? 0}
+			y={props.y ?? 0}
+		>
+			{/* Under the mortar, the brick's own colour: a see-through mortar darkens it. */}
+			<rect width={32} height={20} fill={props.brick} />
+			<rect width={32} height={20} fill={props.mortar} />
+			<rect x={0} y={0} width={14} height={8} fill={props.brick} />
+			<rect x={16} y={0} width={14} height={8} fill={props.brick} />
+			<rect x={-8} y={10} width={14} height={8} fill={props.brick} />
+			<rect x={8} y={10} width={14} height={8} fill={props.brick} />
+			<rect x={24} y={10} width={14} height={8} fill={props.brick} />
+			<rect x={0} y={0} width={14} height={2} fill={props.lit} />
+			<rect x={16} y={0} width={14} height={2} fill={props.lit} />
+			<rect x={8} y={10} width={14} height={2} fill={props.lit} />
+			<rect x={24} y={10} width={8} height={2} fill={props.lit} />
+			<rect x={0} y={10} width={6} height={2} fill={props.lit} />
+		</pattern>
+	)
+}
+
+/**
+ * A brick Cave's back wall: its bricks in `wall`, in shadow. Drawn
+ * elsewhere than the Ground, `x` and `y` line its courses up with the
+ * Ground's: the world's own `x` and `y` at the drawing's top left.
+ */
+export function WallBricks(props: {
+	id: string
+	wall: string
+	x?: number
+	y?: number
+}) {
+	return (
+		<BrickPattern
+			id={props.id}
+			brick={props.wall}
+			mortar="rgba(0,0,0,0.4)"
+			lit="rgba(255,255,255,0.06)"
+			x={DRAWN_FROM - (props.x ?? DRAWN_FROM)}
+			y={-(props.y ?? 0)}
+		/>
+	)
+}
+
+/** A flame, in cells: its red outside, orange in it, and its yellow heart. */
+const FLAME: [number, number, number, number, string][] = [
+	[2, 0, 2, 2, '#e8361c'],
+	[1, 2, 4, 3, '#e8361c'],
+	[0, 5, 6, 5, '#e8361c'],
+	[2, 3, 2, 2, '#ff8a1c'],
+	[1, 5, 4, 5, '#ff8a1c'],
+	[2, 7, 2, 3, '#ffe066'],
+]
+
+/**
+ * Fire down a pit into hell: flames along its bottom, each its own size and
+ * flickering on its own beat, and embers rising out of it. Where each goes
+ * comes from `seed`, so a pit's the same every time it's drawn.
+ */
+function HellFire(props: { width: number; seed: number }) {
+	const random = seeded(Math.round(props.seed) + 666)
+	const count = Math.max(3, Math.round(props.width / 14))
+	const flames = Array.from({ length: count }, (_, i) => ({
+		left: (i / count) * props.width - 4 + random() * 8,
+		scale: 2 + Math.round(random() * 2),
+		delay: random() * 0.6,
+	}))
+	const embers = Array.from(
+		{ length: Math.round(props.width / 30) + 2 },
+		() => ({
+			left: random() * props.width,
+			delay: random() * 2.4,
+			seconds: 1.6 + random() * 1.2,
+		}),
+	)
+	return (
+		<>
+			<For each={flames}>
+				{(flame) => (
+					<svg
+						width={6 * flame.scale}
+						height={10 * flame.scale}
+						viewBox="0 0 6 10"
+						shape-rendering="crispEdges"
+						aria-hidden="true"
+						style={{
+							position: 'absolute',
+							left: `${flame.left}px`,
+							bottom: '-2px',
+							'transform-origin': '50% 100%',
+							animation: `hell-flame 0.45s steps(3) ${flame.delay}s infinite alternate`,
+						}}
+					>
+						<For each={FLAME}>
+							{([x, y, w, h, fill]) => (
+								<rect x={x} y={y} width={w} height={h} fill={fill} />
+							)}
+						</For>
+					</svg>
+				)}
+			</For>
+			<For each={embers}>
+				{(ember) => (
+					<div
+						style={{
+							position: 'absolute',
+							left: `${ember.left}px`,
+							bottom: '20px',
+							width: '3px',
+							height: '3px',
+							background: '#ffb03a',
+							animation: `hell-ember ${ember.seconds}s steps(12) ${ember.delay}s infinite`,
+						}}
+					/>
+				)}
+			</For>
+		</>
 	)
 }
 

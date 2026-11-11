@@ -108,6 +108,7 @@ export function createRaceStream(
 						(b.carried > 0 ? RACER_FLAGS.carried : 0) |
 						(b.on !== undefined ? RACER_FLAGS.platform : 0) |
 						(b.squashed > 0 ? RACER_FLAGS.squashed : 0) |
+						(b.gliding ? RACER_FLAGS.gliding : 0) |
 						(b.pumpkin * PUMPKIN_FLAG),
 					b.stumble,
 					b.spin,
@@ -126,7 +127,7 @@ export function createRaceStream(
 				tenth(p.x),
 				tenth(p.feetY),
 				tenth(p.vx),
-				(p.grounded ? 1 : 0) | (p.scooped ? 2 : 0),
+				(p.grounded ? 1 : 0) | (p.scooped ? 2 : 0) | (p.gliding ? 4 : 0),
 				p.dazed,
 				p.spin,
 			]),
@@ -147,6 +148,7 @@ export function createRaceStream(
 				CORGI_STATES.indexOf(c.state),
 				c.barking ? 1 : 0,
 				c.spin,
+				c.rare ? 1 : 0,
 			]),
 			flyers: world.flyers.map((goose) => [
 				goose.id,

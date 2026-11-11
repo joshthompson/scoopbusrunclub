@@ -14,6 +14,8 @@ import { Stage } from '../ui/Stage'
 export function Round(props: {
 	course: Course
 	number: number
+	/** How many Rounds there are, if it isn't a Backyard Ultra. */
+	of?: number
 	racers: RacerEntry[]
 	onPause: (paused: boolean) => void
 	onOver: (order: Racer[]) => void
@@ -67,6 +69,7 @@ export function Round(props: {
 						<RoundHud
 							world={world}
 							number={props.number}
+							of={props.of}
 							onPause={() => pause(true)}
 						/>
 						<Show when={paused()}>
@@ -95,6 +98,7 @@ export function Round(props: {
 export function RoundHud(props: {
 	world: ReturnType<typeof createWorld>
 	number: number
+	of?: number
 	onPause?: () => void
 	textScale?: number
 }) {
@@ -130,7 +134,8 @@ export function RoundHud(props: {
 		<div style={styles.hud}>
 			<div style={styles.topLeft}>
 				<div style={{ 'font-size': size(18), opacity: 0.8 }}>
-					Round {props.number} · {world.course.name}
+					Round {props.number}
+					{props.of ? ` of ${props.of}` : ''} · {world.course.name}
 				</div>
 				<div style={{ 'font-size': size(28) }}>
 					{left()} of {world.racers.length} running

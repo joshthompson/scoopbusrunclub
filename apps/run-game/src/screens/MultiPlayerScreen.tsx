@@ -1,12 +1,16 @@
 import type { JSX } from 'solid-js'
+import { ON_COMPUTER } from '../multiplayer/onComputer'
 import { Menu, OUTLINED, Panel } from '../ui/Menu'
 
 /**
- * Multi Player: hosting a Room on this screen, or joining someone else's
- * from this phone, with its QR code or Room Code.
+ * Multi Player: hosting a Room on this screen, or joining someone else's:
+ * from a computer, to see it here just as the Host does; from a phone, on
+ * the phone's own pages, with the QR code or the Room Code.
  */
 export function MultiPlayerScreen(props: {
 	onHost: () => void
+	/** Joining from this computer. */
+	onJoin: () => void
 	onBack: () => void
 }) {
 	return (
@@ -18,8 +22,10 @@ export function MultiPlayerScreen(props: {
 						{ label: 'Create Game', choose: props.onHost },
 						{
 							label: 'Join Game',
-							// The phone's side of a Room, where its QR code would take it.
-							choose: () => location.assign(`${import.meta.env.BASE_URL}?pad`),
+							// A phone's side of a Room is its own, where the QR code takes it.
+							choose: ON_COMPUTER
+								? props.onJoin
+								: () => location.assign(`${import.meta.env.BASE_URL}?pad`),
 						},
 						{ label: 'Back', choose: props.onBack },
 					]}
@@ -27,8 +33,8 @@ export function MultiPlayerScreen(props: {
 				/>
 			</Panel>
 			<div style={styles.hint}>
-				Host on the big screen. Join with a phone, as its controller or to play
-				on it.
+				Create one on the big screen, and join it from another computer, or with
+				a phone as your controller.
 			</div>
 		</div>
 	)

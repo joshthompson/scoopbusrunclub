@@ -95,6 +95,8 @@ export function Game(props: {
 
 	/** A score that could go on an online table, and how sending it's going. */
 	const [offer, setOffer] = createSignal<OnlineOffer>()
+	/** Still finding out, at the end of a course, whether its scores would go online. */
+	const [checkingOnline, setCheckingOnline] = createSignal(false)
 	/** Choosing a name and runner, before sending. */
 	const [naming, setNaming] = createSignal(false)
 
@@ -130,6 +132,14 @@ export function Game(props: {
 	 * is sent again as it goes on, without asking.
 	 */
 	async function offerOnline(courseScore: number, tally: Tally) {
+		setCheckingOnline(true)
+		try {
+			await findOffer(courseScore, tally)
+		} finally {
+			setCheckingOnline(false)
+		}
+	}
+	async function findOffer(courseScore: number, tally: Tally) {
 		const scores: OnlineOffer['scores'] = []
 		const candidates: OnlineOffer['scores'] = [
 			{
@@ -317,6 +327,7 @@ export function Game(props: {
 							onPick={setPicked}
 							placing={placing()}
 							online={offer()}
+							checkingOnline={checkingOnline()}
 							onPause={() => canPause() && setPaused(true)}
 						/>
 						<Show when={naming()}>
@@ -376,6 +387,8 @@ function Hud(props: {
 	onPick: (i: number) => void
 	placing: Placing | undefined
 	online: OnlineOffer | undefined
+	/** Still finding out whether there's anything to send online. */
+	checkingOnline?: boolean
 	onPause: () => void
 }) {
 	const { world } = props
@@ -454,6 +467,7 @@ function Hud(props: {
 						result={result()}
 						placing={props.placing}
 						online={props.online}
+						checkingOnline={props.checkingOnline}
 						actions={props.actions}
 						picked={props.picked}
 						onPick={props.onPick}

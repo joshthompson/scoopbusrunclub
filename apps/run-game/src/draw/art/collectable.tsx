@@ -3,12 +3,15 @@ import type { JSX } from 'solid-js'
 import barcodeAsset from '../../assets/boosts/barcode.png'
 import type { Collectable } from '../../game/collectables'
 import type { FikaItem } from '../../game/fika'
-import { CamelArt } from './camel'
+import { BactrianArt, CamelArt } from './camel'
 import { CorgiArt } from './corgi'
+import { DeerArt } from './deer'
 import { DragonArt } from './dragon'
 import { FikaArt } from './fika'
 import { GooseIcon } from './geese'
+import { GliderArt } from './glider'
 import { LlamaArt } from './llama'
+import { UnicornArt } from './unicorn'
 
 /** A collectable's picture, as it's seen on the course: its fika, its ride, sat waiting. */
 export function CollectableArt(props: { id: Collectable }): JSX.Element {
@@ -22,6 +25,18 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <LlamaArt pose="sit" />
 		case 'ride:camel':
 			return <CamelArt pose="sit" />
+		case 'ride:bactrian':
+			return <BactrianArt pose="sit" />
+		case 'ride:deer':
+			return <DeerArt pose="sit" />
+		case 'ride:unicorn':
+			return <UnicornArt pose="sit" />
+		case 'ride:glider':
+			return (
+				<div style={{ transform: 'scale(0.6)' }}>
+					<GliderArt />
+				</div>
+			)
 		case 'ride:goose':
 			return <GooseIcon />
 		case 'ride:dragon':

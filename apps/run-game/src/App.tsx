@@ -48,14 +48,25 @@ type Screen =
 	| { kind: 'courses'; runner: Playable }
 	| { kind: 'play'; runner: Playable; course: Course; mode: Mode }
 	| { kind: 'party' }
+	/** Joined to someone else's Room, from this computer: `code`, if it came with one. */
+	| { kind: 'join'; code?: string }
 
 type Play = Extract<Screen, { kind: 'play' }>
 
 /** Multi Player, in a chunk of its own: trystero and all only load if it's picked. */
 const Party = lazy(() => import('./multiplayer/Party'))
+/** And joining someone else's, from a computer. */
+const Joined = lazy(() => import('./multiplayer/Joined'))
 
-export function App() {
-	const [screen, setScreen] = createSignal<Screen>({ kind: 'title' })
+export function App(props: {
+	/** Opened from a Room's link on a computer: joining it, with its code. */
+	join?: string
+}) {
+	const [screen, setScreen] = createSignal<Screen>(
+		props.join === undefined
+			? { kind: 'title' }
+			: { kind: 'join', code: props.join },
+	)
 	/** Whoever was picked last, so coming back to the list starts on them. */
 	const [selectedId, setSelectedId] = createSignal<string | undefined>(
 		lastRunner(),
@@ -74,7 +85,7 @@ export function App() {
 	createEffect(() => {
 		const now = screen()
 		if (now.kind === 'play') playTune(now.course.id)
-		else if (now.kind !== 'party') playMenu()
+		else if (now.kind !== 'party' && now.kind !== 'join') playMenu()
 	})
 	// It can only start once something's been pressed or tapped.
 	onMount(() => {
@@ -127,6 +138,14 @@ export function App() {
 			 */}
 			<Match when={screen().kind === 'party'}>
 				<Party onLeave={go('title')} />
+			</Match>
+			<Match when={screen().kind === 'join' && screen()}>
+				{(join) => (
+					<Joined
+						code={(join() as { code?: string }).code}
+						onLeave={go('multi')}
+					/>
+				)}
 			</Match>
 			<Match when={screen().kind !== 'play'}>
 				<Stage>
@@ -185,6 +204,7 @@ export function App() {
 						<Match when={screen().kind === 'multi'}>
 							<MultiPlayerScreen
 								onHost={() => setScreen({ kind: 'party' })}
+								onJoin={() => setScreen({ kind: 'join' })}
 								onBack={go('title')}
 							/>
 						</Match>

@@ -1941,6 +1941,7 @@ http.route({
 })
 
 // POST /api/run/score { ticket, table, playerId, name, icon, ... } → { rank }
+// Saved with the name and head it's sent with, to the player's profile.
 http.route({
 	path: '/api/run/score',
 	method: 'POST',
@@ -1975,6 +1976,29 @@ http.route({
 			courses: Math.max(0, number('courses')),
 			finished: body.finished === true,
 			bonuses,
+			ip: clientIp(request),
+		})
+		if ('error' in result)
+			return jsonResponse(result, result.error === 'limit' ? 429 : 400)
+		return jsonResponse(result)
+	}),
+})
+
+// POST /api/run/profile { playerId, name, icon } → { saved }
+// A player's name and head, on every table they're on.
+http.route({
+	path: '/api/run/profile',
+	method: 'POST',
+	handler: httpAction(async (ctx, request) => {
+		const body = await jsonBody(request)
+		const icon = body.icon as { member?: unknown; look?: unknown } | undefined
+		const result = await ctx.runMutation(internal.runScores.saveProfile, {
+			playerId: typeof body.playerId === 'string' ? body.playerId : '',
+			name: typeof body.name === 'string' ? body.name : '',
+			icon:
+				typeof icon?.member === 'string'
+					? { member: icon.member }
+					: { look: icon?.look ?? null },
 			ip: clientIp(request),
 		})
 		if ('error' in result)

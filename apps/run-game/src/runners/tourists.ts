@@ -19,7 +19,13 @@ const TROUSERS = [
 	'#6b6b6b',
 	'#5a4632',
 ]
-const SKINS: Avatar['skin'][] = ['light', 'medium', 'dark']
+const SKINS: Avatar['skin'][] = [
+	'light',
+	'medium-light',
+	'medium',
+	'medium-dark',
+	'dark',
+]
 const HAIRS = ['', 'short', 'short', 'medium', 'long'] as const
 const BEARDS = ['stubble', 'beard', 'moustache'] as const
 

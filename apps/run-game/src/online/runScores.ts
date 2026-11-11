@@ -4,7 +4,8 @@ import { type ScoreIcon, identity } from '../saved/identity'
 
 /**
  * The online high score tables, on the website's backend: one for Endless,
- * and one for each course, as the ones kept in this browser are.
+ * and one for each course, as the ones kept in this browser are. Each score
+ * is under your Profile there, with your name and head (see `saveProfile`).
  *
  * Each go, a Run of Endless or a Practice, gets a Ticket as it starts, and
  * its score's sent with it: the backend only takes a score for a go it saw
@@ -171,7 +172,24 @@ export function wouldPlace(table: OnlineTable, score: number) {
 	)
 }
 
-/** Send a score: where it came on the table (from 0), or why it couldn't go on. */
+/**
+ * Your name and head, to your profile on the tables: every score you've got
+ * on them shows them, changed or not. Nothing offline, or not named yet.
+ */
+export async function saveProfile(): Promise<{ error?: string }> {
+	const { name, icon, playerId } = identity()
+	if (!ONLINE || !name || !icon) return {}
+	const result = await post<{ saved?: boolean; error?: string }>(
+		'/api/run/profile',
+		{ playerId, name, icon },
+	)
+	if (!result) return { error: 'Couldn’t reach the high score tables' }
+	// Shown under the new name next time each table's looked at.
+	if (!result.error) setTables({})
+	return result
+}
+
+/** Send a score, saving your profile with it: where it came on the table (from 0), or why it couldn't go on. */
 export async function submitScore(args: {
 	ticket: string
 	table: string

@@ -4,83 +4,40 @@ import {
 	Match,
 	Show,
 	Switch,
-	createEffect,
 	createSignal,
 	lazy,
 	onCleanup,
 	onMount,
 } from 'solid-js'
-import { type Room, joinRoom } from 'trystero'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
-import { type Action, anyControls, packControls } from '../input'
+import { type Action, anyControls } from '../input'
 import { type CustomRunner, customRunners } from '../runners/customRunners'
 import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
-import { STORAGE_PREFIX } from '../saved/settings'
 import { RunnerEditor } from '../screens/RunnerEditor'
 import { RunStrip } from '../ui/RunStrip'
 import { nameSize } from '../ui/RunnerStage'
-import type { Feed } from './Mirror'
+import { Medal, ordinal, pts } from './Medal'
 import { Scanner } from './Scanner'
+import { isPicked, joinAsGuest, lastMode, rememberMode } from './guest'
 import {
-	APP_ID,
 	CODE_LENGTH,
-	type PadMessage,
 	type PadMode,
 	type PadView,
-	type RaceFrame,
-	type RaceStart,
 	type RoomMode,
-	action,
 	cleanCode,
-	trysteroRoom,
 } from './protocol'
-import { ROOM_MODES } from './roomModes'
+import { ROOM_MODES, roomModeInfo } from './roomModes'
+import { statusText } from './status'
 
 /** The race on the phone, for Remote Play: the game itself, so only loaded then. */
 const Mirror = lazy(() => import('./Mirror'))
-
-/** How often a held button's sent again, even unchanged: in case one went missing. */
-const RESEND_MS = 200
-/** How long to look for the Room before saying it can't be found. */
-const FIND_MS = 20_000
-
-/**
- * This device, the same every time, so dropping out and coming back gets the
- * same seat. Only ever sent to a Room's Host.
- */
-function deviceId() {
-	const key = `${STORAGE_PREFIX}device`
-	try {
-		const known = localStorage.getItem(key)
-		if (known) return known
-		const made = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
-		localStorage.setItem(key, made)
-		return made
-	} catch {
-		return `${Date.now()}-${Math.random()}`
-	}
-}
 
 const MEMBERS_BY_NAME = [...MEMBERS].sort((a, b) =>
 	a.name.localeCompare(b.name),
 )
 
-/** How this phone played last time, to start on next time. */
-const MODE_KEY = `${STORAGE_PREFIX}pad-mode`
-function lastMode(): PadMode {
-	try {
-		return localStorage.getItem(MODE_KEY) === 'remote' ? 'remote' : 'controller'
-	} catch {
-		return 'controller'
-	}
-}
-function rememberMode(mode: PadMode) {
-	try {
-		localStorage.setItem(MODE_KEY, mode)
-	} catch {
-		// Asked again next time, that's all.
-	}
-}
+/** How this phone played last time, under this, to start on next time. */
+const MODE_KEY = 'pad-mode'
 
 /**
  * A phone in a Room: joined with the QR code (scanned with the camera app,
@@ -97,35 +54,34 @@ export default function Pad() {
 	)
 	const [mode, setMode] = createSignal<PadMode>()
 	const choose = (next: PadMode) => {
-		rememberMode(next)
+		rememberMode(MODE_KEY, next)
 		setMode(next)
 	}
 	const leave = () => {
 		setCode('')
 		setMode(undefined)
 	}
-	return (
-		<div style={styles.page}>
-			<Switch>
-				<Match when={!code()}>
-					<CodeEntry onCode={setCode} />
-				</Match>
-				<Match when={!mode()}>
-					<ModePicker code={code()} onPick={choose} onBack={leave} />
-				</Match>
-				<Match when={code()} keyed>
-					{(joined) => (
-						<Controller
-							code={joined}
-							mode={mode() ?? 'controller'}
-							onMode={choose}
-							onLeave={leave}
-						/>
-					)}
-				</Match>
-			</Switch>
-		</div>
+	const screens = () => (
+		<Switch>
+			<Match when={!code()}>
+				<CodeEntry onCode={setCode} />
+			</Match>
+			<Match when={!mode()}>
+				<ModePicker code={code()} onPick={choose} onBack={leave} />
+			</Match>
+			<Match when={code()} keyed>
+				{(joined) => (
+					<Controller
+						code={joined}
+						mode={mode() ?? 'controller'}
+						onMode={choose}
+						onLeave={leave}
+					/>
+				)}
+			</Match>
+		</Switch>
 	)
+	return <div style={styles.page}>{screens()}</div>
 }
 
 function CodeEntry(props: { onCode: (code: string) => void }) {
@@ -155,6 +111,10 @@ function CodeEntry(props: { onCode: (code: string) => void }) {
 					autocapitalize="characters"
 					autocomplete="off"
 					onInput={(event) => setTyped(cleanCode(event.currentTarget.value))}
+					onKeyDown={(event) => {
+						if (event.key === 'Enter' && typed().length === CODE_LENGTH)
+							props.onCode(typed())
+					}}
 				/>
 				<button
 					type="button"
@@ -172,13 +132,13 @@ function CodeEntry(props: { onCode: (code: string) => void }) {
 	)
 }
 
-/** Watching the big screen, or the race on the phone. */
+/** Watching the race on the big screen, or on the phone. */
 function ModePicker(props: {
 	code: string
 	onPick: (mode: PadMode) => void
 	onBack: () => void
 }) {
-	const last = lastMode()
+	const last = lastMode(MODE_KEY, 'controller')
 	const option = (mode: PadMode, title: string, text: string) => (
 		<button
 			type="button"
@@ -194,21 +154,62 @@ function ModePicker(props: {
 	)
 	return (
 		<div style={styles.centre}>
-			<div style={styles.heading}>How are you playing?</div>
+			<div style={styles.heading}>Where will you watch the race?</div>
 			<div style={styles.text}>Room {props.code}</div>
 			{option(
 				'controller',
-				'Controller',
-				'Watch the big screen. Your phone’s the buttons.',
+				'On the big screen',
+				'In the same room as it. Your phone’s just the buttons.',
 			)}
 			{option(
 				'remote',
-				'Remote play',
-				'The race on your phone, with the buttons under it.',
+				'On this phone',
+				'Somewhere else? The race on your phone, the buttons under it.',
 			)}
+			<div style={{ ...styles.text, 'font-size': '15px' }}>
+				You can change this in the lobby
+			</div>
 			<button type="button" style={styles.smallButton} onClick={props.onBack}>
 				Another Room
 			</button>
+		</div>
+	)
+}
+
+/** Where the race is watched, big and plain to see: on the big screen, or on this phone. */
+function WatchToggle(props: {
+	mode: PadMode
+	onMode: (mode: PadMode) => void
+}) {
+	const option = (mode: PadMode, label: string) => {
+		const on = () => props.mode === mode
+		return (
+			<button
+				type="button"
+				aria-pressed={on()}
+				style={{ ...styles.watchOption, ...(on() ? styles.readyOn : {}) }}
+				onClick={() => {
+					if (on()) return
+					navigator.vibrate?.(8)
+					props.onMode(mode)
+				}}
+			>
+				<span style={styles.modeMark}>
+					<Show when={on()}>
+						<span style={styles.modeDot} />
+					</Show>
+				</span>
+				{label}
+			</button>
+		)
+	}
+	return (
+		<div style={styles.watch}>
+			<div style={styles.watchLabel}>Watch the race</div>
+			<div style={styles.watchOptions}>
+				{option('controller', 'Big screen')}
+				{option('remote', 'This phone')}
+			</div>
 		</div>
 	)
 }
@@ -219,73 +220,6 @@ function Controller(props: {
 	onMode: (mode: PadMode) => void
 	onLeave: () => void
 }) {
-	const device = deviceId()
-	const room: Room = joinRoom({ appId: APP_ID }, trysteroRoom(props.code))
-	const pad = action<PadMessage>(room, 'pad')
-	const input = action<number>(room, 'input')
-	const fromHost = action<PadView>(room, 'view')
-	const race = action<RaceStart>(room, 'race')
-	const frames = action<RaceFrame>(room, 'frame')
-
-	const [view, setView] = createSignal<PadView>()
-	const [host, setHost] = createSignal<string>()
-	const [gone, setGone] = createSignal(false)
-	const [lost, setLost] = createSignal(false)
-	/** Changing who they'll be, after picking. */
-	const [choosing, setChoosing] = createSignal(false)
-	/** Making a runner of their own, or changing one: `runner` is the one being changed. */
-	const [editing, setEditing] = createSignal<{ runner?: CustomRunner }>()
-
-	const send = (message: PadMessage) => {
-		const to = host()
-		if (to) void pad.send(message, to)
-	}
-
-	// Every peer's said hello to: the Host's the one that answers. Other
-	// phones in the Room are peers too, and say nothing back.
-	room.onPeerJoin(
-		(peer) => void pad.send({ type: 'hello', device, mode: props.mode }, peer),
-	)
-	fromHost.on((next, peer) => {
-		setHost(peer)
-		setView(next)
-		// Between Rounds: the last one's done with.
-		if (next.stage !== 'round') setStart(undefined)
-	})
-
-	// Remote Play: the Round, as the Host sends it.
-	const [start, setStart] = createSignal<RaceStart>()
-	const feed: Feed = { frames: [] }
-	race.on((next) => {
-		feed.frames = []
-		setStart(next)
-	})
-	frames.on((frame) => {
-		if (frame.round !== start()?.round) return
-		feed.frames.push(frame)
-		// Never more than a second's worth, if it's not being played back.
-		if (feed.frames.length > 30) feed.frames.splice(0, feed.frames.length - 30)
-	})
-	const switchMode = (mode: PadMode) => {
-		props.onMode(mode)
-		send({ type: 'mode', mode })
-	}
-	/** How much room the race gets, playing remotely: the width, and about half the height. */
-	const [screen, setScreen] = createSignal({
-		width: window.innerWidth,
-		height: window.innerHeight,
-	})
-	const resize = () =>
-		setScreen({ width: window.innerWidth, height: window.innerHeight })
-	window.addEventListener('resize', resize)
-	onCleanup(() => window.removeEventListener('resize', resize))
-	const watching = () =>
-		props.mode === 'remote' && view()?.stage === 'round' && start()
-	room.onPeerLeave((peer) => {
-		if (peer === host()) setGone(true)
-	})
-	const notFound = window.setTimeout(() => !host() && setLost(true), FIND_MS)
-
 	// The buttons, and the keyboard too, for trying it out on a computer.
 	const [touched, setTouched] = createSignal<Set<Action>>(new Set())
 	const held = () => {
@@ -298,13 +232,30 @@ function Controller(props: {
 			down: keys.down || touch.has('down'),
 		}
 	}
-	const sendHeld = () => {
-		const to = host()
-		if (to) void input.send(packControls(held()), to)
-	}
-	createEffect(sendHeld)
-	const resend = window.setInterval(sendHeld, RESEND_MS)
+	const link = joinAsGuest({
+		code: props.code,
+		mode: () => props.mode,
+		held,
+	})
+	const { view, gone, lost, start, feed, send } = link
 
+	/** Changing who they'll be, after picking. */
+	const [choosing, setChoosing] = createSignal(false)
+	/** Making a runner of their own, or changing one: `runner` is the one being changed. */
+	const [editing, setEditing] = createSignal<{ runner?: CustomRunner }>()
+
+	const switchMode = (mode: PadMode) => {
+		props.onMode(mode)
+		link.switchMode(mode)
+	}
+	/** How much room the race gets, playing remotely: the phone's width, and about half its height. */
+	const size = () => ({ width: window.innerWidth, height: window.innerHeight })
+	const [screen, setScreen] = createSignal(size())
+	const resize = () => setScreen(size())
+	window.addEventListener('resize', resize)
+	onCleanup(() => window.removeEventListener('resize', resize))
+	const watching = () =>
+		props.mode === 'remote' && view()?.stage === 'round' && start()
 	// Kept awake: a phone that locks drops out of the Room.
 	let wake: WakeLockSentinel | undefined
 	const keepAwake = async () => {
@@ -319,15 +270,12 @@ function Controller(props: {
 	document.addEventListener('visibilitychange', keepAwake)
 
 	onCleanup(() => {
-		window.clearTimeout(notFound)
-		window.clearInterval(resend)
 		document.removeEventListener('visibilitychange', keepAwake)
 		void wake?.release()
-		void room.leave()
 	})
 
 	const leave = () => {
-		send({ type: 'leave' })
+		link.leave()
 		props.onLeave()
 	}
 
@@ -339,11 +287,7 @@ function Controller(props: {
 	const mine = () => {
 		const v = view()
 		if (!v?.character) return undefined
-		return characters().find(
-			(c) =>
-				c.id === v.character ||
-				(c.custom && v.character?.endsWith(`:${c.custom.id}`)),
-		)
+		return characters().find((c) => isPicked(c, v.character))
 	}
 	const pick = (runner: Playable) => {
 		if (view()?.taken.includes(runner.id)) return
@@ -496,85 +440,150 @@ function Controller(props: {
 								v().status !== 'waiting'
 							}
 							fallback={
-								<Show
-									when={v().stage === 'lobby'}
-									fallback={
-										// Between Rounds, or waiting for the next one.
-										<div style={styles.lobby}>
-											<div style={styles.heading}>{statusText(v())}</div>
-											<div style={styles.text}>
-												{v().points} pts · next Round soon
-											</div>
-										</div>
-									}
-								>
-									<div style={styles.lobby}>
-										<Show
-											when={v().starter}
-											fallback={
-												<>
+								<Switch>
+									<Match when={v().stage === 'lobby'}>
+										<div style={styles.scroll}>
+											<div style={styles.scrolled}>
+												<WatchToggle mode={props.mode} onMode={switchMode} />
+												<Show
+													when={v().starter}
+													fallback={
+														<>
+															<button
+																type="button"
+																style={{
+																	...styles.bigButton,
+																	...(v().ready ? styles.readyOn : {}),
+																}}
+																onClick={() =>
+																	send({ type: 'ready', ready: !v().ready })
+																}
+															>
+																{v().ready ? 'Ready!' : 'I’m ready'}
+															</button>
+															<Show when={v().ready && v().starterNumber}>
+																<div style={styles.text}>
+																	P{v().starterNumber} starts the race
+																</div>
+															</Show>
+														</>
+													}
+												>
+													{(starter) => (
+														<Starter
+															starter={starter()}
+															onMode={(mode) => {
+																navigator.vibrate?.(8)
+																send({ type: 'roomMode', mode })
+															}}
+															onStart={() => {
+																navigator.vibrate?.(15)
+																send({ type: 'start' })
+															}}
+														/>
+													)}
+												</Show>
+												<div style={styles.actions}>
+													<Show when={!v().ready}>
+														<button
+															type="button"
+															style={styles.smallButton}
+															onClick={() => setChoosing(true)}
+														>
+															Change runner
+														</button>
+													</Show>
 													<button
 														type="button"
-														style={{
-															...styles.bigButton,
-															...(v().ready ? styles.readyOn : {}),
-														}}
-														onClick={() =>
-															send({ type: 'ready', ready: !v().ready })
-														}
+														style={styles.smallButton}
+														onClick={leave}
 													>
-														{v().ready ? 'Ready!' : 'I’m ready'}
+														Leave
 													</button>
-													<Show when={v().ready && v().starterNumber}>
-														<div style={styles.text}>
-															P{v().starterNumber} starts the race
-														</div>
-													</Show>
-												</>
-											}
-										>
-											{(starter) => (
-												<Starter
-													starter={starter()}
-													onMode={(mode) => send({ type: 'roomMode', mode })}
-													onStart={() => {
-														navigator.vibrate?.(15)
-														send({ type: 'start' })
-													}}
-												/>
-											)}
-										</Show>
-										<Show when={!v().ready}>
+												</div>
+											</div>
+										</div>
+									</Match>
+									<Match when={v().stage === 'podium'}>
+										<div style={styles.lobby}>
+											<Show
+												when={
+													v().place && (v().place as number) <= 3
+														? (v().place as 1 | 2 | 3)
+														: undefined
+												}
+											>
+												{(place) => <Medal place={place()} size={7} />}
+											</Show>
+											<div style={styles.heading}>
+												{v().place === 1
+													? 'You won!'
+													: v().place
+														? `${ordinal(v().place as number)} of ${v().of}`
+														: 'All done!'}
+											</div>
+											<div style={styles.text}>
+												{roomModeInfo(v().roomMode).label} finished ·{' '}
+												{pts(v().points)}
+											</div>
+											<Show
+												when={v().isStarter}
+												fallback={
+													<div style={styles.text}>Back to the lobby soon</div>
+												}
+											>
+												<button
+													type="button"
+													style={styles.bigButton}
+													onClick={() => send({ type: 'lobby' })}
+												>
+													Back to the lobby
+												</button>
+											</Show>
 											<button
 												type="button"
 												style={styles.smallButton}
-												onClick={() => setChoosing(true)}
+												onClick={leave}
 											>
-												Change runner
+												Leave the Room
 											</button>
-										</Show>
-										<button
-											type="button"
-											style={styles.smallButton}
-											onClick={() =>
-												switchMode(
-													props.mode === 'remote' ? 'controller' : 'remote',
-												)
-											}
-										>
-											{props.mode === 'remote'
-												? 'Watch the big screen instead'
-												: 'Watch on this phone instead'}
-										</button>
-										<button
-											type="button"
-											style={styles.smallButton}
-											onClick={leave}
-										>
-											Leave the Room
-										</button>
-									</div>
-								</Show>
+										</div>
+									</Match>
+									<Match when={true}>
+										{/* Between Rounds, or waiting for the next one. */}
+										<div style={styles.lobby}>
+											<div style={styles.heading}>{statusText(v())}</div>
+											<div style={styles.text}>{betweenText(v())}</div>
+											<Show
+												when={
+													v().stage === 'results' &&
+													v().isStarter &&
+													roomModeInfo(v().roomMode).repeats
+												}
+											>
+												<button
+													type="button"
+													style={styles.bigButton}
+													onClick={() => {
+														navigator.vibrate?.(15)
+														send({ type: 'finish' })
+													}}
+												>
+													Finish here
+												</button>
+												<div
+													style={{
+														...styles.text,
+														'font-size': '15px',
+														'text-align': 'center',
+													}}
+												>
+													Or the next Round starts by itself
+												</div>
+											</Show>
+										</div>
+									</Match>
+								</Switch>
 							}
 						>
 							<ArrowPad press={press} />
@@ -591,8 +600,8 @@ function Controller(props: {
 }
 
 /**
- * The Starter's own: how the Room goes, and Start, once everyone else who's
- * picked is ready.
+ * The Starter's own: how far the Room goes, one big button each, and Start,
+ * once everyone else who's picked is ready.
  */
 function Starter(props: {
 	starter: NonNullable<PadView['starter']>
@@ -601,27 +610,37 @@ function Starter(props: {
 }) {
 	return (
 		<>
-			<div style={styles.roomModes}>
+			<div style={styles.heading}>How far?</div>
+			<div style={styles.modeList}>
 				<For each={ROOM_MODES}>
-					{(m) => (
-						<button
-							type="button"
-							style={{
-								...styles.roomMode,
-								...(props.starter.roomMode === m.mode ? styles.readyOn : {}),
-							}}
-							onClick={() => props.onMode(m.mode)}
-						>
-							<span>{m.label}</span>
-							<span style={styles.roomModeNote}>{m.note}</span>
-						</button>
-					)}
+					{(m) => {
+						const on = () => props.starter.roomMode === m.mode
+						return (
+							<button
+								type="button"
+								aria-pressed={on()}
+								style={{ ...styles.modeCard, ...(on() ? styles.readyOn : {}) }}
+								onClick={() => !on() && props.onMode(m.mode)}
+							>
+								<span style={styles.modeMark}>
+									<Show when={on()}>
+										<span style={styles.modeDot} />
+									</Show>
+								</span>
+								<span style={styles.modeWords}>
+									<span style={styles.modeLabel}>{m.label}</span>
+									<span style={styles.modeAbout}>{m.about}</span>
+								</span>
+							</button>
+						)
+					}}
 				</For>
 			</div>
 			<button
 				type="button"
 				style={{
 					...styles.bigButton,
+					...styles.startButton,
 					...(props.starter.canStart ? styles.readyOn : styles.startOff),
 				}}
 				disabled={!props.starter.canStart}
@@ -636,38 +655,15 @@ function Starter(props: {
 	)
 }
 
-function statusText(view: PadView) {
-	const of = view.of ? ` of ${view.of}` : ''
-	switch (view.status) {
-		case 'picking':
-			return !view.character
-				? 'Pick a runner'
-				: view.starter
-					? view.stage === 'starting'
-						? 'Get ready…'
-						: 'You start it'
-					: 'Not ready yet'
-		case 'waiting':
-			return 'In from the next Round'
-		case 'ready':
-			return view.stage === 'starting' ? 'Get ready…' : 'Ready!'
-		case 'racing':
-			return view.stage === 'results' ? `${view.points} pts` : 'Run!'
-		case 'scooped':
-			return view.place ? `Scooped! ${ordinal(view.place)}${of}` : 'Scooped!'
-		case 'fallen':
-			return view.place ? `Fell! ${ordinal(view.place)}${of}` : 'Fell!'
-		case 'finished':
-			return view.place
-				? `Beat the bus! ${ordinal(view.place)}${of}`
-				: 'Beat the bus!'
-		case 'won':
-			return 'You won!'
-	}
+/** Between Rounds: their points, and what's next. */
+function betweenText(view: PadView) {
+	if (view.stage !== 'results') return `${pts(view.points)} · next Round soon`
+	const last = view.rounds && view.round >= view.rounds
+	const done = view.rounds
+		? `Round ${view.round} of ${view.rounds} done`
+		: `Round ${view.round} done`
+	return `${pts(view.points)} · ${last ? 'the Podium’s next' : done}`
 }
-
-const ordinal = (n: number) =>
-	`${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`
 
 /**
  * The four buttons, laid out like a keyboard's arrow keys: up on its own on
@@ -971,25 +967,105 @@ const styles = {
 	},
 	readyOn: { background: '#ffd23f', color: 'var(--ink)' },
 	startOff: { opacity: 0.45 },
-	roomModes: {
+	/** The lobby: scrolled, if it doesn't fit, and in the middle if it does. */
+	scroll: {
+		flex: 1,
+		'min-height': 0,
 		display: 'flex',
-		gap: '8px',
-		'flex-wrap': 'wrap',
-		'justify-content': 'center',
+		'flex-direction': 'column',
+		'overflow-y': 'auto',
+		'touch-action': 'pan-y',
 	},
-	roomMode: {
+	scrolled: {
+		margin: 'auto 0',
 		display: 'flex',
 		'flex-direction': 'column',
 		'align-items': 'center',
-		gap: '4px',
-		padding: '8px 10px 5px',
+		gap: '14px',
+		padding: '16px',
+		'text-align': 'center',
+	},
+	/** The ways a Room can go: one under another on a phone, two by two on a computer. */
+	modeList: {
+		display: 'grid',
+		'grid-template-columns': 'repeat(auto-fit, minmax(250px, 1fr))',
+		gap: '12px',
+		width: 'min(100%, 560px)',
+		padding: '3px',
+		'box-sizing': 'border-box',
+	},
+	modeCard: {
+		display: 'flex',
+		'align-items': 'center',
+		gap: '12px',
+		'min-height': '60px',
+		padding: '9px 12px 6px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '3px solid white',
+		'box-shadow': '0 0 0 3px var(--ink)',
 		'font-family': 'var(--font-pixel)',
-		'font-size': '16px',
+		'text-align': 'left',
 	},
-	roomModeNote: { 'font-size': '11px', opacity: 0.8 },
+	/** A square that's filled in when it's the one. */
+	modeMark: {
+		display: 'grid',
+		'place-items': 'center',
+		width: '22px',
+		height: '22px',
+		'flex-shrink': 0,
+		border: '3px solid currentColor',
+		'box-sizing': 'border-box',
+		'margin-bottom': '3px',
+	},
+	modeDot: { width: '10px', height: '10px', background: 'currentColor' },
+	modeWords: {
+		flex: 1,
+		'min-width': 0,
+		display: 'flex',
+		'flex-direction': 'column',
+		gap: '3px',
+	},
+	modeLabel: { 'font-size': '20px', 'line-height': 1 },
+	modeAbout: { 'font-size': '13px', opacity: 0.8 },
+	startButton: { width: 'min(100%, 320px)' },
+	/** Where the race is watched: two big buttons side by side. */
+	watch: {
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'center',
+		gap: '6px',
+		width: 'min(100%, 360px)',
+	},
+	watchLabel: { 'font-size': '15px', opacity: 0.8 },
+	watchOptions: {
+		display: 'grid',
+		'grid-template-columns': '1fr 1fr',
+		gap: '10px',
+		width: '100%',
+		padding: '3px',
+		'box-sizing': 'border-box',
+	},
+	watchOption: {
+		display: 'flex',
+		'align-items': 'center',
+		'justify-content': 'center',
+		gap: '8px',
+		padding: '10px 8px 7px',
+		background: 'var(--ink)',
+		color: 'white',
+		border: '3px solid white',
+		'box-shadow': '0 0 0 3px var(--ink)',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '18px',
+	},
+	actions: {
+		display: 'flex',
+		'flex-wrap': 'wrap',
+		'justify-content': 'center',
+		gap: '8px',
+		'margin-top': '4px',
+	},
 	modeButton: {
 		display: 'flex',
 		'flex-direction': 'column',
