@@ -3,7 +3,6 @@
 	"files": {
 		"ignore": [
 			"apps/web/styled-system/**",
-			"apps/run-game/styled-system/**",
 			"**/_generated/**",
 			".nx/**",
 			"**/dist/**",

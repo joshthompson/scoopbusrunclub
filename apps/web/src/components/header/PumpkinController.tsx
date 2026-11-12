@@ -1,5 +1,4 @@
 import { RUNNER_SIZE } from '@/data/runners'
-import { type Scene, createController, createObjectSignal } from '@/engine'
 import { halloweenAssetSize, isHalloween, pumpkinTint } from '@/utils/halloween'
 import {
 	type HeaderPumpkin,
@@ -7,6 +6,7 @@ import {
 	isCarvedPumpkin,
 } from '@/utils/pumpkins'
 import { css } from '@style/css'
+import { type Scene, createController, createObjectSignal } from 'scoopjs'
 import { type Accessor, Show } from 'solid-js'
 import { PumpkinLight, createBlink } from '../PumpkinLight'
 import { addBehindBus, addToPath } from './PathOrder'

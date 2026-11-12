@@ -4,7 +4,7 @@ import {
 	isBalloonMilestone,
 } from '@/data/balloons'
 import { RUNNER_SIZE, findRunnerSignal } from '@/data/runners'
-import { type Scene, createController, createObjectSignal } from '@/engine'
+import { type Scene, createController, createObjectSignal } from 'scoopjs'
 import {
 	type RunnerController,
 	headerState,

@@ -1,6 +1,6 @@
 import { lazy } from 'solid-js'
 import { render } from 'solid-js/web'
-import '../styled-system/styles.css'
+import './reset.css'
 import './styles.css'
 import { App } from './App'
 import { ON_COMPUTER } from './multiplayer/onComputer'

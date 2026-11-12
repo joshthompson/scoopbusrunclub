@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: write
+  # ScoopJS, from GitHub Packages.
+  packages: read
 
 concurrency:
   group: pages
@@ -26,6 +28,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      # GitHub Packages wants a token even to install ScoopJS. This one can
+      # read it because the package lets this repo's Actions in (its settings,
+      # "Manage Actions access").
+      - name: Log in to GitHub Packages
+        run: echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: pnpm install --frozen-lockfile
 

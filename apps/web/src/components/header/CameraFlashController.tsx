@@ -1,5 +1,5 @@
 import flashAsset from '@/assets/misc/flash.png'
-import { createController } from '@/engine'
+import { createController } from 'scoopjs'
 import { createSignal } from 'solid-js'
 
 const FLASH_DURATION = 12 // frames (~480ms at 40ms/frame)

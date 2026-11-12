@@ -1,11 +1,11 @@
+import { isChristmas } from '@/utils/christmas'
+import { furbysOn } from '@/utils/furbys'
 import {
 	type Scene,
 	createConnectedController,
 	createController,
-} from '@/engine'
-import { createObjectSignal } from '@/engine'
-import { isChristmas } from '@/utils/christmas'
-import { furbysOn } from '@/utils/furbys'
+	createObjectSignal,
+} from 'scoopjs'
 import { type JSX, createSignal } from 'solid-js'
 
 import busBackAsset from '@/assets/bus/bus-back.png'

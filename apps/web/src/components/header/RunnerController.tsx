@@ -4,10 +4,10 @@ import {
 	findRunnerSignal,
 	type runners,
 } from '@/data/runners'
-import { type Scene, createController, createObjectSignal } from '@/engine'
 import { ZOMBIE_PACE, ZOMBIE_TINT, isHalloween } from '@/utils/halloween'
 import { imageSize } from '@/utils/imageSize'
 import { css } from '@style/css'
+import { type Scene, createController, createObjectSignal } from 'scoopjs'
 import type { Accessor, JSX } from 'solid-js'
 import { createCameraFlashController } from './CameraFlashController'
 import { createChristmasHatController } from './ChristmasHatController'

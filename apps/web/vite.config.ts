@@ -18,6 +18,10 @@ export default defineConfig({
 		target: 'esnext',
 	},
 	resolve: {
+		// One Solid for the site and ScoopJS (the header's engine) both, even with
+		// ScoopJS linked in from its own repo: two would each have their own
+		// signals, and the header would silently stop moving.
+		dedupe: ['solid-js'],
 		alias: {
 			'@': path.resolve(__dirname, 'src'),
 			'@style': path.resolve(__dirname, 'styled-system'),

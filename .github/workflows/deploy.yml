@@ -10,6 +10,7 @@ jobs:
     uses: ./.github/workflows/deploy-web.yml
     permissions:
       contents: write
+      packages: read
 
   deploy-backend:
     uses: ./.github/workflows/deploy-backend.yml

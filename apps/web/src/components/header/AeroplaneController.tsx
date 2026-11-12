@@ -1,7 +1,7 @@
 import aeroplaneAsset from '@/assets/misc/aeroplane.png'
-import { type Scene, createController, createObjectSignal } from '@/engine'
 import { generateFrames } from '@/utils'
 import { css } from '@style/css'
+import { type Scene, createController, createObjectSignal } from 'scoopjs'
 
 // Sprite sheet: 518×117, two propeller-animation frames of 259×117 side by side.
 // The plane's nose points left (it flies right-to-left) and the tow-line for a

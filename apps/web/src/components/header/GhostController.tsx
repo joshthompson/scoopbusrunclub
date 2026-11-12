@@ -1,5 +1,5 @@
-import { createController, createObjectSignal } from '@/engine'
 import { ghostAssets, halloweenAssetSize, isHalloween } from '@/utils/halloween'
+import { createController, createObjectSignal } from 'scoopjs'
 
 /**
  * The grass just behind the path, which is the floor a ghost rises up through

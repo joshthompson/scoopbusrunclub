@@ -1,7 +1,7 @@
 import hatAsset from '@/assets/christmas/father-christmas-hat.png'
 import { RUNNER_SIZE } from '@/data/runners'
-import { createController } from '@/engine'
 import { isChristmas } from '@/utils/christmas'
+import { createController } from 'scoopjs'
 import type { Accessor } from 'solid-js'
 
 /**

@@ -1,4 +1,4 @@
-import { createController, createObjectSignal } from '@/engine'
+import { createController, createObjectSignal } from 'scoopjs'
 
 import cloud1Asset from '@/assets/misc/cloud1.png'
 import cloud2Asset from '@/assets/misc/cloud2.png'
