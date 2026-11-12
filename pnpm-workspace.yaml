@@ -7,3 +7,5 @@ allowBuilds:
   nx: set this to true or false
 ignoredBuiltDependencies:
   - nx
+minimumReleaseAgeExclude:
+  - '@joshthompson/scoopjs@0.1.0'

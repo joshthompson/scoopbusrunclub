@@ -1,4 +1,4 @@
-import { Key } from '@/engine'
+import { Key } from 'scoopjs'
 import { createSignal } from 'solid-js'
 
 export type Action = 'left' | 'right' | 'up' | 'down'

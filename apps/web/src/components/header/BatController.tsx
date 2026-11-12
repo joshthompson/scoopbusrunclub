@@ -1,6 +1,6 @@
 import batAsset from '@/assets/halloween/bat.png'
-import { createController, createObjectSignal } from '@/engine'
 import { isHalloween } from '@/utils/halloween'
+import { createController, createObjectSignal } from 'scoopjs'
 import type { Accessor } from 'solid-js'
 
 /**

@@ -1,8 +1,8 @@
 import shadowAsset from '@/assets/runners/shadow.png'
 import { RUNNER_SIZE } from '@/data/runners'
-import { type Scene, createController, createObjectSignal } from '@/engine'
 import { furbyAssets } from '@/utils/furbys'
 import { css } from '@style/css'
+import { type Scene, createController, createObjectSignal } from 'scoopjs'
 import { addToPath } from './PathOrder'
 import { type RunnerController, isStandingState } from './RunnerController'
 

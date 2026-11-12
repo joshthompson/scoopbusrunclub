@@ -1,5 +1,4 @@
-import { Scene } from '@/engine'
-import { Canvas } from '@/engine/components'
+import { Canvas, Scene } from 'scoopjs'
 import { type JSX, Show } from 'solid-js'
 import {
 	HITBOX_HALF_WIDTH,

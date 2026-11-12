@@ -1,4 +1,4 @@
-import type { Controller, ControllerBaseType, Scene } from '@/engine'
+import type { Controller, ControllerBaseType, Scene } from 'scoopjs'
 import type { Accessor } from 'solid-js'
 
 /**

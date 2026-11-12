@@ -1,6 +1,6 @@
 import shadowAsset from '@/assets/runners/shadow.png'
 import { RUNNER_SIZE, findRunnerSignal } from '@/data/runners'
-import { createController } from '@/engine'
+import { createController } from 'scoopjs'
 import { type RunnerController, isStandingState } from './RunnerController'
 
 export function createShadowController(id: string, runner: RunnerController) {

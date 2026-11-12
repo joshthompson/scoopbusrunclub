@@ -47,6 +47,7 @@ import { seasonalAsset } from '@/utils/seasons'
 import type { WeatherType } from '@/utils/weather'
 import { A, useNavigate } from '@solidjs/router'
 import { css, cx } from '@style/css'
+import { Canvas, Scene } from 'scoopjs'
 import {
 	Show,
 	createEffect,
@@ -55,8 +56,6 @@ import {
 	onCleanup,
 	onMount,
 } from 'solid-js'
-import { Scene } from '../../engine'
-import { Canvas } from '../../engine/components'
 import { createAeroplaneController, flyAeroplane } from './AeroplaneController'
 import {
 	createBalloonControllers,
@@ -616,6 +615,9 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		width: sceneWidth,
 		height: HEADER_HEIGHT,
 		images: [],
+		// Every sprite in the header in its `-halloween`, `-christmas` or `-snow`
+		// look while that's on.
+		resolveAsset: seasonalAsset,
 		afterEnterFrames({ $scene }) {
 			const mouse = mousePosition()
 			const pumpkin = pumpkinAt($scene, mouse)?.data.id

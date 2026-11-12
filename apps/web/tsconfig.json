@@ -8,7 +8,9 @@
 			"@/*": ["./src/*"],
 			"@style/*": ["./styled-system/*"],
 			"@assets/*": ["./src/assets/*"],
-			"@shared/*": ["../../libs/shared/*"]
+			"@shared/*": ["../../libs/shared/*"],
+			"solid-js": ["../../node_modules/solid-js"],
+			"solid-js/*": ["../../node_modules/solid-js/*"]
 		}
 	},
 	"include": ["src", "misc.d.ts"]

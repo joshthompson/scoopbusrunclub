@@ -6,7 +6,7 @@ import {
 	type RunnerData,
 	skeletonRunners,
 } from '@/data/runners'
-import type { Scene } from '@/engine'
+import type { Scene } from 'scoopjs'
 import { type Accessor, createSignal } from 'solid-js'
 import { addToPath } from './PathOrder'
 import {

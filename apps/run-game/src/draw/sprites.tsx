@@ -6,12 +6,12 @@ import pumpkin5Asset from '@/assets/halloween/pumpkin5.png'
 import tombstoneAsset from '@/assets/halloween/tombstone.png'
 import rockAsset from '@/assets/misc/rock1.png'
 import { type RunnerName, runners } from '@/data/runners'
+import { imageSize } from '@/utils/imageSize'
 import {
 	createConnectedController,
 	createController,
 	createObjectSignal,
-} from '@/engine'
-import { imageSize } from '@/utils/imageSize'
+} from 'scoopjs'
 import { For, Index, type JSX, Show, createSignal } from 'solid-js'
 import barcodeAsset from '../assets/boosts/barcode.png'
 // The website's bus, turned round to chase to the right.

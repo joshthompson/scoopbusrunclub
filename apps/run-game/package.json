@@ -8,17 +8,17 @@
 		"dev:phones": "pnpm prepare-web && PHONES=1 vite",
 		"build": "pnpm prepare-web && vite build",
 		"serve": "vite preview",
-		"prepare-web": "tsx ../web/scripts/gen-custom-runner-pixels.ts && panda codegen --clean && panda cssgen",
+		"prepare-web": "tsx ../web/scripts/gen-custom-runner-pixels.ts",
 		"extract-profile": "tsx scripts/extract-profile.ts"
 	},
 	"dependencies": {
 		"jsqr": "^1.4.0",
+		"scoopjs": "npm:@joshthompson/scoopjs@^0.1.0",
 		"solid-js": "^1.9.5",
 		"trystero": "^0.23.1",
 		"uqr": "^0.1.3"
 	},
 	"devDependencies": {
-		"@pandacss/dev": "^1.8.2",
 		"@types/pngjs": "^6.0.5",
 		"@vitejs/plugin-basic-ssl": "^2.3.0",
 		"pngjs": "^7.0.0",

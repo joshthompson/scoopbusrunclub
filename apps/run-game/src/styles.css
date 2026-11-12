@@ -21,7 +21,7 @@
 	--overlay-white-10: rgba(255, 255, 255, 0.1);
 	--ink: #0f1f29;
 	--bus-red: #e0382f;
-	/* The engine's modal backdrop, which is what dims the game while it's paused. */
+	/* What dims the game while it's paused (see `RaceCanvas`). */
 	--overlay-black-50: rgba(15, 31, 41, 0.5);
 	--font-pixel: "Remi Pop", system-ui, sans-serif;
 }
@@ -305,12 +305,12 @@ button {
 }
 
 /*
- * The engine shades its canvas while a race is paused; but the race's
+ * ScoopJS shades its canvas while a race is paused; but the race's
  * canvas moves with the camera, zoomed out and looking up, so its shade
  * misses part of the screen. `RaceCanvas` shades the whole screen instead.
  */
-[data-game-scene="run-game"] > .bg_var\(--overlay-black-50\) {
-	background: transparent;
+[data-game-scene="run-game"] {
+	--scoopjs-modal-backdrop: transparent;
 }
 
 /* Wind streaking by, up high over the sea: see `SeaFront`. */
