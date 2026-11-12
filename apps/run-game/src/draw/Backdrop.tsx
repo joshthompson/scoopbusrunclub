@@ -284,6 +284,9 @@ function nearOf(
 	}
 }
 
+/** How fast a horizon's textured field goes by: slower than the path, faster than the skyline. */
+const FIELD_TEXTURE_PARALLAX = 0.5
+
 /**
  * The sky and the header's scenery bands behind the course, each scrolling
  * slower the further back it is.
@@ -361,7 +364,10 @@ export function Backdrop(props: { world: View }) {
 					...layer,
 					top: `${HORIZON - 40 + SKYLINE_HEIGHT - 1}px`,
 					bottom: 0,
-					background: 'var(--grass-green)',
+					'background-color': 'var(--grass-green)',
+					'background-image': horizon.field && `url("${horizon.field}")`,
+					'background-position-x':
+						horizon.field && scroll(FIELD_TEXTURE_PARALLAX),
 				}}
 			/>
 			<For each={horizon.nearer ?? []}>

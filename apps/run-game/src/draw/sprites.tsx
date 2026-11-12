@@ -98,7 +98,7 @@ import { customRunners } from '../runners/customRunners'
 import { guests } from '../runners/guests'
 import type { Playable } from '../runners/playable'
 import { MEMBERS } from '../runners/playable'
-import { SKELETON_FILTER, zombieSprite } from '../runners/skeleton'
+import { zombieSprite } from '../runners/skeleton'
 import { play } from '../sfx'
 import { WallBricks } from './Backdrop'
 import { Bubble } from './Bubble'
@@ -665,7 +665,6 @@ function createPacer(world: World, p: Pacer) {
 				$.setRotation(p.spin * 14)
 				$.setState('pause')
 				$.setStyle({
-					filter: p.skeleton ? SKELETON_FILTER : undefined,
 					'z-index': SCOOPED_OVER,
 				})
 				return
@@ -695,7 +694,6 @@ function createPacer(world: World, p: Pacer) {
 				$.setState('pause')
 				$.setStyle({
 					opacity: p.dazed > 0 && p.dazed % 8 < 4 ? '0.4' : '1',
-					filter: p.skeleton ? SKELETON_FILTER : undefined,
 				})
 				return
 			}
@@ -727,7 +725,6 @@ function createPacer(world: World, p: Pacer) {
 			// Flashing while they're dazed, and can't be bounced on again.
 			$.setStyle({
 				opacity: p.dazed > 0 && p.dazed % 8 < 4 ? '0.4' : '1',
-				filter: p.skeleton ? SKELETON_FILTER : undefined,
 				// Off the cliff into the sea: gone under.
 				visibility:
 					sea && !p.scooped && p.feetY > sea.level + 30 ? 'hidden' : undefined,

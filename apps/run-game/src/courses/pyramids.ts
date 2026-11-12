@@ -7,10 +7,11 @@ import sphinxHead from '../assets/sphinx/head.png'
 import sphinxPaw from '../assets/sphinx/paw.png'
 import sarcophagus from '../assets/sphinx/sarcophagus.png'
 import { START_X } from '../game/constants'
-import { PATH_BACK, PATH_FRONT, STAND_HEIGHT } from '../game/constants'
+import { PATH_BACK, PATH_FRONT, STAND_HEIGHT, VERGE } from '../game/constants'
 import { PYRAMIDS_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
 import { duckPost } from './kit/duckSigns'
+import { SAND_FAR_RIPPLES, SAND_RIPPLES, SAND_TRACK } from './kit/sand'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
 import type { Cave, Course, CourseDefinition } from './types'
@@ -348,7 +349,21 @@ export const pyramids: CourseDefinition = {
 			far: pyramidsFar,
 			near: pyramidsNear,
 			fill: '#ecc985',
+			// The sand on back to the dunes: rippled, further off.
+			field: SAND_FAR_RIPPLES,
 		},
+		// Rippled sand either side, and the path trodden flat through it.
+		ground: [
+			[-PATH_BACK - VERGE, 'var(--grass-green)'],
+			[-PATH_BACK - VERGE, 'url(#sand-ripples)'],
+			[-PATH_BACK, 'var(--dirt-dark-brown)'],
+			[-PATH_BACK + 5, 'var(--dirt-brown)'],
+			[-PATH_BACK + 5, 'url(#sand-track)'],
+			[PATH_FRONT, 'var(--grass-dark-green)'],
+			[PATH_FRONT + 2, 'var(--grass-green)'],
+			[PATH_FRONT + 2, 'url(#sand-ripples)'],
+		],
+		groundDefs: SAND_RIPPLES + SAND_TRACK,
 		horizonTrees: false,
 		pyramids: {
 			feet: PYRAMIDS.map((p) => p.feet),

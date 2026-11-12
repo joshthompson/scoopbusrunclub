@@ -11,6 +11,7 @@ import { DRAWN_FROM } from '../game/groundColumns'
 import type { World } from '../game/world'
 import { Backdrop, CaveCover, Ground, HorizonTrees } from './Backdrop'
 import { Fog } from './Fog'
+import { createLongJump } from './LongJump'
 import { SeaFront } from './Sea'
 import { Snow } from './Snow'
 import {
@@ -119,6 +120,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				createParkrunSign(world, START_X - 190),
 				...createKmSigns(world),
 				...createWarnings(world),
+				// A running track's long jump pit, near the finish.
+				...createLongJump(world),
 				...createBanner(world, world.terrain.finishX, 'FINISH'),
 				createRunDirector(world),
 				...createPlatforms(world),

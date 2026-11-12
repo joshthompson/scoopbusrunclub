@@ -144,8 +144,15 @@ export interface Body {
 	grindTicks: number
 	/** Ticks left lying in the snow after a wipeout. */
 	wipeout: number
-	/** Where they took off from, if it was the ski jump: for how far they flew. */
+	/**
+	 * Where they took off from, if it was the ski jump, or the long jump's
+	 * board: for how far they flew.
+	 */
 	launchX?: number
+	/** Had their go at the long jump, this course: one each. */
+	longJumped?: boolean
+	/** Where they landed in its sand, if they did: their mark in it. */
+	longJumpMark?: number
 }
 
 /**

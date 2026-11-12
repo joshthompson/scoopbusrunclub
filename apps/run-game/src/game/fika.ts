@@ -61,6 +61,10 @@ export type FikaItem =
 	| 'waffleTower'
 	/** Up on the waffle hut's roof, for the first who gets up there: a bowl of tomato soup. */
 	| 'tomatoSoup'
+	/** Kristineberg's: not fika, but what's had at the side of a running track. */
+	| 'energyDrink'
+	| 'sportsGel'
+	| 'banana'
 
 export const FIKA_ITEMS: FikaItem[] = [
 	'coffee',
@@ -155,6 +159,14 @@ export const SLOPES_FIKA: FikaItem[] = [
 	'coffee',
 ]
 
+/** Kristineberg's, at the side of the track: energy drinks, sports gels and bananas. */
+export const KRISTINEBERG_FIKA: FikaItem[] = [
+	'energyDrink',
+	'banana',
+	'sportsGel',
+	'banana',
+]
+
 /** In Turku: a Karelian pie, a coffee, salmiakki. */
 export const TURKU_FIKA: FikaItem[] = ['karelianPie', 'coffee', 'salmiakki']
 
@@ -201,4 +213,7 @@ export const FIKA_SIZE: Record<FikaItem, { width: number; height: number }> = {
 	pepparkaka: { width: 11 * CELL, height: 10 * CELL },
 	waffleTower: { width: 14 * CELL, height: 18 * CELL },
 	tomatoSoup: { width: 13 * CELL, height: 11 * CELL },
+	energyDrink: { width: 8 * CELL, height: 13 * CELL },
+	sportsGel: { width: 7 * CELL, height: 12 * CELL },
+	banana: { width: 12 * CELL, height: 9 * CELL },
 }

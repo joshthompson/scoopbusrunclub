@@ -92,6 +92,7 @@ import {
 } from './flyers'
 import { scoopFurbies, stepFurbies } from './furbies'
 import { atSea, glidingBox, stepGliding } from './gliders'
+import { callOut, landLongJump, longJumpTakeOff, sandDrag } from './longJump'
 import { mummyAt } from './mummies'
 import { scoopPack, stepPack } from './pack'
 import { landingOn, platformAt, platformMove } from './platforms'
@@ -547,11 +548,16 @@ function stepRunner(world: World, racer: Racer) {
 			if (b.squashed > 0 && Math.abs(b.vx) > SQUASHED_TOP_SPEED) b.vx *= 0.95
 		}
 
+		// Through a long jump's sand: slowed down in it.
+		sandDrag(world, b)
+
 		if (up && !b.wasUp && !low) {
 			// On a Ride, it leaps, with them on its back; otherwise, a jump.
 			jump(b, b.mount > 0 ? RIDE_LEAP : JUMP_SPEED)
 			b.ducking = false
 			b.on = undefined
+			// Off the long jump's board, to be measured.
+			if (racing) longJumpTakeOff(world, b)
 		}
 	} else {
 		// Ducking off a Ride, even with it in the air: from its saddle, falling.
@@ -582,6 +588,7 @@ function stepRunner(world: World, racer: Racer) {
 	const from = b.x
 	b.x = Math.max(LEFT_EDGE, b.x + b.vx)
 	if (racing) {
+		callOut(world, b, from)
 		hitWall(world, racer, from)
 		hitTower(world, racer, from)
 		hitRockFace(world, racer, from)
@@ -640,6 +647,8 @@ function stepRunner(world: World, racer: Racer) {
 			fall(world, racer)
 	}
 	if (b.grounded) b.floor = b.feetY
+	// Down from the long jump: how far.
+	if (b.grounded && b.launchX !== undefined) landLongJump(world, racer)
 }
 
 /** A Pumpkin knocked off someone's head, flying. */

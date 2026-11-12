@@ -10,7 +10,7 @@ import {
 import { COURSES } from '../courses'
 import type { Course } from '../courses/types'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
-import { PX_PER_M, START_X } from '../game/constants'
+import { PX_PER_M, START_X, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { POPUP_TICKS, onScreen } from '../game/step'
 import { type World, createWorld } from '../game/world'
 import { type Action, anyControls, setTouch, touchScreen } from '../input'
@@ -30,6 +30,7 @@ import { record, today, topScore } from '../saved/highScores'
 import { named } from '../saved/identity'
 import { reach } from '../saved/progress'
 import { play } from '../sfx'
+import { ArrowPad } from '../ui/ArrowPad'
 import { Stage } from '../ui/Stage'
 import { IdentityEditor } from './IdentityEditor'
 import { PauseMenu, SOUND_ITEMS } from './PauseMenu'
@@ -319,59 +320,100 @@ export function Game(props: {
 	window.addEventListener('keydown', onKey)
 	onCleanup(() => window.removeEventListener('keydown', onKey))
 
+	const padUnder = createPadUnder()
+	const press = (action: Action, down: boolean) => {
+		if (down) navigator.vibrate?.(8)
+		setTouch(action, down)
+	}
+	// Gone mid-press, to the menu, say: nothing left held for the next race.
+	onCleanup(() => {
+		for (const action of ACTIONS) setTouch(action, false)
+	})
+
 	return (
-		<Stage>
-			<RaceCanvas
-				world={world}
-				scene={scene}
-				overlay={
-					<>
-						<Hud
-							world={world}
-							mode={mode}
-							actions={actions()}
-							picked={picked()}
-							onPick={setPicked}
-							placing={placing()}
-							online={offer()}
-							checkingOnline={checkingOnline()}
-							onPause={() => canPause() && setPaused(true)}
-						/>
-						<Show when={naming()}>
-							<div style={styles.naming}>
-								<IdentityEditor
-									runner={props.runner}
-									saveLabel="Save and send"
-									onSave={() => {
-										setNaming(false)
-										const ready = offer()
-										if (ready?.state === 'ready') send(ready.scores)
-									}}
-									onCancel={() => setNaming(false)}
-								/>
-							</div>
-						</Show>
-						<Show when={paused()}>
-							<PauseMenu
-								groups={[
-									[
-										{ label: 'Resume', choose: resume },
-										{ label: 'Restart', choose: props.onRetry },
-									],
-									SOUND_ITEMS,
-									[
-										{ label: 'Change course', choose: props.onCourses },
-										{ label: 'Change runner', choose: props.onQuit },
-									],
-									[{ label: 'Main menu', choose: props.onMenu }],
-								]}
+		<div style={styles.screen}>
+			<Stage style={padUnder() ? styles.raceAbovePad : undefined}>
+				<RaceCanvas
+					world={world}
+					scene={scene}
+					overlay={
+						<>
+							<Hud
+								world={world}
+								mode={mode}
+								actions={actions()}
+								picked={picked()}
+								onPick={setPicked}
+								placing={placing()}
+								online={offer()}
+								checkingOnline={checkingOnline()}
+								onPause={() => canPause() && setPaused(true)}
+								buttons={!padUnder()}
 							/>
-						</Show>
-					</>
-				}
-			/>
-		</Stage>
+							<Show when={naming()}>
+								<div style={styles.naming}>
+									<IdentityEditor
+										runner={props.runner}
+										saveLabel="Save and send"
+										onSave={() => {
+											setNaming(false)
+											const ready = offer()
+											if (ready?.state === 'ready') send(ready.scores)
+										}}
+										onCancel={() => setNaming(false)}
+									/>
+								</div>
+							</Show>
+							<Show when={paused()}>
+								<PauseMenu
+									groups={[
+										[
+											{ label: 'Resume', choose: resume },
+											{ label: 'Restart', choose: props.onRetry },
+										],
+										SOUND_ITEMS,
+										[
+											{ label: 'Change course', choose: props.onCourses },
+											{ label: 'Change runner', choose: props.onQuit },
+										],
+										[{ label: 'Main menu', choose: props.onMenu }],
+									]}
+								/>
+							</Show>
+						</>
+					}
+				/>
+			</Stage>
+			<Show when={padUnder()}>
+				<div style={styles.padRoom}>
+					<ArrowPad press={press} />
+				</div>
+			</Show>
+		</div>
 	)
+}
+
+const ACTIONS: Action[] = ['left', 'right', 'up', 'down']
+
+/**
+ * Room under the race for the buttons, at least, on a phone held upright:
+ * with the notch and the home bar's room taken off too.
+ */
+const PAD_ROOM = 220
+
+/**
+ * Whether the buttons go under the race, rather than over it: on a touch
+ * screen with room under it, as on a phone held upright. Held sideways,
+ * the race fills the screen and they're over it.
+ */
+function createPadUnder() {
+	const roomUnder = () =>
+		window.innerHeight - (window.innerWidth * VIEW_HEIGHT) / VIEW_WIDTH
+	const [room, setRoom] = createSignal(roomUnder())
+	const resize = () => setRoom(roomUnder())
+	window.addEventListener('resize', resize)
+	onCleanup(() => window.removeEventListener('resize', resize))
+	return () => touchScreen() && room() >= PAD_ROOM
 }
 
 /** The keys that move between the summary's buttons, and which way. */
@@ -397,6 +439,8 @@ function Hud(props: {
 	/** Still finding out whether there's anything to send online. */
 	checkingOnline?: boolean
 	onPause: () => void
+	/** The on-screen buttons, over the race: not if they're under it. */
+	buttons: boolean
 }) {
 	const { world } = props
 	const runner = () => world.runner
@@ -488,7 +532,9 @@ function Hud(props: {
 				)}
 			</Show>
 
-			<TouchControls />
+			<Show when={props.buttons}>
+				<TouchControls />
+			</Show>
 		</div>
 	)
 }
@@ -524,6 +570,30 @@ function TouchControls() {
 }
 
 const styles = {
+	/** The race, and on a phone held upright, the buttons under it. */
+	screen: {
+		width: '100%',
+		height: '100%',
+		display: 'flex',
+		'flex-direction': 'column',
+	},
+	/** As wide as the screen, at the top, out from under the notch. */
+	raceAbovePad: {
+		flex: 'none',
+		height: `calc(100vw * ${VIEW_HEIGHT / VIEW_WIDTH})`,
+		'margin-top': 'env(safe-area-inset-top)',
+	},
+	/** The rest of the screen, under the race: as on a phone in Remote Play. */
+	padRoom: {
+		flex: 1,
+		'min-height': 0,
+		display: 'flex',
+		'flex-direction': 'column',
+		background:
+			'linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom))',
+		'border-top': '4px solid var(--ink)',
+		'padding-bottom': 'env(safe-area-inset-bottom)',
+	},
 	/** Over the summary, choosing a name to send a score under. */
 	naming: {
 		position: 'absolute',

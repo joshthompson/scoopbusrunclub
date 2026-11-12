@@ -5,9 +5,10 @@ import oldTownNear from '../assets/horizons/old-town-near.png'
 import katarinahissen from '../assets/scenery/katarinahissen.png'
 import lamp from '../assets/scenery/lamp.png'
 import quayWall from '../assets/scenery/quay-wall.png'
-import { START_X } from '../game/constants'
+import { PATH_BACK, PATH_FRONT, START_X, VERGE } from '../game/constants'
 import { GAMLA_STAN_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
+import { GAMLA_STAN_COBBLES, GAMLA_STAN_SIDE_COBBLES } from './kit/cobbles'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
 import type { Boost, Course, CourseDefinition, Obstacle } from './types'
@@ -104,13 +105,17 @@ const MIX: Record<Stretch, [number, number, number, number]> = {
 }
 
 /**
- * Cyclists on Guldbron, coming over it from Slussen towards you, round and
- * round from Slussen to the far side of it: always on their way.
+ * Cyclists on Guldbron, coming over it from Slussen towards you, and back
+ * and forth between Slussen and the far side of it, turning round at either
+ * end, as in Turku: always on their way, never vanishing.
  */
-const CYCLE_LOOP: [number, number] = [BRIDGE - 400, BRIDGE_END + 500]
+const CYCLE_SHUTTLE: [number, number] = [BRIDGE - 400, BRIDGE_END + 500]
 const CYCLISTS = [0, 0.25, 0.5, 0.75].map(
-	(along) => CYCLE_LOOP[0] + (CYCLE_LOOP[1] - CYCLE_LOOP[0]) * along,
+	(along) => CYCLE_SHUTTLE[0] + (CYCLE_SHUTTLE[1] - CYCLE_SHUTTLE[0]) * along,
 )
+
+/** The cobbles, pushed down out of sight where the path's over the bridge. */
+const offBridge = (x: number) => (x > BRIDGE && x < BRIDGE_END ? 1000 : 0)
 
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	const random = seeded(1252)
@@ -163,7 +168,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 			(x): Obstacle => ({
 				kind: 'cyclist',
 				x: Math.round(x),
-				loop: CYCLE_LOOP,
+				shuttle: CYCLE_SHUTTLE,
 			}),
 		),
 	)
@@ -218,6 +223,21 @@ export const gamlaStan: CourseDefinition = {
 			fill: '#b98a5a',
 			spires: oldTownChurches,
 		},
+		// Plain grey, cobbles only hinted at here and there: paler either side, a
+		// kerb, and the street down the middle.
+		ground: [
+			[-PATH_BACK - VERGE, 'var(--grass-green)'],
+			[-PATH_BACK - VERGE, 'url(#gamla-stan-side-cobbles)'],
+			[-PATH_BACK, 'var(--grass-darker-green)'],
+			// Guldbron's deck, plain: no cobbles over the bridge.
+			[-PATH_BACK + 2, 'var(--dirt-brown)'],
+			[-PATH_BACK + 2, 'url(#gamla-stan-cobbles)', false, offBridge],
+			[PATH_FRONT, 'var(--grass-darker-green)'],
+			[PATH_FRONT + 2, 'var(--grass-dark-green)'],
+			[PATH_FRONT + 4, 'var(--grass-green)'],
+			[PATH_FRONT + 4, 'url(#gamla-stan-side-cobbles)'],
+		],
+		groundDefs: GAMLA_STAN_COBBLES + GAMLA_STAN_SIDE_COBBLES,
 		// Guldbron: gold underneath, over Riddarfjärden's water.
 		bridge: {
 			from: BRIDGE,

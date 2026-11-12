@@ -38,6 +38,7 @@ import {
 	waffle,
 	waffleTower,
 } from '../../courses/kit/slopesFika'
+import { banana, energyDrink, sportsGel } from '../../courses/kit/stadiumFika'
 import { FIKA_SIZE, type FikaItem } from '../../game/fika'
 import { PixelArt } from '../PixelArt'
 
@@ -173,6 +174,9 @@ const ART: Record<FikaItem, string> = {
 	pepparkaka,
 	waffleTower,
 	tomatoSoup,
+	energyDrink,
+	sportsGel,
+	banana,
 }
 
 /** A fika item, at its size. */

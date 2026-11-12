@@ -9,6 +9,7 @@ import {
 } from 'solid-js'
 import { COURSES } from '../courses'
 import type { Course } from '../courses/types'
+import { touchScreen } from '../input'
 import type { Playable } from '../runners/playable'
 import { type TableId, table, topScore } from '../saved/highScores'
 import { isUnlocked } from '../saved/progress'
@@ -70,6 +71,14 @@ export function CourseSelect(props: {
 		play('move')
 		props.onSelect(choice)
 	}
+	/**
+	 * A row clicked: with a mouse, that one's run. Tapped, on a touch screen,
+	 * it's only picked, to see it first; tapped again, or Run, and it's run.
+	 */
+	const tap = (choice: RunChoice) => {
+		if (touchScreen() && choice !== props.selected) select(choice)
+		else choose(choice)
+	}
 	const back = () => {
 		play('back')
 		props.onBack()
@@ -112,8 +121,8 @@ export function CourseSelect(props: {
 				...(open(choice) ? {} : styles.locked),
 				...(props.selected === choice ? styles.rowSelected : {}),
 			}}
-			onMouseEnter={() => select(choice)}
-			onClick={() => choose(choice)}
+			onMouseEnter={() => !touchScreen() && select(choice)}
+			onClick={() => tap(choice)}
 		>
 			{content}
 		</button>
@@ -207,7 +216,13 @@ export function CourseSelect(props: {
 							</div>
 						}
 					>
-						<div style={styles.go}>Enter to run!</div>
+						<button
+							type="button"
+							style={styles.go}
+							onClick={() => choose(props.selected)}
+						>
+							{touchScreen() ? 'Run ▶' : 'Enter to run!'}
+						</button>
 					</Show>
 				</div>
 
@@ -231,7 +246,9 @@ export function CourseSelect(props: {
 			</Panel>
 
 			<div style={styles.hint}>
-				↑ ↓ to pick · Enter to run · Esc to change runner
+				{touchScreen()
+					? 'Tap a run to see it · tap Run ▶ to start'
+					: '↑ ↓ to pick · Enter to run · Esc to change runner'}
 			</div>
 		</div>
 	)
@@ -508,16 +525,19 @@ const styles = {
 		'font-size': '14px',
 		opacity: 0.7,
 	},
+	/** Run! Big enough for a thumb, and pulsing, so it's plain it's what to press. */
 	go: {
 		position: 'absolute',
 		right: '10px',
 		bottom: '10px',
-		padding: '8px 14px 4px',
+		padding: '12px 22px 8px',
 		background: '#ffd23f',
 		color: 'var(--ink)',
-		'font-size': '20px',
+		border: '3px solid var(--ink)',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '26px',
 		'box-shadow': '4px 4px 0 #b33a2a',
-		animation: 'blink 1.2s steps(2) infinite',
+		animation: 'go-pulse 1.2s ease-in-out infinite',
 	},
 	lockedNote: {
 		'font-family': '"Cabin", sans-serif',

@@ -1,4 +1,5 @@
 import { For, type JSX, Show, createEffect, onCleanup } from 'solid-js'
+import { touchScreen } from '../input'
 import { type CustomRunner, customRunners } from '../runners/customRunners'
 import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
 import { play } from '../sfx'
@@ -44,6 +45,17 @@ export function CharacterSelect(props: {
 		play('select')
 		if (entry.kind === 'new') props.onEdit()
 		else props.onPick(entry.runner)
+	}
+	/**
+	 * A card clicked: with a mouse, that one's run as. Tapped, on a touch
+	 * screen, they're only picked, to see them first; tapped again, or Run,
+	 * and they're run as.
+	 */
+	const tap = (entry: Entry) => {
+		if (touchScreen() && entry.id !== selected()?.id) {
+			play('move')
+			props.onSelect(entry.id)
+		} else choose(entry)
 	}
 
 	const cards: HTMLElement[] = []
@@ -155,14 +167,29 @@ export function CharacterSelect(props: {
 								</div>
 								<div style={styles.previewTag}>
 									{runner().custom
-										? 'Your runner · E to change'
+										? touchScreen()
+											? 'Your runner · Edit to change'
+											: 'Your runner · E to change'
 										: 'Club member'}
 								</div>
 							</>
 						)
 					}}
 				</Show>
-				<div style={styles.go}>Enter to run!</div>
+				<button
+					type="button"
+					style={styles.go}
+					onClick={() => {
+						const entry = selected()
+						if (entry) choose(entry)
+					}}
+				>
+					{touchScreen()
+						? selected()?.kind === 'new'
+							? 'Make ▶'
+							: 'Run ▶'
+						: 'Enter to run!'}
+				</button>
 			</Panel>
 
 			<div
@@ -192,12 +219,12 @@ export function CharacterSelect(props: {
 											...(isSelected() ? styles.cardSelected : {}),
 										}}
 										onMouseEnter={() => {
-											if (!isSelected()) {
+											if (!isSelected() && !touchScreen()) {
 												play('move')
 												props.onSelect(entry.id)
 											}
 										}}
-										onClick={() => choose(entry)}
+										onClick={() => tap(entry)}
 									>
 										<Show
 											when={runner}
@@ -255,8 +282,9 @@ export function CharacterSelect(props: {
 			</div>
 
 			<div style={styles.hint}>
-				Arrows to pick · Enter to run · E to change your runner · Esc for the
-				menu
+				{touchScreen()
+					? 'Tap a runner to see them · tap Run ▶ to start'
+					: 'Arrows to pick · Enter to run · E to change your runner · Esc for the menu'}
 			</div>
 		</div>
 	)
@@ -324,14 +352,17 @@ const styles = {
 		opacity: 0.8,
 		'white-space': 'nowrap',
 	},
+	/** Run! Big enough for a thumb, and pulsing, so it's plain it's what to press. */
 	go: {
 		'margin-top': 'auto',
-		padding: '8px 14px 4px',
+		padding: '12px 22px 8px',
 		background: '#ffd23f',
 		color: 'var(--ink)',
-		'font-size': '20px',
+		border: '3px solid var(--ink)',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '24px',
 		'box-shadow': '4px 4px 0 #b33a2a',
-		animation: 'blink 1.2s steps(2) infinite',
+		animation: 'go-pulse 1.2s ease-in-out infinite',
 	},
 	gridFrame: {
 		position: 'absolute',

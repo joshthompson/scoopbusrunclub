@@ -9,7 +9,13 @@ import {
 } from '../../game/groundColumns'
 import type { Gap, Terrain } from '../../game/terrain'
 import type { Scenery } from '../types'
-import { type PixelRect, pixelCircle, svgUrl } from './pixelArt'
+import {
+	type PixelRect,
+	pixelCircle,
+	rectsMarkup,
+	svgUrl,
+	tile,
+} from './pixelArt'
 import { seeded } from './seeded'
 
 /**
@@ -17,54 +23,6 @@ import { seeded } from './seeded'
  * brick, weeds growing out of the joints; its walkway's paving; the bushes
  * crowding round its foot; and the wooded hillside behind it.
  */
-
-/**
- * A pattern, drawn: its rects wrapped round wherever they go off its edges,
- * so it tiles. As a `<pattern>` for the Ground to fill with; or tiled out
- * over a bit of the world, for a picture of its own to line up with it.
- */
-function tile(width: number, height: number) {
-	const rects: PixelRect[] = []
-	const rect = (x: number, y: number, w: number, h: number, fill: string) => {
-		for (const dx of x + w > width ? [0, -width] : x < 0 ? [0, width] : [0])
-			for (const dy of y + h > height ? [0, -height] : [0])
-				rects.push([x + dx, y + dy, w, h, fill])
-	}
-	return {
-		rect,
-		pattern: (id: string) =>
-			`<pattern id="${id}" patternUnits="userSpaceOnUse" width="${width}" height="${height}">${rectsMarkup(rects)}</pattern>`,
-		/**
-		 * Its rects over `left` to `right`, `top` to `bottom`, tiled out from
-		 * 0, 0 as the Ground's is, each cut to its tile as a pattern's are.
-		 */
-		over(left: number, top: number, right: number, bottom: number) {
-			const out: PixelRect[] = []
-			for (let tx = Math.floor(left / width) * width; tx < right; tx += width)
-				for (
-					let ty = Math.floor(top / height) * height;
-					ty < bottom;
-					ty += height
-				)
-					for (const [x, y, w, h, fill] of rects) {
-						const x0 = Math.max(tx + Math.max(0, x), left)
-						const y0 = Math.max(ty + Math.max(0, y), top)
-						const x1 = Math.min(tx + Math.min(width, x + w), right)
-						const y1 = Math.min(ty + Math.min(height, y + h), bottom)
-						if (x1 > x0 && y1 > y0) out.push([x0, y0, x1 - x0, y1 - y0, fill])
-					}
-			return out
-		},
-	}
-}
-
-const rectsMarkup = (rects: PixelRect[]) =>
-	rects
-		.map(
-			([x, y, w, h, fill]) =>
-				`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`,
-		)
-		.join('')
 
 /** The bricks' colours: grey, and here and there the yellow of the older stone. */
 const BRICKS = [

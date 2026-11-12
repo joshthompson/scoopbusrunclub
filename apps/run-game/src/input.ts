@@ -163,5 +163,28 @@ window.addEventListener('keydown', (event) => {
 	if (GAME_KEYS.has(event.key) && !typing) event.preventDefault()
 })
 
+/** Two taps closer together than this, in ms, would zoom in on a phone. */
+const DOUBLE_TAP_MS = 350
+let lastTap = Number.NEGATIVE_INFINITY
+// A phone's Safari zooms in on two quick taps whatever `touch-action` says,
+// and on a pinch: two thumbs on the buttons at once. Neither, then. The
+// second tap's click is stopped with it, so a button tapped quickly after
+// another is clicked here instead, and doesn't go missing.
+document.addEventListener(
+	'touchend',
+	(event) => {
+		const target = event.target as Element | null
+		if (target?.closest('input, textarea, select')) return
+		if (event.timeStamp - lastTap < DOUBLE_TAP_MS && event.cancelable) {
+			event.preventDefault()
+			target?.closest<HTMLElement>('button, a, label')?.click()
+		}
+		lastTap = event.timeStamp
+	},
+	{ passive: false },
+)
+for (const gesture of ['gesturestart', 'gesturechange'])
+	document.addEventListener(gesture, (event) => event.preventDefault())
+
 /** Played on a touch screen, with no keys: on-screen buttons, and a pause button. */
 export const touchScreen = () => window.matchMedia('(pointer: coarse)').matches

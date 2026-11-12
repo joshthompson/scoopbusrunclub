@@ -317,6 +317,12 @@ export interface CourseLook {
 		/** Spires and towers rising out of the far band's roofs, behind it: a strip as wide as you like. */
 		spires?: string
 		/**
+		 * The ground from the near band on down behind the path, textured: an
+		 * image repeated over the grass's colour, going by slower than the path
+		 * does, it being further off. Cobbles, rippled sand.
+		 */
+		field?: string
+		/**
 		 * More bands, nearer still, each lower down and going by faster than
 		 * the last, `height` tall, and its colour on down below it: so the
 		 * view's full right down to the course.
@@ -781,6 +787,13 @@ export interface Course {
 	 * how far they flew is measured.
 	 */
 	skiJump?: { takeoff: number; k: number }
+	/**
+	 * A long jump pit across the track, near the finish: its take-off
+	 * `board`, and the sand just past it (see `longJump`). Jumped off the
+	 * board, how far is measured, for points; run through, the sand slows
+	 * you down.
+	 */
+	longJump?: { board: number }
 	/**
 	 * How much faster the bus goes down a slope, for its steepness: on skis
 	 * too, it picks up speed downhill, as everyone does.

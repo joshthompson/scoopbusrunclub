@@ -30,15 +30,17 @@ const ZOMBIES: Playable['sprite'][] = (Object.keys(runners) as RunnerName[])
 		height: runner.height,
 	}))
 
-/** A Zombie's look, over that: the website's green, and glowing, to be seen at night. */
-export const ZOMBIE_FILTER = `${ZOMBIE_TINT} drop-shadow(0 0 3px #8dff7a)`
-/** A skeleton just glows. */
-export const SKELETON_FILTER = 'drop-shadow(0 0 3px #8dff7a)'
+/**
+ * A Zombie's look, over that: the website's tint, a hue-rotate. Their zombie
+ * run's already green, so no glow on top.
+ */
+export const ZOMBIE_FILTER = ZOMBIE_TINT
 
 /** Who a Zombie was: a club member, `who` picking which, or a skeleton. */
 export function zombieSprite(zombie: { who: number; skeleton?: boolean }) {
 	if (zombie.skeleton)
-		return { sprite: SKELETON_SPRITE, filter: SKELETON_FILTER }
+		// As it is: white bones, no glow.
+		return { sprite: SKELETON_SPRITE, filter: undefined }
 	return {
 		sprite: ZOMBIES[zombie.who % ZOMBIES.length],
 		filter: ZOMBIE_FILTER,

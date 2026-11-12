@@ -102,7 +102,9 @@ export function Summary(props: {
 									? rideLook(world.course).rides
 									: bonus.kind === 'geese'
 										? flyerLook(world.course).rides
-										: BONUS_LABELS[bonus.kind]
+										: bonus.kind === 'jumps' && world.course.longJump
+											? 'Long jump'
+											: BONUS_LABELS[bonus.kind]
 							} ×${bonus.count}`,
 				points: bonus.points,
 			})),

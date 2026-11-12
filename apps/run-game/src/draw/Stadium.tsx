@@ -3,6 +3,12 @@ import flats from '../assets/stadium/flats.png'
 import grandstand from '../assets/stadium/grandstand.png'
 import masts from '../assets/stadium/masts.png'
 import railing from '../assets/stadium/railing.png'
+import {
+	SKYLINE_HEIGHT,
+	TREELINE_HEIGHT,
+	skyline,
+	treeline,
+} from '../courses/kit/stadiumScenery'
 import { PATH_BACK, PX_PER_M, START_X, VERGE } from '../game/constants'
 import type { View } from './Backdrop'
 import { LANE_LINES, TRACK_INSIDE } from './art/track'
@@ -10,8 +16,9 @@ import { LANE_LINES, TRACK_INSIDE } from './art/track'
 /**
  * A stadium behind the track, for Kristineberg: the grandstand, white with its
  * wooden roof and benches and blue pillars, coming round once a lap; a
- * railing along the back of the track; floodlight masts; and the yellow
- * blocks of flats beyond. Each is a picture, repeated.
+ * railing along the back of the track; floodlight masts; a line of trees;
+ * the yellow blocks of flats beyond them; and the city far off, hazy, over
+ * their roofs. Each is a picture, repeated, further back going by slower.
  */
 
 /** A picture, as a CSS background. */
@@ -37,6 +44,13 @@ const CITY_WIDTH = 1400
 const CITY_HEIGHT = 200
 const CITY_PARALLAX = 0.25
 const CITY = image(flats)
+
+// --- The city far off, and the trees in front of the flats ---------------------
+
+const SKYLINE_PARALLAX = 0.1
+const SKYLINE = image(skyline)
+const TREES_PARALLAX = 0.4
+const TREES = image(treeline)
 
 // --- Floodlight masts ----------------------------------------------------------
 
@@ -89,7 +103,19 @@ export function StadiumBackdrop(props: { world: View }) {
 
 	return (
 		<>
+			{band(
+				SKYLINE,
+				apronTop - 40 - SKYLINE_HEIGHT,
+				SKYLINE_HEIGHT,
+				SKYLINE_PARALLAX,
+			)}
 			{band(CITY, apronTop - 36 - CITY_HEIGHT, CITY_HEIGHT, CITY_PARALLAX)}
+			{band(
+				TREES,
+				apronTop - 40 - TREELINE_HEIGHT,
+				TREELINE_HEIGHT,
+				TREES_PARALLAX,
+			)}
 			{band(MASTS, 40, MAST_HEIGHT, MAST_PARALLAX)}
 			{/* A grass bank between the flats and the track. */}
 			<div
