@@ -8,4 +8,4 @@ allowBuilds:
 ignoredBuiltDependencies:
   - nx
 minimumReleaseAgeExclude:
-  - '@joshthompson/scoopjs@0.1.0'
+  - '@joshthompson/scoopjs@0.1.0 || 0.2.0'

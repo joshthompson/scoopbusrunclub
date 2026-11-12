@@ -56,6 +56,10 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 		width: VIEW_WIDTH,
 		height: VIEW_HEIGHT,
 		frameRate: TICK_MS,
+		// The camera moves every tick, so it moves one layer rather than every
+		// sprite: about half the work a tick. Nothing here sits over the
+		// overlay, nor uses ScoopJS's parallax, which the layer would change.
+		cameraLayer: true,
 		// Front to back.
 		assetOrder: [
 			// Counting everyone down, at the front, always in sight.
@@ -148,9 +152,12 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			)
 		},
 	})
-	// The engine scrolls every sprite by the canvas's x.
-	scene.canvas.get().setX(world.camera())
-	scene.tickers.add(() => scene.canvas.get().setX(world.camera()))
+	// The engine scrolls the sprites' layer by the canvas's x. To a whole
+	// pixel, as the ground and the backdrop scroll: a layer moved by a
+	// fraction of one is drawn a pixel out from the ground under it.
+	const scroll = () => scene.canvas.get().setX(Math.round(world.camera()))
+	scroll()
+	scene.tickers.add(scroll)
 	return scene
 }
 

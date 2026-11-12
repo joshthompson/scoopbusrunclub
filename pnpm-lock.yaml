@@ -96,8 +96,8 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
       scoopjs:
-        specifier: npm:@joshthompson/scoopjs@^0.1.0
-        version: '@joshthompson/scoopjs@0.1.0(solid-js@1.9.9)'
+        specifier: npm:@joshthompson/scoopjs@^0.2.0
+        version: '@joshthompson/scoopjs@0.2.0(solid-js@1.9.9)'
       solid-js:
         specifier: ^1.9.5
         version: 1.9.9
@@ -142,8 +142,8 @@ importers:
         specifier: ^1.4.2
         version: 1.4.2
       scoopjs:
-        specifier: npm:@joshthompson/scoopjs@^0.1.0
-        version: '@joshthompson/scoopjs@0.1.0(solid-js@1.9.9)'
+        specifier: npm:@joshthompson/scoopjs@^0.2.0
+        version: '@joshthompson/scoopjs@0.2.0(solid-js@1.9.9)'
       suncalc:
         specifier: ^1.9.0
         version: 1.9.0
@@ -694,8 +694,8 @@ packages:
     resolution: {integrity: sha512-DmdYgtezMkh3cpU8/1uyXakv3tJRcmcXxBOcO0tbaozPwpmh4YMsnWrQm9ZmZMfa5ocbxzbFk6O4bDPEc/iAnA==}
     engines: {node: ^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0}
 
-  '@joshthompson/scoopjs@0.1.0':
-    resolution: {integrity: sha512-PAdsG+VPqv70jrvmZ9Uhwar55utgBhHunj80qyzuvgqJUmkXQPG4s6FQWOU5uWdkj6u7TNwUpSE0Ds3PoLEKnw==, tarball: https://npm.pkg.github.com/download/@joshthompson/scoopjs/0.1.0/5b29dcefc6e0b487bd61beca08b1a15ab2fbc4ea}
+  '@joshthompson/scoopjs@0.2.0':
+    resolution: {integrity: sha512-t5j6bymSCsLSCS7dg8+L3my6VdqcBGWoeL4JRun9hr8MY3PKJi/5M9Tk7Cam8achozM2GOnpJuk8/lnDAKWw8A==, tarball: https://npm.pkg.github.com/download/@joshthompson/scoopjs/0.2.0/1c42f4ce768daf5608e6a93cfa5a82df8e4c1bd1}
     peerDependencies:
       solid-js: ^1.9.0
 
@@ -3067,7 +3067,7 @@ snapshots:
     dependencies:
       '@sinclair/typebox': 0.34.48
 
-  '@joshthompson/scoopjs@0.1.0(solid-js@1.9.9)':
+  '@joshthompson/scoopjs@0.2.0(solid-js@1.9.9)':
     dependencies:
       solid-js: 1.9.9
 
