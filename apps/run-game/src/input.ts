@@ -162,3 +162,6 @@ window.addEventListener('keydown', (event) => {
 		event.target instanceof HTMLTextAreaElement
 	if (GAME_KEYS.has(event.key) && !typing) event.preventDefault()
 })
+
+/** Played on a touch screen, with no keys: on-screen buttons, and a pause button. */
+export const touchScreen = () => window.matchMedia('(pointer: coarse)').matches

@@ -7,14 +7,9 @@ import {
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
 } from '../game/constants'
+import { DRAWN_FROM } from '../game/groundColumns'
 import type { World } from '../game/world'
-import {
-	Backdrop,
-	CaveCover,
-	DRAWN_FROM,
-	Ground,
-	HorizonTrees,
-} from './Backdrop'
+import { Backdrop, CaveCover, Ground, HorizonTrees } from './Backdrop'
 import { Fog } from './Fog'
 import { SeaFront } from './Sea'
 import { Snow } from './Snow'

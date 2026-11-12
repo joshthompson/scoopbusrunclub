@@ -11,6 +11,20 @@ import {
 	withGaps,
 } from '../game/terrain'
 import { towerSpan } from '../game/towers'
+import {
+	GREAT_WALL_BRICKS,
+	GREAT_WALL_PAVING,
+	GREAT_WALL_SHRUBS,
+	HILLSIDE,
+	HILL_RIM,
+	HILL_SHADE,
+	WALL,
+	WALL_DARKER,
+	WALL_FOOT,
+	breach,
+	wallBushes,
+	wallWoods,
+} from './kit/greatWallScenery'
 import { nearGap, scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
 import type { Course, CourseDefinition } from './types'
@@ -179,12 +193,16 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	const scenery: Course['scenery'] = []
 	for (let at = -300; at < terrain.finishX + 900; at += 260 + random() * 200)
 		if (!nearTower(at)) scenery.push({ x: Math.round(at), asset: lantern })
+	// Where it's crumbled away, a breach in it, the bushes grown up round the heap.
+	terrain.gaps.forEach((gap, i) => {
+		scenery.push(...breach(terrain, gap, 1600 + i))
+	})
 	return { obstacles, boosts, scenery }
 }
 
-/** The wall's stone, light on the walkway, darker down its face. */
-const STONE = '#a59c8c'
-const STONE_DARK = '#7a7265'
+/** The battlements' brick, a little darker than the wall's, so they stand out; and their tops, catching the light. */
+const PARAPET_DIM = 'rgba(36, 28, 20, 0.24)'
+const PARAPET_CAP = 'rgba(255, 250, 232, 0.3)'
 
 export const greatWall: CourseDefinition = {
 	id: 'great-wall',
@@ -208,19 +226,58 @@ export const greatWall: CourseDefinition = {
 			far: wallFar,
 			near: wallNear,
 			fill: '#86ab95',
+			// The wooded hills just behind the wall.
+			nearer: [
+				wallWoods(1501, {
+					leaves: '#557f48',
+					lit: '#6f9a58',
+					shade: '#40683a',
+				}),
+			],
 		},
 		horizonTrees: false,
-		// The parapet behind, the walkway, the parapet in front, and the wall's face on down.
+		// The parapet behind, the walkway, the parapet in front, and the
+		// wall's face on down, in brick; the bushes round its foot, and the
+		// hill on down.
 		ground: [
-			[-PATH_BACK - 10, STONE_DARK],
-			[-PATH_BACK - 4, STONE],
-			[-PATH_BACK, '#c2b9a8'],
-			[PATH_FRONT - 2, STONE_DARK],
-			[PATH_FRONT + 8, '#8f8676'],
-			[PATH_FRONT + 12, STONE_DARK],
+			// The parapet behind: brick, as its merlons are, a little darker, lit along its top.
+			[-PATH_BACK - 10, 'url(#great-wall-bricks)'],
+			[-PATH_BACK - 10, PARAPET_DIM],
+			[-PATH_BACK - 10, PARAPET_CAP],
+			[-PATH_BACK - 8, 'url(#great-wall-bricks)'],
+			[-PATH_BACK - 8, PARAPET_DIM],
+			[-PATH_BACK, WALL.walkway],
+			[-PATH_BACK, 'url(#great-wall-paving)'],
+			[PATH_FRONT - 2, WALL.dark],
+			[PATH_FRONT + 8, WALL.coping],
+			[PATH_FRONT + 12, WALL.shadow],
+			[PATH_FRONT + 14, 'url(#great-wall-bricks)'],
+			// Darker toward its foot.
+			[PATH_FRONT + WALL_DARKER, 'rgba(40, 34, 26, 0.08)'],
+			[PATH_FRONT + WALL_FOOT - 4, HILL_RIM, true, wallBushes],
+			[PATH_FRONT + WALL_FOOT - 2, HILLSIDE, true, wallBushes],
+			[PATH_FRONT + WALL_FOOT - 2, 'url(#great-wall-shrubs)', true, wallBushes],
+			...HILL_SHADE.map(([offset, fill]): [number, string, boolean] => [
+				PATH_FRONT + offset,
+				fill,
+				true,
+			]),
 		],
-		gap: 'linear-gradient(to bottom, #6a6154, #2c3a28 110px)',
-		battlements: { stone: '#b0a795', shade: STONE_DARK, floor: '#c2b9a8' },
+		groundDefs: GREAT_WALL_BRICKS + GREAT_WALL_PAVING + GREAT_WALL_SHRUBS,
+		// See-through: where it's crumbled, the hill behind it, through the breach.
+		gap: 'none',
+		// In brick, a little darker than the wall, their tops catching the light.
+		battlements: {
+			stone: WALL.parapet,
+			shade: WALL.dark,
+			brick: {
+				fill: 'url(#great-wall-bricks)',
+				dim: PARAPET_DIM,
+				shade: 'rgba(30, 24, 18, 0.36)',
+			},
+			cap: PARAPET_CAP,
+			roof: WALL.walkway,
+		},
 	},
 	...layOut(),
 }

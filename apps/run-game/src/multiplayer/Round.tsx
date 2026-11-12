@@ -4,6 +4,7 @@ import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { PX_PER_M } from '../game/constants'
 import { POPUP_TICKS, onScreen, roundOver } from '../game/step'
 import { type Racer, type RacerEntry, createWorld } from '../game/world'
+import { touchScreen } from '../input'
 import { PauseMenu, SOUND_ITEMS } from '../screens/PauseMenu'
 import { Stage } from '../ui/Stage'
 
@@ -141,7 +142,8 @@ export function RoundHud(props: {
 					{left()} of {world.racers.length} running
 				</div>
 			</div>
-			<Show when={props.onPause}>
+			{/* On a touch screen: with a keyboard, it's Esc or P. */}
+			<Show when={props.onPause && touchScreen()}>
 				<div style={styles.topRight}>
 					<button
 						type="button"

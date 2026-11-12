@@ -34,7 +34,7 @@ import ventAsset from '../assets/rooftop/vent.png'
 import purpleSignAsset from '../assets/signs/purple-sign.png'
 import { bouncyToadstool } from '../courses/kit/furbyScenery'
 import { seeded } from '../courses/kit/seeded'
-import type { Obstacle, PlatformDefinition } from '../courses/types'
+import type { CourseLook, Obstacle, PlatformDefinition } from '../courses/types'
 import { boardOf } from '../game/boards'
 import { inTunnel } from '../game/cave'
 import {
@@ -52,6 +52,7 @@ import {
 import { cyclistAt } from '../game/cyclists'
 import { FIKA_SIZE } from '../game/fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from '../game/furbies'
+import { DRAWN_FROM } from '../game/groundColumns'
 import { mummyAt } from '../game/mummies'
 import { type PlatformAt, platformAt } from '../game/platforms'
 import {
@@ -176,7 +177,7 @@ import {
 	PotholeArt,
 	hurdleSize,
 } from './art/track'
-import { frontParapet } from './battlements'
+import { frontParapet, frontParapetCaps } from './battlements'
 import { atSea, rideBus, startRide } from './busRide'
 import { flyerLook } from './flyerLook'
 import { PlatformArt, platformLook } from './platformArt'
@@ -377,6 +378,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			if (racer.out === 'scooped') {
 				$.setRotation(body.spin * 14)
 				$.setState('pause')
+				$.setStyle({ 'z-index': SCOOPED_OVER })
 				return
 			}
 			const xScale = body.facing === 1 ? -1 : 1
@@ -662,6 +664,10 @@ function createPacer(world: World, p: Pacer) {
 			if (p.scooped) {
 				$.setRotation(p.spin * 14)
 				$.setState('pause')
+				$.setStyle({
+					filter: p.skeleton ? SKELETON_FILTER : undefined,
+					'z-index': SCOOPED_OVER,
+				})
 				return
 			}
 			if (p.board) {
@@ -1033,6 +1039,7 @@ function createStoodBoard(world: World, c: Corgi) {
 			$.setRotation(c.state === 'scooped' ? c.spin * 14 : 0)
 			$.setStyle({
 				visibility: c.state === 'ridden' ? 'hidden' : 'visible',
+				'z-index': c.state === 'scooped' ? SCOOPED_OVER : undefined,
 			})
 		},
 	})
@@ -1242,6 +1249,7 @@ function createFurby(world: World, f: Furby) {
 			// Flashing while dazed, and can't be bounced on again.
 			$.setStyle({
 				opacity: f.state === 'dazed' && f.timer % 8 < 4 ? '0.4' : '1',
+				'z-index': f.state === 'scooped' ? SCOOPED_OVER : undefined,
 			})
 		},
 	})
@@ -2137,9 +2145,10 @@ export function createScenery(world: World) {
 	// stands over a Gap. Names carved on any tombstones: runners', in a
 	// shuffled order.
 	const names = gravestoneNames()
-	// Not stood over a Gap: but in front of the path, a bridge's near side, can be.
+	// Not stood over a Gap: but in front of the path, a bridge's near side,
+	// can be, and what's meant to be, a breach in a wall.
 	const standing = world.course.scenery.filter(
-		({ x, front }) => front || !world.terrain.inGap(x),
+		({ x, front, overGap }) => front || overGap || !world.terrain.inGap(x),
 	)
 	let carvings = 0
 	return standing.map((piece, i) => {
@@ -3637,6 +3646,19 @@ export function createKmSigns(world: World) {
 }
 
 /**
+ * Scooped, flying off the bus: over everything on the course, the parapet
+ * in front and guard towers too, all the way down, rather than going under
+ * them as they fall back past. Every sprite's in one stacking context.
+ */
+const SCOOPED_OVER = '1'
+
+/** A wall's battlements: its brick, darker; or its stone. */
+const battlementFills = (
+	stone: NonNullable<CourseLook['battlements']>,
+): string[] =>
+	stone.brick ? [stone.brick.fill, stone.brick.dim] : [stone.stone]
+
+/**
  * In front of everyone: a wall's parapet along the path's near edge, with
  * its merlons, if the course has battlements. One picture, the whole course
  * long, drawn once.
@@ -3645,7 +3667,7 @@ export function createForeground(world: World) {
 	const stone = world.course.look?.battlements
 	if (!stone) return []
 	const { terrain } = world
-	const from = START_X - 1400
+	const from = DRAWN_FROM
 	const to = terrain.finishX + 1600
 	const width = to - from
 	return [
@@ -3666,7 +3688,21 @@ export function createForeground(world: World) {
 						aria-hidden="true"
 						style={{ display: 'block', overflow: 'visible' }}
 					>
-						<path d={frontParapet(terrain, from, to, 4)} fill={stone.stone} />
+						{/* Its fills can be the Ground's patterns: drawn from the
+						    same place, they line up with its own. */}
+						<For each={battlementFills(stone)}>
+							{(fill) => (
+								<path d={frontParapet(terrain, from, to, 4)} fill={fill} />
+							)}
+						</For>
+						<Show when={stone.cap}>
+							{(cap) => (
+								<path
+									d={frontParapetCaps(terrain, from, to, 4, 2)}
+									fill={cap()}
+								/>
+							)}
+						</Show>
 					</svg>
 				),
 			}),
@@ -3699,6 +3735,27 @@ function createTower(world: World, x: number, i: number) {
 	const side = (u: number, v: number) =>
 		`${W + u * S},${M + depth + H - u * depth - v}`
 	/**
+	 * The foot of its side, going back, in steps a pixel wide, as pixel art,
+	 * from `xa` to `xb` (either way): the points along it, each step's
+	 * height where its middle is.
+	 */
+	const stepped = (xa: number, xb: number) => {
+		const P = TOWER_PIXEL
+		const footAt = (x: number) =>
+			Math.round((M + depth + H - ((x - W) / S) * depth) / 2) * 2
+		const lo = Math.min(xa, xb)
+		const hi = Math.max(xa, xb)
+		const points: string[] = []
+		for (let x = lo; x < hi; ) {
+			const next = Math.min(hi, (Math.floor(x / P) + 1) * P)
+			const y = footAt((x + next) / 2)
+			points.push(`${x},${y}`, `${next},${y}`)
+			x = next
+		}
+		if (xa > xb) points.reverse()
+		return points.map((p) => `L${p}`).join(' ')
+	}
+	/**
 	 * The gateway through its side, from `u0` to `u1` of the way back (it
 	 * runs from 0.14 to 0.86): its top an arch, drawn in steps, as pixels,
 	 * its sides straight up, and its foot the floor, along the bottom of the
@@ -3727,9 +3784,7 @@ function createTower(world: World, x: number, i: number) {
 			const { top } = at(x + P / 2)
 			tops.push(`${x},${top} ${x + P},${top}`)
 		}
-		/** The bottom of the wall, `x` along. */
-		const floor = (x: number) => M + depth + H - ((x - W) / S) * depth
-		return `M${tops.join(' ')} L${x1},${floor(x1)} L${x0},${floor(x0)} Z`
+		return `M${tops.join(' ')} ${stepped(x1, x0)} Z`
 	}
 	/**
 	 * Where its side's split into the half in front of everyone and the half
@@ -3740,8 +3795,8 @@ function createTower(world: World, x: number, i: number) {
 	const SPLIT = (Math.round((W + S / 2) / TOWER_PIXEL) * TOWER_PIXEL - W) / S
 	/** Its side from `u0` to `u1` of the way back, the gateway cut out of it. */
 	const sidePart = (u0: number, u1: number) => {
-		const wall = [side(u0, 0), side(u0, H), side(u1, H), side(u1, 0)]
-		return `M${wall.join(' L')} Z ${gateway(u0, u1)}`
+		const wall = [side(u0, H), side(u1, H)]
+		return `M${wall.join(' L')} ${stepped(W + u1 * S, W + u0 * S)} Z ${gateway(u0, u1)}`
 	}
 	const courses: number[] = []
 	for (let y = M + depth + 10; y < height; y += 12) courses.push(y)
@@ -3753,7 +3808,11 @@ function createTower(world: World, x: number, i: number) {
 	) =>
 		Array.from({ length: count }, (_, k) => {
 			const t = (k + 0.5) / count
-			return { x: x0 + (x1 - x0) * t - M / 2, y: y0 + (y1 - y0) * t - M }
+			// On whole pixels, so they're as crisp as everything else.
+			return {
+				x: Math.round((x0 + (x1 - x0) * t - M / 2) / 2) * 2,
+				y: Math.round((y0 + (y1 - y0) * t - M) / 2) * 2,
+			}
 		})
 	const nearLeft: [number, number] = [0, M + depth]
 	const nearRight: [number, number] = [W, M + depth]
@@ -3766,6 +3825,30 @@ function createTower(world: World, x: number, i: number) {
 		...merlonsAlong(nearRight, farRight, 2),
 		...merlonsAlong(nearLeft, nearRight, 7),
 	]
+	/** Its brick, or plain stone: in front; its side, in shade; its battlements, darker. */
+	const { brick } = stone
+	const frontFills = brick ? [brick.fill] : [stone.stone]
+	const sideFills = brick ? [brick.fill, brick.shade] : [stone.shade]
+	const merlonFills = battlementFills(stone)
+	/** Merlons, filled, their tops catching the light. */
+	const merlonRects = (list: { x: number; y: number }[]) => (
+		<For each={list}>
+			{(m) => (
+				<>
+					<For each={merlonFills}>
+						{(fill) => (
+							<rect x={m.x} y={m.y} width={M} height={M} fill={fill} />
+						)}
+					</For>
+					<Show when={stone.cap}>
+						{(cap) => (
+							<rect x={m.x} y={m.y} width={M} height={2} fill={cap()} />
+						)}
+					</Show>
+				</>
+			)}
+		</For>
+	)
 	const svg = (children: JSX.Element) => (
 		<svg
 			width={width}
@@ -3792,38 +3875,37 @@ function createTower(world: World, x: number, i: number) {
 			children: () =>
 				svg(
 					<>
-						{/* Inside it, through the gateway: dark, and the walkway's
-						    floor going on through it, up to its far edge. */}
-						<clipPath id={`tower-door-${i}`}>
-							<path d={gateway(0, 1)} />
-						</clipPath>
+						{/* Inside it, through the gateway: dark, down to the
+						    walkway's far edge. Under that, the walkway itself, the
+						    Ground's, going on through it. */}
 						<clipPath id={`tower-side-${i}`}>
 							<path
-								d={`M${[side(0, 0), side(0, H), side(1, H), side(1, 0)].join(' L')} Z`}
+								d={`M${[side(0, H), side(1, H)].join(' L')} ${stepped(W + S, W)} Z`}
 							/>
+						</clipPath>
+						<clipPath id={`tower-inside-${i}`}>
+							<rect x={0} y={0} width={width} height={height - depth} />
 						</clipPath>
 						{/* A little over the gateway's edges, so no sky shows round
 						    them, zoomed: the side covers what's over. */}
-						<path
-							d={gateway(0, 1)}
-							fill="#3a342c"
-							stroke="#3a342c"
-							stroke-width={2}
-							clip-path={`url(#tower-side-${i})`}
-						/>
-						<rect
-							x={0}
-							y={height - depth}
-							width={width}
-							height={depth}
-							fill={stone.floor ?? stone.stone}
-							clip-path={`url(#tower-door-${i})`}
-						/>
-						<path
-							d={sidePart(SPLIT - SEAM, 1)}
-							fill={stone.shade}
-							fill-rule="evenodd"
-						/>
+						<g clip-path={`url(#tower-inside-${i})`}>
+							<path
+								d={gateway(0, 1)}
+								fill="#3a342c"
+								stroke="#3a342c"
+								stroke-width={2}
+								clip-path={`url(#tower-side-${i})`}
+							/>
+						</g>
+						<For each={sideFills}>
+							{(fill) => (
+								<path
+									d={sidePart(SPLIT - SEAM, 1)}
+									fill={fill}
+									fill-rule="evenodd"
+								/>
+							)}
+						</For>
 					</>,
 				),
 		}),
@@ -3836,30 +3918,32 @@ function createTower(world: World, x: number, i: number) {
 			children: () =>
 				svg(
 					<>
-						<path
-							d={sidePart(0, SPLIT)}
-							fill={stone.shade}
-							fill-rule="evenodd"
-						/>
+						<For each={sideFills}>
+							{(fill) => (
+								<path d={sidePart(0, SPLIT)} fill={fill} fill-rule="evenodd" />
+							)}
+						</For>
 						{/* Its roof, going back, battlements all round it. */}
 						<polygon
 							points={[nearLeft, farLeft, farRight, nearRight]
 								.map((p) => p.join(','))
 								.join(' ')}
-							fill={stone.shade}
+							fill={stone.roof ?? stone.shade}
 						/>
-						<For each={merlons}>
-							{(m) => (
-								<rect x={m.x} y={m.y} width={M} height={M} fill={stone.stone} />
+						{merlonRects(merlons)}
+						{/* Its front, in brick, or in courses of stone. */}
+						<For each={frontFills}>
+							{(fill) => (
+								<rect x={0} y={M + depth} width={W} height={H} fill={fill} />
 							)}
 						</For>
-						{/* Its front, in courses of stone. */}
-						<rect x={0} y={M + depth} width={W} height={H} fill={stone.stone} />
-						<For each={courses}>
-							{(y) => (
-								<rect x={0} y={y} width={W} height={2} fill={stone.shade} />
-							)}
-						</For>
+						<Show when={!brick}>
+							<For each={courses}>
+								{(y) => (
+									<rect x={0} y={y} width={W} height={2} fill={stone.shade} />
+								)}
+							</For>
+						</Show>
 						<rect
 							x={0}
 							y={M + depth + 74}
@@ -3900,11 +3984,7 @@ function createTower(world: World, x: number, i: number) {
 							)}
 						</For>
 						{/* The front edge's merlons again, over the front. */}
-						<For each={merlonsAlong(nearLeft, nearRight, 7)}>
-							{(m) => (
-								<rect x={m.x} y={m.y} width={M} height={M} fill={stone.stone} />
-							)}
-						</For>
+						{merlonRects(merlonsAlong(nearLeft, nearRight, 7))}
 					</>,
 				),
 		}),

@@ -51,3 +51,45 @@ export function backMerlons(
 	}
 	return d
 }
+
+/**
+ * Along the tops of the parapet in front and its merlons, `cap` px deep, as
+ * one path: where the light catches them.
+ */
+export function frontParapetCaps(
+	terrain: Terrain,
+	from: number,
+	to: number,
+	step: number,
+	cap: number,
+) {
+	let d = ''
+	for (let x = from; x < to; x += step) {
+		const middle = x + step / 2
+		if (terrain.inGap(middle)) continue
+		const line = Math.round(terrain.groundY(middle) / 2) * 2
+		const top = line + PATH_FRONT - 4 - (isMerlon(x) ? MERLON_HEIGHT : 0)
+		d += ` M${x - from},${top} h${step} v${cap} h${-step} Z`
+	}
+	return d
+}
+
+/** And the tops of the merlons behind. */
+export function backMerlonCaps(
+	terrain: Terrain,
+	from: number,
+	to: number,
+	step: number,
+	parapet: number,
+	cap: number,
+) {
+	let d = ''
+	for (let x = from; x < to; x += step) {
+		const middle = x + step / 2
+		if (terrain.inGap(middle) || !isMerlon(x + DEPTH_SLANT)) continue
+		const line = Math.round(terrain.groundY(middle) / 2) * 2
+		const top = line - PATH_BACK - parapet - MERLON_HEIGHT
+		d += ` M${x - from},${top} h${step} v${cap} h${-step} Z`
+	}
+	return d
+}

@@ -12,7 +12,12 @@ import tree1Asset from '../assets/scenery/tree1.png'
 import tree2Asset from '../assets/scenery/tree2.png'
 import { svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
-import type { BackdropPiece, PitLook, SkyFlyer } from '../courses/types'
+import type {
+	BackdropPiece,
+	CourseLook,
+	PitLook,
+	SkyFlyer,
+} from '../courses/types'
 import {
 	CAMERA_LEAD,
 	DEPTH_SLANT,
@@ -24,11 +29,18 @@ import {
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
 } from '../game/constants'
+import {
+	DRAWN_FROM,
+	GROUND_STEP,
+	columnMiddle,
+	columnTop,
+	smoothedTop,
+} from '../game/groundColumns'
 import type { Block } from '../game/terrain'
 import { type World, isCaught } from '../game/world'
 import { SeaGround } from './Sea'
 import { StadiumBackdrop } from './Stadium'
-import { backMerlons } from './battlements'
+import { backMerlonCaps, backMerlons } from './battlements'
 
 /**
  * What the backdrop needs to draw a course: which, and where the camera is.
@@ -781,9 +793,10 @@ export function HorizonTrees(props: { world: View }) {
 	)
 }
 
-const STEP = 4
-/** How many columns either way a smoothed layer of the ground's averaged over. */
-const SMOOTH_COLUMNS = 30
+const STEP = GROUND_STEP
+/** The merlons along a wall's parapet behind the path: its brick, darker; or in shade. */
+const backMerlonFills = (stone: NonNullable<CourseLook['battlements']>) =>
+	stone.brick ? [stone.brick.fill, stone.brick.dim] : [stone.shade]
 /** How much water the Ground draws behind a bridge's path, over its verge: the backdrop has the rest (see `BridgeWater`). */
 const BRIDGE_BEHIND = VERGE + 6
 /** A bridge's quay walls: how wide, how far over the water they come, and how tall. */
@@ -805,8 +818,6 @@ const RAINBOW = [
 	'#9b7bff',
 ]
 const RAINBOW_BAND = 10
-/** Drawn from this far behind the start, for the bus to drive out of. */
-export const DRAWN_FROM = START_X - 1400
 
 /**
  * The course's ground, drawn once, in steps 4 px wide so its slopes come out
@@ -819,15 +830,9 @@ export function Ground(props: { world: View }) {
 	const width = drawnTo - DRAWN_FROM
 
 	/** The top of the ground, every `STEP`: none over a Gap. */
-	const tops: (number | undefined)[] = []
-	for (let x = DRAWN_FROM; x <= drawnTo; x += STEP) {
-		const middle = x + STEP / 2
-		tops.push(
-			terrain.inGap(middle)
-				? undefined
-				: Math.round(terrain.groundY(middle) / 2) * 2,
-		)
-	}
+	const tops = Array.from({ length: Math.floor(width / STEP) + 1 }, (_, i) =>
+		columnTop(terrain, i),
+	)
 	/** Room over the top of the screen for it: more, up a mountain, to its top. */
 	const skyRoom = Math.max(
 		SKY_ROOM,
@@ -847,33 +852,30 @@ export function Ground(props: { world: View }) {
 	let smoothed: (number | undefined)[] | undefined
 	const smoothTops = () => {
 		if (smoothed) return smoothed
-		smoothed = tops.map((top, i) => {
-			if (top === undefined) return undefined
-			let sum = 0
-			let count = 0
-			for (let k = i - SMOOTH_COLUMNS; k <= i + SMOOTH_COLUMNS; k++) {
-				const near = tops[k]
-				if (near === undefined) continue
-				sum += near
-				count++
-			}
-			return Math.round(sum / count / 2) * 2
-		})
+		smoothed = tops.map((_, i) => smoothedTop(tops, i))
 		return smoothed
 	}
-	const outline = (offset: number, smooth = false) => {
+	const outline = (
+		offset: number,
+		smooth = false,
+		edge?: (x: number) => number,
+	) => {
 		const along = smooth ? smoothTops() : tops
+		/** Its top in column `i`: ragged, if it has an edge. */
+		const top = (i: number) =>
+			(along[i] ?? 0) +
+			offset +
+			(edge ? Math.round(edge(columnMiddle(i)) / 2) * 2 : 0)
 		let d = ''
 		let run: number[] = []
 		/** Along its tops, and back along its bottoms. */
 		const flush = () => {
 			if (!run.length) return
-			d += ` M${run[0] * STEP},${(along[run[0]] ?? 0) + offset}`
-			for (const i of run)
-				d += ` V${(along[i] ?? 0) + offset} H${(i + 1) * STEP}`
+			d += ` M${run[0] * STEP},${top(run[0])}`
+			for (const i of run) d += ` V${top(i)} H${(i + 1) * STEP}`
 			for (let k = run.length - 1; k >= 0; k--) {
 				const i = run[k]
-				d += ` V${Math.max((along[i] ?? 0) + offset, bottoms[i])} H${i * STEP}`
+				d += ` V${Math.max(top(i), bottoms[i])} H${i * STEP}`
 			}
 			d += ' Z'
 			run = []
@@ -1104,7 +1106,7 @@ export function Ground(props: { world: View }) {
 
 	// The path, with the line everyone runs along down its middle, and the
 	// grass on down to the bottom of the screen in front of it.
-	const layers: [number, string, boolean?][] = props.world.course.look
+	const layers: NonNullable<CourseLook['ground']> = props.world.course.look
 		?.ground ?? [
 		// The verge: the same green as the field, so it only shows where
 		// the course runs higher than the field does.
@@ -1240,8 +1242,8 @@ export function Ground(props: { world: View }) {
 					)}
 				</Show>
 				<For each={layers}>
-					{([offset, fill, smooth]) => (
-						<path d={outline(offset, smooth)} fill={fill} />
+					{([offset, fill, smooth, edge]) => (
+						<path d={outline(offset, smooth, edge)} fill={fill} />
 					)}
 				</For>
 				{/* Its Ledges, drawn as rock. */}
@@ -1581,10 +1583,37 @@ export function Ground(props: { world: View }) {
 				{/* A wall's merlons, along its parapet behind the path. */}
 				<Show when={props.world.course.look?.battlements}>
 					{(stone) => (
-						<path
-							d={backMerlons(terrain, DRAWN_FROM, drawnTo, STEP, BACK_PARAPET)}
-							fill={stone().shade}
-						/>
+						<>
+							<For each={backMerlonFills(stone())}>
+								{(fill) => (
+									<path
+										d={backMerlons(
+											terrain,
+											DRAWN_FROM,
+											drawnTo,
+											STEP,
+											BACK_PARAPET,
+										)}
+										fill={fill}
+									/>
+								)}
+							</For>
+							<Show when={stone().cap}>
+								{(cap) => (
+									<path
+										d={backMerlonCaps(
+											terrain,
+											DRAWN_FROM,
+											drawnTo,
+											STEP,
+											BACK_PARAPET,
+											2,
+										)}
+										fill={cap()}
+									/>
+								)}
+							</Show>
+						</>
 					)}
 				</Show>
 			</svg>

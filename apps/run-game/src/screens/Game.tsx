@@ -13,7 +13,7 @@ import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { PX_PER_M, START_X } from '../game/constants'
 import { POPUP_TICKS, onScreen } from '../game/step'
 import { type World, createWorld } from '../game/world'
-import { type Action, anyControls, setTouch } from '../input'
+import { type Action, anyControls, setTouch, touchScreen } from '../input'
 import {
 	type Tally,
 	addTallies,
@@ -423,8 +423,9 @@ function Hud(props: {
 				</div>
 				<div style={styles.score}>{points(world.score())}</div>
 			</div>
+			{/* On a touch screen: with a keyboard, it's Esc or P. */}
 			<div style={styles.topRight}>
-				<Show when={!world.result()}>
+				<Show when={!world.result() && touchScreen()}>
 					<button
 						type="button"
 						aria-label="Pause"
@@ -494,7 +495,7 @@ function Hud(props: {
 
 /** On-screen buttons, on touch screens only. */
 function TouchControls() {
-	const coarse = window.matchMedia('(pointer: coarse)').matches
+	const coarse = touchScreen()
 	const button = (action: Action, label: string, place: JSX.CSSProperties) => (
 		<button
 			type="button"

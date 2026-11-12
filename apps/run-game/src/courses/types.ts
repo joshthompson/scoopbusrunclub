@@ -221,9 +221,16 @@ export interface CourseLook {
 	stadium?: boolean
 	/**
 	 * The ground's layers, in place of Haga's path and grass: offsets from
-	 * the line everyone runs along, each filled from there on down.
+	 * the line everyone runs along, each filled from there on down. Its
+	 * top `smooth`ed, if deep under the path; and given an `edge`, how much
+	 * further down it is at `x` along, its top ragged: bushes, say.
 	 */
-	ground?: [offset: number, fill: string, smooth?: boolean][]
+	ground?: [
+		offset: number,
+		fill: string,
+		smooth?: boolean,
+		edge?: (x: number) => number,
+	][]
 	/**
 	 * Its Ledges, the steps up it a jump high, drawn as rock: a buttress of
 	 * it, its strata, snow on top, and a fixed rope down it, or a ladder up
@@ -404,7 +411,20 @@ export interface CourseLook {
 	 * Battlements along the path, a wall's: merlons on the parapet behind it,
 	 * and a parapet with its own in front, drawn in front of the runners.
 	 */
-	battlements?: { stone: string; shade: string; floor?: string }
+	battlements?: {
+		stone: string
+		shade: string
+		/**
+		 * Brick, in place of plain stone: `fill`, a pattern of the Ground's,
+		 * as `url(#id)`; `dim` over it on the battlements, so they stand out
+		 * against the wall; and `shade` over it in shadow, a tower's side.
+		 */
+		brick?: { fill: string; dim: string; shade: string }
+		/** Along the battlements' tops, catching the light. */
+		cap?: string
+		/** A tower's roof, walked on: its floor. */
+		roof?: string
+	}
 	/**
 	 * Pyramids the path goes up and over, each from foot to foot: their
 	 * stepped faces drawn in front of it in courses of blocks, `block` with
@@ -672,6 +692,8 @@ export interface Scenery {
 	onFloor?: boolean
 	/** In front of whoever's on the path, rather than behind them: a gateway's near side. */
 	front?: boolean
+	/** Stood over a Gap all the same, as nothing else is: a crumbled wall's breach. */
+	overGap?: boolean
 	/**
 	 * A name carved on it, a runner's, on its panel: `x`, `y`, `width` and
 	 * `height` in its own pixels. A tombstone's.
