@@ -893,11 +893,16 @@ export function Ground(props: { world: View }) {
 	const rainbow = props.world.course.look?.rainbow
 	const overRainbow = (x: number) =>
 		!!rainbow && x > rainbow.from && x < rainbow.to
+	const ridge = props.world.course.look?.ridge
 	const bottoms = tops.map((top, i) => {
 		const x = DRAWN_FROM + i * STEP + STEP / 2
-		return top !== undefined && overRainbow(x)
-			? top + PATH_FRONT + RAINBOW.length * RAINBOW_BAND
-			: VIEW_HEIGHT
+		if (top !== undefined && overRainbow(x))
+			return top + PATH_FRONT + RAINBOW.length * RAINBOW_BAND
+		// Up on a ridge: only as far down as the mountain goes there.
+		const under = top !== undefined ? ridge?.(x) : undefined
+		return under === undefined || top === undefined
+			? VIEW_HEIGHT
+			: Math.round(Math.max(top + PATH_FRONT + 2, under) / 2) * 2
 	})
 
 	/**

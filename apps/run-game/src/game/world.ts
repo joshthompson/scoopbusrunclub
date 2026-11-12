@@ -112,6 +112,11 @@ export interface Body {
 	gliding: boolean
 	/** Ticks left being carried by a flying goose. */
 	carried: number
+	/**
+	 * Caught by a condor, falling off a Leap, here: being carried down from
+	 * it, along its way down to the valley floor (see `rideCondor`).
+	 */
+	condorFrom?: { x: number; y: number }
 	/** Ticks before another Player can bounce on their head again. */
 	stomped: number
 	/** The Platform they're stood on, by its index: on the Ground if none. */
@@ -196,6 +201,8 @@ export interface Pacer {
 	turn?: number
 	/** The Rail they're grinding along, if any. */
 	grind?: number
+	/** Caught by a condor, off a Leap, here: being carried down from it, as anyone. */
+	condorFrom?: { x: number; y: number }
 }
 
 /**
@@ -262,10 +269,11 @@ export interface Corgi {
 
 /**
  * - `flying`: over the course, from behind, low enough to jump into
+ * - `swooping`: a condor, in to catch whoever's falling off a Leap
  * - `carrying`: someone, hanging on underneath
  * - `leaving`: let them go, and off up and away
  */
-export type FlyerState = 'flying' | 'carrying' | 'leaving'
+export type FlyerState = 'flying' | 'swooping' | 'carrying' | 'leaving'
 
 /** A goose flying over the course, at Haga. `feetY` is the bottom of it. */
 export interface Flyer {
@@ -279,8 +287,10 @@ export interface Flyer {
 	/** Climbing away, once it's let go. */
 	vy: number
 	state: FlyerState
-	/** Who it's carrying. */
+	/** Who it's carrying, or swooping in to catch. */
 	rider?: string
+	/** Or which Pacer, by their id. */
+	pacer?: number
 }
 
 export interface Bus {

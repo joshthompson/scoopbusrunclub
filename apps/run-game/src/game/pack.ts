@@ -37,6 +37,7 @@ import {
 	hillPull,
 } from './constants'
 import { cyclistAt } from './cyclists'
+import { rideCondor } from './flyers'
 import { atSea, flyPacer } from './gliders'
 import { mummyAt } from './mummies'
 import { landingOn, platformAt, platformMove } from './platforms'
@@ -222,6 +223,14 @@ function movePacer(world: World, p: Pacer) {
 		return
 	}
 
+	// On a condor's back, off a Leap, carried down to the valley floor.
+	if (p.condorFrom) {
+		if (rideCondor(world, p)) {
+			p.grounded = true
+			p.on = undefined
+		}
+		return
+	}
 	// On a glider, out over the sea.
 	if (p.gliding) return flyPacer(world, p)
 	// On skis, down The Slopes.

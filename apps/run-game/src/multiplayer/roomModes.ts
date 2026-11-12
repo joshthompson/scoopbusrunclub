@@ -42,7 +42,7 @@ export const ROOM_MODES: RoomModeInfo[] = [
 	{
 		mode: 'backyard',
 		label: 'Backyard Ultra',
-		note: 'Till you call it',
+		note: 'As long as you can go',
 		about: 'Every course, round and round, till you call it',
 		repeats: true,
 	},

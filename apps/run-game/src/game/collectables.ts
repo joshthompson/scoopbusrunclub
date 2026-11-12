@@ -77,6 +77,7 @@ export const COLLECTABLE_NAMES = {
 	'ride:snowboard': 'Snowboard',
 	'ride:goose': 'Goose',
 	'ride:dragon': 'Dragon',
+	'ride:condor': 'Condor',
 	pumpkin: 'Pumpkin',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
@@ -134,6 +135,7 @@ export const PICKUP_WORD = {
 	'ride:glider': 'Wheee!',
 	'ride:goose': 'Honk honk!',
 	'ride:dragon': 'Dragon ride!',
+	'ride:condor': 'Caught by a condor!',
 	'ride:goat': 'G.O.A.T.!',
 	'ride:skis': 'Skis on!',
 	'ride:snowboard': 'Shred!',

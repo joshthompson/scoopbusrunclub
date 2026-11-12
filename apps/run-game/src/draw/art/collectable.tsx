@@ -4,6 +4,7 @@ import barcodeAsset from '../../assets/boosts/barcode.png'
 import type { Collectable } from '../../game/collectables'
 import type { FikaItem } from '../../game/fika'
 import { BactrianArt, CamelArt } from './camel'
+import { CondorArt } from './condor'
 import { CorgiArt } from './corgi'
 import { DeerArt } from './deer'
 import { DragonArt } from './dragon'
@@ -53,6 +54,14 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 				<div style={{ width: '80px', height: '28px' }}>
 					<div style={{ transform: 'scale(0.4)', 'transform-origin': '0 0' }}>
 						<DragonArt now={0} />
+					</div>
+				</div>
+			)
+		case 'ride:condor':
+			return (
+				<div style={{ width: '74px', height: '48px', overflow: 'hidden' }}>
+					<div style={{ transform: 'scale(0.4)', 'transform-origin': '0 0' }}>
+						<CondorArt now={0} />
 					</div>
 				</div>
 			)

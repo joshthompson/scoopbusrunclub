@@ -82,7 +82,14 @@ import { MUMMY_HEIGHT } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
 import { cyclistAt } from './cyclists'
 import { FIKA_SIZE } from './fika'
-import { carryHeight, glide, stepFlyers } from './flyers'
+import {
+	CONDOR_SPEED,
+	carryHeight,
+	catchLine,
+	glide,
+	rideCondor,
+	stepFlyers,
+} from './flyers'
 import { scoopFurbies, stepFurbies } from './furbies'
 import { atSea, glidingBox, stepGliding } from './gliders'
 import { mummyAt } from './mummies'
@@ -391,6 +398,7 @@ function stepRunner(world: World, racer: Racer) {
 	if (!racing) {
 		b.mount = 0
 		b.carried = 0
+		b.condorFrom = undefined
 	}
 	if (b.stomped > 0) b.stomped--
 	// A stumble knocks a Pumpkin off.
@@ -403,6 +411,21 @@ function stepRunner(world: World, racer: Racer) {
 		if (b.mount === 0 && !b.grounded) b.feetY -= rideLook(world.course).saddle
 	}
 
+	if (b.carried > 0 && b.condorFrom) {
+		// On a condor's back, off a Leap: nothing to do but hold on, till
+		// it's down on the valley floor and lets go.
+		b.grounded = false
+		b.ducking = false
+		b.facing = 1
+		if (rideCondor(world, b)) {
+			b.carried = 0
+			b.on = undefined
+			land(b)
+			b.floor = b.feetY
+		}
+		b.wasUp = up
+		return
+	}
 	if (b.carried > 0 && up && !b.wasUp) {
 		// Jumping off a goose, or a dragon: up off it, as off the ground.
 		b.carried = 0
@@ -1469,9 +1492,16 @@ function stepBus(world: World) {
 		// Slowed going uphill, as everyone is: its wheels' slope. Down a ski
 		// slope, faster, but never faster than anyone can go.
 		const pace = bus.speed * busHill(world, bus.frontX)
+		// Off a Leap, in a giant condor's talons: no faster than the condors
+		// carrying everyone down ahead of it, so it can't catch them while
+		// there's nothing they can do about it.
+		const { leap } = world.course
+		const carried = !!leap && bus.frontX > leap.edge && bus.frontX < leap.land
 		bus.frontX += world.course.busDownhill
 			? Math.min(pace, topSpeed(world) - ROUND_SEA_SLACK)
-			: pace
+			: carried
+				? Math.min(pace, CONDOR_SPEED)
+				: pace
 	}
 	scoopPack(world)
 	scoopFurbies(world)
@@ -1768,6 +1798,21 @@ function cameraYFor(high: number, low: number, zoom = 1) {
 	return Math.min(0, Math.max(up, down))
 }
 
+/**
+ * Gone over a Leap's edge, falling and then carried down by a condor: the
+ * camera goes down with them, keeping more of what's under them in view
+ * than over them, the cloud they're falling into, the condor coming in,
+ * and then the valley floor coming up. Above the line the condors catch
+ * at, falling, a little less: it's a leap in the dark.
+ */
+function leapView(world: World, b: Body) {
+	const { leap } = world.course
+	if (!leap || b.grounded || b.x <= leap.edge || b.x > leap.land + 400)
+		return undefined
+	const under = b.condorFrom ? 300 : b.feetY < catchLine(world) ? 160 : 240
+	return { high: b.feetY - 40, low: b.feetY + under }
+}
+
 /** How much sky over a glider's highest, and sea under the surface, the camera shows gliding. */
 const GLIDE_SKY_ROOM = 90
 const GLIDE_SEA_ROOM = 40
@@ -1801,16 +1846,18 @@ function stepCamera(world: World) {
 	const wantZoom = gliding?.zoom ?? 1
 	if (Math.abs(wantZoom - zoom) > 0.001)
 		world.setZoom(zoom + (wantZoom - zoom) * ZOOM_EASE)
-	const view = gliding ?? lookAt(b)
+	const leaping = gliding ? undefined : leapView(world, b)
+	const view = gliding ?? leaping ?? lookAt(b)
 	// Up a mountain, up the climb ahead too; down one, down the slope ahead.
-	if (!gliding && !flyingHigh(b))
+	if (!gliding && !leaping && !flyingHigh(b))
 		view.high = upAhead(world, b.x, b.facing, view.high)
-	if (!gliding) view.low = downAhead(world, b, view.low)
+	if (!gliding && !leaping) view.low = downAhead(world, b, view.low)
 	const targetY = cameraYFor(view.high, view.low, world.zoom())
 	const cameraY = world.cameraY()
 	// Quick after them, flying high, or dropping a long way.
 	const dropping = b.feetY > b.floor + CAMERA_DROP_ROOM
-	const lift = flyingHigh(b) || dropping ? CAMERA_FLY_LIFT : CAMERA_LIFT
+	const lift =
+		flyingHigh(b) || dropping || leaping ? CAMERA_FLY_LIFT : CAMERA_LIFT
 	if (targetY !== cameraY) {
 		const eased = cameraY + (targetY - cameraY) * lift
 		// And never so slow their feet go off the bottom of the screen.
@@ -1873,20 +1920,24 @@ function frameEveryone(world: World) {
 		: undefined
 	const high = Math.min(
 		glide?.high ?? Number.POSITIVE_INFINITY,
-		...running.map((r) =>
-			flyingHigh(r.body)
-				? lookAt(r.body).high
-				: upAhead(world, r.body.x, r.body.facing, lookAt(r.body).high),
+		...running.map(
+			(r) =>
+				leapView(world, r.body)?.high ??
+				(flyingHigh(r.body)
+					? lookAt(r.body).high
+					: upAhead(world, r.body.x, r.body.facing, lookAt(r.body).high)),
 		),
 	)
 	const low = Math.max(
 		glide?.low ?? Number.NEGATIVE_INFINITY,
-		...running.map((r) =>
-			downAhead(
-				world,
-				r.body,
-				flyingHigh(r.body) ? lookAt(r.body).low : r.body.floor,
-			),
+		...running.map(
+			(r) =>
+				leapView(world, r.body)?.low ??
+				downAhead(
+					world,
+					r.body,
+					flyingHigh(r.body) ? lookAt(r.body).low : r.body.floor,
+				),
 		),
 	)
 	const tall = (low + CAMERA_FOOTROOM - (high - CAMERA_HEADROOM)) / VIEW_HEIGHT

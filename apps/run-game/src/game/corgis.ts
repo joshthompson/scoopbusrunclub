@@ -68,8 +68,8 @@ export function stepCorgis(world: World) {
 				c.vy = 0
 				c.adrift = 0
 				c.state = 'tired'
-				// Crashed into the sea: it goes down with them.
-				if (gliders && rider?.crashed) {
+				// Crashed into the sea, or fallen down a Gap: it goes down with them.
+				if (rider?.crashed) {
 					c.state = 'scooped'
 					c.vx = 2
 					c.vy = 1
@@ -94,6 +94,14 @@ export function stepCorgis(world: World) {
 				c.x += ADRIFT_SPEED
 				c.feetY -= ADRIFT_CLIMB
 			}
+			continue
+		}
+		// Got off over a Gap: down it, and gone.
+		if (c.state === 'tired' && terrain.inGap(c.x)) {
+			c.state = 'scooped'
+			c.vx = 1
+			c.vy = Math.max(0, c.vy)
+			c.spin = 0
 			continue
 		}
 		const ground = terrain.groundY(c.x)

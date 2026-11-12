@@ -15,6 +15,7 @@ import {
 	Ground,
 	HorizonTrees,
 } from './Backdrop'
+import { Fog } from './Fog'
 import { SeaFront } from './Sea'
 import { Snow } from './Snow'
 import {
@@ -218,6 +219,8 @@ export function RaceCanvas(props: {
 			/>
 			{/* Snow falling up a mountain, over the whole screen. */}
 			<Snow world={props.world} />
+			{/* Fog settled in, high up a mountain, and a bank of cloud to fall through. */}
+			<Fog world={props.world} />
 			{/* Paused, or between Rounds: the whole screen shaded, not just the
 			    canvas, which goes with the camera (see `styles.css`). */}
 			<Show when={props.scene.modal.get()}>

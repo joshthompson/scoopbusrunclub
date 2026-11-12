@@ -8,6 +8,7 @@ import {
 	GOOSE_CARRY_TICKS,
 	GOOSE_FLY_SPEED,
 	GOOSE_POINTS,
+	GRAVITY,
 	HITBOX_HALF_WIDTH,
 	PATH_BACK,
 	RUNNER_SCALE,
@@ -15,7 +16,7 @@ import {
 } from './constants'
 import { scored } from './step'
 import { TOWER_DOOR, TOWER_HEIGHT, TOWER_MERLON, towerSpan } from './towers'
-import type { Flyer, Racer, World } from './world'
+import type { Body, Flyer, Pacer, Racer, World } from './world'
 
 /**
  * Geese flying over Haga: a few at a time, from behind, faster than anyone
@@ -149,7 +150,27 @@ export function stepFlyers(world: World) {
 		}
 	}
 
+	// Off a Leap: a condor for each who's gone over, swooping in to catch them.
+	if (world.course.leap) sendCondors(world)
+
 	for (const goose of flyers) {
+		if (goose.state === 'swooping') {
+			swoop(world, goose)
+			continue
+		}
+		if (goose.state === 'carrying' && goose.pacer !== undefined) {
+			const p = world.pack.find((p) => p.id === goose.pacer)
+			if (!p?.condorFrom || p.scooped) {
+				goose.state = 'leaving'
+				goose.pacer = undefined
+				goose.vy = -1
+			} else {
+				const { seat } = flyerLook(world.course)
+				goose.x = p.x - (seat?.ahead ?? 0)
+				goose.feetY = p.feetY + (seat ? seat.back(0) - seat.sink : 0)
+				continue
+			}
+		}
 		if (goose.state === 'carrying') {
 			const rider = world.racers.find((r) => r.id === goose.rider)
 			if (!rider || rider.body.carried === 0 || rider.out) {
@@ -192,6 +213,7 @@ export function stepFlyers(world: World) {
 		const goose = flyers[i]
 		if (
 			goose.state !== 'carrying' &&
+			goose.state !== 'swooping' &&
 			(goose.x > right || goose.feetY < GONE_ABOVE)
 		)
 			flyers.splice(i, 1)
@@ -259,4 +281,198 @@ function grab(world: World, racer: Racer) {
 		play(look.sound)
 		return
 	}
+}
+
+// --- Off a Leap: condors ------------------------------------------------------
+
+/**
+ * How fast a condor carries someone down to the valley floor, along: a
+ * little slower than anyone runs, gliding, so the ride down lasts.
+ */
+export const CONDOR_SPEED = 5
+/** How quickly whoever it's caught gets up to its speed, a share a tick. */
+const CONDOR_GRIP = 0.06
+/** How far back and up from whoever's going over a condor sets off from: off the screen, up behind them. */
+const SWOOP_BEHIND = 520
+const SWOOP_ABOVE = 140
+/** How far below the Leap's edge someone's gone over it, for a condor to set off. */
+const OVER_EDGE = 12
+/** How little room a condor takes to carry someone down, along, at least. */
+const CONDOR_GLIDE_MIN = 600
+
+/** Whether `x` is past a Leap's edge, before the valley floor's where they'd be let go. */
+const pastEdge = (world: World, x: number) => {
+	const { leap } = world.course
+	return !!leap && x > leap.edge && x < leap.land + 400
+}
+
+/** How high the top of a Leap is: the Ground just before its edge. */
+const leapTop = (world: World) => {
+	const { leap } = world.course
+	return leap ? world.terrain.groundY(leap.edge - 1) : 0
+}
+
+/** The line a condor catches anyone at, falling: `catchAt` down the Leap. */
+export const catchLine = (world: World) => {
+	const { leap } = world.course
+	if (!leap) return 0
+	const top = leapTop(world)
+	return top + (world.terrain.groundY(leap.land) - top) * leap.catchAt
+}
+
+/**
+ * Where a condor's carrying someone it caught at `from`, `x` along: down
+ * onto the valley floor by `land`, swooping down steep at first with all
+ * they had falling, then levelling out to come in gently.
+ */
+export function condorPath(
+	world: World,
+	from: { x: number; y: number },
+	x: number,
+) {
+	const { leap } = world.course
+	if (!leap) return from.y
+	const land = Math.max(leap.land, from.x + CONDOR_GLIDE_MIN)
+	const floor = world.terrain.groundY(land)
+	const t = Math.max(0, Math.min(1, (x - from.x) / (land - from.x)))
+	return from.y + (floor - from.y) * (1 - (1 - t) ** 2)
+}
+
+/**
+ * Carried down by a condor, `b`, along its way: whatever's held, faster
+ * than anyone runs, till they're down on the valley floor, where it lets
+ * go. Returns whether it has.
+ */
+export function rideCondor(
+	world: World,
+	b: Pick<Body, 'x' | 'vx' | 'vy' | 'feetY' | 'condorFrom'>,
+) {
+	const from = b.condorFrom
+	if (!from) return true
+	b.vx += (CONDOR_SPEED - b.vx) * CONDOR_GRIP
+	b.x += b.vx
+	const y = condorPath(world, from, b.x)
+	b.vy = y - b.feetY
+	b.feetY = y
+	const ground = world.terrain.groundY(b.x)
+	if (b.feetY < ground - 1) return false
+	b.feetY = ground
+	b.vy = 0
+	b.condorFrom = undefined
+	return true
+}
+
+/**
+ * Who's gone over a Leap's edge, falling, with no condor yet: one each,
+ * Pacers too, setting off from up behind them, off the screen.
+ */
+function sendCondors(world: World) {
+	const top = leapTop(world)
+	const coming = (x: number, feetY: number) =>
+		pastEdge(world, x) && feetY > top + OVER_EDGE
+	const send = (
+		x: number,
+		feetY: number,
+		who: Pick<Flyer, 'rider' | 'pacer'>,
+	) => {
+		world.flyers.push({
+			id: world.flyerState.nextId++,
+			x: x - SWOOP_BEHIND,
+			feetY: feetY - SWOOP_ABOVE,
+			cruise: 0,
+			altitude: 0,
+			vy: 0,
+			state: 'swooping',
+			...who,
+		})
+		play('whoosh')
+	}
+	const sent = (who: Pick<Flyer, 'rider' | 'pacer'>) =>
+		world.flyers.some(
+			(f) =>
+				(who.rider !== undefined && f.rider === who.rider) ||
+				(who.pacer !== undefined && f.pacer === who.pacer),
+		)
+	for (const racer of world.racers) {
+		const b = racer.body
+		if (racer.out || b.grounded || b.condorFrom) continue
+		if (!coming(b.x, b.feetY) || sent({ rider: racer.id })) continue
+		send(b.x, b.feetY, { rider: racer.id })
+	}
+	for (const p of world.pack) {
+		if (p.scooped || p.grounded || p.condorFrom) continue
+		if (!coming(p.x, p.feetY) || sent({ pacer: p.id })) continue
+		send(p.x, p.feetY, { pacer: p.id })
+	}
+}
+
+/**
+ * A condor swooping in, beating its wings, to be just under whoever it's
+ * after, its back under them, as they fall to the line it catches them
+ * at: there just as they are. Caught, they're on its back.
+ */
+function swoop(world: World, condor: Flyer) {
+	const line = catchLine(world)
+	const { seat } = flyerLook(world.course)
+	const ahead = seat?.ahead ?? 0
+	const under = seat ? seat.back(0) - seat.sink : 0
+	const racer = world.racers.find((r) => r.id === condor.rider)
+	const pacer = world.pack.find((p) => p.id === condor.pacer)
+	const who =
+		racer && !racer.out
+			? racer.body
+			: pacer && !pacer.scooped
+				? pacer
+				: undefined
+	if (!who || who.grounded) {
+		// Gone, or landed somehow: off it goes.
+		condor.state = 'leaving'
+		condor.rider = undefined
+		condor.pacer = undefined
+		condor.vy = -1
+		return
+	}
+	if (who.feetY >= line) {
+		catchFaller(world, condor, who, racer)
+		return
+	}
+	// How long till they're down at the line, falling as they are.
+	const v = who.vy
+	const left =
+		(-v + Math.sqrt(v * v + 2 * GRAVITY * (line - who.feetY))) / GRAVITY
+	const toX = who.x + who.vx * left - ahead
+	const toY = line + under
+	const steps = Math.max(1, left)
+	condor.x += (toX - condor.x) / steps
+	condor.feetY += (toY - condor.feetY) / steps
+}
+
+/** Caught, on a condor's back: carried down from here. */
+function catchFaller(
+	world: World,
+	condor: Flyer,
+	who: Body | Pacer,
+	racer: Racer | undefined,
+) {
+	const { seat } = flyerLook(world.course)
+	condor.state = 'carrying'
+	who.condorFrom = { x: who.x, y: who.feetY }
+	condor.x = who.x - (seat?.ahead ?? 0)
+	condor.feetY = who.feetY + (seat ? seat.back(0) - seat.sink : 0)
+	if (!racer) return
+	const b = racer.body
+	// Carried till it lets go of them, on the valley floor.
+	b.carried = Number.MAX_SAFE_INTEGER
+	collect('ride:condor')
+	b.combo = 0
+	b.stumble = 0
+	b.facing = 1
+	b.ducking = false
+	world.addBonus('geese', GOOSE_POINTS)
+	world.popup(
+		scored(world, PICKUP_WORD['ride:condor'], `+${GOOSE_POINTS}`),
+		b.x,
+		b.feetY - 90,
+	)
+	play('whoosh')
 }

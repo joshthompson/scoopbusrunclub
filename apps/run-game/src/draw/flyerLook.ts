@@ -2,6 +2,13 @@ import type { Component } from 'solid-js'
 import type { Course } from '../courses/types'
 import type { Sound } from '../sfx'
 import {
+	CONDOR_HEIGHT,
+	CONDOR_SEAT_X,
+	CONDOR_SEAT_Y,
+	CONDOR_WIDTH,
+	CondorArt,
+} from './art/condor'
+import {
 	DRAGON_HEIGHT,
 	DRAGON_NECK,
 	DRAGON_WIDTH,
@@ -59,5 +66,33 @@ const DRAGON: FlyerLook = {
 	},
 }
 
+const CONDOR: FlyerLook = {
+	width: CONDOR_WIDTH,
+	height: CONDOR_HEIGHT,
+	// Beating its wings, swooping in; soaring, once it's got someone.
+	Art: (props) =>
+		CondorArt({
+			get now() {
+				return props.now
+			},
+			get beating() {
+				return !props.carrying
+			},
+		}),
+	sound: 'whoosh',
+	rides: 'Condor rides',
+	grip: CONDOR_HEIGHT / 2,
+	// Ridden sat on its back, between its wings, its far wing up behind.
+	seat: {
+		ahead: CONDOR_SEAT_X - CONDOR_WIDTH / 2,
+		back: () => CONDOR_SEAT_Y,
+		sink: 6,
+	},
+}
+
 export const flyerLook = (course: Pick<Course, 'flyer'>) =>
-	course.flyer === 'dragon' ? DRAGON : GOOSE
+	course.flyer === 'dragon'
+		? DRAGON
+		: course.flyer === 'condor'
+			? CONDOR
+			: GOOSE

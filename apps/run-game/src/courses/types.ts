@@ -268,6 +268,20 @@ export interface CourseLook {
 	sunScale?: number
 	/** Over the clouds. */
 	clouds?: string
+	/**
+	 * Fog, settled in: mist drifting over everything, fading in along the
+	 * course from `from`, as thick as it gets by `full`, and clearing again
+	 * from `clear` to `gone`. And a bank of cloud lying across the course,
+	 * `deck`: its top at `top`, `depth` deep, from `from` to `to`, drawn
+	 * over everyone falling through it.
+	 */
+	fog?: {
+		from: number
+		full: number
+		clear: number
+		gone: number
+		deck?: { from: number; to: number; top: number; depth: number }
+	}
 	/** Lightning, flashing now and then. */
 	lightning?: boolean
 	/** What flies about the sky: bats, ghosts. */
@@ -359,6 +373,14 @@ export interface CourseLook {
 	 * the path, nothing under it but the field, its ground `base` there.
 	 */
 	rainbow?: { from: number; to: number; base: (x: number) => number }
+	/**
+	 * Up on a ridge, high over the clouds: how far down the mountain goes
+	 * under the path at `x`, a y, its underside; nothing under that but
+	 * the sky and whatever's on the horizon. Undefined, it goes on down as
+	 * usual. Lost in a bank of cloud (see `fog`), it's a mountain
+	 * disappearing into it.
+	 */
+	ridge?: (x: number) => number | undefined
 	/** Its Steam Vents as bouncy toadstools, rather than grates. */
 	bouncers?: boolean
 	/** How buildings look, on a course over rooftops: see `BuildingLook`. */
@@ -648,6 +670,8 @@ export interface Scenery {
 	 * than on the highest of it under it, clear of a slope: a crystal.
 	 */
 	onFloor?: boolean
+	/** In front of whoever's on the path, rather than behind them: a gateway's near side. */
+	front?: boolean
 	/**
 	 * A name carved on it, a runner's, on its panel: `x`, `y`, `width` and
 	 * `height` in its own pixels. A tombstone's.
@@ -765,8 +789,17 @@ export interface Course {
 	 * gets to `x`. Jump into one and it carries you.
 	 */
 	flyovers?: { x: number; count: number }[]
-	/** What those are: geese, or on the Great Wall, a dragon. */
-	flyer?: 'goose' | 'dragon'
+	/** What those are: geese, or on the Great Wall, a dragon; off Machu Picchu, condors. */
+	flyer?: 'goose' | 'dragon' | 'condor'
+	/**
+	 * A Leap: the Ground drops away sheer at `edge`, a long way down to a
+	 * valley floor, and there's no way on but off it. Whoever goes over
+	 * falls, blind, till they're `catchAt` down: a condor swoops in and
+	 * catches them there, everyone, Pacers too, and carries them down onto
+	 * the valley floor, letting go at `land` along. The bus too: a giant
+	 * one carries it down, `busFloor` its way down.
+	 */
+	leap?: { edge: number; catchAt: number; land: number }
 	/**
 	 * Where the bus digs its own way, its wheels on this rather than the
 	 * Ground: down through the street after whoever's dropped down a

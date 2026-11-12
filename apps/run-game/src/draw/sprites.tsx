@@ -104,6 +104,7 @@ import { Bubble } from './Bubble'
 import { PixelArt } from './PixelArt'
 import { Pixels } from './Pixels'
 import { BusLegs, LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH } from './art/busLegs'
+import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
 import { FikaArt } from './art/fika'
 import { GEESE_HEIGHT, GeeseArt, geeseWidth } from './art/geese'
@@ -576,7 +577,10 @@ function createPacer(world: World, p: Pacer) {
 	const ducked = () =>
 		world.ticks() >= 0 &&
 		!!sit &&
-		((p.grounded && inTunnel(world, p.x, p.feetY)) || (!!p.board && curled(p)))
+		((p.grounded && inTunnel(world, p.x, p.feetY)) ||
+			(!!p.board && curled(p)) ||
+			// Sat on a condor's back, carried down off a Leap.
+			!!p.condorFrom)
 	/** Stood still, on the start line or stopped. */
 	const standing = () =>
 		world.ticks() >= 0 &&
@@ -1255,6 +1259,11 @@ const SLEIGH_HEIGHT = 148
 const SLEIGH_Y = -6
 /** How far down into the bus's roof its glider's struts' feet go. */
 const BUS_GLIDER_ROOF = 10
+/** The giant condor carrying the bus off a Leap: px a cell, and how far down the roof its talons grip. */
+const BUS_CONDOR_CELL = 4
+const BUS_CONDOR_ROOF = 16
+/** How far past the edge it beats its wings, taking the bus's weight, before it soars. */
+const BUS_CONDOR_BEATING = 260
 /** The scoop's front edge, this far in from the bus's left. */
 const SCOOP_FRONT = BUS_WIDTH + 22
 /** How long a bit of rock takes to fly off the drill, and the bits: up and back over the roof, or down ahead onto the floor. */
@@ -1398,15 +1407,28 @@ export function createBus(world: World) {
 			const ride = world.bus.ride
 			rideBus(world, ride, middle)
 			$.setX(world.bus.frontX - SCOOP_FRONT - drillOut())
+			// Off a Leap, hanging in a giant condor's talons: swaying a little,
+			// nose a little down, not driving down the air.
+			const { leap } = world.course
+			const hanging =
+				!!leap &&
+				middle > leap.edge &&
+				world.course.busFloor?.(middle) !== undefined
 			// Its engine rumbling it about, a little; a sleigh glides, smooth.
-			const rumbles = ride.grounded && !look.sleigh
+			const rumbles = ride.grounded && !look.sleigh && !hanging
 			$.setY(ride.y - WHEEL_BOTTOM + (rumbles ? Math.cos(10 + $age / 2) : 0))
 			// Nose up as it jumps, down as it drops; with the hill, on it.
 			$.setRotation(
-				ride.grounded
-					? (Math.atan(slope(middle)) * 180) / Math.PI +
+				hanging
+					? Math.max(
+							-8,
+							Math.min(8, (Math.atan(slope(middle)) * 180) / Math.PI / 5),
+						) +
+							Math.sin($age / 18) * 2.5
+					: ride.grounded
+						? (Math.atan(slope(middle)) * 180) / Math.PI +
 							(rumbles ? (Math.random() - 0.5) * 0.8 : 0)
-					: Math.max(-14, Math.min(14, ride.vy * 1.4)),
+						: Math.max(-14, Math.min(14, ride.vy * 1.4)),
 			)
 		},
 	})
@@ -1562,6 +1584,37 @@ export function createBus(world: World) {
 				}),
 			},
 		)
+	// Off a Leap: carried down in a giant condor's talons, by its roof.
+	const { leap } = world.course
+	if (leap) {
+		const middle = () => world.bus.frontX - SCOOP_FRONT + BUS_WIDTH / 2
+		const carried = () =>
+			world.ticks() >= 0 &&
+			middle() > leap.edge &&
+			world.course.busFloor?.(middle()) !== undefined
+		const { width, height, body } = CONDOR_CELLS
+		part(
+			'bus-glider',
+			condorFrames(true)[0],
+			width * BUS_CONDOR_CELL,
+			height * BUS_CONDOR_CELL,
+			{
+				// Its talons on the middle of the roof.
+				x: BUS_WIDTH / 2 - 45 * BUS_CONDOR_CELL,
+				y: BUS_CONDOR_ROOF - (body + 19) * BUS_CONDOR_CELL,
+			},
+			{
+				frames: condorFrames(true),
+				// Beating its wings, just off the edge, taking the weight; then soaring.
+				frame: () =>
+					condorFrame(world.ticks(), middle() < leap.edge + BUS_CONDOR_BEATING),
+				style: () => ({
+					'image-rendering': 'pixelated',
+					visibility: carried() ? 'visible' : 'hidden',
+				}),
+			},
+		)
+	}
 	/**
 	 * The scoop, or a drill in place of it, turning as it goes: `drill`, which
 	 * this is. `scooping` and `reach` aren't signals: reading the tick redraws
@@ -2084,8 +2137,9 @@ export function createScenery(world: World) {
 	// stands over a Gap. Names carved on any tombstones: runners', in a
 	// shuffled order.
 	const names = gravestoneNames()
+	// Not stood over a Gap: but in front of the path, a bridge's near side, can be.
 	const standing = world.course.scenery.filter(
-		({ x }) => !world.terrain.inGap(x),
+		({ x, front }) => front || !world.terrain.inGap(x),
 	)
 	let carvings = 0
 	return standing.map((piece, i) => {
@@ -2121,7 +2175,8 @@ export function createScenery(world: World) {
 			frames: [asset],
 			init: () => ({
 				id: `scenery-${i}`,
-				type: 'scenery',
+				// A gateway's near side, over whoever's going through it.
+				type: piece.front ? 'foreground' : 'scenery',
 				children: carved
 					? () => <Carved name={name ?? ''} panel={carved} scale={scale} />
 					: undefined,
