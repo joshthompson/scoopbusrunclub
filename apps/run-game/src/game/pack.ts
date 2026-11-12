@@ -7,6 +7,7 @@ import { DEFAULT_AVATAR, pickAny, randomAvatar } from '../runners/looks'
 import { MEMBERS, type Playable, lookSprite } from '../runners/playable'
 import { SKELETON_SPRITE } from '../runners/skeleton'
 import { play } from '../sfx'
+import { BOARDS } from './boards'
 import { ceilingAt, inTunnel, rockOver } from './cave'
 import {
 	BUS_LEASH_MAX,
@@ -40,6 +41,7 @@ import { atSea, flyPacer } from './gliders'
 import { mummyAt } from './mummies'
 import { landingOn, platformAt, platformMove } from './platforms'
 import { swampManAt } from './sewer'
+import { skiPacer } from './skis'
 import { steamFires } from './steam'
 import { boost } from './step'
 import type { Terrain } from './terrain'
@@ -105,7 +107,7 @@ export const SCOOP_HEARD = BUS_LEASH_MAX - VIEW_WIDTH * CAMERA_LEAD + 50
 
 /** What `lineUp` needs: the world's still being made when it's called. */
 interface Lineup {
-	course: Pick<Course, 'skeletons'>
+	course: Pick<Course, 'skeletons' | 'ride'>
 	racers: { runner: Playable }[]
 	terrain: Terrain
 	pack: Pacer[]
@@ -141,8 +143,14 @@ function newcomer(
 	return { name: pickAny(NAMES), look, sprite: lookSprite(look) }
 }
 
-function join(world: Lineup, x: number) {
+/**
+ * Someone joining at `x`. Down The Slopes, part way down, they're on skis
+ * or a snowboard already: those lined up at the start take them from the
+ * rack, as anyone.
+ */
+function join(world: Lineup, x: number, skiing = false) {
 	world.pack.push({
+		board: skiing ? 1 + Math.floor(Math.random() * BOARDS.length) : undefined,
 		id: world.packState.nextId++,
 		...newcomer(world),
 		x,
@@ -186,7 +194,7 @@ export function stepPack(world: World) {
 			x < terrain.finishX - 300 &&
 			!terrain.inGap(x)
 		)
-			join(world, x)
+			join(world, x, world.course.ride === 'skis')
 	}
 
 	for (const pacer of pack) movePacer(world, pacer)
@@ -216,6 +224,8 @@ function movePacer(world: World, p: Pacer) {
 
 	// On a glider, out over the sea.
 	if (p.gliding) return flyPacer(world, p)
+	// On skis, down The Slopes.
+	if (p.board) return skiPacer(world, p, (x) => hopAhead(world, x))
 	const ticks = world.ticks()
 	if (p.dazed > 0) p.dazed--
 	if (p.grounded) {
@@ -519,7 +529,10 @@ function hopAhead(world: World, x: number) {
 	return world.obstacles.some((state) => {
 		const { obstacle: o, used } = state
 		const edge =
-			o.kind === 'rock' || o.kind === 'tombstone' || o.kind === 'vent'
+			o.kind === 'rock' ||
+			o.kind === 'tombstone' ||
+			o.kind === 'vent' ||
+			(o.kind === 'snowman' && !used && !state.scooped)
 				? o.x - 20
 				: o.kind === 'zombie'
 					? zombieAt(world, { ...state, obstacle: o }).x - 14
@@ -607,6 +620,8 @@ export function bounceOff(world: World, racer: Racer, head: number, x: number) {
 	const b = racer.body
 	b.feetY = head
 	b.vy = -(racer.controls().up ? STOMP_BOUNCE_HELD : STOMP_BOUNCE)
+	// Off the ski jump, a bounce off someone isn't a jump of their own.
+	b.launchX = undefined
 	// A bounce, not a jump of their own: letting go doesn't cut it short.
 	b.jumping = false
 	b.vx = boost(world, b.vx, b.facing, STOMP_BOOST)

@@ -19,7 +19,12 @@ export function pixelArt(width: number, height: number, rects: PixelRect[]) {
 /** An SVG's markup, `width` by `height`, as an image's URL. */
 export function svgUrl(width: number, height: number, body: string) {
 	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" shape-rendering="crispEdges">${body}</svg>`
-	return `data:image/svg+xml,${encodeURIComponent(svg)}`
+	// Its brackets and quotes too, which `encodeURIComponent` leaves: as a
+	// frame it goes in an unquoted CSS `url()`, which a bracket ends.
+	return `data:image/svg+xml,${encodeURIComponent(svg).replace(
+		/[()'!*]/g,
+		(c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+	)}`
 }
 
 /** Letters, 5 cells by 7, a row of them a line: `#` lit. */
@@ -66,6 +71,7 @@ const GLYPHS: Record<string, string[]> = {
 	'→': ['.....', '..#..', '...#.', '#####', '...#.', '..#..', '.....'],
 	'←': ['.....', '..#..', '.#...', '#####', '.#...', '..#..', '.....'],
 	'↑': ['..#..', '.###.', '#.#.#', '..#..', '..#..', '..#..', '..#..'],
+	'↓': ['..#..', '..#..', '..#..', '..#..', '#.#.#', '.###.', '..#..'],
 	'/': ['....#', '...#.', '...#.', '..#..', '.#...', '.#...', '#....'],
 	'-': ['.....', '.....', '.....', '.###.', '.....', '.....', '.....'],
 	'!': ['..#..', '..#..', '..#..', '..#..', '..#..', '.....', '..#..'],

@@ -562,6 +562,54 @@ export const TUNES: Record<string, Tune> = {
 			},
 		],
 	},
+
+	// Down The Slopes: après-ski, bright, in G, an oompah of a bass under a
+	// chorus to sing along to, arpeggios sparkling over it, sleigh bells.
+	slopes: {
+		bars: 4,
+		tracks: [
+			{
+				voice: 'bass',
+				pattern: bars(
+					'G2 - D3 - G2 - D3 - G2 - D3 - G2 - B2 -',
+					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
+					'E2 - B2 - E2 - B2 - E2 - B2 - E2 - G2 -',
+					'C2 - G2 - C2 - G2 - D2 - A2 - D2 - F#2 -',
+				),
+				gain: 0.12,
+				gate: 0.5,
+			},
+			{
+				voice: 'pluck',
+				pattern: bars(
+					'G4 B4 D5 G5 D5 B4 G4 B4 G4 B4 D5 G5 D5 B4 G4 B4',
+					'F#4 A4 D5 F#5 D5 A4 F#4 A4 F#4 A4 D5 F#5 D5 A4 F#4 A4',
+					'E4 G4 B4 E5 B4 G4 E4 G4 E4 G4 B4 E5 B4 G4 E4 G4',
+					'E4 G4 C5 E5 C5 G4 E4 G4 F#4 A4 D5 F#5 D5 A4 F#4 A4',
+				),
+				gain: 0.03,
+			},
+			{
+				voice: 'square',
+				pattern: bars(
+					'B5 - D6 - G6 _ _ - F#6 - E6 - D6 _ _ -',
+					'A5 - D6 - F#6 _ _ - E6 - D6 - A5 _ _ -',
+					'G5 - B5 - E6 _ _ - D6 - B5 - G5 _ _ -',
+					'C6 - E6 - G6 _ _ - E6 - D6 _ _ _ - - - -',
+				),
+				gain: 0.028,
+				gate: 0.7,
+			},
+			{
+				voice: 'bell',
+				pattern: bars(
+					'- - G6 - - - G6 - - - G6 - - - G6 -',
+					'- - A6 - - - A6 - - - A6 - - - D7 -',
+				),
+				gain: 0.022,
+			},
+		],
+	},
 }
 
 /** A course with no tune of its own yet gets Haga's. */

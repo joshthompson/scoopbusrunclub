@@ -22,6 +22,7 @@ import { machuPicchu } from './machuPicchu'
 import { pyramids } from './pyramids'
 import { scoopLine } from './scoopLine'
 import { sewers } from './sewers'
+import { slopes } from './slopes'
 import type { Course, CourseDefinition } from './types'
 
 /**
@@ -100,6 +101,7 @@ export const COURSES: Course[] = [
 	cityRooftop,
 	cliff,
 	everest,
+	slopes,
 ].map((course, i) => {
 	const climb = climbOf(course)
 	// So a Round can always get everyone on the screen.

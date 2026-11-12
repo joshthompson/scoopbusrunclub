@@ -38,7 +38,7 @@ export function createRunnerFrames(
 	character: CharacterSpriteProps,
 ): Pick<
 	RunnerData,
-	'frames' | 'width' | 'height' | 'headPoint' | 'sitHeadPoint'
+	'frames' | 'width' | 'height' | 'headPoint' | 'sitHeadPoint' | 'look'
 > {
 	const run = generateCustomSpriteFrames(character, runPixels, FRAME_COUNT)
 	const sit = generateCustomSpriteFrames(character, sitPixels, 1)
@@ -72,6 +72,7 @@ export function createRunnerFrames(
 		height: run?.height ?? 28,
 		headPoint: run?.headPoint,
 		sitHeadPoint: sit?.headPoint,
+		look: character,
 	}
 }
 
@@ -396,17 +397,15 @@ function generateFaceFrame(character: CharacterSpriteProps): string[] {
 const HEAD_FACE_CENTRE: Vector = { x: 4, y: 3 }
 
 /**
- * A sprite from one of the custom runner templates (`spritePixels`, of
- * `frameCount` frames side by side), in `character`'s colours, with their
- * head on: what the run game's tourists are made from, too.
+ * A sprite from one of the custom runner templates, as `generateCustomSpriteFrames`
+ * makes it, drawn on a canvas, frames side by side: for reading its pixels,
+ * as the run game does to make its ski poses from a stand pose.
  */
-export function generateCustomSpriteFrames(
+export function drawCustomSprite(
 	character: CharacterSpriteProps,
 	spritePixels: SpritePixelData | null,
 	frameCount: number,
-):
-	| { frames: string[]; width: number; height: number; headPoint: Vector }
-	| undefined {
+) {
 	if (!spritePixels) return undefined
 
 	const spriteData = decodePixels(spritePixels)
@@ -518,6 +517,39 @@ export function generateCustomSpriteFrames(
 		frameCtx.putImageData(frameData, 0, 0)
 		finalCtx.drawImage(frameCanvas, frameX, headExtensionAboveSprite)
 	}
+
+	return {
+		canvas: finalCanvas,
+		totalWidth,
+		totalHeight,
+		spriteRedPixels,
+		headRedPixel,
+		headExtensionAboveSprite,
+	}
+}
+
+/**
+ * A sprite from one of the custom runner templates (`spritePixels`, of
+ * `frameCount` frames side by side), in `character`'s colours, with their
+ * head on: what the run game's tourists are made from, too.
+ */
+export function generateCustomSpriteFrames(
+	character: CharacterSpriteProps,
+	spritePixels: SpritePixelData | null,
+	frameCount: number,
+):
+	| { frames: string[]; width: number; height: number; headPoint: Vector }
+	| undefined {
+	const drawn = drawCustomSprite(character, spritePixels, frameCount)
+	if (!drawn) return undefined
+	const {
+		canvas: finalCanvas,
+		totalWidth,
+		totalHeight,
+		spriteRedPixels,
+		headRedPixel,
+		headExtensionAboveSprite,
+	} = drawn
 
 	// toDataURL is synchronous
 	const imageUrl = finalCanvas.toDataURL('image/png')

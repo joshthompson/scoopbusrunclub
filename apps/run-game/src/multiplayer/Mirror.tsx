@@ -6,6 +6,8 @@ import {
 	type Flyer,
 	type Out,
 	type Pacer,
+	TRICK_KINDS,
+	type TrickKind,
 	type World,
 	createWorld,
 } from '../game/world'
@@ -27,6 +29,7 @@ import {
 	type RaceFrame,
 	type RaceStart,
 	type RacerIntro,
+	fromSkiState,
 } from './protocol'
 import { CORGI_STATES, FLYER_STATES, FURBY_STATES } from './stream'
 
@@ -185,6 +188,13 @@ export default function Mirror(props: {
 			body.spin = mix(from[5], to[5])
 			racer.out = OUTS[from[6]]
 			racer.outAt = from[7]
+			// On skis: which, a trick, a grind, a wipeout.
+			const ski = fromSkiState(from[8] ?? 0, TRICK_KINDS)
+			body.board = ski.board
+			body.grind = ski.grinding ? 0 : undefined
+			body.trick = ski.trick as TrickKind | undefined
+			body.wipeout = ski.wipedOut ? 1 : 0
+			body.turn = mix(from[9] ?? 0, to[9] ?? from[9] ?? 0)
 		})
 
 		const next = new Map(b.pack.map((p) => [p[0], p]))
@@ -207,6 +217,11 @@ export default function Mirror(props: {
 			pacer.gliding = !!(from[4] & 4)
 			pacer.dazed = from[5]
 			pacer.spin = mix(from[6], to[6])
+			const ski = fromSkiState(from[7] ?? 0, TRICK_KINDS)
+			pacer.board = ski.board || undefined
+			pacer.grind = ski.grinding ? 0 : undefined
+			pacer.trick = ski.trick as TrickKind | undefined
+			pacer.turn = mix(from[8] ?? 0, to[8] ?? from[8] ?? 0)
 			world.pack.push(pacer)
 		}
 

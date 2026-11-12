@@ -13,6 +13,8 @@ export type RideKind =
 	| 'goose'
 	/** The Pyramids' rarer camel, with two humps, now and then. */
 	| 'bactrian'
+	/** On The Slopes, a snowboard, rather than skis, out of the rack. */
+	| 'snowboard'
 
 export type Collectable =
 	| `fika:${FikaItem}`
@@ -57,6 +59,12 @@ export const COLLECTABLE_NAMES = {
 	'fika:captainsHat': "Captain's hat",
 	'fika:mintCake': 'Kendal Mint Cake',
 	'fika:butterTea': 'Butter tea',
+	'fika:waffle': 'Våffla',
+	'fika:hotChocolate': 'Varm choklad',
+	'fika:lussekatt': 'Lussekatt',
+	'fika:pepparkaka': 'Pepparkaka',
+	'fika:waffleTower': 'Våffeltorn',
+	'fika:tomatoSoup': 'Tomatsoppa',
 	'ride:corgi': 'Corgi',
 	'ride:llama': 'Llama',
 	'ride:camel': 'Camel',
@@ -65,6 +73,8 @@ export const COLLECTABLE_NAMES = {
 	'ride:unicorn': 'Unicorn',
 	'ride:glider': 'Glider',
 	'ride:goat': 'Mountain goat',
+	'ride:skis': 'Skis',
+	'ride:snowboard': 'Snowboard',
 	'ride:goose': 'Goose',
 	'ride:dragon': 'Dragon',
 	pumpkin: 'Pumpkin',
@@ -109,6 +119,12 @@ export const PICKUP_WORD = {
 	'fika:captainsHat': 'Aye aye, Captain!',
 	'fika:mintCake': 'Mint cake!',
 	'fika:butterTea': 'Butter tea!',
+	'fika:waffle': 'Våffla!',
+	'fika:hotChocolate': 'Varm choklad!',
+	'fika:lussekatt': 'Lussekatt!',
+	'fika:pepparkaka': 'Pepparkaka!',
+	'fika:waffleTower': 'Våffeltorn!',
+	'fika:tomatoSoup': 'Tomatsoppa!',
 	'ride:corgi': 'Giddy up!',
 	'ride:llama': 'Giddy up!',
 	'ride:camel': 'Giddy up!',
@@ -119,6 +135,8 @@ export const PICKUP_WORD = {
 	'ride:goose': 'Honk honk!',
 	'ride:dragon': 'Dragon ride!',
 	'ride:goat': 'G.O.A.T.!',
+	'ride:skis': 'Skis on!',
+	'ride:snowboard': 'Shred!',
 	pumpkin: 'This is halloween!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>

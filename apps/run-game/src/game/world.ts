@@ -9,6 +9,7 @@ import type { Playable } from '../runners/playable'
 import {
 	BUS_START_X,
 	DUCK_HEIGHT,
+	GROUND_Y,
 	PACK_SIZE,
 	SQUASHED,
 	STAND_HEIGHT,
@@ -92,6 +93,10 @@ export interface Body {
 	facing: 1 | -1
 	/** Up was held last tick, so holding it doesn't keep jumping. */
 	wasUp: boolean
+	/** And left, right and down, on skis: a trick's each pressed in the air, not held into it. */
+	wasLeft: boolean
+	wasRight: boolean
+	wasDown: boolean
 	/** On the way up from a jump of their own: letting go of up cuts it short. */
 	jumping: boolean
 	/** Degrees, while flying out of the scoop. */
@@ -117,7 +122,38 @@ export interface Body {
 	droppingFrom?: number
 	/** The height they last stood at: what the camera follows, not every jump. */
 	floor: number
+	/**
+	 * On skis or a snowboard, the whole way down The Slopes: which of the
+	 * rack's they took, from 1 (see `BOARDS`); 0, on foot.
+	 */
+	board: number
+	/** The trick they're in the middle of, in the air, if any, and how far through it, in ticks. */
+	trick?: TrickKind
+	trickTicks: number
+	/** How far round they've turned in it, in degrees: what it's drawn by. */
+	turn: number
+	/** The tricks done since leaving the snow, to be scored on landing. */
+	airTricks: TrickKind[]
+	/** The Rail they're grinding along, by its index, if any; and for how long. */
+	grind?: number
+	grindTicks: number
+	/** Ticks left lying in the snow after a wipeout. */
+	wipeout: number
+	/** Where they took off from, if it was the ski jump: for how far they flew. */
+	launchX?: number
 }
+
+/**
+ * A trick in the air, on skis or a snowboard: spun round, flipped back or
+ * forward, or a grab.
+ */
+export type TrickKind = 'spin' | 'backflip' | 'frontflip' | 'grab'
+export const TRICK_KINDS: TrickKind[] = [
+	'spin',
+	'backflip',
+	'frontflip',
+	'grab',
+]
 
 /**
  * Someone else out running: anyone at all, or now and then a club member.
@@ -152,6 +188,14 @@ export interface Pacer {
 	tunnelSpeed?: number
 	/** On a glider, out over the sea, as anyone: see `flyPacer`. */
 	gliding?: boolean
+	/** On skis or a snowboard, down The Slopes, as anyone: see `skiPacer`. */
+	board?: number
+	/** A trick they're doing in the air, and how far round they've turned in it. */
+	trick?: TrickKind
+	trickTicks?: number
+	turn?: number
+	/** The Rail they're grinding along, if any. */
+	grind?: number
 }
 
 /**
@@ -319,6 +363,10 @@ export type BonusKind =
 	| 'pumpkins'
 	| 'barcodes'
 	| 'rings'
+	| 'tricks'
+	| 'grinds'
+	| 'gates'
+	| 'jumps'
 	| 'speed'
 	| 'hazards'
 
@@ -356,6 +404,9 @@ export function startingBody(terrain: Terrain, x: number): Body {
 		pumpkin: 0,
 		facing: 1,
 		wasUp: false,
+		wasLeft: false,
+		wasRight: false,
+		wasDown: false,
 		jumping: false,
 		spin: 0,
 		combo: 0,
@@ -365,6 +416,12 @@ export function startingBody(terrain: Terrain, x: number): Body {
 		stomped: 0,
 		dropping: 0,
 		floor: terrain.groundY(x),
+		board: 0,
+		trickTicks: 0,
+		turn: 0,
+		airTricks: [],
+		grindTicks: 0,
+		wipeout: 0,
 	}
 }
 
@@ -398,8 +455,16 @@ export function createWorld(
 	const [ticks, setTicks] = createSignal(0)
 	const [raceTicks, setRaceTicks] = createSignal(0)
 	const [camera, setCamera] = createSignal(START_X - VIEW_WIDTH * START_LEAD)
-	/** How far up the camera's looking, from where it starts: negative is up. */
-	const [cameraY, setCameraY] = createSignal(0)
+	/**
+	 * How far up the camera's looking, from where the course's lowest is:
+	 * negative is up. Starting at the top of a mountain, off the top of the
+	 * screen, looking up at the start line from the first tick, as at the
+	 * foot of any other course.
+	 */
+	const startY = terrain.groundY(START_X)
+	const [cameraY, setCameraY] = createSignal(
+		startY < 0 ? Math.round(startY - GROUND_Y) : 0,
+	)
 	const [playerX, setPlayerX] = createSignal(START_X)
 	const [busX, setBusX] = createSignal(BUS_START_X)
 	const [popups, setPopups] = createSignal<Popup[]>([])
@@ -417,6 +482,10 @@ export function createWorld(
 		pumpkins: { count: 0, points: 0 },
 		barcodes: { count: 0, points: 0 },
 		rings: { count: 0, points: 0 },
+		tricks: { count: 0, points: 0 },
+		grinds: { count: 0, points: 0 },
+		gates: { count: 0, points: 0 },
+		jumps: { count: 0, points: 0 },
 		speed: { count: 0, points: 0 },
 		hazards: { count: 0, points: 0 },
 	}

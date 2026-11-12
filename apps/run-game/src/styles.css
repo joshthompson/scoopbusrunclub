@@ -255,6 +255,19 @@ button {
 	}
 }
 
+/* A slalom gate's flag, gone through: flapping in the wind of it. */
+@keyframes gate-flap {
+	0% {
+		transform: skewX(0deg) scaleY(1);
+	}
+	50% {
+		transform: skewX(-14deg) scaleY(0.86);
+	}
+	100% {
+		transform: skewX(8deg) scaleY(0.95);
+	}
+}
+
 /* Steam off a vent, rising and spreading as it goes. */
 @keyframes steam-rise {
 	from {

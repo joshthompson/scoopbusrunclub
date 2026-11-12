@@ -45,10 +45,21 @@ const FIXED_POINTS = {
 	pumpkins: 100,
 	barcodes: 250,
 	rings: 50,
+	gates: 25,
 	hazards: -50,
 } as const
 /** Bouncing off heads: from this, doubling for each more before landing, up to the most. */
 const HEADS_POINTS = { least: 100, most: 1600 }
+/**
+ * Those whose points vary, each one had: tricks landed, doubling like heads;
+ * grinds, for how long; ski jumps, for how far.
+ */
+const RANGED_POINTS = {
+	heads: HEADS_POINTS,
+	tricks: { least: 100, most: 1600 },
+	grinds: { least: 50, most: 500 },
+	jumps: { least: 0, most: 1500 },
+} as const
 /**
  * The most of each a course has, with some to spare: the most fika on any
  * course is 18, cheers 6, pumpkins 8, rides 8, geese 8 and Rings 40.
@@ -61,13 +72,20 @@ const MOST_PER_COURSE = {
 	pumpkins: 10,
 	barcodes: 1,
 	rings: 50,
+	gates: 30,
 	heads: 60,
+	tricks: 160,
+	grinds: 40,
+	jumps: 3,
 } as const
 
-type BonusKind = keyof typeof FIXED_POINTS | 'heads' | 'speed'
+type BonusKind =
+	| keyof typeof FIXED_POINTS
+	| keyof typeof RANGED_POINTS
+	| 'speed'
 const BONUS_KINDS: BonusKind[] = [
 	...(Object.keys(FIXED_POINTS) as (keyof typeof FIXED_POINTS)[]),
-	'heads',
+	...(Object.keys(RANGED_POINTS) as (keyof typeof RANGED_POINTS)[]),
 	'speed',
 ]
 
@@ -151,15 +169,15 @@ export function implausible(
 				(metres * PX_PER_M * (1 / BUS_START_SPEED - 1 / TOP_SPEED) +
 					BUS_HOLD_TICKS * courses)
 			if (count > courses || points < 0 || points > most) return 'speed'
-		} else if (kind === 'heads') {
-			if (count > MOST_PER_COURSE.heads * courses) return 'heads'
-			if (
-				points < count * HEADS_POINTS.least ||
-				points > count * HEADS_POINTS.most
-			)
-				return 'heads'
+		} else if (kind in RANGED_POINTS) {
+			const range = RANGED_POINTS[kind as keyof typeof RANGED_POINTS]
+			const most = MOST_PER_COURSE[kind as keyof typeof RANGED_POINTS]
+			if (count > most * courses) return kind
+			if (points < count * range.least || points > count * range.most)
+				return kind
 		} else {
-			if (points !== count * FIXED_POINTS[kind]) return kind
+			const fixed = FIXED_POINTS[kind as keyof typeof FIXED_POINTS]
+			if (points !== count * fixed) return kind
 			if (kind !== 'hazards' && count > MOST_PER_COURSE[kind] * courses)
 				return kind
 		}

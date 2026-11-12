@@ -12,6 +12,7 @@ import { GooseIcon } from './geese'
 import { GliderArt } from './glider'
 import { GoatArt } from './goat'
 import { LlamaArt } from './llama'
+import { StoodBoardArt } from './skis'
 import { UnicornArt } from './unicorn'
 
 /** A collectable's picture, as it's seen on the course: its fika, its ride, sat waiting. */
@@ -34,6 +35,11 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <UnicornArt pose="sit" />
 		case 'ride:goat':
 			return <GoatArt pose="sit" />
+		case 'ride:skis':
+			// The rack's first pair, stood up in the snow; and its first snowboard.
+			return <StoodBoardArt board={1} />
+		case 'ride:snowboard':
+			return <StoodBoardArt board={2} />
 		case 'ride:glider':
 			return (
 				<div style={{ transform: 'scale(0.6)' }}>

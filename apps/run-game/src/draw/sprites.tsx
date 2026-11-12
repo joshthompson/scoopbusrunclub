@@ -12,7 +12,7 @@ import {
 	createController,
 	createObjectSignal,
 } from 'scoopjs'
-import { For, Index, type JSX, Show, createSignal } from 'solid-js'
+import { For, Index, type JSX, Show, createMemo, createSignal } from 'solid-js'
 import barcodeAsset from '../assets/boosts/barcode.png'
 // The website's bus, turned round to chase to the right.
 import busBackAsset from '../assets/bus/bus-back.png'
@@ -35,6 +35,7 @@ import purpleSignAsset from '../assets/signs/purple-sign.png'
 import { bouncyToadstool } from '../courses/kit/furbyScenery'
 import { seeded } from '../courses/kit/seeded'
 import type { Obstacle, PlatformDefinition } from '../courses/types'
+import { boardOf } from '../game/boards'
 import { inTunnel } from '../game/cave'
 import {
 	BARCODE_TALL,
@@ -88,11 +89,13 @@ import type {
 	ObstacleState,
 	Pacer,
 	Racer,
+	TrickKind,
 	World,
 } from '../game/world'
 import { ZOMBIE_SINK_GONE, zombieAt } from '../game/zombies'
 import { customRunners } from '../runners/customRunners'
 import { guests } from '../runners/guests'
+import type { Playable } from '../runners/playable'
 import { MEMBERS } from '../runners/playable'
 import { SKELETON_FILTER, zombieSprite } from '../runners/skeleton'
 import { play } from '../sfx'
@@ -125,6 +128,14 @@ import {
 	SwampManArt,
 } from './art/sewer'
 import {
+	BoardUnder,
+	BusSpray,
+	STOOD_HEIGHT,
+	STOOD_WIDTH,
+	StoodBoardArt,
+	UNDER_LIFT,
+} from './art/skis'
+import {
 	BalloonArt,
 	GullArt,
 	RingArt,
@@ -134,6 +145,15 @@ import {
 	WHALE_WIDTH,
 	WhaleArt,
 } from './art/sky'
+import {
+	GATE_HEIGHT,
+	GATE_WIDTH,
+	GateArt,
+	RailArt,
+	SNOWMAN_DRAWN,
+	SNOWMAN_WIDTH,
+	SnowmanArt,
+} from './art/slopes'
 import {
 	SPLASH_HEIGHT,
 	SPLASH_TICKS,
@@ -222,18 +242,44 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const run = sprite.run
 	const sit = sprite.sit
 	const stand = sprite.stand
+	const skiTuck = sprite.skiTuck
+	const skiStance = sprite.ski
 	const runSize = {
 		width: sprite.width * RUNNER_SCALE,
 		height: sprite.height * RUNNER_SCALE,
 	}
 
 	const { body } = racer
-	// Sat down, ducking or riding a corgi. `body` isn't a signal: reading
-	// the tick keeps this up to date.
+	/** On skis or a snowboard: which, if so. `body` isn't a signal: reading the tick keeps this up to date. */
+	const board = createMemo(() => (world.ticks() >= 0 ? body.board : 0))
+	/** Crouched on them: curled up in a trick, or in a heap, wiped out. */
+	const crouched = (b: Body) => curled(b) || b.wipeout > 0
+	// Sat down, ducking or riding a corgi; or crouched on skis. `body` isn't
+	// a signal: reading the tick keeps this up to date.
 	const ducking = () =>
 		world.ticks() >= 0 &&
-		(body.ducking || body.mount > 0 || (seated && body.carried > 0)) &&
+		(body.ducking ||
+			body.mount > 0 ||
+			(seated && body.carried > 0) ||
+			(body.board > 0 && crouched(body))) &&
 		!!sit
+	/**
+	 * Tucked down on skis, on the snow, or curled up in a trick: in their ski
+	 * tuck, poles under their arms, if they've one. On a snowboard, ducked.
+	 */
+	const tucked = () =>
+		world.ticks() >= 0 &&
+		!!skiTuck &&
+		body.board > 0 &&
+		boardOf(body.board).kind === 'skis' &&
+		body.wipeout === 0 &&
+		(curled(body) || body.ducking)
+	/** Stood up on skis, not a snowboard, in their ski pose, if they've one: poles in hand. */
+	const onSkis = () =>
+		world.ticks() >= 0 &&
+		!!stanceOf(sprite, body.board) &&
+		!tucked() &&
+		!ducking()
 	// Stood still, on their feet: on the start line, or stopped.
 	const standing = () =>
 		world.ticks() >= 0 &&
@@ -244,19 +290,36 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		racer.out !== 'scooped' &&
 		Math.abs(body.vx) < STILL_SPEED
 	// On a glider, lying along under its wing, head first, legs together:
-	// the stand frame, turned over.
-	const lying = () => world.ticks() >= 0 && body.gliding
+	// the stand frame, turned over. On skis, stood up on them.
+	const lying = () => world.ticks() >= 0 && (body.gliding || body.board > 0)
 	/** How they're tipped, lying on a glider: nose up climbing, down diving. */
 	let was = body.feetY
 	let tilt = 0
+	/** On skis in the air, how far they're pitched, nose up or down, smoothed. */
+	let air = 0
+	const [spray, setSpray] = createSignal(false)
+	const [sparks, setSparks] = createSignal(false)
 
 	return createController({
-		frames: [...run, ...(sit ? [sit] : []), ...(stand ? [stand] : [])],
+		frames: [
+			...run,
+			...(sit ? [sit] : []),
+			...(stand ? [stand] : []),
+			...(skiTuck ? [skiTuck] : []),
+			...(skiStance ? [skiStance] : []),
+			...(sprite.snowboard ? [sprite.snowboard] : []),
+		],
 		init() {
 			const size = () =>
 				// Stood, as tall and wide as a run frame: a custom runner's stand
 				// is one frame of a strip, not a picture of its own.
-				ducking() ? poseSize(sit, sprite) : runSize
+				tucked()
+					? poseSize(skiTuck, sprite)
+					: ducking()
+						? poseSize(sit, sprite)
+						: onSkis()
+							? poseSize(stanceOf(sprite, body.board), sprite)
+							: runSize
 			return {
 				id: `player-${racer.id}`,
 				type: 'player',
@@ -265,11 +328,15 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				width: () => size().width,
 				height: () => size().height,
 				frames: () =>
-					ducking() && sit
-						? [sit]
-						: (standing() || lying()) && stand
-							? [stand]
-							: run,
+					tucked() && skiTuck
+						? [skiTuck]
+						: ducking() && sit
+							? [sit]
+							: onSkis()
+								? [stanceOf(sprite, body.board) ?? stand ?? run[0]]
+								: (standing() || lying()) && stand
+									? [stand]
+									: run,
 				...createObjectSignal(undefined as number | undefined, 'frame'),
 				// Run sprites face left, the way the header's runners run.
 				...createObjectSignal(-1, 'xScale'),
@@ -277,14 +344,34 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				...createObjectSignal(100, 'frameInterval'),
 				...createObjectSignal('pause' as 'play' | 'pause', 'state'),
 				...createObjectSignal({} as JSX.CSSProperties, 'style'),
+				// Their skis or snowboard, under their feet.
+				children: () => (
+					<Show when={board()}>
+						{(on) => (
+							<>
+								<BoardUnder
+									board={on()}
+									width={size().width}
+									spray={spray()}
+									sparks={sparks()}
+								/>
+							</>
+						)}
+					</Show>
+				),
 			}
 		},
 		onEnterFrame({ $ }) {
 			const { body } = racer
 			const width = $.width()
 			$.setX(body.x - width / 2)
-			// Up on a corgi's back, riding one.
-			$.setY(body.feetY - $.height() - (body.mount > 0 ? saddle : 0))
+			// Up on a corgi's back, riding one; or on their skis.
+			$.setY(
+				body.feetY -
+					$.height() -
+					(body.mount > 0 ? saddle : 0) -
+					(body.board > 0 ? UNDER_LIFT : 0),
+			)
 
 			if (racer.out === 'scooped') {
 				$.setRotation(body.spin * 14)
@@ -292,13 +379,22 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				return
 			}
 			const xScale = body.facing === 1 ? -1 : 1
-			$.setXScale(xScale)
 			const dy = body.feetY - was
 			was = body.feetY
 			tilt += (Math.max(-12, Math.min(12, dy * 3)) - tilt) * 0.2
-			$.setRotation(
-				body.gliding ? GLIDING_LEAN + tilt : runnerLean(world, body),
-			)
+			if (body.board > 0) {
+				const pose = skiPose(world, body, air)
+				air = pose.air
+				$.setXScale(xScale * pose.xScale)
+				$.setRotation(pose.rotation)
+				setSpray(pose.spray)
+				setSparks(pose.sparks)
+			} else {
+				$.setXScale(xScale)
+				$.setRotation(
+					body.gliding ? GLIDING_LEAN + tilt : runnerLean(world, body),
+				)
+			}
 			// Sat down, the one sit frame: switching to it from a run frame
 			// would otherwise leave the engine on a frame it doesn't have. In
 			// the air, legs out in one stride.
@@ -309,12 +405,12 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			$.setFrame(
 				sitting || standing() || (lying() && stand)
 					? 0
-					: body.grounded
+					: body.grounded && !body.board
 						? undefined
 						: 1,
 			)
 			const speed = Math.abs(body.vx)
-			$.setState(body.grounded && speed > 0.3 ? 'play' : 'pause')
+			$.setState(body.grounded && !body.board && speed > 0.3 ? 'play' : 'pause')
 			$.setFrameInterval(Math.max(45, 190 - speed * 22))
 			const { sea } = world.course
 			$.setStyle({
@@ -338,6 +434,90 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 
 /** How far over a glider's rider is turned, lying along under it, head first. */
 const GLIDING_LEAN = 80
+
+/** Tucked, faster than this, snow sprays off the back of them. */
+const TUCK_SPRAY_SPEED = 3
+/** Faster than this on skis, snow sprays off the back of them. */
+const SPRAY_SPEED = 7
+/** How far over someone wiped out lies, in a heap in the snow. */
+const WIPEOUT_LEAN = 84
+
+/**
+ * How someone on skis or a snowboard is drawn, from how they're going:
+ * along the snow under them, its slope; in the air, pitched with how
+ * they're flying, smoothed from `air` as it was, and turned round in a
+ * trick, flipped over or spun about (`xScale` through 0 and back);
+ * wiped out, lying in the snow. Snow sprays off the back at speed, and
+ * sparks off a rail.
+ */
+function skiPose(
+	world: World,
+	b: Pick<
+		Body,
+		| 'x'
+		| 'vx'
+		| 'vy'
+		| 'grounded'
+		| 'grind'
+		| 'trick'
+		| 'turn'
+		| 'wipeout'
+		| 'ducking'
+	>,
+	air: number,
+) {
+	// On a rail, grinding it; not along a roof.
+	const grinding =
+		b.grind !== undefined && world.course.rails?.[b.grind]?.look !== 'roof'
+	const slope = (Math.atan(tiltAt(world.terrain, b.x)) * 180) / Math.PI
+	const flying = Math.max(
+		-30,
+		Math.min(
+			40,
+			(Math.atan2(b.vy, Math.max(2, Math.abs(b.vx))) * 180) / Math.PI,
+		),
+	)
+	const pitch = b.grounded ? slope : flying
+	const smoothed = air + (pitch - air) * (b.grounded ? 0.5 : 0.15)
+	const spinning = b.trick === 'spin'
+	const turn = b.turn * (Math.PI / 180)
+	const along = Math.cos(turn)
+	return {
+		air: smoothed,
+		rotation:
+			b.wipeout > 0
+				? WIPEOUT_LEAN
+				: smoothed +
+					(b.trick === 'backflip' || b.trick === 'frontflip' ? b.turn : 0) +
+					(b.trick === 'grab' ? -18 : 0),
+		// Spun round: narrower, and through 0 to the other way, and back.
+		xScale: spinning
+			? Math.sign(along || 1) * Math.max(0.15, Math.abs(along))
+			: 1,
+		spray:
+			b.grounded &&
+			!grinding &&
+			b.wipeout === 0 &&
+			// Tucked down, sooner: snow flying off them, to see it.
+			Math.abs(b.vx) > (b.ducking ? TUCK_SPRAY_SPEED : SPRAY_SPEED),
+		sparks: b.grounded && grinding,
+	}
+}
+
+/**
+ * How someone stands on their `board`, in their own pose for it, if they've
+ * one: their ski stance on skis, their snowboard stance on a snowboard.
+ */
+const stanceOf = (sprite: Playable['sprite'], board: number | undefined) =>
+	board
+		? boardOf(board).kind === 'skis'
+			? sprite.ski
+			: sprite.snowboard
+		: undefined
+
+/** Curled up in a trick, in the air: grabbing their board, or rolling forward. */
+const curled = (b: { trick?: TrickKind }) =>
+	b.trick === 'grab' || b.trick === 'frontflip'
 
 /** Slower than this, on their feet, someone's stood still, not running. */
 const STILL_SPEED = 0.3
@@ -376,9 +556,27 @@ function createPacer(world: World, p: Pacer) {
 	}
 	const sit = sprite.sit
 	const stand = sprite.stand
-	/** Ducked down, going through a Tunnel. `p` isn't a signal: reading the tick keeps this up to date. */
+	const skiTuck = sprite.skiTuck
+	const skiStance = sprite.ski
+	/**
+	 * Curled up on skis, in a trick: in their ski tuck, poles under their
+	 * arms, if they've one. `p` isn't a signal: reading the tick keeps this
+	 * up to date.
+	 */
+	const tucked = () =>
+		world.ticks() >= 0 &&
+		!!skiTuck &&
+		!!p.board &&
+		boardOf(p.board).kind === 'skis' &&
+		curled(p)
+	/** Stood up on skis, not a snowboard, in their ski pose, if they've one: poles in hand. */
+	const onSkis = () =>
+		world.ticks() >= 0 && !!stanceOf(sprite, p.board) && !tucked()
+	/** Ducked down, going through a Tunnel, or curled up in a trick. `p` isn't a signal: reading the tick keeps this up to date. */
 	const ducked = () =>
-		world.ticks() >= 0 && !!sit && p.grounded && inTunnel(world, p.x, p.feetY)
+		world.ticks() >= 0 &&
+		!!sit &&
+		((p.grounded && inTunnel(world, p.x, p.feetY)) || (!!p.board && curled(p)))
 	/** Stood still, on the start line or stopped. */
 	const standing = () =>
 		world.ticks() >= 0 &&
@@ -387,14 +585,33 @@ function createPacer(world: World, p: Pacer) {
 		p.grounded &&
 		!p.scooped &&
 		Math.abs(p.vx) < STILL_SPEED
-	const size = () => (ducked() ? poseSize(sit, sprite) : runSize)
-	/** On a glider, lying along under it, as a racer does. */
-	const lying = () => world.ticks() >= 0 && !!p.gliding
+	const size = () =>
+		tucked()
+			? poseSize(skiTuck, sprite)
+			: ducked()
+				? poseSize(sit, sprite)
+				: onSkis()
+					? poseSize(stanceOf(sprite, p.board), sprite)
+					: runSize
+	/** On a glider, lying along under it, as a racer does; or stood up on skis. */
+	const lying = () => world.ticks() >= 0 && (!!p.gliding || !!p.board)
 	let was = p.feetY
 	let tilt = 0
+	/** On skis, which, and how they're pitched in the air; snow spraying, sparks flying. */
+	const board = createMemo(() => (world.ticks() >= 0 ? (p.board ?? 0) : 0))
+	let air = 0
+	const [spray, setSpray] = createSignal(false)
+	const [sparks, setSparks] = createSignal(false)
 	const { sea } = world.course
 	return createController({
-		frames: [...sprite.run, ...(sit ? [sit] : []), ...(stand ? [stand] : [])],
+		frames: [
+			...sprite.run,
+			...(sit ? [sit] : []),
+			...(stand ? [stand] : []),
+			...(skiTuck ? [skiTuck] : []),
+			...(skiStance ? [skiStance] : []),
+			...(sprite.snowboard ? [sprite.snowboard] : []),
+		],
 		randomStartFrame: true,
 		init: () => ({
 			id: `pacer-${p.id}`,
@@ -404,27 +621,75 @@ function createPacer(world: World, p: Pacer) {
 			width: () => size().width,
 			height: () => size().height,
 			frames: () =>
-				ducked() && sit
-					? [sit]
-					: (standing() || lying()) && stand
-						? [stand]
-						: sprite.run,
+				tucked() && skiTuck
+					? [skiTuck]
+					: ducked() && sit
+						? [sit]
+						: onSkis()
+							? [stanceOf(sprite, p.board) ?? stand ?? sprite.run[0]]
+							: (standing() || lying()) && stand
+								? [stand]
+								: sprite.run,
 			...createObjectSignal(undefined as number | undefined, 'frame'),
 			// Facing right, the way they're running.
-			xScale: () => -1,
 			...createObjectSignal(0, 'rotation'),
 			...createObjectSignal(150, 'frameInterval'),
 			...createObjectSignal('pause' as 'play' | 'pause', 'state'),
 			...createObjectSignal({} as JSX.CSSProperties, 'style'),
+			...createObjectSignal(-1, 'xScale'),
+			children: () => (
+				<Show when={board()}>
+					{(on) => (
+						<>
+							<BoardUnder
+								board={on()}
+								width={size().width}
+								spray={spray()}
+								sparks={sparks()}
+							/>
+						</>
+					)}
+				</Show>
+			),
 		}),
 		onEnterFrame({ $ }) {
 			$.setX(p.x - $.width() / 2)
-			$.setY(p.feetY - $.height())
+			$.setY(p.feetY - $.height() - (p.board ? UNDER_LIFT : 0))
 			if (p.scooped) {
 				$.setRotation(p.spin * 14)
 				$.setState('pause')
 				return
 			}
+			if (p.board) {
+				const pose = skiPose(
+					world,
+					{
+						x: p.x,
+						vx: p.vx,
+						vy: p.vy,
+						grounded: p.grounded,
+						grind: p.grind,
+						trick: p.trick,
+						turn: p.turn ?? 0,
+						wipeout: 0,
+						ducking: false,
+					},
+					air,
+				)
+				air = pose.air
+				$.setXScale(-pose.xScale)
+				$.setRotation(pose.rotation)
+				setSpray(pose.spray)
+				setSparks(pose.sparks)
+				$.setFrame(ducked() || (lying() && stand) ? 0 : 1)
+				$.setState('pause')
+				$.setStyle({
+					opacity: p.dazed > 0 && p.dazed % 8 < 4 ? '0.4' : '1',
+					filter: p.skeleton ? SKELETON_FILTER : undefined,
+				})
+				return
+			}
+			$.setXScale(-1)
 			// Leaning with the hill, running; upright, stood still; lying
 			// along under a glider, tipped as it climbs and dives.
 			const dy = p.feetY - was
@@ -699,6 +964,8 @@ export function createGiantFurby(world: World) {
 export function createCorgis(world: World) {
 	if (world.course.ride === 'glider')
 		return world.corgis.map((c) => createGlider(world, c))
+	if (world.course.ride === 'skis')
+		return world.corgis.map((c) => createStoodBoard(world, c))
 	return world.corgis.map((c) => createCorgi(world, c))
 }
 
@@ -735,6 +1002,34 @@ function createGlider(world: World, c: Corgi) {
 			was = c.feetY
 			tilt += (Math.max(-12, Math.min(12, dy * 3)) - tilt) * 0.2
 			$.setRotation(c.state === 'waiting' ? 6 : tilt)
+		},
+	})
+}
+
+/**
+ * A pair of skis, or a snowboard, stood up in the snow at the top: gone
+ * once someone's taken them, onto their feet; flying, scooped.
+ */
+function createStoodBoard(world: World, c: Corgi) {
+	return createController({
+		init: () => ({
+			id: `corgi-${c.id}`,
+			type: 'corgi',
+			...createObjectSignal(c.x - STOOD_WIDTH / 2, 'x'),
+			...createObjectSignal(c.feetY - STOOD_HEIGHT + 4, 'y'),
+			width: () => STOOD_WIDTH,
+			height: () => STOOD_HEIGHT,
+			...createObjectSignal(0, 'rotation'),
+			...createObjectSignal({} as JSX.CSSProperties, 'style'),
+			children: () => <StoodBoardArt board={c.id + 1} />,
+		}),
+		onEnterFrame({ $ }) {
+			$.setX(c.x - STOOD_WIDTH / 2)
+			$.setY(c.feetY - STOOD_HEIGHT + 4)
+			$.setRotation(c.state === 'scooped' ? c.spin * 14 : 0)
+			$.setStyle({
+				visibility: c.state === 'ridden' ? 'hidden' : 'visible',
+			})
 		},
 	})
 }
@@ -809,6 +1104,96 @@ function createCorgi(world: World, c: Corgi) {
 	})
 }
 
+/**
+ * The rails, boxes and logs down The Slopes, to grind along: each along the
+ * snow at its height, following it down, its legs into the snow.
+ */
+export function createRails(world: World) {
+	const { groundY } = world.terrain
+	// Roofs are drawn as what they're the roof of: see `createHut`.
+	return (world.course.rails ?? []).flatMap((rail, i) => {
+		if (rail.look === 'roof') return []
+		const xs: number[] = []
+		for (let x = rail.from; x < rail.to; x += 8) xs.push(x)
+		xs.push(rail.to)
+		const top = Math.min(...xs.map((x) => groundY(x) - rail.height)) - 4
+		const bottom = Math.max(...xs.map((x) => groundY(x))) + 8
+		const left = rail.from - 4
+		const tops = xs.map((x): [number, number] => [
+			x - left,
+			groundY(x) - rail.height - top,
+		])
+		const feet = xs.map((x): [number, number] => [x - left, groundY(x) - top])
+		const width = rail.to - rail.from + 8
+		const height = bottom - top
+		return createController({
+			init: () => ({
+				id: `rail-${i}`,
+				type: 'platform',
+				x: () => left,
+				y: () => top,
+				width: () => width,
+				height: () => height,
+				children: () => (
+					<RailArt
+						rail={rail}
+						width={width}
+						height={height}
+						tops={tops}
+						feet={feet}
+					/>
+				),
+			}),
+		})
+	})
+}
+
+/**
+ * The hut the course runs through, if it has one: its inside behind
+ * whoever's in it, its front over them, lifted away while someone racing's
+ * inside, under its roof, to see them in there (see `Hut`).
+ */
+export function createHut(world: World) {
+	const hut = world.course.hut
+	if (!hut) return []
+	const width = hut.to - hut.from
+	const height = hut.above + hut.height + PATH_FRONT
+	const top = world.terrain.groundY(hut.from) - hut.height - hut.above
+	/** Whether someone racing's inside it, in under its roof: not up on it. */
+	const inside = () =>
+		world.racers.some(
+			({ body, out }) =>
+				!out &&
+				body.x > hut.from &&
+				body.x < hut.to &&
+				body.feetY > world.terrain.groundY(body.x) - hut.height + 2,
+		)
+	const part = (id: string, type: string, src: string, front: boolean) =>
+		createController({
+			init: () => ({
+				id,
+				type,
+				x: () => hut.from,
+				y: () => top,
+				width: () => width,
+				height: () => height,
+				children: () => <PixelArt src={src} width={width} height={height} />,
+				// Its front, lifted away while someone's inside. `inside` isn't
+				// a signal: reading the tick keeps it up to date.
+				style: front
+					? () => ({
+							opacity: world.ticks() >= 0 && inside() ? 0 : 1,
+							transition: 'opacity 0.25s',
+						})
+					: undefined,
+			}),
+		})
+	return [
+		part('hut-back', 'platform', hut.back, false),
+		part('hut-front', 'foreground', hut.front, true),
+	]
+}
+
 /** The course's furbies, if it has any. */
 export function createFurbies(world: World) {
 	return world.furbies.map((f) => createFurby(world, f))
@@ -860,6 +1245,14 @@ function createFurby(world: World, f: Furby) {
 
 const BUS_WIDTH = 247
 const BUS_HEIGHT = 127
+/**
+ * The sleigh, in place of the bus down a ski slope (see `BusLook['sleigh']`):
+ * its size, and how far above the top of the bus it's drawn, so its runners
+ * are where the bus's wheels touch the ground. As on the website.
+ */
+const SLEIGH_WIDTH = 312
+const SLEIGH_HEIGHT = 148
+const SLEIGH_Y = -6
 /** How far down into the bus's roof its glider's struts' feet go. */
 const BUS_GLIDER_ROOF = 10
 /** The scoop's front edge, this far in from the bus's left. */
@@ -988,7 +1381,8 @@ export function createBus(world: World) {
 		return ((dug?.(x + 4) ?? here) - (dug?.(x - 4) ?? here)) / 8
 	}
 	const bus = createController({
-		frames: [busBackAsset],
+		// A sleigh has no back to see through its windows.
+		frames: look.sleigh ? [] : [busBackAsset],
 		init: () => ({
 			id: 'bus',
 			type: 'bus',
@@ -1004,14 +1398,14 @@ export function createBus(world: World) {
 			const ride = world.bus.ride
 			rideBus(world, ride, middle)
 			$.setX(world.bus.frontX - SCOOP_FRONT - drillOut())
-			$.setY(
-				ride.y - WHEEL_BOTTOM + (ride.grounded ? Math.cos(10 + $age / 2) : 0),
-			)
+			// Its engine rumbling it about, a little; a sleigh glides, smooth.
+			const rumbles = ride.grounded && !look.sleigh
+			$.setY(ride.y - WHEEL_BOTTOM + (rumbles ? Math.cos(10 + $age / 2) : 0))
 			// Nose up as it jumps, down as it drops; with the hill, on it.
 			$.setRotation(
 				ride.grounded
 					? (Math.atan(slope(middle)) * 180) / Math.PI +
-							(Math.random() - 0.5) * 0.8
+							(rumbles ? (Math.random() - 0.5) * 0.8 : 0)
 					: Math.max(-14, Math.min(14, ride.vy * 1.4)),
 			)
 		},
@@ -1074,7 +1468,7 @@ export function createBus(world: World) {
 		)
 	}
 	if (look.legs) legs('bus-legs-far', true)
-	else {
+	else if (!look.sleigh) {
 		part(
 			'bus-wheel1',
 			wheel1Asset,
@@ -1108,18 +1502,44 @@ export function createBus(world: World) {
 			{ y: bounce(15) },
 		)
 	}
-	part(
-		'bus-window',
-		look.windows,
-		212,
-		40,
-		{ x: 9, y: 26 },
-		{
-			style: () => ({ opacity: 0.75 }),
-		},
-	)
-	part('bus-body', look.body, BUS_WIDTH, BUS_HEIGHT, { x: 0, y: 0 })
+	if (!look.sleigh)
+		part(
+			'bus-window',
+			look.windows,
+			212,
+			40,
+			{ x: 9, y: 26 },
+			{
+				style: () => ({ opacity: 0.75 }),
+			},
+		)
+	// A sleigh, in place of its body: wider and taller than the bus, level
+	// with its front, and a little higher, its runners where its wheels touch.
+	if (look.sleigh)
+		part('bus-body', look.sleigh, SLEIGH_WIDTH, SLEIGH_HEIGHT, {
+			x: BUS_WIDTH - SLEIGH_WIDTH,
+			y: SLEIGH_Y,
+		})
+	else part('bus-body', look.body, BUS_WIDTH, BUS_HEIGHT, { x: 0, y: 0 })
 	legs('bus-legs', false)
+	// Snow sprayed off the back of its sleigh's runners, as it goes.
+	if (look.sleigh)
+		bus.attach(
+			createConnectedController({
+				type: 'bus-spray',
+				base: bus,
+				width: () => 0,
+				height: () => 0,
+				offset: { x: BUS_WIDTH - SLEIGH_WIDTH + 14, y: WHEEL_BOTTOM - 10 },
+				init: () => ({
+					children: () => (
+						<div style={{ position: 'absolute', transform: 'scaleX(-1)' }}>
+							<BusSpray />
+						</div>
+					),
+				}),
+			}),
+		)
 	// Its own glider, bolted to its roof, out over the sea.
 	if (world.course.sea)
 		part(
@@ -2360,6 +2780,29 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 		case 'turbine':
 		case 'whale':
 			return createSkyThing(world, state, o, id)
+		case 'snowman':
+			return createFixture({
+				id,
+				type: 'hazard',
+				x: o.x,
+				sink: 3,
+				width: SNOWMAN_WIDTH,
+				height: SNOWMAN_DRAWN,
+				world,
+				// Burst, flying apart, then a heap. Neither's a signal: reading
+				// the tick keeps it up to date.
+				children: () => (
+					<Scoopable world={world} state={state}>
+						<SnowmanArt
+							since={
+								world.ticks() >= 0 && state.flown !== undefined
+									? world.ticks() - state.flown
+									: undefined
+							}
+						/>
+					</Scoopable>
+				),
+			})
 	}
 }
 
@@ -2572,6 +3015,22 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				),
 			})
 		}
+		case 'gate':
+			// At the edge of the piste, red at its back, behind whoever goes
+			// past it, blue at its front, in front of them: in turn, so the
+			// course weaves past them. Flapping, gone past.
+			return createFixture({
+				id,
+				type: o.colour === 'red' ? 'banner' : 'banner-front',
+				x: o.x,
+				sink: o.colour === 'red' ? 4 - PATH_BACK : PATH_FRONT - 4,
+				width: GATE_WIDTH,
+				height: GATE_HEIGHT,
+				world,
+				children: () => (
+					<GateArt colour={o.colour} flapping={state.cheering() > 0} />
+				),
+			})
 		case 'ring': {
 			// Its far half behind whoever's going through it, its near half in
 			// front of them; lit up, as someone does.

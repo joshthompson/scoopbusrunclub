@@ -235,7 +235,11 @@ export interface RaceStart {
 	pack: PacerIntro[]
 }
 
-/** [x, feetY, vx, flags (see `RACER_FLAGS`), stumble, spin, out (0 running, 1 scooped, 2 finished, 3 fallen), outAt] */
+/**
+ * [x, feetY, vx, flags (see `RACER_FLAGS`), stumble, spin, out (0 running,
+ * 1 scooped, 2 finished, 3 fallen), outAt], and down The Slopes, on skis:
+ * their ski state (see `skiState`), and how far round a trick they are.
+ */
 export type RacerState = [
 	number,
 	number,
@@ -245,6 +249,8 @@ export type RacerState = [
 	number,
 	number,
 	number,
+	ski?: number,
+	turn?: number,
 ]
 export const RACER_FLAGS = {
 	grounded: 1,
@@ -261,7 +267,7 @@ export const RACER_FLAGS = {
 }
 /** The Pumpkin a racer's wearing, by its carving, is the flags over this. */
 export const PUMPKIN_FLAG = 256
-/** [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding), dazed, spin] */
+/** [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding), dazed, spin], and on skis, their ski state and trick's turn */
 export type PacerState = [
 	number,
 	number,
@@ -270,7 +276,42 @@ export type PacerState = [
 	number,
 	number,
 	number,
+	ski?: number,
+	turn?: number,
 ]
+
+/**
+ * Someone's skis, in a number: which board they're on (0 none), whether
+ * they're grinding (16), the trick they're in (its place in `TRICK_KINDS`,
+ * from 1, times 32), and whether they've wiped out (512).
+ */
+export function skiState(
+	s: {
+		board?: number
+		grind?: number
+		trick?: string
+		wipeout?: number
+	},
+	tricks: readonly string[],
+) {
+	const trick = s.trick ? tricks.indexOf(s.trick) + 1 : 0
+	return (
+		(s.board ?? 0) +
+		(s.grind !== undefined ? 16 : 0) +
+		trick * 32 +
+		((s.wipeout ?? 0) > 0 ? 512 : 0)
+	)
+}
+
+/** A ski state, back as what it says. */
+export function fromSkiState(state: number, tricks: readonly string[]) {
+	return {
+		board: state % 16,
+		grinding: !!(state & 16),
+		trick: tricks[(Math.floor(state / 32) % 16) - 1],
+		wipedOut: !!(state & 512),
+	}
+}
 /** [x, feetY, facing, state, spin, landed, timer] */
 export type FurbyStateFrame = [
 	number,

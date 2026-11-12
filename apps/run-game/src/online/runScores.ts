@@ -1,6 +1,9 @@
 import { createSignal } from 'solid-js'
 import type { BonusKind, World } from '../game/world'
 import { type ScoreIcon, identity } from '../saved/identity'
+import { ONLINE, ask, isObject, numberIn, post, stringIn } from './backend'
+
+export { ONLINE }
 
 /**
  * The online high score tables, on the website's backend: one for Endless,
@@ -14,9 +17,6 @@ import { type ScoreIcon, identity } from '../saved/identity'
  * `VITE_CONVEX_URL`, as when developing), or with no connection, there's
  * just no ticket, and the score stays in this browser.
  */
-
-const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string | undefined) ?? ''
-export const ONLINE = !!CONVEX_URL
 
 /** How many a table shows: in step with the backend's. */
 export const ONLINE_TABLE_SIZE = 10
@@ -74,24 +74,10 @@ export const EMPTY_TALLY: Tally = {
 	bonuses: {},
 }
 
-/** Post to the backend, as plain text so there's no asking first (no CORS preflight). */
-async function post<T>(path: string, body: unknown): Promise<T | undefined> {
-	try {
-		const response = await fetch(`${CONVEX_URL}${path}`, {
-			method: 'POST',
-			body: JSON.stringify(body),
-		})
-		return (await response.json()) as T
-	} catch {
-		return undefined
-	}
-}
-
 /** A ticket for a run of a table, starting now: undefined offline. */
 export async function startRun(table: string): Promise<string | undefined> {
 	if (!ONLINE) return undefined
-	const result = await post<{ ticket?: string }>('/api/run/start', { table })
-	return result?.ticket
+	return stringIn(await post('/api/run/start', { table }), 'ticket')
 }
 
 /**
@@ -118,7 +104,8 @@ export function endlessRun(runId: string): EndlessRun {
 export interface OnlineEntry {
 	score: number
 	name: string
-	icon: ScoreIcon
+	/** Whose head it's under: none if the backend's is one this game doesn't know. */
+	icon?: ScoreIcon
 	date: string
 	metres?: number
 	finished?: boolean
@@ -133,6 +120,46 @@ export interface OnlineTable {
 	mine?: { rank: number; entry: OnlineEntry }
 }
 
+/** A score's icon from the backend: undefined if it isn't one, for no face. */
+function asIcon(icon: unknown): ScoreIcon | undefined {
+	if (!isObject(icon)) return undefined
+	if (typeof icon.member === 'string') return { member: icon.member }
+	if (isObject(icon.look)) return icon as ScoreIcon
+	return undefined
+}
+
+/** An entry from the backend, as it's shown: undefined if it's missing its score or name. */
+function asEntry(entry: unknown): OnlineEntry | undefined {
+	const score = numberIn(entry, 'score')
+	const name = stringIn(entry, 'name')
+	if (score === undefined || name === undefined || !isObject(entry))
+		return undefined
+	return {
+		score,
+		name,
+		icon: asIcon(entry.icon),
+		date: stringIn(entry, 'date') ?? '',
+		metres: numberIn(entry, 'metres'),
+		finished: entry.finished === true,
+		courses: numberIn(entry, 'courses'),
+		mine: entry.mine === true,
+	}
+}
+
+/** A table from the backend: undefined if it isn't one. */
+function asTable(table: unknown): OnlineTable | undefined {
+	if (!isObject(table) || !Array.isArray(table.entries)) return undefined
+	const entries = table.entries
+		.map(asEntry)
+		.filter((entry) => entry !== undefined)
+	const rank = numberIn(table.mine, 'rank')
+	const entry = isObject(table.mine) ? asEntry(table.mine.entry) : undefined
+	return {
+		entries,
+		mine: rank !== undefined && entry ? { rank, entry } : undefined,
+	}
+}
+
 /** The tables fetched so far, by id: shown straight away next time, while it's fetched again. */
 const [tables, setTables] = createSignal<Record<string, OnlineTable>>({})
 export const onlineTable = (table: string) => tables()[table]
@@ -142,19 +169,22 @@ export async function fetchTable(
 	table: string,
 ): Promise<OnlineTable | undefined> {
 	if (!ONLINE) return undefined
-	try {
-		const params = new URLSearchParams({
-			table,
-			player: identity().playerId,
-		})
-		const response = await fetch(`${CONVEX_URL}/api/run/scores?${params}`)
-		if (!response.ok) return undefined
-		const fetched = (await response.json()) as OnlineTable
-		setTables((all) => ({ ...all, [table]: fetched }))
-		return fetched
-	} catch {
-		return undefined
-	}
+	const params = new URLSearchParams({ table, player: identity().playerId })
+	const fetched = asTable(await ask(`/api/run/scores?${params}`))
+	if (!fetched) return undefined
+	setTables((all) => ({ ...all, [table]: fetched }))
+	return fetched
+}
+
+/** Why the backend said no, or that it couldn't be asked: undefined for a yes. */
+function problemWith(result: unknown): string | undefined {
+	if (!isObject(result)) return 'Couldn’t reach the high score tables'
+	const error = result.error
+	if (error === undefined) return undefined
+	if (error === 'limit') return 'Too many scores sent today. Try again tomorrow'
+	return typeof error === 'string' && error
+		? error
+		: 'The high score tables didn’t take it'
 }
 
 /** Whether a score's better than the player's own on a table, or they've none there yet. */
@@ -179,14 +209,12 @@ export function wouldPlace(table: OnlineTable, score: number) {
 export async function saveProfile(): Promise<{ error?: string }> {
 	const { name, icon, playerId } = identity()
 	if (!ONLINE || !name || !icon) return {}
-	const result = await post<{ saved?: boolean; error?: string }>(
-		'/api/run/profile',
-		{ playerId, name, icon },
+	const error = problemWith(
+		await post('/api/run/profile', { playerId, name, icon }),
 	)
-	if (!result) return { error: 'Couldn’t reach the high score tables' }
 	// Shown under the new name next time each table's looked at.
-	if (!result.error) setTables({})
-	return result
+	if (!error) setTables({})
+	return { error }
 }
 
 /** Send a score, saving your profile with it: where it came on the table (from 0), or why it couldn't go on. */
@@ -198,22 +226,18 @@ export async function submitScore(args: {
 	date: string
 }): Promise<{ rank?: number; error?: string }> {
 	const { name, icon, playerId } = identity()
-	const result = await post<{ rank?: number; error?: string }>(
-		'/api/run/score',
-		{
-			ticket: args.ticket,
-			table: args.table,
-			playerId,
-			name,
-			icon,
-			date: args.date,
-			score: args.score,
-			...args.tally,
-		},
-	)
-	if (!result) return { error: 'Couldn’t reach the high score tables' }
-	if (result.error === 'limit')
-		return { error: 'Too many scores sent today. Try again tomorrow' }
-	if (!result.error) fetchTable(args.table)
-	return result
+	const result = await post('/api/run/score', {
+		ticket: args.ticket,
+		table: args.table,
+		playerId,
+		name,
+		icon,
+		date: args.date,
+		score: args.score,
+		...args.tally,
+	})
+	const error = problemWith(result)
+	if (error) return { error }
+	void fetchTable(args.table)
+	return { rank: numberIn(result, 'rank') }
 }

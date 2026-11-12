@@ -13,6 +13,7 @@ import {
 } from './constants'
 import { grabGlider, grabPacerGlider, pacerRider } from './gliders'
 import { SCOOP_HEARD } from './pack'
+import { grabBoard, grabPacerBoard } from './skis'
 import { scored } from './step'
 import type { Racer, World } from './world'
 
@@ -46,6 +47,8 @@ export function stepCorgis(world: World) {
 	const running = world.phase() === 'running'
 	const racing = world.racers.filter((r) => !r.out)
 	const gliders = world.course.ride === 'glider'
+	/** Skis and snowboards: once taken, theirs the whole way down, drawn on them. */
+	const skis = world.course.ride === 'skis'
 
 	for (const c of corgis) {
 		if (c.state === 'scooped') {
@@ -56,6 +59,7 @@ export function stepCorgis(world: World) {
 			c.spin++
 			continue
 		}
+		if (c.state === 'ridden' && skis) continue
 		if (c.state === 'ridden') {
 			const rider = riderOf(world, c.rider)
 			// Off: worn out, jumped off, or scooped; a glider, come down.
@@ -103,7 +107,11 @@ export function stepCorgis(world: World) {
 		for (const r of racing)
 			if (Math.abs(r.body.x - c.x) < Math.abs(dx)) dx = r.body.x - c.x
 		c.barking =
-			!gliders && running && c.state === 'waiting' && Math.abs(dx) < CORGI_CALL
+			!gliders &&
+			!skis &&
+			running &&
+			c.state === 'waiting' &&
+			Math.abs(dx) < CORGI_CALL
 		// Watching you come, and go.
 		if (c.barking) c.facing = dx >= 0 ? 1 : -1
 	}
@@ -111,8 +119,12 @@ export function stepCorgis(world: World) {
 	if (!running) return
 	for (const racer of racing) {
 		if (gliders) grabGlider(world, racer)
+		else if (skis) grabBoard(world, racer)
 		else if (racer.body.mount === 0) mount(world, racer)
 	}
+	if (skis)
+		for (const pacer of world.pack)
+			if (!pacer.scooped) grabPacerBoard(world, pacer)
 	// The pack takes gliders too, those that get to them.
 	if (gliders)
 		for (const pacer of world.pack)

@@ -45,6 +45,22 @@ export type FikaItem =
 	 */
 	| 'mintCake'
 	| 'butterTea'
+	/**
+	 * The Slopes': from the waffle hut halfway down, a waffle with cream and
+	 * cloudberry jam, and a hot chocolate; a saffron bun and a gingerbread
+	 * heart, it being winter.
+	 */
+	| 'waffle'
+	| 'hotChocolate'
+	| 'lussekatt'
+	| 'pepparkaka'
+	/**
+	 * Hidden inside the waffle hut, only for whoever skis through it rather
+	 * than over: a tower of waffles, cream between, cloudberries on top.
+	 */
+	| 'waffleTower'
+	/** Up on the waffle hut's roof, for the first who gets up there: a bowl of tomato soup. */
+	| 'tomatoSoup'
 
 export const FIKA_ITEMS: FikaItem[] = [
 	'coffee',
@@ -129,6 +145,16 @@ export const EVEREST_FIKA: FikaItem[] = [
 	'kanelbulle',
 ]
 
+/** Down The Slopes: the waffle hut's, and a winter's saffron buns and gingerbread. */
+export const SLOPES_FIKA: FikaItem[] = [
+	'waffle',
+	'hotChocolate',
+	'lussekatt',
+	'pepparkaka',
+	'kanelbulle',
+	'coffee',
+]
+
 /** In Turku: a Karelian pie, a coffee, salmiakki. */
 export const TURKU_FIKA: FikaItem[] = ['karelianPie', 'coffee', 'salmiakki']
 
@@ -169,4 +195,10 @@ export const FIKA_SIZE: Record<FikaItem, { width: number; height: number }> = {
 	captainsHat: { width: 12 * CELL, height: 8 * CELL },
 	mintCake: { width: 12 * CELL, height: 8 * CELL },
 	butterTea: { width: 11 * CELL, height: 11 * CELL },
+	waffle: { width: 13 * CELL, height: 9 * CELL },
+	hotChocolate: { width: 10 * CELL, height: 12 * CELL },
+	lussekatt: { width: 12 * CELL, height: 10 * CELL },
+	pepparkaka: { width: 11 * CELL, height: 10 * CELL },
+	waffleTower: { width: 14 * CELL, height: 18 * CELL },
+	tomatoSoup: { width: 13 * CELL, height: 11 * CELL },
 }

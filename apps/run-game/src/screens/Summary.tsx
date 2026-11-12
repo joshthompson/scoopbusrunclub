@@ -53,6 +53,10 @@ const BONUS_LABELS: Record<BonusKind, string> = {
 	pumpkins: 'Pumpkins',
 	barcodes: 'Barcode',
 	rings: 'Rings',
+	tricks: 'Tricks landed',
+	grinds: 'Grinds',
+	gates: 'Slalom gates',
+	jumps: 'Ski jumps',
 	speed: 'Speed',
 	hazards: 'Hazards hit',
 }

@@ -106,14 +106,19 @@ export function Game(props: {
 		const ranks: Record<string, number> = {}
 		let problem: string | undefined
 		for (const score of scores) {
-			const ticket = await score.ticket
-			if (!ticket) {
+			try {
+				const ticket = await score.ticket
+				if (!ticket) {
+					problem = 'Couldn’t reach the high score tables'
+					continue
+				}
+				const result = await submitScore({ ...score, ticket, date: today() })
+				if (result.error) problem = result.error
+				else if (result.rank !== undefined) ranks[score.table] = result.rank
+			} catch {
+				// Never left sending: it just didn't go.
 				problem = 'Couldn’t reach the high score tables'
-				continue
 			}
-			const result = await submitScore({ ...score, ticket, date: today() })
-			if (result.error) problem = result.error
-			else if (result.rank !== undefined) ranks[score.table] = result.rank
 		}
 		setOffer(
 			(was) =>
@@ -135,6 +140,8 @@ export function Game(props: {
 		setCheckingOnline(true)
 		try {
 			await findOffer(courseScore, tally)
+		} catch {
+			// The tables can't be got at: the scores stay in this browser.
 		} finally {
 			setCheckingOnline(false)
 		}

@@ -1,5 +1,8 @@
 import { generateFrames } from '@/utils'
-import { createRunnerFrames } from '@/utils/createRunnerFrames'
+import {
+	type CharacterSpriteProps,
+	createRunnerFrames,
+} from '@/utils/createRunnerFrames'
 import { CLUB_MEMBERS, type MemberFacts, type MemberKey } from '@shared/members'
 import { type Accessor, type Setter, createSignal } from 'solid-js'
 import * as assets from './runner-assets'
@@ -45,6 +48,11 @@ export interface RunnerData extends MemberFacts {
 	}
 	runnerState?: RunnerState
 	color?: string
+	/**
+	 * The look they're drawn from, if they're made from one rather than drawn
+	 * by hand: for drawing more of them from it, as the run game does.
+	 */
+	look?: CharacterSpriteProps
 	/**
 	 * One of their run frames' size, in the sprite's own pixels, which is the
 	 * box they're drawn in: run frames have to be cut at exactly this width, or

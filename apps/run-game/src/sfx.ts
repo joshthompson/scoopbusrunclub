@@ -27,6 +27,8 @@ export type Sound =
 	| 'bleat'
 	| 'honk'
 	| 'furby'
+	| 'trick'
+	| 'grind'
 
 /** [frequency in Hz, length in seconds, wave] for each note, played one after another. */
 type Note = [number, number, OscillatorType?]
@@ -123,6 +125,25 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 			],
 			volume: 0.045,
 			slide: 0.9,
+		},
+		/** A trick landed: a bright run up, and a ding. */
+		trick: {
+			notes: [
+				[659, 0.05, 'square'],
+				[880, 0.05, 'square'],
+				[1175, 0.05, 'square'],
+				[1568, 0.16, 'triangle'],
+			],
+			volume: 0.07,
+		},
+		/** Down onto a rail: a metal scrape. */
+		grind: {
+			notes: [
+				[1900, 0.04, 'sawtooth'],
+				[1400, 0.22, 'sawtooth'],
+			],
+			volume: 0.025,
+			slide: 0.92,
 		},
 		finished: {
 			notes: [

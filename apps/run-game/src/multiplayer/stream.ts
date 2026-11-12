@@ -1,9 +1,10 @@
-import type {
-	CorgiState,
-	FlyerState,
-	FurbyState,
-	Pacer,
-	World,
+import {
+	type CorgiState,
+	type FlyerState,
+	type FurbyState,
+	type Pacer,
+	TRICK_KINDS,
+	type World,
 } from '../game/world'
 import { type Sound, overhear } from '../sfx'
 import {
@@ -13,6 +14,7 @@ import {
 	type RaceFrame,
 	type RaceStart,
 	type RacerState,
+	skiState,
 } from './protocol'
 
 /**
@@ -120,6 +122,10 @@ export function createRaceStream(
 								? 3
 								: 0,
 					outAt,
+					// On skis: their board, a trick, a grind.
+					...(b.board
+						? ([skiState(b, TRICK_KINDS), Math.round(b.turn)] as const)
+						: ([] as const)),
 				],
 			),
 			pack: world.pack.map((p) => [
@@ -130,6 +136,9 @@ export function createRaceStream(
 				(p.grounded ? 1 : 0) | (p.scooped ? 2 : 0) | (p.gliding ? 4 : 0),
 				p.dazed,
 				p.spin,
+				...(p.board
+					? ([skiState(p, TRICK_KINDS), Math.round(p.turn ?? 0)] as const)
+					: ([] as const)),
 			]),
 			joined: joined.map(pacerIntro),
 			furbies: world.furbies.map((f) => [

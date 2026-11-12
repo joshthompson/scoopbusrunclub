@@ -1,5 +1,6 @@
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
 import { createSignal } from 'solid-js'
+import { ask, isObject, stringIn } from '../online/backend'
 import { type Playable, lookSprite } from './playable'
 
 /**
@@ -9,38 +10,32 @@ import { type Playable, lookSprite } from './playable'
  * the course, and behind the menus.
  */
 
-const CONVEX_URL = (import.meta.env.VITE_CONVEX_URL as string | undefined) ?? ''
-
-/** A guest, as the backend has them: only those with a look are any use. */
-interface Guest {
-	_id: string
-	name: string
-	avatar?: Record<string, unknown>
-}
-
 const [guests, setGuests] = createSignal<Playable[]>([])
 
 /** The guests with a look, as runners: none until they've loaded, or if they can't be. */
 export { guests }
 
-/** Fetch them, once. Without a backend to ask, or with no connection, there are just none. */
-export async function loadGuests() {
-	if (!CONVEX_URL) return
+/** A guest from the backend, as a runner: undefined without a look this game can draw. */
+function asRunner(guest: unknown): Playable | undefined {
+	const id = stringIn(guest, '_id')
+	const name = stringIn(guest, 'name')
+	const avatar = isObject(guest) ? guest.avatar : undefined
+	if (!id || !name || !isObject(avatar) || !('head' in avatar)) return undefined
+	const look = avatar as unknown as CharacterSpriteProps
 	try {
-		const response = await fetch(`${CONVEX_URL}/api/guests`)
-		if (!response.ok) return
-		const all: Guest[] = await response.json()
-		setGuests(
-			all
-				.filter((guest) => guest.avatar && 'head' in guest.avatar)
-				.map((guest) => ({
-					id: `guest:${guest._id}`,
-					name: guest.name,
-					look: guest.avatar as unknown as CharacterSpriteProps,
-					sprite: lookSprite(guest.avatar as unknown as CharacterSpriteProps),
-				})),
-		)
+		return { id: `guest:${id}`, name, look, sprite: lookSprite(look) }
 	} catch {
-		// Offline, or the backend's down: the club runs without them.
+		// Drawn on the website some way this game can't: they sit this one out.
+		return undefined
 	}
+}
+
+/**
+ * Fetch them, once. Without a backend to ask, with no connection, or with
+ * an answer that isn't a list of them, there are just none.
+ */
+export async function loadGuests() {
+	const all = await ask('/api/guests')
+	if (!Array.isArray(all)) return
+	setGuests(all.map(asRunner).filter((guest) => guest !== undefined))
 }

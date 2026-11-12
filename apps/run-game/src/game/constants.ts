@@ -243,6 +243,74 @@ export const GLIDER_WING = 16
 export const RING_BOOST = 1.8
 export const RING_POINTS = 50
 
+// --- The Slopes: skis, snowboards, tricks and rails ---------------------------
+/**
+ * On skis: how hard a slope pulls them down it, and how much of their speed
+ * the snow takes off each tick, so they settle at a speed for its steepness;
+ * less, tucked down, holding down on the snow.
+ */
+export const SKI_PULL = 0.45
+export const SKI_DRAG = 0.01
+export const SKI_TUCK_DRAG = 0.006
+/**
+ * Tucked down, how much faster than anyone else can go they can: 1.5 px a
+ * tick, or in a multiplayer Round, where top speed's lower, a little.
+ */
+export const SKI_TUCK_OVER = 1.5
+export const SKI_TUCK_OVER_ROUND = 0.5
+/** Holding right, poling along: this much faster a tick, up to this. */
+export const SKI_PUSH = 0.07
+export const SKI_PUSH_TO = 6.5
+/**
+ * Tapping down, going slowly, a push off the poles, or off a back foot on
+ * a snowboard: this much faster, up to `SKI_PUSH_TO`.
+ */
+export const SKI_POLE_PUSH = 1.4
+/** Holding left, snowploughing: this much of their speed kept a tick. */
+export const SKI_BRAKE = 0.95
+/**
+ * How far the snow can drop away under them, more than they'd fall
+ * anyway, before they're off it, in the air: off a kicker's lip, or over
+ * the top of a bump at speed.
+ */
+export const SKI_LAUNCH_GIVE = 1.2
+/** How much of the speed they're going up a kicker goes into a jump off it. */
+export const SKI_POP = 0.8
+/** How fast, upwards, anything can launch them, at most. */
+export const SKI_LAUNCH_MAX = 15
+/**
+ * Off the ski jump's lip, a jump's only a pop, as a ski jumper's is: timed
+ * right at the lip, enough to fly to its K-point, but no further.
+ */
+export const SKI_JUMP_POP = 3
+/** How far up its inrun and table, before its lip, a jump's only a pop. */
+export const SKI_JUMP_TABLE = 640
+/**
+ * A trick: points for the first in one go in the air, doubling for each
+ * more before landing, up to the most; and this much faster for each.
+ */
+export const TRICK_POINTS = 100
+export const TRICK_POINTS_MAX = 1600
+export const TRICK_BOOST = 1.2
+/** Landing in the middle of one: a wipeout, slowed to this share of their speed, and down this long. */
+export const WIPEOUT_KEEP = 0.3
+export const WIPEOUT_TICKS = 50
+/** How much of a trick can be left to do and still land it: the last few ticks of it. */
+export const TRICK_LAND_GIVE = 7
+/** A grind: points for it, and a few more for every tick of it, up to the most. */
+export const GRIND_POINTS = 50
+export const GRIND_POINTS_TICK = 3
+export const GRIND_POINTS_MAX = 500
+/** How much less the snow takes off them grinding: a rail's slick. */
+export const GRIND_DRAG = 0.004
+/** Through a slalom gate: this much faster, and these points. */
+export const GATE_BOOST = 1
+export const GATE_POINTS = 25
+/** Off the ski jump: these points a metre flown, and a bonus past its K-point. */
+export const SKI_JUMP_POINTS_M = 4
+export const SKI_JUMP_K_BONUS = 200
+export const SKI_JUMP_POINTS_MAX = 1200
+
 // --- The bus ------------------------------------------------------------
 /**
  * Where the front of the scoop starts: parked a way back behind everyone on

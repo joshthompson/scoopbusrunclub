@@ -112,11 +112,26 @@ export type Obstacle =
 	 * air: through the spout as it blows, and you're soaked.
 	 */
 	| { kind: 'whale'; x: number; height: number }
+	/**
+	 * A snowman, on the piste: jump it, or ski into it and it bursts, a
+	 * stumble for you and gone for whoever comes after.
+	 */
+	| { kind: 'snowman'; x: number }
 
 /** Something on the course, at `x` along it, that speeds you up. */
 export type Boost =
 	/** Fika, `height` off the ground: some you have to jump for. */
-	| { kind: 'fika'; x: number; height: number; item: FikaItem }
+	| {
+			kind: 'fika'
+			x: number
+			height: number
+			item: FikaItem
+			/**
+			 * There for everyone, once each, rather than had by whoever gets
+			 * to it first: gone once they all have. The waffle hut's.
+			 */
+			everyone?: boolean
+	  }
 	/** A club member, a cheerer, cheering you on as you pass. */
 	| { kind: 'cheer'; x: number; member: RunnerName }
 	/**
@@ -134,6 +149,11 @@ export type Boost =
 	 * for a boost. There for everyone, once each.
 	 */
 	| { kind: 'ring'; x: number; height: number }
+	/**
+	 * A slalom gate across the piste, its flag `red` or `blue`: through it,
+	 * on the ground or in the air, for a boost. There for everyone, once each.
+	 */
+	| { kind: 'gate'; x: number; colour: 'red' | 'blue' }
 
 /** The game's colours a course can change: the sky, the grass and the path. */
 export type PaletteVar =
@@ -522,6 +542,12 @@ export interface BusLook {
 	 * climb a mountain on. Their metal, the joints' bolts, and their feet.
 	 */
 	legs?: { metal: string; shade: string; bolt: string; foot: string }
+	/**
+	 * A sleigh in place of the bus, down a ski slope, as on the website at
+	 * Christmas: its picture, facing right, in place of the body, and no
+	 * back, wheels or windows. Only its scoop's the bus's.
+	 */
+	sleigh?: string
 }
 
 /**
@@ -682,7 +708,43 @@ export interface Course {
 	 * camels, in Huddinge's forest, deer, in Furby Fields, unicorns, on
 	 * The Cliff, gliders, parked along its top, or up Everest, mountain goats.
 	 */
-	ride?: 'corgi' | 'llama' | 'camel' | 'deer' | 'glider' | 'unicorn' | 'goat'
+	ride?:
+		| 'corgi'
+		| 'llama'
+		| 'camel'
+		| 'deer'
+		| 'glider'
+		| 'unicorn'
+		| 'goat'
+		/**
+		 * On The Slopes, skis and snowboards, stood up in the snow at the
+		 * top: run into a pair and they're yours, the whole way down (see
+		 * `skis`).
+		 */
+		| 'skis'
+	/**
+	 * Rails to grind along on skis, each `from` to `to`, `height` over the
+	 * Ground all along it, following it down: a rail, a box, or a log.
+	 */
+	rails?: Rail[]
+	/** A hut the course runs through, to ski through, or over the roof of. */
+	hut?: Hut
+	/**
+	 * A ski jump: its takeoff's lip at `takeoff`, and how far down the
+	 * landing hill counts as a good one, its K-point, `k` past it. Off it,
+	 * how far they flew is measured.
+	 */
+	skiJump?: { takeoff: number; k: number }
+	/**
+	 * How much faster the bus goes down a slope, for its steepness: on skis
+	 * too, it picks up speed downhill, as everyone does.
+	 */
+	busDownhill?: number
+	/**
+	 * How far ahead down the hill the camera looks, down a mountain, so
+	 * what's coming is in view, not off the bottom of the screen.
+	 */
+	lookDown?: number
 	/**
 	 * The sea, from the foot of a cliff, `from`, to an island's shore, `to`:
 	 * a Gap, the Ground's line across it at its surface, `level`. Down into
@@ -711,6 +773,38 @@ export interface Course {
 	 * manhole, and back up out of it. The Ground, where it's undefined.
 	 */
 	busFloor?: (x: number) => number | undefined
+}
+
+/** A rail on a ski slope, to grind along: see `Course['rails']`. */
+export interface Rail {
+	from: number
+	to: number
+	height: number
+	/**
+	 * What it is: a rail, a box or a log, to grind; or a roof, to ski along
+	 * the top of, no grinding about it, drawn as whatever it's the roof of.
+	 */
+	look: 'rail' | 'box' | 'log' | 'roof'
+	/** A roof's thickness: under it, a ceiling, to bump a head on. */
+	thick?: number
+}
+
+/**
+ * A hut the course runs through, `from` to `to`: its roof a Rail to ski
+ * over (see `Rail`), `height` over the Ground. Its inside, `back`, is drawn
+ * behind whoever's in it, and its front, `front`, over them, till someone
+ * racing goes in, and it's lifted away to see them in there. Both pictures
+ * from its left, from its roof's top down to the path's near edge, drawn at
+ * twice their size.
+ */
+export interface Hut {
+	from: number
+	to: number
+	height: number
+	/** How far over its roof's top its pictures start: room for its chimney. */
+	above: number
+	back: string
+	front: string
 }
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */

@@ -30,12 +30,14 @@ import {
 	createGameController,
 	createGiantFurby,
 	createHats,
+	createHut,
 	createKmSigns,
 	createObstacle,
 	createPack,
 	createParkrunSign,
 	createPlatforms,
 	createPlayer,
+	createRails,
 	createRunDirector,
 	createScenery,
 	createScoopArm,
@@ -84,6 +86,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			// The bus's own parts, front to back, then the back of it: in
 			// order, so a guard tower's front is drawn over the lot.
 			'bus-scoop',
+			// Snow sprayed off the back of its sleigh's runners.
+			'bus-spray',
 			'bus-body',
 			'bus-window',
 			'bus-wheel4',
@@ -118,6 +122,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createBanner(world, world.terrain.finishX, 'FINISH'),
 				createRunDirector(world),
 				...createPlatforms(world),
+				...createRails(world),
+				...createHut(world),
 				...createBusBore(world),
 				...world.obstacles.flatMap((state, i) =>
 					createObstacle(world, state, i),

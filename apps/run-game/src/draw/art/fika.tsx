@@ -30,6 +30,14 @@ import {
 	oldCoin,
 	rubberDuck,
 } from '../../courses/kit/sewerFinds'
+import {
+	hotChocolate,
+	lussekatt,
+	pepparkaka,
+	tomatoSoup,
+	waffle,
+	waffleTower,
+} from '../../courses/kit/slopesFika'
 import { FIKA_SIZE, type FikaItem } from '../../game/fika'
 import { PixelArt } from '../PixelArt'
 
@@ -159,6 +167,12 @@ const ART: Record<FikaItem, string> = {
 	captainsHat,
 	mintCake,
 	butterTea,
+	waffle,
+	hotChocolate,
+	lussekatt,
+	pepparkaka,
+	waffleTower,
+	tomatoSoup,
 }
 
 /** A fika item, at its size. */

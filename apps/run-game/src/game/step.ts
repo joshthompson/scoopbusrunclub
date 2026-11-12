@@ -40,6 +40,8 @@ import {
 	DUCK_HEIGHT,
 	FIKA_BOOST,
 	FIKA_POINTS,
+	GATE_BOOST,
+	GATE_POINTS,
 	GLIDER_KNOCK_DROP,
 	GLIDER_KNOCK_SPEED,
 	GLIDER_WING,
@@ -96,6 +98,7 @@ import {
 	sewageAt,
 	swampManAt,
 } from './sewer'
+import { stepSkiing } from './skis'
 import {
 	GULL_HEIGHT,
 	GULL_WIDTH,
@@ -251,10 +254,15 @@ function busTicksToFinish(world: World) {
 	let ticks = BUS_HOLD_TICKS
 	while (x < world.terrain.finishX) {
 		const ramp = Math.min(1, (ticks - BUS_HOLD_TICKS) / BUS_RAMP_TICKS)
-		x += Math.max(
+		const pace = Math.max(
 			BUS_START_SPEED + (BUS_TOP_SPEED - BUS_START_SPEED) * ramp,
 			seaPace(world, x),
 		)
+		// Its own pace, as it goes up and down: on a ski slope, quicker down
+		// it, up to the most anyone can go.
+		x += world.course.busDownhill
+			? Math.min(pace * busHill(world, x), topSpeed(world) - ROUND_SEA_SLACK)
+			: pace
 		ticks++
 	}
 	return ticks
@@ -430,6 +438,16 @@ function stepRunner(world: World, racer: Racer) {
 		const crashed = stepGliding(world, racer, { up, down, left, right })
 		b.wasUp = up
 		if (crashed && racing) fall(world, racer)
+		return
+	}
+	if (b.board) {
+		// On skis or a snowboard: down the hill, the whole way.
+		const fell = stepSkiing(world, racer, { up, down, left, right }, racing)
+		b.wasUp = up
+		b.wasLeft = left
+		b.wasRight = right
+		b.wasDown = down
+		if (fell) fall(world, racer)
 		return
 	}
 
@@ -751,6 +769,9 @@ function fall(world: World, racer: Racer) {
 	b.carried = 0
 	b.gliding = false
 	b.ducking = false
+	b.trick = undefined
+	b.turn = 0
+	b.grind = undefined
 	racer.out = 'fallen'
 	racer.outAt = world.ticks()
 	if (!world.round) world.setPhase('fallen')
@@ -867,6 +888,20 @@ function collide(world: World, racer: Racer) {
 				) {
 					hits(state)
 					stumble('Bonk!')
+				}
+				break
+			case 'snowman':
+				// Into one: it bursts, and it's gone, for everyone.
+				if (
+					!state.used &&
+					!state.scooped &&
+					b.stumble === 0 &&
+					overlaps(o.x - 13, o.x + 13, ground - SNOWMAN_HEIGHT, ground)
+				) {
+					state.used = true
+					state.flown = world.ticks()
+					play('squelch')
+					stumble('Poof!')
 				}
 				break
 			case 'vent':
@@ -1241,11 +1276,14 @@ function collide(world: World, racer: Racer) {
 				const y = ground - o.height
 				// A little bigger than the art, so grabbing it isn't fiddly.
 				const reach = width / 2 + 4
-				if (
-					!state.used &&
-					overlaps(o.x - reach, o.x + reach, y - height - 2, y)
-				) {
-					state.used = true
+				// Had already: by anyone, or, if it's there for everyone, by them.
+				const had = o.everyone ? state.hit.has(racer.id) : state.used
+				if (!had && overlaps(o.x - reach, o.x + reach, y - height - 2, y)) {
+					if (o.everyone) {
+						hits(state)
+						// Gone, once everyone racing's had theirs.
+						state.used = world.racers.every((r) => state.hit.has(r.id))
+					} else state.used = true
 					collect(`fika:${o.item}`)
 					b.vx = boost(world, b.vx, b.facing, FIKA_BOOST)
 					world.addBonus('fika', FIKA_POINTS)
@@ -1318,6 +1356,23 @@ function collide(world: World, racer: Racer) {
 				}
 				break
 			}
+			case 'gate':
+				// Through it, either way, on the snow or over it: faster, once
+				// each. Its flag flaps.
+				if (
+					!state.hit.has(racer.id) &&
+					b.x - o.x !== 0 &&
+					b.x - o.x > 0 !== wasAt - o.x > 0 &&
+					b.feetY > ground - GATE_HEIGHT
+				) {
+					hits(state)
+					state.setCheering(GATE_FLAP_TICKS)
+					b.vx = boost(world, b.vx, b.facing, GATE_BOOST)
+					world.addBonus('gates', GATE_POINTS)
+					world.popup(scored(world, 'Gate!', `+${GATE_POINTS}`), b.x, top)
+					play('scan')
+				}
+				break
 			case 'cheer':
 				// Passing them, either way: they cheer on everyone, once each.
 				if (
@@ -1345,6 +1400,32 @@ function collide(world: World, racer: Racer) {
 /** How far behind the scoop's front the middle of the bus is, where it feels the hill. */
 const BUS_MIDDLE_BEHIND = 145
 
+/** Over the line ahead of it, how far past the finish the bus pulls up, its scoop's front. */
+const BUS_PARKS_PAST = 220
+/** And how quickly it slows to a stop there: a share of the way left, a tick. */
+const BUS_PARKING = 0.05
+
+/** How tall a snowman is, to ski into. */
+export const SNOWMAN_HEIGHT = 44
+/** How tall a slalom gate is: through it, or clean over it. */
+export const GATE_HEIGHT = 110
+/** How long a slalom gate's flag flaps, gone through. */
+const GATE_FLAP_TICKS = 30
+
+/**
+ * How much the hill at `x` changes the bus's pace, out of its own: slowed
+ * going up it, as everyone is; and down a ski slope, on skis, faster.
+ */
+function busHill(world: World, x: number) {
+	const slope = world.terrain.slope(x - BUS_MIDDLE_BEHIND)
+	const uphill =
+		Math.min(0, hillPull(slope)) *
+		BUS_HILL_PULL *
+		(world.course.busHillPull ?? 1)
+	const downhill = Math.max(0, slope) * (world.course.busDownhill ?? 0)
+	return Math.max(0.3, 1 + uphill) * (1 + downhill)
+}
+
 /** How fast holding a way in a Tunnel gets someone going through it, and how quickly. */
 const TUNNEL_PUSH_TO = 4
 const TUNNEL_PUSH = 0.04
@@ -1365,7 +1446,17 @@ function stepBus(world: World) {
 
 	// Parked until a moment after "Go!", but run back into it and it'll still scoop.
 	const driving = world.raceTicks() - BUS_HOLD_TICKS
-	if (driving >= 0) {
+	if (phase === 'finished' && !world.round) {
+		// Beaten to the line: it comes on in to the finish anyway, however far
+		// back it is, and pulls up just past the line, in view behind the
+		// summary, rather than stopping wherever it was.
+		const left = world.terrain.finishX + BUS_PARKS_PAST - bus.frontX
+		bus.speed = Math.max(
+			0,
+			Math.min(Math.max(bus.speed, BUS_TOP_SPEED), left * BUS_PARKING),
+		)
+		bus.frontX += Math.min(left, bus.speed * busHill(world, bus.frontX))
+	} else if (driving >= 0) {
 		if (phase === 'finished') bus.speed *= 0.97
 		else {
 			const ramp = Math.min(1, driving / BUS_RAMP_TICKS)
@@ -1375,13 +1466,12 @@ function stepBus(world: World) {
 				seaPace(world, bus.frontX),
 			)
 		}
-		// Slowed going uphill, as everyone is: its wheels' slope.
-		const slope = world.terrain.slope(bus.frontX - BUS_MIDDLE_BEHIND)
-		const uphill =
-			Math.min(0, hillPull(slope)) *
-			BUS_HILL_PULL *
-			(world.course.busHillPull ?? 1)
-		bus.frontX += bus.speed * Math.max(0.3, 1 + uphill)
+		// Slowed going uphill, as everyone is: its wheels' slope. Down a ski
+		// slope, faster, but never faster than anyone can go.
+		const pace = bus.speed * busHill(world, bus.frontX)
+		bus.frontX += world.course.busDownhill
+			? Math.min(pace, topSpeed(world) - ROUND_SEA_SLACK)
+			: pace
 	}
 	scoopPack(world)
 	scoopFurbies(world)
@@ -1450,6 +1540,9 @@ function scoop(world: World, racer: Racer, body: Body) {
 	body.gliding = false
 	body.grounded = false
 	body.ducking = false
+	body.trick = undefined
+	body.turn = 0
+	body.grind = undefined
 	body.vx = Math.max(bus.speed, 2) + 2
 	body.vy = -15
 	body.spin = 0
@@ -1535,7 +1628,9 @@ function knockOver(world: World) {
 			o.kind === 'branch' ||
 			o.kind === 'kids' ||
 			o.kind === 'tombstone' ||
-			o.kind === 'tourists'
+			o.kind === 'tourists' ||
+			// A snowman, still stood up.
+			(o.kind === 'snowman' && !state.used)
 		) {
 			state.used = true
 			state.scooped = {
@@ -1639,6 +1734,30 @@ function upAhead(world: World, x: number, facing: number, high: number) {
 }
 
 /**
+ * How far below someone the camera looks, at most, down the slope ahead:
+ * so they're still well down from the top of the screen.
+ */
+const LOOK_DOWN_MOST = 330
+
+/**
+ * The lowest the Ground goes from `b` to the course's `lookDown` past it,
+ * the way they're facing, down a mountain: what the camera looks down to,
+ * so the slope ahead's in view, off a ski jump too; but never so far it
+ * loses them off the top. `low`, otherwise.
+ */
+function downAhead(world: World, b: Body, low: number) {
+	const ahead = world.course.lookDown
+	if (!ahead) return low
+	const { terrain } = world
+	let bottom = low
+	for (let along = 40; along <= ahead; along += 40) {
+		const at = b.x + along * b.facing
+		if (!terrain.inGap(at)) bottom = Math.max(bottom, terrain.groundY(at))
+	}
+	return Math.max(low, Math.min(bottom, b.feetY + LOOK_DOWN_MOST))
+}
+
+/**
  * How far up the camera wants to look for floors from `high` to `low`, at
  * `zoom`: no further down than where it starts, which is the course's
  * lowest.
@@ -1683,9 +1802,10 @@ function stepCamera(world: World) {
 	if (Math.abs(wantZoom - zoom) > 0.001)
 		world.setZoom(zoom + (wantZoom - zoom) * ZOOM_EASE)
 	const view = gliding ?? lookAt(b)
-	// Up a mountain, up the climb ahead too.
+	// Up a mountain, up the climb ahead too; down one, down the slope ahead.
 	if (!gliding && !flyingHigh(b))
 		view.high = upAhead(world, b.x, b.facing, view.high)
+	if (!gliding) view.low = downAhead(world, b, view.low)
 	const targetY = cameraYFor(view.high, view.low, world.zoom())
 	const cameraY = world.cameraY()
 	// Quick after them, flying high, or dropping a long way.
@@ -1762,7 +1882,11 @@ function frameEveryone(world: World) {
 	const low = Math.max(
 		glide?.low ?? Number.NEGATIVE_INFINITY,
 		...running.map((r) =>
-			flyingHigh(r.body) ? lookAt(r.body).low : r.body.floor,
+			downAhead(
+				world,
+				r.body,
+				flyingHigh(r.body) ? lookAt(r.body).low : r.body.floor,
+			),
 		),
 	)
 	const tall = (low + CAMERA_FOOTROOM - (high - CAMERA_HEADROOM)) / VIEW_HEIGHT

@@ -39,6 +39,7 @@ import {
 	LLAMA_WIDTH,
 	LlamaArt,
 } from './art/llama'
+import { STOOD_HEIGHT, STOOD_WIDTH, StoodBoardArt } from './art/skis'
 import {
 	UNICORN_BACK,
 	UNICORN_HEIGHT,
@@ -159,6 +160,21 @@ const GLIDER: RideLook = {
 	rides: 'Glider rides',
 }
 
+/**
+ * Stood up in the snow, not sat on: run into a pair and they're yours, the
+ * whole way down. See `skis`.
+ */
+const SKIS: RideLook = {
+	width: STOOD_WIDTH,
+	height: STOOD_HEIGHT,
+	back: STOOD_HEIGHT,
+	saddle: 0,
+	Art: () => StoodBoardArt({ board: 1 }),
+	call: '',
+	sound: 'whoosh',
+	rides: 'Skis and boards',
+}
+
 const RIDES = {
 	corgi: CORGI,
 	llama: LLAMA,
@@ -167,6 +183,7 @@ const RIDES = {
 	unicorn: UNICORN,
 	glider: GLIDER,
 	goat: GOAT,
+	skis: SKIS,
 }
 
 export const rideLook = (course: Pick<Course, 'ride'>) =>
