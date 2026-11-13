@@ -267,6 +267,8 @@ function movePacer(world: World, p: Pacer) {
 			decide(world, p)
 		}
 	}
+	// Under a low branch, or a tall hurdle: ducked, sliding under it.
+	p.ducking = p.grounded && duckUnder(world, p.x)
 	const from = p.x
 	p.x += p.vx
 	// Never through a Wall: stopped at its foot, like anyone.
@@ -530,9 +532,25 @@ const STEP_DOWN = 12
 /** How far past a Gap they land. */
 const LEAP_PAST = 40
 
+/** How far before a low branch or a tall hurdle a Pacer ducks, and how far past it they get up again. */
+const DUCK_BEFORE = 30
+const DUCK_PAST = 22
+
 /**
- * A rock, a hurdle, a puddle, a pothole or geese just ahead of `x`. Branches and
- * tall hurdles they just run under: they're shorter than you.
+ * A low branch or a tall hurdle (still standing) over `x`, or just ahead:
+ * something to duck under, as anyone does, rather than run through.
+ */
+function duckUnder(world: World, x: number) {
+	return world.obstacles.some(({ obstacle: o, used, scooped }) => {
+		if (scooped) return false
+		const low = o.kind === 'branch' || (o.kind === 'hurdle' && o.tall && !used)
+		return low && x > o.x - DUCK_BEFORE && x < o.x + DUCK_PAST
+	})
+}
+
+/**
+ * A rock, a hurdle, a puddle, a pothole or geese just ahead of `x`. Branches
+ * and tall hurdles they duck under instead (see `duckUnder`).
  */
 function hopAhead(world: World, x: number) {
 	return world.obstacles.some((state) => {

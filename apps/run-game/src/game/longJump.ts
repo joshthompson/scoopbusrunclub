@@ -71,6 +71,17 @@ export function callOut(world: World, b: Body, from: number) {
 }
 
 /**
+ * How far the first racer's long jump was measured, in metres, as it was
+ * called out, if they had one that landed in the sand.
+ */
+export function longJumpMetres(world: World) {
+	const board = world.course.longJump?.board
+	const mark = world.body.longJumpMark
+	if (board === undefined || mark === undefined) return undefined
+	return Math.round(((mark - board) / LONG_JUMP_PX_PER_M) * 10) / 10
+}
+
+/**
  * Down again, having taken off for the long jump: over the board, a foul;
  * otherwise, in the sand (or past it), how far from the board, a tenth of a
  * metre at a time, and points for it.

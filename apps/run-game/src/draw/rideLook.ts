@@ -39,6 +39,13 @@ import {
 	LLAMA_WIDTH,
 	LlamaArt,
 } from './art/llama'
+import {
+	MOLE_BACK,
+	MOLE_HEIGHT,
+	MOLE_SADDLE,
+	MOLE_WIDTH,
+	MoleArt,
+} from './art/mole'
 import { STOOD_HEIGHT, STOOD_WIDTH, StoodBoardArt } from './art/skis'
 import {
 	UNICORN_BACK,
@@ -65,6 +72,10 @@ export interface RideLook {
 	sound: Sound
 	/** What its rides are called in the summary. */
 	rides: string
+	/** How long a ride on it lasts, in ticks, if not as long as a corgi's. */
+	ticks?: number
+	/** How fast it goes, if not at a corgi's gallop. */
+	speed?: number
 	/**
 	 * A rarer one, now and then one of them, `share` of the time: its own
 	 * look, and its own Collectable, ridden the same.
@@ -148,6 +159,24 @@ const GOAT: RideLook = {
 	rides: 'Goat rides',
 }
 
+/**
+ * A mole: hopping along with you on its back, over and over, and on
+ * through whatever rock's in the way (see `moles`), faster than running.
+ */
+const MOLE: RideLook = {
+	width: MOLE_WIDTH,
+	height: MOLE_HEIGHT,
+	back: MOLE_BACK,
+	saddle: MOLE_SADDLE,
+	Art: MoleArt,
+	call: 'Squeak!',
+	sound: 'furby',
+	rides: 'Mole rides',
+	// Faster than running, and a good long ride, for the climb up to it.
+	speed: 8,
+	ticks: 320,
+}
+
 /** Hung under, not sat on: run into it. See `gliders`. */
 const GLIDER: RideLook = {
 	width: GLIDER_WIDTH,
@@ -183,6 +212,7 @@ const RIDES = {
 	unicorn: UNICORN,
 	glider: GLIDER,
 	goat: GOAT,
+	mole: MOLE,
 	skis: SKIS,
 }
 

@@ -4,9 +4,10 @@ import shrub2 from '@/assets/misc/shrub2.png'
 import type { RunnerName } from '@/data/runners'
 import tree1 from '../assets/scenery/tree1.png'
 import tree2 from '../assets/scenery/tree2.png'
-import { START_X } from '../game/constants'
+import { PATH_BACK, START_X } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { createTerrain } from '../game/terrain'
+import { withHat } from './kit/hats'
 import { STEP_M, heights } from './kit/huddinge-profile'
 import { seeded } from './kit/seeded'
 import type {
@@ -15,6 +16,7 @@ import type {
 	Course,
 	CourseDefinition,
 	Obstacle,
+	PlatformDefinition,
 } from './types'
 
 /**
@@ -46,6 +48,24 @@ const DEER = [START_X + 3600, START_X + 11600]
 /** How far either side of a deer the path's kept clear, to hop on and get going. */
 const DEER_ROOM = 180
 const nearDeer = (x: number) => DEER.some((d) => Math.abs(d - x) < DEER_ROOM)
+
+/**
+ * A granite ledge up over the path, its end just short of the second deer:
+ * jump up onto it for the antlers near its end, then run off it and drop
+ * onto the deer's back, wearing them.
+ */
+const LEDGE: PlatformDefinition = {
+	x: DEER[1] - 340,
+	width: 230,
+	height: 70,
+	// A boulder, behind the path: down to its back edge.
+	depth: 70 - (PATH_BACK - 2),
+}
+/** How far back from the ledge's end its antlers are. */
+const ANTLERS_BACK = 40
+/** Clear under the ledge and round it, so it's a clean jump up. */
+const nearLedge = (x: number) =>
+	x > LEDGE.x - 160 && x < LEDGE.x + LEDGE.width + 40
 
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	const random = seeded(1410)
@@ -92,8 +112,8 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		})
 	}
 	return {
-		obstacles: obstacles.filter((o) => !nearDeer(o.x)),
-		boosts: boosts.filter((b) => !nearDeer(b.x)),
+		obstacles: obstacles.filter((o) => !nearDeer(o.x) && !nearLedge(o.x)),
+		boosts: boosts.filter((b) => !nearDeer(b.x) && !nearLedge(b.x)),
 		scenery,
 	}
 }
@@ -110,7 +130,7 @@ export const huddinge: CourseDefinition = {
 	blurb: 'Deep in the forest, up and down: branches, rocks and mud.',
 	parkrun: true,
 	terrain,
-	runDirectors: ['rick', 'keith'],
+	runDirectors: ['adam', 'keith'],
 	cheerers: CHEERERS,
 	look: {
 		palette: {
@@ -144,8 +164,33 @@ export const huddinge: CourseDefinition = {
 			piece(tree2, 110, SHADE),
 		],
 		nearGap: [24, 90],
+		// Granite, grey and mossy, as the forest's boulders are.
+		platform: {
+			top: '#8e8b80',
+			face: 'linear-gradient(to bottom, #7d796f, #5b5850)',
+			edge: '#36342f',
+			depth: 16,
+			rock: { lit: '#b8b4a7', moss: '#5f8a45', drip: '#6c685f' },
+		},
 	},
-	...layOut(),
+	// Antlers, up on the ledge before the second deer: off its end, down
+	// onto the deer, in them.
+	...withHat(
+		layOut(),
+		'antlers',
+		() => {
+			const x = LEDGE.x + LEDGE.width - ANTLERS_BACK
+			// On its top: as high over the Ground there as the top is, and a hat's height up.
+			const top = terrain.groundY(LEDGE.x) - LEDGE.height
+			return { x, height: Math.round(terrain.groundY(x) - top + 26) }
+		},
+		0,
+	),
+	platforms: [LEDGE],
+	special: {
+		goal: 'Deer riding deer',
+		done: (run) => !!run.rodeWearing?.includes('antlers'),
+	},
 	corgis: DEER,
 	ride: 'deer',
 }

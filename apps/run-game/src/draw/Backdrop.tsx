@@ -999,6 +999,16 @@ export function Ground(props: { world: View }) {
 			const ceiling = cave.ceiling(x)
 			return ceiling === undefined ? undefined : [ceiling - 4, ceiling]
 		}),
+		/** Stalactites off its Ceiling, where there's room under it for them. */
+		drips: props.world.course.look?.cave?.stalactites
+			? columns((x, ground) => {
+					const ceiling = cave.ceiling(x)
+					if (ceiling === undefined || ground - ceiling < DRIP_ROOM)
+						return undefined
+					const length = Math.round(stalactite(x) / 2) * 2
+					return length >= 2 ? [ceiling - 2, ceiling + length] : undefined
+				}, false)
+			: '',
 		front: columns((x, ground) => {
 			const foot = cave.foot(x)
 			return foot === undefined || (cave.ceiling(x) === undefined && !cave.hull)
@@ -1560,6 +1570,7 @@ export function Ground(props: { world: View }) {
 								fill={look().tiles ? 'url(#cave-tile-rock)' : 'url(#cave-rock)'}
 							/>
 							<path d={caveParts?.underside} fill={look().edge} />
+							<path d={caveParts?.drips} fill={look().edge} />
 							<Show
 								when={look().road}
 								fallback={<path d={caveParts?.grass} fill={look().grass} />}
@@ -1698,6 +1709,29 @@ function Buildings(props: { world: View; blocks: Block[] }) {
 			}}
 		</For>
 	)
+}
+
+/** How much room there has to be under a Cave's Ceiling for stalactites. */
+const DRIP_ROOM = 70
+/** How far apart they hang, at most. */
+const DRIP_EVERY = 36
+
+/**
+ * How far a stalactite hangs down off a Cave's Ceiling at `x`, if there's
+ * one there: one now and then, each its own length and width, tapering to
+ * its tip. The same every time for the same `x`.
+ */
+function stalactite(x: number) {
+	const k = Math.floor(x / DRIP_EVERY)
+	const hash = (n: number) => {
+		const h = Math.sin(n * 127.1 + k * 311.7) * 43758.5453
+		return h - Math.floor(h)
+	}
+	if (hash(3) < 0.4) return 0
+	const middle = k * DRIP_EVERY + 8 + hash(1) * (DRIP_EVERY - 16)
+	const half = 4 + hash(2) * 6
+	const across = 1 - Math.abs(x - middle) / half
+	return across > 0 ? (6 + hash(4) * 14) * across : 0
 }
 
 /** How much of a Cave's way in, and its way out, the cover leaves showing. */

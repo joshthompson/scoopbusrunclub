@@ -2,6 +2,7 @@ import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
 import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
+import { onHover } from '../ui/hover'
 import { ordinal } from './Medal'
 import { type Seat, seatPlayable } from './room'
 
@@ -10,7 +11,8 @@ export interface Placing {
 	seatId: string
 	place: number
 	points: number
-	how: 'won' | 'finished' | 'scooped' | 'fallen'
+	/** `running`: still going when a Round in Baby Mode was called. */
+	how: 'won' | 'finished' | 'scooped' | 'fallen' | 'running'
 }
 
 /**
@@ -53,6 +55,8 @@ export function Results(props: {
 	nextLabel?: string
 	placings: Placing[]
 	seats: Seat[]
+	/** Raced in Baby Mode: no bus to beat. */
+	baby?: boolean
 	onNext?: () => void
 	/** Finishing a Backyard Ultra here: to the Podium. */
 	onFinish?: () => void
@@ -130,10 +134,14 @@ export function Results(props: {
 											{p().how === 'won'
 												? 'Last standing'
 												: p().how === 'finished'
-													? 'Beat the bus'
-													: p().how === 'fallen'
-														? 'Fell'
-														: 'Scooped'}
+													? props.baby
+														? 'Finished'
+														: 'Beat the bus'
+													: p().how === 'running'
+														? 'Still going'
+														: p().how === 'fallen'
+															? 'Fell'
+															: 'Scooped'}
 										</span>
 									)}
 								</Show>
@@ -163,7 +171,7 @@ export function Results(props: {
 									? { background: '#ffd23f', color: 'var(--ink)' }
 									: {}),
 							}}
-							onMouseEnter={() => setPicked(i())}
+							onMouseEnter={onHover(() => setPicked(i()))}
 							onClick={button.choose}
 						>
 							{button.label}

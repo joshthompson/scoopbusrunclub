@@ -6,10 +6,11 @@ import type { RunnerName } from '@/data/runners'
 import copperTents from '../assets/scenery/copper-tents.png'
 import tree1 from '../assets/scenery/tree1.png'
 import tree2 from '../assets/scenery/tree2.png'
-import { START_X } from '../game/constants'
+import { PX_PER_M, START_X } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { createTerrain } from '../game/terrain'
 import { STEP_M, heights } from './kit/haga-profile'
+import { withHat } from './kit/hats'
 import { seeded } from './kit/seeded'
 import type { Boost, Course, CourseDefinition, Obstacle } from './types'
 
@@ -70,8 +71,13 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			asset: assets[Math.floor(random() * assets.length)],
 		})
 	}
-	// Koppartälten, the Copper Tents, at the top of the hill.
-	scenery.push({ x: TENTS_X, asset: copperTents, setBack: 18 })
+	// Koppartälten, the Copper Tents, at the top of the hill, levelled on it.
+	scenery.push({
+		x: TENTS_X,
+		asset: copperTents,
+		scale: TENTS_SCALE,
+		footing: true,
+	})
 	return { obstacles, boosts, scenery }
 }
 
@@ -88,8 +94,10 @@ const TENTS_X = (() => {
 		if (terrain.groundY(x) < terrain.groundY(top)) top = x
 	return top - TENTS_SHORT
 })()
+/** How big the Copper Tents are drawn: twice their pixel size. */
+const TENTS_SCALE = 2
 /** Half the Copper Tents' width, and a little more: no trees in front of them. */
-const TENTS_ROOM = 150
+const TENTS_ROOM = 120 * TENTS_SCALE + 30
 
 /** Room either side of geese, to land a jump between them and whatever's next. */
 const GEESE_ROOM = 320
@@ -136,6 +144,36 @@ function flyOvers(): NonNullable<Course['flyovers']> {
 	}))
 }
 
+/**
+ * Everything along it: and a crown of midsummer flowers, high over the
+ * path a while after the geese have flown over, too high to jump for, but
+ * not to be carried up to on a goose, or to bounce up to off someone's
+ * head.
+ */
+const LAID_OUT = withHat(layOut(), 'flowerCrown', () => ({
+	x: flyOvers()[2].x + 700,
+	height: 160,
+}))
+
+/**
+ * How far round the football's left lying: a little past the 1 km sign,
+ * not on it; and how far it's kept from anything in the way.
+ */
+const FOOTBALL_AT = 1025 * PX_PER_M
+const FOOTBALL_ROOM = 200
+
+/** Where the football is: about a kilometre in, clear of anything in the way. */
+const FOOTBALL = (() => {
+	let x = START_X + FOOTBALL_AT
+	while (
+		[...LAID_OUT.obstacles, ...LAID_OUT.boosts].some(
+			(o) => Math.abs(o.x - x) < FOOTBALL_ROOM,
+		)
+	)
+		x += 20
+	return x
+})()
+
 export const haga: CourseDefinition = {
 	id: 'haga',
 	name: 'Haga',
@@ -144,6 +182,12 @@ export const haga: CourseDefinition = {
 	terrain,
 	runDirectors: ['claire', 'eline'],
 	cheerers: CHEERERS,
-	...layOut(),
+	...LAID_OUT,
 	flyovers: flyOvers(),
+	football: FOOTBALL,
+	// The football, dribbled all 4 km to the line, and over it.
+	special: {
+		goal: 'Score a goal',
+		done: (run) => (run.counts.football ?? 0) > 0,
+	},
 }

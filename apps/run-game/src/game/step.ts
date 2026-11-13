@@ -11,6 +11,7 @@ import { flyerLook } from '../draw/flyerLook'
 import { rideLook } from '../draw/rideLook'
 import { collect } from '../saved/collected'
 import { play } from '../sfx'
+import { boardCarts, rideCart, stepCarts } from './carts'
 import { ceilingAt, inTunnel, rockOver } from './cave'
 import { PICKUP_WORD } from './collectables'
 import {
@@ -30,13 +31,16 @@ import {
 	BUS_START_X,
 	BUS_TOP_SPEED,
 	CAMERA_LEAD,
+	CAMERA_PAST_FINISH,
 	CAMERA_TURN,
 	CHEER_BOOST,
 	CHEER_POINTS,
 	COAST_KEEP,
+	CONE_POINTS,
 	CORGI_GALLOP,
 	CORGI_GRIP,
 	COUNTDOWN_STEP_TICKS,
+	DRAGON_LEAP,
 	DUCK_HEIGHT,
 	FIKA_BOOST,
 	FIKA_POINTS,
@@ -48,16 +52,18 @@ import {
 	GOOSE_CARRY_HEIGHT,
 	GOOSE_CARRY_SPEED,
 	GRAVITY,
+	HAT_POINTS,
+	HAT_REACH,
 	HAZARD_POINTS,
 	HILL_PULL,
 	HITBOX_HALF_WIDTH,
 	JUMP_CUT,
 	JUMP_SPEED,
+	LEFT_EDGE,
 	MUD_TOP_SPEED,
 	PATH_FRONT,
 	PUMPKIN_BOOST,
 	PUMPKIN_POINTS,
-	PUMPKIN_SPEED,
 	PX_PER_M,
 	RIDE_LEAP,
 	RING_BOOST,
@@ -90,9 +96,12 @@ import {
 	rideCondor,
 	stepFlyers,
 } from './flyers'
+import { stepFootball } from './football'
 import { scoopFurbies, stepFurbies } from './furbies'
 import { atSea, glidingBox, stepGliding } from './gliders'
+import { HAT_RULES, type Hat, WORN_FIKA, sameHat } from './hats'
 import { callOut, landLongJump, longJumpTakeOff, sandDrag } from './longJump'
+import { MOLE_HOP, burrowing, onMole } from './moles'
 import { mummyAt } from './mummies'
 import { scoopPack, stepPack } from './pack'
 import { landingOn, platformAt, platformMove } from './platforms'
@@ -175,6 +184,9 @@ export function stepWorld(world: World) {
 	stepPack(world)
 	stepFurbies(world)
 	stepCorgis(world)
+	boardCarts(world)
+	stepCarts(world)
+	stepFootball(world)
 	stepFlyers(world)
 	for (const racer of world.racers) collide(world, racer)
 	stepBus(world)
@@ -309,19 +321,46 @@ function speedBonus(world: World, racer: Racer) {
 const WINNER_RUN_TICKS = 150
 
 /**
- * A Round's decided once nobody's left running, or only one Player is and
- * nobody's beaten the bus to the line: they've outlasted everyone. In order,
- * then: over the line first, then whoever was still running, then the
- * scooped, the last to go first.
+ * How long the last Player left running has to stay up, once everyone else
+ * is out, to win: half a second. Scooped or fallen before then, and they're
+ * out too, last out, so they still win, but they have to earn it.
+ */
+const LAST_STANDING_TICKS = 30
+/**
+ * In Baby Mode, nobody's ever out but over the line: how long after the
+ * first's in that the Round's called anyway, wherever the rest have got to.
+ */
+const BABY_CALLED_TICKS = 30 * 60
+
+/**
+ * A Round's decided once nobody's left running, or only one Player is (and
+ * has been for `LAST_STANDING_TICKS`) and nobody's beaten the bus to the
+ * line: they've outlasted everyone. In Baby Mode, once everyone's over the
+ * line, or a while after the first. In order, then: over the line first,
+ * then whoever was still running, furthest along first, then the scooped,
+ * the last to go first.
+ *
+ * Whoever's still running once it's decided runs on as before, under their
+ * own steam, the bus and all as it was, while the Round's wrapped up.
  */
 function decideRound(world: World) {
 	const { racers } = world
 	if (world.phase() !== 'running' || world.order()) return
 	const running = racers.filter((r) => !r.out)
 	const someoneFinished = racers.some((r) => r.out === 'finished')
+	const alone =
+		!world.baby && racers.length > 1 && running.length === 1 && !someoneFinished
+	if (!alone) world.aloneSince = undefined
+	else world.aloneSince ??= world.ticks()
 	const lastStanding =
-		racers.length > 1 && running.length === 1 && !someoneFinished
-	if (running.length > 0 && !lastStanding) return
+		alone && world.ticks() - (world.aloneSince ?? 0) >= LAST_STANDING_TICKS
+	const firstIn = Math.min(
+		...racers.map((r) =>
+			r.out === 'finished' ? r.outAt : Number.POSITIVE_INFINITY,
+		),
+	)
+	const called = world.baby && world.ticks() - firstIn > BABY_CALLED_TICKS
+	if (running.length > 0 && !lastStanding && !called) return
 
 	const rank = (r: Racer) =>
 		r.out === 'finished' ? 0 : isCaught(r.out) ? 2 : 1
@@ -338,7 +377,9 @@ function decideRound(world: World) {
 		),
 	)
 	world.decidedAt = world.ticks()
-	world.setPhase('finished')
+	// Everyone's out: it's over, the bus pulling up. Anyone still running
+	// keeps on as they were.
+	if (!running.length) world.setPhase('finished')
 	if (lastStanding) {
 		play('finished')
 		world.popup(
@@ -396,20 +437,33 @@ function stepRunner(world: World, racer: Racer) {
 	const left = !!held?.left
 	const up = !!held?.up
 	const down = !!held?.down
+	// Baby Mode: left behind, carried along faster, holding on or not.
+	const catchUp = racing ? babyCatchUp(world, racer) : 0
 	if (!racing) {
 		b.mount = 0
 		b.carried = 0
 		b.condorFrom = undefined
 	}
 	if (b.stomped > 0) b.stomped--
-	// A stumble knocks a Pumpkin off.
-	if (b.stumble > 0 && b.pumpkin) loseHat(world, b)
+	// A stumble knocks a Pumpkin off, or a helmet.
+	if (b.stumble > 0 && b.hat && HAT_RULES[b.hat.kind].fallsOff)
+		loseHat(world, b)
 	if (b.dropping > 0) b.dropping--
 	// A Ride wears out as it goes, leaping too, so it's only ever a while:
-	// worn out in the air, they're off it, from its saddle, falling.
+	// worn out in the air, they're off it, from its saddle, falling. A
+	// mole's not till it's out of the rock: it won't leave you in it.
 	if (b.mount > 0 && racing) {
-		b.mount--
+		if (b.mount > 1 || !burrowing(world, b)) b.mount--
 		if (b.mount === 0 && !b.grounded) b.feetY -= rideLook(world.course).saddle
+	}
+	/** On a mole: hopping along, and digging on through any rock in the way. */
+	const mole = onMole(world, b)
+
+	if (b.cart !== undefined) {
+		// In a mine cart: down the line, nothing to do but hold on.
+		rideCart(world, racer, up)
+		b.wasUp = up
+		return
 	}
 
 	if (b.carried > 0 && b.condorFrom) {
@@ -428,9 +482,11 @@ function stepRunner(world: World, racer: Racer) {
 		return
 	}
 	if (b.carried > 0 && up && !b.wasUp) {
-		// Jumping off a goose, or a dragon: up off it, as off the ground.
+		// Jumping off a goose: up off it, as off the ground. Off a dragon's
+		// back, pushing off it, higher: high enough, just before a guard
+		// tower, to come down on its roof.
 		b.carried = 0
-		jump(b)
+		jump(b, flyerLook(world.course).seat ? DRAGON_LEAP : JUMP_SPEED)
 		b.wasUp = up
 		return
 	}
@@ -503,13 +559,15 @@ function stepRunner(world: World, racer: Racer) {
 		if (b.squashed > 0) b.squashed--
 		const canDrive = b.stumble === 0
 		// Ducking, off a Ride: slid off its back, going as fast as it was.
-		if (b.mount > 0 && down) b.mount = 0
+		// Not off a mole in the rock, though.
+		if (b.mount > 0 && down && !burrowing(world, b)) b.mount = 0
 
 		if (b.mount > 0) {
 			// On a corgi: galloping on, whatever's held.
 			b.ducking = false
 			b.facing = 1
-			b.vx += (CORGI_GALLOP - b.vx) * CORGI_GRIP
+			b.vx +=
+				((rideLook(world.course).speed ?? CORGI_GALLOP) - b.vx) * CORGI_GRIP
 		} else if (b.ducking) {
 			// A slide: hardly slows on the flat, and gathers speed downhill.
 			b.vx *= SLIDE_KEEP
@@ -530,12 +588,16 @@ function stepRunner(world: World, racer: Racer) {
 		} else {
 			const running = b.muddy
 				? MUD_TOP_SPEED
-				: RUN_TOP_SPEED + (b.pumpkin ? PUMPKIN_SPEED : 0)
+				: RUN_TOP_SPEED + (b.hat ? HAT_RULES[b.hat.kind].speed : 0)
 			// Squashed by a furby: slower, till they spring back up.
 			const top =
-				b.squashed > 0 ? Math.min(running, SQUASHED_TOP_SPEED) : running
-			// Holding both is standing still.
-			const drive = canDrive ? Number(right) - Number(left) : 0
+				(b.squashed > 0 ? Math.min(running, SQUASHED_TOP_SPEED) : running) +
+				catchUp
+			// Holding both is standing still. Left behind in Baby Mode, on
+			// regardless, unless they're holding back.
+			const drive = canDrive
+				? Number(right) - Number(left) || (catchUp > 0 ? 1 : 0)
+				: 0
 			if (finished) b.vx += (RUN_OFF_SPEED - b.vx) * RUN_GRIP * 2
 			else if (drive) {
 				const target = drive * top
@@ -559,9 +621,17 @@ function stepRunner(world: World, racer: Racer) {
 			// Off the long jump's board, to be measured.
 			if (racing) longJumpTakeOff(world, b)
 		}
+		// A mole hops again as soon as it's down, by itself.
+		if (mole && b.grounded) {
+			b.vy = -MOLE_HOP
+			b.grounded = false
+			b.jumping = false
+			b.on = undefined
+		}
 	} else {
 		// Ducking off a Ride, even with it in the air: from its saddle, falling.
-		if (down && b.mount > 0) {
+		// Not off a mole in the rock, though.
+		if (down && b.mount > 0 && !burrowing(world, b)) {
 			b.feetY -= rideLook(world.course).saddle
 			b.mount = 0
 		}
@@ -569,14 +639,30 @@ function stepRunner(world: World, racer: Racer) {
 		// Let go of jump on the way up: cut short, a hop. Held: the whole jump.
 		if (b.jumping && !up && b.vy < -JUMP_CUT) b.vy = -JUMP_CUT
 		if (b.vy >= 0) b.jumping = false
-		if (right) b.vx += AIR_PUSH
-		if (left) b.vx -= AIR_PUSH
+		if (mole) {
+			// A mole's always in the air, hopping: on at a gallop, whatever's held.
+			b.facing = 1
+			b.vx +=
+				((rideLook(world.course).speed ?? CORGI_GALLOP) - b.vx) * CORGI_GRIP
+		} else {
+			if (right) b.vx += AIR_PUSH
+			if (left) b.vx -= AIR_PUSH
+		}
+		// A propeller beanie: holding jump on the way down, floating down.
+		b.floating =
+			!mole &&
+			up &&
+			b.vy > FLOAT_FALL &&
+			!!b.hat &&
+			!!HAT_RULES[b.hat.kind].floats
+		if (b.floating) b.vy = FLOAT_FALL
 	}
+	if (b.grounded) b.floating = false
 	b.wasUp = up
 	if (b.vx > 0.5) b.facing = 1
 	else if (b.vx < -0.5) b.facing = -1
 
-	const top = topSpeed(world)
+	const top = topSpeed(world) + catchUp
 	b.vx = grabbed ? 0 : Math.max(-top, Math.min(top, b.vx))
 
 	// Carried along by a Moving Platform.
@@ -591,16 +677,20 @@ function stepRunner(world: World, racer: Racer) {
 		callOut(world, b, from)
 		hitWall(world, racer, from)
 		hitTower(world, racer, from)
-		hitRockFace(world, racer, from)
+		// A mole digs on through the rock, rather than running into it.
+		if (!mole) hitRockFace(world, racer, from)
 	}
 
 	const ground = terrain.groundY(b.x)
 	const overGap = terrain.inGap(b.x)
 	if (b.grounded) {
 		if (b.on !== undefined) {
-			const at = platformAt(terrain, world.platforms[b.on], ticks)
-			// Run off the end of it.
-			if (b.x < at.left || b.x > at.right) leaveFooting(b)
+			const platform = world.platforms[b.on]
+			const at = platformAt(terrain, platform, ticks)
+			// Run off the end of it: off a solid shelf's corner once they're
+			// all off it (see `landingOn`).
+			const edge = platform.solid ? HITBOX_HALF_WIDTH : 0
+			if (b.x < at.left - edge || b.x > at.right + edge) leaveFooting(b)
 			else b.feetY = at.top
 		} else if (overGap || stepsDown(world, from, b.x, ground - b.feetY))
 			leaveFooting(b)
@@ -609,10 +699,21 @@ function stepRunner(world: World, racer: Racer) {
 	if (!b.grounded) {
 		const wasFeetY = b.feetY
 		b.feetY += b.vy
-		// Up into a Ceiling: a bump on the head, and no higher.
-		if (b.vy < 0) {
+		// Up into a Ceiling: a bump on the head, and no higher. Not on a
+		// mole: up into the rock it digs.
+		if (b.vy < 0 && !mole) {
 			const height = bodyHeight(b)
-			const ceiling = ceilingAt(world, b.x, wasFeetY - height)
+			const over = ceilingAt(world, b.x, wasFeetY - height)
+			// And the Cave's Ceiling over their front: under a roof sloping
+			// down ahead, a Tunnel's mouth, it's their front that bumps it,
+			// rather than rising on into the rock.
+			const ahead = world.course.cave?.ceiling(
+				b.x + b.facing * HITBOX_HALF_WIDTH,
+			)
+			const ceiling =
+				ahead !== undefined && ahead <= wasFeetY - height + 1
+					? Math.max(ahead, over ?? ahead)
+					: over
 			if (ceiling !== undefined && b.feetY - height < ceiling) {
 				b.feetY = ceiling + height
 				b.vy = 0
@@ -629,12 +730,14 @@ function stepRunner(world: World, racer: Racer) {
 						wasFeetY,
 						b.feetY,
 						b.dropping > 0 ? b.droppingFrom : undefined,
+						HITBOX_HALF_WIDTH,
 					)
 				: undefined
 		if (platform && (overGap || platform.top <= ground)) {
 			b.feetY = platform.top
 			b.on = platform.index
 			land(b)
+			if (world.platforms[platform.index].tower) b.toppedTower = true
 		} else if (!overGap && b.feetY >= ground && b.vy >= 0) {
 			b.feetY = ground
 			b.on = undefined
@@ -651,10 +754,30 @@ function stepRunner(world: World, racer: Racer) {
 	if (b.grounded && b.launchX !== undefined) landLongJump(world, racer)
 }
 
-/** A Pumpkin knocked off someone's head, flying. */
-function loseHat(world: World, b: Body) {
-	b.lostPumpkin = { carving: b.pumpkin, at: world.ticks() }
-	b.pumpkin = 0
+/** A hat knocked off someone's head, flying. */
+export function loseHat(world: World, b: Body) {
+	if (!b.hat) return
+	b.lostHat = { hat: b.hat, at: world.ticks() }
+	b.hat = undefined
+}
+
+/** On someone's head, in place of whatever was: that's knocked off, flying. */
+function wearHat(world: World, b: Body, hat: Hat) {
+	loseHat(world, b)
+	b.hat = hat
+}
+
+/**
+ * About to stumble, or wipe out: a helmet takes the knock for them, and
+ * comes off doing it, if they've one on. Whether it did.
+ */
+export function shielded(world: World, b: Body) {
+	const rules = b.hat && HAT_RULES[b.hat.kind]
+	if (!rules?.shield) return false
+	loseHat(world, b)
+	play('stomp')
+	world.popup(rules.saved ?? 'Saved!', b.x, b.feetY - STAND_HEIGHT - 10)
+	return true
 }
 
 /**
@@ -726,7 +849,7 @@ function thud(world: World, b: Body, dir: number, edge: number) {
 	// Walked into, it just stops them: only at a run does it throw them back.
 	const fast = Math.abs(b.vx) >= WALL_BOUNCE_SPEED
 	b.vx = fast ? -dir * WALL_BOUNCE : 0
-	if (fast && b.stumble === 0) {
+	if (fast && b.stumble === 0 && !shielded(world, b)) {
 		play('stumble')
 		b.stumble = STUMBLE_TICKS
 		world.addBonus('hazards', -HAZARD_POINTS)
@@ -741,7 +864,8 @@ function thud(world: World, b: Body, dir: number, edge: number) {
 /**
  * A guard tower's walls: solid, all but its doorways. Into its side above
  * the doorway, it stops them as a Wall does; jumping inside it, they hit
- * their head on the top of the doorway. Over its top, nothing.
+ * their head on the top of the doorway. Over its top, nothing: its roof is a
+ * Platform (see `towerRoof`).
  */
 function hitTower(world: World, racer: Racer, from: number) {
 	const b = racer.body
@@ -779,22 +903,150 @@ function hitRockFace(world: World, racer: Racer, from: number) {
 	const dir = Math.sign(b.x - from)
 	if (!cave || !dir) return
 	const height = bodyHeight(b)
+	// Where their front was: under the rock, or outside the Cave altogether.
+	const was = from + dir * HITBOX_HALF_WIDTH
+	const wasCeiling = cave.ceiling(was)
+	const wasUnder = wasCeiling !== undefined && wasCeiling <= b.feetY + 1
+	const wasOutside = was < cave.from || was >= cave.to
+	// Or up on top of it: on the Sphinx's porch roof, say, its chest ahead.
+	const wasTop = cave.surface(was)
+	const wasOnTop = wasTop !== undefined && b.feetY <= wasTop + 1
 	/** Whether, at `x`, their front's into the rock. */
 	const into = (x: number) => {
 		const front = x + dir * HITBOX_HALF_WIDTH
 		const feet =
 			b.grounded && b.on === undefined ? world.terrain.groundY(front) : b.feetY
 		const rock = rockOver(world, front, feet)
-		return rock !== undefined && rock > feet - height + 1
+		if (rock !== undefined && rock > feet - height + 1) return true
+		// Their feet up over the Ceiling here, but its rock still lower than
+		// their head: they'd be in the rock, which is solid on up from its
+		// Ceiling. Jumped at a Tunnel's mouth from under the rock before it,
+		// it's its face, however high they jump; from outside the Cave, or up
+		// on top of its rock, its face up to its top. (Not up over it from
+		// inside the Cave: on a street over a sewer, say.)
+		const ceiling = cave.ceiling(front)
+		if (ceiling === undefined || ceiling <= feet - height + 1) return false
+		if (wasUnder) return true
+		const top = cave.surface(front)
+		return (
+			(wasOutside || wasOnTop) &&
+			front >= cave.from &&
+			front < cave.to &&
+			top !== undefined &&
+			feet > top + 1
+		)
 	}
 	if (into(from) || !into(b.x)) return
 	let edge = from
 	while (!into(edge + dir)) edge += dir
-	thud(world, b, dir, edge + dir * (HITBOX_HALF_WIDTH + 1))
+	const face = edge + dir * (HITBOX_HALF_WIDTH + 1)
+	// The side of a shelf of rock, rather than the Cave's own rock: no
+	// bonking on that (see `sideOfShelf`).
+	const ceiling = cave.ceiling(face)
+	const caveRock = ceiling !== undefined && ceiling > b.feetY - height + 1
+	if (!caveRock && sideOfShelf(world, b, dir, edge, face)) return
+	if (caveRock && downTheSlope(world, b, dir, height)) return
+	thud(world, b, dir, face)
 }
 
-/** Down a Gap, and out. */
+/** How fast someone floats down, holding jump, in a propeller beanie. */
+const FLOAT_FALL = 2.3
+
+/** How far down a sloping roof can push someone in a tick: any steeper, it's a wall. */
+const SLOPE_PUSH = 24
+/** How much of their speed they keep, pushed down one. */
+const SLOPE_KEEP = 0.9
+
+/**
+ * In the air, into the Cave's roof sloping down ahead of them, `height`
+ * tall: rather than a bonk, pushed down under it, the way it slopes, and
+ * on down to the floor, still going. Not into a wall, nor a Tunnel's mouth,
+ * with no room to stand under it. Whether they were.
+ */
+function downTheSlope(world: World, b: Body, dir: number, height: number) {
+	if (b.grounded) return false
+	const front = b.x + dir * HITBOX_HALF_WIDTH
+	const roof = world.course.cave?.ceiling(front)
+	if (roof === undefined) return false
+	const push = roof + height + 1 - b.feetY
+	if (push <= 0 || push > SLOPE_PUSH) return false
+	if (world.terrain.groundY(front) - roof < height) return false
+	b.feetY += push
+	b.vy = Math.max(b.vy, push)
+	b.vx *= SLOPE_KEEP
+	b.jumping = false
+	return true
+}
+
+/**
+ * How far under the top of a shelf of rock someone can be, going into its
+ * side, and still step up onto it: a kerb's worth, no more, or it's a jump
+ * up onto it they never made.
+ */
+const MANTLE = 16
+/** And how far over its underside their head can be and still be slipped under it. */
+const SLIP_UNDER = 26
+
+/**
+ * Into the side of a solid shelf of rock at `face`, going `dir`, their
+ * middle at `edge` once they're up against it: never a bonk. Near enough
+ * its top, they're up onto it, going on as they were; just under its
+ * corner, they're slipped under it; otherwise they're stopped against it,
+ * or in the air, slide down it, still going. Along the ground, a Tunnel
+ * under it, it's that Tunnel's mouth, and a bonk, as any is. Whether it
+ * was a shelf, and dealt with.
+ */
+function sideOfShelf(
+	world: World,
+	b: Body,
+	dir: number,
+	edge: number,
+	face: number,
+) {
+	const ticks = world.ticks()
+	const height = bodyHeight(b)
+	let shelf: { index: number; top: number; under: number } | undefined
+	world.platforms.forEach((platform, index) => {
+		if (!platform.solid) return
+		const at = platformAt(world.terrain, platform, ticks)
+		if (face < at.left - 1 || face > at.right + 1) return
+		const under = at.top + platform.solid
+		if (at.top >= b.feetY - 1 || under <= b.feetY - height + 1) return
+		if (!shelf || at.top < shelf.top) shelf = { index, top: at.top, under }
+	})
+	if (!shelf) return false
+	if (b.feetY - shelf.top <= MANTLE && !b.ducking) {
+		b.feetY = shelf.top
+		b.on = shelf.index
+		land(b)
+		b.floor = b.feetY
+		return true
+	}
+	// At a run along the ground, a Tunnel under it: its mouth, as any
+	// Tunnel's is, to duck into, or bonk.
+	if (b.grounded && b.feetY - shelf.under >= DUCK_HEIGHT) return false
+	// Coming down past its corner, their head only just over its underside,
+	// with room under it to stand: under it, going on as they were.
+	const below = shelf.under + height - b.feetY
+	if (
+		!b.grounded &&
+		below <= SLIP_UNDER &&
+		world.terrain.groundY(face) - shelf.under >= height
+	) {
+		b.feetY = shelf.under + height
+		b.vy = Math.max(0, b.vy)
+		return true
+	}
+	// Up against it: on the ground, stopped; in the air, sliding down it,
+	// still going, to go on under it, or along, as soon as they're down.
+	b.x = edge
+	if (b.grounded && b.vx * dir > 0) b.vx = 0
+	return true
+}
+
+/** Down a Gap, and out: or in Baby Mode, back on their feet past it. */
 function fall(world: World, racer: Racer) {
+	if (world.baby) return respawn(world, racer)
 	const b = racer.body
 	const crashed = b.gliding
 	b.mount = 0
@@ -819,11 +1071,69 @@ function fall(world: World, racer: Racer) {
 	)
 }
 
+/** How far past a Gap, or the sea, someone's put back on their feet in Baby Mode. */
+const RESPAWN_PAST = 60
+/** And how long they're stumbling, getting going again. */
+const RESPAWN_STUMBLE = 24
+
+/**
+ * Baby Mode's fall: not out, but put back on their feet just past the Gap
+ * they fell down (or past the sea, fallen in), stumbling a moment.
+ */
+function respawn(world: World, racer: Racer) {
+	const b = racer.body
+	const { terrain } = world
+	const { sea } = world.course
+	const gap = terrain.gaps.find((g) => g.to > b.x - 120 && g.from < b.x + 120)
+	let x = (sea && atSea(world, b.x) ? sea.to : (gap?.to ?? b.x)) + RESPAWN_PAST
+	while (x < terrain.finishX && (terrain.inGap(x) || atSea(world, x))) x += 20
+	b.mount = 0
+	b.carried = 0
+	b.condorFrom = undefined
+	b.gliding = false
+	b.ducking = false
+	b.trick = undefined
+	b.turn = 0
+	b.grind = undefined
+	b.launchX = undefined
+	b.x = x
+	b.feetY = terrain.groundY(x)
+	b.floor = b.feetY
+	b.vx = 2
+	b.vy = 0
+	b.grounded = true
+	b.jumping = false
+	b.on = undefined
+	b.stumble = RESPAWN_STUMBLE
+	play('fallen')
+	world.popup(`${racer.runner.name} fell! Back up`, x, b.feetY - 80)
+}
+
+/** Baby Mode: this far behind whoever's furthest along, and you're carried along faster... */
+const CATCH_UP_FROM = 360
+/** ...faster the further back, up to this much over top speed this much further back. */
+const CATCH_UP_MAX = 3
+const CATCH_UP_OVER = 600
+
+/** How much faster than top speed someone can go, left behind in Baby Mode. */
+function babyCatchUp(world: World, racer: Racer) {
+	if (!world.baby) return 0
+	let front = Number.NEGATIVE_INFINITY
+	for (const r of world.racers)
+		if (r !== racer) front = Math.max(front, r.body.x)
+	const { finishX } = world.terrain
+	const behind = Math.min(front, finishX) - racer.body.x
+	// Someone's in: everyone else carried on in to the line too.
+	const home = front >= finishX && behind > 0
+	if (behind <= CATCH_UP_FROM && !home) return 0
+	return Math.min(
+		CATCH_UP_MAX,
+		0.5 + (Math.max(0, behind - CATCH_UP_FROM) / CATCH_UP_OVER) * CATCH_UP_MAX,
+	)
+}
+
 /** How quickly a goose lifts whoever it's carrying up to its height, a share a tick. */
 const CARRY_LIFT = 0.05
-
-/** As far back as the ground goes (see `Ground`). */
-const LEFT_EDGE = START_X - 1300
 
 /** `speed` faster the way they're going, up to the top speed (lower in a Round). */
 export function boost(world: World, vx: number, facing: 1 | -1, speed: number) {
@@ -860,6 +1170,8 @@ function collide(world: World, racer: Racer) {
 		box.right > x0 && box.left < x1 && box.bottom > y0 && box.top < y1
 
 	const stumble = (word: string) => {
+		// A helmet takes the knock: no stumble, and it's off.
+		if (shielded(world, b)) return
 		play('stumble')
 		b.stumble = STUMBLE_TICKS
 		if (b.gliding) {
@@ -872,8 +1184,8 @@ function collide(world: World, racer: Racer) {
 	}
 
 	b.muddy = false
-	/** On a corgi, over rocks, under branches and through the mud. Or carried over them. */
-	const riding = b.mount > 0 || b.carried > 0
+	/** On a corgi, over rocks, under branches and through the mud. Or carried over them, or in a cart. */
+	const riding = b.mount > 0 || b.carried > 0 || b.cart !== undefined
 	/**
 	 * Not yet had its go at them. A rock, a branch, a pothole, mud and the
 	 * children are there for everyone, once each; a hurdle and geese only for
@@ -936,6 +1248,24 @@ function collide(world: World, racer: Racer) {
 					stumble('Poof!')
 				}
 				break
+			case 'cone': {
+				// Into it: knocked over, flat, and on its way, costing a few
+				// points and a little speed. Not a stumble: no hat comes off.
+				const base = ground - (o.height ?? 0)
+				if (
+					!state.used &&
+					overlaps(o.x - CONE_HALF, o.x + CONE_HALF, base - CONE_TALL, base)
+				) {
+					hits(state)
+					state.used = true
+					state.flown = world.ticks()
+					b.vx *= CONE_KEEP
+					world.addBonus('cones', -CONE_POINTS)
+					world.popup(scored(world, 'Bonk!', `-${CONE_POINTS}`), b.x, top)
+					play('stomp')
+				}
+				break
+			}
 			case 'vent':
 				if (
 					freshFor(state) &&
@@ -1048,7 +1378,10 @@ function collide(world: World, racer: Racer) {
 				) {
 					hits(state)
 					play('squelch')
-					stumble('Splat!')
+					// A tentacle on their head: it slides off it.
+					if (b.hat && HAT_RULES[b.hat.kind].splatProof)
+						world.popup('Boing!', b.x, top)
+					else stumble('Splat!')
 				}
 				break
 			}
@@ -1317,6 +1650,9 @@ function collide(world: World, racer: Racer) {
 						state.used = world.racers.every((r) => state.hit.has(r.id))
 					} else state.used = true
 					collect(`fika:${o.item}`)
+					// A hat too: on their head.
+					const worn = WORN_FIKA[o.item]
+					if (worn) wearHat(world, b, { kind: worn })
 					b.vx = boost(world, b.vx, b.facing, FIKA_BOOST)
 					world.addBonus('fika', FIKA_POINTS)
 					world.popup(
@@ -1331,11 +1667,14 @@ function collide(world: World, racer: Racer) {
 			case 'barcode': {
 				const y = ground - o.height
 				const reach = BARCODE_WIDTH / 2 + 4
+				// Everyone's, once each, as at a real parkrun: gone once
+				// everyone racing's had theirs scanned.
 				if (
-					!state.used &&
+					!state.hit.has(racer.id) &&
 					overlaps(o.x - reach, o.x + reach, y - BARCODE_TALL - 2, y)
 				) {
-					state.used = true
+					hits(state)
+					state.used = world.racers.every((r) => state.hit.has(r.id))
 					collect('barcode')
 					b.vx = boost(world, b.vx, b.facing, BARCODE_BOOST)
 					world.addBonus('barcodes', BARCODE_POINTS)
@@ -1349,16 +1688,16 @@ function collide(world: World, racer: Racer) {
 				break
 			}
 			case 'pumpkin':
-				// Only with nothing on your head already.
+				// Only with no Pumpkin on your head already.
 				if (
 					!state.used &&
-					!b.pumpkin &&
+					b.hat?.kind !== 'pumpkin' &&
 					b.stumble === 0 &&
 					overlaps(o.x - 16, o.x + 16, ground - 30, ground)
 				) {
 					state.used = true
 					collect('pumpkin')
-					b.pumpkin = o.carving
+					wearHat(world, b, { kind: 'pumpkin', carving: o.carving })
 					b.vx = boost(world, b.vx, b.facing, PUMPKIN_BOOST)
 					world.addBonus('pumpkins', PUMPKIN_POINTS)
 					world.popup(
@@ -1369,6 +1708,29 @@ function collide(world: World, racer: Racer) {
 					play('fika')
 				}
 				break
+			case 'hat': {
+				// Into it, wherever it's sat: on their head, unless one like
+				// it's on there already.
+				const hat: Hat = { kind: o.hat }
+				const y = ground - o.height
+				if (
+					!state.used &&
+					!sameHat(b.hat, hat) &&
+					overlaps(o.x - HAT_REACH, o.x + HAT_REACH, y - HAT_REACH * 2, y)
+				) {
+					state.used = true
+					collect(`hat:${o.hat}`)
+					wearHat(world, b, hat)
+					world.addBonus('hats', HAT_POINTS)
+					world.popup(
+						scored(world, PICKUP_WORD[`hat:${o.hat}`], `+${HAT_POINTS}`),
+						b.x,
+						top,
+					)
+					play('fika')
+				}
+				break
+			}
 			case 'ring': {
 				// Through it, either way, their middle through its: faster,
 				// once each. It lights up.
@@ -1437,6 +1799,11 @@ const BUS_PARKS_PAST = 220
 /** And how quickly it slows to a stop there: a share of the way left, a tick. */
 const BUS_PARKING = 0.05
 
+/** How wide a traffic cone is either side of its middle, and how tall; and how much speed's kept, knocking one over. */
+const CONE_HALF = 8
+const CONE_TALL = 22
+const CONE_KEEP = 0.65
+
 /** How tall a snowman is, to ski into. */
 export const SNOWMAN_HEIGHT = 44
 /** How tall a slalom gate is: through it, or clean over it. */
@@ -1474,7 +1841,8 @@ function stepBus(world: World) {
 	for (const state of world.boosts)
 		if (state.cheering() > 0) state.setCheering(state.cheering() - 1)
 
-	if (phase === 'countdown') return
+	// Baby Mode: no bus, parked well out of the way.
+	if (phase === 'countdown' || world.baby) return
 
 	// Parked until a moment after "Go!", but run back into it and it'll still scoop.
 	const driving = world.raceTicks() - BUS_HOLD_TICKS
@@ -1668,8 +2036,9 @@ function knockOver(world: World) {
 			o.kind === 'kids' ||
 			o.kind === 'tombstone' ||
 			o.kind === 'tourists' ||
-			// A snowman, still stood up.
-			(o.kind === 'snowman' && !state.used)
+			// A snowman, or a traffic cone, still stood up.
+			(o.kind === 'snowman' && !state.used) ||
+			(o.kind === 'cone' && !state.used)
 		) {
 			state.used = true
 			state.scooped = {
@@ -1885,7 +2254,7 @@ function stepCamera(world: World) {
 	const target = Math.max(
 		LEFT_EDGE - VIEW_WIDTH * CAMERA_LEAD,
 		Math.min(
-			world.terrain.finishX + 500 - VIEW_WIDTH,
+			world.terrain.finishX + CAMERA_PAST_FINISH - VIEW_WIDTH,
 			world.body.x - VIEW_WIDTH * world.view.lead,
 		),
 	)
@@ -1914,13 +2283,17 @@ function frameEveryone(world: World) {
 	// Left where it is once everyone's out: to watch the last of them fly off.
 	if (!running.length) return
 	const xs = running.map((r) => r.body.x)
-	if (world.phase() === 'countdown') xs.push(world.bus.frontX - 80)
+	if (world.phase() === 'countdown' && !world.baby)
+		xs.push(world.bus.frontX - 80)
 	const last = Math.min(...xs)
-	// The bus too, once it's closing in on the last of them: they see it coming.
-	const back = Math.min(
-		last - ROUND_BEHIND,
-		Math.max(world.bus.frontX - 80, last - BUS_IN_VIEW),
-	)
+	// The bus too, once it's closing in on the last of them: they see it
+	// coming. None in Baby Mode.
+	const back = world.baby
+		? last - ROUND_BEHIND
+		: Math.min(
+				last - ROUND_BEHIND,
+				Math.max(world.bus.frontX - 80, last - BUS_IN_VIEW),
+			)
 	const front = Math.max(...xs) + ROUND_AHEAD
 	// And up and down: from the highest anyone's stood to the lowest; the
 	// whole sky, with anyone gliding.
@@ -1964,7 +2337,7 @@ function frameEveryone(world: World) {
 	const target = Math.max(
 		LEFT_EDGE - VIEW_WIDTH * CAMERA_LEAD,
 		Math.min(
-			world.terrain.finishX + 500 - width,
+			world.terrain.finishX + CAMERA_PAST_FINISH - width,
 			front > back + width ? front - width : back - spare / 2,
 		),
 	)

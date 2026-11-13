@@ -1,12 +1,11 @@
 import type { RunnerName } from '@/data/runners'
 import busBody from '../assets/bus/bus.png'
-import drill1 from '../assets/bus/drill-1.png'
-import drill2 from '../assets/bus/drill-2.png'
 import scoop from '../assets/bus/scoop.png'
 import windows from '../assets/bus/windows.png'
 import oldTownFar from '../assets/horizons/old-town-far.png'
 import oldTownNear from '../assets/horizons/old-town-near.png'
 import lamp from '../assets/scenery/lamp.png'
+import { DRILL_FRAMES } from '../draw/art/drill'
 import {
 	GROUND_Y,
 	PATH_BACK,
@@ -17,6 +16,7 @@ import {
 } from '../game/constants'
 import { SEWER_FINDS } from '../game/fika'
 import { type Gap, type Terrain, withGaps } from '../game/terrain'
+import { withHat } from './kit/hats'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
 import {
@@ -25,7 +25,6 @@ import {
 	ROAD_BLOCK_HEIGHT,
 	ROAD_BLOCK_WIDTH,
 	archway,
-	cone,
 	crates,
 	drumFire,
 	duckSign,
@@ -401,6 +400,99 @@ const inTunnel = (x: number) => {
 	return x > section.from + 220 && x < section.to - before
 }
 
+/** How many traffic cones there are, about, and how far apart a group's are. */
+const CONES = 23
+const CONE_GROUP_GAP = 34
+/** How far apart cones up on the catwalks are, so each can be got to from the last. */
+const PLATFORM_CONES_APART = 700
+/** How far a cone's kept from anything else in the way. */
+const CONE_ROOM = 80
+
+/**
+ * Where there's only the one way along, so every cone can be knocked over
+ * in one go: on the street, in the hall under the manhole once down in it,
+ * along the plain tunnels, across the caverns' floors where there's no
+ * catwalk over them to go along instead, and in the hall up to the Giant
+ * Vent.
+ */
+function oneWay(x: number) {
+	if (x > START_X + 500 && x < MANHOLE - 30) return true
+	if (x > EXIT + 300 && x < FINISH - 300) return true
+	if (inTunnel(x)) return true
+	const section = sectionAt(x)
+	// A cavern's floor, where there's nothing over it to go along instead,
+	// clear of its sludge, its Swamp Men and its drains.
+	if (section?.kind === 'cavern')
+		return (
+			x > section.from + 300 &&
+			x < section.to - 300 &&
+			!terrain.inGap(x) &&
+			!CHANNELS.some((c) => x > c.from - 120 && x < c.to + 120) &&
+			!PLATFORMS.some((p) => {
+				const reach = Math.abs(p.move?.x ?? 0) + 160
+				return x > p.x - reach && x < p.x + p.width + reach
+			})
+		)
+	if (section?.kind !== 'hall') return false
+	return section.from === MOUTH
+		? x > section.from + LANDING + 60 && x < section.to - 60
+		: x > section.from + 60 && x < section.to - 100
+}
+
+/**
+ * Traffic cones, out in the way, there to be knocked over: every one of
+ * them, the special goal. A few up on the catwalks, to go up for; a row
+ * of them at the roadworks before the manhole; then on along wherever
+ * there's only the one way, now and then two or three together, clear of
+ * whatever else is there.
+ */
+function trafficCones(
+	random: () => number,
+	there: { x: number }[],
+): Obstacle[] {
+	const cones: Obstacle[] = []
+	const clear = (x: number) =>
+		oneWay(x) &&
+		there.every((o) => Math.abs(o.x - x) > CONE_ROOM) &&
+		cones.every((c) => Math.abs(c.x - x) >= CONE_GROUP_GAP)
+	// Up on the catwalks: one on each wide one that stays put, on the
+	// first two levels, well apart. Nothing's on the floor under a
+	// catwalk, so going up for these misses none down there.
+	for (const p of PLATFORMS) {
+		if (p.move || p.width < 500 || p.height > LEVEL * 2) continue
+		const x = Math.round(p.x + p.width * 0.3)
+		if (cones.some((c) => Math.abs(c.x - x) < PLATFORM_CONES_APART)) continue
+		if (there.some((o) => Math.abs(o.x - x) < CONE_ROOM)) continue
+		cones.push({ kind: 'cone', x, height: p.height })
+	}
+	// The roadworks' row, along the road to the manhole.
+	for (let x = MANHOLE - 300; x < MANHOLE - 30; x += 70)
+		if (clear(x)) cones.push({ kind: 'cone', x })
+	// The rest, along the one way, spread out over all of it.
+	let length = 0
+	for (let x = START_X; x < FINISH; x += 20) if (oneWay(x)) length += 20
+	// A little further apart than evenly, to leave room for the groups.
+	const every = (length / (CONES - cones.length)) * 1.25
+	let along = 0
+	for (
+		let x = START_X + 500;
+		x < FINISH - 300 && cones.length < CONES;
+		x += 20
+	) {
+		if (!oneWay(x)) continue
+		along += 20
+		if (along < every * (0.6 + random() * 0.8) || !clear(x)) continue
+		along = 0
+		// Now and then, two or three together.
+		const group = random() < 0.3 ? 2 + Math.floor(random() * 2) : 1
+		for (let i = 0; i < group && cones.length < CONES; i++) {
+			const at = x + i * CONE_GROUP_GAP
+			if (clear(at)) cones.push({ kind: 'cone', x: at })
+		}
+	}
+	return cones
+}
+
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	const random = seeded(1984)
 	let fika = 0
@@ -456,6 +548,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	for (const x of SWAMP_MEN) obstacles.push({ kind: 'swampman', x })
 	for (const x of DRAINS) obstacles.push({ kind: 'sewage', x })
 	obstacles.push({ kind: 'steam', x: VENT, giant: true })
+	obstacles.push(...trafficCones(random, [...obstacles, ...boosts]))
 	obstacles.sort((a, b) => a.x - b.x)
 
 	// Fika up on the catwalks, for whoever goes the high way; and down in the
@@ -513,10 +606,9 @@ function scenery(random: () => number): Course['scenery'] {
 		if (x < MANHOLE - 60 || x > EXIT + 60)
 			// Stood on the pavement's edge, by the road: in front of the houses.
 			pieces.push({ x, asset: lamp, setBack: -2 })
-	// Roadworks, before the manhole: a sign, and cones along the road to it.
+	// Roadworks, before the manhole: a sign. Its cones are out in the road
+	// (see `trafficCones`).
 	pieces.push({ x: MANHOLE - 520, asset: roadworksSign, scale: 2, setBack: -2 })
-	for (let x = MANHOLE - 360; x < MANHOLE - 20; x += 70)
-		pieces.push({ x, asset: cone, scale: 2, setBack: -14 })
 	// Under the street.
 	const tunnelBits = [pipes, archway, crates, pipes, lanternPole, archway]
 	const site = [
@@ -560,6 +652,18 @@ function scenery(random: () => number): Course['scenery'] {
 	}
 	return pieces
 }
+
+/**
+ * Everything along it: and a purple tentacle hat, up on a high shelf in
+ * the first cavern, up four of them to it.
+ */
+const LAID_OUT = withHat(layOut(), 'tentacle', () => {
+	const shelf =
+		PLATFORMS.find((p) => p.height === 320 && !p.move) ?? PLATFORMS[0]
+	return { x: shelf.x + shelf.width / 2, height: shelf.height + 10 }
+})
+/** How many traffic cones there are, all told. */
+const CONE_COUNT = LAID_OUT.obstacles.filter((o) => o.kind === 'cone').length
 
 export const sewers: CourseDefinition = {
 	id: 'sewers',
@@ -648,9 +752,14 @@ export const sewers: CourseDefinition = {
 			body: busBody,
 			windows,
 			scoop,
-			drill: [drill1, drill2],
+			drill: DRILL_FRAMES,
 			drillFrom: DIG_FROM + 160,
 		},
 	},
-	...layOut(),
+	...LAID_OUT,
+	// Every traffic cone knocked over.
+	special: {
+		goal: 'Knock over every traffic cone',
+		done: (run) => (run.counts.cones ?? 0) >= CONE_COUNT,
+	},
 }

@@ -34,6 +34,7 @@ import ventAsset from '../assets/rooftop/vent.png'
 import purpleSignAsset from '../assets/signs/purple-sign.png'
 import { bouncyToadstool } from '../courses/kit/furbyScenery'
 import { seeded } from '../courses/kit/seeded'
+import { cone } from '../courses/kit/sewerScenery'
 import type { CourseLook, Obstacle, PlatformDefinition } from '../courses/types'
 import { boardOf } from '../game/boards'
 import { inTunnel } from '../game/cave'
@@ -41,18 +42,22 @@ import {
 	BARCODE_TALL,
 	BARCODE_WIDTH,
 	DEPTH_SLANT,
+	HITBOX_HALF_WIDTH,
+	LEFT_EDGE,
 	PATH_BACK,
 	PATH_FRONT,
 	PX_PER_M,
 	RUNNER_SCALE,
 	SQUASHED,
 	START_X,
+	VERGE,
 	VIEW_HEIGHT,
 } from '../game/constants'
 import { cyclistAt } from '../game/cyclists'
 import { FIKA_SIZE } from '../game/fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from '../game/furbies'
 import { DRAWN_FROM } from '../game/groundColumns'
+import type { Hat } from '../game/hats'
 import { mummyAt } from '../game/mummies'
 import { type PlatformAt, platformAt } from '../game/platforms'
 import {
@@ -107,6 +112,7 @@ import { Pixels } from './Pixels'
 import { BusLegs, LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH } from './art/busLegs'
 import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
+import { DRILL_AT, DRILL_HEIGHT, DRILL_POINT, DRILL_WIDTH } from './art/drill'
 import { FikaArt } from './art/fika'
 import { GEESE_HEIGHT, GeeseArt, geeseWidth } from './art/geese'
 import {
@@ -117,7 +123,9 @@ import {
 } from './art/giantFurby'
 import { BUS_GLIDER_HEIGHT, BUS_GLIDER_WIDTH, busGlider } from './art/glider'
 import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt } from './art/hands'
+import { HatPicture, hatArt } from './art/hats'
 import { KIDS_HEIGHT, KidsArt, kidsWidth } from './art/kids'
+import { ROADBLOCK, ROADBLOCK_HEIGHT, ROADBLOCK_WIDTH } from './art/roadblock'
 import {
 	GIANT_VENT_HEIGHT,
 	GIANT_VENT_WIDTH,
@@ -180,6 +188,7 @@ import {
 import { frontParapet, frontParapetCaps } from './battlements'
 import { atSea, rideBus, startRide } from './busRide'
 import { flyerLook } from './flyerLook'
+import { headTop } from './heads'
 import { PlatformArt, platformLook } from './platformArt'
 import { rideLook } from './rideLook'
 
@@ -301,6 +310,18 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	let air = 0
 	const [spray, setSpray] = createSignal(false)
 	const [sparks, setSparks] = createSignal(false)
+	/** The frame they're drawn in this tick, for where their head is in it. */
+	const [shown, setShown] = createSignal<string>()
+	/** Floating down in a propeller beanie: its propeller whirring. */
+	const [floating, setFloating] = createSignal(false)
+	/** The hat they've on, if any. `body` isn't a signal: reading the tick keeps this up to date. */
+	const hat = createMemo(
+		() => (world.ticks() >= 0 ? body.hat : undefined),
+		undefined,
+		{
+			equals: (a, b) => a?.kind === b?.kind && a?.carving === b?.carving,
+		},
+	)
 
 	return createController({
 		frames: [
@@ -346,26 +367,43 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				...createObjectSignal(100, 'frameInterval'),
 				...createObjectSignal('pause' as 'play' | 'pause', 'state'),
 				...createObjectSignal({} as JSX.CSSProperties, 'style'),
-				// Their skis or snowboard, under their feet.
+				// Their skis or snowboard, under their feet; and their hat, on
+				// their head, wherever it is in the frame they're drawn in.
 				children: () => (
-					<Show when={board()}>
-						{(on) => (
-							<>
-								<BoardUnder
-									board={on()}
+					<>
+						<Show when={board()}>
+							{(on) => (
+								<>
+									<BoardUnder
+										board={on()}
+										width={size().width}
+										spray={spray()}
+										sparks={sparks()}
+									/>
+								</>
+							)}
+						</Show>
+						<Show when={hat()}>
+							{(on) => (
+								<WornHat
+									hat={on()}
+									whirring={floating()}
+									frame={shown()}
 									width={size().width}
-									spray={spray()}
-									sparks={sparks()}
+									height={size().height}
 								/>
-							</>
-						)}
-					</Show>
+							)}
+						</Show>
+					</>
 				),
 			}
 		},
-		onEnterFrame({ $ }) {
+		onEnterFrame({ $, $currentFrame }) {
 			const { body } = racer
 			const width = $.width()
+			const frames = $.frames?.() ?? []
+			setShown(frames[$currentFrame] ?? frames[0])
+			setFloating(!!body.floating)
 			$.setX(body.x - width / 2)
 			// Up on a corgi's back, riding one; or on their skis.
 			$.setY(
@@ -431,8 +469,60 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 						}
 					: {}),
 			})
+			// Where their head is, as they're drawn: for a hat knocked off it
+			// to fly off from.
+			const height = $.height()
+			const frame = shown()
+			const head = frame ? headTop(frame, width, height) : undefined
+			const across = ((head?.x ?? width / 2) - width / 2) * $.xScale()
+			const down = (head?.y ?? 0) - height / 2
+			const turned = ($.rotation() * Math.PI) / 180
+			headAt.set(body, {
+				x:
+					$.x() +
+					width / 2 +
+					across * Math.cos(turned) -
+					down * Math.sin(turned),
+				y:
+					$.y() +
+					height / 2 +
+					across * Math.sin(turned) +
+					down * Math.cos(turned),
+			})
 		},
 	})
+}
+
+/** Where each racer's head was last drawn, in the world: see `createPlayer`. */
+const headAt = new WeakMap<Body, { x: number; y: number }>()
+
+/**
+ * A hat on someone's head: where the top of it is in the frame they're
+ * drawn in, `width` by `height`, found from the frame itself (see
+ * `headTop`); till that's known, the top of the frame. Inside their
+ * sprite, so it leans, turns round and flips over with them.
+ */
+function WornHat(props: {
+	hat: Hat
+	whirring?: boolean
+	frame?: string
+	width: number
+	height: number
+}) {
+	const head = () =>
+		props.frame ? headTop(props.frame, props.width, props.height) : undefined
+	const art = () => hatArt(props.hat)
+	return (
+		<HatPicture
+			hat={props.hat}
+			lit
+			whirring={props.whirring}
+			style={{
+				left: `${(head()?.x ?? props.width / 2) - art().middle}px`,
+				top: `${(head()?.y ?? 2) - art().crown}px`,
+			}}
+		/>
+	)
 }
 
 /** How far over a glider's rider is turned, lying along under it, head first. */
@@ -575,11 +665,11 @@ function createPacer(world: World, p: Pacer) {
 	/** Stood up on skis, not a snowboard, in their ski pose, if they've one: poles in hand. */
 	const onSkis = () =>
 		world.ticks() >= 0 && !!stanceOf(sprite, p.board) && !tucked()
-	/** Ducked down, going through a Tunnel, or curled up in a trick. `p` isn't a signal: reading the tick keeps this up to date. */
+	/** Ducked down, going through a Tunnel or under a branch, or curled up in a trick. `p` isn't a signal: reading the tick keeps this up to date. */
 	const ducked = () =>
 		world.ticks() >= 0 &&
 		!!sit &&
-		((p.grounded && inTunnel(world, p.x, p.feetY)) ||
+		((p.grounded && (!!p.ducking || inTunnel(world, p.x, p.feetY))) ||
 			(!!p.board && curled(p)) ||
 			// Sat on a condor's back, carried down off a Leap.
 			!!p.condorFrom)
@@ -1090,7 +1180,9 @@ function createCorgi(world: World, c: Corgi) {
 			// Barking on and off, rather than one long bark.
 			setBarking(c.barking && world.ticks() % 50 < 30)
 			/** Up off the ground: leaping, with someone on its back, or coming down after. */
-			const airborne = c.feetY < world.terrain.groundY(c.x) - 2
+			const floor =
+				world.terrain.groundY(c.x) - (c.state === 'waiting' ? (c.up ?? 0) : 0)
+			const airborne = c.feetY < floor - 2
 			setPose(
 				c.state === 'scooped' || airborne
 					? 'leap'
@@ -1269,6 +1361,8 @@ const BUS_CONDOR_CELL = 4
 const BUS_CONDOR_ROOF = 16
 /** How far past the edge it beats its wings, taking the bus's weight, before it soars. */
 const BUS_CONDOR_BEATING = 260
+/** How long it takes, once it's let go of the bus, to fly off up and away out of sight. */
+const BUS_CONDOR_FLY_OFF = 150
 /** The scoop's front edge, this far in from the bus's left. */
 const SCOOP_FRONT = BUS_WIDTH + 22
 /** How long a bit of rock takes to fly off the drill, and the bits: up and back over the roof, or down ahead onto the floor. */
@@ -1284,7 +1378,7 @@ const DIRT = [
 	{ to: { x: -20, y: -118 }, size: 6, shade: 0, delay: 0.44 },
 ]
 /** Where the drill's tip is, down from the top of the bus. */
-const DRILL_TIP_DOWN = 94 - 35 + 33
+const DRILL_TIP_DOWN = DRILL_AT.y + DRILL_POINT.y
 
 /**
  * Rock flying off the drill as the bus bores through a Cave: bits flung up
@@ -1365,9 +1459,11 @@ function drilling(world: World, front: number) {
 	)
 }
 
-/** How much further out than a scoop a drill is, and how much higher: at the front, headlight high. */
+/**
+ * How much further out than a scoop a drill is: its point (see `DRILL_AT`
+ * and `DRILL_POINT`) this far past the scoop's front.
+ */
 const DRILL_OUT = 25
-const DRILL_UP = 35
 /** Where the wheels touch the ground, from the top of the bus. */
 const WHEEL_BOTTOM = 141
 
@@ -1598,9 +1694,21 @@ export function createBus(world: World) {
 			middle() > leap.edge &&
 			world.course.busFloor?.(middle()) !== undefined
 		const { width, height, body } = CONDOR_CELLS
+		/**
+		 * When it let go, the bus down on the valley floor, and how long
+		 * since: flying off, up and away ahead, rather than gone at once.
+		 */
+		let letGoAt: number | undefined
+		const flown = () => {
+			const ticks = world.ticks()
+			if (carried()) letGoAt = undefined
+			else if (letGoAt === undefined && middle() > leap.edge) letGoAt = ticks
+			return letGoAt === undefined ? undefined : ticks - letGoAt
+		}
+		const gripping = condorFrames(true)
 		part(
 			'bus-glider',
-			condorFrames(true)[0],
+			gripping[0],
 			width * BUS_CONDOR_CELL,
 			height * BUS_CONDOR_CELL,
 			{
@@ -1609,14 +1717,31 @@ export function createBus(world: World) {
 				y: BUS_CONDOR_ROOF - (body + 19) * BUS_CONDOR_CELL,
 			},
 			{
-				frames: condorFrames(true),
-				// Beating its wings, just off the edge, taking the weight; then soaring.
-				frame: () =>
-					condorFrame(world.ticks(), middle() < leap.edge + BUS_CONDOR_BEATING),
-				style: () => ({
-					'image-rendering': 'pixelated',
-					visibility: carried() ? 'visible' : 'hidden',
-				}),
+				// Gripping the bus, then its talons drawn up, let go.
+				frames: [...gripping, ...condorFrames(false)],
+				// Beating its wings, just off the edge, taking the weight; then
+				// soaring; then beating them again, climbing away.
+				frame: () => {
+					const since = flown()
+					if (since !== undefined)
+						return gripping.length + condorFrame(world.ticks(), true)
+					return condorFrame(
+						world.ticks(),
+						middle() < leap.edge + BUS_CONDOR_BEATING,
+					)
+				},
+				style: () => {
+					const since = flown()
+					const away = since !== undefined && since < BUS_CONDOR_FLY_OFF
+					return {
+						'image-rendering': 'pixelated',
+						visibility: carried() || away ? 'visible' : 'hidden',
+						// Up and on ahead of the bus, climbing steeper as it goes.
+						...(away && {
+							transform: `translate(${since * 4}px, ${-(since * 1.5 + since * since * 0.03)}px)`,
+						}),
+					}
+				},
 			},
 		)
 	}
@@ -1629,9 +1754,9 @@ export function createBus(world: World) {
 		part(
 			'bus-scoop',
 			look.scoop,
-			88,
-			57,
-			drill ? { x: 181 + DRILL_OUT, y: 94 - DRILL_UP } : { x: 181, y: 94 },
+			drill ? DRILL_WIDTH : 88,
+			drill ? DRILL_HEIGHT : 57,
+			drill ? DRILL_AT : { x: 181, y: 94 },
 			{
 				...(drill &&
 					look.drill && {
@@ -1641,7 +1766,7 @@ export function createBus(world: World) {
 				style: () => ({
 					transition: 'transform 60ms linear',
 					// Lifted about its top front corner.
-					'transform-origin': '88px 0px',
+					'transform-origin': `${drill ? DRILL_WIDTH : 88}px 0px`,
 					visibility:
 						world.ticks() >= 0 && (armOut(world) || drillOn() !== drill)
 							? 'hidden'
@@ -1871,7 +1996,9 @@ export function createPlatforms(world: World) {
 			? 1400
 			: Math.max(0, at.top - SLING_HEIGHT - ceiling)
 	}
-	return world.platforms.map((platform, i) => {
+	// A guard tower's roof is drawn as the tower.
+	return world.platforms.flatMap((platform, i) => {
+		if (platform.tower) return []
 		const start = platformAt(world.terrain, platform, world.ticks())
 		const [cable, setCable] = createSignal(cableTo(platform, start))
 		return createController({
@@ -1884,7 +2011,17 @@ export function createPlatforms(world: World) {
 				height: () => platform.depth ?? look.depth,
 				children: () => (
 					<>
-						<Show when={platform.art} fallback={<PlatformArt look={look} />}>
+						<Show
+							when={platform.art}
+							fallback={
+								<PlatformArt
+									look={look}
+									solid={!!platform.solid}
+									width={platform.width}
+									depth={platform.depth ?? look.depth}
+								/>
+							}
+						>
 							{/* Its own picture: its top on the Platform's. */}
 							{(art) => (
 								<img
@@ -2149,23 +2286,27 @@ export function createScenery(world: World) {
 	)
 	let carvings = 0
 	return standing.map((piece, i) => {
-		const { x, asset, scale = 1, filter, hops, carved } = piece
-		const setBack = piece.setBack ?? SCENERY_SET_BACK
+		const { x, asset, scale = 1, filter, hops, carved, footing } = piece
+		const setBack = piece.setBack ?? (footing ? VERGE : SCENERY_SET_BACK)
 		const name = carved ? names[carvings++ % names.length] : undefined
 		const width = () => (imageSize(asset)?.width ?? 0) * scale
 		const height = () => (imageSize(asset)?.height ?? 0) * scale
 		/**
 		 * The path's back edge at its highest under it, so a slope doesn't run
-		 * into its foot; or on the floor, where its middle is.
+		 * into its foot; or on the floor, where its middle is. On a footing,
+		 * all the way along, not just at its ends and middle, so no bump
+		 * between them pokes up past its foot.
 		 */
 		const pathTop = () =>
 			(piece.onFloor
 				? groundY(x)
-				: Math.min(
-						groundY(x - width() / 2),
-						groundY(x),
-						groundY(x + width() / 2),
-					)) - PATH_BACK
+				: footing
+					? highestUnder(groundY, x - width() / 2, x + width() / 2)
+					: Math.min(
+							groundY(x - width() / 2),
+							groundY(x),
+							groundY(x + width() / 2),
+						)) - PATH_BACK
 		const top = () => pathTop() - setBack - height()
 		/** How steep the floor is under it, end to end, as an angle. */
 		const floorLean = () => {
@@ -2185,7 +2326,16 @@ export function createScenery(world: World) {
 				type: piece.front ? 'foreground' : 'scenery',
 				children: carved
 					? () => <Carved name={name ?? ''} panel={carved} scale={scale} />
-					: undefined,
+					: footing
+						? () => (
+								<Footing
+									groundY={groundY}
+									x={x}
+									width={width()}
+									base={pathTop() - setBack}
+								/>
+							)
+						: undefined,
 				x: () => x - width() / 2,
 				y: () => Math.round(top() - lift()),
 				width,
@@ -2260,6 +2410,23 @@ export function createRunDirector(world: World) {
  * `TitleSign` in the web app) at twice its pixel size, lettered the same way:
  * gold, in Jersey 10.
  */
+/**
+ * The roadblock at the far left of the course: across the way, just where
+ * anyone running the wrong way is stopped (`LEFT_EDGE`).
+ */
+export function createRoadblock(world: World) {
+	return createFixture({
+		id: 'roadblock',
+		type: 'sign',
+		x: LEFT_EDGE - HITBOX_HALF_WIDTH - ROADBLOCK_WIDTH / 2,
+		width: ROADBLOCK_WIDTH,
+		height: ROADBLOCK_HEIGHT,
+		sink: 2,
+		world,
+		frames: [ROADBLOCK],
+	})
+}
+
 export function createParkrunSign(world: World, x: number) {
 	return createFixture({
 		id: 'parkrun-sign',
@@ -2486,6 +2653,48 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							width={art?.width}
 							height={art?.height}
 							style={{ display: 'block', filter: world.course.look?.rock }}
+						/>
+					</Scoopable>
+				),
+			})
+		}
+		case 'cone': {
+			// Knocked over: tipped forward onto its side, and skidding on a
+			// little way. `flown` isn't a signal: reading the tick keeps it
+			// up to date.
+			const knocked = () =>
+				world.ticks() >= 0 && state.used && !state.scooped
+					? world.ticks() - (state.flown ?? world.ticks())
+					: undefined
+			return createFixture({
+				id,
+				type: 'hazard',
+				x: o.x,
+				// Up on a platform, if it's on one.
+				sink: 1 - (o.height ?? 0),
+				width: CONE_WIDTH,
+				height: CONE_HEIGHT,
+				world,
+				children: () => (
+					<Scoopable world={world} state={state}>
+						<img
+							src={cone}
+							alt=""
+							class="pixelated"
+							width={CONE_WIDTH}
+							height={CONE_HEIGHT}
+							style={{
+								display: 'block',
+								'transform-origin': '100% 100%',
+								transform: (() => {
+									const since = knocked()
+									if (since === undefined) return undefined
+									const tip = Math.min(1, since / CONE_TIPS)
+									const skid = Math.min(1, since / CONE_SKIDS)
+									const slid = CONE_SKID * (1 - (1 - skid) ** 2)
+									return `translateX(${Math.round(slid)}px) rotate(${Math.round(90 * tip)}deg)`
+								})(),
+							}}
 						/>
 					</Scoopable>
 				),
@@ -3050,6 +3259,30 @@ export function createBoost(world: World, state: BoostState, i: number) {
 					visibility: world.ticks() >= 0 && state.used ? 'hidden' : 'visible',
 				}),
 			})
+		case 'hat': {
+			// Bobbing, glowing, plainly something to have.
+			const art = hatArt({ kind: o.hat })
+			return createFixture({
+				id,
+				type: 'boost',
+				x: o.x,
+				width: art.width,
+				height: art.height,
+				sink: -o.height,
+				world,
+				lift: (age) => Math.round(Math.sin(age / 9) * 3),
+				children: () => (
+					<>
+						<div style={HAT_GLOW} />
+						<HatPicture hat={{ kind: o.hat }} />
+					</>
+				),
+				// Picked up: gone, onto someone's head.
+				style: () => ({
+					visibility: world.ticks() >= 0 && state.used ? 'hidden' : 'visible',
+				}),
+			})
+		}
 		case 'cheer': {
 			const frame = volunteerFrame(o.member)
 			const runner = runners[o.member][0]
@@ -3193,19 +3426,33 @@ const PUMPKINS = [
 ]
 const PUMPKIN_WIDTH = 29
 const PUMPKIN_HEIGHT = 23
-/** How far down onto a runner's head a Pumpkin sits. */
-const PUMPKIN_ON = 9
-/** How long a knocked-off Pumpkin's seen flying. */
-const PUMPKIN_FLIES = 50
+/** A glow round a hat sat waiting, so it's plain it's there to have. */
+const HAT_GLOW: JSX.CSSProperties = {
+	position: 'absolute',
+	inset: '-10px',
+	background:
+		'radial-gradient(closest-side, rgba(255, 244, 190, 0.55), rgba(255, 244, 190, 0))',
+}
+/** A traffic cone's size, drawn; and knocked over, how long it takes to tip, how far it skids, and for how long. */
+const CONE_WIDTH = 16
+const CONE_HEIGHT = 22
+const CONE_TIPS = 6
+const CONE_SKID = 40
+const CONE_SKIDS = 18
+/** How long a knocked-off hat's seen flying. */
+const HAT_FLIES = 50
 
 /**
- * The Pumpkins on racers' heads, one for each racer, worn until a stumble
- * knocks it off, flying.
+ * Hats knocked off racers' heads, one for each racer: up and away behind
+ * them, from where their head was, spinning and fading. (A hat on someone's
+ * head is drawn with them: see `WornHat`.)
  */
 export function createHats(world: World) {
 	return world.racers.map((racer) => {
-		const { sprite } = racer.runner
-		const [carving, setCarving] = createSignal(0)
+		const [flying, setFlying] = createSignal<Hat>()
+		/** Where it came off. */
+		let from = { x: 0, y: 0 }
+		let lostAt = -1
 		return createController({
 			init: () => ({
 				id: `hat-${racer.id}`,
@@ -3214,62 +3461,38 @@ export function createHats(world: World) {
 				...createObjectSignal(0, 'y'),
 				...createObjectSignal(0, 'rotation'),
 				...createObjectSignal({} as JSX.CSSProperties, 'style'),
-				width: () => PUMPKIN_WIDTH,
-				height: () => PUMPKIN_HEIGHT,
+				width: () => (flying() ? hatArt(flying() as Hat).width : 0),
+				height: () => (flying() ? hatArt(flying() as Hat).height : 0),
 				children: () => (
-					<Show when={carving()}>
-						{(n) => (
-							<img
-								src={PUMPKINS[n() - 1]}
-								alt=""
-								style={{ display: 'block' }}
-							/>
-						)}
-					</Show>
+					<Show when={flying()}>{(hat) => <HatPicture hat={hat()} />}</Show>
 				),
 			}),
 			onEnterFrame({ $ }) {
 				const { body } = racer
-				const lost = body.lostPumpkin
-				const since = lost ? world.ticks() - lost.at : PUMPKIN_FLIES
-				setCarving(
-					body.pumpkin || (since < PUMPKIN_FLIES ? (lost?.carving ?? 0) : 0),
-				)
-				if (!carving()) return
-				const sitting = (body.ducking || body.mount > 0) && !!sprite.sit
-				const height =
-					(sitting
-						? poseSize(sprite.sit, sprite).height
-						: sprite.height * RUNNER_SCALE) * (body.squashed > 0 ? SQUASHED : 1)
-				const feet =
-					body.feetY - (body.mount > 0 ? rideLook(world.course).saddle : 0)
-				// On their head as they lean with the hill, as the runner's drawn
-				// (see `createPlayer`): leaning round their middle, or squashed,
-				// round their feet.
-				const lean = runnerLean(world, body)
-				const pivot = body.squashed > 0 ? 0 : height / 2
-				const reach = height - pivot
-				const radians = (lean * Math.PI) / 180
-				const headX = body.x + reach * Math.sin(radians)
-				const headY = feet - pivot - reach * Math.cos(radians)
-				const x = headX - PUMPKIN_WIDTH / 2
-				const y = headY - PUMPKIN_HEIGHT + PUMPKIN_ON
-				if (body.pumpkin) {
-					$.setX(x)
-					$.setY(y)
-					$.setRotation(racer.out === 'scooped' ? body.spin * 14 : lean)
-					$.setStyle({ opacity: 1 })
+				const lost = body.lostHat
+				const since = lost ? world.ticks() - lost.at : HAT_FLIES
+				if (!lost || since >= HAT_FLIES || since < 0) {
+					if (flying()) setFlying(undefined)
 					return
 				}
-				// Knocked off: up and away behind them, spinning, fading.
+				if (lost.at !== lostAt) {
+					lostAt = lost.at
+					const art = hatArt(lost.hat)
+					const head = headAt.get(body) ?? {
+						x: body.x,
+						y: body.feetY - racer.runner.sprite.height * RUNNER_SCALE,
+					}
+					from = { x: head.x - art.middle, y: head.y - art.crown }
+					setFlying(lost.hat)
+				}
 				const flight = scoopFlight(
-					{ at: lost?.at ?? 0, vx: -2 * body.facing },
+					{ at: lost.at, vx: -2 * body.facing },
 					world.ticks(),
 				)
-				$.setX(x + flight.x)
-				$.setY(y + flight.y * 0.6)
+				$.setX(from.x + flight.x)
+				$.setY(from.y + flight.y * 0.6)
 				$.setRotation(flight.spin)
-				$.setStyle({ opacity: String(1 - since / PUMPKIN_FLIES) })
+				$.setStyle({ opacity: String(1 - since / HAT_FLIES) })
 			},
 		})
 	})
@@ -3419,6 +3642,67 @@ function gravestoneNames() {
  * A name carved in a tombstone's panel, as on the website's tombstone sign:
  * dark, lit along each letter's bottom edge, smaller the longer it is.
  */
+/** The highest the ground gets (the least `groundY`) between `from` and `to`. */
+function highestUnder(
+	groundY: (x: number) => number,
+	from: number,
+	to: number,
+) {
+	let highest = groundY(to)
+	for (let at = from; at < to; at += 4) highest = Math.min(highest, groundY(at))
+	return highest
+}
+
+/** How far past either end of it a footing's grass runs on down the slope. */
+const FOOTING_SHOULDER = 60
+/** How far into the verge a footing's grass goes, so no sky shows between them. */
+const FOOTING_OVERLAP = 4
+
+/**
+ * The field made up under something wide on a hill, from its foot down to
+ * the verge wherever the ground falls away under it, and sloping off past
+ * its ends: the Copper Tents, levelled on the top of Haga's hill. In the
+ * verge's green, so it's all one field. `base` is its foot, in the world.
+ */
+function Footing(props: {
+	groundY: (x: number) => number
+	x: number
+	width: number
+	base: number
+}) {
+	const columns = () => {
+		const { groundY, x, width } = props
+		const base = Math.round(props.base)
+		const rects: string[] = []
+		let deepest = 0
+		for (let at = -FOOTING_SHOULDER; at < width + FOOTING_SHOULDER; at += 2) {
+			const top = at < 0 ? -at / 2 : at > width ? (at - width) / 2 : 0
+			const verge = groundY(x - width / 2 + at + 1) - PATH_BACK - VERGE
+			const bottom = Math.round(verge - base) + FOOTING_OVERLAP
+			if (bottom <= top) continue
+			rects.push(`M${at + FOOTING_SHOULDER} ${Math.round(top)}h2V${bottom}h-2Z`)
+			deepest = Math.max(deepest, bottom)
+		}
+		return { path: rects.join(''), deepest }
+	}
+	return (
+		<svg
+			aria-hidden="true"
+			width={props.width + FOOTING_SHOULDER * 2}
+			height={columns().deepest}
+			shape-rendering="crispEdges"
+			style={{
+				position: 'absolute',
+				left: `${-FOOTING_SHOULDER}px`,
+				top: '100%',
+				'pointer-events': 'none',
+			}}
+		>
+			<path d={columns().path} fill="var(--grass-green)" />
+		</svg>
+	)
+}
+
 function Carved(props: {
 	name: string
 	panel: [number, number, number, number]
@@ -3708,10 +3992,11 @@ export function createForeground(world: World) {
 }
 
 /**
- * A guard tower over a wall's walkway, in two halves: its front, its roof
- * with battlements all round, and the near half of its side, in front of
- * everyone; the far half of its side, with the back of its gateway, behind
- * them. In through its left side out of sight, hidden behind its front a
+ * A guard tower over a wall's walkway, in two halves: its front, the
+ * battlements along the front of its roof, and the near half of its side,
+ * in front of everyone; the far half of its side, with the back of its
+ * gateway, and its roof, with the rest of its battlements, behind them, so
+ * anyone up on its roof stands on it. In through its left side out of sight, hidden behind its front a
  * moment, and out through the gateway in its right, past the back of it.
  */
 function createTower(world: World, x: number, i: number) {
@@ -3815,13 +4100,16 @@ function createTower(world: World, x: number, i: number) {
 	const nearRight: [number, number] = [W, M + depth]
 	const farLeft: [number, number] = [S, M]
 	const farRight: [number, number] = [W + S, M]
-	const merlons = [
-		// Along the back and down the left first: behind the others.
+	/**
+	 * Its battlements along the back and down either side, behind whoever's
+	 * up on its roof; along the front, in front of them.
+	 */
+	const backMerlons = [
 		...merlonsAlong(farLeft, farRight, 7),
 		...merlonsAlong(nearLeft, farLeft, 2),
 		...merlonsAlong(nearRight, farRight, 2),
-		...merlonsAlong(nearLeft, nearRight, 7),
 	]
+	const frontMerlons = merlonsAlong(nearLeft, nearRight, 7)
 	/** Its brick, or plain stone: in front; its side, in shade; its battlements, darker. */
 	const { brick } = stone
 	const frontFills = brick ? [brick.fill] : [stone.stone]
@@ -3903,6 +4191,15 @@ function createTower(world: World, x: number, i: number) {
 								/>
 							)}
 						</For>
+						{/* Its roof, going back, behind anyone stood up on it, and
+						    the battlements round its back and sides. */}
+						<polygon
+							points={[nearLeft, farLeft, farRight, nearRight]
+								.map((p) => p.join(','))
+								.join(' ')}
+							fill={stone.roof ?? stone.shade}
+						/>
+						{merlonRects(backMerlons)}
 					</>,
 				),
 		}),
@@ -3920,14 +4217,8 @@ function createTower(world: World, x: number, i: number) {
 								<path d={sidePart(0, SPLIT)} fill={fill} fill-rule="evenodd" />
 							)}
 						</For>
-						{/* Its roof, going back, battlements all round it. */}
-						<polygon
-							points={[nearLeft, farLeft, farRight, nearRight]
-								.map((p) => p.join(','))
-								.join(' ')}
-							fill={stone.roof ?? stone.shade}
-						/>
-						{merlonRects(merlons)}
+						{/* The battlements along the front of its roof. */}
+						{merlonRects(frontMerlons)}
 						{/* Its front, in brick, or in courses of stone. */}
 						<For each={frontFills}>
 							{(fill) => (

@@ -372,3 +372,19 @@ button {
 		background-position-x: -64px;
 	}
 }
+
+/* A propeller beanie's propeller, turning: its blades seen edge on and round again. */
+@keyframes propeller {
+	from {
+		transform: scaleX(1);
+	}
+	50% {
+		transform: scaleX(-1);
+	}
+	to {
+		transform: scaleX(1);
+	}
+}
+.propeller {
+	animation: propeller 0.6s steps(6) infinite;
+}

@@ -20,43 +20,72 @@ const ICING = '#fff6fb'
 
 /**
  * The far band: candy mountains, pink and lilac, icing down their tops,
- * one behind another. 480 by 160, their feet in its fill.
+ * one behind another. 480 by 160, their feet in its fill. Tiling: each
+ * one's drawn again a tile's width either side, so one cut off at an edge
+ * carries on over the other.
  */
 export const candyMountains = (() => {
-	const parts: string[] = []
 	const random = seeded(808)
-	for (let x = -40, i = 0; x < 520; i++) {
+	const peaks: {
+		peak: number
+		width: number
+		height: number
+		colour: string
+	}[] = []
+	for (let x = 0, i = 0; x < 480 - 40; i++) {
 		const width = 90 + Math.floor(random() * 6) * 10
 		const height = 60 + Math.floor(random() * 6) * 10
-		const peak = x + width / 2
-		const colour = MOUNTAINS[i % MOUNTAINS.length]
-		for (let y = 160 - height; y < 160; y += 4) {
-			const half = ((y - (160 - height)) / height) * (width / 2)
-			parts.push(rect(peak - half, y, half * 2, 4, colour))
-			// Icing, down from the top, dripping.
-			if (y < 160 - height + 22 + ((peak * 7) % 3) * 4)
-				parts.push(rect(peak - half, y, half * 2, 4, ICING))
-		}
+		peaks.push({
+			peak: x + width / 2,
+			width,
+			height,
+			colour: MOUNTAINS[i % MOUNTAINS.length],
+		})
 		x += width * 0.7
 	}
+	const parts: string[] = []
+	// The copy to the left first, then the tile's own, then the one to the
+	// right: each one over the one before it, the same either side of a join.
+	for (const shift of [-480, 0, 480])
+		for (const { peak, width, height, colour } of peaks) {
+			const icing = 22 + ((Math.round(peak) * 7) % 3) * 4
+			for (let y = 160 - height; y < 160; y += 4) {
+				const half =
+					Math.round(((y - (160 - height)) / height) * (width / 4)) * 2
+				const left = Math.round(peak / 2) * 2 + shift - half
+				parts.push(rect(left, y, half * 2, 4, colour))
+				// Icing, down from the top, dripping.
+				if (y < 160 - height + icing)
+					parts.push(rect(left, y, half * 2, 4, ICING))
+			}
+		}
 	return svgUrl(480, 160, parts.join(''))
 })()
 export const MOUNTAIN_FILL = '#e8b4ec'
 
+/** How high the sweet hills are, `x` along their 400: in waves that come round again every 400. */
+const hillTop = (x: number) =>
+	108 +
+	Math.round(
+		Math.sin((x / 400) * Math.PI * 4) * 10 +
+			Math.sin((x / 400) * Math.PI * 12) * 4,
+	)
+
 /**
  * The near band: rolling sweet hills, mint and lemon, gumdrops and
- * lollipops along their tops. 400 by 160, the field from 120 down.
+ * lollipops along their tops. 400 by 160, the field from 120 down, tiling.
  */
 export const sweetHills = (() => {
 	const parts: string[] = []
 	const random = seeded(909)
 	for (let x = 0; x < 400; x += 4) {
-		const top = 108 + Math.round(Math.sin(x / 40) * 10 + Math.sin(x / 17) * 4)
-		parts.push(rect(x, top, 4, 160 - top, x % 160 < 80 ? '#a8f0d0' : '#b8f4dc'))
+		const top = hillTop(x)
+		parts.push(rect(x, top, 4, 160 - top, '#b0f2d6'))
 		parts.push(rect(x, top, 4, 4, '#d8ffee'))
 	}
-	for (let x = 14; x < 390; x += 40 + Math.floor(random() * 30)) {
-		const top = 108 + Math.round(Math.sin(x / 40) * 10 + Math.sin(x / 17) * 4)
+	// Clear of the tile's edges, so none's cut off at a join.
+	for (let x = 14; x < 384; x += 40 + Math.floor(random() * 30)) {
+		const top = hillTop(x)
 		if (random() < 0.5) {
 			// A gumdrop.
 			const c = ['#ff6fa8', '#ffe66b', '#6bc4ff', '#b48bff'][

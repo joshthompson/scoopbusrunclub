@@ -1,11 +1,11 @@
 import type { RunnerName } from '@/data/runners'
 import busBody from '../assets/bus/bus.png'
-import drill1 from '../assets/bus/drill-1.png'
-import drill2 from '../assets/bus/drill-2.png'
 import windows from '../assets/bus/windows.png'
 import crystals from '../assets/scenery/crystals.png'
 import tree1 from '../assets/scenery/tree1.png'
 import tree2 from '../assets/scenery/tree2.png'
+import { DRILL_FRAMES } from '../draw/art/drill'
+import { CART_SEAT } from '../game/carts'
 import {
 	GROUND_Y,
 	PATH_BACK,
@@ -15,6 +15,20 @@ import {
 } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { type Terrain, withGaps } from '../game/terrain'
+import {
+	CAVE_TILES,
+	ROCK,
+	ROCK_FACE,
+	ROCK_LIGHTEST,
+	SEAM,
+	WALL,
+	glowShrooms,
+	lampPost,
+	mineSign,
+	minersKit,
+	stalagmites,
+	timberFrame,
+} from './kit/caveScenery'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
 import type {
@@ -22,16 +36,20 @@ import type {
 	Cave,
 	Course,
 	CourseDefinition,
+	Mine,
 	Obstacle,
 	PlatformDefinition,
 } from './types'
 
 /**
  * The Caves: across a meadow and into a hill, through the caves under it,
- * and out again for the finish. Tunnels too low to stand in, to slide into
- * and roll through; chambers with two ways through them, up over a shelf of
- * rock or along under it; and the bus, too big for any of it, drilling
- * through the lot behind you.
+ * and out again right at the finish. Tunnels too low to stand in, to slide
+ * into and roll through; chambers with two ways through them, up over a
+ * shelf of rock or along under it; a mine, its carts to ride, and for the
+ * ones who know to take it, a secret line up to a gallery nobody else can
+ * get to; moles to
+ * ride, digging their own way through the rock; and the bus, too big for
+ * any of it, drilling through the lot behind you.
  */
 
 const CHEERERS: RunnerName[] = [
@@ -47,9 +65,9 @@ const CHEERERS: RunnerName[] = [
 const DISTANCE_M = 5000
 const FINISH = START_X + DISTANCE_M * PX_PER_M
 
-/** The cave's mouth, and the way out, near the finish. */
-const MOUTH = START_X + 1500
-const EXIT = FINISH - 1300
+/** The cave's mouth, soon after the start, and the way out, right at the finish. */
+const MOUTH = START_X + 560
+const EXIT = FINISH - 120
 
 /** How high the rock is over the Ground: in a tunnel, and a Tunnel to slide through. */
 const TUNNEL = 120
@@ -81,14 +99,67 @@ const TOP = 110
 const CHAMBER_ROOM = 200
 /** How long a stack's levels go on after their floors end, to drop out of: the top one first. */
 const DROP_OUT = 280
+/** How far a stack's roof slopes down at its end, to the roof of what's after it. */
+const STACK_SLOPE = 240
 /** How long a Tunnel in a stack is. */
 const STACK_SLIDE = 440
 
 /** How long the tunnel to the way out is, at least. */
-const LAST_TUNNEL = 900
+const LAST_TUNNEL = 360
+
+/**
+ * The mine, along from where it starts: its rails, the carts waiting on
+ * them, the chamber the secret line climbs up through, from the points, to
+ * the gallery high in its far wall, and the chamber it comes back down
+ * through, back onto the line along the floor, before the buffers.
+ */
+const MINE = {
+	length: 2800,
+	rails: 40,
+	/** Where the carts wait: one for each Player there might be. */
+	carts: [150, 212, 274, 336],
+	up: 480,
+	points: 540,
+	gallery: 1000,
+	galleryTo: 1900,
+	down: 2460,
+	rejoin: 2380,
+	buffers: 2680,
+}
+/** How high the gallery's floor is over the mine's, and how high it is inside. */
+const GALLERY_FLOOR = 250
+const GALLERY_ROOM = 96
+/** How high the chambers either side of it are, and how far their roofs take to rise. */
+const MINE_ROOM = 380
+const MINE_RAMP = 160
+
+/**
+ * The climb up to the mole, along from where it starts: a tall chamber,
+ * stepping stones of rock up it, each a jump higher than the last, to land
+ * on, and the ledge the mole's waiting on, high against its far wall. Miss
+ * one, and it's down to the floor, and on along under it all.
+ */
+const CLIMB = {
+	length: 1300,
+	/**
+	 * Each a jump along from the last: running flat out, there's only a
+	 * little of each to take off from and land the next.
+	 */
+	stones: [300, 540, 780],
+	stoneWidth: 110,
+	/** How much higher each is than the one before, from the floor. */
+	step: 70,
+	ledge: 1020,
+	ledgeHeight: 280,
+	mole: 1200,
+}
+
+/** How high the climb's roof is, and how far it takes to rise. */
+const CLIMB_ROOM = 410
+const CLIMB_RAMP = 140
 
 type Section =
-	| { kind: 'tunnel' | 'slide'; from: number; to: number }
+	| { kind: 'tunnel' | 'slide' | 'mine' | 'climb'; from: number; to: number }
 	| {
 			kind: 'chamber'
 			from: number
@@ -107,29 +178,33 @@ type Section =
 	  }
 
 type Plan =
-	| ['tunnel' | 'slide', number]
+	| ['tunnel' | 'slide' | 'mine' | 'climb', number]
 	| ['chamber', number, { levels: number; tunnel?: boolean }]
 	| ['stack', number, { levels: number; slides: boolean[] }]
 
 /** The caves, one stretch after another, from the mouth to the way out. */
 const SECTIONS: Section[] = (() => {
 	const plan: Plan[] = [
-		['tunnel', 600],
+		['tunnel', 500],
 		['slide', 400],
-		['tunnel', 600],
+		['tunnel', 500],
 		['chamber', 1500, { levels: 2 }],
 		['stack', 1800, { levels: 2, slides: [true, false] }],
-		['tunnel', 600],
-		['slide', 500],
 		['tunnel', 500],
-		['chamber', 1700, { levels: 3 }],
-		['stack', 2200, { levels: 3, slides: [false, true, true] }],
-		['tunnel', 600],
+		['mine', MINE.length],
+		['tunnel', 300],
+		['slide', 500],
+		['tunnel', 400],
+		['chamber', 1500, { levels: 3 }],
+		['stack', 2000, { levels: 3, slides: [false, true, true] }],
+		// The mole, up on its ledge, for whoever can get up to it, and a long
+		// Tunnel after it for it to dig along over.
+		['climb', CLIMB.length],
 		['slide', 600],
 		['tunnel', 500],
-		['chamber', 1400, { levels: 2, tunnel: true }],
-		['chamber', 1300, { levels: 2 }],
-		['stack', 1500, { levels: 2, slides: [true, true] }],
+		['chamber', 1300, { levels: 2, tunnel: true }],
+		['chamber', 1200, { levels: 2 }],
+		['stack', 1300, { levels: 2, slides: [true, true] }],
 	]
 	// A good stretch of tunnel before the way out, whatever's left out for it.
 	while (
@@ -162,7 +237,12 @@ const SECTIONS: Section[] = (() => {
 
 const sectionAt = (x: number) => SECTIONS.find((s) => x >= s.from && x < s.to)
 const after = (section: Section) => SECTIONS[SECTIONS.indexOf(section) + 1]
-const level = (s: Section) => s.kind === 'chamber' || s.kind === 'stack'
+/** Level all along, its floor not rising and falling: a chamber, a stack, the mine. */
+const level = (s: Section) =>
+	s.kind === 'chamber' ||
+	s.kind === 'stack' ||
+	s.kind === 'mine' ||
+	s.kind === 'climb'
 
 /**
  * Where along a stack level `i`'s Tunnel is, if it has one: each level's
@@ -183,7 +263,7 @@ const stackRoof = (levels: number) => (levels - 1) * STOREY + TOP
 /**
  * How much the floor rises and falls at `x`: all it can in the tunnels, and
  * not at all in the chambers and stacks of tunnels, whose shelves are level,
- * nor outside, easing between.
+ * nor in the mine, nor outside, easing between.
  */
 function hilliness(x: number) {
 	if (x < MOUTH || x >= EXIT) return 0
@@ -222,20 +302,35 @@ const terrain: Terrain = withGaps(
 	RAVINES,
 )
 
+/** Smoothly, from 0 to 1. */
+const ease = (t: number) => t * t * (3 - 2 * t)
+
 /** How high the cave's rock is over the Ground at `x`: none outside it. */
-function headroom(x: number) {
+function headroom(x: number): number | undefined {
 	const section = sectionAt(x)
 	if (!section) return undefined
 	if (section.kind === 'slide') return SLIDE
 	// A tunnel's roof, a little uneven.
 	if (section.kind === 'tunnel')
 		return Math.round((TUNNEL + 10 * Math.sin(x / 170)) / 4) * 4
+	if (section.kind === 'mine') return mineRoom(section.from, x)
+	// The climb: up high, as soon as it's in, and sheer at its far wall.
+	if (section.kind === 'climb') {
+		const rise = Math.min(1, (x - section.from) / CLIMB_RAMP)
+		return Math.round((TUNNEL + (CLIMB_ROOM - TUNNEL) * ease(rise)) / 8) * 8
+	}
 	if (section.kind === 'stack') {
 		// Down to a Tunnel along its top level, where that has one.
 		const top = section.levels - 1
 		const slide = stackSlide(section, top)
 		if (slide && x >= slide.from && x < slide.to) return top * STOREY + SLIDE
-		return stackRoof(section.levels)
+		// Sloping down at its end to the roof of what's after it, rather than
+		// a sheer wall to run into off its top level.
+		const next = after(section)
+		const ending = next ? (headroom(next.from) ?? TUNNEL) : TUNNEL
+		const roof = stackRoof(section.levels)
+		const slope = Math.min(1, (section.to - x) / STACK_SLOPE)
+		return Math.round((ending + (roof - ending) * slope) / 4) * 4
 	}
 	if (section.kind !== 'chamber') return TUNNEL
 	// Up from a tunnel's roof, and back down to it, or to the roof of the
@@ -245,13 +340,68 @@ function headroom(x: number) {
 	const high = (section.levels - 1) * STOREY + CHAMBER_ROOM
 	const rise = Math.min(1, (x - section.from) / CHAMBER_RAMP)
 	const fall = Math.min(1, (section.to - x) / CHAMBER_RAMP)
-	const ease = (t: number) => t * t * (3 - 2 * t)
 	const room =
 		rise < fall
 			? TUNNEL + (high - TUNNEL) * ease(rise)
 			: ending + (high - ending) * ease(fall)
 	return Math.round(room / 8) * 8
 }
+
+/**
+ * How high the rock is over the mine's floor, `x` along it from `from`: a
+ * tunnel's roof, but for the two chambers, the secret line's way up and
+ * its way back down, their roofs rising high, and sheer where the gallery
+ * goes off into the rock between them.
+ */
+function mineRoom(from: number, x: number) {
+	const t = x - from
+	if (t >= MINE.up && t < MINE.gallery) {
+		const rise = Math.min(1, (t - MINE.up) / MINE_RAMP)
+		return Math.round((TUNNEL + (MINE_ROOM - TUNNEL) * ease(rise)) / 8) * 8
+	}
+	if (t >= MINE.galleryTo && t < MINE.down) {
+		const fall = Math.min(1, (MINE.down - t) / MINE_RAMP)
+		return Math.round((TUNNEL + (MINE_ROOM - TUNNEL) * ease(fall)) / 8) * 8
+	}
+	return TUNNEL
+}
+
+/** The mine, laid out from where its stretch of the caves starts: see `Mine`. */
+const MINE_AT = SECTIONS.find((s) => s.kind === 'mine')?.from ?? MOUTH
+const mine: Mine = {
+	from: MINE_AT + MINE.rails,
+	to: MINE_AT + MINE.buffers,
+	carts: MINE.carts.map((x) => MINE_AT + x),
+	secret: {
+		from: MINE_AT + MINE.points,
+		to: MINE_AT + MINE.rejoin,
+		height: (x) => {
+			const t = x - MINE_AT
+			if (t < MINE.gallery)
+				return (
+					GALLERY_FLOOR * ease((t - MINE.points) / (MINE.gallery - MINE.points))
+				)
+			if (t < MINE.galleryTo) return GALLERY_FLOOR
+			return (
+				GALLERY_FLOOR *
+				(1 - ease((t - MINE.galleryTo) / (MINE.rejoin - MINE.galleryTo)))
+			)
+		},
+		gallery: {
+			from: MINE_AT + MINE.gallery,
+			to: MINE_AT + MINE.galleryTo,
+			floor: GALLERY_FLOOR,
+			room: GALLERY_ROOM,
+		},
+	},
+}
+
+/** The moles, sat waiting at the start of a Tunnel, to dig through what's after it. */
+/** The climb's stretch of the caves. */
+const CLIMB_AT = SECTIONS.find((s) => s.kind === 'climb')?.from
+/** The mole, sat waiting on its ledge at the top of the climb, and how high that is. */
+const MOLES = CLIMB_AT === undefined ? [] : [CLIMB_AT + CLIMB.mole]
+const MOLES_UP = MOLES.map(() => CLIMB.ledgeHeight)
 
 /** How high the hill's top is over the course. */
 const HILL = 620
@@ -364,12 +514,32 @@ function stackPlatforms(stack: Extract<Section, { kind: 'stack' }>) {
 	return platforms
 }
 
+/** The climb's stepping stones, and the mole's ledge at the top of them. */
+function climbPlatforms(from: number): PlatformDefinition[] {
+	return [
+		...CLIMB.stones.map((at, i) => ({
+			x: from + at,
+			width: CLIMB.stoneWidth,
+			height: CLIMB.step * (i + 1),
+			depth: 16,
+		})),
+		{
+			x: from + CLIMB.ledge,
+			width: CLIMB.length - CLIMB.ledge,
+			height: CLIMB.ledgeHeight,
+			depth: 22,
+		},
+	]
+}
+
 const PLATFORMS = SECTIONS.flatMap((s) =>
 	s.kind === 'chamber'
 		? chamberPlatforms(s)
 		: s.kind === 'stack'
 			? stackPlatforms(s)
-			: [],
+			: s.kind === 'climb'
+				? climbPlatforms(s.from)
+				: [],
 )
 
 /** How far along a Tunnel's way in its warning stripes go. */
@@ -408,18 +578,27 @@ const WARNINGS: NonNullable<Cave['warnings']> = MOUTHS.map(({ x, roof }) => ({
 	roof,
 }))
 
+/** How far in from the cave's mouth it's kept clear of anything in the way. */
+const MOUTH_CLEAR = 400
+
 /**
- * Whether `x` is too near a Tunnel's mouth, or a chamber's ledge, for
- * anything to be in the way; or in a stack of tunnels, too low to jump
- * anything in.
+ * Whether `x` is too near a Tunnel's mouth, or a chamber's ledge, or just
+ * inside the cave's own, for anything to be in the way; or in a stack of
+ * tunnels, too low to jump anything in.
  */
 const busy = (x: number) =>
+	// Just inside the mouth, where it's only showing as the rock over it
+	// fades away: too late to see anything in the way in time.
+	(x > MOUTH - 120 && x < MOUTH + MOUTH_CLEAR) ||
 	SECTIONS.some(
 		(s) =>
 			(s.kind === 'slide' && x > s.from - 220 && x < s.to + 120) ||
 			(s.kind === 'chamber' && x > s.from - 120 && x < s.to + 120) ||
-			(s.kind === 'stack' && x > s.from - 120 && x < s.to + 120),
+			(s.kind === 'stack' && x > s.from - 120 && x < s.to + 120) ||
+			(s.kind === 'mine' && x > s.from - 120 && x < s.to + 120) ||
+			(s.kind === 'climb' && x > s.from - 120 && x < s.to + 220),
 	) ||
+	MOLES.some((m) => Math.abs(x - m) < 220) ||
 	PLATFORMS.some(
 		(p) => p.solid === OVER_TUNNEL && x > p.x - 220 && x < p.x + p.width + 120,
 	)
@@ -457,70 +636,130 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 					item: nextFika(),
 				})
 		}
+	// Up in the secret gallery: a miner's helmet, at the height of whoever's
+	// sat in a cart going by.
+	boosts.push({
+		kind: 'hat',
+		x: Math.round((mine.secret.gallery.from + mine.secret.gallery.to) / 2),
+		height: GALLERY_FLOOR + CART_SEAT + 8,
+		hat: 'miner',
+	})
 	boosts.sort((a, b) => a.x - b.x)
 
-	// Trees and flowers outside; crystals glowing on the walls inside.
+	// Trees outside; inside, crystals, toadstools glowing, stalagmites,
+	// timbers holding up the tunnels' roofs, and lamps.
 	const scenery: Course['scenery'] = []
+	/** On the cave's floor, up and down with it, at the back edge of the path. */
+	const onFloor = (
+		x: number,
+		asset: string,
+		filter?: string,
+	): Course['scenery'][number] => ({
+		x,
+		asset,
+		scale: 2,
+		setBack: -2,
+		onFloor: true,
+		filter,
+	})
+	/** Not under a shelf or a terrace: for something tall, the timbers or a lamp. */
+	const open = (x: number, half: number) =>
+		!PLATFORMS.some((p) => x + half > p.x && x - half < p.x + p.width)
+	/** Clear of what's there already, `room` either side. */
+	const taken: [number, number][] = []
+	const free = (x: number, room: number) =>
+		!taken.some(([from, to]) => x + room > from && x - room < to)
+	const take = (x: number, room: number) => taken.push([x - room, x + room])
+	/**
+	 * Somewhere for something on the floor: inside, not in a Tunnel, nor
+	 * under rock thick down to one, nor at the mine's carts.
+	 */
+	const room = (x: number) =>
+		x > MOUTH + 200 &&
+		x < EXIT - 120 &&
+		sectionAt(x)?.kind !== 'slide' &&
+		!(x > mine.carts[0] - 120 && x < mine.carts[mine.carts.length - 1] + 120) &&
+		!PLATFORMS.some(
+			(p) => p.solid === OVER_TUNNEL && x > p.x - 30 && x < p.x + p.width + 30,
+		)
+
+	// The mine's sign over its way in, and a miner's things by its rails.
+	const signAt = MINE_AT - 60
+	scenery.push(onFloor(signAt, mineSign.asset))
+	take(signAt, (mineSign.width * 2) / 2 + 10)
+	scenery.push(onFloor(mine.to + 70, minersKit))
+	take(mine.to + 70, 40)
+
+	// Timbers along the tunnels and through the mine, every so often, a
+	// lamp hung now and then between them.
+	for (const section of SECTIONS) {
+		if (section.kind !== 'tunnel' && section.kind !== 'mine') continue
+		for (
+			let x = section.from + 140;
+			x < section.to - 100;
+			x += 260 + random() * 200
+		) {
+			const at = Math.round(x)
+			// Where the roof's high enough over it all the way across.
+			const roomy = [-30, 0, 30].every(
+				(dx) =>
+					(headroom(at + dx) ?? 0) >= 104 && (headroom(at + dx) ?? 0) < 200,
+			)
+			if (!roomy || !room(at) || !free(at, 34) || !open(at, 34)) continue
+			scenery.push(onFloor(at, timberFrame))
+			take(at, 34)
+		}
+	}
+	for (let at = MOUTH + 300; at < EXIT - 200; at += 500 + random() * 500) {
+		const x = Math.round(at)
+		if (!room(x) || !free(x, 16) || !open(x, 16) || (headroom(x) ?? 0) < 90)
+			continue
+		scenery.push(onFloor(x, lampPost))
+		take(x, 16)
+	}
+	// Toadstools, stalagmites and crystals, all along the floor.
+	const shrooms = [
+		glowShrooms('#5ee8e0', '#d6fffb'),
+		glowShrooms('#c27df0', '#f3dcff'),
+	]
+	for (let at = MOUTH + 220; at < EXIT - 200; at += 90 + random() * 200) {
+		const x = Math.round(at)
+		if (!room(x) || !free(x, 18)) continue
+		const roll = random()
+		if (roll < 0.4)
+			scenery.push({
+				...onFloor(
+					x,
+					crystals,
+					random() < 0.35 ? 'hue-rotate(110deg)' : undefined,
+				),
+			})
+		else if (roll < 0.7)
+			scenery.push(onFloor(x, shrooms[Math.floor(random() * 2)]))
+		else scenery.push(onFloor(x, stalagmites))
+		take(x, 18)
+	}
 	for (let at = -400; at < terrain.finishX + 900; at += 120 + random() * 260) {
 		const x = Math.round(at)
 		if (x < MOUTH - 120 || x > EXIT + 120)
 			scenery.push({ x, asset: random() < 0.5 ? tree1 : tree2 })
-		else if (
-			x > MOUTH + 200 &&
-			x < EXIT - 200 &&
-			sectionAt(x)?.kind !== 'slide' &&
-			// Nor under rock thick down to a Tunnel's roof.
-			!PLATFORMS.some(
-				(p) =>
-					p.solid === OVER_TUNNEL && x > p.x - 30 && x < p.x + p.width + 30,
-			)
-		)
-			scenery.push({
-				x,
-				asset: crystals,
-				scale: 2,
-				// On the cave's floor, the back edge of the path, where they
-				// stand: no field behind them, and up and down with the floor.
-				setBack: -2,
-				onFloor: true,
-				filter: random() < 0.35 ? 'hue-rotate(110deg)' : undefined,
-			})
 	}
+	scenery.sort((a, b) => a.x - b.x)
 	return { obstacles, boosts, scenery }
 }
-
-/** The cave's rock, as a CSS background: its seams and flecks, as the Ground draws it. */
-const ROCK_FACE = (() => {
-	const [rock, seam, edge] = ['#5a4639', '#3f3129', '#7a6150']
-	const rects: [number, number, number, number, string][] = [
-		[0, 0, 48, 36, rock],
-		[2, 6, 16, 2, seam],
-		[16, 8, 6, 2, seam],
-		[28, 18, 14, 2, seam],
-		[24, 20, 4, 4, seam],
-		[6, 28, 10, 2, seam],
-		[36, 4, 4, 2, edge],
-		[10, 18, 2, 2, edge],
-		[40, 30, 2, 2, edge],
-	]
-	const body = rects
-		.map(
-			([x, y, w, h, fill]) =>
-				`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`,
-		)
-		.join('')
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="36" shape-rendering="crispEdges">${body}</svg>`
-	return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
-})()
 
 export const caves: CourseDefinition = {
 	id: 'caves',
 	name: 'The Caves',
 	blurb:
-		'Into the hill and through its caves: duck into the low tunnels, and choose your level, up through the shelves or along under them.',
+		'Into the hill and through its caves: duck into the low tunnels, choose your level, climb to the mole and dig through the rock, and take a mine cart up to the secret line.',
 	terrain,
 	cave: { ...cave, warnings: WARNINGS },
 	platforms: PLATFORMS,
+	mine,
+	corgis: MOLES,
+	corgisUp: MOLES_UP,
+	ride: 'mole',
 	runDirectors: ['keith', 'rick'],
 	cheerers: CHEERERS,
 	look: {
@@ -532,25 +771,27 @@ export const caves: CourseDefinition = {
 		// A ravine's drop: on down into the dark.
 		gap: 'linear-gradient(to bottom, #251c18, #0d0907 110px)',
 		cave: {
-			rock: '#5a4639',
-			seam: '#3f3129',
-			edge: '#7a6150',
-			wall: '#251c18',
+			rock: ROCK,
+			seam: SEAM,
+			edge: ROCK_LIGHTEST,
+			wall: WALL,
 			grass: '#5e8d3c',
+			tiles: CAVE_TILES,
+			stalactites: true,
 		},
-		// The rock shelves: a worn top, and rock down their face.
-		// Terraces and floors of rock: a worn top, and the cave's rock down
-		// their face.
+		// Terraces and floors of rock: a worn lip, moss along it, and the
+		// cave's rock down their face, darker the further down.
 		platform: {
 			top: '#8a7262',
 			face: ROCK_FACE,
 			edge: '#2e231d',
+			rock: { lit: '#b9a08a', moss: '#6d9a4a', drip: ROCK_LIGHTEST },
 		},
 		bus: {
 			body: busBody,
 			windows,
-			scoop: drill1,
-			drill: [drill1, drill2],
+			scoop: DRILL_FRAMES[0],
+			drill: DRILL_FRAMES,
 		},
 	},
 	...layOut(),

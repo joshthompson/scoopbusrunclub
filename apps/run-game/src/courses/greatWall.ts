@@ -10,7 +10,7 @@ import {
 	createTerrain,
 	withGaps,
 } from '../game/terrain'
-import { towerSpan } from '../game/towers'
+import { towerRoof, towerSpan } from '../game/towers'
 import {
 	GREAT_WALL_BRICKS,
 	GREAT_WALL_PAVING,
@@ -189,6 +189,20 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			}
 		},
 	})
+	// A bamboo hat (dǒulì), blown along the walkway past the second tower: jump for it.
+	for (
+		let x = (TOWERS[1] ?? START_X + 2400) + 300;
+		x < terrain.finishX - 600;
+		x += 40
+	)
+		if (!nearGap(terrain, x) && !onStairs(x) && !inTower(x) && !nearTower(x)) {
+			const clear = (o: { x: number }) => Math.abs(o.x - x) > 140
+			obstacles.splice(0, obstacles.length, ...obstacles.filter(clear))
+			boosts.splice(0, boosts.length, ...boosts.filter(clear))
+			boosts.push({ kind: 'hat', x, height: 64, hat: 'bambooHat' })
+			boosts.sort((a, b) => a.x - b.x)
+			break
+		}
 	// Red lanterns along the walkway.
 	const scenery: Course['scenery'] = []
 	for (let at = -300; at < terrain.finishX + 900; at += 260 + random() * 200)
@@ -211,6 +225,12 @@ export const greatWall: CourseDefinition = {
 		'Along the top of the wall, over the mountains: rubble, and gaps where it has crumbled.',
 	terrain,
 	towers: TOWERS,
+	// Their roofs, to stand on: up there, off a dragon, the special goal.
+	platforms: TOWERS.map((x) => towerRoof(terrain, x)),
+	special: {
+		goal: 'On top of a tower',
+		done: (run) => !!run.toppedTower,
+	},
 	// A dragon now and then, flying over from behind: jump into it for a ride.
 	flyer: 'dragon',
 	flyovers: dragons(),

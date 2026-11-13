@@ -1,3 +1,5 @@
+import type { CartState } from '../game/carts'
+import { hatCode } from '../game/hats'
 import {
 	type CorgiState,
 	type FlyerState,
@@ -8,7 +10,7 @@ import {
 } from '../game/world'
 import { type Sound, overhear } from '../sfx'
 import {
-	PUMPKIN_FLAG,
+	HAT_FLAG,
 	type PacerIntro,
 	RACER_FLAGS,
 	type RaceFrame,
@@ -32,6 +34,12 @@ export const FURBY_STATES: FurbyState[] = [
 	'scooped',
 ]
 export const FLYER_STATES: FlyerState[] = ['flying', 'carrying', 'leaving']
+export const CART_STATES: CartState[] = [
+	'waiting',
+	'ridden',
+	'parked',
+	'scooped',
+]
 export const CORGI_STATES: CorgiState[] = [
 	'waiting',
 	'ridden',
@@ -55,6 +63,7 @@ export const pacerIntro = (p: Pacer): PacerIntro => ({
 export function raceStart(world: World, round: number): RaceStart {
 	return {
 		round,
+		...(world.baby ? { baby: true } : {}),
 		course: world.course.id,
 		racers: world.racers.map((r) => ({
 			id: r.id,
@@ -111,7 +120,8 @@ export function createRaceStream(
 						(b.on !== undefined ? RACER_FLAGS.platform : 0) |
 						(b.squashed > 0 ? RACER_FLAGS.squashed : 0) |
 						(b.gliding ? RACER_FLAGS.gliding : 0) |
-						(b.pumpkin * PUMPKIN_FLAG),
+						(b.cart !== undefined ? RACER_FLAGS.cart : 0) |
+						(hatCode(b.hat) * HAT_FLAG),
 					b.stumble,
 					b.spin,
 					out === 'scooped'
@@ -133,7 +143,10 @@ export function createRaceStream(
 				tenth(p.x),
 				tenth(p.feetY),
 				tenth(p.vx),
-				(p.grounded ? 1 : 0) | (p.scooped ? 2 : 0) | (p.gliding ? 4 : 0),
+				(p.grounded ? 1 : 0) |
+					(p.scooped ? 2 : 0) |
+					(p.gliding ? 4 : 0) |
+					(p.ducking ? 8 : 0),
 				p.dazed,
 				p.spin,
 				...(p.board
@@ -159,6 +172,30 @@ export function createRaceStream(
 				c.spin,
 				c.rare ? 1 : 0,
 			]),
+			...(world.carts.length
+				? {
+						carts: world.carts.map((c): [number, number, number, number] => [
+							tenth(c.x),
+							tenth(c.feetY),
+							CART_STATES.indexOf(c.state),
+							c.spin,
+						]),
+					}
+				: {}),
+			...(world.ball
+				? {
+						ball: [
+							tenth(world.ball.x),
+							tenth(world.ball.y),
+							Math.round(world.ball.spin),
+							world.ball.out === 'home'
+								? 1
+								: world.ball.out === 'scooped'
+									? 2
+									: 0,
+						] as [number, number, number, number],
+					}
+				: {}),
 			flyers: world.flyers.map((goose) => [
 				goose.id,
 				tenth(goose.x),

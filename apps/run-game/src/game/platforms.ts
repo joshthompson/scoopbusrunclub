@@ -55,12 +55,19 @@ export function landingOn(
 	wasFeetY: number,
 	feetY: number,
 	skip?: number,
+	/**
+	 * How far either side of `x` they reach: a solid shelf of rock catches
+	 * them on its corner by that much, or they'd come down past it with
+	 * their front inside it.
+	 */
+	reach = 0,
 ) {
 	let best: { index: number; top: number } | undefined
 	platforms.forEach((platform, index) => {
 		if (index === skip) return
 		const at = platformAt(terrain, platform, ticks)
-		if (x < at.left || x > at.right) return
+		const edge = platform.solid ? reach : 0
+		if (x < at.left - edge || x > at.right + edge) return
 		// From above it, or level with it, where it was last tick: never up
 		// through it. A lift rising to meet someone coming down passes their
 		// feet between one tick and the next, and still catches them.

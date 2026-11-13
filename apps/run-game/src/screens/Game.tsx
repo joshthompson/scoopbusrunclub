@@ -10,7 +10,10 @@ import {
 import { COURSES } from '../courses'
 import type { Course } from '../courses/types'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
-import { PX_PER_M, START_X, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
+import { PX_PER_M, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
+import type { Hat } from '../game/hats'
+import { longJumpMetres } from '../game/longJump'
+import { medalFor } from '../game/medals'
 import { POPUP_TICKS, onScreen } from '../game/step'
 import { type World, createWorld } from '../game/world'
 import { type Action, anyControls, setTouch, touchScreen } from '../input'
@@ -26,8 +29,10 @@ import {
 	wouldPlace,
 } from '../online/runScores'
 import type { Playable } from '../runners/playable'
+import { markSpecialDone } from '../saved/goals'
 import { record, today, topScore } from '../saved/highScores'
 import { named } from '../saved/identity'
+import { award } from '../saved/medals'
 import { reach } from '../saved/progress'
 import { play } from '../sfx'
 import { ArrowPad } from '../ui/ArrowPad'
@@ -56,18 +61,22 @@ export type Mode =
 			startScore: number
 			/** Which run this is, for its one entry in the Endless table. */
 			runId: string
+			/** The hat they've still got on from the last course, if any. */
+			hat?: Hat
 	  }
 
 const points = (score: number) => `${score.toLocaleString('en')} pts`
-const km = (px: number) => (Math.max(0, px) / PX_PER_M / 1000).toFixed(2)
 const metres = (px: number) => `${Math.max(0, Math.round(px / PX_PER_M))} m`
 
 export function Game(props: {
 	course: Course
 	runner: Playable
 	mode: Mode
-	/** On to the next course: in Endless, with the score so far; practising, the next to practise. */
-	onNext: (score: number) => void
+	/**
+	 * On to the next course: in Endless, with the score so far, and the hat
+	 * they've got on; practising, the next to practise.
+	 */
+	onNext: (score: number, hat?: Hat) => void
 	/** The same again: in Endless, the run from the start. */
 	onRetry: () => void
 	onQuit: () => void
@@ -79,7 +88,14 @@ export function Game(props: {
 	const { mode } = props
 	const world = createWorld(
 		props.course,
-		[{ id: 'solo', runner: props.runner, controls: anyControls }],
+		[
+			{
+				id: 'solo',
+				runner: props.runner,
+				controls: anyControls,
+				hat: mode.kind === 'endless' ? mode.hat : undefined,
+			},
+		],
 		{ startScore: mode.kind === 'endless' ? mode.startScore : 0 },
 	)
 	/** Endless's next course, round to the first again after the last. */
@@ -220,6 +236,27 @@ export function Game(props: {
 			}
 			if (finished && following !== undefined && reach(following))
 				placing.unlocked = COURSES[following].name
+			// A medal, for the points: its score goal.
+			placing.medal = medalFor(props.course, world.courseScore())
+			if (placing.medal)
+				placing.newMedal = award(props.course.id, placing.medal)
+			// Its special goal, if it has one, done this go.
+			const { special } = props.course
+			if (
+				special?.done({
+					finished,
+					counts: Object.fromEntries(
+						Object.entries(world.bonuses).map(([kind, b]) => [kind, b.count]),
+					),
+					hat: world.body.hat?.kind,
+					longJump: longJumpMetres(world),
+					rodeWearing: world.body.rodeWearing,
+					toppedTower: world.body.toppedTower,
+				})
+			) {
+				placing.special = true
+				placing.newSpecial = markSpecialDone(props.course.id)
+			}
 			setPlacing(placing)
 		})
 	})
@@ -242,7 +279,7 @@ export function Game(props: {
 			return [
 				{
 					label: `Next: ${COURSES[nextIndex].name}`,
-					choose: () => props.onNext(world.score()),
+					choose: () => props.onNext(world.score(), world.body.hat),
 				},
 				{ label: 'Stop here', choose: props.onCourses },
 			]
@@ -458,16 +495,9 @@ function Hud(props: {
 							? `${world.course.name} parkrun`
 							: world.course.name}
 				</div>
-				<div style={{ 'font-size': '32px' }}>
-					{km(Math.min(world.terrain.length, world.playerX() - START_X))}
-					<span style={{ 'font-size': '18px' }}>
-						{' '}
-						/ {km(world.terrain.length)} km
-					</span>
-				</div>
 				<div style={styles.score}>{points(world.score())}</div>
 			</div>
-			{/* On a touch screen: with a keyboard, it's Esc or P. */}
+			{/* On a touch screen, the pause button: with a keyboard, it's Esc or P. */}
 			<div style={styles.topRight}>
 				<Show when={!world.result() && touchScreen()}>
 					<button

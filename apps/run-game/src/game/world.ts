@@ -6,6 +6,7 @@ import { rideLook } from '../draw/rideLook'
 import type { Controls } from '../input'
 import type { Avatar } from '../runners/looks'
 import type { Playable } from '../runners/playable'
+import { createCarts } from './carts'
 import {
 	BUS_START_X,
 	DUCK_HEIGHT,
@@ -17,6 +18,8 @@ import {
 	START_X,
 	VIEW_WIDTH,
 } from './constants'
+import { createFootball } from './football'
+import type { Hat } from './hats'
 import { lineUp } from './pack'
 import type { Terrain } from './terrain'
 
@@ -58,11 +61,14 @@ export interface Racer {
 	outAt: number
 }
 
-/** Who's racing, as the game's given them. */
+/**
+ * Who's racing, as the game's given them: and the hat they've still got on
+ * from the course before, in Endless, or the Round before.
+ */
 export type RacerEntry = Pick<
 	Racer,
 	'id' | 'runner' | 'controls' | 'colour' | 'number'
->
+> & { hat?: Hat }
 
 /** The runner, as the physics sees them: `x` is the middle of their feet. */
 /** How tall someone is, for running into things: ducking or not, squashed or not. */
@@ -85,10 +91,10 @@ export interface Body {
 	/** Ticks left of being held still by a Swamp Man. */
 	held: number
 	muddy: boolean
-	/** The Pumpkin they're wearing, by its carving: 0 for none. */
-	pumpkin: number
+	/** The hat they're wearing, if any: a Pumpkin, a helmet (see `hats`). */
+	hat?: Hat
 	/** The last one knocked off, flying, and when. */
-	lostPumpkin?: { carving: number; at: number }
+	lostHat?: { hat: Hat; at: number }
 	/** Which way they last ran: 1 right, -1 left. */
 	facing: 1 | -1
 	/** Up was held last tick, so holding it doesn't keep jumping. */
@@ -99,12 +105,16 @@ export interface Body {
 	wasDown: boolean
 	/** On the way up from a jump of their own: letting go of up cuts it short. */
 	jumping: boolean
+	/** Floating down, holding jump, in a propeller beanie. */
+	floating?: boolean
 	/** Degrees, while flying out of the scoop. */
 	spin: number
 	/** Heads bounced off since last on the ground, for doubling the points. */
 	combo: number
 	/** Ticks left riding a corgi. */
 	mount: number
+	/** The mine cart they're riding, by its index, in The Caves (see `carts`). */
+	cart?: number
 	/**
 	 * On a glider, out over the sea, steering it up and down, until it comes
 	 * down on the island.
@@ -153,6 +163,10 @@ export interface Body {
 	longJumped?: boolean
 	/** Where they landed in its sand, if they did: their mark in it. */
 	longJumpMark?: number
+	/** The hats they had on getting onto a Ride, by kind: one each time. */
+	rodeWearing?: string[]
+	/** Been up on top of a guard tower: the Great Wall's special goal. */
+	toppedTower?: boolean
 }
 
 /**
@@ -198,6 +212,8 @@ export interface Pacer {
 	on?: number
 	/** How fast they went into the Tunnel they're in: they go through it no slower. */
 	tunnelSpeed?: number
+	/** Ducked under a low branch or a tall hurdle, as anyone: see `duckUnder`. */
+	ducking?: boolean
 	/** On a glider, out over the sea, as anyone: see `flyPacer`. */
 	gliding?: boolean
 	/** On skis or a snowboard, down The Slopes, as anyone: see `skiPacer`. */
@@ -258,6 +274,8 @@ export type CorgiState = 'waiting' | 'ridden' | 'tired' | 'scooped'
 export interface Corgi {
 	id: number
 	x: number
+	/** How high over the Ground it waits, up on a ledge, if it's not on the Ground. */
+	up?: number
 	feetY: number
 	vx: number
 	vy: number
@@ -376,8 +394,14 @@ export type BonusKind =
 	| 'fika'
 	| 'cheers'
 	| 'corgis'
+	/** The Caves' mine carts: rides too, but not the course's Ride. */
+	| 'carts'
+	| 'cones'
+	/** Haga's football, kicked all the way over the finish line. */
+	| 'football'
 	| 'geese'
 	| 'pumpkins'
+	| 'hats'
 	| 'barcodes'
 	| 'rings'
 	| 'tricks'
@@ -403,7 +427,15 @@ export interface WorldOptions {
 	 * decided when one Player's left.
 	 */
 	round?: boolean
+	/**
+	 * A Round in Baby Mode: no bus, a fall's not out (back on your feet just
+	 * past the Gap), and anyone left behind is carried along faster.
+	 */
+	baby?: boolean
 }
+
+/** Where the bus is in Baby Mode: parked well out of the way, off the course. */
+export const BABY_BUS_PARKED = -100_000
 
 /** A body on the start line at `x`. */
 export function startingBody(terrain: Terrain, x: number): Body {
@@ -418,7 +450,6 @@ export function startingBody(terrain: Terrain, x: number): Body {
 		squashed: 0,
 		held: 0,
 		muddy: false,
-		pumpkin: 0,
 		facing: 1,
 		wasUp: false,
 		wasLeft: false,
@@ -458,11 +489,11 @@ export function createWorld(
 	entries: RacerEntry[],
 	options: WorldOptions = {},
 ) {
-	const { startScore = 0, round = false } = options
+	const { startScore = 0, round = false, baby = false } = options
 	const terrain: Terrain = course.terrain
-	const racers: Racer[] = entries.map((entry, i) => ({
+	const racers: Racer[] = entries.map(({ hat, ...entry }, i) => ({
 		...entry,
-		body: startingBody(terrain, START_X - i * START_GAP),
+		body: { ...startingBody(terrain, START_X - i * START_GAP), hat },
 		outAt: 0,
 	}))
 	const runner = racers[0].runner
@@ -495,8 +526,12 @@ export function createWorld(
 		fika: { count: 0, points: 0 },
 		cheers: { count: 0, points: 0 },
 		corgis: { count: 0, points: 0 },
+		carts: { count: 0, points: 0 },
+		cones: { count: 0, points: 0 },
+		football: { count: 0, points: 0 },
 		geese: { count: 0, points: 0 },
 		pumpkins: { count: 0, points: 0 },
+		hats: { count: 0, points: 0 },
 		barcodes: { count: 0, points: 0 },
 		rings: { count: 0, points: 0 },
 		tricks: { count: 0, points: 0 },
@@ -516,7 +551,7 @@ export function createWorld(
 
 	const body = racers[0].body
 	const bus: Bus = {
-		frontX: BUS_START_X,
+		frontX: baby ? BABY_BUS_PARKED : BUS_START_X,
 		speed: 0,
 		scooping: 0,
 		leash: START_X - BUS_START_X,
@@ -591,6 +626,8 @@ export function createWorld(
 		runner,
 		racers,
 		round,
+		/** Baby Mode: see `WorldOptions`. */
+		baby: round && baby,
 		runDirector,
 		terrain,
 		body,
@@ -618,6 +655,8 @@ export function createWorld(
 		setOrder,
 		/** The tick a Round was decided. */
 		decidedAt: 0,
+		/** Since when only one Player's been left running, if only one is. */
+		aloneSince: undefined as number | undefined,
 		/** The body's and the bus's positions, as signals, for the HUD. */
 		playerX,
 		setPlayerX,
@@ -665,13 +704,18 @@ export function createWorld(
 		/** Geese flying over, and which of the course's flyovers is next. Plain state. */
 		flyers: [] as Flyer[],
 		flyerState: { next: 0, nextId: 0 },
+		/** The course's mine carts, if it has a mine. Plain state, like the body. */
+		carts: createCarts({ course, terrain }),
+		/** Its football, if it has one: see `Football`. Plain state, like the body. */
+		ball: createFootball({ football: course.football, terrain }),
 		/** The course's Platforms, which move with the tick: see `platformAt`. */
 		platforms: course.platforms ?? [],
 		corgis: (course.corgis ?? []).map(
 			(x, id): Corgi => ({
 				id,
 				x,
-				feetY: terrain.groundY(x),
+				up: course.corgisUp?.[id],
+				feetY: terrain.groundY(x) - (course.corgisUp?.[id] ?? 0),
 				vx: 0,
 				vy: 0,
 				facing: -1,

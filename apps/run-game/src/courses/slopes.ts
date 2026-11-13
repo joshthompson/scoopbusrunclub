@@ -435,9 +435,34 @@ function layOut(): Pick<CourseDefinition, 'obstacles' | 'boosts' | 'scenery'> {
 			item: 'tomatoSoup',
 		},
 	]
+	// Ski helmets, for the way down: one just past the rack, and one
+	// halfway, on the snow, each good for one knock.
+	const helmets: Boost[] = [
+		RACK_FROM + RACK.length * RACK_GAP + 260,
+		Math.round(terrain.length / 2),
+	].flatMap((along) => {
+		for (let at = along; at < along + 800; at += 20) {
+			const x = START_X + at
+			const near = (o: { x: number }) => Math.abs(o.x - x) < 120
+			if (
+				obstacles.some(near) ||
+				[...boosts, ...gates, ...flying, ...hut].some(near) ||
+				KICKERS.some(([lip]) => Math.abs(START_X + lip - x) < 200) ||
+				CREEKS.some(([creek]) => Math.abs(START_X + creek - x) < 200) ||
+				(at > HUT_FROM - 100 && at < HUT_TO + 100)
+			)
+				continue
+			return [
+				{ kind: 'hat' as const, x, height: 24, hat: 'skiHelmet' as const },
+			]
+		}
+		return []
+	})
 	return {
 		obstacles: obstacles.sort((a, b) => a.x - b.x),
-		boosts: [...boosts, ...gates, ...flying, ...hut].sort((a, b) => a.x - b.x),
+		boosts: [...boosts, ...gates, ...flying, ...hut, ...helmets].sort(
+			(a, b) => a.x - b.x,
+		),
 		scenery: scenery(obstacles),
 	}
 }
@@ -661,6 +686,11 @@ export const slopes: CourseDefinition = {
 		'Down and down a Dalarna fell on skis or a board: kickers, tricks, rails and a ski jump, and a fire at the finish.',
 	terrain,
 	corgis: RACK,
+	// No skis, nor a snowboard: down the whole mountain on foot.
+	special: {
+		goal: 'Complete the course on foot',
+		done: (run) => run.finished && !run.counts.corgis,
+	},
 	ride: 'skis',
 	rails,
 	skiJump: { takeoff: START_X + TAKEOFF, k: K_POINT },

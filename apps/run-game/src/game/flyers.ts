@@ -66,6 +66,8 @@ export const glide = (from: number, to: number, rate = GLIDE) =>
 /** How far before a tower a flyer's down at its doorway, and after it, before climbing back up. */
 const DOOR_AHEAD = 260
 const DOOR_AFTER = 40
+/** How far before a tower a dragon carrying someone is up as high over it as over the ground. */
+const TOWER_APPROACH = 700
 
 /**
  * The tower a flyer at `x` is going through, if it's anywhere near one:
@@ -235,7 +237,13 @@ export function carryHeight(world: World, x: number) {
 	const tower = towerAt(world, x)
 	if (tower !== undefined)
 		return world.terrain.groundY(tower) - SEATED_THROUGH_DOOR
-	return flightFloor(world, x, false) - GOOSE_CARRY_HEIGHT
+	const height = flightFloor(world, x, false) - GOOSE_CARRY_HEIGHT
+	// Coming up to one, uphill, as high over it as over the ground, so
+	// jumping off can still land on its roof.
+	const coming = towerAt(world, x, TOWER_APPROACH)
+	return coming === undefined
+		? height
+		: Math.min(height, world.terrain.groundY(coming) - GOOSE_CARRY_HEIGHT)
 }
 
 /**

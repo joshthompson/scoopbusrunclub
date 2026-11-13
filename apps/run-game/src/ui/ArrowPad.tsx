@@ -1,4 +1,4 @@
-import { type JSX, createSignal } from 'solid-js'
+import { type JSX, createSignal, onCleanup } from 'solid-js'
 import type { Action } from '../input'
 
 /**
@@ -42,6 +42,11 @@ function PadButton(props: {
 		setDown(next)
 		props.press(props.action, next)
 	}
+	// Gone while it's held (the Round over under a finger): let go of, or
+	// it's still held next time, ducking from the start.
+	onCleanup(() => {
+		if (down()) props.press(props.action, false)
+	})
 	return (
 		<button
 			type="button"

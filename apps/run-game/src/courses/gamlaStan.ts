@@ -5,10 +5,18 @@ import oldTownNear from '../assets/horizons/old-town-near.png'
 import katarinahissen from '../assets/scenery/katarinahissen.png'
 import lamp from '../assets/scenery/lamp.png'
 import quayWall from '../assets/scenery/quay-wall.png'
-import { PATH_BACK, PATH_FRONT, START_X, VERGE } from '../game/constants'
+import {
+	CAMERA_PAST_FINISH,
+	PATH_BACK,
+	PATH_FRONT,
+	START_X,
+	VERGE,
+} from '../game/constants'
 import { GAMLA_STAN_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
 import { GAMLA_STAN_COBBLES, GAMLA_STAN_SIDE_COBBLES } from './kit/cobbles'
+import { withHat } from './kit/hats'
+import { type PixelRect, pixelArt } from './kit/pixelArt'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
 import type { Boost, Course, CourseDefinition, Obstacle } from './types'
@@ -47,11 +55,30 @@ const island = createTerrain(heights, STEP_M, DISTANCE_M)
 const BRIDGE = island.finishX - 1700
 const BRIDGE_END = island.finishX + 260
 /**
- * Katarinahissen, at Slussen, just off the end of the bridge: its middle,
- * its lift tower in the picture's right half, near enough the finish that
- * the camera, which stops 500 px past it, has it in view.
+ * Katarinahissen, at Slussen, just off the end of the bridge: its middle.
+ * Its lift tower's on the picture's left, its walkway across to the right,
+ * to the building at its end. Far enough along that, where the camera stops
+ * (`CAMERA_PAST_FINISH` past the finish), its tower's in view and its
+ * walkway runs on off the edge of the screen, the building past it.
  */
-const KATARINAHISSEN = BRIDGE_END + 110
+const KATARINAHISSEN = island.finishX + CAMERA_PAST_FINISH - 48
+/** Where its walkway's building is, along the picture, and how far the walkway goes on past it. */
+const WALKWAY_ON_FROM = 75
+const WALKWAY_ON = 1200
+/**
+ * Katarinahissen's walkway, going on: its rail over its lattice, as in its
+ * picture, `WALKWAY_ON` long, as tall as the picture, so it lines up with it.
+ */
+const walkwayOn = (() => {
+	const rects: PixelRect[] = [
+		[0, 20, WALKWAY_ON, 2, '#c9ccd6'],
+		[0, 22, WALKWAY_ON, 8, '#3d4148'],
+		[0, 22, WALKWAY_ON, 2, '#c9ccd6'],
+	]
+	for (let x = 2; x < WALKWAY_ON; x += 8) rects.push([x, 22, 2, 8, '#6a707a'])
+	return pixelArt(WALKWAY_ON, 240, rects)
+})()
+
 /** How steeply it rises on over the water to Slussen: a little. */
 const BRIDGE_RISE = 0.03
 
@@ -182,6 +209,12 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 		)
 			scenery.push({ x: Math.round(at), asset: lamp })
 	scenery.push({ x: KATARINAHISSEN, asset: katarinahissen })
+	// Its walkway, on past the building, so it's never left in mid-air,
+	// however far the camera's zoomed out.
+	scenery.push({
+		x: KATARINAHISSEN + WALKWAY_ON_FROM + WALKWAY_ON / 2,
+		asset: walkwayOn,
+	})
 	// Corgis, out for a walk in the old town, waiting to be ridden: in a
 	// clear bit of street, each, well before the bridge.
 	const corgis: number[] = []
@@ -252,5 +285,17 @@ export const gamlaStan: CourseDefinition = {
 		horizonTrees: false,
 		geese: 'grayscale(1) brightness(0.9)',
 	},
-	...layOut(),
+	// A Royal Guard's helmet, high over a steam vent: stop on it, and it
+	// fires you straight up to it; running on over it, you're carried on
+	// past under it.
+	...withHat(
+		layOut(),
+		'guardHelmet',
+		({ obstacles }) => {
+			const vents = obstacles.filter((o) => o.kind === 'steam')
+			const vent = vents[Math.min(2, vents.length - 1)]
+			return { x: vent?.x ?? START_X + 13000, height: 240 }
+		},
+		0,
+	),
 }

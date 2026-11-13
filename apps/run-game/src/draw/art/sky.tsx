@@ -1,5 +1,9 @@
-import { For, type JSX, Show } from 'solid-js'
-import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
+import { For, type JSX, Show, createMemo } from 'solid-js'
+import {
+	type PixelRect,
+	paintedArt,
+	pixelArt,
+} from '../../courses/kit/pixelArt'
 import {
 	BALLOON_ENVELOPE,
 	BALLOON_HEIGHT,
@@ -242,15 +246,112 @@ export function StormArt(props: {
 const TURBINE_WHITE = '#eef1f4'
 const TURBINE_SHADE = '#b9c1ca'
 const BLADE_TIP = '#e8473c'
+/** A turbine's pixels: twice the size of a screen pixel, as everything's are. */
+const TURBINE_CELL = 2
+/** How many steps its blades are drawn at, over a third of a turn, when they look the same again. */
+const BLADE_STEPS = 120
+/** How long the red at each blade's tip is. */
+const TIP_LENGTH = 16
+
+/** Rects of cells, as a path: a row's run of them, each, `CELL` square. */
+function cellPath(runs: [number, number, number][]) {
+	return runs
+		.map(
+			([x, y, n]) =>
+				`M${x * TURBINE_CELL} ${y * TURBINE_CELL}h${n * TURBINE_CELL}v${TURBINE_CELL}h${-n * TURBINE_CELL}z`,
+		)
+		.join('')
+}
+
+/** Its blades, drawn at each step round, once: white, edged, red-tipped. */
+const BLADES = new Map<number, { white: string; shade: string; tip: string }>()
 
 /**
- * A wind turbine: its tower down `tall` to the sea, and its blades at
- * `angles`, radians, round its hub, which is at the drawing's
+ * Its three blades, a third of a turn apart, one at `angle`, as pixels:
+ * each tapering from the hub out to its tip, its trailing edge in shade,
+ * the end of it red.
+ */
+function bladesAt(angle: number) {
+	const third = (Math.PI * 2) / 3
+	const step =
+		Math.round(((((angle % third) + third) % third) / third) * BLADE_STEPS) %
+		BLADE_STEPS
+	const cached = BLADES.get(step)
+	if (cached) return cached
+	const half = Math.ceil((TURBINE_BLADE + 2) / TURBINE_CELL)
+	const size = half * 2
+	/** What's in the cell at `i`, `j` (from the hub's): a blade's white, its shaded edge, its red tip. */
+	const KINDS = ['white', 'shade', 'tip'] as const
+	const cells = new Int8Array(size * size).fill(-1)
+	for (let j = 0; j < size; j++)
+		for (let i = 0; i < size; i++) {
+			const x = (i - half + 0.5) * TURBINE_CELL
+			const y = (j - half + 0.5) * TURBINE_CELL
+			for (let k = 0; k < 3; k++) {
+				const a = (step / BLADE_STEPS) * third + k * third
+				const out = x * Math.cos(a) + y * Math.sin(a)
+				const across = -x * Math.sin(a) + y * Math.cos(a)
+				if (out < 6 || out > TURBINE_BLADE) continue
+				// Tapering, from as wide as the hub to a point.
+				const width = 5.5 - (3 * (out - 6)) / (TURBINE_BLADE - 6)
+				if (Math.abs(across) > width) continue
+				// Its trailing edge in shade, a pixel wide.
+				cells[j * size + i] =
+					out > TURBINE_BLADE - TIP_LENGTH ? 2 : across > width - 2.5 ? 1 : 0
+			}
+		}
+	const runs = { white: [], shade: [], tip: [] } as Record<
+		(typeof KINDS)[number],
+		[number, number, number][]
+	>
+	for (let j = 0; j < size; j++) {
+		let from = 0
+		let kind = -1
+		for (let i = 0; i <= size; i++) {
+			const here = i < size ? cells[j * size + i] : -1
+			if (here !== kind) {
+				if (kind >= 0) runs[KINDS[kind]].push([from - half, j - half, i - from])
+				from = i
+				kind = here
+			}
+		}
+	}
+	const drawn = {
+		white: cellPath(runs.white),
+		shade: cellPath(runs.shade),
+		tip: cellPath(runs.tip),
+	}
+	BLADES.set(step, drawn)
+	return drawn
+}
+
+/**
+ * A turbine's tower, `tall`, as pixels: tapering out down to the sea, its
+ * right side in shade.
+ */
+function towerPath(tall: number) {
+	const lit: [number, number, number][] = []
+	const shade: [number, number, number][] = []
+	for (let y = 2; y < tall / TURBINE_CELL; y++) {
+		const t = (y * TURBINE_CELL - 4) / (tall - 4)
+		const half = Math.round(2 + 1.5 * t)
+		const shaded = Math.max(1, Math.round(half * 0.6))
+		lit.push([-half, y, half * 2 - shaded])
+		shade.push([half - shaded, y, shaded])
+	}
+	return { lit: cellPath(lit), shade: cellPath(shade) }
+}
+
+/**
+ * A wind turbine, as pixel art: its tower down `tall` to the sea, and its
+ * blades at `angles`, radians, round its hub, which is at the drawing's
  * (`TURBINE_BLADE`, `TURBINE_BLADE`).
  */
 export function TurbineArt(props: { angles: number[]; tall: number }) {
 	const c = TURBINE_BLADE + 4
 	const size = c * 2
+	const tower = createMemo(() => towerPath(props.tall))
+	const blades = () => bladesAt(props.angles[0] ?? 0)
 	return (
 		<svg
 			width={size}
@@ -261,32 +362,13 @@ export function TurbineArt(props: { angles: number[]; tall: number }) {
 			aria-hidden="true"
 		>
 			{/* Its tower, tapering, shaded down one side. */}
-			<polygon
-				points={`-4,4 4,4 7,${props.tall} -7,${props.tall}`}
-				fill={TURBINE_WHITE}
-			/>
-			<polygon
-				points={`2,4 4,4 7,${props.tall} 3,${props.tall}`}
-				fill={TURBINE_SHADE}
-			/>
+			<path d={tower().lit} fill={TURBINE_WHITE} />
+			<path d={tower().shade} fill={TURBINE_SHADE} />
 			{/* Its nacelle, behind the hub. */}
-			<rect x={-4} y={-7} width={18} height={12} fill={TURBINE_SHADE} />
-			<For each={props.angles}>
-				{(angle) => (
-					<g transform={`rotate(${(angle * 180) / Math.PI})`}>
-						<polygon
-							points={`6,-4 ${TURBINE_BLADE},-1 ${TURBINE_BLADE},1 6,5`}
-							fill={TURBINE_WHITE}
-							stroke={TURBINE_SHADE}
-							stroke-width={1}
-						/>
-						<polygon
-							points={`${TURBINE_BLADE - 16},-1.6 ${TURBINE_BLADE},-1 ${TURBINE_BLADE},1 ${TURBINE_BLADE - 16},1.8`}
-							fill={BLADE_TIP}
-						/>
-					</g>
-				)}
-			</For>
+			<rect x={-4} y={-8} width={18} height={12} fill={TURBINE_SHADE} />
+			<path d={blades().white} fill={TURBINE_WHITE} />
+			<path d={blades().shade} fill={TURBINE_SHADE} />
+			<path d={blades().tip} fill={BLADE_TIP} />
 			<rect x={-6} y={-6} width={12} height={12} fill={TURBINE_WHITE} />
 			<rect x={-6} y={4} width={12} height={2} fill={TURBINE_SHADE} />
 		</svg>
@@ -410,48 +492,65 @@ export function WhaleArt(props: {
 
 const GOLD = '#f7c531'
 const GOLD_DARK = '#b8860b'
+const GOLD_LIGHT = '#ffe680'
 const LIT = '#fffbe0'
+
+/** A Ring's cells: twice the size of a screen pixel. */
+const RING_COLUMNS = RING_WIDTH / 2
+const RING_ROWS = RING_HEIGHT / 2
+/** How far in from its outside its hole is, in cells. */
+const RING_BAND = 3
+
+/**
+ * A Ring, seen almost edge on, as pixel art: gold, its inside edge in
+ * shade, the light on its top left; lit up, pale, glowing.
+ */
+function ring(lit: boolean) {
+	const rx = RING_COLUMNS / 2
+	const ry = RING_ROWS / 2
+	const inside = (x: number, y: number, inset: number) =>
+		((x - rx) / (rx - inset)) ** 2 + ((y - ry) / (ry - inset)) ** 2 <= 1
+	const band = (x: number, y: number) =>
+		inside(x, y, 0) && !inside(x, y, RING_BAND)
+	return paintedArt(RING_COLUMNS, RING_ROWS, (x, y) => {
+		if (!band(x, y)) return undefined
+		// Next to the hole: its inside edge.
+		if ([-1, 1].some((d) => !band(x + d, y) && inside(x + d, y, RING_BAND)))
+			return lit ? GOLD : GOLD_DARK
+		if ([-1, 1].some((d) => !band(x, y + d) && inside(x, y + d, RING_BAND)))
+			return lit ? GOLD : GOLD_DARK
+		// Its outside edge, up on its left: the light on it.
+		const edge = [-1, 1].some(
+			(d) => !inside(x + d, y, 0) || !inside(x, y + d, 0),
+		)
+		if (edge && x < rx && y < ry) return lit ? '#ffffff' : GOLD_LIGHT
+		return lit ? LIT : GOLD
+	})
+}
+const RING = ring(false)
+const RING_LIT = ring(true)
 
 /**
  * A Ring, seen almost edge on: its near half, in front of whoever's going
  * through it, or its far half, behind them. Lit up, flown through.
  */
 export function RingArt(props: { half: 'near' | 'far'; lit: boolean }) {
-	const style = (): JSX.CSSProperties => ({
-		display: 'block',
-		overflow: 'visible',
-		'clip-path':
-			props.half === 'near'
-				? 'inset(-8px 50% -8px -8px)'
-				: 'inset(-8px -8px -8px 50%)',
-		filter: props.lit ? 'drop-shadow(0 0 6px #fff4a0)' : undefined,
-	})
 	return (
-		<svg
-			width={RING_WIDTH}
-			height={RING_HEIGHT}
-			viewBox={`0 0 ${RING_WIDTH} ${RING_HEIGHT}`}
-			style={style()}
-			aria-hidden="true"
+		<div
+			style={{
+				'line-height': 0,
+				'clip-path':
+					props.half === 'near'
+						? 'inset(-8px 50% -8px -8px)'
+						: 'inset(-8px -8px -8px 50%)',
+				filter: props.lit ? 'drop-shadow(0 0 6px #fff4a0)' : undefined,
+			}}
 		>
-			<ellipse
-				cx={RING_WIDTH / 2}
-				cy={RING_HEIGHT / 2}
-				rx={RING_WIDTH / 2 - 3}
-				ry={RING_HEIGHT / 2 - 3}
-				fill="none"
-				stroke={props.lit ? LIT : GOLD}
-				stroke-width={6}
+			<PixelArt
+				src={props.lit ? RING_LIT : RING}
+				width={RING_WIDTH}
+				height={RING_HEIGHT}
 			/>
-			<ellipse
-				cx={RING_WIDTH / 2}
-				cy={RING_HEIGHT / 2}
-				rx={RING_WIDTH / 2 - 6}
-				ry={RING_HEIGHT / 2 - 6}
-				fill="none"
-				stroke={props.lit ? GOLD : GOLD_DARK}
-				stroke-width={1.5}
-			/>
-		</svg>
+		</div>
 	)
 }

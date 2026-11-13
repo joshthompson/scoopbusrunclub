@@ -29,6 +29,7 @@ import {
 	umbrella,
 	windsock,
 } from './kit/cliffScenery'
+import { withHat } from './kit/hats'
 import { seeded } from './kit/seeded'
 import type { Boost, Course, CourseDefinition, Obstacle } from './types'
 
@@ -303,10 +304,29 @@ const GRASS_DARK = '#4e9a36'
 const DIRT = '#c9a46a'
 const DIRT_DARK = '#a8824a'
 
+/** How far round the flying helmet the sky's kept clear, and how far under its top it is. */
+const HELMET_CLEAR = 240
+const HELMET_UNDER_SKY = 10
+
 /** How many Rings it has: the backend takes no more than 50 a course. */
 const MOST_RINGS = 50
 
-const laidOut = layOut()
+/**
+ * A flying helmet, high in the sky, right up under its top, where nothing
+ * else is: only got to by climbing a glider all the way up to it.
+ */
+const laidOut = withHat(
+	layOut(),
+	'flyingHelmet',
+	({ obstacles, boosts }) => {
+		const clear = (x: number) =>
+			[...obstacles, ...boosts].every((o) => Math.abs(o.x - x) > HELMET_CLEAR)
+		let x = CLIFF + 2600
+		while (x < ISLAND - 2000 && !clear(x)) x += 20
+		return { x, height: SEA - SKY + HELMET_UNDER_SKY }
+	},
+	0,
+)
 const rings = laidOut.boosts.filter((b) => b.kind === 'ring').length
 if (rings > MOST_RINGS)
 	console.error(`The Cliff has ${rings} Rings: more than ${MOST_RINGS}`)

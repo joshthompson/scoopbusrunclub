@@ -14,6 +14,8 @@ import { Stage } from '../ui/Stage'
  */
 export function Round(props: {
 	course: Course
+	/** Baby Mode: no bus, and nobody's out. */
+	baby?: boolean
 	number: number
 	/** How many Rounds there are, if it isn't a Backyard Ultra. */
 	of?: number
@@ -27,7 +29,10 @@ export function Round(props: {
 	onLobby: () => void
 	onEnd: () => void
 }) {
-	const world = createWorld(props.course, props.racers, { round: true })
+	const world = createWorld(props.course, props.racers, {
+		round: true,
+		baby: props.baby,
+	})
 	props.onWorld(world)
 	const scene = createRaceScene(world)
 
@@ -118,7 +123,11 @@ export function RoundHud(props: {
 	/** How far the bus is behind the last of them, once it's off the screen. */
 	const busBehind = () => {
 		world.ticks()
-		if (world.phase() !== 'running' || world.busX() >= world.camera())
+		if (
+			world.baby ||
+			world.phase() !== 'running' ||
+			world.busX() >= world.camera()
+		)
 			return undefined
 		const running = world.racers.filter((r) => !r.out)
 		if (!running.length) return undefined
@@ -182,7 +191,8 @@ export function RoundHud(props: {
 								background: racer.colour,
 							}}
 						>
-							P{racer.number} {racer.runner.name}
+							<span style={{ 'margin-right': '0.7em' }}>P{racer.number}</span>
+							{racer.runner.name}
 						</div>
 					</Show>
 				)}

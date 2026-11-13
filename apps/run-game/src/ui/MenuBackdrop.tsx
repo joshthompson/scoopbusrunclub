@@ -39,6 +39,11 @@ import { RunStrip } from './RunStrip'
 const HORIZON = 300
 /** The top of the path the runners are on. */
 const PATH_TOP = 462
+/**
+ * How fast the near field goes by, px a second: its grass, and the trees
+ * and shrubs stood on it, together, so they don't slide over it.
+ */
+const FIELD_SPEED = 24
 
 /** A seeded random number generator, so the scene's the same every time. */
 function seeded(seed: number) {
@@ -306,7 +311,7 @@ export function MenuBackdrop() {
 				top={HORIZON}
 				height={150}
 				imageWidth={1200}
-				speed={24}
+				speed={FIELD_SPEED}
 			/>
 			<div
 				style={{
@@ -318,8 +323,9 @@ export function MenuBackdrop() {
 					background: 'var(--grass-green)',
 				}}
 			/>
+			{/* Trees and shrubs stood on the field: going by with it, as fast. */}
 			<Strip
-				speed={40}
+				speed={FIELD_SPEED}
 				seed={23}
 				gap={[110, 300]}
 				pieces={[

@@ -59,8 +59,21 @@ export function IdentityEditor(props: {
 	]
 	const indexOf = (id: string | undefined) =>
 		choices().findIndex((choice) => choice !== NEW_RUNNER && choice.id === id)
-	const startAt = () =>
-		Math.max(1, indexOf(identity().runnerId ?? props.runner?.id))
+	/**
+	 * Who's picked to begin with: whoever was chosen last time; or, the first
+	 * time, the club member just run as; or the first of the club. Never
+	 * making a new runner, nor one of your own you've not chosen.
+	 */
+	const startAt = () => {
+		const chosen = indexOf(identity().runnerId)
+		if (chosen > 0) return chosen
+		const ran = props.runner?.custom ? -1 : indexOf(props.runner?.id)
+		if (ran > 0) return ran
+		const firstMember = choices().findIndex(
+			(choice) => choice !== NEW_RUNNER && !choice.custom,
+		)
+		return Math.max(1, firstMember)
+	}
 	const [at, setAt] = createSignal(startAt())
 	const choice = () => choices()[at()]
 	/** The runner picked, unless it's making a new one. */

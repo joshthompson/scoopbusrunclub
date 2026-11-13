@@ -77,6 +77,15 @@ export type PadMode = 'controller' | 'remote'
  */
 export type RoomMode = 'parkrun' | 'half' | 'marathon' | 'backyard'
 
+/**
+ * How its Rounds are raced, as its Starter chooses in the lobby too:
+ * - `scoop`: the bus coming, scooping up the last; fall down a Gap and
+ *   you're out. Last one standing wins.
+ * - `baby`: no bus; fall, and you're back on your feet past the Gap; left
+ *   behind, and you're carried along faster. First over the line wins.
+ */
+export type GameMode = 'scoop' | 'baby'
+
 /** Phone → Host, on the `pad` action. Its controls go on `input`, as packed bits. */
 export type PadMessage =
 	/**
@@ -93,6 +102,13 @@ export type PadMessage =
 	| { type: 'leave' }
 	/** The Starter, choosing how the Room goes. */
 	| { type: 'roomMode'; mode: RoomMode }
+	/** The Starter, choosing how its Rounds are raced. */
+	| { type: 'gameMode'; mode: GameMode }
+	/**
+	 * Playing remotely, and there's a Round on that this phone's not been
+	 * sent the start of, or has lost: sent again, please.
+	 */
+	| { type: 'resync' }
 	/** The Starter, starting the first Round. */
 	| { type: 'start' }
 	/** The Starter, stopping the countdown to it. */
@@ -148,8 +164,9 @@ export interface PadView {
 	points: number
 	paused: boolean
 	course: string
-	/** How the Room's set to go, for everyone to see. */
+	/** How the Room's set to go, and how its Rounds are raced, for everyone to see. */
 	roomMode: RoomMode
+	gameMode: GameMode
 	/** Whether they're the Starter, whatever the stage. */
 	isStarter: boolean
 	/** Which Round the Room's on, or just had, and out of how many, unless it's a Backyard Ultra. */
@@ -159,7 +176,12 @@ export interface PadView {
 	 * In the lobby, if they're the Starter: how the Room's set to go, and
 	 * whether it can start yet, and if not, why.
 	 */
-	starter?: { roomMode: RoomMode; canStart: boolean; why: string }
+	starter?: {
+		roomMode: RoomMode
+		gameMode: GameMode
+		canStart: boolean
+		why: string
+	}
 	/** If someone else is the Starter, their Player number. */
 	starterNumber?: number
 	/** Joined from a computer: the whole Room, to show it as the Host does. */
@@ -187,6 +209,11 @@ export interface RoomView {
 	nextIn: number
 	/** At the Podium: how long till it's back to the lobby. */
 	lobbyIn: number
+	/**
+	 * At the Podium: the Standings as they were at the end, fixed, with
+	 * anyone who's left since, or left during it, still on it.
+	 */
+	podium?: Seat[]
 }
 
 /**
@@ -228,6 +255,8 @@ export interface PacerIntro {
  */
 export interface RaceStart {
 	round: number
+	/** Raced in Baby Mode: no bus. */
+	baby?: boolean
 	/** The course's id. */
 	course: string
 	racers: RacerIntro[]
@@ -264,10 +293,12 @@ export const RACER_FLAGS = {
 	squashed: 64,
 	/** On a glider. */
 	gliding: 128,
+	/** In a mine cart. */
+	cart: 256,
 }
-/** The Pumpkin a racer's wearing, by its carving, is the flags over this. */
-export const PUMPKIN_FLAG = 256
-/** [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding), dazed, spin], and on skis, their ski state and trick's turn */
+/** The hat a racer's wearing, as its `hatCode`, is the flags over this. */
+export const HAT_FLAG = 512
+/** [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding, 8 ducking), dazed, spin], and on skis, their ski state and trick's turn */
 export type PacerState = [
 	number,
 	number,
@@ -373,6 +404,10 @@ export interface RaceFrame {
 	joined: PacerIntro[]
 	furbies: FurbyStateFrame[]
 	corgis: CorgiStateFrame[]
+	/** The Caves' mine carts, if there are any: [x, rail y, state, spin], its state by `CART_STATES`. */
+	carts?: [number, number, number, number][]
+	/** Haga's football, if there is one: [x, y, spin, out: 0 no, 1 home, 2 scooped]. */
+	ball?: [number, number, number, number]
 	/** Geese flying over. */
 	flyers: FlyerFrame[]
 	/** Every obstacle that's been used, scooped or flown off. */

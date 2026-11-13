@@ -14,7 +14,12 @@ import { duckPost } from './kit/duckSigns'
 import { SAND_FAR_RIPPLES, SAND_RIPPLES, SAND_TRACK } from './kit/sand'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
-import type { Cave, Course, CourseDefinition } from './types'
+import type {
+	Cave,
+	Course,
+	CourseDefinition,
+	PlatformDefinition,
+} from './types'
 
 /**
  * The Pyramids, a placeholder: across the sand at Giza, over the dunes, and
@@ -303,6 +308,9 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 			height: 26,
 			item: PYRAMIDS_FIKA[fika++ % PYRAMIDS_FIKA.length],
 		})
+	// In the Sphinx's tomb, between its Mummies, by the sarcophagus: a
+	// pharaoh's headdress, to jump for.
+	boosts.push({ kind: 'hat', x: TOMB_FROM + 350, height: 64, hat: 'pharaoh' })
 	boosts.sort((a, b) => a.x - b.x)
 	// The tomb's Mummies.
 	for (const mummy of MUMMIES) obstacles.push({ kind: 'mummy', ...mummy })
@@ -324,6 +332,32 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	scenery.push({ x: SPHINX - PORCH - 80, asset: duckPost, setBack: 0 })
 	return { obstacles, boosts, scenery, corgis }
 }
+
+/** Nothing at all, to draw: the porch's roof is drawn as the Sphinx's own. */
+const NOTHING =
+	'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/%3E'
+
+/**
+ * The porch's roof, solid, to stand on: jumped onto, it's the roof you're
+ * on, not a way down through it into the slide under it, which is only
+ * ever slid into.
+ */
+const PORCH_ROOF: PlatformDefinition = (() => {
+	// The sand rises a little under it, and a Platform's flat: level with
+	// the drawn roof halfway along, and thin enough to stay clear of the
+	// slide's Ceiling under it all the way along.
+	const near = terrain.groundY(SPHINX - PORCH)
+	const far = terrain.groundY(SPHINX)
+	const height = PORCH_TOP + Math.round((near - far) / 2)
+	const top = near - height
+	return {
+		x: SPHINX - PORCH,
+		width: PORCH,
+		height,
+		solid: Math.max(4, Math.floor(far - SLIDE - top) - 2),
+		art: { asset: NOTHING, width: 1, height: 1, top: 0 },
+	}
+})()
 
 export const pyramids: CourseDefinition = {
 	id: 'pyramids',
@@ -384,6 +418,7 @@ export const pyramids: CourseDefinition = {
 		},
 	},
 	cave: sphinx,
+	platforms: [PORCH_ROOF],
 	...layOut(),
 	ride: 'camel',
 }

@@ -1,4 +1,4 @@
-import type { RoomMode } from './protocol'
+import type { GameMode, RoomMode } from './protocol'
 
 /** One way a Room can go, as the lobby and the Starter's phone offer it. */
 export interface RoomModeInfo {
@@ -50,3 +50,31 @@ export const ROOM_MODES: RoomModeInfo[] = [
 
 export const roomModeInfo = (mode: RoomMode) =>
 	ROOM_MODES.find((m) => m.mode === mode) ?? ROOM_MODES[0]
+
+/** One way a Room's Rounds can be raced, as the lobby and the Starter's phone offer it. */
+export interface GameModeInfo {
+	mode: GameMode
+	label: string
+	/** What it's like, in a few words, on the big screen. */
+	note: string
+	/** What it's like, for the Starter choosing on their phone. */
+	about: string
+}
+
+export const GAME_MODES: GameModeInfo[] = [
+	{
+		mode: 'scoop',
+		label: 'Scoop Mode',
+		note: 'The bus is coming',
+		about: 'The bus is coming: last one standing wins',
+	},
+	{
+		mode: 'baby',
+		label: 'Baby Mode',
+		note: 'No bus, no falling out',
+		about: 'No bus, and nobody’s out: first over the line wins',
+	},
+]
+
+export const gameModeInfo = (mode: GameMode) =>
+	GAME_MODES.find((m) => m.mode === mode) ?? GAME_MODES[0]

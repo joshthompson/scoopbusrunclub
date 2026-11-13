@@ -13,6 +13,7 @@ import { type CustomRunner, customRunners } from '../runners/customRunners'
 import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
 import {
 	APP_ID,
+	type GameMode,
 	type PadMessage,
 	type PadMode,
 	type PadView,
@@ -131,13 +132,23 @@ export function createRoom(code: string) {
 		undefined
 
 	/** The lobby, for its Starter's phone: the Party says. */
-	let lobby: () => { roomMode: RoomMode; canStart: boolean; why: string } =
-		() => ({ roomMode: 'backyard', canStart: false, why: '' })
+	let lobby: () => {
+		roomMode: RoomMode
+		gameMode: GameMode
+		canStart: boolean
+		why: string
+	} = () => ({
+		roomMode: 'backyard',
+		gameMode: 'scoop',
+		canStart: false,
+		why: '',
+	})
 	/** What the Starter's asked for: the Party does it. Start says whether it's starting. */
 	let onStarter: {
 		start: () => boolean
 		cancel: () => void
 		roomMode: (mode: RoomMode) => void
+		gameMode: (mode: GameMode) => void
 		/** Calling a Backyard Ultra, between Rounds. */
 		finish: () => void
 		/** Leaving the Podium for the lobby. */
@@ -146,6 +157,7 @@ export function createRoom(code: string) {
 		start: () => false,
 		cancel: () => {},
 		roomMode: () => {},
+		gameMode: () => {},
 		finish: () => {},
 		lobby: () => {},
 	}
@@ -167,6 +179,13 @@ export function createRoom(code: string) {
 
 	/** What each phone's holding, as it last said. */
 	const held = new Map<string, Controls>()
+	/**
+	 * Everyone who's left the Room, or dropped out of it for good, as they
+	 * were, by their seat's id: their points kept, for the Standings and
+	 * the Podium, and so coming back (the same device) gets them back, and
+	 * who they were running as too.
+	 */
+	const departed = new Map<string, Seat>()
 
 	const room: Room = joinRoom({ appId: APP_ID }, trysteroRoom(code))
 	const view = action<PadView>(room, 'view')
@@ -209,12 +228,23 @@ export function createRoom(code: string) {
 		seat: Omit<Seat, 'colour' | 'points' | 'ready' | 'waiting'>,
 	) {
 		if (seats.length >= MAX_PLAYERS) return undefined
+		// Back again: their points, and who they were, if nobody's taken them since.
+		const was = departed.get(seat.id)
+		departed.delete(seat.id)
+		const character =
+			was?.character && !taken().includes(was.character)
+				? was.character
+				: undefined
 		const added: Seat = {
 			...seat,
-			colour: freeColour(),
-			points: 0,
+			colour:
+				was && !seats.some((s) => s.colour === was.colour)
+					? was.colour
+					: freeColour(),
+			points: was?.points ?? 0,
 			ready: false,
 			waiting: stage() !== 'lobby' && stage() !== 'starting',
+			...(character ? { character, custom: was?.custom } : {}),
 		}
 		setSeats(seats.length, added)
 		return added
@@ -222,8 +252,28 @@ export function createRoom(code: string) {
 
 	function removeSeat(id: string) {
 		held.delete(id)
+		const seat = seats.find((s) => s.id === id)
+		// Kept, as they were, for the Standings and for coming back.
+		if (seat?.character || seat?.points)
+			departed.set(id, {
+				...seat,
+				peer: undefined,
+				lostAt: undefined,
+				ready: false,
+			})
 		setSeats((all) => all.filter((s) => s.id !== id))
 	}
+
+	/**
+	 * Everyone in this go, still here or not, for the Standings: whoever's
+	 * left keeps their points on them.
+	 */
+	const everyone = (): Seat[] => [
+		...seats,
+		...[...departed.values()].filter(
+			(gone) => gone.points > 0 && !seats.some((s) => s.id === gone.id),
+		),
+	]
 
 	/** `character` for `seat`, if nobody else has them. */
 	function pick(id: string, character: string, custom?: CustomRunner) {
@@ -253,6 +303,10 @@ export function createRoom(code: string) {
 	/** `id` choosing how the Room goes: only the Starter can. */
 	const chooseModeAs = (id: string, mode: RoomMode) => {
 		if (isStarter(id)) onStarter.roomMode(mode)
+	}
+	/** `id` choosing how its Rounds are raced: only the Starter can. */
+	const chooseGameModeAs = (id: string, mode: GameMode) => {
+		if (isStarter(id)) onStarter.gameMode(mode)
 	}
 	/** `id` calling a Backyard Ultra between Rounds: only the Starter can. */
 	const finishAs = (id: string) => {
@@ -309,6 +363,9 @@ export function createRoom(code: string) {
 		if (message.type === 'start') startAs(seat.id)
 		if (message.type === 'cancel') cancelAs(seat.id)
 		if (message.type === 'roomMode') chooseModeAs(seat.id, message.mode)
+		if (message.type === 'gameMode') chooseGameModeAs(seat.id, message.mode)
+		// Missed the start of the Round: sent it again, and caught up.
+		if (message.type === 'resync') onWatch(peer)
 		if (message.type === 'finish') finishAs(seat.id)
 		if (message.type === 'lobby') lobbyAs(seat.id)
 		if (message.type === 'leave') removeSeat(seat.id)
@@ -351,6 +408,7 @@ export function createRoom(code: string) {
 		paused: false,
 		course: course(),
 		roomMode: lobby().roomMode,
+		gameMode: lobby().gameMode,
 		isStarter: false,
 		...progress(),
 	})
@@ -387,6 +445,7 @@ export function createRoom(code: string) {
 			paused: paused(),
 			course: course(),
 			roomMode: lobby().roomMode,
+			gameMode: lobby().gameMode,
 			isStarter: starter() === seat,
 			...progress(),
 			...(seat.screen ? { room: roomView() } : {}),
@@ -452,6 +511,12 @@ export function createRoom(code: string) {
 		taken,
 		addSeat,
 		removeSeat,
+		everyone,
+		/** A fresh go: nobody who's left has points to come back to any more. */
+		resetDeparted() {
+			for (const [id, gone] of departed)
+				departed.set(id, { ...gone, points: 0 })
+		},
 		pick,
 		setReady,
 		dropLost,
@@ -475,6 +540,7 @@ export function createRoom(code: string) {
 		startAs,
 		cancelAs,
 		chooseModeAs,
+		chooseGameModeAs,
 		finishAs,
 		lobbyAs,
 		/** Tells the Room how the lobby's going, for the Starter's phone. */

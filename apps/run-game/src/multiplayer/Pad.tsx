@@ -4,6 +4,7 @@ import {
 	Match,
 	Show,
 	Switch,
+	createEffect,
 	createSignal,
 	lazy,
 	onCleanup,
@@ -22,12 +23,13 @@ import { Scanner } from './Scanner'
 import { isPicked, joinAsGuest, lastMode, rememberMode } from './guest'
 import {
 	CODE_LENGTH,
+	type GameMode,
 	type PadMode,
 	type PadView,
 	type RoomMode,
 	cleanCode,
 } from './protocol'
-import { ROOM_MODES, roomModeInfo } from './roomModes'
+import { GAME_MODES, ROOM_MODES, roomModeInfo } from './roomModes'
 import { statusText } from './status'
 
 /** The race on the phone, for Remote Play: the game itself, so only loaded then. */
@@ -62,6 +64,8 @@ export default function Pad() {
 		setCode('')
 		setMode(undefined)
 	}
+	/** Joining again, from scratch: the same seat, by this device. */
+	const [attempt, setAttempt] = createSignal(0)
 	const screens = () => (
 		<Switch>
 			<Match when={!code()}>
@@ -70,13 +74,14 @@ export default function Pad() {
 			<Match when={!mode()}>
 				<ModePicker code={code()} onPick={choose} onBack={leave} />
 			</Match>
-			<Match when={code()} keyed>
+			<Match when={code() && `${code()}#${attempt()}`} keyed>
 				{(joined) => (
 					<Controller
-						code={joined}
+						code={joined.split('#')[0]}
 						mode={mode() ?? 'controller'}
 						onMode={choose}
 						onLeave={leave}
+						onRejoin={() => setAttempt(attempt() + 1)}
 					/>
 				)}
 			</Match>
@@ -220,6 +225,8 @@ function Controller(props: {
 	mode: PadMode
 	onMode: (mode: PadMode) => void
 	onLeave: () => void
+	/** Lost touch with the Room: trying again, from scratch. */
+	onRejoin: () => void
 }) {
 	// The buttons, and the keyboard too, for trying it out on a computer.
 	const [touched, setTouched] = createSignal<Set<Action>>(new Set())
@@ -238,7 +245,7 @@ function Controller(props: {
 		mode: () => props.mode,
 		held,
 	})
-	const { view, gone, lost, start, feed, send } = link
+	const { view, gone, lost, reconnecting, start, feed, send } = link
 
 	/** Changing who they'll be, after picking. */
 	const [choosing, setChoosing] = createSignal(false)
@@ -310,14 +317,31 @@ function Controller(props: {
 			return next
 		})
 	}
+	// Nothing's held while the buttons aren't up: between Rounds, nothing
+	// pressed as the last ended carries over into the next.
+	createEffect(() => {
+		const stage = view()?.stage
+		if (stage !== 'round' && stage !== 'starting' && touched().size)
+			setTouched(new Set<Action>())
+	})
 
 	return (
 		<Switch>
 			<Match when={gone()}>
-				<Message title="The Room's closed" text="The big screen's left it.">
+				<Message
+					title="Lost the big screen"
+					text="It's not answering: the Room may have closed. Your seat and points are kept for a while."
+				>
 					<button
 						type="button"
 						style={styles.bigButton}
+						onClick={props.onRejoin}
+					>
+						Rejoin
+					</button>
+					<button
+						type="button"
+						style={styles.smallButton}
 						onClick={props.onLeave}
 					>
 						Join another
@@ -477,6 +501,10 @@ function Controller(props: {
 																navigator.vibrate?.(8)
 																send({ type: 'roomMode', mode })
 															}}
+															onGameMode={(mode) => {
+																navigator.vibrate?.(8)
+																send({ type: 'gameMode', mode })
+															}}
 															onStart={() => {
 																navigator.vibrate?.(15)
 																send({ type: 'start' })
@@ -593,6 +621,9 @@ function Controller(props: {
 						<Show when={v().paused}>
 							<div style={styles.paused}>Paused</div>
 						</Show>
+						<Show when={reconnecting()}>
+							<div style={styles.reconnecting}>Reconnecting…</div>
+						</Show>
 					</div>
 				)}
 			</Match>
@@ -607,10 +638,37 @@ function Controller(props: {
 function Starter(props: {
 	starter: NonNullable<PadView['starter']>
 	onMode: (mode: RoomMode) => void
+	onGameMode: (mode: GameMode) => void
 	onStart: () => void
 }) {
 	return (
 		<>
+			<div style={styles.heading}>How to race?</div>
+			<div style={styles.modeList}>
+				<For each={GAME_MODES}>
+					{(m) => {
+						const on = () => props.starter.gameMode === m.mode
+						return (
+							<button
+								type="button"
+								aria-pressed={on()}
+								style={{ ...styles.modeCard, ...(on() ? styles.readyOn : {}) }}
+								onClick={() => !on() && props.onGameMode(m.mode)}
+							>
+								<span style={styles.modeMark}>
+									<Show when={on()}>
+										<span style={styles.modeDot} />
+									</Show>
+								</span>
+								<span style={styles.modeWords}>
+									<span style={styles.modeLabel}>{m.label}</span>
+									<span style={styles.modeAbout}>{m.about}</span>
+								</span>
+							</button>
+						)
+					}}
+				</For>
+			</div>
 			<div style={styles.heading}>How far?</div>
 			<div style={styles.modeList}>
 				<For each={ROOM_MODES}>
@@ -1069,6 +1127,21 @@ const styles = {
 		'justify-content': 'center',
 		'border-bottom': '4px solid var(--ink)',
 		background: 'var(--ink)',
+	},
+	/** Out of touch with the big screen a moment: getting back in. */
+	reconnecting: {
+		position: 'absolute',
+		left: '50%',
+		top: '64px',
+		transform: 'translateX(-50%)',
+		padding: '8px 14px 5px',
+		background: 'var(--bus-red)',
+		color: 'white',
+		border: '3px solid var(--ink)',
+		'font-size': '18px',
+		'white-space': 'nowrap',
+		'z-index': 2,
+		animation: 'blink 1.2s steps(2) infinite',
 	},
 	paused: {
 		position: 'absolute',

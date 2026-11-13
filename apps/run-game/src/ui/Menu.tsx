@@ -7,6 +7,7 @@ import {
 	onCleanup,
 } from 'solid-js'
 import { play } from '../sfx'
+import { onHover } from './hover'
 
 /** A framed pixel panel, the menus' and the pause menu's look. */
 export function Panel(props: {
@@ -114,12 +115,12 @@ export function Menu(props: {
 								...(isSelected() ? styles.itemSelected : {}),
 								...(item.disabled ? styles.itemDisabled : {}),
 							}}
-							onMouseEnter={() => {
+							onMouseEnter={onHover(() => {
 								if (!isSelected()) {
 									setSelected(i())
 									play('move')
 								}
-							}}
+							})}
 							onClick={() => choose(item)}
 						>
 							<span

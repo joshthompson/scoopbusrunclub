@@ -23,6 +23,7 @@ import {
 	toadstool,
 	wires,
 } from './kit/furbyScenery'
+import { withHat } from './kit/hats'
 import { seeded } from './kit/seeded'
 import type {
 	Boost,
@@ -274,11 +275,12 @@ const PLATFORMS: PlatformDefinition[] = [
 	...BOUNCERS.map((x, i) =>
 		cloud(x + LANDS_PAST, 220, LANDS_HEIGHT, i % 2 ? 20 : 0, i * 0.3),
 	),
-	cloud(CLOUDS, 200, 80),
-	cloud(CLOUDS + 300, 180, 140, 30, 0),
-	cloud(CLOUDS + 620, 200, 190),
-	cloud(CLOUDS + 940, 180, 140, 30, 0.5),
-	cloud(CLOUDS + 1260, 220, 100),
+	// Long, each of them, for a good run at the jump to the next.
+	cloud(CLOUDS, 290, 80),
+	cloud(CLOUDS + 360, 280, 140, 30, 0),
+	cloud(CLOUDS + 720, 320, 190),
+	cloud(CLOUDS + 1100, 280, 140, 30, 0.5),
+	cloud(CLOUDS + 1460, 300, 100),
 ]
 
 // --- What's along it ------------------------------------------------------------------
@@ -480,7 +482,12 @@ export const furbyFields: CourseDefinition = {
 			grass: GIANT_FUR_LIGHT,
 		},
 	},
-	...layOut(),
+	// A propeller beanie, over the highest of the platforms: up the moving
+	// ones to it, and a jump.
+	...withHat(layOut(), 'propeller', () => {
+		const top = PLATFORMS.reduce((a, b) => (b.height > a.height ? b : a))
+		return { x: top.x + top.width / 2, height: top.height + 70 }
+	}),
 }
 
 /** Tall enough inside to stand: no Tunnel in it. */

@@ -104,6 +104,11 @@ export const TABLE_SIZE = 10
 
 /** Tables there are: Endless, and the courses' ids. */
 const TABLE_ID = /^(endless|[a-z][a-z0-9-]{1,30})$/
+/**
+ * Not a table scores are sent to, but one made from the others: each
+ * player's best on every course, added up.
+ */
+export const ALL_LEVELS = 'all-levels'
 
 const bonusValidator = v.object({ count: v.number(), points: v.number() })
 
@@ -111,7 +116,8 @@ const bonusValidator = v.object({ count: v.number(), points: v.number() })
 export const start = internalMutation({
 	args: { table: v.string(), ip: v.string() },
 	handler: async (ctx, { table, ip }) => {
-		if (!TABLE_ID.test(table)) return { error: 'No such table' }
+		if (!TABLE_ID.test(table) || table === ALL_LEVELS)
+			return { error: 'No such table' }
 		const now = Date.now()
 		// Clear out a few that are past their time, as each one's handed out.
 		const old = await ctx.db
@@ -460,6 +466,7 @@ async function byWhom(ctx: Pick<QueryCtx, 'db'>, entry: Doc<'runScores'>) {
 export const list = internalQuery({
 	args: { table: v.string(), playerId: v.optional(v.string()) },
 	handler: async (ctx, { table, playerId }) => {
+		if (table === ALL_LEVELS) return await allLevels(ctx, playerId)
 		const top = await ctx.db
 			.query('runScores')
 			.withIndex('by_table', (q) => q.eq('table', table).eq('status', 'active'))
@@ -504,6 +511,82 @@ export const list = internalQuery({
 		return { entries, mine }
 	},
 })
+
+/**
+ * The All levels table: each player's best on every course added up, and
+ * how many courses they've a score on. Worked out afresh from every course
+ * score each time it's asked for, so it's always in step with them.
+ */
+async function allLevels(ctx: QueryCtx, playerId: string | undefined) {
+	const scores = await ctx.db.query('runScores').collect()
+	interface Total {
+		score: number
+		courses: number
+		date: string
+		/** When they got to this total: equal totals, whoever got there first goes first. */
+		updatedAt: number
+		/** One of their scores, to say who they are. */
+		some: Doc<'runScores'>
+	}
+	/** By their profile, or from before there were profiles, their old copy of the player. */
+	const totals = new Map<string, Total>()
+	for (const score of scores) {
+		if (score.status !== 'active') continue
+		if (score.table === 'endless' || score.table === ALL_LEVELS) continue
+		const key = score.profileId ?? score.playerId
+		if (!key) continue
+		const total = totals.get(key)
+		if (!total)
+			totals.set(key, {
+				score: score.score,
+				courses: 1,
+				date: score.date,
+				updatedAt: score.updatedAt,
+				some: score,
+			})
+		else {
+			total.score += score.score
+			total.courses++
+			if (score.date > total.date) total.date = score.date
+			total.updatedAt = Math.max(total.updatedAt, score.updatedAt)
+		}
+	}
+	const ranked = [...totals.entries()]
+		.filter(([, total]) => total.score > 0)
+		.sort(([, a], [, b]) => b.score - a.score || a.updatedAt - b.updatedAt)
+
+	const shown = async (total: Total) => {
+		const who = await byWhom(ctx, total.some)
+		if (!who) return undefined
+		return {
+			score: total.score,
+			name: who.name,
+			icon: who.icon,
+			date: total.date,
+			courses: total.courses,
+			mine: !!playerId && who.playerId === playerId,
+		}
+	}
+	type Shown = NonNullable<Awaited<ReturnType<typeof shown>>>
+	const entries = (
+		await Promise.all(
+			ranked.slice(0, TABLE_SIZE * 3).map(([, total]) => shown(total)),
+		)
+	)
+		.filter((entry): entry is Shown => !!entry)
+		.slice(0, TABLE_SIZE)
+
+	let mine: { rank: number; entry: Shown } | undefined
+	if (playerId && !entries.some((entry) => entry.mine)) {
+		const profile = await profileOf(ctx, playerId)
+		const rank = ranked.findIndex(
+			([key]) => key === profile?._id || key === playerId,
+		)
+		const entry = rank >= 0 ? await shown(ranked[rank][1]) : undefined
+		if (entry) mine = { rank, entry }
+	}
+	return { entries, mine }
+}
 
 /**
  * Once, after profiles came in: every score from before them moved onto

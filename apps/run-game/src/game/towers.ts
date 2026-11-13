@@ -1,3 +1,4 @@
+import type { PlatformDefinition } from '../courses/types'
 import { DEPTH_SLANT } from './constants'
 
 /**
@@ -25,3 +26,22 @@ export const towerSpan = (x: number) => ({
 	left: x - TOWER_WIDTH / 2,
 	right: x + TOWER_WIDTH / 2 + DEPTH_SLANT,
 })
+
+/**
+ * A guard tower's roof, at `x`, to stand on: a Platform halfway back across
+ * it, where the walkway's line is on the path, `TOWER_HEIGHT` over the
+ * walkway's. Drawn as the tower, not as a Platform.
+ */
+export function towerRoof(
+	terrain: { groundY: (x: number) => number },
+	x: number,
+): PlatformDefinition {
+	const left = x - TOWER_WIDTH / 2 + DEPTH_SLANT / 2
+	const top = terrain.groundY(x) - TOWER_HEIGHT
+	return {
+		x: Math.round(left),
+		width: TOWER_WIDTH,
+		height: terrain.groundY(Math.round(left)) - top,
+		tower: true,
+	}
+}

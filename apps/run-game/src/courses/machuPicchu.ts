@@ -1,6 +1,7 @@
 import type { RunnerName } from '@/data/runners'
 import { PATH_BACK, PATH_FRONT, START_X, VERGE } from '../game/constants'
 import { type Gap, type Terrain, withGaps } from '../game/terrain'
+import { withHat } from './kit/hats'
 import {
 	BROKEN_BRIDGE,
 	DOORWAY,
@@ -865,5 +866,13 @@ export const machuPicchu: CourseDefinition = {
 		rock: 'grayscale(0.5) brightness(1.05)',
 		clouds: 'brightness(1.02)',
 	},
-	...layOut(),
+	// A chullo, over the top terrace: up the steps to it, and a jump.
+	...withHat(layOut(), 'chullo', () => {
+		const top = PLATFORMS.reduce((a, b) =>
+			b.height > a.height || (b.height === a.height && b.width > a.width)
+				? b
+				: a,
+		)
+		return { x: top.x + top.width / 2, height: top.height + 64 }
+	}),
 }

@@ -1,6 +1,7 @@
 import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
 import { effectsOn, musicOn, setEffectsOn, setMusicOn } from '../saved/settings'
 import { play } from '../sfx'
+import { onHover } from '../ui/hover'
 
 export interface MenuItem {
 	label: string
@@ -90,7 +91,7 @@ export function PauseMenu(props: {
 												...styles.item,
 												...(selected() === index() ? styles.itemSelected : {}),
 											}}
-											onMouseEnter={() => setSelected(index())}
+											onMouseEnter={onHover(() => setSelected(index()))}
 											onClick={() => item.choose()}
 										>
 											<span>{item.label}</span>

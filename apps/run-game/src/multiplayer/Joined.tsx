@@ -21,7 +21,7 @@ import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { MenuBackdrop } from '../ui/MenuBackdrop'
 import { Stage } from '../ui/Stage'
-import { LobbyView, SIDE_PANEL, nextMode } from './Lobby'
+import { LobbyView, SIDE_PANEL, nextGameMode, nextMode } from './Lobby'
 import Mirror from './Mirror'
 import { Podium } from './Podium'
 import { Results } from './Results'
@@ -58,9 +58,11 @@ export default function Joined(props: {
 	createEffect(() => {
 		if (!code()) playMenu()
 	})
+	/** Joining again, from scratch: the same seat, by this computer. */
+	const [attempt, setAttempt] = createSignal(0)
 	return (
 		<Show
-			when={code()}
+			when={code() && `${code()}#${attempt()}`}
 			keyed
 			fallback={
 				<Stage>
@@ -71,9 +73,10 @@ export default function Joined(props: {
 		>
 			{(joined) => (
 				<InRoom
-					code={joined}
+					code={joined.split('#')[0]}
 					onLeave={props.onLeave}
 					onAnother={() => setCode('')}
+					onRejoin={() => setAttempt(attempt() + 1)}
 				/>
 			)}
 		</Show>
@@ -145,6 +148,8 @@ function InRoom(props: {
 	code: string
 	onLeave: () => void
 	onAnother: () => void
+	/** Lost touch with the Room: trying again, from scratch. */
+	onRejoin: () => void
 }) {
 	const [mode, setMode] = createSignal<PadMode>(lastMode(MODE_KEY, 'remote'))
 	/**
@@ -160,7 +165,7 @@ function InRoom(props: {
 		screen: true,
 		held: () => (menu() ? NOTHING_HELD : anyControls()),
 	})
-	const { view, gone, lost, start, feed, send } = link
+	const { view, gone, lost, reconnecting, start, feed, send } = link
 	const room = () => view()?.room
 	/**
 	 * Everyone in the Room, the same objects from one view to the next, so
@@ -255,7 +260,8 @@ function InRoom(props: {
 
 	// The keys, as a Local Player's at the Host: left and right to pick,
 	// jump to be ready (or, the Starter, to start it), duck to change your
-	// mind (or stop it starting). M for how far, Esc to leave.
+	// mind (or stop it starting). M for how far, G for Scoop or Baby Mode,
+	// Esc to leave.
 	const onKey = (event: KeyboardEvent) => {
 		if (event.repeat) return
 		const v = view()
@@ -277,6 +283,10 @@ function InRoom(props: {
 		if ((event.key === 'm' || event.key === 'M') && v.isStarter && !starting) {
 			play('move')
 			send({ type: 'roomMode', mode: nextMode(v.roomMode) })
+		}
+		if ((event.key === 'g' || event.key === 'G') && v.isStarter && !starting) {
+			play('move')
+			send({ type: 'gameMode', mode: nextGameMode(v.gameMode) })
 		}
 		const action = actionOfKey(event.key)
 		if (action === 'left' || action === 'right') {
@@ -308,7 +318,7 @@ function InRoom(props: {
 				<>
 					<b>↑</b> or <b>space</b>: start
 					<br />
-					<b>M</b>: how far
+					<b>M</b>: how far · <b>G</b>: Scoop or Baby
 				</>
 			) : (
 				<>
@@ -339,6 +349,9 @@ function InRoom(props: {
 						<Show when={view()?.paused && !menu()}>
 							<div style={styles.paused}>Paused at the big screen</div>
 						</Show>
+						<Show when={reconnecting()}>
+							<div style={styles.reconnecting}>Reconnecting…</div>
+						</Show>
 						<Show when={menu()}>
 							<PauseMenu
 								title="Menu"
@@ -362,15 +375,25 @@ function InRoom(props: {
 			<Match when={true}>
 				<Stage>
 					<MenuBackdrop />
+					<Show when={reconnecting() && !gone()}>
+						<div style={styles.reconnecting}>Reconnecting…</div>
+					</Show>
 					<Switch>
 						<Match when={gone()}>
 							<Message
-								title="The Room's closed"
-								text="The big screen's left it."
+								title="Lost the big screen"
+								text="It's not answering: the Room may have closed. Your seat and points are kept for a while."
 							>
 								<button
 									type="button"
 									style={{ ...styles.button, ...styles.on }}
+									onClick={props.onRejoin}
+								>
+									Rejoin
+								</button>
+								<button
+									type="button"
+									style={styles.button}
 									onClick={props.onAnother}
 								>
 									Join another
@@ -479,7 +502,7 @@ function InRoom(props: {
 									<Podium
 										title={roomModeInfo(v().roomMode).label}
 										rounds={v().round}
-										seats={seats}
+										seats={r().podium ?? seats}
 										placings={r().placings}
 										lobbyIn={r().lobbyIn}
 										onLobby={
@@ -501,6 +524,10 @@ function InRoom(props: {
 										mode={v().roomMode}
 										choosesHere={v().isStarter}
 										onMode={(next) => send({ type: 'roomMode', mode: next })}
+										gameMode={v().gameMode}
+										onGameMode={(next) =>
+											send({ type: 'gameMode', mode: next })
+										}
 										canStart={r().canStart}
 										startingIn={r().startingIn}
 										waitingFor={r().waitingFor}
@@ -689,6 +716,21 @@ const styles = {
 		'font-family': 'var(--font-pixel)',
 		'font-size': '18px',
 		'white-space': 'nowrap',
+	},
+	/** Out of touch with the big screen a moment: getting back in. */
+	reconnecting: {
+		position: 'absolute',
+		left: '50%',
+		top: '12px',
+		transform: 'translateX(-50%)',
+		padding: '8px 14px 5px',
+		background: 'var(--bus-red)',
+		color: 'white',
+		border: '3px solid var(--ink)',
+		'font-size': '18px',
+		'white-space': 'nowrap',
+		'z-index': 2,
+		animation: 'blink 1.2s steps(2) infinite',
 	},
 	paused: {
 		position: 'absolute',

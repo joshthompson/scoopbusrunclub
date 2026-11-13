@@ -109,7 +109,7 @@ export function stepCorgis(world: World) {
 		if (c.state === 'tired' && c.feetY < ground) {
 			c.vy += GRAVITY
 			c.feetY = Math.min(ground, c.feetY + c.vy)
-		} else c.feetY = ground
+		} else c.feetY = ground - (c.state === 'waiting' ? (c.up ?? 0) : 0)
 		// Barking at whoever's nearest. Gliders don't.
 		let dx = Number.POSITIVE_INFINITY
 		for (const r of racing)
@@ -172,10 +172,14 @@ function riderOf(world: World, id: string | undefined) {
 	}
 }
 
-/** Coming down on a waiting corgi's back: on it, and off you go. */
+/**
+ * Coming down on a waiting corgi's back: on it, and off you go. A mole,
+ * down in a tunnel with no room to jump onto it, you just run into.
+ */
 function mount(world: World, racer: Racer) {
 	const b = racer.body
-	if (b.grounded || b.vy <= 0) return
+	const runInto = world.course.ride === 'mole'
+	if (!runInto && (b.grounded || b.vy <= 0)) return
 	/** Where their feet were last tick. */
 	const was = b.feetY - b.vy
 
@@ -184,19 +188,27 @@ function mount(world: World, racer: Racer) {
 		if (c.state !== 'waiting') continue
 		if (Math.abs(b.x - c.x) > backReach(ride.width)) continue
 		const back = c.feetY - ride.back + BACK_GIVE
-		if (was > back || b.feetY < back) continue
+		// Run into, it's from beside it, level with it: not from under its ledge.
+		if (
+			runInto
+				? b.feetY < back || b.feetY > c.feetY + BACK_GIVE
+				: was > back || b.feetY < back
+		)
+			continue
 
 		c.state = 'ridden'
 		c.rider = racer.id
 		c.barking = false
-		b.mount = CORGI_RIDE_TICKS
+		b.mount = ride.ticks ?? CORGI_RIDE_TICKS
+		// Got on in a hat: for a special goal (Huddinge's, in antlers).
+		if (b.hat) b.rodeWearing = [...(b.rodeWearing ?? []), b.hat.kind]
 		const kind =
 			c.rare && ride.rare ? ride.rare.kind : (world.course.ride ?? 'corgi')
 		collect(`ride:${kind}`)
 		b.combo = 0
 		// Sat on its back: its feet are theirs now.
 		b.x = c.x
-		b.feetY = world.terrain.groundY(b.x)
+		b.feetY = c.feetY
 		b.vy = 0
 		b.grounded = true
 		b.stumble = 0

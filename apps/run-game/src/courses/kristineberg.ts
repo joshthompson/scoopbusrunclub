@@ -3,6 +3,7 @@ import { TRACK_GROUND } from '../draw/Stadium'
 import { START_X } from '../game/constants'
 import { KRISTINEBERG_FIKA } from '../game/fika'
 import { createTerrain } from '../game/terrain'
+import { withHat } from './kit/hats'
 import { seeded } from './kit/seeded'
 import type { Boost, Course, CourseDefinition, Obstacle } from './types'
 
@@ -96,10 +97,31 @@ export const kristineberg: CourseDefinition = {
 	terrain,
 	runDirectors: ['keith', 'claire'],
 	longJump: { board: BOARD },
+	// A long jump of 10 m or more: a full jump off the board, flat out,
+	// only gets 8 or 9; it takes speed carried into it, a boost or two.
+	special: {
+		goal: 'Long jump 10 m',
+		done: (run) => (run.longJump ?? 0) >= 10,
+	},
 	cheerers: CHEERERS,
 	look: {
 		stadium: true,
 		ground: TRACK_GROUND,
 	},
-	...layOut(),
+	// A sweatband, high over a hurdle past halfway: too high to jump for,
+	// only got by bouncing up off someone's head.
+	...withHat(
+		layOut(),
+		'sweatband',
+		({ obstacles }) => {
+			const hurdle = obstacles.find(
+				(o) =>
+					o.kind === 'hurdle' &&
+					!o.tall &&
+					o.x > START_X + terrain.length * 0.55,
+			)
+			return { x: hurdle?.x ?? START_X + 12000, height: 180 }
+		},
+		0,
+	),
 }

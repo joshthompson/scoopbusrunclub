@@ -29,6 +29,7 @@ import { play } from '../sfx'
 import { Menu, OUTLINED, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { RunnerStage, nameSize } from '../ui/RunnerStage'
+import { onHover } from '../ui/hover'
 
 /** The row's next value along: `by` steps, wrapping round. */
 function step<T>(options: T[], current: T, by: number): T {
@@ -264,7 +265,7 @@ export function RunnerEditor(props: {
 										...styles.row,
 										...(isSelected() ? styles.rowSelected : {}),
 									}}
-									onMouseEnter={() => select(row)}
+									onMouseEnter={onHover(() => select(row))}
 								>
 									<span
 										style={{
@@ -340,12 +341,12 @@ export function RunnerEditor(props: {
 										...(which === 'delete' ? styles.actionDelete : {}),
 										...(isSelected() ? styles.actionSelected : {}),
 									}}
-									onMouseEnter={() => {
+									onMouseEnter={onHover(() => {
 										if (isSelected()) return
 										setSelection('actions')
 										setAction(which)
 										play('move')
-									}}
+									})}
 									onClick={() => doAction(which)}
 								>
 									{ACTION_LABELS[which]}
@@ -442,7 +443,7 @@ function ColourRow(props: {
 	return (
 		<>
 			<span style={styles.label}>{props.row.label}</span>
-			<span style={{ ...styles.value, gap: '4px' }}>
+			<span style={{ ...styles.value, gap: '3px' }}>
 				<For each={props.row.palette}>
 					{(colour) => (
 						<button
@@ -590,6 +591,9 @@ const styles = {
 	},
 	cursor: {
 		width: '18px',
+		// Kept, however long the row: or a long row of swatches squeezes it,
+		// and starts left of all the others.
+		'flex-shrink': 0,
 		'text-align': 'center',
 		animation: 'cursor-bob 0.6s ease-in-out infinite alternate',
 	},
@@ -598,7 +602,10 @@ const styles = {
 		cursor: 'text',
 	},
 	label: {
-		width: '150px',
+		// Room for the longest, "Bottoms colour", and never squeezed by a
+		// long row of swatches.
+		width: '172px',
+		'flex-shrink': 0,
 		'padding-top': '3px',
 	},
 	value: {

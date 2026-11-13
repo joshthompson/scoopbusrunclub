@@ -192,6 +192,11 @@ export const halloweenTown: CourseDefinition = {
 	blurb:
 		'Under a blood moon: open graves, Zombies coming at you, and Pumpkins to wear.',
 	terrain,
+	// Over the line with a Pumpkin still on: one stumble knocks it off.
+	special: {
+		goal: 'Finish wearing a pumpkin',
+		done: (run) => run.finished && run.hat === 'pumpkin',
+	},
 	runDirectors: ['august', 'keith'],
 	cheerers: CHEERERS,
 	// Skeletons, out for a run with everyone else.

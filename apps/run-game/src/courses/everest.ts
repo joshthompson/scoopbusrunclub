@@ -21,6 +21,7 @@ import {
 	tent,
 	yak,
 } from './kit/everestScenery'
+import { withHat } from './kit/hats'
 import { nearGap, scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
 import type { Course, CourseDefinition, Obstacle, Scenery } from './types'
@@ -255,6 +256,22 @@ const nearStep = (along: number, room = 220) =>
 const GOATS = [1500, 3150, 5300, 7350, 12250, 14950, 17050].map(
 	(along) => START_X + along,
 )
+
+/**
+ * Where the bobble hat is: wherever the mountain's flattest, a while after
+ * one of the goats, so it's a bounce up to it from where you are, not from
+ * way down the slope behind.
+ */
+const BOBBLE_HAT_AT = (() => {
+	let best = { x: GOATS[0] + 700, rise: Number.POSITIVE_INFINITY }
+	for (const goat of GOATS)
+		for (let x = goat + 500; x <= goat + 1100; x += 20) {
+			if (terrain.gaps.some((g) => g.to > x - 400 && g.from < x + 200)) continue
+			const rise = Math.abs(terrain.groundY(x + 300) - terrain.groundY(x - 300))
+			if (rise < best.rise) best = { x, rise }
+		}
+	return best.x
+})()
 
 /** Whether `x` is up a headwall: too steep to stand anything on, or put anything in the way. */
 const sheer = (x: number) => Math.abs(tilt(x)) > 0.5
@@ -497,5 +514,7 @@ export const everest: CourseDefinition = {
 			},
 		},
 	},
-	...layOut(),
+	// A bobble hat, high over a flat stretch up the mountain: too high to
+	// jump for, only got by bouncing up off someone's head.
+	...withHat(layOut(), 'bobbleHat', () => ({ x: BOBBLE_HAT_AT, height: 180 })),
 }

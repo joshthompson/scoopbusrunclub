@@ -1,8 +1,10 @@
 import { createSignal } from 'solid-js'
 import { forgetCustomRunners } from '../runners/customRunners'
 import { forgetCollected } from './collected'
+import { forgetSpecialGoals } from './goals'
 import { forgetHighScores } from './highScores'
 import { forgetIdentity } from './identity'
+import { forgetMedals } from './medals'
 import { forgetProgress } from './progress'
 
 import { STORAGE_PREFIX } from './storagePrefix'
@@ -79,6 +81,8 @@ export function clearLocalData() {
 	forgetCustomRunners()
 	forgetProgress()
 	forgetHighScores()
+	forgetMedals()
+	forgetSpecialGoals()
 	forgetCollected()
 	forgetIdentity()
 }

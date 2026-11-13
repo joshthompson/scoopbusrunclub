@@ -3,7 +3,10 @@ import { Menu, Panel } from '../ui/Menu'
 
 const CREDITS: { role: string; names: string[] }[] = [
 	{ role: 'Made by', names: ['Josh Thompson'] },
-	{ role: 'Play Testing', names: ['Alisa Vasileva'] },
+	{
+		role: 'Play Testing',
+		names: ['Alisa Vasileva', 'Olesia Vasileva', 'Jack Thompson'],
+	},
 ]
 
 export function CreditsScreen(props: { onBack: () => void }) {

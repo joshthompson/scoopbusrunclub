@@ -36,6 +36,13 @@ export const VERGE = 24
 /** Where the runner starts, and where the start line is. */
 export const START_X = 200
 /**
+ * As far back as anyone can go, the wrong way: a roadblock across the way
+ * there, on every course (see `createRoadblock`).
+ */
+export const LEFT_EDGE = START_X - 1300
+/** How far past the finish the camera goes, at most: where its view's right edge stops. */
+export const CAMERA_PAST_FINISH = 500
+/**
  * The runner is kept this far across the screen running right, leaving room
  * behind for the bus to show up in, and this far from the right running left.
  */
@@ -79,7 +86,7 @@ export const MAX_SPEED = 12
  * so a few boosts at once can't take one Player so far ahead that the bus
  * scoops everyone else off the back of the screen.
  */
-export const ROUND_MAX_SPEED = 8
+export const ROUND_MAX_SPEED = 7
 /** How fast anyone can go: lower in a multiplayer Round. */
 export const topSpeed = (world: { round: boolean }) =>
 	world.round ? ROUND_MAX_SPEED : MAX_SPEED
@@ -190,6 +197,11 @@ export const GOOSE_ALTITUDES = [96, 120, 142]
 export const GOOSE_CARRY_TICKS = 150
 export const GOOSE_CARRY_SPEED = 10
 export const GOOSE_CARRY_HEIGHT = 120
+/**
+ * How hard someone jumps off a dragon's back, pushing off it: from as high as
+ * it carries them, high enough to come down on a guard tower's roof.
+ */
+export const DRAGON_LEAP = 12
 export const GOOSE_POINTS = 250
 
 /** Land on a corgi and you ride it this long, galloping at this speed, over everything. */
@@ -352,6 +364,11 @@ export const COUNTDOWN_STEP_TICKS = 50
 export const PUMPKIN_BOOST = 2
 export const PUMPKIN_SPEED = 1.5
 export const PUMPKIN_POINTS = 100
+/** What a traffic cone costs, knocked over. */
+export const CONE_POINTS = 25
+/** A hat's points, and how far round one it's reached for. */
+export const HAT_POINTS = 150
+export const HAT_REACH = 14
 /** How tall a Mummy is, to run into: jump it. */
 export const MUMMY_HEIGHT = 50
 /** How fast Zombies walk towards you. */

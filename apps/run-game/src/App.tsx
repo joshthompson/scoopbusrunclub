@@ -9,6 +9,7 @@ import {
 } from 'solid-js'
 import { COURSES } from './courses'
 import type { Course } from './courses/types'
+import type { Hat } from './game/hats'
 import { playMenu, playTune, unlockMusic } from './music/music'
 import type { CustomRunner } from './runners/customRunners'
 import type { Playable } from './runners/playable'
@@ -111,7 +112,7 @@ export function App(props: {
 		},
 	})
 	/** Endless's next course, round to the first again after the last. */
-	const next = (play: Play, score: number): Play => {
+	const next = (play: Play, score: number, hat?: Hat): Play => {
 		// Practising: the next course along, to practise.
 		if (play.mode.kind !== 'endless') {
 			const index = COURSES.findIndex((course) => course.id === play.course.id)
@@ -123,7 +124,8 @@ export function App(props: {
 		return {
 			...play,
 			course: COURSES[cleared % COURSES.length],
-			mode: { ...play.mode, cleared, startScore: score },
+			// Whatever they've got on their head, still on it.
+			mode: { ...play.mode, cleared, startScore: score, hat },
 		}
 	}
 	/** The same again, as a new object so the game's rebuilt: Endless from the start. */
@@ -249,7 +251,7 @@ export function App(props: {
 						course={play.course}
 						runner={play.runner}
 						mode={play.mode}
-						onNext={(score) => setScreen(next(play, score))}
+						onNext={(score, hat) => setScreen(next(play, score, hat))}
 						onRetry={() => setScreen(retry(play))}
 						onQuit={go('select')}
 						onCourses={() =>

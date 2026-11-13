@@ -1,9 +1,13 @@
 import type { Course } from '../courses/types'
+import { rideLook } from '../draw/rideLook'
+import { BOARDS } from './boards'
 import type { FikaItem } from './fika'
+import { type Hat, WORN_FIKA } from './hats'
+import type { PickupHat } from './hats'
 
 /**
  * Everything that can be collected: each fika there is, each ride there is,
- * a Pumpkin, and a parkrun's barcode token. Counted each time it's had, and
+ * a Pumpkin, each hat, and a parkrun's barcode token. Counted each time it's had, and
  * kept (see `saved/collected`).
  */
 export type RideKind =
@@ -15,11 +19,14 @@ export type RideKind =
 	| 'bactrian'
 	/** On The Slopes, a snowboard, rather than skis, out of the rack. */
 	| 'snowboard'
+	/** In The Caves, a mine cart, along its rails. */
+	| 'minecart'
 
 export type Collectable =
 	| `fika:${FikaItem}`
 	| `ride:${RideKind}`
 	| 'pumpkin'
+	| `hat:${PickupHat}`
 	| 'barcode'
 
 /**
@@ -81,7 +88,23 @@ export const COLLECTABLE_NAMES = {
 	'ride:goose': 'Goose',
 	'ride:dragon': 'Dragon',
 	'ride:condor': 'Condor',
+	'ride:mole': 'Mole',
+	'ride:minecart': 'Mine cart',
 	pumpkin: 'Pumpkin',
+	'hat:miner': "Miner's helmet",
+	'hat:skiHelmet': 'Ski helmet',
+	'hat:pharaoh': "Pharaoh's headdress",
+	'hat:bambooHat': 'Bamboo hat',
+	'hat:flowerCrown': 'Flower crown',
+	'hat:sweatband': 'Sweatband',
+	'hat:guardHelmet': "Royal Guard's helmet",
+	'hat:antlers': 'Antlers',
+	'hat:propeller': 'Propeller beanie',
+	'hat:chullo': 'Chullo',
+	'hat:tentacle': 'Tentacle hat',
+	'hat:topHat': 'Top hat',
+	'hat:flyingHelmet': 'Flying helmet',
+	'hat:bobbleHat': 'Bobble hat',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
 
@@ -142,12 +165,70 @@ export const PICKUP_WORD = {
 	'ride:goose': 'Honk honk!',
 	'ride:dragon': 'Dragon ride!',
 	'ride:condor': 'Caught by a condor!',
+	'ride:mole': 'Dig dig!',
+	'ride:minecart': 'All aboard!',
 	'ride:goat': 'G.O.A.T.!',
 	'ride:skis': 'Skis on!',
 	'ride:snowboard': 'Shred!',
 	pumpkin: 'This is halloween!',
+	'hat:miner': "A miner's helmet!",
+	'hat:skiHelmet': 'Safety first!',
+	'hat:pharaoh': 'Walk like an Egyptian!',
+	'hat:bambooHat': 'Bamboo hat!',
+	'hat:flowerCrown': 'Glad midsommar!',
+	'hat:sweatband': 'Feel the burn!',
+	'hat:guardHelmet': 'Attention!',
+	'hat:antlers': 'Oh deer!',
+	'hat:propeller': 'Wheee!',
+	'hat:chullo': 'Toasty!',
+	'hat:tentacle': 'Tentacle!',
+	'hat:topHat': 'Chim chim cher-ee!',
+	'hat:flyingHelmet': 'Chocks away!',
+	'hat:bobbleHat': 'Toppluva!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>
 
 /** Every one, in order. */
 export const COLLECTABLES = Object.keys(COLLECTABLE_NAMES) as Collectable[]
+
+/**
+ * The collectables there are on a course, in the order they're shown: its
+ * fika, hats, Pumpkins and barcode, its Rides (a rarer one too, if it has
+ * one; skis and a snowboard, on a ski slope), the flyers over it, and a
+ * condor, off a Leap, or a mine cart, in a mine.
+ */
+export function courseCollectables(course: Course): Collectable[] {
+	const there = new Set<Collectable>()
+	for (const b of course.boosts) {
+		if (b.kind === 'fika') there.add(`fika:${b.item}`)
+		else if (b.kind === 'pumpkin') there.add('pumpkin')
+		else if (b.kind === 'hat') there.add(`hat:${b.hat}`)
+		else if (b.kind === 'barcode') there.add('barcode')
+	}
+	const rides = course.corgis?.length ?? 0
+	if (rides && course.ride === 'skis')
+		for (const board of BOARDS.slice(0, rides)) there.add(`ride:${board.kind}`)
+	else if (rides) {
+		there.add(`ride:${course.ride ?? 'corgi'}`)
+		const rare = rideLook(course).rare
+		if (rare) there.add(`ride:${rare.kind}`)
+	}
+	if (course.flyovers?.length) there.add(`ride:${course.flyer ?? 'goose'}`)
+	if (course.leap) there.add('ride:condor')
+	if (course.mine) there.add('ride:minecart')
+	return COLLECTABLES.filter((c) => there.has(c))
+}
+
+/**
+ * A course's own hat, for its collectables goal: its hat to find, its
+ * Pumpkin, or its captain's hat; none, if it's none.
+ */
+export function courseHat(course: Course): Hat | undefined {
+	for (const b of course.boosts) {
+		if (b.kind === 'hat') return { kind: b.hat }
+		if (b.kind === 'pumpkin') return { kind: 'pumpkin', carving: 1 }
+		if (b.kind === 'fika' && WORN_FIKA[b.item])
+			return { kind: WORN_FIKA[b.item] as Hat['kind'] }
+	}
+	return undefined
+}

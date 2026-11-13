@@ -1,8 +1,10 @@
+import { Show } from 'solid-js'
 import {
 	GIANT_FUR,
 	GIANT_FUR_DARK,
 	GIANT_FUR_LIGHT,
 } from '../../courses/kit/furbyScenery'
+import { pixelPolygon } from '../../courses/kit/pixelArt'
 
 /**
  * The Giant Furby's face, on the front of its head, facing left, at whoever's
@@ -21,6 +23,28 @@ const HINGE = 215
 const BEAK = '#f2a33a'
 const BEAK_DARK = '#c77a1e'
 const TONGUE = '#ff7fb0'
+/** How big its eye's pixels are: big, as it is. */
+const CELL = 4
+
+/** To the nearest pixel of its eye. */
+const snap = (n: number) => Math.round(n / CELL) * CELL
+
+/**
+ * An ellipse round `cx`, `cy`, `rx` across and `ry` down, in `CELL`s, a
+ * row of them at a time, as a path: pixel art, not a smooth curve.
+ */
+function blob(cx: number, cy: number, rx: number, ry: number) {
+	let d = ''
+	for (let y = snap(cy - ry); y < cy + ry; y += CELL) {
+		const across = (y + CELL / 2 - cy) / ry
+		if (Math.abs(across) >= 1) continue
+		const half = rx * Math.sqrt(1 - across * across)
+		const left = snap(cx - half)
+		const right = snap(cx + half)
+		if (right > left) d += `M${left},${y}H${right}v${CELL}H${left}Z`
+	}
+	return d
+}
 
 export function GiantFurbyFace(props: {
 	/** How far open its beak is, 0 to 1. */
@@ -31,9 +55,49 @@ export function GiantFurbyFace(props: {
 	look: { x: number; y: number }
 }) {
 	const hingeY = FACE_HEIGHT - HINGE
-	const eye = { x: FACE_FRONT + 80, y: FACE_HEIGHT - 285 }
+	const eye = { x: snap(FACE_FRONT + 80), y: snap(FACE_HEIGHT - 285) }
+	/** Where its iris and pupil are, looking: a whole pixel at a time. */
+	const iris = () => ({
+		x: eye.x + snap(props.look.x * 18),
+		y: eye.y + snap(props.look.y * 12),
+	})
+	const pupil = () => ({
+		x: eye.x + snap(props.look.x * 22),
+		y: eye.y + snap(props.look.y * 14),
+	})
 	/** Its beak hangs down over its mouth, shut, and swings up, open: up's clockwise, its tip being on the left. */
 	const angle = () => -50 + 65 * props.open
+	/** Its upper beak's corners, turned round its hinge by `angle`. */
+	const turned = (points: [number, number][]): [number, number][] => {
+		const a = (angle() * Math.PI) / 180
+		return points.map(([x, y]) => {
+			const dx = x - FACE_FRONT
+			const dy = y - hingeY
+			return [
+				FACE_FRONT + dx * Math.cos(a) - dy * Math.sin(a),
+				hingeY + dx * Math.sin(a) + dy * Math.cos(a),
+			]
+		})
+	}
+	const upperBeak = () =>
+		pixelPolygon(
+			turned([
+				[FACE_FRONT + 6, hingeY - 34],
+				[FACE_FRONT - 110, hingeY + 6],
+				[FACE_FRONT + 6, hingeY + 26],
+			]),
+			BEAK,
+			CELL,
+		) +
+		pixelPolygon(
+			turned([
+				[FACE_FRONT - 110, hingeY + 6],
+				[FACE_FRONT + 6, hingeY + 16],
+				[FACE_FRONT + 6, hingeY + 26],
+			]),
+			BEAK_DARK,
+			CELL,
+		)
 	return (
 		<svg
 			width={FACE_WIDTH}
@@ -59,60 +123,70 @@ export function GiantFurbyFace(props: {
 				fill="#e0558f"
 			/>
 			{/* Its lower beak, jutting out along the floor. */}
-			<polygon
-				points={`${FACE_FRONT},${FACE_HEIGHT - 30} ${FACE_FRONT - 70},${FACE_HEIGHT - 6} ${FACE_FRONT - 70},${FACE_HEIGHT} ${FACE_FRONT},${FACE_HEIGHT}`}
-				fill={BEAK}
+			<g
+				innerHTML={
+					pixelPolygon(
+						[
+							[FACE_FRONT, FACE_HEIGHT - 30],
+							[FACE_FRONT - 70, FACE_HEIGHT - 6],
+							[FACE_FRONT - 70, FACE_HEIGHT],
+							[FACE_FRONT, FACE_HEIGHT],
+						],
+						BEAK,
+						CELL,
+					) +
+					pixelPolygon(
+						[
+							[FACE_FRONT - 70, FACE_HEIGHT - 6],
+							[FACE_FRONT, FACE_HEIGHT - 8],
+							[FACE_FRONT, FACE_HEIGHT],
+							[FACE_FRONT - 70, FACE_HEIGHT],
+						],
+						BEAK_DARK,
+						CELL,
+					)
+				}
 			/>
-			<polygon
-				points={`${FACE_FRONT - 70},${FACE_HEIGHT - 6} ${FACE_FRONT},${FACE_HEIGHT - 8} ${FACE_FRONT},${FACE_HEIGHT} ${FACE_FRONT - 70},${FACE_HEIGHT}`}
-				fill={BEAK_DARK}
-			/>
-			{/* Its eye: white, its iris, its pupil and the light in it. */}
-			<ellipse cx={eye.x} cy={eye.y} rx={58} ry={50} fill={GIANT_FUR_DARK} />
-			<ellipse cx={eye.x} cy={eye.y} rx={50} ry={42} fill="#ffffff" />
-			<circle
-				cx={eye.x + props.look.x * 18}
-				cy={eye.y + props.look.y * 12}
-				r={26}
-				fill="#3fc6b8"
-			/>
-			<circle
-				cx={eye.x + props.look.x * 22}
-				cy={eye.y + props.look.y * 14}
-				r={13}
-				fill="#1d1d1d"
-			/>
+			{/* Its eye, in pixels as big as it is: white, its iris, its pupil
+			    and the light in it, a ring of shade round it. */}
+			<path d={blob(eye.x, eye.y, 58, 50)} fill={GIANT_FUR_DARK} />
+			<path d={blob(eye.x, eye.y, 50, 42)} fill="#ffffff" />
+			<path d={blob(eye.x, eye.y + 30, 44, 14)} fill="#e6eef5" />
+			<path d={blob(iris().x, iris().y, 26, 26)} fill="#3fc6b8" />
+			<path d={blob(iris().x - 6, iris().y - 6, 14, 12)} fill="#6fe0d4" />
+			<path d={blob(pupil().x, pupil().y, 13, 13)} fill="#1d1d1d" />
 			<rect
-				x={eye.x + props.look.x * 22 + 2}
-				y={eye.y + props.look.y * 14 - 10}
-				width={8}
-				height={8}
+				x={pupil().x + CELL}
+				y={pupil().y - 3 * CELL}
+				width={2 * CELL}
+				height={2 * CELL}
 				fill="#ffffff"
 			/>
 			{/* Its eyelid, down over it, blinking. */}
-			<ellipse
-				cx={eye.x}
-				cy={eye.y}
-				rx={52}
-				ry={props.blink ? 46 : 0}
-				fill={GIANT_FUR}
-			/>
+			<Show when={props.blink}>
+				<path d={blob(eye.x, eye.y, 54, 46)} fill={GIANT_FUR} />
+				<path
+					d={`M${eye.x - 52},${eye.y}h104v${CELL}h-104Z`}
+					fill={GIANT_FUR_DARK}
+				/>
+			</Show>
 			{/* A tuft over its eye. */}
-			<polygon
-				points={`${eye.x - 60},${eye.y - 46} ${eye.x - 20},${eye.y - 70} ${eye.x + 30},${eye.y - 64} ${eye.x + 60},${eye.y - 44} ${eye.x},${eye.y - 52}`}
-				fill={GIANT_FUR_LIGHT}
+			<g
+				innerHTML={pixelPolygon(
+					[
+						[eye.x - 60, eye.y - 46],
+						[eye.x - 20, eye.y - 70],
+						[eye.x + 30, eye.y - 64],
+						[eye.x + 60, eye.y - 44],
+						[eye.x, eye.y - 52],
+					],
+					GIANT_FUR_LIGHT,
+					CELL,
+				)}
 			/>
-			{/* Its upper beak, on its hinge, hanging down over its mouth or swung up. */}
-			<g transform={`rotate(${angle()} ${FACE_FRONT} ${hingeY})`}>
-				<polygon
-					points={`${FACE_FRONT + 6},${hingeY - 34} ${FACE_FRONT - 110},${hingeY + 6} ${FACE_FRONT + 6},${hingeY + 26}`}
-					fill={BEAK}
-				/>
-				<polygon
-					points={`${FACE_FRONT - 110},${hingeY + 6} ${FACE_FRONT + 6},${hingeY + 16} ${FACE_FRONT + 6},${hingeY + 26}`}
-					fill={BEAK_DARK}
-				/>
-			</g>
+			{/* Its upper beak, on its hinge, hanging down over its mouth or
+			    swung up: turned on it first, then drawn in its pixels. */}
+			<g innerHTML={upperBeak()} />
 		</svg>
 	)
 }

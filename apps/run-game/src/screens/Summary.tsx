@@ -1,11 +1,15 @@
 import { For, type JSX, Show } from 'solid-js'
+import { SpecialGoalArt } from '../draw/art/goals'
+import { MedalArt } from '../draw/art/medal'
 import { flyerLook } from '../draw/flyerLook'
 import { rideLook } from '../draw/rideLook'
 import { PX_PER_M } from '../game/constants'
+import { type Medal, medalScores } from '../game/medals'
 import type { BonusKind, Result, World } from '../game/world'
 import { ONLINE, type Tally } from '../online/runScores'
 import { identity } from '../saved/identity'
 import { ScoreFace } from '../ui/ScoreFace'
+import { onHover } from '../ui/hover'
 import type { Mode } from './Game'
 
 /** What the end of a course has to say about the high score tables. */
@@ -18,6 +22,12 @@ export interface Placing {
 	endlessPlace?: number
 	/** A course just unlocked for practice, by finishing the one before it. */
 	unlocked?: string
+	/** The medal this go got, if any, and whether it's the course's best yet. */
+	medal?: Medal
+	newMedal?: boolean
+	/** Whether this go did the course's special goal, and whether that's for the first time. */
+	special?: boolean
+	newSpecial?: boolean
 }
 
 /** Scores from the end of a course that would go on the online tables, and how sending them's going. */
@@ -49,8 +59,12 @@ const BONUS_LABELS: Record<BonusKind, string> = {
 	fika: 'Fika',
 	cheers: 'Cheers',
 	corgis: 'Corgi rides',
+	carts: 'Mine cart rides',
+	cones: 'Cones knocked over',
+	football: 'Football to the finish',
 	geese: 'Goose rides',
 	pumpkins: 'Pumpkins',
+	hats: 'Hats',
 	barcodes: 'Barcode',
 	rings: 'Rings',
 	tricks: 'Tricks landed',
@@ -62,6 +76,11 @@ const BONUS_LABELS: Record<BonusKind, string> = {
 }
 
 const number = (n: number) => n.toLocaleString('en')
+const MEDAL_NAMES: Record<Medal, string> = {
+	bronze: 'Bronze',
+	silver: 'Silver',
+	gold: 'Gold',
+}
 const km = (px: number) => (Math.max(0, px) / PX_PER_M / 1000).toFixed(2)
 const metres = (px: number) => `${Math.max(0, Math.round(px / PX_PER_M))} m`
 
@@ -85,6 +104,8 @@ export function Summary(props: {
 }) {
 	const { world } = props
 	const finished = () => props.result.kind === 'finished'
+	/** What its silver and gold take. */
+	const targets = medalScores(world.course)
 	const endless = props.mode.kind === 'endless' ? props.mode : undefined
 
 	/** Each line of the points: the distance, then each bonus had. */
@@ -132,7 +153,7 @@ export function Summary(props: {
 		<button
 			type="button"
 			style={{ ...style, ...(i === props.picked ? on : {}) }}
-			onMouseEnter={() => props.onPick(i)}
+			onMouseEnter={onHover(() => props.onPick(i))}
 			onClick={action.choose}
 		>
 			{action.label}
@@ -166,6 +187,48 @@ export function Summary(props: {
 							{world.runner.name} beat the bus by {metres(props.result.busGap)}
 						</Show>
 					</div>
+					{/* The medal it got: or a shadow of one, and what it'd take. */}
+					<div style={styles.medal}>
+						<MedalArt medal={props.placing?.medal} scale={3} />
+						<div style={styles.medalText}>
+							<span style={styles.medalName}>
+								{props.placing?.medal
+									? `${MEDAL_NAMES[props.placing.medal]} medal!${props.placing.newMedal ? ' New best' : ''}`
+									: 'No medal'}
+							</span>
+							<span style={styles.medalTargets}>
+								Bronze {number(targets.bronze)} · Silver{' '}
+								{number(targets.silver)} · Gold {number(targets.gold)}
+							</span>
+						</div>
+					</div>
+					{/* Its special goal, if it has one: done this go, or not. */}
+					<Show when={world.course.special}>
+						{(special) => (
+							<div style={styles.medal}>
+								<SpecialGoalArt
+									course={world.course.id}
+									done={props.placing?.special}
+								/>
+								<span
+									style={{
+										...styles.medalTargets,
+										'font-size': '14px',
+										...(props.placing?.special
+											? { color: '#ffd23f', opacity: 1 }
+											: {}),
+									}}
+								>
+									{special().goal}
+									{props.placing?.special
+										? props.placing.newSpecial
+											? ': done! First time!'
+											: ': done!'
+										: ''}
+								</span>
+							</div>
+						)}
+					</Show>
 				</div>
 
 				<div
@@ -312,6 +375,21 @@ const styles = {
 	heading: { 'text-align': 'center' },
 	title: { 'font-size': '40px', 'line-height': 1 },
 	subtitle: { 'margin-top': '6px', 'font-size': '16px', opacity: 0.85 },
+	medal: {
+		display: 'flex',
+		'align-items': 'center',
+		'justify-content': 'center',
+		gap: '10px',
+		'margin-top': '8px',
+	},
+	medalText: {
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'flex-start',
+		gap: '2px',
+	},
+	medalName: { 'font-size': '18px', color: '#ffd23f' },
+	medalTargets: { 'font-size': '12px', opacity: 0.75 },
 	/** The points, in two columns. */
 	points: {
 		display: 'grid',

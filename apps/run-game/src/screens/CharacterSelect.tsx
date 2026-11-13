@@ -6,6 +6,7 @@ import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { RunnerStage, nameSize } from '../ui/RunnerStage'
+import { onHover } from '../ui/hover'
 
 /** A card on the select screen: making a new runner, or someone to run as. */
 type Entry =
@@ -218,12 +219,12 @@ export function CharacterSelect(props: {
 											...(entry.kind === 'new' ? styles.cardNew : {}),
 											...(isSelected() ? styles.cardSelected : {}),
 										}}
-										onMouseEnter={() => {
+										onMouseEnter={onHover(() => {
 											if (!isSelected() && !touchScreen()) {
 												play('move')
 												props.onSelect(entry.id)
 											}
-										}}
+										})}
 										onClick={() => tap(entry)}
 									>
 										<Show

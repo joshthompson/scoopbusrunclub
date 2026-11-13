@@ -24,6 +24,7 @@ export function scatter(options: {
 				placed.kind === 'fika' ||
 				placed.kind === 'cheer' ||
 				placed.kind === 'pumpkin' ||
+				placed.kind === 'hat' ||
 				placed.kind === 'barcode' ||
 				placed.kind === 'ring' ||
 				placed.kind === 'gate'

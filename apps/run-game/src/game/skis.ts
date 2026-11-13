@@ -15,6 +15,7 @@ import {
 	HAZARD_POINTS,
 	HITBOX_HALF_WIDTH,
 	JUMP_SPEED,
+	LEFT_EDGE,
 	PACER_FASTEST,
 	PACER_SLOWEST,
 	PX_PER_M,
@@ -44,7 +45,7 @@ import {
 	WIPEOUT_TICKS,
 	topSpeed,
 } from './constants'
-import { boost, scored } from './step'
+import { boost, scored, shielded } from './step'
 import type { Body, Pacer, Racer, TrickKind, World } from './world'
 
 /**
@@ -228,6 +229,8 @@ function wipeout(world: World, racer: Racer) {
 	b.turn = 0
 	b.airTricks = []
 	b.launchX = undefined
+	// A helmet takes the knock: down on their skis after all, and it's off.
+	if (shielded(world, b)) return
 	b.wipeout = WIPEOUT_TICKS
 	b.stumble = WIPEOUT_TICKS
 	b.ducking = false
@@ -354,8 +357,6 @@ const FALL_DEPTH = 160
 const WALL_GIVE = 14
 /** How fast they glide on, over the line, and how quickly they settle to it. */
 const RUN_OFF_SPEED = 6
-/** As far back as the ground goes. */
-const LEFT_EDGE = -1100
 
 /**
  * Off the snow, into the air: where they took off from, if it's the ski

@@ -2,6 +2,7 @@ import type { JSX } from 'solid-js'
 import { COURSES } from '../courses'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
+import { hatCode, hatFromCode } from '../game/hats'
 import {
 	type Flyer,
 	type Out,
@@ -24,14 +25,14 @@ import { SKELETON_SPRITE } from '../runners/skeleton'
 import { play } from '../sfx'
 import { RoundHud } from './Round'
 import {
-	PUMPKIN_FLAG,
+	HAT_FLAG,
 	type PacerIntro,
 	type RaceFrame,
 	type RaceStart,
 	type RacerIntro,
 	fromSkiState,
 } from './protocol'
-import { CORGI_STATES, FLYER_STATES, FURBY_STATES } from './stream'
+import { CART_STATES, CORGI_STATES, FLYER_STATES, FURBY_STATES } from './stream'
 
 /**
  * A Remote Player's view of the race: the Host's, drawn from the frames it
@@ -106,7 +107,7 @@ export default function Mirror(props: {
 			colour: intro.colour,
 			number: intro.number,
 		})),
-		{ round: true },
+		{ round: true, baby: start.baby },
 	)
 	// Not this phone's own pack: the Host's.
 	const intros = new Map(start.pack.map((p) => [p.id, p]))
@@ -180,10 +181,13 @@ export default function Mirror(props: {
 			body.squashed = flags & 64 ? 1 : 0
 			body.gliding = !!(flags & 128)
 			// Knocked off since the last frame: flying.
-			const pumpkin = Math.floor(flags / PUMPKIN_FLAG)
-			if (body.pumpkin && !pumpkin)
-				body.lostPumpkin = { carving: body.pumpkin, at: world.ticks() }
-			body.pumpkin = pumpkin
+			// In a mine cart: which doesn't matter here, only that they are.
+			body.cart = flags & 256 ? 0 : undefined
+			// Knocked off since the last frame, or swapped: flying.
+			const hat = Math.floor(flags / HAT_FLAG)
+			if (body.hat && hatCode(body.hat) !== hat)
+				body.lostHat = { hat: body.hat, at: world.ticks() }
+			body.hat = hatFromCode(hat)
 			body.stumble = from[4]
 			body.spin = mix(from[5], to[5])
 			racer.out = OUTS[from[6]]
@@ -215,6 +219,7 @@ export default function Mirror(props: {
 			pacer.grounded = !!(from[4] & 1)
 			pacer.scooped = !!(from[4] & 2)
 			pacer.gliding = !!(from[4] & 4)
+			pacer.ducking = !!(from[4] & 8)
 			pacer.dazed = from[5]
 			pacer.spin = mix(from[6], to[6])
 			const ski = fromSkiState(from[7] ?? 0, TRICK_KINDS)
@@ -236,6 +241,23 @@ export default function Mirror(props: {
 			furby.spin = mix(from[4], to[4])
 			furby.landed = from[5]
 			furby.timer = from[6]
+		})
+		if (world.ball && a.ball) {
+			const to = b.ball ?? a.ball
+			world.ball.x = mix(a.ball[0], to[0])
+			world.ball.y = mix(a.ball[1], to[1])
+			world.ball.spin = mix(a.ball[2], to[2])
+			world.ball.out =
+				a.ball[3] === 1 ? 'home' : a.ball[3] === 2 ? 'scooped' : undefined
+		}
+		world.carts.forEach((cart, i) => {
+			const from = a.carts?.[i]
+			if (!from) return
+			const to = b.carts?.[i] ?? from
+			cart.x = mix(from[0], to[0])
+			cart.feetY = mix(from[1], to[1])
+			cart.state = CART_STATES[from[2]] ?? 'waiting'
+			cart.spin = mix(from[3], to[3])
 		})
 		world.corgis.forEach((corgi, i) => {
 			const from = a.corgis[i]

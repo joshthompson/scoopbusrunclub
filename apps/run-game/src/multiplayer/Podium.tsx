@@ -3,6 +3,7 @@ import { play } from '../sfx'
 import { OUTLINED } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { nameSize } from '../ui/RunnerStage'
+import { onHover } from '../ui/hover'
 import { Medal, ordinal, pts } from './Medal'
 import { type Placing, standingsOf } from './Results'
 import { COLOURS, type Seat, seatPlayable } from './room'
@@ -149,7 +150,7 @@ export function Podium(props: {
 									? { background: '#ffd23f', color: 'var(--ink)' }
 									: {}),
 							}}
-							onMouseEnter={() => setPicked(i())}
+							onMouseEnter={onHover(() => setPicked(i()))}
 							onClick={button.choose}
 						>
 							{button.label}

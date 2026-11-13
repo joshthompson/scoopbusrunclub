@@ -29,10 +29,10 @@ export function statusText(view: PadView) {
 			return view.place ? `Scooped! ${ordinal(view.place)}${of}` : 'Scooped!'
 		case 'fallen':
 			return view.place ? `Fell! ${ordinal(view.place)}${of}` : 'Fell!'
-		case 'finished':
-			return view.place
-				? `Beat the bus! ${ordinal(view.place)}${of}`
-				: 'Beat the bus!'
+		case 'finished': {
+			const word = view.gameMode === 'baby' ? 'Finished!' : 'Beat the bus!'
+			return view.place ? `${word} ${ordinal(view.place)}${of}` : word
+		}
 		case 'won':
 			return 'You won!'
 	}

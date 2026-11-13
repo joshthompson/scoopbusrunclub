@@ -15,6 +15,7 @@ import {
 import { hasCollected, timesCollected } from '../saved/collected'
 import { play } from '../sfx'
 import { Menu, Panel } from '../ui/Menu'
+import { onHover } from '../ui/hover'
 
 /** How many cards to a row. */
 const COLUMNS = 7
@@ -97,7 +98,7 @@ export function CollectablesScreen(props: { onBack: () => void }) {
 				</div>
 				<div
 					style={{ width: '200px', margin: '6px auto 0' }}
-					onMouseEnter={() => select(COLLECTABLES.length)}
+					onMouseEnter={onHover(() => select(COLLECTABLES.length))}
 				>
 					<Menu
 						items={[{ label: 'Back', choose: props.onBack }]}
@@ -129,7 +130,7 @@ function Card(props: {
 		<div
 			ref={props.ref}
 			style={{ ...styles.card, ...(props.selected ? styles.selected : {}) }}
-			onMouseEnter={props.onHover}
+			onMouseEnter={onHover(props.onHover)}
 		>
 			<div
 				style={{

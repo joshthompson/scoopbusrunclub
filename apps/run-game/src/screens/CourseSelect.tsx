@@ -8,14 +8,30 @@ import {
 	onCleanup,
 } from 'solid-js'
 import { COURSES } from '../courses'
+import { levelCollectables } from '../courses/collectables'
 import type { Course } from '../courses/types'
+import {
+	COLLECTABLES_ICON,
+	type GoalIcon,
+	GoalIconArt,
+	SpecialGoalArt,
+} from '../draw/art/goals'
+import { HatPicture, hatArt } from '../draw/art/hats'
+import { MedalArt } from '../draw/art/medal'
+import { StarArt } from '../draw/art/star'
+import { courseHat } from '../game/collectables'
+import { type Medal, medalScores, nextMedal } from '../game/medals'
 import { touchScreen } from '../input'
 import type { Playable } from '../runners/playable'
+import { hasCollected } from '../saved/collected'
+import { specialDone } from '../saved/goals'
 import { type TableId, table, topScore } from '../saved/highScores'
+import { bestMedal } from '../saved/medals'
 import { isUnlocked } from '../saved/progress'
 import { play } from '../sfx'
 import { CoursePreview } from '../ui/CoursePreview'
 import { OUTLINED, Panel } from '../ui/Menu'
+import { onHover } from '../ui/hover'
 
 /** What's picked: Endless, or a course's id, to practise it. */
 export type RunChoice = string
@@ -106,6 +122,43 @@ export function CourseSelect(props: {
 	window.addEventListener('keydown', onKey)
 	onCleanup(() => window.removeEventListener('keydown', onKey))
 
+	/**
+	 * How many of a course's own collectables have been had, of how many
+	 * it has: only those not on a course before it (see `levelCollectables`).
+	 */
+	const found = (course: Course) => {
+		const all = levelCollectables(course)
+		return { had: all.filter(hasCollected).length, of: all.length }
+	}
+
+	/** Whether every one of a course's collectables has been had. */
+	const allFound = (course: Course) => {
+		const { had, of } = found(course)
+		return had === of
+	}
+
+	/**
+	 * Whether a course is all done: its gold medal, every one of its
+	 * collectables, and its special goal, if it has one.
+	 */
+	const allDone = (course: Course) =>
+		bestMedal(course.id) === 'gold' &&
+		allFound(course) &&
+		(!course.special || specialDone(course.id))
+
+	/**
+	 * A course's score goal, said: the medal got, and the points the next
+	 * one up takes, if there's one.
+	 */
+	const scoreGoal = (course: Course) => {
+		const best = bestMedal(course.id)
+		const next = nextMedal(best)
+		const got = best ? `${MEDAL_NAMES[best]} score!` : 'No medal yet'
+		if (!next) return { got }
+		const points = medalScores(course)[next].toLocaleString('en')
+		return { got, next: `(${points} for ${MEDAL_NAMES[next]})` }
+	}
+
 	/** The course before one, which has to be finished to unlock it. */
 	const before = (course: Course) => COURSES[course.number - 2]?.name
 
@@ -121,7 +174,7 @@ export function CourseSelect(props: {
 				...(open(choice) ? {} : styles.locked),
 				...(props.selected === choice ? styles.rowSelected : {}),
 			}}
-			onMouseEnter={() => !touchScreen() && select(choice)}
+			onMouseEnter={onHover(() => !touchScreen() && select(choice))}
 			onClick={() => tap(choice)}
 		>
 			{content}
@@ -185,6 +238,20 @@ export function CourseSelect(props: {
 												: 'No runs yet'}
 									</span>
 								</span>
+								{/* Its best medal, at the row's end: empty till there's
+								    one, and a star, once it's all done. */}
+								<Show when={open(course.id)}>
+									<span style={styles.rowMedal}>
+										<Show
+											when={allDone(course)}
+											fallback={
+												<MedalArt medal={bestMedal(course.id)} scale={1.5} />
+											}
+										>
+											<StarArt scale={1.5} />
+										</Show>
+									</span>
+								</Show>
 							</>,
 						)
 					}
@@ -241,8 +308,59 @@ export function CourseSelect(props: {
 					{picked()?.blurb ??
 						'Every course in turn, your points carried on, until the bus gets you.'}
 				</div>
-
-				<TopScores id={props.selected} />
+				{/* Down one side, its medals, each and what it takes, in colour
+				    once got, and how many of its collectables have been found;
+				    down the other, the top scores on it. */}
+				<div style={styles.lower}>
+					<Show when={picked()}>
+						{(course) => (
+							<div style={styles.stats}>
+								<div style={styles.scoresLabel}>Your goals</div>
+								{/* The medal it's got, and the points for the next. */}
+								<div style={styles.goalLine}>
+									<span style={styles.goalText}>
+										{scoreGoal(course()).got}{' '}
+										<span style={styles.nextGoal}>
+											{scoreGoal(course()).next}
+										</span>
+									</span>
+									<span style={styles.goalIcon}>
+										<MedalArt medal={bestMedal(course().id)} scale={1} />
+									</span>
+								</div>
+								{/* Its collectables found, its own hat once they all are. */}
+								<div style={styles.goalLine}>
+									<span style={styles.goalText}>
+										{found(course()).had}/{found(course()).of} Collectables
+									</span>
+									<Show when={allFound(course())}>
+										<span style={styles.goalIcon}>
+											<GoalHat course={course()} done size={GOAL_ICON} />
+										</span>
+									</Show>
+								</div>
+								{/* Its special goal, if it has one, its picture once it's done. */}
+								<Show when={course().special}>
+									{(special) => (
+										<div style={styles.goalLine}>
+											<span style={styles.goalText}>{special().goal}</span>
+											<Show when={specialDone(course().id)}>
+												<span style={styles.goalIcon}>
+													<SpecialGoalArt
+														course={course().id}
+														done
+														size={GOAL_ICON}
+													/>
+												</span>
+											</Show>
+										</div>
+									)}
+								</Show>
+							</div>
+						)}
+					</Show>
+					<TopScores id={props.selected} />
+				</div>
 			</Panel>
 
 			<div style={styles.hint}>
@@ -252,6 +370,12 @@ export function CourseSelect(props: {
 			</div>
 		</div>
 	)
+}
+
+const MEDAL_NAMES: Record<Medal, string> = {
+	bronze: 'Bronze',
+	silver: 'Silver',
+	gold: 'Gold',
 }
 
 /** The top three in a table, with a word if it's empty. */
@@ -296,7 +420,10 @@ function TopScores(props: { id: TableId }) {
  * A course's name in the list, on its one line: smaller if it's long, so
  * it all fits ("Great Wall of China"), rather than being cut off.
  */
-const rowNameSize = (name: string) => (name.length > 15 ? 16 : 20)
+const rowNameSize = (name: string) => (name.length > 13 ? 16 : 20)
+
+/** How big each goal's picture is, at most, beside it. */
+const GOAL_ICON = 16
 
 const styles = {
 	screen: {
@@ -386,7 +513,10 @@ const styles = {
 		height: '28px',
 		display: 'grid',
 		'place-items': 'center',
-		'padding-top': '3px',
+		// Its digits are drawn 2 px down their 16 px line, and none under
+		// it: up by half that, to sit in the middle.
+		'line-height': 1,
+		'padding-bottom': '2px',
 		'box-sizing': 'border-box',
 		background: 'var(--ink)',
 		color: 'white',
@@ -407,6 +537,53 @@ const styles = {
 		'text-overflow': 'ellipsis',
 		'white-space': 'nowrap',
 	},
+	/** Medals and collectables down one side, the top scores down the other. */
+	lower: {
+		display: 'flex',
+		gap: '16px',
+		// As tall as what's in it: the preview has the rest.
+		flex: '0 0 auto',
+		'min-height': 0,
+		'padding-top': '6px',
+		'border-top': '2px solid rgba(255, 255, 255, 0.2)',
+	},
+	/** A course's medals, and its collectables found. */
+	stats: {
+		display: 'flex',
+		'flex-direction': 'column',
+		gap: '3px',
+		flex: 1.3,
+		'min-width': 0,
+	},
+	/** A row's medal, or its star, at its end, as wide whichever it is. */
+	rowMedal: {
+		display: 'grid',
+		'place-items': 'center',
+		width: '18px',
+		'flex-shrink': 0,
+	},
+	/** Each of a course's goals: how it's doing, and its icon at the end. */
+	goalLine: {
+		display: 'flex',
+		'align-items': 'center',
+		'justify-content': 'space-between',
+		gap: '10px',
+		// As tall as a top score's line, alongside.
+		'min-height': '18px',
+		'font-size': '15px',
+	},
+	goalText: { opacity: 0.9 },
+	/** Each goal's picture, in a box as big as any's, so they all line up. */
+	goalIcon: {
+		display: 'inline-grid',
+		'place-items': 'center',
+		width: `${GOAL_ICON}px`,
+		height: `${GOAL_ICON}px`,
+		'flex-shrink': 0,
+		'line-height': 0,
+	},
+	/** What the next medal up takes: quieter than the medal got. */
+	nextGoal: { color: 'rgba(255, 255, 255, 0.5)' },
 	rowDetail: {
 		'font-family': '"Cabin", sans-serif',
 		'font-size': '12px',
@@ -491,12 +668,10 @@ const styles = {
 		'flex-direction': 'column',
 		gap: '3px',
 		position: 'relative',
-		flex: '0 1 auto',
+		flex: 1,
 		'min-height': 0,
 		'overflow-y': 'auto',
 		'scrollbar-width': 'thin',
-		'padding-top': '6px',
-		'border-top': '2px solid rgba(255, 255, 255, 0.2)',
 	},
 	scoresLabel: {
 		'font-size': '12px',
@@ -555,3 +730,56 @@ const styles = {
 		'white-space': 'nowrap',
 	},
 } satisfies Record<string, JSX.CSSProperties>
+
+/**
+ * A course's own hat, for its collectables goal, made to fit in `size` px:
+ * a shadow of it, till all of them are found.
+ */
+function GoalHat(props: { course: Course; done: boolean; size: number }) {
+	const hat = () => courseHat(props.course)
+	// Or something else in its place, where it's the special goal's picture.
+	const instead = () => COLLECTABLES_ICON[props.course.id]
+	return (
+		<Show
+			when={!instead()}
+			fallback={
+				<GoalIconArt
+					icon={instead() as GoalIcon}
+					done={props.done}
+					size={props.size}
+				/>
+			}
+		>
+			<span
+				style={{
+					display: 'inline-grid',
+					'place-items': 'center',
+					width: `${props.size}px`,
+					height: `${props.size}px`,
+					'flex-shrink': 0,
+					filter: props.done ? undefined : 'brightness(0) opacity(0.35)',
+				}}
+			>
+				<Show when={hat()}>
+					{(on) => {
+						const art = () => hatArt(on())
+						const fit = () =>
+							Math.min(1, props.size / Math.max(art().width, art().height))
+						return (
+							<span
+								style={{
+									position: 'relative',
+									width: `${art().width}px`,
+									height: `${art().height}px`,
+									transform: `scale(${fit()})`,
+								}}
+							>
+								<HatPicture hat={on()} still />
+							</span>
+						)
+					}}
+				</Show>
+			</span>
+		</Show>
+	)
+}

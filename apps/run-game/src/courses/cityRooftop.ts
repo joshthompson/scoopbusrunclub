@@ -17,6 +17,7 @@ import waterTower from '../assets/rooftop/water-tower.png'
 import { GROUND_Y, START_X } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { type Block, createRooftops } from '../game/terrain'
+import { withHat } from './kit/hats'
 import { seeded } from './kit/seeded'
 import { swing } from './kit/swing'
 import type {
@@ -310,5 +311,17 @@ export const cityRooftop: CourseDefinition = {
 		// Pigeons, not geese.
 		geese: 'grayscale(1) brightness(0.9)',
 	},
-	...layOut(),
+	// A chimney sweep's top hat, high over a vent on a roof: stop on it,
+	// and it fires you straight up to it; running on over it, you're
+	// carried on past under it.
+	...withHat(
+		layOut(),
+		'topHat',
+		({ obstacles }) => {
+			const vents = obstacles.filter((o) => o.kind === 'steam')
+			const vent = vents[Math.min(3, vents.length - 1)]
+			return { x: vent?.x ?? START_X + 8000, height: 240 }
+		},
+		0,
+	),
 }

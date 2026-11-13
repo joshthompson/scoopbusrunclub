@@ -1,5 +1,6 @@
 import type { RunnerName } from '@/data/runners'
 import type { FikaItem } from '../game/fika'
+import type { PickupHat } from '../game/hats'
 import type { Terrain } from '../game/terrain'
 
 /** Something in the way on the course, at `x` along it: jump it or duck it, or stumble. */
@@ -117,6 +118,13 @@ export type Obstacle =
 	 * stumble for you and gone for whoever comes after.
 	 */
 	| { kind: 'snowman'; x: number }
+	/**
+	 * A traffic cone, stood in the way, `height` up on a platform, if it's
+	 * not on the Ground: run into it and it's knocked over, flat, costing
+	 * points and slowing you a little. In The Sewers, knocking every one
+	 * over is its special goal all the same.
+	 */
+	| { kind: 'cone'; x: number; height?: number }
 
 /** Something on the course, at `x` along it, that speeds you up. */
 export type Boost =
@@ -139,6 +147,11 @@ export type Boost =
 	 * keeping you faster until you next stumble. One at a time.
 	 */
 	| { kind: 'pumpkin'; x: number; carving: number }
+	/**
+	 * A hat, its brim `height` off the ground: run into it and it's on your
+	 * head, in place of whatever was (see `hats`). The first to it has it.
+	 */
+	| { kind: 'hat'; x: number; height: number; hat: PickupHat }
 	/**
 	 * A parkrun barcode token, `height` off the ground, just before a parkrun's
 	 * finish: one last big boost, as at a real parkrun, where it's scanned at the end.
@@ -460,6 +473,8 @@ export interface CourseLook {
 		 * bulkheads inside.
 		 */
 		tiles?: CaveTiles
+		/** Stalactites hanging off its Ceiling, wherever there's room under it. */
+		stalactites?: boolean
 		/**
 		 * No hole bored behind the bus: it fits through, all the way, as on a
 		 * ferry's decks, and what's on its back wall stays there.
@@ -638,6 +653,12 @@ export interface PlatformLook {
 	cable?: string
 	/** Candyfloss clouds, puffy, not slabs. */
 	cloud?: boolean
+	/**
+	 * Rock, rather than a slab: its lip `lit`, tufts of `moss` along it,
+	 * shaded darker down its face and at its ends; and a solid shelf of it,
+	 * rock dripping off its underside, `drip`.
+	 */
+	rock?: { lit: string; moss: string; drip: string }
 }
 
 /**
@@ -672,6 +693,11 @@ export interface PlatformDefinition {
 	 * down from the picture's: a little ferry, its deck to stand on.
 	 */
 	art?: { asset: string; width: number; height: number; top: number }
+	/**
+	 * A guard tower's roof (see `towerRoof`): drawn as the tower is, not as a
+	 * Platform. Up on one, off a dragon, is the Great Wall's special goal.
+	 */
+	tower?: boolean
 }
 
 /** Scenery along the course: a tree, a shrub, a flower, or a furby. */
@@ -701,14 +727,42 @@ export interface Scenery {
 	/** Stood over a Gap all the same, as nothing else is: a crumbled wall's breach. */
 	overGap?: boolean
 	/**
+	 * Something wide on a hill, stood on its top, the verge's edge, with
+	 * grass made up under it down to wherever the ground falls away under
+	 * its ends: the Copper Tents. Its `setBack` is the verge, unless given.
+	 */
+	footing?: boolean
+	/**
 	 * A name carved on it, a runner's, on its panel: `x`, `y`, `width` and
 	 * `height` in its own pixels. A tombstone's.
 	 */
 	carved?: [x: number, y: number, width: number, height: number]
 }
 
+/**
+ * Every course's id. A new course goes here too, and then wants its medals
+ * in `MEDAL_SCORES`, which won't compile without them.
+ */
+export type CourseId =
+	| 'haga'
+	| 'kristineberg'
+	| 'gamla-stan'
+	| 'huddinge'
+	| 'pyramids'
+	| 'halloween-town'
+	| 'scoop-line'
+	| 'caves'
+	| 'great-wall'
+	| 'furby-fields'
+	| 'machu-picchu'
+	| 'sewers'
+	| 'city-rooftop'
+	| 'cliff'
+	| 'everest'
+	| 'slopes'
+
 export interface Course {
-	id: string
+	id: CourseId
 	/** Its number, on the sign by the start: where it is in `COURSES`. */
 	number: number
 	name: string
@@ -756,6 +810,11 @@ export interface Course {
 	/** Where corgis sit, waiting for someone to hop on and ride them. */
 	corgis?: number[]
 	/**
+	 * How high over the Ground each of those sits waiting, if not on it: up
+	 * on a ledge, to get to first. The Caves' mole.
+	 */
+	corgisUp?: number[]
+	/**
 	 * What those are: corgis, or on Machu Picchu, llamas, at the Pyramids,
 	 * camels, in Huddinge's forest, deer, in Furby Fields, unicorns, on
 	 * The Cliff, gliders, parked along its top, or up Everest, mountain goats.
@@ -768,6 +827,12 @@ export interface Course {
 		| 'glider'
 		| 'unicorn'
 		| 'goat'
+		/**
+		 * In The Caves, moles: hopping along with you on their back, over and
+		 * over, and digging on through whatever rock's in the way, leaving
+		 * their way through it behind them (see `moles`).
+		 */
+		| 'mole'
 		/**
 		 * On The Slopes, skis and snowboards, stood up in the snow at the
 		 * top: run into a pair and they're yours, the whole way down (see
@@ -835,12 +900,48 @@ export interface Course {
 	 * one carries it down, `busFloor` its way down.
 	 */
 	leap?: { edge: number; catchAt: number; land: number }
+	/** A mine, with mine carts to ride: see `Mine`. */
+	mine?: Mine
+	/**
+	 * A football, lying on the path at `x`: run into it and you kick it on
+	 * ahead (see `Football`).
+	 */
+	football?: number
+	/** Its special goal, its own: see `SpecialGoal`. */
+	special?: SpecialGoal
 	/**
 	 * Where the bus digs its own way, its wheels on this rather than the
 	 * Ground: down through the street after whoever's dropped down a
 	 * manhole, and back up out of it. The Ground, where it's undefined.
 	 */
 	busFloor?: (x: number) => number | undefined
+}
+
+/**
+ * A mine, in The Caves: rails along the Ground, `from` to their buffers at
+ * `to`, and mine carts waiting on them at `carts`. Run into one and you're
+ * in it, riding it down the line, faster than you'd run, to the buffers,
+ * where you're out and on your way. Holding up at the points, you're sent
+ * up a line of its own instead, `secret`: up a trestle to a gallery high
+ * in the rock that there's no getting to any other way, a hat waiting in
+ * it, and back down to the rest.
+ */
+export interface Mine {
+	from: number
+	to: number
+	carts: number[]
+	secret: {
+		/** The points, where it leaves the line along the Ground, and where it's back on it. */
+		from: number
+		to: number
+		/** How high over the Ground its rail is, `x` along, between the two. */
+		height: (x: number) => number
+		/**
+		 * The gallery it runs along, hollowed out of the rock, `from` to
+		 * `to`: its floor's height over the Ground, and how high it is.
+		 */
+		gallery: { from: number; to: number; floor: number; room: number }
+	}
 }
 
 /** A rail on a ski slope, to grind along: see `Course['rails']`. */
@@ -873,6 +974,32 @@ export interface Hut {
 	above: number
 	back: string
 	front: string
+}
+
+/**
+ * A course's special goal, its own, beside its score and collectables
+ * goals: `goal`, what's to be done, said as such; done, by a go at it
+ * that `done` says did it.
+ */
+export interface SpecialGoal {
+	goal: string
+	done: (run: SpecialRun) => boolean
+}
+
+/** What a go at a course did, for its special goal to be judged by. */
+export interface SpecialRun {
+	/** Got round it. */
+	finished: boolean
+	/** How many of each bonus they had: `corgis` its rides, `fika`, `heads`. */
+	counts: Partial<Record<string, number>>
+	/** The hat on their head at the end, by its kind, if any. */
+	hat?: string
+	/** How far their long jump was measured, in metres, if they had one that landed in the sand. */
+	longJump?: number
+	/** The hats they had on getting onto a Ride, by kind: one each time. */
+	rodeWearing?: string[]
+	/** Stood on top of a guard tower, at some point. */
+	toppedTower?: boolean
 }
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */

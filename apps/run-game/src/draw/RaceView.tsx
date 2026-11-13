@@ -14,6 +14,8 @@ import { Fog } from './Fog'
 import { createLongJump } from './LongJump'
 import { SeaFront } from './Sea'
 import { Snow } from './Snow'
+import { createFootballSprite } from './football'
+import { createMine, createMineCarts, createMoleTrails } from './mine'
 import {
 	createBanner,
 	createBoost,
@@ -35,6 +37,7 @@ import {
 	createPlatforms,
 	createPlayer,
 	createRails,
+	createRoadblock,
 	createRunDirector,
 	createScenery,
 	createScoopArm,
@@ -75,6 +78,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			'furby',
 			// On their heads.
 			'hat',
+			// In front of whoever's in one: sat down inside it.
+			'cart',
 			'player',
 			// Behind them: they sit on its back.
 			'corgi',
@@ -100,12 +105,18 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			'bus',
 			// The back of a guard tower: behind whoever's coming out of it.
 			'tower-back',
+			// Behind whoever's kicking it, in front of the rocks it rolls past.
+			'football',
 			'boost',
 			'hazard',
 			'cheerer',
 			'banner',
 			'sign',
 			'mud',
+			// The Caves' mine: its rails, trestles and secret gallery.
+			'mine',
+			// The ways moles have dug through the rock, its shelves too.
+			'mole-trail',
 			// The hole the bus bores through a Cave's rock, its shelves too.
 			'bus-bore',
 			'platform',
@@ -118,6 +129,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				// Just ahead of the runner, so they toe the line rather than stand on it.
 				...createBanner(world, START_X + HITBOX_HALF_WIDTH + 4, 'START'),
 				createParkrunSign(world, START_X - 190),
+				// Across the way back, at the far left, for anyone going the wrong way.
+				createRoadblock(world),
 				...createKmSigns(world),
 				...createWarnings(world),
 				// A running track's long jump pit, near the finish.
@@ -128,6 +141,10 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createRails(world),
 				...createHut(world),
 				...createBusBore(world),
+				...createMine(world),
+				...createMoleTrails(world),
+				...createMineCarts(world),
+				...createFootballSprite(world),
 				...world.obstacles.flatMap((state, i) =>
 					createObstacle(world, state, i),
 				),

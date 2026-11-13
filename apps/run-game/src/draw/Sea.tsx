@@ -105,10 +105,19 @@ export function SeaGround(props: { world: View; left: number; right: number }) {
 				{/* Patches of shade, over the rock, on a beat of their own, so
 				    the rock's doesn't show. */}
 				<CliffMottle id="cliff-mottle" />
-				{/* Darker, down the cliff, away from the light. */}
-				<linearGradient id="cliff-shade" x1="0" y1="0" x2="0" y2="1">
+				{/* Darker, down the cliff, away from the light: from its top, and
+				    on down, however far down the camera shows, without starting
+				    over anywhere. */}
+				<linearGradient
+					id="cliff-shade"
+					gradientUnits="userSpaceOnUse"
+					x1="0"
+					y1={props.world.terrain.groundY(sea.from - 1) + PATH_FRONT}
+					x2="0"
+					y2={VIEW_HEIGHT}
+				>
 					<stop offset="0" stop-color="#2a2118" stop-opacity="0" />
-					<stop offset="1" stop-color="#2a2118" stop-opacity="0.35" />
+					<stop offset="1" stop-color="#2a2118" stop-opacity="0.4" />
 				</linearGradient>
 			</defs>
 			<Crag world={props.world} left={left} />
@@ -168,8 +177,9 @@ function Crag(props: { world: View; left: number }) {
 			lit += ` M${x0 + last},${y} H${x0 + out} V${y + 4} H${x0 + last} Z`
 		last = out
 	}
-	// The face behind the field's path, the field's own rock: shaded down it too.
-	const shade = `M${x0 - 4000},${top + 12} H${x0} V${sea.level + PATH_FRONT} H${x0 - 4000} Z ${face}`
+	// The face behind the field's path, the field's own rock: shaded down it
+	// too, right to the bottom of it, past where the sea's in front of it.
+	const shade = `M${x0 - 4000},${top + 12} H${x0} V${VIEW_HEIGHT} H${x0 - 4000} Z ${face}`
 	// Grass and earth hanging over its top edge, and crumbling off it.
 	const lip = [
 		[0, -2, 6, 4, '#4e9a36'],
@@ -193,10 +203,13 @@ function Crag(props: { world: View; left: number }) {
 	)
 }
 
-/** The cliff's rock's pixels: this big, and how many to a tile, across and down. */
+/**
+ * The cliff's rock's pixels: this big, and how many to a tile, across and
+ * down. Big, so zoomed out to the whole cliff, it doesn't show as tiles.
+ */
 const ROCK_CELL = 4
-const ROCK_ACROSS = 24
-const ROCK_DOWN = 18
+const ROCK_ACROSS = 60
+const ROCK_DOWN = 45
 const ROCK_SHADES = ['#867560', '#9a896f', '#ab9a7f', '#bcab8f']
 const ROCK_DARK = '#5f5141'
 const ROCK_LIT = '#d2c4a8'
@@ -231,35 +244,52 @@ const rockLight = (i: number, j: number) =>
 	ROCK_LIGHT[(j + ROCK_DOWN) % ROCK_DOWN][(i + ROCK_ACROSS) % ROCK_ACROSS]
 
 /**
+ * The rock's tile, as a path for each colour, painted in order, so it's a
+ * handful of shapes, not thousands of cells.
+ */
+const ROCK_TILE = (() => {
+	const paths = new Map<string, string>()
+	const cell = (i: number, j: number, fill: string) => {
+		const x = ((i + ROCK_ACROSS) % ROCK_ACROSS) * ROCK_CELL
+		const y = ((j + ROCK_DOWN) % ROCK_DOWN) * ROCK_CELL
+		paths.set(
+			fill,
+			`${paths.get(fill) ?? ''}M${x},${y}h${ROCK_CELL}v${ROCK_CELL}h${-ROCK_CELL}z`,
+		)
+	}
+	for (const fill of [...ROCK_SHADES, ROCK_LIT, ROCK_DARK]) paths.set(fill, '')
+	for (let j = 0; j < ROCK_DOWN; j++)
+		for (let i = 0; i < ROCK_ACROSS; i++) {
+			const shade = Math.min(
+				ROCK_SHADES.length - 1,
+				Math.floor(rockLight(i, j) * ROCK_SHADES.length),
+			)
+			cell(i, j, ROCK_SHADES[shade])
+		}
+	// The light catching the tops of its lumps: a lighter cell over a darker.
+	for (let j = 0; j < ROCK_DOWN; j++)
+		for (let i = 0; i < ROCK_ACROSS; i++)
+			if (rockLight(i, j) > 0.78 && rockLight(i, j + 1) < 0.62)
+				cell(i, j, ROCK_LIT)
+	// Cracks, stepping down through it, here and there.
+	const random = seeded(808)
+	for (let c = 0; c < 14; c++) {
+		const i = Math.floor(random() * ROCK_ACROSS)
+		const j = Math.floor(random() * ROCK_DOWN)
+		const steps = 3 + Math.floor(random() * 3)
+		const lean = random() < 0.5 ? 1 : -1
+		for (let k = 0; k < steps; k++)
+			cell(i + lean * Math.floor(k / 2), j + k, ROCK_DARK)
+	}
+	return [...paths].filter(([, d]) => d)
+})()
+
+/**
  * Rock, in pixels: lumps of it lighter and darker, the light catching their
  * tops, and cracks stepping down through it. No layers across it: lined
  * up, tile after tile, they look like bricks.
  */
 function CliffRock(props: { id: string }) {
-	const cells: [number, number, string][] = []
-	for (let j = 0; j < ROCK_DOWN; j++)
-		for (let i = 0; i < ROCK_ACROSS; i++) {
-			const light = rockLight(i, j)
-			const shade = Math.min(
-				ROCK_SHADES.length - 1,
-				Math.floor(light * ROCK_SHADES.length),
-			)
-			cells.push([i, j, ROCK_SHADES[shade]])
-		}
-	// The light catching the tops of its lumps: a lighter cell over a darker.
-	for (let j = 1; j < ROCK_DOWN; j++)
-		for (let i = 0; i < ROCK_ACROSS; i++)
-			if (rockLight(i, j - 1) > 0.78 && rockLight(i, j) < 0.62)
-				cells.push([i, j - 1, ROCK_LIT])
-	// Cracks, stepping down through it.
-	for (const [i, j, steps] of [
-		[8, 6, 4],
-		[18, 0, 4],
-		[3, 12, 3],
-		[21, 12, 4],
-	])
-		for (let k = 0; k < steps; k++)
-			cells.push([(i + Math.floor(k / 2)) % ROCK_ACROSS, j + k, ROCK_DARK])
 	return (
 		<pattern
 			id={props.id}
@@ -267,27 +297,22 @@ function CliffRock(props: { id: string }) {
 			width={ROCK_ACROSS * ROCK_CELL}
 			height={ROCK_DOWN * ROCK_CELL}
 		>
-			<For each={cells}>
-				{([i, j, fill]) => (
-					<rect
-						x={i * ROCK_CELL}
-						y={j * ROCK_CELL}
-						width={ROCK_CELL}
-						height={ROCK_CELL}
-						fill={fill}
-					/>
-				)}
-			</For>
+			<For each={ROCK_TILE}>{([fill, d]) => <path d={d} fill={fill} />}</For>
 		</pattern>
 	)
 }
 
-/** Blocks of shade, in the rock's own pixels, on a beat of their own. */
+/**
+ * Blocks of shade, in the rock's own pixels, on a beat of their own, so
+ * the rock's doesn't show; and big, so neither does its own.
+ */
+const MOTTLE_WIDTH = 148 * 3
+const MOTTLE_HEIGHT = 108 * 3
 function CliffMottle(props: { id: string }) {
 	const random = seeded(311)
-	const blocks = Array.from({ length: 9 }, () => ({
-		x: Math.floor(random() * 34) * ROCK_CELL,
-		y: Math.floor(random() * 24) * ROCK_CELL,
+	const blocks = Array.from({ length: 70 }, () => ({
+		x: Math.floor((random() * (MOTTLE_WIDTH - 24)) / ROCK_CELL) * ROCK_CELL,
+		y: Math.floor((random() * (MOTTLE_HEIGHT - 12)) / ROCK_CELL) * ROCK_CELL,
 		w: (2 + Math.floor(random() * 5)) * ROCK_CELL,
 		h: (1 + Math.floor(random() * 3)) * ROCK_CELL,
 		fill: random() < 0.6 ? 'rgba(40,30,20,0.16)' : 'rgba(255,245,225,0.12)',
@@ -296,8 +321,8 @@ function CliffMottle(props: { id: string }) {
 		<pattern
 			id={props.id}
 			patternUnits="userSpaceOnUse"
-			width={148}
-			height={108}
+			width={MOTTLE_WIDTH}
+			height={MOTTLE_HEIGHT}
 		>
 			<For each={blocks}>
 				{(b) => <rect x={b.x} y={b.y} width={b.w} height={b.h} fill={b.fill} />}

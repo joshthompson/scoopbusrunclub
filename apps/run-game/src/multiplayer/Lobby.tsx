@@ -5,7 +5,7 @@ import { RunStrip } from '../ui/RunStrip'
 import { nameSize } from '../ui/RunnerStage'
 import { QrCode } from './QrCode'
 import { createLocalPlayers } from './localPlayers'
-import { type RoomMode, padLink } from './protocol'
+import { type GameMode, type RoomMode, padLink } from './protocol'
 import {
 	type HostRoom,
 	MAX_PLAYERS,
@@ -13,7 +13,7 @@ import {
 	seatLabel,
 	seatPlayable,
 } from './room'
-import { ROOM_MODES } from './roomModes'
+import { GAME_MODES, ROOM_MODES } from './roomModes'
 
 /** How a Room can go, for the Starter to choose: M to go through them, or click. */
 const MODES = ROOM_MODES
@@ -30,6 +30,9 @@ export function Lobby(props: {
 	mode: RoomMode
 	/** How it goes, chosen here before anyone's joined. */
 	onMode: (mode: RoomMode) => void
+	/** How its Rounds are raced, and choosing it here before anyone's joined. */
+	gameMode: GameMode
+	onGameMode: (mode: GameMode) => void
 	/** Whether the Starter can start it: everyone else who's picked is ready. */
 	canStart: boolean
 	/** Seconds until the first Round, once the Starter's started it. */
@@ -50,6 +53,11 @@ export function Lobby(props: {
 		if (!starter) return props.onMode(mode)
 		room.chooseModeAs(starter.id, mode)
 	}
+	const chooseGameMode = (mode: GameMode) => {
+		const starter = room.starter()
+		if (!starter) return props.onGameMode(mode)
+		room.chooseGameModeAs(starter.id, mode)
+	}
 	const coarse = window.matchMedia('(pointer: coarse)').matches
 	const link = padLink(room.code)
 
@@ -63,6 +71,11 @@ export function Lobby(props: {
 			play('move')
 			chooseMode(nextMode(props.mode))
 		}
+		// G, for game: Scoop Mode or Baby Mode.
+		if ((event.key === 'g' || event.key === 'G') && choosesHere()) {
+			play('move')
+			chooseGameMode(nextGameMode(props.gameMode))
+		}
 	}
 	window.addEventListener('keydown', onKey)
 	onCleanup(() => window.removeEventListener('keydown', onKey))
@@ -74,6 +87,8 @@ export function Lobby(props: {
 			mode={props.mode}
 			choosesHere={choosesHere()}
 			onMode={chooseMode}
+			gameMode={props.gameMode}
+			onGameMode={chooseGameMode}
 			canStart={props.canStart}
 			startingIn={props.startingIn}
 			waitingFor={props.waitingFor}
@@ -131,6 +146,12 @@ export const SIDE_PANEL: JSX.CSSProperties = {
 	padding: '14px 12px',
 }
 
+/** The other way of racing, for G to switch between them. */
+export const nextGameMode = (mode: GameMode) =>
+	GAME_MODES[
+		(GAME_MODES.findIndex((m) => m.mode === mode) + 1) % GAME_MODES.length
+	].mode
+
 /** The way a Room can go after `mode`, for M to go through them. */
 export const nextMode = (mode: RoomMode) =>
 	MODES[(MODES.findIndex((m) => m.mode === mode) + 1) % MODES.length].mode
@@ -149,6 +170,8 @@ export function LobbyView(props: {
 	/** Whether how it goes can be chosen here. */
 	choosesHere: boolean
 	onMode: (mode: RoomMode) => void
+	gameMode: GameMode
+	onGameMode: (mode: GameMode) => void
 	canStart: boolean
 	startingIn: number | undefined
 	waitingFor: string
@@ -164,7 +187,12 @@ export function LobbyView(props: {
 	onCycle: (seat: Seat, by: number) => void
 	onReady: (seat: Seat) => void
 }) {
-	const starterSeat = () => props.seats.find((s) => s.id === props.starter)
+	/** Who chooses how it goes, if it's not chosen here: the Starter, wherever they are. */
+	const chosenBy = () => {
+		if (props.choosesHere) return undefined
+		const at = props.seats.findIndex((s) => s.id === props.starter)
+		return at < 0 ? 'Starter picks' : `P${at + 1} picks`
+	}
 	return (
 		<div style={styles.screen}>
 			<div style={styles.top}>
@@ -211,39 +239,24 @@ export function LobbyView(props: {
 						</For>
 					</div>
 
-					<div style={styles.modes}>
-						<For each={MODES}>
-							{(m) => (
-								<button
-									type="button"
-									disabled={!props.choosesHere}
-									style={{
-										...styles.mode,
-										...(props.mode === m.mode ? styles.modeOn : {}),
-										...(props.choosesHere ? {} : styles.modeLocked),
-									}}
-									onClick={() => {
-										play('select')
-										props.onMode(m.mode)
-									}}
-								>
-									<span>{m.label}</span>
-									<span style={styles.modeNote}>{m.note}</span>
-								</button>
-							)}
-						</For>
+					<div style={styles.options}>
+						<OptionPicker
+							caption="How far"
+							keyName="M"
+							options={MODES}
+							value={props.mode}
+							onPick={props.onMode}
+							chosenBy={chosenBy()}
+						/>
+						<OptionPicker
+							caption="How to race"
+							keyName="G"
+							options={GAME_MODES}
+							value={props.gameMode}
+							onPick={props.onGameMode}
+							chosenBy={chosenBy()}
+						/>
 					</div>
-
-					<Show when={!props.choosesHere && starterSeat()}>
-						{(starter) => (
-							<div style={styles.modeHint}>
-								P{props.seats.indexOf(starter()) + 1} chooses{' '}
-								{starter().kind === 'phone'
-									? 'on their own screen'
-									: 'at the big screen'}
-							</div>
-						)}
-					</Show>
 
 					<div style={styles.status}>
 						<Show
@@ -280,6 +293,78 @@ function PixelArrow(props: { facing: 1 | -1 }) {
 				{(x) => <rect x={x} y={x} width={1} height={9 - 2 * x} fill="white" />}
 			</For>
 		</svg>
+	)
+}
+
+/**
+ * One of how the Room's set, under the cards: what it's on, with arrows
+ * either side to go through the rest (or its key), and a pip for each.
+ * Only its Starter can change it: anywhere else, it just says who does.
+ */
+function OptionPicker<M extends string>(props: {
+	caption: string
+	/** The key that goes to the next one. */
+	keyName: string
+	options: { mode: M; label: string; note: string }[]
+	value: M
+	onPick: (mode: M) => void
+	/** Who chooses it instead, if it can't be chosen here. */
+	chosenBy?: string
+}) {
+	const at = () =>
+		Math.max(
+			0,
+			props.options.findIndex((o) => o.mode === props.value),
+		)
+	const current = () => props.options[at()]
+	const step = (by: 1 | -1) => {
+		play('move')
+		const count = props.options.length
+		props.onPick(props.options[(at() + by + count) % count].mode)
+	}
+	const arrow = (by: 1 | -1) => (
+		<Show when={!props.chosenBy}>
+			<button
+				type="button"
+				class="seat-arrow"
+				aria-label={`${by < 0 ? 'Previous' : 'Next'}: ${props.caption}`}
+				style={styles.optionArrow}
+				onClick={() => step(by)}
+			>
+				<PixelArrow facing={by} />
+			</button>
+		</Show>
+	)
+	return (
+		<div
+			style={{
+				...styles.option,
+				...(props.chosenBy ? styles.optionLocked : {}),
+			}}
+		>
+			<div style={styles.optionCaption}>
+				{props.caption}
+				<span style={styles.optionKey}>{props.chosenBy ?? props.keyName}</span>
+			</div>
+			<div style={styles.optionPips}>
+				<For each={props.options}>
+					{(o) => (
+						<span
+							style={{
+								...styles.pip,
+								...(o.mode === props.value ? styles.pipOn : {}),
+							}}
+						/>
+					)}
+				</For>
+			</div>
+			{arrow(-1)}
+			<div style={styles.optionValue}>
+				<span style={styles.optionLabel}>{current().label}</span>
+				<span style={styles.optionNote}>{current().note}</span>
+			</div>
+			{arrow(1)}
+		</div>
 	)
 }
 
@@ -426,39 +511,101 @@ function SeatCard(props: {
 }
 
 const styles = {
-	modes: {
-		display: 'flex',
-		gap: '8px',
-		'justify-content': 'center',
-		'margin-top': '8px',
+	/** How the Room's set, side by side under the cards: one short row. */
+	/** On the same columns as the cards over them: two each, edge to edge with them. */
+	options: {
+		display: 'grid',
+		'grid-template-columns': 'repeat(4, 1fr)',
+		gap: '10px',
+		'margin-top': '12px',
+		'flex-shrink': 0,
 	},
-	mode: {
-		flex: '1 1 0',
+	option: {
+		position: 'relative',
+		'grid-column': 'span 2',
 		'min-width': 0,
+		display: 'flex',
+		'align-items': 'center',
+		gap: '8px',
+		height: '52px',
+		padding: '6px 8px 2px',
+		'box-sizing': 'border-box',
+		background: 'rgba(15, 31, 41, 0.92)',
+		border: '3px solid white',
+		'box-shadow': '0 0 0 3px var(--ink)',
+	},
+	optionLocked: { border: '3px solid rgba(255, 255, 255, 0.5)' },
+	/** What it is, sat on its top edge, and the key that changes it. */
+	optionCaption: {
+		position: 'absolute',
+		top: '-15px',
+		left: '10px',
+		display: 'flex',
+		'align-items': 'center',
+		gap: '6px',
+		padding: '1px 6px 3px',
+		background: 'var(--ink)',
+		color: 'white',
+		border: '2px solid white',
+		'font-size': '12px',
+		'line-height': 1,
 		'white-space': 'nowrap',
+	},
+	optionKey: {
+		padding: '1px 4px 2px',
+		// The caption's text sits high to look centred; the key's box mustn't.
+		position: 'relative',
+		top: '1px',
+		background: '#ffd23f',
+		color: 'var(--ink)',
+		'font-size': '11px',
+	},
+	/** Which of them it's on: a pip each, top right. */
+	optionPips: {
+		position: 'absolute',
+		top: '-5px',
+		right: '10px',
+		display: 'flex',
+		gap: '3px',
+		padding: '0 4px',
+		background: 'var(--ink)',
+	},
+	pip: {
+		width: '6px',
+		height: '6px',
+		background: 'rgba(255, 255, 255, 0.35)',
+	},
+	pipOn: { background: '#ffd23f' },
+	optionArrow: {
+		width: '26px',
+		height: '30px',
+		'flex-shrink': 0,
+		padding: 0,
+		display: 'grid',
+		'place-items': 'center',
+		background: 'var(--bus-red)',
+		border: '3px solid white',
+		'box-shadow': '3px 3px 0 var(--ink)',
+	},
+	optionValue: {
+		flex: 1,
+		'min-width': 0,
 		display: 'flex',
 		'flex-direction': 'column',
 		'align-items': 'center',
-		gap: '2px',
-		padding: '7px 14px 5px',
-		background: 'rgba(15, 31, 41, 0.75)',
-		color: 'white',
-		border: '3px solid rgba(255, 255, 255, 0.4)',
-		'font-family': 'var(--font-pixel)',
-		'font-size': '16px',
-		cursor: 'pointer',
+		gap: '3px',
+		'white-space': 'nowrap',
+		overflow: 'hidden',
 	},
-	modeOn: {
-		background: '#ffd23f',
-		color: 'var(--ink)',
-		border: '3px solid white',
+	optionLabel: {
+		color: '#ffd23f',
+		'font-size': '18px',
+		'line-height': 1,
 	},
-	modeLocked: { cursor: 'default', opacity: 0.6 },
-	modeHint: {
-		...OUTLINED,
-		'text-align': 'center',
-		'font-size': '13px',
-		'margin-top': '-4px',
+	optionNote: {
+		'font-size': '12px',
+		'line-height': 1,
+		opacity: 0.8,
 	},
 	starterBadge: {
 		padding: '2px 6px 0',
@@ -478,10 +625,6 @@ const styles = {
 		'text-shadow': 'none',
 	},
 	startOff: { opacity: 0.5 },
-	modeNote: {
-		'font-size': '12px',
-		opacity: 0.8,
-	},
 	screen: {
 		position: 'absolute',
 		inset: 0,

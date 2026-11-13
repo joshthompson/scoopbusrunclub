@@ -3,6 +3,7 @@ import type { JSX } from 'solid-js'
 import barcodeAsset from '../../assets/boosts/barcode.png'
 import type { Collectable } from '../../game/collectables'
 import type { FikaItem } from '../../game/fika'
+import type { Hat, PickupHat } from '../../game/hats'
 import { BactrianArt, CamelArt } from './camel'
 import { CondorArt } from './condor'
 import { CorgiArt } from './corgi'
@@ -12,7 +13,10 @@ import { FikaArt } from './fika'
 import { GooseIcon } from './geese'
 import { GliderArt } from './glider'
 import { GoatArt } from './goat'
+import { HatPicture, hatArt } from './hats'
 import { LlamaArt } from './llama'
+import { MineCartArt } from './mineCart'
+import { MoleArt } from './mole'
 import { StoodBoardArt } from './skis'
 import { UnicornArt } from './unicorn'
 
@@ -21,6 +25,8 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 	const { id } = props
 	if (id.startsWith('fika:'))
 		return <FikaArt item={id.slice('fika:'.length) as FikaItem} />
+	if (id.startsWith('hat:'))
+		return <HatIcon hat={id.slice('hat:'.length) as PickupHat} />
 	switch (id) {
 		case 'ride:corgi':
 			return <CorgiArt pose="sit" />
@@ -65,6 +71,10 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 					</div>
 				</div>
 			)
+		case 'ride:mole':
+			return <MoleArt pose="sit" />
+		case 'ride:minecart':
+			return <MineCartArt />
 		case 'barcode':
 			return (
 				<img
@@ -84,4 +94,38 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 				/>
 			)
 	}
+}
+
+/** A hat, on its own, at its size on a head, made a little bigger. */
+function HatIcon(props: { hat: PickupHat }) {
+	const hat = () => ({ kind: props.hat })
+	return (
+		<div
+			style={{
+				position: 'relative',
+				width: '40px',
+				height: '32px',
+				display: 'grid',
+				'place-items': 'center',
+			}}
+		>
+			<div style={{ transform: 'scale(1.4)', position: 'relative' }}>
+				<HatSized hat={hat()} />
+			</div>
+		</div>
+	)
+}
+
+function HatSized(props: { hat: Hat }) {
+	return (
+		<div
+			style={{
+				position: 'relative',
+				width: `${hatArt(props.hat).width}px`,
+				height: `${hatArt(props.hat).height}px`,
+			}}
+		>
+			<HatPicture hat={props.hat} still />
+		</div>
+	)
 }

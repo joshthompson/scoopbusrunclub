@@ -24,9 +24,20 @@ const ROW_STEP = 24
 /** How many rows the table shows at once. */
 const ROWS_SHOWN = 7
 
-/** Endless's table first, then each course's, in order. */
+/**
+ * Not a table scores go on, but one the backend makes from the courses':
+ * each player's best on every course, added up.
+ */
+const ALL_LEVELS = 'all-levels'
+
+/** Endless's table first, then All levels, then each course's, in order. */
 const TABLES: { id: TableId; name: string; detail: string }[] = [
 	{ id: 'endless', name: 'Endless', detail: 'Every course in turn' },
+	{
+		id: ALL_LEVELS,
+		name: 'All levels',
+		detail: 'Your best on every course, added up',
+	},
 	...COURSES.map((course) => ({
 		id: course.id,
 		name: course.name,
@@ -60,6 +71,7 @@ export function HighScoresScreen(props: { onBack: () => void }) {
 	const [at, setAt] = createSignal(0)
 	const current = () => TABLES[at()]
 	const endless = () => current().id === 'endless'
+	const allLevels = () => current().id === ALL_LEVELS
 	/** Whether the table's been asked for and couldn't be got. */
 	const [failed, setFailed] = createSignal(!ONLINE)
 	createEffect(() => {
@@ -106,11 +118,16 @@ export function HighScoresScreen(props: { onBack: () => void }) {
 	window.addEventListener('keydown', onKey)
 	onCleanup(() => window.removeEventListener('keydown', onKey))
 
-	/** How far round a course they got. Endless's table is just the points. */
+	/**
+	 * How far round a course they got, or on All levels, how many courses
+	 * they've a score on. Endless's table is just the points.
+	 */
 	const extra = (entry: OnlineEntry) =>
-		entry.finished
-			? 'Finished'
-			: `${(entry.metres ?? 0).toLocaleString('en')} m`
+		allLevels()
+			? `${entry.courses ?? 0}/${COURSES.length}`
+			: entry.finished
+				? 'Finished'
+				: `${(entry.metres ?? 0).toLocaleString('en')} m`
 
 	return (
 		<div style={styles.screen}>
@@ -156,7 +173,9 @@ export function HighScoresScreen(props: { onBack: () => void }) {
 						<span style={styles.runner}>Runner</span>
 						<span style={styles.score}>Points</span>
 						<Show when={!endless()}>
-							<span style={styles.extra}>Got to</span>
+							<span style={styles.extra}>
+								{allLevels() ? 'Levels' : 'Got to'}
+							</span>
 						</Show>
 						<span style={styles.date}>When</span>
 					</div>
