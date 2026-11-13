@@ -36,6 +36,7 @@ import { award } from '../saved/medals'
 import { reach } from '../saved/progress'
 import { play } from '../sfx'
 import { ArrowPad } from '../ui/ArrowPad'
+import { ControlsCard } from '../ui/ControlsCard'
 import { Stage } from '../ui/Stage'
 import { IdentityEditor } from './IdentityEditor'
 import { PauseMenu, SOUND_ITEMS } from './PauseMenu'
@@ -542,9 +543,7 @@ function Hud(props: {
 				}}
 			</For>
 
-			<Show when={world.phase() === 'countdown'}>
-				<div style={styles.hint}>→ run · ↑ jump · ↓ duck</div>
-			</Show>
+			<ControlsCard world={world} />
 
 			<Show when={world.result()}>
 				{(result) => (
@@ -689,16 +688,6 @@ const styles = {
 		'text-shadow':
 			'2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink)',
 		'white-space': 'nowrap',
-	},
-	hint: {
-		position: 'absolute',
-		bottom: '20px',
-		left: 0,
-		right: 0,
-		'text-align': 'center',
-		color: 'white',
-		'font-size': '20px',
-		'text-shadow': '2px 2px 0 var(--ink)',
 	},
 	touchButton: {
 		position: 'absolute',

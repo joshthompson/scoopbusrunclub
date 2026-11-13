@@ -113,8 +113,12 @@ export const ROWS: Row[] = [
 		options: [
 			{ value: '', label: 'Bald' },
 			{ value: 'short', label: 'Short' },
+			{ value: 'medium-short', label: 'Medium short' },
 			{ value: 'medium', label: 'Medium' },
 			{ value: 'long', label: 'Long' },
+			{ value: 'ponytail', label: 'Ponytail' },
+			{ value: 'bun', label: 'Bun' },
+			{ value: 'curly', label: 'Curly' },
 		],
 		get: (a) => a.head.hair ?? '',
 		set: (a, hair) =>

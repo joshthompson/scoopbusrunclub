@@ -2,6 +2,7 @@ export { default as adamRun } from '@/assets/runners/adam/run.png'
 export { default as adamZombie } from '@/assets/runners/adam/zombie.png'
 export { default as adamSit } from '@/assets/runners/adam/sit.png'
 export { default as adamFace } from '@/assets/runners/adam/face.png'
+export { default as adamRunDirector } from '@/assets/runners/adam/run-director.png'
 
 export { default as alisaRun } from '@/assets/runners/alisa/run.png'
 export { default as alisaZombie } from '@/assets/runners/alisa/zombie.png'

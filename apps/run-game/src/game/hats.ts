@@ -5,8 +5,8 @@ import type { FikaItem } from './fika'
  * Hats: worn on your head once you've run into one, each course's own.
  * Some do something while they're on; some fall off.
  *
- * - `pumpkin`: Halloween Town's, carved: faster while it's on, and knocked
- *   off by a stumble
+ * - `pumpkin`: Halloween Town's, carved: faster while it's on, and it takes
+ *   the next knock for you, smashed off doing it
  * - `miner`: a miner's helmet, its lamp lit, from the secret gallery in The
  *   Caves, only got to in a mine cart
  * - `captain`: a captain's hat, off the roof of a Scoop Cruises ferry
@@ -75,7 +75,12 @@ export interface HatRules {
 const PLAIN: HatRules = { speed: 0, fallsOff: false, shield: false }
 
 export const HAT_RULES: Record<HatKind, HatRules> = {
-	pumpkin: { speed: PUMPKIN_SPEED, fallsOff: true, shield: false },
+	pumpkin: {
+		speed: PUMPKIN_SPEED,
+		fallsOff: true,
+		shield: true,
+		saved: 'Pumpkin saved you!',
+	},
 	miner: PLAIN,
 	captain: PLAIN,
 	skiHelmet: {

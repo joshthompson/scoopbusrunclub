@@ -1,10 +1,12 @@
 import { For, type JSX, Show, createSignal, onCleanup, onMount } from 'solid-js'
+import type { Controls } from '../input'
 import { play } from '../sfx'
 import { OUTLINED } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { nameSize } from '../ui/RunnerStage'
 import { onHover } from '../ui/hover'
 import { Medal, ordinal, pts } from './Medal'
+import { PodiumPlay } from './PodiumPlay'
 import { type Placing, standingsOf } from './Results'
 import { COLOURS, type Seat, seatPlayable } from './room'
 
@@ -49,6 +51,12 @@ export function Podium(props: {
 	onEnd: () => void
 	/** What ending is: the Room, at the Host; leaving it, joined from a computer. */
 	endLabel?: string
+	/**
+	 * Each Player's controls, where they're to hand (at the Host): everyone
+	 * runs and jumps about on the Podium with them till it's back to the
+	 * lobby. Without them, the top three just run on the spot.
+	 */
+	controlsFor?: (seat: Seat) => () => Controls
 }) {
 	const standings = () => standingsOf(props.seats, props.placings)
 	const top = () => standings().slice(0, 3)
@@ -74,8 +82,21 @@ export function Podium(props: {
 			},
 		},
 	]
+	let screen: HTMLDivElement | undefined
+	let podium: HTMLDivElement | undefined
+	/** The top three's steps, by seat, for them to stand on. */
+	const steps = new Map<string, HTMLElement>()
+	/**
+	 * Someone running about with the arrows: they don't move between the
+	 * buttons too, or Enter could end the Room by surprise.
+	 */
+	const arrowsRun = () =>
+		!!props.controlsFor && props.seats.some((s) => s.kind === 'arrows')
+
 	const onKey = (event: KeyboardEvent) => {
-		const move = MOVES[event.key]
+		// Space is a jump, not a press of whichever button has the focus.
+		if (props.controlsFor && event.key === ' ') event.preventDefault()
+		const move = arrowsRun() ? undefined : MOVES[event.key]
 		if (move) {
 			const next = Math.max(0, Math.min(buttons.length - 1, picked() + move))
 			if (next !== picked()) {
@@ -91,7 +112,7 @@ export function Podium(props: {
 	onCleanup(() => window.removeEventListener('keydown', onKey))
 
 	return (
-		<div style={styles.screen}>
+		<div style={styles.screen} ref={screen}>
 			<div style={styles.confetti} aria-hidden="true">
 				<For each={CONFETTI}>
 					{(bit) => (
@@ -114,15 +135,34 @@ export function Podium(props: {
 			<div style={styles.title}>{props.title} finished!</div>
 			<div style={styles.subtitle}>
 				{props.rounds} Round{props.rounds === 1 ? '' : 's'}
+				{props.controlsFor ? ' · Run about, and jump on the podium!' : ''}
 			</div>
 
-			<div style={styles.podium}>
+			<div style={styles.podium} ref={podium}>
 				<For each={STEP_ORDER.filter((place) => top()[place])}>
 					{(place) => (
-						<Step seat={top()[place]} place={(place + 1) as 1 | 2 | 3} />
+						<Step
+							seat={top()[place]}
+							place={(place + 1) as 1 | 2 | 3}
+							loose={!!props.controlsFor}
+							onStep={(step) => steps.set(top()[place].id, step)}
+						/>
 					)}
 				</For>
 			</div>
+
+			<Show when={props.controlsFor}>
+				{(controlsFor) => (
+					<PodiumPlay
+						standings={standings()}
+						playableOf={seatPlayable}
+						controlsFor={controlsFor()}
+						steps={() => steps}
+						ground={() => podium}
+						screen={() => screen}
+					/>
+				)}
+			</Show>
 
 			<Show when={rest().length}>
 				<div style={styles.rest}>
@@ -164,7 +204,13 @@ export function Podium(props: {
 }
 
 /** One Player on their step: their medal, them, the step, and who they are. */
-function Step(props: { seat: Seat; place: 1 | 2 | 3 }) {
+function Step(props: {
+	seat: Seat
+	place: 1 | 2 | 3
+	/** Their runner's loose, run about by them (see `PodiumPlay`): only room left for them here. */
+	loose?: boolean
+	onStep?: (step: HTMLElement) => void
+}) {
 	const runner = () => seatPlayable(props.seat)
 	const winner = () => props.place === 1
 	return (
@@ -179,16 +225,29 @@ function Step(props: { seat: Seat; place: 1 | 2 | 3 }) {
 			</div>
 			<Show when={runner()}>
 				{(r) => (
-					<RunStrip
-						frame={r().sprite.run[0] ?? ''}
-						width={r().sprite.width}
-						height={r().sprite.height}
-						scale={winner() ? 3 : 2.5}
-						stride={winner() ? 0.4 : 0.6}
-					/>
+					<Show
+						when={!props.loose}
+						fallback={
+							<div
+								style={{
+									width: `${r().sprite.width * (winner() ? 3 : 2.5)}px`,
+									height: `${r().sprite.height * (winner() ? 3 : 2.5)}px`,
+								}}
+							/>
+						}
+					>
+						<RunStrip
+							frame={r().sprite.run[0] ?? ''}
+							width={r().sprite.width}
+							height={r().sprite.height}
+							scale={winner() ? 3 : 2.5}
+							stride={winner() ? 0.4 : 0.6}
+						/>
+					</Show>
 				)}
 			</Show>
 			<div
+				ref={(step) => props.onStep?.(step)}
 				style={{
 					...styles.step,
 					height: `${STEP_HEIGHT[props.place - 1]}px`,

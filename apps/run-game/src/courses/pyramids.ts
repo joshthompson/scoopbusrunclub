@@ -7,7 +7,7 @@ import sphinxHead from '../assets/sphinx/head.png'
 import sphinxPaw from '../assets/sphinx/paw.png'
 import sarcophagus from '../assets/sphinx/sarcophagus.png'
 import { START_X } from '../game/constants'
-import { PATH_BACK, PATH_FRONT, STAND_HEIGHT, VERGE } from '../game/constants'
+import { PATH_BACK, PATH_FRONT, VERGE } from '../game/constants'
 import { PYRAMIDS_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
 import { duckPost } from './kit/duckSigns'
@@ -87,7 +87,9 @@ const pyramidAt = (x: number) =>
 /**
  * The Sphinx, between the second pyramid and the third: a slot between its
  * paws to slide into, a Tunnel sliding down into its tomb, the tomb, tall
- * enough to stand in, and a Tunnel sliding back up and out of its back.
+ * enough to stand in, and a passage up and out of its back, tall enough to
+ * run up: dodging the Mummies leaves you slow, and a Tunnel would keep you
+ * that slow all the way up.
  */
 const SPHINX = START_X + 11400
 /**
@@ -118,6 +120,14 @@ const TOMB_DEPTH = DUNE
 /** How high the rock is over the floor: in a Tunnel, and in the tomb. */
 const SLIDE = 30
 const TOMB_ROOM = 190
+/** How high the passage up out of the tomb is: room to stand and run, not to jump. */
+const EXIT_ROOM = 68
+/**
+ * How much of the passage's steepness holds a runner back: drawn as steep as
+ * it is, but run up like a gentle one, or it'd near stop them (as Scoop
+ * Cruises' stairs).
+ */
+const EXIT_PULL = 0.15
 /** How far the tomb's roof takes to rise from a Tunnel's, and fall back. */
 const TOMB_RAMP = 120
 
@@ -153,8 +163,10 @@ const terrain: Terrain = withGaps({
 			if (Math.abs(x - pyramid.x) <= SUMMIT) return 0
 			return x < pyramid.x ? -CLIMB_SLOPE : FACE_SLOPE
 		}
-		if (x > DUNE_FROM && x < DUNE_TO)
-			return (terrain.groundY(x + 4) - terrain.groundY(x - 4)) / 8
+		if (x > DUNE_FROM && x < DUNE_TO) {
+			const slope = (terrain.groundY(x + 4) - terrain.groundY(x - 4)) / 8
+			return x >= TOMB_TO && x < SPHINX_END ? slope * EXIT_PULL : slope
+		}
 		return dunes.slope(x)
 	},
 })
@@ -162,12 +174,14 @@ const terrain: Terrain = withGaps({
 /** How high the rock is over the floor in the Sphinx, `x` along. */
 function headroom(x: number) {
 	if (x < SPHINX - PORCH || x >= SPHINX_END) return undefined
-	if (x < TOMB_FROM || x >= TOMB_TO) return SLIDE
+	if (x < TOMB_FROM) return SLIDE
+	if (x >= TOMB_TO) return EXIT_ROOM
 	const rise = Math.min(1, (x - TOMB_FROM) / TOMB_RAMP)
 	const fall = Math.min(1, (TOMB_TO - x) / TOMB_RAMP)
+	// Down to a Tunnel's on the way in, and to the passage's on the way out.
+	const low = rise < fall ? SLIDE : EXIT_ROOM
 	return (
-		Math.round((SLIDE + (TOMB_ROOM - SLIDE) * ease(Math.min(rise, fall))) / 4) *
-		4
+		Math.round((low + (TOMB_ROOM - low) * ease(Math.min(rise, fall))) / 4) * 4
 	)
 }
 
@@ -183,18 +197,9 @@ function sphinxHeight(x: number) {
 	if (t < 100) return 85 + ((t - 40) / 60) * 35
 	if (t < 320) return 120
 	if (t < length - 260) return 110 - ((t - 320) / (length - 580)) * 15
-	return 50 + 45 * ease((length - t) / 260)
+	// Its haunches, over the passage out: rock over its doorway to the end.
+	return EXIT_ROOM + 16 + (95 - EXIT_ROOM - 16) * ease((length - t) / 260)
 }
-
-/**
- * Where the Tunnel up out of the tomb's way in is: where its roof comes
- * down too low to stand under, at the tomb's far end.
- */
-const EXIT_MOUTH = (() => {
-	for (let x = TOMB_TO - TOMB_RAMP; x < TOMB_TO; x++)
-		if ((headroom(x) ?? TOMB_ROOM) < STAND_HEIGHT + 8) return x
-	return TOMB_TO
-})()
 
 /** The Sphinx, as a Cave: its body over the way through it. */
 const sphinx: Cave = {
@@ -222,8 +227,6 @@ const sphinx: Cave = {
 		if (x < SPHINX || x >= SPHINX_END) return undefined
 		return dunes.groundY(x) - dune(x) - PATH_BACK
 	},
-	// Yellow and black stripes over the Tunnel up out of the tomb.
-	warnings: [{ from: EXIT_MOUTH - 8, to: EXIT_MOUTH + 56 }],
 	features: [
 		// Its head, forward over its chest.
 		{ asset: sphinxHead, x: SPHINX + 170, width: 120, height: 130, sink: 14 },

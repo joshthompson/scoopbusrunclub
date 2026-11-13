@@ -7,6 +7,7 @@ import {
 } from './_generated/server'
 import { logAdminEvent, validateSession } from './auth'
 import { findBlockedTerm } from './profanity'
+import { facialHairValidator, hairValidator } from './schema'
 
 /** How long a visitor-created racer runs in the header. */
 export const RACER_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
@@ -48,17 +49,13 @@ const avatarValidator = v.object({
 	sockColor: v.optional(v.string()),
 	shoeColor: v.string(),
 	head: v.object({
-		hair: v.optional(
-			v.union(v.literal('long'), v.literal('medium'), v.literal('short')),
-		),
+		hair: v.optional(hairValidator),
 		hairColor: v.optional(v.string()),
 		accessory: v.optional(
 			v.union(v.literal('cap'), v.literal('headband'), v.literal('glasses')),
 		),
 		accessoryColor: v.optional(v.string()),
-		facialHair: v.optional(
-			v.union(v.literal('beard'), v.literal('stubble'), v.literal('long')),
-		),
+		facialHair: v.optional(facialHairValidator),
 		facialHairColor: v.optional(v.string()),
 		topColorForNeck: v.optional(v.boolean()),
 	}),

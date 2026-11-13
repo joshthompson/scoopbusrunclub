@@ -8,6 +8,7 @@ import { PATH_BACK, START_X } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { createTerrain } from '../game/terrain'
 import { withHat } from './kit/hats'
+import { huddingeLedgeArt } from './kit/huddinge-ledge'
 import { STEP_M, heights } from './kit/huddinge-profile'
 import { seeded } from './kit/seeded'
 import type {
@@ -186,7 +187,7 @@ export const huddinge: CourseDefinition = {
 		},
 		0,
 	),
-	platforms: [LEDGE],
+	platforms: [{ ...LEDGE, art: huddingeLedgeArt(terrain, LEDGE) }],
 	special: {
 		goal: 'Deer riding deer',
 		done: (run) => !!run.rodeWearing?.includes('antlers'),

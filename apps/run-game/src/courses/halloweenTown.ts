@@ -31,7 +31,8 @@ import type {
  * Halloween Town: under a blood moon, through a graveyard. Open graves to
  * jump, tombstones with runners' names on, dead trees' branches, and
  * Zombies, club members risen from the grave, coming the wrong way, with
- * skeletons out running among everyone else. Pumpkins to wear, for speed, until you stumble.
+ * skeletons out running among everyone else. Pumpkins to wear, for speed,
+ * each taking a knock for you.
  * The Spook Bus behind.
  */
 
@@ -74,6 +75,9 @@ const GRAVE_ROOM = 240
 const nearGrave = (x: number) =>
 	graves.some((g) => x > g.from - GRAVE_ROOM && x < g.to + GRAVE_ROOM)
 
+/** Room left clear of Zombies either side of a branch. */
+const BRANCH_ROOM = 600
+
 /**
  * The panel on a tombstone's face, under its RIP, where a name goes: as the
  * website's tombstone sign has it, in the stone's own pixels.
@@ -114,13 +118,18 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		x += 380 + random() * (520 - progress * 260)
 	}
 
-	// Zombies, a steady stream of them, more the further round: their own
-	// random numbers, so the rest stays where it is. Where they rise: they
-	// walk towards you once you're near (see `zombieAt`), and any just past
-	// a grave walk into it.
+	// Zombies, every so often, more the further round: their own random
+	// numbers, so the rest stays where it is. Where they rise: they walk
+	// towards you once you're near (see `zombieAt`), and any just past a
+	// grave walk into it. None by a branch: jumping one and ducking the
+	// other at once is too much.
 	const shamble = seeded(1313)
+	const nearBranch = (x: number) =>
+		obstacles.some(
+			(o) => o.kind === 'branch' && Math.abs(o.x - x) < BRANCH_ROOM,
+		)
 	for (let at = START_X + 1500; at < terrain.finishX; ) {
-		if (!nearGrave(at))
+		if (!nearGrave(at) && !nearBranch(at))
 			obstacles.push({
 				kind: 'zombie',
 				x: Math.round(at),
@@ -129,7 +138,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 				skeleton: shamble() < 0.2,
 			})
 		const progress = (at - START_X) / terrain.length
-		at += 900 + shamble() * (600 - progress * 300)
+		at += 1300 + shamble() * (800 - progress * 300)
 	}
 	// Hands under the graveyard, here and there: their own random numbers
 	// too, and clear of the graves and of anything else in the way.
@@ -192,7 +201,7 @@ export const halloweenTown: CourseDefinition = {
 	blurb:
 		'Under a blood moon: open graves, Zombies coming at you, and Pumpkins to wear.',
 	terrain,
-	// Over the line with a Pumpkin still on: one stumble knocks it off.
+	// Over the line with a Pumpkin still on: one knock smashes it off.
 	special: {
 		goal: 'Finish wearing a pumpkin',
 		done: (run) => run.finished && run.hat === 'pumpkin',

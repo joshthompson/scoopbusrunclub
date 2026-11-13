@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import { type QueryCtx, mutation, query } from './_generated/server'
 import { logAdminEvent, validateSession } from './auth'
+import { facialHairValidator, hairValidator } from './schema'
 
 const avatarValidator = v.optional(
 	v.object({
@@ -27,17 +28,13 @@ const avatarValidator = v.optional(
 		sockColor: v.optional(v.string()),
 		shoeColor: v.string(),
 		head: v.object({
-			hair: v.optional(
-				v.union(v.literal('long'), v.literal('medium'), v.literal('short')),
-			),
+			hair: v.optional(hairValidator),
 			hairColor: v.optional(v.string()),
 			accessory: v.optional(
 				v.union(v.literal('cap'), v.literal('headband'), v.literal('glasses')),
 			),
 			accessoryColor: v.optional(v.string()),
-			facialHair: v.optional(
-				v.union(v.literal('beard'), v.literal('stubble'), v.literal('long')),
-			),
+			facialHair: v.optional(facialHairValidator),
 			facialHairColor: v.optional(v.string()),
 			topColorForNeck: v.optional(v.boolean()),
 		}),

@@ -36,23 +36,37 @@ const BUS_HOLD_TICKS = 60
 const SPEED_POINTS = 2
 const COURSE_METRES = 5000
 
-/** Each bonus that's always the same, for each one had. */
+/**
+ * Each bonus that's always the same, for each one had. Every kind the game
+ * has (`BonusKind` in apps/run-game/src/game/world.ts) must be here or in
+ * `RANGED_POINTS`: a score with one that isn't is turned down.
+ */
 const FIXED_POINTS = {
 	fika: 100,
 	cheers: 50,
+	/** Rides: corgis, deer, llamas, ski racks, gliders. */
 	corgis: 250,
+	/** The Caves' mine carts. */
+	carts: 250,
+	/** Geese ridden, and Machu Picchu's condor. */
 	geese: 250,
 	pumpkins: 100,
+	hats: 150,
 	barcodes: 250,
+	/** Haga's football, over the finish line. */
+	football: 500,
 	rings: 50,
 	gates: 25,
 	hazards: -50,
+	cones: -25,
 } as const
+/** The ones that come off, rather than add: as many as anyone likes. */
+const PENALTIES: ReadonlySet<BonusKind> = new Set(['hazards', 'cones'])
 /** Bouncing off heads: from this, doubling for each more before landing, up to the most. */
 const HEADS_POINTS = { least: 100, most: 1600 }
 /**
  * Those whose points vary, each one had: tricks landed, doubling like heads;
- * grinds, for how long; ski jumps, for how far.
+ * grinds, for how long; ski jumps and long jumps, for how far.
  */
 const RANGED_POINTS = {
 	heads: HEADS_POINTS,
@@ -61,16 +75,22 @@ const RANGED_POINTS = {
 	jumps: { least: 0, most: 1500 },
 } as const
 /**
- * The most of each a course has, with some to spare: the most fika on any
- * course is 18, cheers 6, pumpkins 8, rides 8, geese 8 and Rings 40.
+ * The most of each a course has, with some to spare. The most on any course
+ * (2026-11-13): fika 17 (Scoop Line), cheers 6, rides 10 (the Cliff's
+ * gliders), mine carts 4, geese 19 (City Rooftop), pumpkins 8, hats 2
+ * (Slopes), a barcode, a football, Rings 24, gates 11, and a ski jump or a
+ * long jump.
  */
 const MOST_PER_COURSE = {
 	fika: 22,
 	cheers: 8,
-	corgis: 10,
-	geese: 10,
+	corgis: 16,
+	carts: 6,
+	geese: 25,
 	pumpkins: 10,
+	hats: 3,
 	barcodes: 1,
+	football: 1,
 	rings: 50,
 	gates: 30,
 	heads: 60,
@@ -78,6 +98,14 @@ const MOST_PER_COURSE = {
 	grinds: 40,
 	jumps: 3,
 } as const
+/**
+ * Heads, tricks and grinds aren't laid out on a course: anyone can keep at
+ * them. So past the most a course is likely to give, there can be one each
+ * this many ticks: a bounce off a head is ~19 ticks up to the top before
+ * coming down onto the next, the quickest trick 11 (a grab, landed early),
+ * and getting off a rail and back onto one longer than that.
+ */
+const MIN_TICKS_EACH = { heads: 18, tricks: 11, grinds: 20 } as const
 
 type BonusKind =
 	| keyof typeof FIXED_POINTS
@@ -162,9 +190,10 @@ export function implausible(
 	if (ticks * TICK_MS > elapsed + 5000) return 'more time than has gone by'
 	if (metres * PX_PER_M > ticks * TOP_SPEED + 400) return 'too quick'
 	let total = metres
-	for (const kind of BONUS_KINDS) {
-		const bonus = bonuses[kind]
+	for (const [kind, bonus] of Object.entries(bonuses)) {
 		if (!bonus) continue
+		// One the game's got and this hasn't: its points can't be checked.
+		if (!(BONUS_KINDS as string[]).includes(kind)) return `${kind}: unknown`
 		const { count, points } = bonus
 		if (!Number.isInteger(count) || !Number.isInteger(points) || count < 0)
 			return `${kind}: not numbers`
@@ -176,20 +205,29 @@ export function implausible(
 					BUS_HOLD_TICKS * courses)
 			if (count > courses || points < 0 || points > most) return 'speed'
 		} else if (kind in RANGED_POINTS) {
-			const range = RANGED_POINTS[kind as keyof typeof RANGED_POINTS]
-			const most = MOST_PER_COURSE[kind as keyof typeof RANGED_POINTS]
-			if (count > most * courses) return kind
+			const ranged = kind as keyof typeof RANGED_POINTS
+			const range = RANGED_POINTS[ranged]
+			const most = Math.max(
+				MOST_PER_COURSE[ranged] * courses,
+				ranged in MIN_TICKS_EACH
+					? ticks / MIN_TICKS_EACH[ranged as keyof typeof MIN_TICKS_EACH]
+					: 0,
+			)
+			if (count > most) return `${kind}: too many`
 			if (points < count * range.least || points > count * range.most)
-				return kind
+				return `${kind}: points`
 		} else {
-			const fixed = FIXED_POINTS[kind as keyof typeof FIXED_POINTS]
-			if (points !== count * fixed) return kind
-			if (kind !== 'hazards' && count > MOST_PER_COURSE[kind] * courses)
-				return kind
+			const fixed = kind as keyof typeof FIXED_POINTS
+			if (points !== count * FIXED_POINTS[fixed]) return `${kind}: points`
+			if (
+				!PENALTIES.has(fixed) &&
+				count > MOST_PER_COURSE[fixed as keyof typeof MOST_PER_COURSE] * courses
+			)
+				return `${kind}: too many`
 		}
-		if (kind !== 'hazards') total += points
+		if (!PENALTIES.has(kind as BonusKind)) total += points
 	}
-	// Hazards come off, but never below 0 a course: so at most this.
+	// Hazards and cones come off, but never below 0 a course: so at most this.
 	if (score > total) return 'more than it adds up to'
 	return undefined
 }

@@ -275,13 +275,22 @@ export function createRoom(code: string) {
 		),
 	]
 
-	/** `character` for `seat`, if nobody else has them. */
+	/**
+	 * `character` for `seat`, if nobody else has them. A custom runner goes
+	 * with its look, whoever's it is: a phone's, sent with it; or one of the
+	 * Host's own, which no other screen has, or the Players on it would be
+	 * nameless and invisible there, in the lobby, the Results and on the
+	 * Podium.
+	 */
 	function pick(id: string, character: string, custom?: CustomRunner) {
 		const seat = seats.find((s) => s.id === id)
 		if (!seat || taken(seat).includes(character)) return false
+		const own = custom
+			? undefined
+			: customRunners().find((r) => `custom:${r.id}` === character)
 		update(id, (s) => {
 			s.character = character
-			s.custom = custom
+			s.custom = custom ?? (own && structuredClone(own))
 			s.ready = false
 		})
 		return true

@@ -483,6 +483,7 @@ export default function Party(props: { onLeave: () => void }) {
 								lobbyIn={lobbyIn()}
 								onLobby={toLobby}
 								onEnd={end}
+								controlsFor={room.controlsFor}
 							/>
 						</Match>
 						<Match when={true}>

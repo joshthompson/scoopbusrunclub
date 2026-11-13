@@ -321,8 +321,9 @@ function Controller(props: {
 	// pressed as the last ended carries over into the next.
 	createEffect(() => {
 		const stage = view()?.stage
-		if (stage !== 'round' && stage !== 'starting' && touched().size)
-			setTouched(new Set<Action>())
+		const buttonsUp =
+			stage === 'round' || stage === 'starting' || stage === 'podium'
+		if (!buttonsUp && touched().size) setTouched(new Set<Action>())
 	})
 
 	return (
@@ -534,7 +535,7 @@ function Controller(props: {
 										</div>
 									</Match>
 									<Match when={v().stage === 'podium'}>
-										<div style={styles.lobby}>
+										<div style={styles.podium}>
 											<Show
 												when={
 													v().place && (v().place as number) <= 3
@@ -542,7 +543,7 @@ function Controller(props: {
 														: undefined
 												}
 											>
-												{(place) => <Medal place={place()} size={7} />}
+												{(place) => <Medal place={place()} size={5} />}
 											</Show>
 											<div style={styles.heading}>
 												{v().place === 1
@@ -577,6 +578,8 @@ function Controller(props: {
 												Leave the Room
 											</button>
 										</div>
+										{/* Running about on the Podium, on the big screen. */}
+										<ArrowPad press={press} />
 									</Match>
 									<Match when={true}>
 										{/* Between Rounds, or waiting for the next one. */}
@@ -1121,6 +1124,14 @@ const styles = {
 		'align-items': 'center',
 		'justify-content': 'center',
 		gap: '16px',
+	},
+	/** At the Podium: how it went, over the buttons to run about with. */
+	podium: {
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'center',
+		gap: '8px',
+		padding: '10px 0',
 	},
 	mirror: {
 		display: 'flex',

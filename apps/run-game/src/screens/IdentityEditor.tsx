@@ -8,6 +8,7 @@ import {
 	identity,
 	setIdentity,
 } from '../saved/identity'
+import { lastRunner } from '../saved/settings'
 import { play } from '../sfx'
 import { Menu, Panel } from '../ui/Menu'
 import { ScoreFace } from '../ui/ScoreFace'
@@ -60,15 +61,18 @@ export function IdentityEditor(props: {
 	const indexOf = (id: string | undefined) =>
 		choices().findIndex((choice) => choice !== NEW_RUNNER && choice.id === id)
 	/**
-	 * Who's picked to begin with: whoever was chosen last time; or, the first
-	 * time, the club member just run as; or the first of the club. Never
-	 * making a new runner, nor one of your own you've not chosen.
+	 * Who's picked to begin with: the runner just run as, before sending a
+	 * score, your own or the club's; else whoever was chosen last time; else
+	 * the last runner picked to run as; or the first of the club. Never
+	 * making a new runner.
 	 */
 	const startAt = () => {
+		const ran = indexOf(props.runner?.id)
+		if (ran > 0) return ran
 		const chosen = indexOf(identity().runnerId)
 		if (chosen > 0) return chosen
-		const ran = props.runner?.custom ? -1 : indexOf(props.runner?.id)
-		if (ran > 0) return ran
+		const current = indexOf(lastRunner())
+		if (current > 0) return current
 		const firstMember = choices().findIndex(
 			(choice) => choice !== NEW_RUNNER && !choice.custom,
 		)

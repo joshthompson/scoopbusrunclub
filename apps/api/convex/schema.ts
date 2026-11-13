@@ -1,6 +1,27 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 
+/**
+ * A runner's hair and facial hair, as `CharacterSpriteProps` in
+ * apps/web/src/utils/createRunnerFrames.ts has them: kept in step with it,
+ * or a look with a new style won't save.
+ */
+export const hairValidator = v.union(
+	v.literal('long'),
+	v.literal('medium'),
+	v.literal('medium-short'),
+	v.literal('short'),
+	v.literal('ponytail'),
+	v.literal('bun'),
+	v.literal('curly'),
+)
+export const facialHairValidator = v.union(
+	v.literal('beard'),
+	v.literal('stubble'),
+	v.literal('long'),
+	v.literal('moustache'),
+)
+
 /** Whose head goes by a run game score: a club member's, or a look's. */
 export const runIconValidator = v.union(
 	v.object({ member: v.string() }),
@@ -180,9 +201,7 @@ export default defineSchema({
 				sockColor: v.optional(v.string()),
 				shoeColor: v.string(),
 				head: v.object({
-					hair: v.optional(
-						v.union(v.literal('long'), v.literal('medium'), v.literal('short')),
-					),
+					hair: v.optional(hairValidator),
 					hairColor: v.optional(v.string()),
 					accessory: v.optional(
 						v.union(
@@ -192,13 +211,7 @@ export default defineSchema({
 						),
 					),
 					accessoryColor: v.optional(v.string()),
-					facialHair: v.optional(
-						v.union(
-							v.literal('beard'),
-							v.literal('stubble'),
-							v.literal('long'),
-						),
-					),
+					facialHair: v.optional(facialHairValidator),
 					facialHairColor: v.optional(v.string()),
 					topColorForNeck: v.optional(v.boolean()),
 				}),
@@ -275,9 +288,7 @@ export default defineSchema({
 			sockColor: v.optional(v.string()),
 			shoeColor: v.string(),
 			head: v.object({
-				hair: v.optional(
-					v.union(v.literal('long'), v.literal('medium'), v.literal('short')),
-				),
+				hair: v.optional(hairValidator),
 				hairColor: v.optional(v.string()),
 				accessory: v.optional(
 					v.union(
@@ -287,9 +298,7 @@ export default defineSchema({
 					),
 				),
 				accessoryColor: v.optional(v.string()),
-				facialHair: v.optional(
-					v.union(v.literal('beard'), v.literal('stubble'), v.literal('long')),
-				),
+				facialHair: v.optional(facialHairValidator),
 				facialHairColor: v.optional(v.string()),
 				topColorForNeck: v.optional(v.boolean()),
 			}),

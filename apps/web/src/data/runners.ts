@@ -337,7 +337,7 @@ export const runners: Record<
 			tailSit: undefined,
 			scanner: undefined,
 			photographer: undefined,
-			runDirector: undefined,
+			runDirector: [assets.adamRunDirector],
 			marshal: undefined,
 			volunteerGeneric: undefined,
 			numberChecker: undefined,

@@ -167,8 +167,12 @@ export const CharacterEditor: Component<{
 							>
 								<option value="">Bald</option>
 								<option value="short">Short</option>
+								<option value="medium-short">Medium short</option>
 								<option value="medium">Medium</option>
 								<option value="long">Long</option>
+								<option value="ponytail">Ponytail</option>
+								<option value="bun">Bun</option>
+								<option value="curly">Curly</option>
 							</AdminSelect>
 							<Show when={character().head.hair}>
 								<ColorPicker
