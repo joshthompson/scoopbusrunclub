@@ -157,6 +157,22 @@ export default function Mirror(props: {
 		world.setCamera(mix(a.camera, b.camera))
 		world.setCameraY(mix(a.cameraY, b.cameraY))
 		world.setZoom(mix(a.zoom, b.zoom))
+		// A Portal at work: who's in it, and how far it's got.
+		if (a.portal) {
+			const [index, firstAt, zappedAt, busGap, held] = a.portal
+			world.portal = {
+				index,
+				firstAt,
+				zappedAt: zappedAt < 0 ? undefined : zappedAt,
+				busGap,
+				held: new Map(
+					held.flatMap(([i, at, slot]) => {
+						const racer = world.racers[i]
+						return racer ? [[racer.id, { at, vx: 0, slot }] as const] : []
+					}),
+				),
+			}
+		} else world.portal = undefined
 		world.bus.frontX = mix(a.bus[0], b.bus[0])
 		world.bus.scooping = a.bus[1]
 		world.bus.reach = mix(a.bus[2], b.bus[2])

@@ -257,6 +257,18 @@ const BUILDINGS = [
 ]
 const CHIMNEYS = BUILDINGS.map((b) => b.chimney)
 
+/**
+ * Where its course select preview looks: a gap between roofs, a third of
+ * the way along, to jump.
+ */
+const PREVIEW_FROM = (() => {
+	const third = START_X + terrain.length / 3
+	const gap = blocks.find(
+		(b, i) => b.from > third && blocks[i + 1] && blocks[i + 1].from > b.to,
+	)
+	return (gap?.to ?? third) - 520
+})()
+
 /** How far either side of something on a roof has to be roof too. */
 const CLUTTER_ROOM = 40
 export const cityRooftop: CourseDefinition = {
@@ -269,6 +281,7 @@ export const cityRooftop: CourseDefinition = {
 	runDirectors: ['josh', 'eline'],
 	cheerers: CHEERERS,
 	look: {
+		previewFrom: PREVIEW_FROM,
 		palette: {
 			'--sky-blue-top': '#2b2a5c',
 			'--sky-blue-bottom': '#f2955f',

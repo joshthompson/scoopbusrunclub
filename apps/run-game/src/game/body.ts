@@ -1,68 +1,12 @@
 import type { Obstacle } from '../courses/types'
 import { play } from '../sfx'
-import { GRAVITY } from './constants'
 import type { Body, World } from './world'
 
 /**
- * Inside someone, in Karolinska: breathed in off a table, Germs floating
+ * Inside someone, in Karolinska: Germs floating
  * about to pop, and a heart beating, its valves firing whoever's on them
  * up into the air on every beat.
  */
-
-// --- Breathed in --------------------------------------------------------
-
-/** How hard the breath pulls, a tick, before the table's edge. */
-const BREATH_PULL = 0.06
-/** How fast it carries whoever's over the drop, and how quickly it gets them going. */
-const BREATH_SPEED = 7.5
-const BREATH_GRIP = 0.12
-/** How far over the table, and over the nostril's floor, it carries them, at its highest. */
-const BREATH_LIFT = 90
-
-const ease = (t: number) => {
-	const c = Math.max(0, Math.min(1, t))
-	return c * c * (3 - 2 * c)
-}
-
-/**
- * The breath on someone, if they're in it: drawn towards the edge, and
- * over the drop, carried up off it and on into the nostril. Whether it's
- * carrying them, so nothing else moves them this tick.
- */
-export function breathe(world: World, b: Body) {
-	const breath = world.course.breath
-	if (!breath || b.x < breath.edge - breath.pull || b.x >= breath.to) return false
-	if (b.x < breath.edge) {
-		// Sniffed towards it, along the table.
-		b.vx += BREATH_PULL
-		return false
-	}
-	// Over the drop: carried, whatever's held, up and into the nostril.
-	const { terrain } = world
-	const from = terrain.groundY(breath.edge - 1)
-	const to = terrain.groundY(breath.to)
-	const along = (b.x - breath.edge) / (breath.to - breath.edge)
-	const line = from + (to - from) * ease(along * 1.15)
-	const target = line - BREATH_LIFT * Math.sin(Math.PI * Math.min(1, along))
-	// Once each: the giant breathing in.
-	if (!b.breathed) {
-		b.breathed = true
-		play('sniff')
-		world.popup('Sniiiff!', b.x + 60, b.feetY - 90)
-	}
-	b.grounded = false
-	b.jumping = false
-	b.ducking = false
-	b.on = undefined
-	b.facing = 1
-	b.vx += (BREATH_SPEED - b.vx) * BREATH_GRIP
-	b.vy = Math.max(-9, Math.min(6, (target - b.feetY) * 0.2))
-	b.x += b.vx
-	b.feetY += b.vy
-	// Past it, down onto the nostril's floor, falling as anyone does.
-	if (b.x >= breath.to) b.vy = Math.max(0, b.vy) + GRAVITY
-	return true
-}
 
 // --- Germs ---------------------------------------------------------------
 
@@ -90,9 +34,9 @@ export const GERM_GIVE = 10
 export const HEARTBEAT = 80
 export const HEARTBEAT_DUB = 14
 /** How long a valve's open on the beat, firing anyone on it up; how far either side; how hard. */
-const VALVE_OPEN = 14
-export const VALVE_REACH = 26
-const VALVE_LAUNCH = 15.5
+const VALVE_OPEN = 24
+export const VALVE_REACH = 48
+const VALVE_LAUNCH = 16
 
 /** How far through the heart's beat it is, in ticks since its last "lub". */
 export const beatAt = (ticks: number) => ticks % HEARTBEAT

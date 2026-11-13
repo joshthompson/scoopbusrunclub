@@ -15,7 +15,6 @@ import {
 	GERM_GIVE,
 	GERM_REACH,
 	GERM_SIZE,
-	breathe,
 	germHeight,
 	onValve,
 	stepHeart,
@@ -478,12 +477,6 @@ function stepRunner(world: World, racer: Racer) {
 	}
 	/** On a mole: hopping along, and digging on through any rock in the way. */
 	const mole = onMole(world, b)
-
-	// Breathed in, off a table, by a giant: carried up into its nose.
-	if (racing && breathe(world, b)) {
-		b.wasUp = up
-		return
-	}
 
 	if (b.cart !== undefined) {
 		// In a mine cart: down the line, nothing to do but hold on.
@@ -1634,9 +1627,7 @@ function collide(world: World, racer: Racer) {
 				if (state.used || state.scooped) break
 				const bottom = ground - germHeight(o, world.ticks())
 				const head = bottom - GERM_SIZE
-				if (
-					!overlaps(o.x - GERM_REACH, o.x + GERM_REACH, head + 4, bottom - 2)
-				)
+				if (!overlaps(o.x - GERM_REACH, o.x + GERM_REACH, head + 4, bottom - 2))
 					break
 				// Down onto the top of it: popped, and a bounce off it, as off a
 				// head.

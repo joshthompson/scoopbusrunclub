@@ -75,6 +75,9 @@ export const COLLECTABLE_NAMES = {
 	'fika:energyDrink': 'Energy drink',
 	'fika:sportsGel': 'Sports gel',
 	'fika:banana': 'Banana',
+	'fika:grapes': 'Grapes',
+	'fika:oxygen': 'Oxygen',
+	'fika:vitamin': 'Vitamins',
 	'ride:corgi': 'Corgi',
 	'ride:llama': 'Llama',
 	'ride:camel': 'Camel',
@@ -90,6 +93,7 @@ export const COLLECTABLE_NAMES = {
 	'ride:condor': 'Condor',
 	'ride:mole': 'Mole',
 	'ride:minecart': 'Mine cart',
+	'ride:bloodCell': 'Red blood cell',
 	pumpkin: 'Pumpkin',
 	'hat:miner': "Miner's helmet",
 	'hat:skiHelmet': 'Ski helmet',
@@ -105,6 +109,7 @@ export const COLLECTABLE_NAMES = {
 	'hat:topHat': 'Top hat',
 	'hat:flyingHelmet': 'Flying helmet',
 	'hat:bobbleHat': 'Bobble hat',
+	'hat:headMirror': 'Head mirror',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
 
@@ -155,6 +160,9 @@ export const PICKUP_WORD = {
 	'fika:energyDrink': 'Energy!',
 	'fika:sportsGel': 'Gel!',
 	'fika:banana': 'Banana!',
+	'fika:grapes': 'Get well soon!',
+	'fika:oxygen': 'Oxygen!',
+	'fika:vitamin': 'Vitamins!',
 	'ride:corgi': 'Giddy up!',
 	'ride:llama': 'Giddy up!',
 	'ride:camel': 'Giddy up!',
@@ -167,6 +175,7 @@ export const PICKUP_WORD = {
 	'ride:condor': 'Caught by a condor!',
 	'ride:mole': 'Dig dig!',
 	'ride:minecart': 'All aboard!',
+	'ride:bloodCell': 'Go with the flow!',
 	'ride:goat': 'G.O.A.T.!',
 	'ride:skis': 'Skis on!',
 	'ride:snowboard': 'Shred!',
@@ -185,6 +194,7 @@ export const PICKUP_WORD = {
 	'hat:topHat': 'Chim chim cher-ee!',
 	'hat:flyingHelmet': 'Chocks away!',
 	'hat:bobbleHat': 'Toppluva!',
+	'hat:headMirror': 'Say aah!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>
 

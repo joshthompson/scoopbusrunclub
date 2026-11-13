@@ -44,7 +44,7 @@ export interface PortalRun {
  * after them a moment behind, and at `SNAP` there's a flash and they're on
  * the other side, tiny. Ticks from going off.
  */
-const SHRINK = { charge: 40, lag: 10, snap: 124 }
+const SHRINK = { charge: 40, lag: 6, snap: 124 }
 /**
  * The sneeze: "Ah... Ah..." for `snap` ticks, the nose shaking, then
  * "CHOO!", a flash, and they're blown out of the giant's nose, growing back
@@ -63,7 +63,8 @@ const FLASH_DOWN = 30
 const snapOf = (portal: Portal) =>
 	portal.kind === 'shrink' ? SHRINK.snap : SNEEZE.snap
 /** How long after their turn someone's flying, sneezed out, before they're down and running. */
-const emergeOf = (portal: Portal) => (portal.kind === 'shrink' ? 0 : SNEEZE.flight)
+const emergeOf = (portal: Portal) =>
+	portal.kind === 'shrink' ? 0 : SNEEZE.flight
 
 /** Where someone in slot `slot` stands, across, from the middle. */
 const slotOffset = (slot: number) =>
@@ -144,7 +145,11 @@ export function stepPortals(world: World) {
 				world.popup('Shrink ray!', portal.focus.x, portal.focus.y - 110)
 			} else {
 				play('sniff')
-				world.popup('Ah...', portal.in + 70, world.terrain.groundY(portal.in) - 90)
+				world.popup(
+					'Ah...',
+					portal.in + 70,
+					world.terrain.groundY(portal.in) - 90,
+				)
 			}
 		}
 		return false
@@ -155,7 +160,11 @@ export function stepPortals(world: World) {
 	if (t < snap) {
 		if (portal.kind === 'grow' && t === Math.round(snap * 0.45)) {
 			play('sniff')
-			world.popup('Ah...', portal.in + 70, world.terrain.groundY(portal.in) - 110)
+			world.popup(
+				'Ah...',
+				portal.in + 70,
+				world.terrain.groundY(portal.in) - 110,
+			)
 		}
 		if (portal.kind === 'shrink' && t === SHRINK.charge) play('whoosh')
 		return true
@@ -195,8 +204,7 @@ function hold(world: World, run: PortalRun, portal: Portal, racer: Racer) {
 		slot: run.held.size,
 	})
 	if (run.held.size === 1) run.firstAt = world.ticks()
-	if (portal.kind === 'shrink')
-		world.popup('In you go!', b.x, b.feetY - 70)
+	if (portal.kind === 'shrink') world.popup('In you go!', b.x, b.feetY - 70)
 }
 
 /** Stood still at `x`, on the floor, nothing going on. */
@@ -231,7 +239,9 @@ function through(world: World, run: PortalRun, portal: Portal) {
 	const lookAt = portal.kind === 'shrink' ? portal.out : portal.focus.x + 120
 	world.setZoom(1)
 	world.view.lead = CAMERA_LEAD
-	world.setCamera(lookAt - VIEW_WIDTH * (portal.kind === 'shrink' ? CAMERA_LEAD : 0.5))
+	world.setCamera(
+		lookAt - VIEW_WIDTH * (portal.kind === 'shrink' ? CAMERA_LEAD : 0.5),
+	)
 	const floor = world.terrain.groundY(portal.out)
 	world.setCameraY(Math.min(0, floor - CAMERA_HEADROOM))
 	for (const racer of world.racers) {
@@ -283,9 +293,7 @@ export function sneezedTo(
 function letOut(world: World, racer: Racer, held: Held, portal: Portal) {
 	const b = racer.body
 	const x =
-		portal.kind === 'shrink'
-			? portal.out
-			: sneezedTo(world, portal, held, 1).x
+		portal.kind === 'shrink' ? portal.out : sneezedTo(world, portal, held, 1).x
 	b.x = x
 	b.feetY = world.terrain.groundY(x)
 	b.floor = b.feetY
@@ -411,4 +419,19 @@ export function shrunkAt(course: { portals?: Portal[] }, x: number) {
 		const back = portals.slice(i + 1).find((p) => p.kind === 'grow')
 		return x >= portal.in && x < (back?.out ?? Number.POSITIVE_INFINITY)
 	})
+}
+
+/**
+ * How far a Portal going off has got, for drawing it: `t` ticks since it
+ * went off, its flash at `snap`, and `since` ticks since then. The tick's
+ * a signal: reading it keeps this up to date.
+ */
+export function portalTime(world: World) {
+	const now = world.ticks()
+	const run = world.portal
+	const portal = run && world.course.portals?.[run.index]
+	if (!run || !portal || run.zappedAt === undefined) return undefined
+	const t = now - run.zappedAt
+	const snap = snapOf(portal)
+	return { portal, t, snap, since: t - snap }
 }

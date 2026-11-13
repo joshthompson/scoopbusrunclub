@@ -398,6 +398,37 @@ const BOBBLE_HAT = cells(
 	4,
 )
 
+/**
+ * A doctor's head mirror, as an ear, nose and throat doctor wears: a white
+ * band round the brow, and on the front of it, up over the forehead, the
+ * round mirror, its rim steel, its face catching the light, the hole in
+ * its middle to look through.
+ */
+const HEAD_MIRROR = cells(
+	10,
+	6,
+	[
+		// The band, round the brow, tied off at the back.
+		[2, 4, 7, 1, '#f4f4f4'],
+		[2, 5, 7, 1, '#c9ced2'],
+		[9, 4, 1, 2, '#e2e5e8'],
+		// The mirror: its steel rim, round.
+		[1, 0, 3, 1, '#9aa4aa'],
+		[0, 1, 1, 3, '#9aa4aa'],
+		[4, 1, 1, 3, '#6f787e'],
+		[1, 4, 3, 1, '#6f787e'],
+		// Its face, catching the light, and the hole through its middle.
+		[1, 1, 3, 3, '#cfe6f2'],
+		[1, 1, 1, 1, '#ffffff'],
+		[3, 3, 1, 1, '#9fc4d8'],
+		[2, 2, 1, 1, '#2b2722'],
+		// Its arm, back to the band.
+		[5, 3, 1, 1, '#8a9298'],
+	],
+	1,
+	5.5,
+)
+
 const PUMPKINS = [
 	pumpkin1Asset,
 	pumpkin2Asset,
@@ -431,6 +462,7 @@ const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	topHat: TOP_HAT,
 	flyingHelmet: FLYING_HELMET,
 	bobbleHat: BOBBLE_HAT,
+	headMirror: HEAD_MIRROR,
 }
 
 /** The propeller on top of a propeller beanie, its two blades, red and yellow. */

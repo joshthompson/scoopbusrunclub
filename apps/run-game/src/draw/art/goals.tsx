@@ -1,9 +1,10 @@
-import ghostAsset from '@/assets/halloween/ghost1.png'
 import pumpkinAsset from '@/assets/halloween/pumpkin1.png'
 import { Show } from 'solid-js'
+import spiderCupcakeAsset from '../../assets/boosts/spider-cupcake.png'
 import { paintedArt } from '../../courses/kit/pixelArt'
 import { cone } from '../../courses/kit/sewerScenery'
 import type { CourseId } from '../../courses/types'
+import { FIKA_SIZE } from '../../game/fika'
 import { PixelArt } from '../PixelArt'
 import { BALL } from '../football'
 import { TrophyArt } from './trophy'
@@ -145,6 +146,26 @@ const TOWER = rowsArt(
 	},
 )
 
+/** Pop every germ: a germ, green, its spikes out all round, grinning. */
+const GERM = rowsArt(
+	[
+		'......S......',
+		'......D......',
+		'..S..GGG..S..',
+		'...DGGGGGD...',
+		'...GLLGGGG...',
+		'..GLGGGGGGG..',
+		'SDGGKGGGKGGDS',
+		'..GGGGGGGGG..',
+		'...GGKKKGGD..',
+		'...DGGGGGD...',
+		'..S..GDD..S..',
+		'......D......',
+		'......S......',
+	],
+	{ G: '#7ac143', L: '#c4ec86', D: '#4f8a2a', S: '#e8604a', K: '#2b2722' },
+)
+
 /** Each special goal's picture: any without, a trophy. */
 const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	haga: FOOTBALL,
@@ -154,15 +175,16 @@ const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	sewers: CONE,
 	slopes: SHOE,
 	'great-wall': TOWER,
+	karolinska: GERM,
 }
 
 /**
  * For a collectables goal, in place of the course's own hat, where that's
- * its special goal's picture: Halloween Town's ghost, its pumpkin being for
- * finishing in one.
+ * its special goal's picture: Halloween Town's spider cupcake, its own fika,
+ * its pumpkin being for finishing in one.
  */
 export const COLLECTABLES_ICON: Partial<Record<CourseId, GoalIcon>> = {
-	'halloween-town': { src: ghostAsset, width: 32, height: 50 },
+	'halloween-town': { src: spiderCupcakeAsset, ...FIKA_SIZE.spiderCupcake },
 }
 
 /**

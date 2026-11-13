@@ -170,8 +170,6 @@ export interface Body {
 	toppedTower?: boolean
 	/** Germs popped, landing on them: Karolinska's special goal. */
 	germsPopped?: number
-	/** Breathed in off the table, by the giant: see `breathe`. */
-	breathed?: boolean
 }
 
 /**

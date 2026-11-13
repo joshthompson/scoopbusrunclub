@@ -253,6 +253,7 @@ export function Game(props: {
 					longJump: longJumpMetres(world),
 					rodeWearing: world.body.rodeWearing,
 					toppedTower: world.body.toppedTower,
+					germsPopped: world.body.germsPopped,
 				})
 			) {
 				placing.special = true

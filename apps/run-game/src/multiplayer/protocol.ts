@@ -417,6 +417,18 @@ export interface RaceFrame {
 	popups: { id: number; text: string; x: number; y: number; born: number }[]
 	/** Racers' ids in the order they came, once the Round's decided. */
 	order?: string[]
+	/**
+	 * A Portal at work, if one is (see `PortalRun`): which, when the first
+	 * got in, when it went off (-1, still waiting), how far back the bus
+	 * was, and who's in it: [racer index, when they got in, their slot].
+	 */
+	portal?: [
+		index: number,
+		firstAt: number,
+		zappedAt: number,
+		busGap: number,
+		held: [number, number, number][],
+	]
 	/** What was heard since the last frame. */
 	sounds: Sound[]
 }

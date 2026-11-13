@@ -32,11 +32,19 @@ import mummyAsset from '../assets/obstacles/mummy.png'
 import steamVentAsset from '../assets/obstacles/steam-vent.png'
 import ventAsset from '../assets/rooftop/vent.png'
 import purpleSignAsset from '../assets/signs/purple-sign.png'
+import { GERM_FRAMES, GERM_POPPED, VALVE } from '../courses/kit/bodyScenery'
 import { bouncyToadstool } from '../courses/kit/furbyScenery'
 import { seeded } from '../courses/kit/seeded'
 import { cone } from '../courses/kit/sewerScenery'
 import type { CourseLook, Obstacle, PlatformDefinition } from '../courses/types'
 import { boardOf } from '../game/boards'
+import {
+	GERM_SIZE,
+	HEARTBEAT,
+	beatAt,
+	germHeight,
+	valveOpen,
+} from '../game/body'
 import { inTunnel } from '../game/cave'
 import {
 	BARCODE_TALL,
@@ -60,6 +68,7 @@ import { DRAWN_FROM } from '../game/groundColumns'
 import type { Hat } from '../game/hats'
 import { mummyAt } from '../game/mummies'
 import { type PlatformAt, platformAt } from '../game/platforms'
+import { heldLook } from '../game/portals'
 import {
 	BALLOON_HEIGHT,
 	BALLOON_WIDTH,
@@ -469,6 +478,19 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 						}
 					: {}),
 			})
+			// In a Portal: shrinking, or growing as they're sneezed out, from
+			// their feet; or out of sight, waiting their turn the other side.
+			const portal = heldLook(world, racer)
+			if (portal?.hidden) $.setStyle({ visibility: 'hidden' })
+			else if (portal && portal.scale !== 1) {
+				$.setX(portal.x - width / 2)
+				$.setY(portal.feetY - $.height())
+				$.setState('pause')
+				$.setStyle({
+					transform: `scale(${xScale * portal.scale}, ${portal.scale})`,
+					'transform-origin': '50% 100%',
+				})
+			}
 			// Where their head is, as they're drawn: for a hat knocked off it
 			// to fly off from.
 			const height = $.height()
@@ -2200,13 +2222,14 @@ function Bouncer(props: { world: World; state: ObstacleState }) {
 		// Down flat, then up past where it was, and settling.
 		return 1 - 0.45 * Math.cos(puff * Math.PI * 3) * (1 - puff)
 	}
+	const own = props.world.course.look?.bouncer
 	return (
 		<img
-			src={bouncyToadstool}
+			src={own?.asset ?? bouncyToadstool}
 			alt=""
 			class="pixelated"
-			width={44}
-			height={32}
+			width={own?.width ?? 44}
+			height={own?.height ?? 32}
 			style={{
 				display: 'block',
 				transform: `scale(${2 - squash()}, ${squash()})`,
@@ -2232,10 +2255,12 @@ function createCyclist(
 	o: Extract<Obstacle, { kind: 'cyclist' }>,
 	id: string,
 ) {
-	const WIDTH = 56
-	const HEIGHT = 48
+	// Or the course's own: a hospital bed, wheeled along by a porter.
+	const own = world.course.look?.cyclist
+	const WIDTH = own?.width ?? 56
+	const HEIGHT = own?.height ?? 48
 	return createController({
-		frames: [cyclist1Asset, cyclist2Asset],
+		frames: own?.frames ?? [cyclist1Asset, cyclist2Asset],
 		init: () => ({
 			id,
 			type: 'zombie',
@@ -2627,8 +2652,13 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 	const id = `${o.kind}-${i}`
 	switch (o.kind) {
 		case 'rock': {
-			// Or the course's own, in its place, taken in turn.
-			const own = world.course.look?.rocks
+			// Or the course's own, in its place, taken in turn: those for where
+			// it is, if they're only for some of the course.
+			const own = world.course.look?.rocks?.filter(
+				(r) =>
+					o.x >= (r.from ?? Number.NEGATIVE_INFINITY) &&
+					o.x < (r.to ?? Number.POSITIVE_INFINITY),
+			)
 			const art = own?.length
 				? own[
 						world.obstacles
@@ -2885,8 +2915,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					type: 'hazard',
 					x: o.x,
 					sink: 2,
-					width: 44,
-					height: 32,
+					width: world.course.look.bouncer?.width ?? 44,
+					height: world.course.look.bouncer?.height ?? 32,
 					world,
 					children: () => <Bouncer world={world} state={state} />,
 				})
@@ -3050,6 +3080,51 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 		case 'turbine':
 		case 'whale':
 			return createSkyThing(world, state, o, id)
+		case 'germ':
+			return createGerm(world, state, o, id)
+		case 'valve':
+			// Raised a little off the floor, flapping open on the beat, its
+			// chevrons over it lighting up and leaping: stand here. The
+			// tick's a signal: reading it keeps it beating.
+			return createFixture({
+				id,
+				type: 'hazard',
+				x: o.x,
+				sink: VALVE_SINK,
+				width: VALVE.width,
+				height: VALVE.height,
+				world,
+				children: () => {
+					const beat = () => beatAt(Math.max(0, world.ticks()))
+					const open = () => valveOpen(Math.max(0, world.ticks()))
+					return (
+						<>
+							<img
+								src={open() ? VALVE.open : VALVE.shut}
+								alt=""
+								class="pixelated"
+								width={VALVE.width}
+								height={VALVE.height}
+								style={{ display: 'block' }}
+							/>
+							<img
+								src={VALVE.arrows}
+								alt=""
+								class="pixelated"
+								width={VALVE_ARROWS}
+								height={VALVE_ARROWS * (10 / 12)}
+								style={{
+									position: 'absolute',
+									left: `${(VALVE.width - VALVE_ARROWS) / 2}px`,
+									bottom: `${VALVE.height + 10 + (open() ? Math.round(Math.sin((beat() / 24) * Math.PI) * 16) : 0)}px`,
+									opacity: open() ? 1 : 0.35 + 0.35 * (beat() / HEARTBEAT),
+									filter: open() ? 'drop-shadow(0 0 4px #fff6a8)' : undefined,
+								}}
+							/>
+						</>
+					)
+				},
+			})
 		case 'snowman':
 			return createFixture({
 				id,
@@ -3073,6 +3148,86 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					</Scoopable>
 				),
 			})
+	}
+}
+
+/** How far a heart valve sits down in the floor, its rim raised over it; and how wide its chevrons are. */
+const VALVE_SINK = 10
+const VALVE_ARROWS = 24
+
+/** How long a popped Germ's burst is seen for. */
+const GERM_BURST = 18
+
+/**
+ * A Germ, bobbing up and down where it floats, its spikes wriggling; popped,
+ * a burst, and gone; scooped, flying. Drawn where `germHeight` says it is
+ * by the tick, which is a signal: reading it keeps it bobbing.
+ */
+function createGerm(
+	world: World,
+	state: ObstacleState,
+	o: Extract<Obstacle, { kind: 'germ' }>,
+	id: string,
+) {
+	const ground = world.terrain.groundY(o.x)
+	return createController({
+		frames: [...GERM_FRAMES, GERM_POPPED],
+		init: () => ({
+			id,
+			type: 'zombie',
+			...createObjectSignal(o.x - GERM_SIZE / 2, 'x'),
+			...createObjectSignal(ground - o.low - GERM_SIZE, 'y'),
+			width: () => GERM_SIZE,
+			height: () => GERM_SIZE,
+			frames: () => GERM_FRAMES,
+			...createObjectSignal(0, 'rotation'),
+			...createObjectSignal(220, 'frameInterval'),
+			...createObjectSignal('play' as 'play' | 'pause', 'state'),
+			...createObjectSignal({} as JSX.CSSProperties, 'style'),
+			children: () => (
+				<Show when={popped()}>
+					<img
+						src={GERM_POPPED}
+						alt=""
+						class="pixelated"
+						width={GERM_SIZE}
+						height={GERM_SIZE}
+						style={{
+							position: 'absolute',
+							inset: 0,
+							transform: `scale(${1 + (popped() ?? 0) / GERM_BURST})`,
+							opacity: 1 - (popped() ?? 0) / GERM_BURST,
+						}}
+					/>
+				</Show>
+			),
+		}),
+		onEnterFrame({ $ }) {
+			const now = world.ticks()
+			const bottom = ground - germHeight(o, Math.max(0, now))
+			if (state.scooped) {
+				const flight = scoopFlight(state.scooped, now)
+				$.setX(o.x - GERM_SIZE / 2 + flight.x)
+				$.setY(bottom - GERM_SIZE + flight.y)
+				$.setRotation(flight.spin)
+				return
+			}
+			$.setX(o.x - GERM_SIZE / 2)
+			$.setY(bottom - GERM_SIZE)
+			// Popped: its body gone, its burst going.
+			$.setStyle(
+				state.used && state.flown !== undefined
+					? { 'background-image': 'none' }
+					: {},
+			)
+		},
+	})
+	/** How long since it was popped, while its burst's still showing. */
+	function popped() {
+		const now = world.ticks()
+		if (!state.used || state.flown === undefined || state.scooped) return
+		const since = now - state.flown
+		return since >= 0 && since < GERM_BURST ? since : undefined
 	}
 }
 

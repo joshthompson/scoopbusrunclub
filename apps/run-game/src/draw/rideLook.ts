@@ -3,6 +3,13 @@ import type { Course } from '../courses/types'
 import { CORGI_SADDLE } from '../game/constants'
 import type { Sound } from '../sfx'
 import {
+	BLOOD_CELL_BACK,
+	BLOOD_CELL_HEIGHT,
+	BLOOD_CELL_SADDLE,
+	BLOOD_CELL_WIDTH,
+	BloodCellArt,
+} from './art/bloodCell'
+import {
 	BactrianArt,
 	CAMEL_BACK,
 	CAMEL_HEIGHT,
@@ -204,6 +211,23 @@ const SKIS: RideLook = {
 	rides: 'Skis and boards',
 }
 
+/**
+ * A red blood cell, in the bloodstream: going with the flow, faster than
+ * running, and a long ride, up the artery.
+ */
+const BLOOD_CELL: RideLook = {
+	width: BLOOD_CELL_WIDTH,
+	height: BLOOD_CELL_HEIGHT,
+	back: BLOOD_CELL_BACK,
+	saddle: BLOOD_CELL_SADDLE,
+	Art: BloodCellArt,
+	call: 'Blub!',
+	sound: 'pop',
+	rides: 'Blood cell rides',
+	speed: 8.5,
+	ticks: 360,
+}
+
 const RIDES = {
 	corgi: CORGI,
 	llama: LLAMA,
@@ -214,6 +238,7 @@ const RIDES = {
 	goat: GOAT,
 	mole: MOLE,
 	skis: SKIS,
+	bloodCell: BLOOD_CELL,
 }
 
 export const rideLook = (course: Pick<Course, 'ride'>) =>

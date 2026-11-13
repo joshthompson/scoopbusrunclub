@@ -984,17 +984,44 @@ export function Ground(props: { world: View }) {
 		flush()
 		return d
 	}
+	type Span = (x: number, ground: number) => [number, number] | undefined
+	const wallSpan: Span = (x, ground) => {
+		const ceiling = cave?.ceiling(x)
+		return ceiling === undefined ? undefined : [ceiling, ground - PATH_BACK]
+	}
+	const rockSpan: Span = (x) => {
+		const ceiling = cave?.ceiling(x)
+		if (ceiling === undefined) return undefined
+		return [Math.max(-SKY_ROOM, cave?.surface(x) ?? -SKY_ROOM), ceiling]
+	}
+	const frontSpan: Span = (x, ground) => {
+		const foot = cave?.foot(x)
+		return foot === undefined || (cave?.ceiling(x) === undefined && !cave?.hull)
+			? undefined
+			: [ground + PATH_FRONT + 2, Math.min(VIEW_HEIGHT, foot)]
+	}
+	/**
+	 * A Cave's tiles, zone by zone along it (see `zones`): each its wall,
+	 * front and rock, only where it's that zone's.
+	 */
+	const caveLook = props.world.course.look?.cave
+	const tileZones = caveLook?.tiles ? caveZones(caveLook) : []
+	const zoned = tileZones.map((zone, k) => {
+		const only =
+			(span: Span): Span =>
+			(x, ground) =>
+				zoneAt(tileZones, x) === k ? span(x, ground) : undefined
+		return {
+			tiles: zone.tiles,
+			wall: columns(only(wallSpan)),
+			front: columns(only(frontSpan), false),
+			rock: columns(only(rockSpan)),
+		}
+	})
 	/** A Cave: its back wall, the rock over it and in front of the path, its underside, and the grass on the hill. */
 	const caveParts = cave && {
-		wall: columns((x, ground) => {
-			const ceiling = cave.ceiling(x)
-			return ceiling === undefined ? undefined : [ceiling, ground - PATH_BACK]
-		}),
-		rock: columns((x) => {
-			const ceiling = cave.ceiling(x)
-			if (ceiling === undefined) return undefined
-			return [Math.max(-SKY_ROOM, cave.surface(x) ?? -SKY_ROOM), ceiling]
-		}),
+		wall: tileZones.length > 1 ? '' : columns(wallSpan),
+		rock: tileZones.length > 1 ? '' : columns(rockSpan),
 		underside: columns((x) => {
 			const ceiling = cave.ceiling(x)
 			return ceiling === undefined ? undefined : [ceiling - 4, ceiling]
@@ -1009,12 +1036,7 @@ export function Ground(props: { world: View }) {
 					return length >= 2 ? [ceiling - 2, ceiling + length] : undefined
 				}, false)
 			: '',
-		front: columns((x, ground) => {
-			const foot = cave.foot(x)
-			return foot === undefined || (cave.ceiling(x) === undefined && !cave.hull)
-				? undefined
-				: [ground + PATH_FRONT + 2, Math.min(VIEW_HEIGHT, foot)]
-		}, false),
+		front: tileZones.length > 1 ? '' : columns(frontSpan, false),
 		/** Under the sand's top, where it's dug down under it: drawn as sand, not rock. */
 		sand: columns((x) => {
 			const sand = cave.sand?.(x)
@@ -1569,6 +1591,44 @@ export function Ground(props: { world: View }) {
 								d={caveParts?.rock}
 								fill={look().tiles ? 'url(#cave-tile-rock)' : 'url(#cave-rock)'}
 							/>
+							{/* Zone by zone, each its own tiles: a hospital, a nose, lungs. */}
+							<For each={zoned.length > 1 ? zoned : []}>
+								{(zone, k) => (
+									<>
+										<defs>
+											<TilePattern
+												id={`cave-zone-${k()}-rock`}
+												tile={zone.tiles.rock}
+											/>
+											<TilePattern
+												id={`cave-zone-${k()}-front`}
+												tile={zone.tiles.front ?? zone.tiles.rock}
+											/>
+											<Show when={zone.tiles.wall}>
+												{(wall) => (
+													<TilePattern
+														id={`cave-zone-${k()}-wall`}
+														tile={wall()}
+													/>
+												)}
+											</Show>
+										</defs>
+										<path
+											d={zone.wall}
+											fill={
+												zone.tiles.wall
+													? `url(#cave-zone-${k()}-wall)`
+													: look().wall
+											}
+										/>
+										<path
+											d={zone.front}
+											fill={`url(#cave-zone-${k()}-front)`}
+										/>
+										<path d={zone.rock} fill={`url(#cave-zone-${k()}-rock)`} />
+									</>
+								)}
+							</For>
 							<path d={caveParts?.underside} fill={look().edge} />
 							<path d={caveParts?.drips} fill={look().edge} />
 							<Show
@@ -1582,7 +1642,7 @@ export function Ground(props: { world: View }) {
 							{/* Its sand, where it's dug down under it, on its rock. */}
 							<path d={caveParts?.sand} fill="url(#cave-sand)" />
 							{/* Pictures on it: the Sphinx's head, its paws. */}
-							<For each={cave?.features ?? []}>
+							<For each={(cave?.features ?? []).filter((f) => !f.outside)}>
 								{(feature) => (
 									<image
 										href={feature.asset}
@@ -1742,7 +1802,8 @@ const COVER_FADE = '350ms'
 /**
  * A Cave's rock over the inside of it, in front of everything in there:
  * till someone racing goes in, it's solid ground, its way in and its way
- * out showing; with them inside, it's gone, the cave opened up.
+ * out showing, with what's on it from `outside`; with them inside, it's
+ * gone, the cave opened up. Part by part, if it has `parts`.
  */
 export function CaveCover(props: {
 	world: View & Pick<World, 'racers' | 'ticks'>
@@ -1750,20 +1811,52 @@ export function CaveCover(props: {
 	const { cave } = props.world.course
 	const look = props.world.course.look?.cave
 	if (!cave || !look) return null
+	const parts = cave.parts ?? [{ from: cave.from, to: cave.to }]
+	return (
+		<For each={parts}>
+			{(part, i) => (
+				<CavePartCover
+					world={props.world}
+					cave={cave}
+					look={look}
+					from={part.from}
+					to={part.to}
+					mouth={i() === 0 ? cave.mouth : undefined}
+					id={`cave-cover-${i()}`}
+				/>
+			)}
+		</For>
+	)
+}
+
+/** One part of a Cave's cover, `from` to `to`: see `CaveCover`. */
+function CavePartCover(props: {
+	world: View & Pick<World, 'racers' | 'ticks'>
+	cave: NonNullable<World['course']['cave']>
+	look: NonNullable<CourseLook['cave']>
+	from: number
+	to: number
+	mouth?: number
+	id: string
+}) {
+	const { cave, look, id } = props
 	const { terrain } = props.world
 	const drawnTo = terrain.finishX + 1600
 	const width = drawnTo - DRAWN_FROM
-	// Its rock, and under the sand's top, where it's dug down under it, sand.
-	let rock = ''
+	const zones = look.tiles ? caveZones(look) : []
+	// Its rock, zone by zone, and under the sand's top, where it's dug down
+	// under it, sand.
+	const rock = zones.map(() => '')
+	let plainRock = ''
 	let sand = ''
 	/** With tiles, its front under the path, as the hull's, apart from its side over it. */
-	let front = ''
+	const front = zones.map(() => '')
 	const column = (x: number, top: number, bottom: number) =>
 		bottom > top
 			? ` M${x - DRAWN_FROM},${Math.round(top / 2) * 2} H${x - DRAWN_FROM + STEP} V${Math.round(bottom / 2) * 2} H${x - DRAWN_FROM} Z`
 			: ''
-	const mouth = cave.mouth ?? MOUTH_SHOWN
-	for (let x = cave.from + mouth; x < cave.to - MOUTH_SHOWN; x += STEP) {
+	const mouth = props.mouth ?? MOUTH_SHOWN
+	for (let x = props.from + mouth; x < props.to - MOUTH_SHOWN; x += STEP) {
 		const middle = x + STEP / 2
 		const ceiling = cave.ceiling(middle)
 		const foot = cave.foot(middle)
@@ -1771,19 +1864,24 @@ export function CaveCover(props: {
 		const top = ceiling - 4
 		const under = cave.sand?.(middle)
 		if (look.tiles) {
+			const k = zoneAt(zones, middle)
 			const path = Math.round(terrain.groundY(middle) / 2) * 2 + PATH_FRONT + 2
-			rock += column(x, top, Math.min(foot, path))
-			front += column(x, path, foot)
-		} else if (under === undefined) rock += column(x, top, foot)
+			rock[k] += column(x, top, Math.min(foot, path))
+			front[k] += column(x, path, foot)
+		} else if (under === undefined) plainRock += column(x, top, foot)
 		else {
-			rock += column(x, top, Math.min(foot, under))
+			plainRock += column(x, top, Math.min(foot, under))
 			sand += column(x, Math.max(top, under), foot)
 		}
 	}
+	/** What's on it seen from outside: its doors, a face. */
+	const outside = (cave.features ?? []).filter(
+		(f) => f.outside && f.x >= props.from && f.x < props.to,
+	)
 	/** Whether someone racing's in it, under its hill. */
 	const anyoneInside = () =>
 		props.world.racers.some(({ body, out }) => {
-			if (out || body.x < cave.from || body.x > cave.to) return false
+			if (out || body.x < props.from || body.x > props.to) return false
 			// Aboard a ship, anywhere: up on its roof too.
 			if (cave.hull) return true
 			const surface = cave.surface(body.x)
@@ -1824,33 +1922,33 @@ export function CaveCover(props: {
 				aria-hidden="true"
 			>
 				<defs>
-					<SandPattern id="cave-cover-sand" />
-					<Show when={look.tiles}>
-						{(tiles) => (
+					<SandPattern id={`${id}-sand`} />
+					<For each={zones}>
+						{(zone, k) => (
 							<>
 								<TilePattern
-									id="cave-cover-tile"
-									tile={tiles().rock}
+									id={`${id}-tile-${k()}`}
+									tile={zone.tiles.rock}
 									x={DRAWN_FROM}
 								/>
 								<TilePattern
-									id="cave-cover-front"
-									tile={tiles().front ?? tiles().rock}
+									id={`${id}-front-${k()}`}
+									tile={zone.tiles.front ?? zone.tiles.rock}
 									x={DRAWN_FROM}
 								/>
 							</>
 						)}
-					</Show>
+					</For>
 					<Show when={look.bricks}>
 						<BrickPattern
-							id="cave-cover-bricks"
+							id={`${id}-bricks`}
 							brick={look.rock}
 							mortar={look.seam}
 							lit={look.edge}
 						/>
 					</Show>
 					<pattern
-						id="cave-cover-rock"
+						id={`${id}-rock`}
 						patternUnits="userSpaceOnUse"
 						width={48}
 						height={36}
@@ -1867,20 +1965,52 @@ export function CaveCover(props: {
 					</pattern>
 				</defs>
 				<path
-					d={rock}
-					fill={
-						look.tiles
-							? 'url(#cave-cover-tile)'
-							: look.bricks
-								? 'url(#cave-cover-bricks)'
-								: 'url(#cave-cover-rock)'
-					}
+					d={plainRock}
+					fill={look.bricks ? `url(#${id}-bricks)` : `url(#${id}-rock)`}
 				/>
-				<path d={front} fill="url(#cave-cover-front)" />
-				<path d={sand} fill="url(#cave-cover-sand)" />
+				<For each={zones}>
+					{(_, k) => (
+						<>
+							<path d={rock[k()]} fill={`url(#${id}-tile-${k()})`} />
+							<path d={front[k()]} fill={`url(#${id}-front-${k()})`} />
+						</>
+					)}
+				</For>
+				<path d={sand} fill={`url(#${id}-sand)`} />
+				<For each={outside}>
+					{(feature) => (
+						<image
+							href={feature.asset}
+							x={feature.x - DRAWN_FROM - feature.width / 2}
+							y={featureTop(props.world, feature)}
+							width={feature.width}
+							height={feature.height}
+							style={{ 'image-rendering': 'pixelated' }}
+						/>
+					)}
+				</For>
 			</svg>
 		</div>
 	)
+}
+
+/**
+ * A Cave's tiles, zone by zone: its own `tiles` from the start, then each
+ * of its `zones` from where it starts.
+ */
+function caveZones(look: NonNullable<CourseLook['cave']>) {
+	if (!look.tiles) return []
+	return [
+		{ from: Number.NEGATIVE_INFINITY, tiles: look.tiles },
+		...(look.zones ?? []),
+	]
+}
+
+/** Which of `zones` `x` is in: the last to have started by it. */
+function zoneAt(zones: { from: number }[], x: number) {
+	let k = 0
+	for (let i = 1; i < zones.length; i++) if (zones[i].from <= x) k = i
+	return k
 }
 
 /**

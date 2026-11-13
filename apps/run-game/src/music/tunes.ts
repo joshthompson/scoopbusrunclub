@@ -563,6 +563,55 @@ export const TUNES: Record<string, Tune> = {
 		],
 	},
 
+	// Karolinska: A minor, a fantastic voyage. A heart's "lub-dub" for a
+	// bass, arpeggios bubbling over it like air through the lungs, and the
+	// hospital's chime, "ding, dong, ding, dong", as on its tannoy.
+	karolinska: {
+		bars: 4,
+		tracks: [
+			{
+				voice: 'sub',
+				pattern: bars(
+					'A1 - A1 - - - - - A1 - A1 - - - - -',
+					'F1 - F1 - - - - - F1 - F1 - - - - -',
+					'D2 - D2 - - - - - D2 - D2 - - - - -',
+					'E1 - E1 - - - - - E1 - E1 - - - G#1 -',
+				),
+				gain: 0.22,
+			},
+			{
+				voice: 'pluck',
+				pattern: bars(
+					'A4 C5 E5 A5 E5 C5 A4 C5 E5 A5 C6 A5 E5 C5 A4 C5',
+					'F4 A4 C5 F5 C5 A4 F4 A4 C5 F5 A5 F5 C5 A4 F4 A4',
+					'D4 F4 A4 D5 A4 F4 D4 F4 A4 D5 F5 D5 A4 F4 D4 F4',
+					'E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 G#5 E5 B4 G#4 E4 B4',
+				),
+				gain: 0.03,
+			},
+			{
+				voice: 'bell',
+				pattern: bars(
+					'E6 - - - C6 - - - D6 - - - G5 _ _ -',
+					'- - - - - - - - - - - - - - - -',
+					'G5 - - - D6 - - - E6 - - - C6 _ _ -',
+					'- - - - - - - - B5 - - - G#5 - - -',
+				),
+				gain: 0.035,
+			},
+			{
+				voice: 'whistle',
+				pattern: bars(
+					'- - - - - - - - - - - - E5 _ A5 _',
+					'C6 _ _ _ B5 _ A5 _ F5 _ _ _ - - - -',
+					'- - - - - - - - - - - - D5 _ F5 _',
+					'A5 _ _ _ G#5 _ B5 _ E6 _ _ _ - - - -',
+				),
+				gain: 0.045,
+			},
+		],
+	},
+
 	// Down The Slopes: après-ski, bright, in G, an oompah of a bass under a
 	// chorus to sing along to, arpeggios sparkling over it, sleigh bells.
 	slopes: {

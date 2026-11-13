@@ -35,15 +35,13 @@ import { zombieSprite } from '../runners/skeleton'
 
 /**
  * A course, seen through a little window onto it: its own sky, hills, path
- * and scenery, drawn by the game's own backdrop, panning along it, up and
- * down its real hills.
+ * and scenery, drawn by the game's own backdrop, at one place along it,
+ * still, chosen to show it off (`CourseLook['previewFrom']`).
  */
 
 /** The game's scene, at this size in the window: small enough to see its hills. */
 const SCALE = 0.5
-/** How fast it scrolls by, in the scene's pixels a second. */
-const SPEED = 130
-/** Where it starts, as a share of the way round: somewhere with hills, past the flat start. */
+/** Where it looks, if the course doesn't say, as a share of the way round: somewhere with hills, past the flat start. */
 const START_AT = 0.35
 /** Where across the window it follows the ground up and down, and how far down the window that is. */
 const FOLLOW_ACROSS = 0.55
@@ -56,8 +54,6 @@ const GROUND_DOWN = 0.92
 const HORIZON_TOP = 120
 /** Up a mountain, the ground's never higher up the window than this: it follows it up. */
 const GROUND_HIGHEST = 0.45
-/** How quickly the window follows the ground up and down the hills. */
-const FOLLOW = 0.08
 /** Scenery stands this far back from the path, as in the game. */
 const SET_BACK = 10
 
@@ -74,8 +70,7 @@ export function CoursePreview(props: {
 	const followAcross = sceneWidth * FOLLOW_ACROSS
 
 	const from = course.look?.previewFrom ?? START_X + terrain.length * START_AT
-	const to = terrain.finishX - sceneWidth
-	const [camera, setCamera] = createSignal(from)
+	const camera = () => from
 	/**
 	 * The window's top, in the scene: down with the ground, low on the
 	 * course; and up with it, up a mountain, keeping it at least
@@ -91,7 +86,8 @@ export function CoursePreview(props: {
 			),
 		)
 	}
-	const [top, setTop] = createSignal(topFor(from))
+	/** As tall as the window is, which can change: see `CourseSelect`. */
+	const top = () => topFor(from)
 
 	let frame = 0
 	let last = 0
@@ -103,11 +99,6 @@ export function CoursePreview(props: {
 		last = now
 		clock += seconds
 		setTicks(Math.floor(clock * 60))
-		// On round the course, and back to the start from the finish.
-		let next = camera() + SPEED * seconds
-		if (next > to) next = START_X - followAcross
-		setCamera(next)
-		setTop(top() + (topFor(next) - top()) * FOLLOW)
 		frame = requestAnimationFrame(tick)
 	}
 	onMount(() => {

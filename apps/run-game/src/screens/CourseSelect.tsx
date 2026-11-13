@@ -36,6 +36,12 @@ import { onHover } from '../ui/hover'
 /** What's picked: Endless, or a course's id, to practise it. */
 export type RunChoice = string
 
+/**
+ * Whether each course's blurb is shown under its name: hidden for now, the
+ * preview taking its room. Every course still has one (`Course['blurb']`).
+ */
+const SHOW_BLURBS = false
+
 /** The preview's least height, and its border, top and bottom, round that. */
 const PREVIEW_LEAST = 110
 const PREVIEW_BORDER = 6
@@ -304,10 +310,12 @@ export function CourseSelect(props: {
 						</Show>
 					</span>
 				</div>
-				<div style={styles.blurb}>
-					{picked()?.blurb ??
-						'Every course in turn, your points carried on, until the bus gets you.'}
-				</div>
+				<Show when={SHOW_BLURBS}>
+					<div style={styles.blurb}>
+						{picked()?.blurb ??
+							'Every course in turn, your points carried on, until the bus gets you.'}
+					</div>
+				</Show>
 				{/* Down one side, its medals, each and what it takes, in colour
 				    once got, and how many of its collectables have been found;
 				    down the other, the top scores on it. */}

@@ -77,6 +77,13 @@ A Platform that moves, such as a girder swinging from a crane.
 **Cave**:
 A stretch of a Course under a hill, with rock over the Ground, or dug down under the sand, as through the Sphinx on the Pyramids. Some Platforms in a Cave are shelves of solid rock: there's no jumping up through those from below. From outside, a Cave is solid rock, only its way in and its way out showing; it opens up once someone racing goes in. On Scoop Cruises the ferry is a Cave: its plated side is the rock, its rooms open up once someone's aboard, and its sun deck is open to the sky.
 
+**Portal**:
+A machine, or a sneeze, that changes everyone's size: in Karolinska, the **Shrink Ray** in the lab and the **Sneeze** that blows everyone back out of the scientist's nose. Whoever gets to one is held in it till every Player still racing is; then it goes off for all of them at once, the camera diving in (or pulling out), and they come out the other side in the order they went in, as far apart, each as fast as they went in. The Scoop Bus comes through after them, as far behind as it was. No Pacers go through.
+_Avoid_: Teleport, warp
+
+**Giant Mouth**:
+In Karolinska, the scientist's mouth, at the edge of the lab bench: it opens as anyone racing gets near, and its tongue rolls out over the edge, to be run up and in.
+
 **Ceiling**:
 The underside of the rock over the Ground in a Cave, or of a solid rock shelf. A runner who jumps into it bumps their head and comes back down.
 _Avoid_: Roof (a roof is Ground, on City Rooftop)
@@ -107,6 +114,12 @@ _Avoid_: Zombie (Zombies walk Halloween Town)
 **Zombie**:
 A club member risen from the grave, now and then just a skeleton, walking the wrong way along Halloween Town: an Obstacle. One that walks into an open grave is gone, and the Scoop Bus Scoops any it reaches. (Skeletons also run the right way, as Pacers.)
 _Avoid_: Pacer (Pacers race the right way)
+
+**Germ**:
+A virus floating inside someone, in Karolinska, bobbing up and down: run under it or jump it, or stumble. Land on top of it and it pops, a bounce off it as off a head.
+
+**Heart Valve**:
+A flap in the floor of Karolinska's heart that opens on every beat, firing whoever's on it up into the air: the only way over the ridges between the heart's chambers.
 
 **Steam Vent**:
 A grate in the Ground that puffs steam now and then, firing whoever's on it as it puffs high into the air. Not an Obstacle: nothing to stumble on. A **Giant Vent** is The Sewers' way out: it fires whoever's on it right up out of the sewer and on, back onto the street.

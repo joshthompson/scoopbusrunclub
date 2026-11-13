@@ -65,6 +65,13 @@ export type FikaItem =
 	| 'energyDrink'
 	| 'sportsGel'
 	| 'banana'
+	/**
+	 * Karolinska's: grapes, as brought to anyone in hospital; and once
+	 * you're shrunk and inside someone, bubbles of oxygen, and vitamins.
+	 */
+	| 'grapes'
+	| 'oxygen'
+	| 'vitamin'
 
 export const FIKA_ITEMS: FikaItem[] = [
 	'coffee',
@@ -167,6 +174,17 @@ export const KRISTINEBERG_FIKA: FikaItem[] = [
 	'banana',
 ]
 
+/** In Karolinska's corridors: grapes, for the patients, a coffee and a bun. */
+export const HOSPITAL_FIKA: FikaItem[] = [
+	'grapes',
+	'coffee',
+	'kanelbulle',
+	'grapes',
+]
+
+/** Inside someone: bubbles of oxygen, and vitamins. */
+export const BODY_FIKA: FikaItem[] = ['oxygen', 'vitamin', 'oxygen']
+
 /** In Turku: a Karelian pie, a coffee, salmiakki. */
 export const TURKU_FIKA: FikaItem[] = ['karelianPie', 'coffee', 'salmiakki']
 
@@ -216,4 +234,7 @@ export const FIKA_SIZE: Record<FikaItem, { width: number; height: number }> = {
 	energyDrink: { width: 8 * CELL, height: 13 * CELL },
 	sportsGel: { width: 7 * CELL, height: 12 * CELL },
 	banana: { width: 12 * CELL, height: 9 * CELL },
+	grapes: { width: 12 * CELL, height: 12 * CELL },
+	oxygen: { width: 11 * CELL, height: 11 * CELL },
+	vitamin: { width: 12 * CELL, height: 7 * CELL },
 }

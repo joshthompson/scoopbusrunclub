@@ -17,6 +17,7 @@ import { greatWall } from './greatWall'
 import { haga } from './haga'
 import { halloweenTown } from './halloweenTown'
 import { huddinge } from './huddinge'
+import { karolinska } from './karolinska'
 import { kristineberg } from './kristineberg'
 import { machuPicchu } from './machuPicchu'
 import { pyramids } from './pyramids'
@@ -102,6 +103,7 @@ export const COURSES: Course[] = [
 	cliff,
 	everest,
 	slopes,
+	karolinska,
 ].map((course, i) => {
 	const climb = climbOf(course)
 	// So a Round can always get everyone on the screen.

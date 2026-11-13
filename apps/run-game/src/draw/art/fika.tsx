@@ -23,6 +23,7 @@ import {
 	pickAndMix,
 	salmiakki,
 } from '../../courses/kit/ferryFika'
+import { grapes, oxygen, vitamin } from '../../courses/kit/karolinskaFika'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
 import {
 	goldRing,
@@ -177,6 +178,9 @@ const ART: Record<FikaItem, string> = {
 	energyDrink,
 	sportsGel,
 	banana,
+	grapes,
+	oxygen,
+	vitamin,
 }
 
 /** A fika item, at its size. */

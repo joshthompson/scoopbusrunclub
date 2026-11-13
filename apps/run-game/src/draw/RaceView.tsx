@@ -1,5 +1,6 @@
 import { Canvas, Scene } from 'scoopjs'
-import { type JSX, Show } from 'solid-js'
+import { type JSX, Show, createMemo } from 'solid-js'
+import { HEARTBEAT_DUB, beatAt } from '../game/body'
 import {
 	HITBOX_HALF_WIDTH,
 	START_X,
@@ -8,6 +9,8 @@ import {
 	VIEW_WIDTH,
 } from '../game/constants'
 import { DRAWN_FROM } from '../game/groundColumns'
+import { portalView } from '../game/portals'
+import { onScreen } from '../game/step'
 import type { World } from '../game/world'
 import { Backdrop, CaveCover, Ground, HorizonTrees } from './Backdrop'
 import { Fog } from './Fog'
@@ -15,7 +18,9 @@ import { createLongJump } from './LongJump'
 import { SeaFront } from './Sea'
 import { Snow } from './Snow'
 import { createFootballSprite } from './football'
+import { createGiantMouth } from './giantMouth'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
+import { createPortalFx } from './portalFx'
 import {
 	createBanner,
 	createBoost,
@@ -126,6 +131,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			scene.addController(
 				createGameController(world, step),
 				...createScenery(world),
+				// A giant's mouth, opening, over its face: after the scenery, over it.
+				...createGiantMouth(world),
 				// Just ahead of the runner, so they toe the line rather than stand on it.
 				...createBanner(world, START_X + HITBOX_HALF_WIDTH + 4, 'START'),
 				createParkrunSign(world, START_X - 190),
@@ -161,6 +168,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createHats(world),
 				...createForeground(world),
 				...createTowers(world),
+				// A Portal going off: the shrink ray's beam, the sneeze's spray.
+				...createPortalFx(world),
 				// The first racer last, so they're drawn over everyone else racing.
 				...[...world.racers]
 					.reverse()
@@ -188,50 +197,76 @@ export function RaceCanvas(props: {
 	overlay?: JSX.Element
 }) {
 	const zoom = () => props.world.zoom()
+	/**
+	 * A Portal going off (see `portals`): diving in after everyone as they
+	 * shrink, or pulling back from the nose they're sneezed out of, zoomed
+	 * in on that point; the screen shaking, "Ah... Ah..."; and a flash.
+	 * The tick's a signal: reading it keeps this up to date.
+	 */
+	const portal = createMemo(() =>
+		props.world.ticks() >= 0 ? portalView(props.world) : undefined,
+	)
+	const portalStyle = (): JSX.CSSProperties => {
+		const view = portal()
+		if (!view) return { position: 'relative' }
+		const at = onScreen(props.world, view.focus.x, view.focus.y)
+		return {
+			position: 'relative',
+			transform: `translateX(${view.shake}px) scale(${view.zoom})`,
+			'transform-origin': `${at.x}px ${at.y}px`,
+		}
+	}
 	return (
 		// The course's own colours, for the sky, the grass and the path.
 		<div style={{ ...props.world.course.look?.palette, display: 'contents' }}>
 			{/* Over the top of the course's own sky, once zoomed out. The top
 			    of its gradient, so the join doesn't show. */}
 			<div style={styles.sky} />
-			<Canvas
-				scene={props.scene}
-				// Looking up a mountain, the canvas goes right down off the
-				// screen, its scene still showing over the top of it.
-				runOffScreen
-				// Zoomed out to fit a Round's Players in, and looking up (or down)
-				// at them: everything on it goes, the backdrop putting itself back.
-				style={{
-					width: `${VIEW_WIDTH * zoom()}px`,
-					height: `${VIEW_HEIGHT}px`,
-					transform: `scale(${1 / zoom()}) translateY(${Math.round(-props.world.cameraY())}px)`,
-					'transform-origin': '0 100%',
-					overflow: 'visible',
-					background: 'transparent',
-				}}
-				underlay={
-					<>
-						<Backdrop world={props.world} />
-						<HorizonTrees world={props.world} />
-						<Ground world={props.world} />
-					</>
-				}
-				// A Cave's rock over everyone in it, till someone racing goes in;
-				// the sea's waves over everyone in it.
-				overlay={
-					<>
-						<CaveCover world={props.world} />
-						<SeaFront
-							world={props.world}
-							from={DRAWN_FROM}
-							to={props.world.terrain.finishX + 1600}
-						/>
-					</>
-				}
-				loading={() => (
-					<div style={styles.loading}>Loading {props.world.course.name}…</div>
-				)}
-			/>
+			<div style={portalStyle()}>
+				<Canvas
+					scene={props.scene}
+					// Looking up a mountain, the canvas goes right down off the
+					// screen, its scene still showing over the top of it.
+					runOffScreen
+					// Zoomed out to fit a Round's Players in, and looking up (or down)
+					// at them: everything on it goes, the backdrop putting itself back.
+					style={{
+						width: `${VIEW_WIDTH * zoom()}px`,
+						height: `${VIEW_HEIGHT}px`,
+						transform: `scale(${1 / zoom()}) translateY(${Math.round(-props.world.cameraY())}px)`,
+						'transform-origin': '0 100%',
+						overflow: 'visible',
+						background: 'transparent',
+					}}
+					underlay={
+						<>
+							<Backdrop world={props.world} />
+							<HorizonTrees world={props.world} />
+							<Ground world={props.world} />
+						</>
+					}
+					// A Cave's rock over everyone in it, till someone racing goes in;
+					// the sea's waves over everyone in it.
+					overlay={
+						<>
+							<CaveCover world={props.world} />
+							<SeaFront
+								world={props.world}
+								from={DRAWN_FROM}
+								to={props.world.terrain.finishX + 1600}
+							/>
+						</>
+					}
+					loading={() => (
+						<div style={styles.loading}>Loading {props.world.course.name}…</div>
+					)}
+				/>
+			</div>
+			{/* A heart beating: the screen thumping red with it. */}
+			<Heartbeat world={props.world} />
+			<Show when={(portal()?.flash ?? 0) > 0}>
+				<div style={{ ...styles.flash, opacity: portal()?.flash }} />
+			</Show>
 			{/* Snow falling up a mountain, over the whole screen. */}
 			<Snow world={props.world} />
 			{/* Fog settled in, high up a mountain, and a bank of cloud to fall through. */}
@@ -246,7 +281,45 @@ export function RaceCanvas(props: {
 	)
 }
 
+/**
+ * A heart beating, in view: the screen's edges thumping red, "lub", and a
+ * little less, "dub", in time with its valves (see `HEARTBEAT`).
+ */
+function Heartbeat(props: { world: World }) {
+	const heart = props.world.course.look?.heartbeat
+	if (!heart) return null
+	const strength = () => {
+		const middle = props.world.camera() + props.world.viewWidth() / 2
+		if (middle < heart.from || middle > heart.to) return 0
+		const beat = beatAt(Math.max(0, props.world.ticks()))
+		const lub = Math.max(0, 1 - beat / 16)
+		const dub =
+			beat >= HEARTBEAT_DUB
+				? Math.max(0, 1 - (beat - HEARTBEAT_DUB) / 14) * 0.7
+				: 0
+		return Math.max(lub, dub)
+	}
+	return (
+		<Show when={strength() > 0}>
+			<div style={{ ...styles.heartbeat, opacity: strength() * 0.85 }} />
+		</Show>
+	)
+}
+
 const styles = {
+	flash: {
+		position: 'absolute',
+		inset: 0,
+		background: 'white',
+		'pointer-events': 'none',
+	},
+	heartbeat: {
+		position: 'absolute',
+		inset: 0,
+		'pointer-events': 'none',
+		background:
+			'radial-gradient(ellipse at center, transparent 55%, rgba(170, 20, 40, 0.55) 100%)',
+	},
 	sky: {
 		position: 'absolute',
 		inset: 0,

@@ -346,6 +346,8 @@ export const cliff: CourseDefinition = {
 	runDirectors: ['rick', 'eline'],
 	cheerers: CHEERERS,
 	look: {
+		// Its course select preview: the top of the cliff, its gliders, and the drop.
+		previewFrom: CLIFF - 650,
 		palette: {
 			'--sky-blue-top': '#3f9fe2',
 			'--sky-blue-bottom': '#c4e9ff',

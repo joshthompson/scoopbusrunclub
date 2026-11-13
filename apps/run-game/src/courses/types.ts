@@ -246,6 +246,18 @@ export interface CourseLook {
 	/** A bouncer's picture, in place of the toadstool (see `bouncers`): an air sac in a lung. */
 	bouncer?: { asset: string; width: number; height: number }
 	/**
+	 * A giant's mouth, in its face (a Cave feature, `GIANT_FACE`), opening
+	 * as anyone racing gets within `opens` of it, its jaw dropping and its
+	 * tongue rolling out over the edge of the bench, from `tip` to `inside`,
+	 * the Ground everyone runs up into it. The face's top left at `face`.
+	 */
+	mouth?: {
+		face: { x: number; y: number }
+		tip: number
+		inside: number
+		opens: number
+	}
+	/**
 	 * A heart beating, from `from` to `to` along the course: the screen
 	 * thumping red with it, in time with its valves (see `HEARTBEAT`).
 	 */
@@ -581,7 +593,20 @@ export interface Cave {
 		height: number
 		sink?: number
 		on?: 'surface' | 'behind' | 'in front' | 'path'
+		/**
+		 * Seen from outside: drawn on its cover, over everyone, and gone
+		 * with it once someone's in. A hospital's front doors, a giant's
+		 * face over its nostril. Keep it clear of the way in, so nobody
+		 * outside is drawn behind it.
+		 */
+		outside?: boolean
 	}[]
+	/**
+	 * Its parts, each `from` to `to`, covered till someone's in that one,
+	 * rather than the whole of it opening up at once: a hospital, and
+	 * someone's nose. Without them, it's all one.
+	 */
+	parts?: { from: number; to: number }[]
 	/**
 	 * Where it's dug down under the sand, rather than through a hill: the
 	 * sand's top, `x` along. Under it, it's sand, drawn as the ground; over
@@ -819,19 +844,6 @@ export interface Portal {
 	focus: { x: number; y: number }
 }
 
-/**
- * Breathed in: off the edge of a table at `edge`, a giant breathing in,
- * and whoever's over the drop (a Gap, `edge` to `to`) is carried up off
- * it, into its nostril, landing on its floor at `to`. From `pull` before
- * the edge, they're drawn towards it.
- */
-export interface Breath {
-	edge: number
-	to: number
-	/** How far before the edge it starts pulling. */
-	pull: number
-}
-
 export interface Course {
 	id: CourseId
 	/** Its number, on the sign by the start: where it is in `COURSES`. */
@@ -917,8 +929,6 @@ export interface Course {
 		| 'bloodCell'
 	/** Its Portals, a shrink and then a grow, in order along it: see `Portal`. */
 	portals?: Portal[]
-	/** Breathed in by a giant, off a table: see `Breath`. */
-	breath?: Breath
 	/**
 	 * Rails to grind along on skis, each `from` to `to`, `height` over the
 	 * Ground all along it, following it down: a rail, a box, or a log.

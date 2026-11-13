@@ -102,6 +102,20 @@ export function createRaceStream(
 			camera: tenth(world.camera()),
 			cameraY: tenth(world.cameraY()),
 			zoom: Math.round(world.zoom() * 1000) / 1000,
+			...(world.portal
+				? {
+						portal: [
+							world.portal.index,
+							world.portal.firstAt,
+							world.portal.zappedAt ?? -1,
+							world.portal.busGap,
+							world.racers.flatMap((r, i): [number, number, number][] => {
+								const held = world.portal?.held.get(r.id)
+								return held ? [[i, held.at, held.slot]] : []
+							}),
+						] as NonNullable<RaceFrame['portal']>,
+					}
+				: {}),
 			bus: [
 				tenth(world.bus.frontX),
 				world.bus.scooping,
