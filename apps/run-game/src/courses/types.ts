@@ -125,6 +125,18 @@ export type Obstacle =
 	 * over is its special goal all the same.
 	 */
 	| { kind: 'cone'; x: number; height?: number }
+	/**
+	 * A Germ, a virus, floating in the body at `x`, bobbing up and down from
+	 * `low` to `high` over the Ground (its bottom): under it, or over it, or
+	 * into it, and you stumble. Land on top of it and it pops, a bounce off
+	 * it, as off a head. Popping every one is Karolinska's special goal.
+	 */
+	| { kind: 'germ'; x: number; low: number; high: number }
+	/**
+	 * A heart valve in the floor at `x`: on every beat of the heart it flaps
+	 * open, and whoever's stood on it is fired up into the air.
+	 */
+	| { kind: 'valve'; x: number }
 
 /** Something on the course, at `x` along it, that speeds you up. */
 export type Boost =
@@ -218,7 +230,26 @@ export interface CourseLook {
 	 * Pictures in place of the rock, taken in turn along the course, each
 	 * drawn `width` by `height`: luggage on a ferry. Still jumped as a rock.
 	 */
-	rocks?: { asset: string; width: number; height: number }[]
+	rocks?: {
+		asset: string
+		width: number
+		height: number
+		/** Only from and to here along the course, if not all the way: an IV stand in a hospital, a crumb on a table. */
+		from?: number
+		to?: number
+	}[]
+	/**
+	 * A cyclist's two frames, in place of the bike, `width` by `height`: a
+	 * hospital bed, pushed by a porter. Still a cyclist, to jump.
+	 */
+	cyclist?: { frames: [string, string]; width: number; height: number }
+	/** A bouncer's picture, in place of the toadstool (see `bouncers`): an air sac in a lung. */
+	bouncer?: { asset: string; width: number; height: number }
+	/**
+	 * A heart beating, from `from` to `to` along the course: the screen
+	 * thumping red with it, in time with its valves (see `HEARTBEAT`).
+	 */
+	heartbeat?: { from: number; to: number }
 	/**
 	 * Colours that change along the course, for the Ground's layers to fill
 	 * with, as `url(#id)`: each stop a colour from `x` on, till the next.
@@ -473,6 +504,12 @@ export interface CourseLook {
 		 * bulkheads inside.
 		 */
 		tiles?: CaveTiles
+		/**
+		 * Other tiles, each from `from` along the course till the next: a
+		 * hospital's walls, then the inside of someone's nose, their lungs,
+		 * their heart. Before the first, `tiles`.
+		 */
+		zones?: { from: number; tiles: CaveTiles }[]
 		/** Stalactites hanging off its Ceiling, wherever there's room under it. */
 		stalactites?: boolean
 		/**
@@ -760,6 +797,40 @@ export type CourseId =
 	| 'cliff'
 	| 'everest'
 	| 'slopes'
+	| 'karolinska'
+
+/**
+ * A Portal: a machine that shrinks everyone down, or a sneeze that blows
+ * them back up to size. Whoever gets to `in` is held there, in it, till
+ * everyone still racing is; then the lot of them are shrunk (or grown),
+ * the camera diving in with them (or out), and let out at `out` in the
+ * order they got in, as far apart, each going as fast as they went in. The
+ * bus too, as far behind as it was. See `portals`.
+ */
+export interface Portal {
+	kind: 'shrink' | 'grow'
+	in: number
+	out: number
+	/**
+	 * Where the camera dives in to, shrinking: the shrink ray's plate, a y
+	 * over the Ground at `in`. Growing, where they're sneezed out from: the
+	 * nose, at `x`, a y.
+	 */
+	focus: { x: number; y: number }
+}
+
+/**
+ * Breathed in: off the edge of a table at `edge`, a giant breathing in,
+ * and whoever's over the drop (a Gap, `edge` to `to`) is carried up off
+ * it, into its nostril, landing on its floor at `to`. From `pull` before
+ * the edge, they're drawn towards it.
+ */
+export interface Breath {
+	edge: number
+	to: number
+	/** How far before the edge it starts pulling. */
+	pull: number
+}
 
 export interface Course {
 	id: CourseId
@@ -839,6 +910,15 @@ export interface Course {
 		 * `skis`).
 		 */
 		| 'skis'
+		/**
+		 * In Karolinska, red blood cells, in the bloodstream: bobbing along
+		 * with the flow, faster than running, over everything in the way.
+		 */
+		| 'bloodCell'
+	/** Its Portals, a shrink and then a grow, in order along it: see `Portal`. */
+	portals?: Portal[]
+	/** Breathed in by a giant, off a table: see `Breath`. */
+	breath?: Breath
 	/**
 	 * Rails to grind along on skis, each `from` to `to`, `height` over the
 	 * Ground all along it, following it down: a rail, a box, or a log.
@@ -1000,6 +1080,8 @@ export interface SpecialRun {
 	rodeWearing?: string[]
 	/** Stood on top of a guard tower, at some point. */
 	toppedTower?: boolean
+	/** How many Germs they popped, landing on them. */
+	germsPopped?: number
 }
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */

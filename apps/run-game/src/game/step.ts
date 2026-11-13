@@ -11,6 +11,15 @@ import { flyerLook } from '../draw/flyerLook'
 import { rideLook } from '../draw/rideLook'
 import { collect } from '../saved/collected'
 import { play } from '../sfx'
+import {
+	GERM_GIVE,
+	GERM_REACH,
+	GERM_SIZE,
+	breathe,
+	germHeight,
+	onValve,
+	stepHeart,
+} from './body'
 import { boardCarts, rideCart, stepCarts } from './carts'
 import { ceilingAt, inTunnel, rockOver } from './cave'
 import { PICKUP_WORD } from './collectables'
@@ -103,8 +112,9 @@ import { HAT_RULES, type Hat, WORN_FIKA, sameHat } from './hats'
 import { callOut, landLongJump, longJumpTakeOff, sandDrag } from './longJump'
 import { MOLE_HOP, burrowing, onMole } from './moles'
 import { mummyAt } from './mummies'
-import { scoopPack, stepPack } from './pack'
+import { bounceOff, scoopPack, stepPack } from './pack'
 import { landingOn, platformAt, platformMove } from './platforms'
+import { busHeld, isHeld, portalCamera, stepPortals } from './portals'
 import {
 	HANDS_HOLD,
 	HANDS_REACH,
@@ -179,21 +189,30 @@ const STEP_DOWN = 12
  */
 export function stepWorld(world: World) {
 	world.setTicks(world.ticks() + 1)
-	stepPhase(world)
-	for (const racer of world.racers) stepRunner(world, racer)
-	stepPack(world)
-	stepFurbies(world)
-	stepCorgis(world)
-	boardCarts(world)
-	stepCarts(world)
-	stepFootball(world)
-	stepFlyers(world)
-	for (const racer of world.racers) collide(world, racer)
-	stepBus(world)
-	if (world.round) {
-		decideRound(world)
-		frameEveryone(world)
-	} else stepCamera(world)
+	// A Portal going off: everything stopped still till it's done.
+	const frozen = stepPortals(world)
+	stepPhase(world, frozen)
+	if (!frozen) {
+		for (const racer of world.racers)
+			if (!isHeld(world, racer)) stepRunner(world, racer)
+		stepPack(world)
+		stepFurbies(world)
+		stepCorgis(world)
+		boardCarts(world)
+		stepCarts(world)
+		stepFootball(world)
+		stepFlyers(world)
+		for (const racer of world.racers)
+			if (!isHeld(world, racer)) collide(world, racer)
+		if (!busHeld(world)) stepBus(world)
+	}
+	stepHeart(world)
+	if (world.round) decideRound(world)
+	// The camera on the Portal going off, if one is; or as usual.
+	if (!portalCamera(world)) {
+		if (world.round) frameEveryone(world)
+		else stepCamera(world)
+	}
 
 	// Not while flying out of the scoop: how far they got is where it got them.
 	if (!isCaught(world.racers[0].out)) world.setPlayerX(world.body.x)
@@ -208,7 +227,7 @@ export function stepWorld(world: World) {
 		world.setPopups((all) => all.filter((p) => now - p.born <= POPUP_TICKS))
 }
 
-function stepPhase(world: World) {
+function stepPhase(world: World, frozen = false) {
 	const phase = world.phase()
 	if (phase === 'countdown') {
 		// A beep for each of "3", "2", "1", then a higher one for "Go!".
@@ -220,7 +239,8 @@ function stepPhase(world: World) {
 		return
 	}
 	if (phase === 'running') {
-		world.setRaceTicks(world.raceTicks() + 1)
+		// Not while a Portal's going off: the clock stops, the bus with it.
+		if (!frozen) world.setRaceTicks(world.raceTicks() + 1)
 		for (const racer of world.racers) {
 			if (racer.out || racer.body.x < world.terrain.finishX) continue
 			racer.out = 'finished'
@@ -458,6 +478,12 @@ function stepRunner(world: World, racer: Racer) {
 	}
 	/** On a mole: hopping along, and digging on through any rock in the way. */
 	const mole = onMole(world, b)
+
+	// Breathed in, off a table, by a giant: carried up into its nose.
+	if (racing && breathe(world, b)) {
+		b.wasUp = up
+		return
+	}
 
 	if (b.cart !== undefined) {
 		// In a mine cart: down the line, nothing to do but hold on.
@@ -1604,6 +1630,36 @@ function collide(world: World, racer: Racer) {
 					stumble('Ouch!')
 				}
 				break
+			case 'germ': {
+				if (state.used || state.scooped) break
+				const bottom = ground - germHeight(o, world.ticks())
+				const head = bottom - GERM_SIZE
+				if (
+					!overlaps(o.x - GERM_REACH, o.x + GERM_REACH, head + 4, bottom - 2)
+				)
+					break
+				// Down onto the top of it: popped, and a bounce off it, as off a
+				// head.
+				if (b.vy > 0 && b.feetY - b.vy <= head + GERM_GIVE) {
+					state.used = true
+					state.flown = world.ticks()
+					b.germsPopped = (b.germsPopped ?? 0) + 1
+					play('pop')
+					bounceOff(world, racer, head, o.x)
+					break
+				}
+				if (!freshFor(state) || b.stumble > 0) break
+				hits(state)
+				// A head mirror: it bounces right off it.
+				if (b.hat && HAT_RULES[b.hat.kind].germProof) {
+					play('stomp')
+					world.popup('Reflected!', b.x, top)
+				} else stumble('Atishoo!')
+				break
+			}
+			case 'valve':
+				if (onValve(world, b, o.x)) state.flown = world.ticks()
+				break
 			case 'mud':
 				// Bogging everyone down, and costing each of them once.
 				if (
@@ -1907,6 +1963,8 @@ function stepBus(world: World) {
 	reachFor(world, running)
 	for (const racer of running) {
 		const body = racer.body
+		// In a Portal: out of its reach.
+		if (isHeld(world, racer)) continue
 		if (bus.frontX < body.x - HITBOX_HALF_WIDTH) continue
 		scoop(world, racer, body)
 	}
@@ -2038,7 +2096,9 @@ function knockOver(world: World) {
 			o.kind === 'tourists' ||
 			// A snowman, or a traffic cone, still stood up.
 			(o.kind === 'snowman' && !state.used) ||
-			(o.kind === 'cone' && !state.used)
+			(o.kind === 'cone' && !state.used) ||
+			// A Germ not yet popped.
+			(o.kind === 'germ' && !state.used)
 		) {
 			state.used = true
 			state.scooped = {

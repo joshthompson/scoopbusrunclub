@@ -28,6 +28,8 @@ import type { FikaItem } from './fika'
  * - `topHat`: a chimney sweep's top hat, high over a vent on City Rooftop
  * - `flyingHelmet`: a leather flying helmet, high in the sky off The Cliff
  * - `bobbleHat`: a bobble hat, up Everest, got to on a goat
+ * - `headMirror`: a doctor's head mirror, high in Karolinska's lungs: Germs
+ *   bounce right off it
  */
 export type HatKind =
 	| 'pumpkin'
@@ -46,6 +48,7 @@ export type HatKind =
 	| 'topHat'
 	| 'flyingHelmet'
 	| 'bobbleHat'
+	| 'headMirror'
 
 /** A hat someone's wearing: a Pumpkin by its carving, 1 to 5. */
 export interface Hat {
@@ -69,6 +72,8 @@ export interface HatRules {
 	floats?: boolean
 	/** Sewage pouring down onto it bounces off it, rather than splattering you. */
 	splatProof?: boolean
+	/** Germs bounce off it, rather than giving you a stumble. */
+	germProof?: boolean
 }
 
 /** A hat that does nothing but look good. */
@@ -107,6 +112,7 @@ export const HAT_RULES: Record<HatKind, HatRules> = {
 	topHat: PLAIN,
 	flyingHelmet: PLAIN,
 	bobbleHat: PLAIN,
+	headMirror: { ...PLAIN, germProof: true },
 }
 
 /** Fika that's a hat too, put on as it's had: the captain's hat, off the ferry's roof. */
@@ -135,6 +141,7 @@ const CODED: HatKind[] = [
 	'topHat',
 	'flyingHelmet',
 	'bobbleHat',
+	'headMirror',
 ]
 /** How many carvings a Pumpkin can have: its codes. */
 const CARVINGS = 5

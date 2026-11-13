@@ -41,6 +41,7 @@ import { rideCondor } from './flyers'
 import { atSea, flyPacer } from './gliders'
 import { mummyAt } from './mummies'
 import { landingOn, platformAt, platformMove } from './platforms'
+import { isHeld, shrunkAt } from './portals'
 import { swampManAt } from './sewer'
 import { skiPacer } from './skis'
 import { steamFires } from './steam'
@@ -193,14 +194,16 @@ export function stepPack(world: World) {
 		if (
 			running < world.packSize &&
 			x < terrain.finishX - 300 &&
-			!terrain.inGap(x)
+			!terrain.inGap(x) &&
+			!shrunkAt(world.course, x)
 		)
 			join(world, x, world.course.ride === 'skis')
 	}
 
 	for (const pacer of pack) movePacer(world, pacer)
 	for (const racer of world.racers) {
-		if (phase === 'running' && !racer.out) bounceOffHeads(world, racer)
+		if (phase === 'running' && !racer.out && !isHeld(world, racer))
+			bounceOffHeads(world, racer)
 		if (racer.body.grounded) racer.body.combo = 0
 	}
 
@@ -208,7 +211,12 @@ export function stepPack(world: World) {
 	// Anyone left behind stays until the bus gets them, on the screen or not.
 	for (let i = pack.length - 1; i >= 0; i--) {
 		const p = pack[i]
-		if (p.feetY > VIEW_HEIGHT + 300 || p.x > terrain.finishX + 700)
+		if (
+			p.feetY > VIEW_HEIGHT + 300 ||
+			p.x > terrain.finishX + 700 ||
+			// Into a shrink ray: gone, nobody else is shrunk.
+			(!p.scooped && shrunkAt(world.course, p.x))
+		)
 			pack.splice(i, 1)
 	}
 }

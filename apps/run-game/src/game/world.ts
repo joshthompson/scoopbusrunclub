@@ -21,6 +21,7 @@ import {
 import { createFootball } from './football'
 import type { Hat } from './hats'
 import { lineUp } from './pack'
+import type { PortalRun } from './portals'
 import type { Terrain } from './terrain'
 
 /**
@@ -167,6 +168,10 @@ export interface Body {
 	rodeWearing?: string[]
 	/** Been up on top of a guard tower: the Great Wall's special goal. */
 	toppedTower?: boolean
+	/** Germs popped, landing on them: Karolinska's special goal. */
+	germsPopped?: number
+	/** Breathed in off the table, by the giant: see `breathe`. */
+	breathed?: boolean
 }
 
 /**
@@ -710,6 +715,10 @@ export function createWorld(
 		ball: createFootball({ football: course.football, terrain }),
 		/** The course's Platforms, which move with the tick: see `platformAt`. */
 		platforms: course.platforms ?? [],
+		/** A Portal at work, if one is: see `portals`. Plain state, like the body. */
+		portal: undefined as PortalRun | undefined,
+		/** The course's Portals that have gone off, and let everyone through, by index. */
+		portalsDone: new Set<number>(),
 		corgis: (course.corgis ?? []).map(
 			(x, id): Corgi => ({
 				id,

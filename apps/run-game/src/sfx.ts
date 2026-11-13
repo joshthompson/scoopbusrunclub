@@ -29,6 +29,13 @@ export type Sound =
 	| 'furby'
 	| 'trick'
 	| 'grind'
+	/** Karolinska's: the shrink ray, a giant's sniff and sneeze, a Germ popping, and a heartbeat. */
+	| 'zap'
+	| 'sniff'
+	| 'sneeze'
+	| 'pop'
+	| 'heartbeat'
+	| 'heartbeatDub'
 
 /** [frequency in Hz, length in seconds, wave] for each note, played one after another. */
 type Note = [number, number, OscillatorType?]
@@ -154,6 +161,33 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 			],
 			volume: 0.07,
 		},
+		/** The shrink ray going off: a rising warble, then a long falling zap. */
+		zap: {
+			notes: [
+				[220, 0.12, 'square'],
+				[330, 0.12, 'square'],
+				[440, 0.12, 'square'],
+				[1800, 0.9, 'sawtooth'],
+			],
+			volume: 0.05,
+			slide: 0.2,
+		},
+		/** A giant breathing in: "Ah...", a long rising hiss. */
+		sniff: { notes: [[180, 0.5, 'triangle']], volume: 0.1, slide: 2.4 },
+		/** "CHOO!": a burst, falling away. */
+		sneeze: {
+			notes: [
+				[900, 0.06, 'sawtooth'],
+				[300, 0.5, 'sawtooth'],
+			],
+			volume: 0.08,
+			slide: 0.3,
+		},
+		/** A Germ popped. */
+		pop: { notes: [[520, 0.08, 'square']], volume: 0.08, slide: 2.5 },
+		/** "Lub", and "dub": low thumps. */
+		heartbeat: { notes: [[70, 0.16, 'sine']], volume: 0.32, slide: 0.6 },
+		heartbeatDub: { notes: [[60, 0.12, 'sine']], volume: 0.24, slide: 0.6 },
 	}
 
 /** Told of every sound played, sound on or off: a Room's Host passes them on. */
