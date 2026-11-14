@@ -30,6 +30,7 @@ import {
 	createWeather,
 } from './backdropControllers'
 import { createFootballSprite } from './football'
+import { createCaveCover, createSeaFront } from './frontControllers'
 import { createGiantMouth } from './giantMouth'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPortalFx } from './portalFx'
@@ -198,6 +199,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			if (rendererChoice.canvas)
 				scene.addController(
 					...createBackdrop(world, scene),
+					...createCaveCover(world, scene),
+					...createSeaFront(world, scene),
 					...createWeather(world, scene),
 				)
 		},
@@ -311,16 +314,19 @@ export function RaceCanvas(props: {
 						)
 					}
 					// A Cave's rock over everyone in it, till someone racing goes in;
-					// the sea's waves over everyone in it.
+					// the sea's waves over everyone in it. On the canvas itself,
+					// under the Canvas Renderer.
 					overlay={
-						<InScene world={props.world}>
-							<CaveCover world={props.world} />
-							<SeaFront
-								world={props.world}
-								from={DRAWN_FROM}
-								to={props.world.terrain.finishX + 1600}
-							/>
-						</InScene>
+						rendererChoice.canvas ? undefined : (
+							<>
+								<CaveCover world={props.world} />
+								<SeaFront
+									world={props.world}
+									from={DRAWN_FROM}
+									to={props.world.terrain.finishX + 1600}
+								/>
+							</>
+						)
 					}
 					loading={() => (
 						<div style={styles.loading}>Loading {props.world.course.name}…</div>
@@ -348,26 +354,6 @@ export function RaceCanvas(props: {
 			<Show when={rendererChoice.fps}>
 				<FrameMeter />
 			</Show>
-		</div>
-	)
-}
-
-/**
- * Page elements laid out in the scene, under the Canvas Renderer moved up
- * and down with its camera, as under the DOM Renderer the whole canvas is.
- * Only till they're drawn on the canvas themselves.
- */
-function InScene(props: { world: World; children: JSX.Element }) {
-	if (!rendererChoice.canvas) return props.children
-	return (
-		<div
-			style={{
-				position: 'absolute',
-				inset: 0,
-				transform: `translateY(${-cameraTop(props.world)}px)`,
-			}}
-		>
-			{props.children}
 		</div>
 	)
 }

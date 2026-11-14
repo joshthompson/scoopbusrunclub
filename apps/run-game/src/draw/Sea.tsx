@@ -22,7 +22,7 @@ const STEP = 4
 /** How far out from the island's shore its beach starts coming up out of the sea. */
 const SHORE = 96
 /** How far down in front of the path its waves in front of everything start. */
-const FRONT_WAVES = PATH_FRONT - 4
+export const FRONT_WAVES = PATH_FRONT - 4
 
 /**
  * Columns `STEP` wide from `from` to `to` along, from `span`'s top to its
@@ -349,7 +349,7 @@ function SeaPattern(props: { id: string; water: string; light: string }) {
  * more of them, and plainer, the higher up, where it's strongest. Across
  * the screen, wherever the camera is, and as wide as it gets zoomed out.
  */
-const WIND = (() => {
+export const WIND = (() => {
 	const random = seeded(77)
 	return Array.from({ length: 26 }, () => {
 		const up = Math.sqrt(random())
@@ -365,15 +365,19 @@ const WIND = (() => {
 })()
 
 /** A tile of the waves' crests: this wide and tall, and how far into it the water's up to. */
-const CREST_WIDTH = 64
-const CREST_HEIGHT = 16
-const CREST_SINK = 6
+export const CREST_WIDTH = 64
+export const CREST_HEIGHT = 16
+export const CREST_SINK = 6
 
 /**
  * The waves' crests, in pixels: rolling up and down along, foam along their
  * tops, the light under it, and the water on down to the tile's foot.
  */
-const crests = (look: { water: string; light: string; foam: string }) => {
+export const crests = (look: {
+	water: string
+	light: string
+	foam: string
+}) => {
 	const cells: string[] = []
 	for (let x = 0; x < CREST_WIDTH; x += 4) {
 		const wave = Math.sin((x / CREST_WIDTH) * Math.PI * 2)
