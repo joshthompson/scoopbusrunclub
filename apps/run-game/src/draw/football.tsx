@@ -3,7 +3,6 @@ import type { JSX } from 'solid-js'
 import { paintedArt } from '../courses/kit/pixelArt'
 import { FOOTBALL_RADIUS } from '../game/football'
 import type { World } from '../game/world'
-import { PixelArt } from './PixelArt'
 
 /**
  * A football, as pixel art: a black pentagon in the middle, seams out from
@@ -54,7 +53,6 @@ export function createFootballSprite(world: World) {
 				...createObjectSignal({} as JSX.CSSProperties, 'style'),
 				width: () => size,
 				height: () => size,
-				children: () => <PixelArt src={BALL} width={size} height={size} />,
 			}),
 			draw({ ctx, image }) {
 				const art = image(BALL)

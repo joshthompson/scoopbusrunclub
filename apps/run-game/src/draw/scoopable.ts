@@ -2,7 +2,6 @@ import { type DrawPainting, type DrawReach, createController } from 'scoopjs'
 import type { JSX } from 'solid-js'
 import { scoopFlight } from '../game/step'
 import type { ObstacleState, World } from '../game/world'
-import { rendererChoice } from './rendererChoice'
 
 /** A point in a Sprite's box, from its top left. */
 interface Point {
@@ -12,12 +11,10 @@ interface Point {
 
 /**
  * An Obstacle the bus can scoop up, standing on the ground at `x` as a
- * fixture does until then, and flying off, spinning, after.
- *
- * Under the DOM Renderer its `children` fly, in `Scoopable`, and it stays
- * where it was. Under the Canvas Renderer it flies itself, along with its
- * box: the canvas leaves out whatever's boxed off the screen, and a box left
- * behind goes off it while what was scooped is still up in the air, ahead.
+ * fixture does until then, and flying off, spinning, after. It flies
+ * along with its box: the canvas leaves out whatever's boxed off the
+ * screen, and a box left behind would go off it while what was scooped is
+ * still up in the air, ahead.
  */
 export function createScoopable(options: {
 	id: string
@@ -29,18 +26,14 @@ export function createScoopable(options: {
 	height: number
 	world: World
 	state: ObstacleState
-	children: () => JSX.Element
 	draw: (painting: DrawPainting) => void
 	/** How far its Draw Hook paints past its box: see `drawReach`. */
 	drawReach?: DrawReach
-	/**
-	 * What it spins round, flying: its middle, unless it's somewhere else
-	 * in its art, as `Scoopable`'s `spin` says.
-	 */
+	/** What it spins round, flying: its middle, unless it's somewhere else in its art. */
 	spin?: Point
 	/**
 	 * How it lies on the ground, if not upright: a CSS `transform` about
-	 * `origin`. It flies inside that, as `Scoopable` flies inside it.
+	 * `origin`. It flies inside that.
 	 */
 	lie?: { transform: string; origin: Point }
 	/** The rest of its style. */
@@ -54,7 +47,7 @@ export function createScoopable(options: {
 	const origin = lie?.origin ?? { x: width / 2, y: height / 2 }
 	/**
 	 * Its flight, as a `transform` after how it lies: on from where it was,
-	 * spinning round `spin`, as `Scoopable` moves its `children`.
+	 * spinning round `spin`.
 	 */
 	const flight = () => {
 		const { scooped } = state
@@ -74,16 +67,10 @@ export function createScoopable(options: {
 			y: () => top,
 			width: () => width,
 			height: () => height,
-			children: options.children,
 			// `scooped` isn't a signal: reading the tick keeps it up to date.
 			style: () => {
 				const own = options.style?.() ?? {}
-				const transform = [
-					lie?.transform,
-					rendererChoice.canvas ? flight() : undefined,
-				]
-					.filter(Boolean)
-					.join(' ')
+				const transform = [lie?.transform, flight()].filter(Boolean).join(' ')
 				if (!transform) return own
 				return {
 					...own,
