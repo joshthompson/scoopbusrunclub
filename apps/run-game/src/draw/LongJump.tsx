@@ -140,6 +140,20 @@ export function createLongJump(world: World) {
 					</div>
 				),
 			}),
+			draw: ({ ctx, image }) => {
+				const pit = image(art.src)
+				if (pit) ctx.drawImage(pit.image, 0, 0, art.width, art.height)
+				// Each mark, and the lip of sand thrown up in front of it, as
+				// its shadow is on the page.
+				for (const x of marks()) {
+					const markX = Math.round(x - left) - 7
+					const markY = MARKERS - BACK - 2
+					ctx.fillStyle = SAND_LIGHT
+					ctx.fillRect(markX, markY + 2, 14, 4)
+					ctx.fillStyle = DENT
+					ctx.fillRect(markX, markY, 14, 4)
+				}
+			},
 		}),
 	]
 }

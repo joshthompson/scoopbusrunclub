@@ -103,3 +103,37 @@ export function SplashArt(props: { age: number }) {
 		</div>
 	)
 }
+
+/**
+ * The same splash, painted on the Canvas Renderer, `age` ticks in, from the
+ * top left of its box: the same blocks, at the same places.
+ */
+export function paintSplash(ctx: CanvasRenderingContext2D, age: number) {
+	const t = Math.max(0, age)
+	const column = t < 26 ? Math.sin((t / 26) * Math.PI) * 70 : 0
+	const middle = SPLASH_WIDTH / 2
+	if (t > SPLASH_TICKS - 10) ctx.globalAlpha *= (SPLASH_TICKS - t) / 10
+	ctx.fillStyle = WATER
+	ctx.fillRect(middle - 8, snap(SPLASH_UP - column), 16, snap(column))
+	ctx.fillStyle = SPRAY
+	ctx.fillRect(
+		middle - 14,
+		snap(SPLASH_UP - column * 0.4),
+		28,
+		snap(column * 0.4),
+	)
+	for (const [vx, vy, size] of DROPS) {
+		const y = SPLASH_UP - (vy * t - (FALL * t * t) / 2)
+		if (y > SPLASH_UP + 4) continue
+		ctx.fillStyle = size > 4 ? WATER : SPRAY
+		ctx.fillRect(snap(middle + vx * t * 1.6 - size / 2), snap(y), size, size)
+	}
+	ctx.globalAlpha *= 0.85
+	ctx.fillStyle = WATER
+	ctx.fillRect(
+		snap(middle - 12 - t * 1.1),
+		SPLASH_UP - 2,
+		snap(24 + t * 2.2),
+		6,
+	)
+}
