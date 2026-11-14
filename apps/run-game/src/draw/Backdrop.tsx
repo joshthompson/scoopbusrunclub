@@ -1856,8 +1856,9 @@ function stalactite(x: number) {
 
 /** How much of a Cave's way in, and its way out, the cover leaves showing. */
 const MOUTH_SHOWN = 56
-/** How long the cover takes to go, or come back. */
-const COVER_FADE = '350ms'
+/** How long the cover takes to go, or come back, in ms. */
+export const COVER_FADE_MS = 350
+const COVER_FADE = `${COVER_FADE_MS}ms`
 
 /**
  * A Cave's rock over the inside of it, in front of everything in there:
@@ -1871,26 +1872,53 @@ export function CaveCover(props: {
 	const { cave } = props.world.course
 	const look = props.world.course.look?.cave
 	if (!cave || !look) return null
-	const parts = cave.parts ?? [{ from: cave.from, to: cave.to }]
 	return (
-		<For each={parts}>
-			{(part, i) => (
-				<CavePartCover
-					world={props.world}
-					cave={cave}
-					look={look}
-					from={part.from}
-					to={part.to}
-					mouth={i() === 0 ? cave.mouth : undefined}
-					id={`cave-cover-${i()}`}
-				/>
+		<For each={caveCoverParts(cave)}>
+			{(part) => (
+				<CavePartCover world={props.world} cave={cave} look={look} {...part} />
 			)}
 		</For>
 	)
 }
 
+/**
+ * A Cave's cover's parts, each `from` to `to`: the first with the Cave's
+ * own way in showing, if it says how much.
+ */
+export function caveCoverParts(cave: NonNullable<World['course']['cave']>) {
+	const parts = cave.parts ?? [{ from: cave.from, to: cave.to }]
+	return parts.map((part, i) => ({
+		from: part.from,
+		to: part.to,
+		mouth: i === 0 ? cave.mouth : undefined,
+		id: `cave-cover-${i}`,
+	}))
+}
+
 /** One part of a Cave's cover, `from` to `to`: see `CaveCover`. */
-function CavePartCover(props: {
+function CavePartCover(props: CavePartProps) {
+	const inside = coverOpening(props.world, props.cave, props.from, props.to)
+	return (
+		<div
+			style={{
+				position: 'absolute',
+				top: 0,
+				left: 0,
+				width: `${props.world.terrain.finishX + 1600 - DRAWN_FROM}px`,
+				height: `${VIEW_HEIGHT}px`,
+				transform: `translateX(${Math.round(DRAWN_FROM - props.world.camera())}px)`,
+				'will-change': 'transform',
+				'pointer-events': 'none',
+				opacity: inside() ? 0 : 1,
+				transition: `opacity ${COVER_FADE}`,
+			}}
+		>
+			<CaveCoverArt {...props} />
+		</div>
+	)
+}
+
+type CavePartProps = {
 	world: View & Pick<World, 'racers' | 'ticks'>
 	cave: NonNullable<World['course']['cave']>
 	look: NonNullable<CourseLook['cave']>
@@ -1898,7 +1926,43 @@ function CavePartCover(props: {
 	to: number
 	mouth?: number
 	id: string
-}) {
+}
+
+/**
+ * Whether a part of a Cave's cover, `from` to `to`, has opened up: someone
+ * racing's in it, or was, till they were Scooped or Fallen in there. Then
+ * it stays open, to see where. Asked as the race goes on, every tick.
+ */
+export function coverOpening(
+	world: Pick<World, 'racers' | 'ticks'>,
+	cave: NonNullable<World['course']['cave']>,
+	from: number,
+	to: number,
+) {
+	/** Whether someone racing's in it, under its hill. */
+	const anyoneInside = () =>
+		world.racers.some(({ body, out }) => {
+			if (out || body.x < from || body.x > to) return false
+			// Aboard a ship, anywhere: up on its roof too.
+			if (cave.hull) return true
+			const surface = cave.surface(body.x)
+			return surface === undefined || body.feetY > surface
+		})
+	let opened = false
+	return () => {
+		if (world.ticks() < 0) return false
+		const caught = world.racers.some(({ out }) => isCaught(out))
+		opened = anyoneInside() || (opened && caught)
+		return opened
+	}
+}
+
+/**
+ * A part of a Cave's cover, as it is till it opens up: its rock, and what's
+ * on it from `outside`, in the Ground's own coordinates (x from
+ * `DRAWN_FROM`, the world's y).
+ */
+export function CaveCoverArt(props: CavePartProps) {
 	const { cave, look, id } = props
 	const { terrain } = props.world
 	const drawnTo = terrain.finishX + 1600
@@ -1938,119 +2002,84 @@ function CavePartCover(props: {
 	const outside = (cave.features ?? []).filter(
 		(f) => f.outside && f.x >= props.from && f.x < props.to,
 	)
-	/** Whether someone racing's in it, under its hill. */
-	const anyoneInside = () =>
-		props.world.racers.some(({ body, out }) => {
-			if (out || body.x < props.from || body.x > props.to) return false
-			// Aboard a ship, anywhere: up on its roof too.
-			if (cave.hull) return true
-			const surface = cave.surface(body.x)
-			return surface === undefined || body.feetY > surface
-		})
-	/**
-	 * Whether it's opened up: someone racing's in it, or was, till they were
-	 * Scooped or Fallen in there. Then it stays open, to see where.
-	 */
-	let opened = false
-	const inside = () => {
-		if (props.world.ticks() < 0) return false
-		const caught = props.world.racers.some(({ out }) => isCaught(out))
-		opened = anyoneInside() || (opened && caught)
-		return opened
-	}
 	return (
-		<div
-			style={{
-				position: 'absolute',
-				top: 0,
-				left: 0,
-				width: `${width}px`,
-				height: `${VIEW_HEIGHT}px`,
-				transform: `translateX(${Math.round(DRAWN_FROM - props.world.camera())}px)`,
-				'will-change': 'transform',
-				'pointer-events': 'none',
-				opacity: inside() ? 0 : 1,
-				transition: `opacity ${COVER_FADE}`,
-			}}
+		<svg
+			style={{ position: 'absolute', top: `${-SKY_ROOM}px`, left: 0 }}
+			width={width}
+			height={VIEW_HEIGHT + SKY_ROOM}
+			viewBox={`0 ${-SKY_ROOM} ${width} ${VIEW_HEIGHT + SKY_ROOM}`}
+			shape-rendering="crispEdges"
+			aria-hidden="true"
 		>
-			<svg
-				style={{ position: 'absolute', top: `${-SKY_ROOM}px`, left: 0 }}
-				width={width}
-				height={VIEW_HEIGHT + SKY_ROOM}
-				viewBox={`0 ${-SKY_ROOM} ${width} ${VIEW_HEIGHT + SKY_ROOM}`}
-				shape-rendering="crispEdges"
-				aria-hidden="true"
-			>
-				<defs>
-					<SandPattern id={`${id}-sand`} />
-					<For each={zones}>
-						{(zone, k) => (
-							<>
-								<TilePattern
-									id={`${id}-tile-${k()}`}
-									tile={zone.tiles.rock}
-									x={DRAWN_FROM}
-								/>
-								<TilePattern
-									id={`${id}-front-${k()}`}
-									tile={zone.tiles.front ?? zone.tiles.rock}
-									x={DRAWN_FROM}
-								/>
-							</>
-						)}
-					</For>
-					<Show when={look.bricks}>
-						<BrickPattern
-							id={`${id}-bricks`}
-							brick={look.rock}
-							mortar={look.seam}
-							lit={look.edge}
-						/>
-					</Show>
-					<pattern
-						id={`${id}-rock`}
-						patternUnits="userSpaceOnUse"
-						width={48}
-						height={36}
-					>
-						<rect width={48} height={36} fill={look.rock} />
-						<rect x={2} y={6} width={16} height={2} fill={look.seam} />
-						<rect x={16} y={8} width={6} height={2} fill={look.seam} />
-						<rect x={28} y={18} width={14} height={2} fill={look.seam} />
-						<rect x={24} y={20} width={4} height={4} fill={look.seam} />
-						<rect x={6} y={28} width={10} height={2} fill={look.seam} />
-						<rect x={36} y={4} width={4} height={2} fill={look.edge} />
-						<rect x={10} y={18} width={2} height={2} fill={look.edge} />
-						<rect x={40} y={30} width={2} height={2} fill={look.edge} />
-					</pattern>
-				</defs>
-				<path
-					d={plainRock}
-					fill={look.bricks ? `url(#${id}-bricks)` : `url(#${id}-rock)`}
-				/>
+			<defs>
+				<SandPattern id={`${id}-sand`} />
 				<For each={zones}>
-					{(_, k) => (
+					{(zone, k) => (
 						<>
-							<path d={rock[k()]} fill={`url(#${id}-tile-${k()})`} />
-							<path d={front[k()]} fill={`url(#${id}-front-${k()})`} />
+							<TilePattern
+								id={`${id}-tile-${k()}`}
+								tile={zone.tiles.rock}
+								x={DRAWN_FROM}
+							/>
+							<TilePattern
+								id={`${id}-front-${k()}`}
+								tile={zone.tiles.front ?? zone.tiles.rock}
+								x={DRAWN_FROM}
+							/>
 						</>
 					)}
 				</For>
-				<path d={sand} fill={`url(#${id}-sand)`} />
-				<For each={outside}>
-					{(feature) => (
-						<image
-							href={feature.asset}
-							x={feature.x - DRAWN_FROM - feature.width / 2}
-							y={featureTop(props.world, feature)}
-							width={feature.width}
-							height={feature.height}
-							style={{ 'image-rendering': 'pixelated' }}
-						/>
-					)}
-				</For>
-			</svg>
-		</div>
+				<Show when={look.bricks}>
+					<BrickPattern
+						id={`${id}-bricks`}
+						brick={look.rock}
+						mortar={look.seam}
+						lit={look.edge}
+					/>
+				</Show>
+				<pattern
+					id={`${id}-rock`}
+					patternUnits="userSpaceOnUse"
+					width={48}
+					height={36}
+				>
+					<rect width={48} height={36} fill={look.rock} />
+					<rect x={2} y={6} width={16} height={2} fill={look.seam} />
+					<rect x={16} y={8} width={6} height={2} fill={look.seam} />
+					<rect x={28} y={18} width={14} height={2} fill={look.seam} />
+					<rect x={24} y={20} width={4} height={4} fill={look.seam} />
+					<rect x={6} y={28} width={10} height={2} fill={look.seam} />
+					<rect x={36} y={4} width={4} height={2} fill={look.edge} />
+					<rect x={10} y={18} width={2} height={2} fill={look.edge} />
+					<rect x={40} y={30} width={2} height={2} fill={look.edge} />
+				</pattern>
+			</defs>
+			<path
+				d={plainRock}
+				fill={look.bricks ? `url(#${id}-bricks)` : `url(#${id}-rock)`}
+			/>
+			<For each={zones}>
+				{(_, k) => (
+					<>
+						<path d={rock[k()]} fill={`url(#${id}-tile-${k()})`} />
+						<path d={front[k()]} fill={`url(#${id}-front-${k()})`} />
+					</>
+				)}
+			</For>
+			<path d={sand} fill={`url(#${id}-sand)`} />
+			<For each={outside}>
+				{(feature) => (
+					<image
+						href={feature.asset}
+						x={feature.x - DRAWN_FROM - feature.width / 2}
+						y={featureTop(props.world, feature)}
+						width={feature.width}
+						height={feature.height}
+						style={{ 'image-rendering': 'pixelated' }}
+					/>
+				)}
+			</For>
+		</svg>
 	)
 }
 

@@ -17,7 +17,7 @@ A course is ported when a full run under `?renderer=canvas` gives no Canvas Issu
 - **In the game.** Play the course with `?renderer=canvas`, and run `raceScene.canvasIssues()` in the console. Each entry names the Controller's type and id, the feature the canvas can't draw, and where it was created. The same issues are logged as `[scoopjs:canvas]` errors.
 - **Each type and feature is reported once.** If the vent is reported as a `hazard` with `children`, the geese and steam (also hazards) don't show until the vent is ported. Fix one, then run the course again.
 - **In the code.** A `children` given to `createController`, `createFixture` or `createConnectedController`, with no `draw` beside it, is a piece to port. This finds pieces you haven't reached in a run.
-- **Page layers.** Anything `RaceView.tsx` wraps in `InScene` (the cave cover, the sea's front) is still a page element over the canvas, moved with the camera. It moves onto the canvas as a Controller of its own, as `draw/backdropControllers.ts` did for the backdrop, ground, snow and fog.
+- **Page layers.** Under the Canvas Renderer, the scene's element (`[data-game-scene]`) holds only the canvas. Anything drawn in the scene behind or over every sprite is a Controller of its own, as `draw/backdropControllers.ts` does for the backdrop, ground, snow and fog, and `draw/frontControllers.ts` for a Cave's cover and the sea's front. Art as long as a course is painted in tiles (`paint/tiles.ts`).
 
 ## 2. Port a Controller
 

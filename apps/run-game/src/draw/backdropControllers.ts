@@ -28,9 +28,9 @@ import {
 import { deckBox, deckTiles, paintFog, paintFogDeck } from './Fog'
 import { paintSnow } from './Snow'
 import { createBackdropPainter } from './backdropPaint'
-import { cachedArt, screenDensity } from './canvasArt'
+import { cachedArt } from './canvasArt'
 import { cycle, steps } from './paint/animation'
-import { type ImageOf, drawSnapped, paintTiled } from './paint/bands'
+import { type ImageOf, paintTiled } from './paint/bands'
 import {
 	type Resolve,
 	brighter,
@@ -39,6 +39,7 @@ import {
 	paletteOf,
 } from './paint/css'
 import { type SvgDrawing, compileSvg } from './paint/svgCanvas'
+import { TILE, tileControllers, tileDensity } from './paint/tiles'
 
 /**
  * Under the Canvas Renderer, what's drawn behind the course and over it,
@@ -54,8 +55,12 @@ import { type SvgDrawing, compileSvg } from './paint/svgCanvas'
 
 /** Their types, behind every sprite, front to back, for `assetOrder`'s end. */
 export const BEHIND_TYPES = ['ground', 'backdrop']
-/** And over every sprite, front to back, for its start. */
-export const OVER_TYPES = ['fog', 'snow']
+/**
+ * And over every sprite, front to back, for its start: under the snow and
+ * fog, the sea's waves in front of everyone in it, and a Cave's cover (see
+ * `frontControllers`).
+ */
+export const OVER_TYPES = ['fog', 'snow', 'sea-front', 'cave-cover']
 
 /** What the camera sees, in the Scene. */
 const cameraOf = (scene: Scene) => scene.canvas.get()
@@ -163,76 +168,21 @@ function createSky(world: World, scene: Scene, resolve: Resolve) {
 	})
 }
 
-/** The Ground's tiles: this big, painted once each and kept, only those in view. */
-const TILE = 256
-/** How many columns of tiles each of its Controllers has. */
-const TILES_ACROSS = 4
-
 /**
- * The Ground, and the trees over the brow behind it, in tiles `TILE`
- * square, in the world: a Controller for each few columns of them, as
+ * The Ground, and the trees over the brow behind it, in tiles (`TILE`
+ * square), in the world: a Controller for each few columns of them, as
  * tall as the ground in them goes, each painting the tiles of it in view.
  * Fire down a pit into hell, flickering, over them.
  */
 function createGround(world: World, scene: Scene, resolve: Resolve) {
 	const art = createGroundArt(world, resolve)
-	const camera = () => cameraOf(scene)
-	const groups = Math.ceil(art.columns / TILES_ACROSS)
-	const controllers = []
-	for (let g = 0; g < groups; g++) {
-		const from = g * TILES_ACROSS
-		const to = Math.min(art.columns, from + TILES_ACROSS)
-		let top = Number.POSITIVE_INFINITY
-		let bottom = Number.NEGATIVE_INFINITY
-		for (let c = from; c < to; c++) {
-			top = Math.min(top, art.rows[c][0] * TILE)
-			bottom = Math.max(bottom, (art.rows[c][1] + 1) * TILE)
-		}
-		if (!(bottom > top)) continue
-		const left = DRAWN_FROM + from * TILE
-		controllers.push(
-			createController({
-				init: () => ({
-					id: `ground-${g}`,
-					type: 'ground',
-					x: () => left,
-					y: () => top,
-					width: () => (to - from) * TILE,
-					height: () => bottom - top,
-				}),
-				draw: ({ ctx, image }) => {
-					const view = camera()
-					const zoom = view.width() / VIEW_WIDTH
-					for (let c = from; c < to; c++) {
-						const x = DRAWN_FROM + c * TILE
-						if (x >= view.x() + view.width() || x + TILE <= view.x()) continue
-						const [first, last] = art.rows[c]
-						for (let r = first; r <= last; r++) {
-							const y = r * TILE
-							if (y >= view.y() + view.height() || y + TILE <= view.y())
-								continue
-							const tile = art.tile(c, r, image, zoom)
-							if (tile)
-								drawSnapped(
-									ctx,
-									tile,
-									0,
-									0,
-									tile.width,
-									tile.height,
-									x - left,
-									y - top,
-									TILE,
-									TILE,
-									{ x: left - view.x(), y: top - view.y() },
-								)
-						}
-					}
-				},
-			}),
-		)
-	}
-	return [...controllers, ...createHellFire(world, scene)]
+	return [
+		...tileControllers({ left: DRAWN_FROM, ...art }, scene, {
+			id: 'ground',
+			type: 'ground',
+		}),
+		...createHellFire(world, scene),
+	]
 }
 
 /**
@@ -381,7 +331,7 @@ function createGroundArt(world: World, resolve: Resolve) {
 		 */
 		tile(c: number, r: number, image: ImageOf, zoom: number) {
 			for (const url of images) if (!image(url)) return undefined
-			const density = screenDensity() / (zoom > 2 ? 4 : zoom > 1.5 ? 2 : 1)
+			const density = tileDensity(zoom)
 			return cachedArt(
 				`${key}:${density}:${c}:${r}`,
 				TILE,
