@@ -5,7 +5,7 @@ import pumpkin4Asset from '@/assets/halloween/pumpkin4.png'
 import pumpkin5Asset from '@/assets/halloween/pumpkin5.png'
 import tombstoneAsset from '@/assets/halloween/tombstone.png'
 import rockAsset from '@/assets/misc/rock1.png'
-import { type RunnerName, runners } from '@/data/runners'
+import { type RunnerName, runners, strideFrameInterval } from '@/data/runners'
 import { imageSize } from '@/utils/imageSize'
 import {
 	createConnectedController,
@@ -247,16 +247,15 @@ function poseSize(
 	}
 }
 
-/** A member's volunteer pose, for cheering and run directing. They all face right. */
-export function volunteerFrame(member: RunnerName) {
-	const { frames } = runners[member][0]()
-	return (
-		frames.runDirector?.[0] ??
-		frames.marshal?.[0] ??
-		frames.photographer?.[0] ??
-		frames.scanner?.[0] ??
-		frames.volunteerGeneric?.[0]
-	)
+/**
+ * A member at a volunteer post: run directing at the start, or marshalling
+ * along the way, cheering. They all face right.
+ */
+export function volunteerFrame(
+	member: RunnerName,
+	post: 'runDirector' | 'marshal',
+) {
+	return runners[member][0]().frames[post][0]
 }
 
 export function createPlayer(world: World, racer: Racer = world.racers[0]) {
@@ -467,7 +466,9 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			)
 			const speed = Math.abs(body.vx)
 			$.setState(body.grounded && !body.board && speed > 0.3 ? 'play' : 'pause')
-			$.setFrameInterval(Math.max(45, 190 - speed * 22))
+			$.setFrameInterval(
+				strideFrameInterval(Math.max(45, 190 - speed * 22), run.length),
+			)
 			const { sea } = world.course
 			$.setStyle({
 				opacity: body.stumble > 0 && body.stumble % 8 < 4 ? '0.4' : '1',
@@ -839,7 +840,9 @@ function createPacer(world: World, p: Pacer) {
 			)
 			const speed = Math.abs(p.vx)
 			$.setState(p.grounded && !down && speed > 0.3 ? 'play' : 'pause')
-			$.setFrameInterval(Math.max(45, 190 - speed * 22))
+			$.setFrameInterval(
+				strideFrameInterval(Math.max(45, 190 - speed * 22), sprite.run.length),
+			)
 			// Flashing while they're dazed, and can't be bounced on again.
 			$.setStyle({
 				opacity: p.dazed > 0 && p.dazed % 8 < 4 ? '0.4' : '1',
@@ -2410,7 +2413,7 @@ const RUN_DIRECTOR_SINK = PATH_FRONT - 2
 
 export function createRunDirector(world: World) {
 	const member = world.runDirector
-	const frame = volunteerFrame(member)
+	const frame = volunteerFrame(member, 'runDirector')
 	const runner = runners[member][0]
 	const size = poseSize(frame, runner())
 	return createFixture({
@@ -2421,7 +2424,7 @@ export function createRunDirector(world: World) {
 		width: size.width,
 		height: size.height,
 		world,
-		frames: frame ? [frame] : [],
+		frames: [frame],
 		// Turned round to face everyone on the line, the bubble turned back.
 		xScale: -1,
 		children: () => (
@@ -3465,12 +3468,11 @@ export function createBoost(world: World, state: BoostState, i: number) {
 			})
 		}
 		case 'cheer': {
-			const frame = volunteerFrame(o.member)
+			const frame = volunteerFrame(o.member, 'marshal')
 			const runner = runners[o.member][0]
 			const size = poseSize(frame, runner())
 			// Marshals' signs point left, the way the header's runners go. Turned
 			// round, they point on along the course, and face the runner coming.
-			const turned = frame === runner().frames.marshal?.[0]
 			return createFixture({
 				id,
 				type: 'cheerer',
@@ -3479,11 +3481,11 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				width: size.width,
 				height: size.height,
 				world,
-				frames: frame ? [frame] : [],
-				xScale: turned ? -1 : 1,
+				frames: [frame],
+				xScale: -1,
 				children: () => (
 					<Show when={state.cheering() > 0}>
-						<Bubble size={18} mirrored={turned}>
+						<Bubble size={18} mirrored>
 							Go {state.cheered || world.runner.name}!
 						</Bubble>
 					</Show>
@@ -3705,7 +3707,10 @@ function createZombie(
 			height: () => ZOMBIE_HEIGHT,
 			...createObjectSignal(0, 'rotation'),
 			// A shamble: a run, slowed right down.
-			...createObjectSignal(o.skeleton ? 220 : 300, 'frameInterval'),
+			...createObjectSignal(
+				strideFrameInterval(o.skeleton ? 220 : 300, sprite.run.length),
+				'frameInterval',
+			),
 			...createObjectSignal('play' as 'play' | 'pause', 'state'),
 			...createObjectSignal({} as JSX.CSSProperties, 'style'),
 		}),

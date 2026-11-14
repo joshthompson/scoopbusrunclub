@@ -1,8 +1,15 @@
 import {
 	type SpritePixelData,
+	marshalPixels,
+	numberCheckerPixels,
+	photographerPixels,
+	runDirectorPixels,
 	runPixels,
+	scannerPixels,
 	sitPixels,
 	standPixels,
+	tailSitPixels,
+	tailWalkPixels,
 	zombiePixels,
 } from '@/assets/runners/custom/pixel-data.generated'
 import { generateFrames } from '@/utils'
@@ -38,7 +45,14 @@ export interface CharacterSpriteProps {
 	}
 }
 
-const FRAME_COUNT = 4
+/**
+ * Frames to a stride in the run and zombie templates, as a club member's have
+ * (`RUN_FRAME_COUNT` in `data/runners`, which imports this, so it can't be
+ * imported from there).
+ */
+const RUN_FRAME_COUNT = 6
+/** Frames to a stride in the tail walker's walk (`FRAME_COUNT` in `data/runners`). */
+const WALK_FRAME_COUNT = 4
 const RUNNER_SIZE = 2
 
 export function createRunnerFrames(
@@ -47,7 +61,7 @@ export function createRunnerFrames(
 	RunnerData,
 	'frames' | 'width' | 'height' | 'headPoint' | 'sitHeadPoint' | 'look'
 > {
-	const run = generateCustomSpriteFrames(character, runPixels, FRAME_COUNT)
+	const run = generateCustomSpriteFrames(character, runPixels, RUN_FRAME_COUNT)
 	const sit = generateCustomSpriteFrames(character, sitPixels, 1)
 	// Its first frame: stood, arms down (the other's a phone up). The strip
 	// comes back last frame first, so that's the last of them.
@@ -55,9 +69,14 @@ export function createRunnerFrames(
 	const zombie = generateCustomSpriteFrames(
 		character,
 		zombiePixels,
-		FRAME_COUNT,
+		RUN_FRAME_COUNT,
 	)
 	const face = generateFaceFrame(character)
+	// At a volunteer post they face out of the screen, looking right, as the
+	// club's own do: the head, drawn looking left, is turned round.
+	const post = (pixels: SpritePixelData) =>
+		generateCustomSpriteFrames(character, pixels, 1, { mirrorHead: true })
+			.frames
 	return {
 		frames: {
 			run: run?.frames,
@@ -65,14 +84,17 @@ export function createRunnerFrames(
 			sit: sit?.frames,
 			stand: stand?.frames.slice(-1),
 			face,
-			tailWalk: undefined,
-			tailSit: undefined,
-			scanner: undefined,
-			photographer: undefined,
-			runDirector: undefined,
-			marshal: undefined,
-			volunteerGeneric: undefined,
-			numberChecker: undefined,
+			tailWalk: generateCustomSpriteFrames(
+				character,
+				tailWalkPixels,
+				WALK_FRAME_COUNT,
+			).frames,
+			tailSit: generateCustomSpriteFrames(character, tailSitPixels, 1).frames,
+			scanner: post(scannerPixels),
+			photographer: post(photographerPixels),
+			runDirector: post(runDirectorPixels),
+			marshal: post(marshalPixels),
+			numberChecker: post(numberCheckerPixels),
 		},
 		// Their box is one of their run frames, head and all.
 		width: run?.width ?? 23,
@@ -151,6 +173,26 @@ const LEG_SHOE: [number, number, number] = [0x00, 0x33, 0x00] // #003300
 // Neck point
 const NECK_RED: [number, number, number] = [0xff, 0x00, 0x00] // #FF0000
 
+/**
+ * Colours that are the same on everyone, kept as they are: the volunteer
+ * poses' vests and what they're holding (see `scripts/gen-volunteer-poses.ts`).
+ */
+const FIXED_COLORS = new Set(
+	[
+		'#f0e928', // hi-vis vest
+		'#b6b6b6', // its reflective stripes
+		'#ff791e', // the tail walker's orange vest
+		'#afadb1', // its stripes, and the run director's
+		'#0b51c2', // the run director's blue vest, and their clipboard
+		'#e4e3e3', // paper
+		'#000000', // phone, camera, the arrow on the sign
+		'#424242', // camera lens
+		'#fdfe64', // the marshal's sign
+		'#aeaeae', // its pole
+		'#242424', // the number checker's tablet
+	].map((hex) => hexToRgb(hex).join()),
+)
+
 function recolorSprite(data: ImageData, character: CharacterSpriteProps): void {
 	const skinCol = skinColor(character.skin)
 	const topRgb = hexToRgb(character.topColor)
@@ -203,6 +245,10 @@ function recolorSprite(data: ImageData, character: CharacterSpriteProps): void {
 		}
 		// Neck point — keep for alignment
 		else if (colorsMatch(r, g, b, a, NECK_RED)) {
+			continue
+		}
+		// The same on everyone
+		else if (a === 255 && FIXED_COLORS.has(`${r},${g},${b}`)) {
 			continue
 		}
 		// Unknown color — make transparent
@@ -398,6 +444,34 @@ function generateFaceFrame(character: CharacterSpriteProps): string[] {
 	return [imageUrl]
 }
 
+interface CustomSprite {
+	frames: string[]
+	width: number
+	height: number
+	headPoint: Vector
+}
+
+interface SpriteOptions {
+	/** Turn the head round to look right, for a body facing out of the screen. */
+	mirrorHead?: boolean
+}
+
+/** Flip an image left to right, in place. */
+function flipImageData(image: ImageData) {
+	const { data, width, height } = image
+	for (let y = 0; y < height; y++) {
+		for (let x = 0; x < Math.floor(width / 2); x++) {
+			const a = (y * width + x) * 4
+			const b = (y * width + width - 1 - x) * 4
+			for (let c = 0; c < 4; c++) {
+				const t = data[a + c]
+				data[a + c] = data[b + c]
+				data[b + c] = t
+			}
+		}
+	}
+}
+
 /**
  * The middle of the face in `HEAD.base`, which is where anything worn on the
  * head is centred.
@@ -413,11 +487,13 @@ export function drawCustomSprite(
 	character: CharacterSpriteProps,
 	spritePixels: SpritePixelData | null,
 	frameCount: number,
+	{ mirrorHead = false }: SpriteOptions = {},
 ) {
 	if (!spritePixels) return undefined
 
 	const spriteData = decodePixels(spritePixels)
 	const headData = generateHeadImageData(character)
+	if (mirrorHead) flipImageData(headData)
 	const frameWidth = spriteData.width / frameCount
 
 	// Recolor the sprite
@@ -543,12 +619,23 @@ export function drawCustomSprite(
  */
 export function generateCustomSpriteFrames(
 	character: CharacterSpriteProps,
+	spritePixels: SpritePixelData,
+	frameCount: number,
+	options?: SpriteOptions,
+): CustomSprite
+export function generateCustomSpriteFrames(
+	character: CharacterSpriteProps,
 	spritePixels: SpritePixelData | null,
 	frameCount: number,
-):
-	| { frames: string[]; width: number; height: number; headPoint: Vector }
-	| undefined {
-	const drawn = drawCustomSprite(character, spritePixels, frameCount)
+	options?: SpriteOptions,
+): CustomSprite | undefined
+export function generateCustomSpriteFrames(
+	character: CharacterSpriteProps,
+	spritePixels: SpritePixelData | null,
+	frameCount: number,
+	options?: SpriteOptions,
+): CustomSprite | undefined {
+	const drawn = drawCustomSprite(character, spritePixels, frameCount, options)
 	if (!drawn) return undefined
 	const {
 		canvas: finalCanvas,

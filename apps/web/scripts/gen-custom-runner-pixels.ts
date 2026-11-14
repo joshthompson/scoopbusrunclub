@@ -28,6 +28,14 @@ const sprites: SpriteData[] = [
 	// Stood still: the run game's tourists.
 	{ name: 'stand', filename: 'stand.png' },
 	{ name: 'head', filename: 'head.png' },
+	// Volunteering (see gen-volunteer-poses.ts).
+	{ name: 'scanner', filename: 'scanner.png' },
+	{ name: 'marshal', filename: 'marshal.png' },
+	{ name: 'photographer', filename: 'photographer.png' },
+	{ name: 'runDirector', filename: 'run-director.png' },
+	{ name: 'numberChecker', filename: 'number-checker.png' },
+	{ name: 'tailWalk', filename: 'tail-walk.png' },
+	{ name: 'tailSit', filename: 'tail-sit.png' },
 ]
 
 function extractPixelData(filePath: string): {

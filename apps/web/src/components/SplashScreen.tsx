@@ -2,6 +2,7 @@ import {
 	RUNNER_SIZE,
 	type RunnerName,
 	runners as runnerSignals,
+	strideFrameInterval,
 } from '@/data/runners'
 import { randomItem } from '@/utils'
 import { css } from '@style/css'
@@ -63,9 +64,12 @@ export function SplashScreen(props: SplashScreenProps) {
 		startTime = Date.now()
 
 		// Animate sprite frames
-		spriteInterval = setInterval(() => {
-			setFrameIndex((i) => (i + 1) % frames.length)
-		}, runner.frameInterval)
+		spriteInterval = setInterval(
+			() => {
+				setFrameIndex((i) => (i + 1) % frames.length)
+			},
+			strideFrameInterval(runner.frameInterval, frames.length),
+		)
 
 		// Progress simulation
 		const tick = () => {

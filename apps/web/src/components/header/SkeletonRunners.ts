@@ -1,5 +1,13 @@
+import skeletonFaceAsset from '@/assets/halloween/skeleton-face.png'
+import skeletonMarshalAsset from '@/assets/halloween/skeleton-marshal.png'
+import skeletonNumberCheckerAsset from '@/assets/halloween/skeleton-number-checker.png'
+import skeletonPhotographerAsset from '@/assets/halloween/skeleton-photographer.png'
+import skeletonRunDirectorAsset from '@/assets/halloween/skeleton-run-director.png'
 import skeletonRunAsset from '@/assets/halloween/skeleton-run.png'
+import skeletonScannerAsset from '@/assets/halloween/skeleton-scanner.png'
 import skeletonSitAsset from '@/assets/halloween/skeleton-sit.png'
+import skeletonTailSitAsset from '@/assets/halloween/skeleton-tail-sit.png'
+import skeletonTailWalkAsset from '@/assets/halloween/skeleton-tail-walk.png'
 import {
 	FRAME_COUNT,
 	RUNNER_SIZE,
@@ -46,11 +54,14 @@ export function isSkeleton(runnerId: string) {
  * wider would land every frame a little off and show a sliver of the next one.
  * Stepping left from the start doesn't care how wide the sheet is.
  */
-const runFrames = Array.from(
-	{ length: FRAME_COUNT },
-	(_, n) =>
-		`${skeletonRunAsset}#${-23 * RUNNER_SIZE * n},0,${23 * FRAME_COUNT},29`,
-)
+const stepThrough = (sheet: string) =>
+	Array.from(
+		{ length: FRAME_COUNT },
+		(_, n) => `${sheet}#${-23 * RUNNER_SIZE * n},0,${23 * FRAME_COUNT},29`,
+	)
+const runFrames = stepThrough(skeletonRunAsset)
+/** Its run in the tail walker's vest. */
+const walkFrames = stepThrough(skeletonTailWalkAsset)
 
 /**
  * Register the skeletons, the first time they're needed. They're drawn the same
@@ -70,15 +81,16 @@ function registerSkeletons() {
 				// Already dead.
 				zombie: undefined,
 				sit: [skeletonSitAsset],
-				face: undefined,
-				tailWalk: undefined,
-				tailSit: undefined,
-				scanner: undefined,
-				photographer: undefined,
-				runDirector: undefined,
-				marshal: undefined,
-				volunteerGeneric: undefined,
-				numberChecker: undefined,
+				face: [skeletonFaceAsset],
+				// They only come out in Halloween mode, when nobody's volunteering,
+				// but they've the poses for it all the same.
+				tailWalk: walkFrames,
+				tailSit: [skeletonTailSitAsset],
+				scanner: [skeletonScannerAsset],
+				photographer: [skeletonPhotographerAsset],
+				runDirector: [skeletonRunDirectorAsset],
+				marshal: [skeletonMarshalAsset],
+				numberChecker: [skeletonNumberCheckerAsset],
 			},
 			width: 23,
 			height: 29,
