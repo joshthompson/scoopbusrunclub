@@ -8,6 +8,7 @@ import {
 	LIPS_FRONT,
 	LOWER_TEETH,
 	MOUTH_INSIDE,
+	MOUTH_INSIDE_STOPS,
 	MOUTH_WIDTH,
 	UPPER_TEETH,
 	tongue,
@@ -43,6 +44,8 @@ export function createGiantMouth(world: World) {
 		)
 	const jawTop = face.y + JAW_FROM
 	const drop = () => Math.round((open() * JAW_DROP) / CELL) * CELL
+	/** How much of the tongue, from its tip, is still back in the mouth, in %. */
+	const hidden = () => Math.round(Math.max(0, 1 - open() * 1.2) * 100)
 	return [
 		// The inside of the mouth, its teeth top and bottom, between its lips.
 		createController({
@@ -81,6 +84,20 @@ export function createGiantMouth(world: World) {
 					</div>
 				),
 			}),
+			draw: ({ ctx, image }) => {
+				if (open() <= 0.02) return
+				const height = drop() + 4
+				const inside = ctx.createLinearGradient(0, 0, MOUTH_WIDTH, 0)
+				for (const [at, colour] of MOUTH_INSIDE_STOPS)
+					inside.addColorStop(at, colour)
+				ctx.fillStyle = inside
+				ctx.fillRect(0, 0, MOUTH_WIDTH, height)
+				const upper = image(UPPER_TEETH)
+				if (upper) ctx.drawImage(upper.image, 4, 4, MOUTH_WIDTH - 8, 12)
+				const lower = image(LOWER_TEETH)
+				if (lower)
+					ctx.drawImage(lower.image, 8, height - 12, MOUTH_WIDTH - 8, 12)
+			},
 			// Opening and shutting, by who's near: the same on every screen.
 			onEnterFrame: () => {
 				const target = wanted() ? 1 : 0
@@ -117,6 +134,11 @@ export function createGiantMouth(world: World) {
 					/>
 				),
 			}),
+			draw: ({ ctx, image }) => {
+				const jaw = image(JAW)
+				if (jaw && open() > 0.02)
+					ctx.drawImage(jaw.image, 0, 0, GIANT_FACE.width, 900 - JAW_FROM)
+			},
 		}),
 		// Its tongue, rolling out of it, over the bench: from its tip, out of
 		// sight back in the mouth till it's open.
@@ -137,11 +159,20 @@ export function createGiantMouth(world: World) {
 						height={art.height}
 						style={{
 							display: 'block',
-							'clip-path': `inset(0 0 0 ${Math.round(Math.max(0, 1 - open() * 1.2) * 100)}%)`,
+							'clip-path': `inset(0 0 0 ${hidden()}%)`,
 						}}
 					/>
 				),
 			}),
+			draw: ({ ctx, image }) => {
+				const picture = image(art.asset)
+				if (!picture || hidden() >= 100) return
+				const from = (art.width * hidden()) / 100
+				ctx.beginPath()
+				ctx.rect(from, 0, art.width - from, art.height)
+				ctx.clip()
+				ctx.drawImage(picture.image, 0, 0, art.width, art.height)
+			},
 		}),
 	]
 }

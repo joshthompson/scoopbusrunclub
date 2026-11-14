@@ -66,6 +66,9 @@ const ORE: PixelRect[] = [
 const EMPTY = pixelArt(COLUMNS, ROWS, TUB)
 const LOADED = pixelArt(COLUMNS, ROWS, [...ORE, ...TUB])
 
+/** The cart's picture, heaped with ore or not, for the Canvas Renderer to draw. */
+export const mineCartPicture = (loaded = true) => (loaded ? LOADED : EMPTY)
+
 export function MineCartArt(props: { loaded?: boolean }) {
 	return (
 		<Show

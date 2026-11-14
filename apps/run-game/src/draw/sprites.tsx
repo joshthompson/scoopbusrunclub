@@ -205,6 +205,7 @@ import {
 	SPLASH_UP,
 	SPLASH_WIDTH,
 	SplashArt,
+	paintSplash,
 } from './art/splash'
 import {
 	TOURISTS_DEPTH_ROOM,
@@ -230,6 +231,7 @@ import { paintFlung } from './paint/dirtFly'
 import { paintHazardStripes } from './paint/hazardStripes'
 import { FONT_PIXEL, FONT_SIGN, fillLine, wrapLines } from './paint/lettering'
 import { mirrored, paintPicture } from './paint/picture'
+import { svgPainter } from './paint/svgPainter'
 import { PlatformArt, platformLook, platformPainter } from './platformArt'
 import { rendererChoice } from './rendererChoice'
 import { rideLook } from './rideLook'
@@ -1117,6 +1119,7 @@ function createSplash(world: World, id: string, x: number, at: number) {
 			height: () => SPLASH_HEIGHT,
 			children: () => <SplashArt age={world.ticks() - at} />,
 		}),
+		draw: ({ ctx }) => paintSplash(ctx, world.ticks() - at),
 	})
 }
 
@@ -2068,6 +2071,31 @@ export function createBusBore(world: World) {
 	const hole = band((c) => [c.top, c.bottom])
 	const rim = band((c) => (c.rim ? [c.top - 4, c.top] : undefined))
 	const [shown, setShown] = createSignal(0)
+	const art = () => (
+		<svg
+			width={width}
+			height={lowest - highest}
+			shape-rendering="crispEdges"
+			aria-hidden="true"
+			style={{ display: 'block' }}
+		>
+			{/* The Cave's back wall, through it: brick, its courses in
+			    line with the wall's, where it's laid in brick. */}
+			<Show when={look.bricks}>
+				<defs>
+					<WallBricks
+						id="bus-bore-bricks"
+						wall={look.wall}
+						x={start}
+						y={highest}
+					/>
+				</defs>
+			</Show>
+			<path d={hole} fill={look.bricks ? 'url(#bus-bore-bricks)' : look.wall} />
+			<path d={rim} fill={look.seam} />
+		</svg>
+	)
+	const paint = svgPainter(`bus-bore:${world.course.id}`, art)
 	return [
 		createController({
 			init: () => ({
@@ -2079,34 +2107,21 @@ export function createBusBore(world: World) {
 				height: () => lowest - highest,
 				children: () => (
 					<div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-						<svg
-							width={width}
-							height={lowest - highest}
-							shape-rendering="crispEdges"
-							aria-hidden="true"
-							style={{ display: 'block' }}
-						>
-							{/* The Cave's back wall, through it: brick, its courses in
-							    line with the wall's, where it's laid in brick. */}
-							<Show when={look.bricks}>
-								<defs>
-									<WallBricks
-										id="bus-bore-bricks"
-										wall={look.wall}
-										x={start}
-										y={highest}
-									/>
-								</defs>
-							</Show>
-							<path
-								d={hole}
-								fill={look.bricks ? 'url(#bus-bore-bricks)' : look.wall}
-							/>
-							<path d={rim} fill={look.seam} />
-						</svg>
+						{art()}
 					</div>
 				),
 			}),
+			// Bored as far as the bus has got, and painted only where it's in view.
+			draw: ({ ctx, image, $scene }) => {
+				const view = $scene.canvas.get()
+				const from = Math.max(0, view.x() - start)
+				const to = Math.min(shown(), view.x() + view.width() - start)
+				if (to <= from) return
+				ctx.beginPath()
+				ctx.rect(0, 0, shown(), lowest - highest)
+				ctx.clip()
+				paint(ctx, image, from, to)
+			},
 			onEnterFrame() {
 				setShown(Math.max(0, Math.min(width, world.bus.frontX - 40 - start)))
 			},
