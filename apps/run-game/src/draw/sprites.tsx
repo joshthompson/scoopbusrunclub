@@ -192,7 +192,11 @@ import {
 	WHALE_WIDTH,
 	WhaleArt,
 	gullPicture,
+	paintBalloon,
 	paintRing,
+	paintStorm,
+	paintTurbine,
+	paintWhale,
 } from './art/sky'
 import {
 	GATE_HEIGHT,
@@ -3913,6 +3917,7 @@ function createSkyThing(
 	const at = (
 		box: { x: number; y: number; width: number; height: number },
 		children: () => JSX.Element,
+		draw: (painting: DrawPainting) => void,
 		y?: () => number,
 	) =>
 		createController({
@@ -3925,6 +3930,7 @@ function createSkyThing(
 				height: () => box.height,
 				children,
 			}),
+			draw,
 			onEnterFrame: y ? ({ $ }) => $.setY(y()) : undefined,
 		})
 	switch (o.kind) {
@@ -3982,11 +3988,13 @@ function createSkyThing(
 					height: BALLOON_HEIGHT,
 				},
 				() => <BalloonArt x={o.x} />,
+				({ ctx, image }) => paintBalloon(ctx, image, o.x),
 				() => balloonAt(o, line, now()).top,
 			)
 		case 'storm': {
 			const { top, bottom } = stormAt(o, line, 0)
 			const storm = () => stormAt(o, line, now())
+			const reach = line - bottom + 18
 			return at(
 				{
 					x: o.x - STORM_WIDTH / 2,
@@ -3999,9 +4007,11 @@ function createSkyThing(
 						brewing={storm().brewing}
 						striking={storm().striking}
 						now={now()}
-						reach={line - bottom + 18}
+						reach={reach}
 					/>
 				),
+				({ ctx, image }) =>
+					paintStorm(ctx, image, { ...storm(), now: now(), reach }),
 			)
 		}
 		case 'turbine': {
@@ -4019,6 +4029,8 @@ function createSkyThing(
 						tall={o.height + 10}
 					/>
 				),
+				({ ctx }) =>
+					paintTurbine(ctx, turbineAt(o, line, now()).angles, o.height + 10),
 			)
 		}
 		case 'whale': {
@@ -4039,6 +4051,12 @@ function createSkyThing(
 						now={now()}
 					/>
 				),
+				({ ctx, image }) =>
+					paintWhale(ctx, image, {
+						...whale(),
+						height: o.height,
+						now: now(),
+					}),
 			)
 		}
 	}
