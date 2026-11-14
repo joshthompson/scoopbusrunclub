@@ -362,3 +362,14 @@ export function paintBoardUnder(
 export function BusSpray(): JSX.Element {
 	return <Bits colours={SPRAY} from={0} />
 }
+
+/**
+ * `BusSpray`, in a Draw Hook, from (0, 0): turned round, as it is, flung
+ * back behind the sleigh, `seconds` since it started.
+ */
+export function paintBusSpray(ctx: CanvasRenderingContext2D, seconds: number) {
+	ctx.save()
+	ctx.scale(-1, 1)
+	paintBits(ctx, SPRAY, 0, 0, seconds)
+	ctx.restore()
+}

@@ -120,7 +120,13 @@ import { WallBricks } from './Backdrop'
 import { Bubble, paintBubble } from './Bubble'
 import { PixelArt } from './PixelArt'
 import { Pixels } from './Pixels'
-import { BusLegs, LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH } from './art/busLegs'
+import {
+	BusLegs,
+	LEGS_HEIGHT,
+	LEGS_OUT,
+	LEGS_WIDTH,
+	paintBusLegs,
+} from './art/busLegs'
 import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
 import { DRILL_AT, DRILL_HEIGHT, DRILL_POINT, DRILL_WIDTH } from './art/drill'
@@ -163,6 +169,7 @@ import {
 	UNDER_LIFT,
 	goingFor,
 	paintBoardUnder,
+	paintBusSpray,
 	stoodBoardPicture,
 } from './art/skis'
 import {
@@ -212,6 +219,8 @@ import { cachedArt } from './canvasArt'
 import { flyerLook } from './flyerLook'
 import { headTop } from './heads'
 import { cssColour } from './paint/cssBackground'
+import { paintFlung } from './paint/dirtFly'
+import { paintHazardStripes } from './paint/hazardStripes'
 import { FONT_PIXEL, FONT_SIGN, fillLine, wrapLines } from './paint/lettering'
 import { mirrored, paintPicture } from './paint/picture'
 import { PlatformArt, platformLook, platformPainter } from './platformArt'
@@ -1538,6 +1547,8 @@ const BUS_CONDOR_BEATING = 260
 const BUS_CONDOR_FLY_OFF = 150
 /** The scoop's front edge, this far in from the bus's left. */
 const SCOOP_FRONT = BUS_WIDTH + 22
+/** How many ticks its scoop takes to flick up, or back down: 60ms. */
+const SCOOP_FLICK = 60 / TICK_MS
 /** How long a bit of rock takes to fly off the drill, and the bits: up and back over the roof, or down ahead onto the floor. */
 const DIRT_SECONDS = 0.5
 const DIRT = [
@@ -1563,6 +1574,15 @@ export function createBusDirt(world: World) {
 	const rock = look?.cave
 	if (!look?.bus?.drill || !world.course.cave || !rock) return []
 	const shades = [rock.edge, rock.rock, '#9a8270']
+	/** The same bits, for painting on the Canvas Renderer. */
+	const bits = DIRT.map((bit) => ({
+		x: -bit.size / 2,
+		y: -bit.size / 2,
+		size: bit.size,
+		colour: shades[bit.shade],
+		to: bit.to,
+		delay: bit.delay,
+	}))
 	return [
 		createController({
 			init: () => ({
@@ -1607,6 +1627,11 @@ export function createBusDirt(world: World) {
 						world.ticks() >= 0 && drilling(world, front) ? 'visible' : 'hidden',
 				})
 			},
+			draw: ({ ctx }) =>
+				paintFlung(ctx, world.ticks(), bits, {
+					seconds: DIRT_SECONDS,
+					steps: 8,
+				}),
 		}),
 	]
 }
@@ -1663,6 +1688,11 @@ export function createBus(world: World) {
 		if (here === undefined) return tiltAt(world.terrain, x)
 		return ((dug?.(x + 4) ?? here) - (dug?.(x - 4) ?? here)) / 8
 	}
+	/**
+	 * How far its scoop's flicked up, after scooping someone, 0 to 1: eased
+	 * there and back over `SCOOP_FLICK` ticks, rather than jumping.
+	 */
+	const [flick, setFlick] = createSignal(0)
 	const bus = createController({
 		// A sleigh has no back to see through its windows.
 		frames: look.sleigh ? [] : [busBackAsset],
@@ -1676,6 +1706,12 @@ export function createBus(world: World) {
 			...createObjectSignal(0, 'rotation'),
 		}),
 		onEnterFrame({ $, $age }) {
+			const flicked = world.ticks() >= 0 && world.bus.scooping > 0 ? 1 : 0
+			setFlick((f) =>
+				f < flicked
+					? Math.min(flicked, f + 1 / SCOOP_FLICK)
+					: Math.max(flicked, f - 1 / SCOOP_FLICK),
+			)
 			const middle = world.bus.frontX - SCOOP_FRONT - drillOut() + BUS_WIDTH / 2
 			world.bus.ride ??= startRide(world, middle)
 			const ride = world.bus.ride
@@ -1706,6 +1742,18 @@ export function createBus(world: World) {
 			)
 		},
 	})
+
+	/**
+	 * Gives a part a Draw Hook, for the Canvas Renderer, where it's drawn with
+	 * `children` on the DOM: `createConnectedController` doesn't take one.
+	 */
+	const withDraw = <C extends { draw?: unknown }>(
+		controller: C,
+		draw: C['draw'],
+	) => {
+		controller.draw = draw
+		return controller
+	}
 
 	const part = (
 		type: string,
@@ -1741,26 +1789,30 @@ export function createBus(world: World) {
 		if (!look.legs) return
 		const legsLook = look.legs
 		bus.attach(
-			createConnectedController({
-				type,
-				base: bus,
-				width: () => LEGS_WIDTH,
-				height: () => LEGS_HEIGHT,
-				offset: { x: -LEGS_OUT, y: 0 },
-				init: () => ({
-					children: () => (
-						<BusLegs
-							look={legsLook}
-							far={far}
-							ground={WHEEL_BOTTOM}
-							travelled={() => {
-								world.ticks()
-								return world.bus.frontX
-							}}
-						/>
-					),
+			withDraw(
+				createConnectedController({
+					type,
+					base: bus,
+					width: () => LEGS_WIDTH,
+					height: () => LEGS_HEIGHT,
+					offset: { x: -LEGS_OUT, y: 0 },
+					init: () => ({
+						children: () => (
+							<BusLegs
+								look={legsLook}
+								far={far}
+								ground={WHEEL_BOTTOM}
+								travelled={() => {
+									world.ticks()
+									return world.bus.frontX
+								}}
+							/>
+						),
+					}),
 				}),
-			}),
+				({ ctx }) =>
+					paintBusLegs(ctx, legsLook, world.bus.frontX, WHEEL_BOTTOM, far),
+			),
 		)
 	}
 	if (look.legs) legs('bus-legs-far', true)
@@ -1818,23 +1870,28 @@ export function createBus(world: World) {
 		})
 	else part('bus-body', look.body, BUS_WIDTH, BUS_HEIGHT, { x: 0, y: 0 })
 	legs('bus-legs', false)
-	// Snow sprayed off the back of its sleigh's runners, as it goes.
+	// Snow sprayed off the back of its sleigh's runners, as it goes: from
+	// the start, as its animation starts once it's on the page.
+	const sprayFor = goingFor()
 	if (look.sleigh)
 		bus.attach(
-			createConnectedController({
-				type: 'bus-spray',
-				base: bus,
-				width: () => 0,
-				height: () => 0,
-				offset: { x: BUS_WIDTH - SLEIGH_WIDTH + 14, y: WHEEL_BOTTOM - 10 },
-				init: () => ({
-					children: () => (
-						<div style={{ position: 'absolute', transform: 'scaleX(-1)' }}>
-							<BusSpray />
-						</div>
-					),
+			withDraw(
+				createConnectedController({
+					type: 'bus-spray',
+					base: bus,
+					width: () => 0,
+					height: () => 0,
+					offset: { x: BUS_WIDTH - SLEIGH_WIDTH + 14, y: WHEEL_BOTTOM - 10 },
+					init: () => ({
+						children: () => (
+							<div style={{ position: 'absolute', transform: 'scaleX(-1)' }}>
+								<BusSpray />
+							</div>
+						),
+					}),
 				}),
-			}),
+				({ ctx }) => paintBusSpray(ctx, sprayFor(true, world.ticks()) ?? 0),
+			),
 		)
 	// Its own glider, bolted to its roof, out over the sea.
 	if (world.course.sea)
@@ -1937,17 +1994,13 @@ export function createBus(world: World) {
 						frame: () => Math.floor(Math.max(0, world.ticks()) / 2) % 2,
 					}),
 				style: () => ({
-					transition: 'transform 60ms linear',
 					// Lifted about its top front corner.
 					'transform-origin': `${drill ? DRILL_WIDTH : 88}px 0px`,
 					visibility:
 						world.ticks() >= 0 && (armOut(world) || drillOn() !== drill)
 							? 'hidden'
 							: 'visible',
-					transform:
-						world.ticks() >= 0 && world.bus.scooping > 0
-							? 'translateY(-45px) rotate(-10deg)'
-							: 'translateY(0px) rotate(0deg)',
+					transform: `translateY(${-45 * flick()}px) rotate(${-10 * flick()}deg)`,
 				}),
 			},
 		)
@@ -2141,6 +2194,33 @@ export function createScoopArm(world: World) {
 				</Show>
 			),
 		}),
+		// The same, on the Canvas Renderer: each section of the arm, thinnest
+		// first, then the scoop on the end.
+		draw: ({ ctx, image }) => {
+			if (length() <= ARM_SHOWS) return
+			const height = length() + SCOOP_HEIGHT
+			ARM_SECTIONS.forEach((thickness, i) => {
+				const long =
+					(length() * (ARM_SECTIONS.length - i)) / ARM_SECTIONS.length
+				const bottom = height - (SCOOP_HEIGHT - SCOOP_LIP)
+				paintHazardStripes(
+					ctx,
+					SCOOP_WIDTH / 2 - thickness / 2,
+					up() ? bottom - long : 0,
+					thickness,
+					long,
+				)
+			})
+			const art = image(scoop)
+			if (!art) return
+			const top = up() ? 0 : height - SCOOP_HEIGHT
+			if (scooping()) {
+				ctx.translate(SCOOP_WIDTH / 2, top + SCOOP_HEIGHT / 2)
+				ctx.rotate((20 * Math.PI) / 180)
+				ctx.translate(-SCOOP_WIDTH / 2, -(top + SCOOP_HEIGHT / 2))
+			}
+			ctx.drawImage(art.image, 0, top, SCOOP_WIDTH, SCOOP_HEIGHT)
+		},
 		onEnterFrame({ $ }) {
 			setReach(world.bus.reach)
 			setScooping(world.bus.scooping > 0)
