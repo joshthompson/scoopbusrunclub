@@ -1858,28 +1858,6 @@ function stalactite(x: number) {
 const MOUTH_SHOWN = 56
 /** How long the cover takes to go, or come back, in ms. */
 export const COVER_FADE_MS = 350
-const COVER_FADE = `${COVER_FADE_MS}ms`
-
-/**
- * A Cave's rock over the inside of it, in front of everything in there:
- * till someone racing goes in, it's solid ground, its way in and its way
- * out showing, with what's on it from `outside`; with them inside, it's
- * gone, the cave opened up. Part by part, if it has `parts`.
- */
-export function CaveCover(props: {
-	world: View & Pick<World, 'racers' | 'ticks'>
-}) {
-	const { cave } = props.world.course
-	const look = props.world.course.look?.cave
-	if (!cave || !look) return null
-	return (
-		<For each={caveCoverParts(cave)}>
-			{(part) => (
-				<CavePartCover world={props.world} cave={cave} look={look} {...part} />
-			)}
-		</For>
-	)
-}
 
 /**
  * A Cave's cover's parts, each `from` to `to`: the first with the Cave's
@@ -1893,29 +1871,6 @@ export function caveCoverParts(cave: NonNullable<World['course']['cave']>) {
 		mouth: i === 0 ? cave.mouth : undefined,
 		id: `cave-cover-${i}`,
 	}))
-}
-
-/** One part of a Cave's cover, `from` to `to`: see `CaveCover`. */
-function CavePartCover(props: CavePartProps) {
-	const inside = coverOpening(props.world, props.cave, props.from, props.to)
-	return (
-		<div
-			style={{
-				position: 'absolute',
-				top: 0,
-				left: 0,
-				width: `${props.world.terrain.finishX + 1600 - DRAWN_FROM}px`,
-				height: `${VIEW_HEIGHT}px`,
-				transform: `translateX(${Math.round(DRAWN_FROM - props.world.camera())}px)`,
-				'will-change': 'transform',
-				'pointer-events': 'none',
-				opacity: inside() ? 0 : 1,
-				transition: `opacity ${COVER_FADE}`,
-			}}
-		>
-			<CaveCoverArt {...props} />
-		</div>
-	)
 }
 
 type CavePartProps = {

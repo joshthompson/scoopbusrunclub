@@ -1,4 +1,3 @@
-import { For, Show } from 'solid-js'
 import { HANDS_HOLD } from '../../game/sewer'
 import { cellArt } from '../paint/cells'
 
@@ -80,25 +79,6 @@ const ARMS: Rect[] = [
 const BURST = 4
 const SINK = 14
 
-function Cells(props: { rects: Rect[] }) {
-	return (
-		<svg
-			width={HANDS_WIDTH}
-			height={HANDS_HEIGHT}
-			viewBox={`0 0 ${COLUMNS} ${ROWS}`}
-			shape-rendering="crispEdges"
-			aria-hidden="true"
-			style={{ display: 'block' }}
-		>
-			<For each={props.rects}>
-				{([x, y, w, h, fill]) => (
-					<rect x={x} y={y} width={w} height={h} fill={fill} />
-				)}
-			</For>
-		</svg>
-	)
-}
-
 /** How far up out of the ground the arms are at `now`, out of 1, if they last grabbed at `grabbed`. */
 function handsUp(now: number, grabbed: number | undefined) {
 	if (grabbed === undefined) return 0
@@ -111,38 +91,9 @@ function handsUp(now: number, grabbed: number | undefined) {
 /** How far down the arms are drawn, `up` out of 1 up out of the ground. */
 const sunk = (up: number) => Math.round((1 - up) * (HANDS_HEIGHT - 4))
 
-export function HandsArt(props: {
-	now: () => number
-	/** The tick they last grabbed someone, if they have. */
-	grabbed: () => number | undefined
-}) {
-	const up = () => handsUp(props.now(), props.grabbed())
-	return (
-		<div
-			style={{
-				position: 'relative',
-				width: `${HANDS_WIDTH}px`,
-				height: `${HANDS_HEIGHT}px`,
-				overflow: 'hidden',
-			}}
-		>
-			<Show when={up() > 0} fallback={<Cells rects={TIPS} />}>
-				<div
-					style={{
-						transform: `translateY(${sunk(up())}px)`,
-					}}
-				>
-					<Cells rects={ARMS} />
-				</div>
-			</Show>
-		</div>
-	)
-}
-
 /**
- * Hands, as `HandsArt` draws them, painted in a Draw Hook: their
- * fingertips, or their arms as far up out of the earth as they've come,
- * cut off at its bottom.
+ * Hands, painted in a Draw Hook: their fingertips, or their arms as far up
+ * out of the earth as they've come, cut off at its bottom.
  */
 export function paintHands(
 	ctx: CanvasRenderingContext2D,

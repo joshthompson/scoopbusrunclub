@@ -29,7 +29,7 @@ export function readSvg(
 
 /**
  * A long SVG of the game's own that doesn't change, as the page draws it,
- * painted on the Canvas Renderer a chunk at a time: only the chunks between
+ * painted a chunk at a time: only the chunks between
  * `from` and `to` across it, what's in view, in its own coordinates. Read
  * (see `readSvg`) the first time it's painted, and painted once every
  * picture in it has loaded. Its colours' `var(--name)`s are the page's,

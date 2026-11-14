@@ -1,15 +1,11 @@
 import { TICK_MS } from '../../game/constants'
 
 /**
- * The `dirt-fly` animation (in `styles.css`), worked out for painting on the
- * Canvas Renderer, where CSS animations don't play: a bit of rock, or snow,
- * flung `to` px from where it starts, over `seconds`, in `steps` jumps each
- * way, fading out over the second half; then again, over and over.
- *
- * The animation's `steps()` applies to each half of it, between its
- * keyframes, as CSS does, and before its `delay` it sits where it starts.
- * `ticks` is how long it's been going: the world's ticks, where under the
- * DOM Renderer it's real time, since the page put it there.
+ * A bit of rock, or snow, flying: flung `to` px from where it starts, over
+ * `seconds`, in `steps` jumps each half of the way, fading out over the
+ * second half; then again, over and over. Before its `delay` it sits where
+ * it starts. `ticks` is how long it's been going: the world's ticks, so it
+ * pauses with the game.
  */
 export function dirtFlyAt(
 	ticks: number,
@@ -41,10 +37,7 @@ export interface FlungBit {
 	delay: number
 }
 
-/**
- * Bits flying with `dirt-fly`, each a square `<div>` under the DOM Renderer,
- * painted where they've got to after `ticks`.
- */
+/** Bits flying, each a square, painted where they've got to after `ticks`. */
 export function paintFlung(
 	ctx: CanvasRenderingContext2D,
 	ticks: number,

@@ -1,5 +1,4 @@
 import type { DrawPainting } from 'scoopjs'
-import { For, type JSX, Show } from 'solid-js'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
 import { type Board, boardOf } from '../../game/boards'
 import { TICK_MS } from '../../game/constants'
@@ -190,42 +189,6 @@ function underPicture(board: number) {
 const underWidth = (board: number) =>
 	(boardOf(board).kind === 'skis' ? SKI_COLUMNS : BOARD_COLUMNS) * CELL
 
-/**
- * Whoever's riding `board`'s skis or snowboard, under their feet, side on,
- * its tips to the left: their sprite's flipped to face right, and it with
- * them. Snow sprayed off it at speed, and sparks off a rail grinding.
- */
-export function BoardUnder(props: {
-	board: number
-	/** The rider's box's width: it's in the middle of it. */
-	width: number
-	spray: boolean
-	sparks: boolean
-}) {
-	const src = () => underPicture(props.board)
-	const width = () => underWidth(props.board)
-	return (
-		<div
-			style={{
-				position: 'absolute',
-				left: `${(props.width - width()) / 2}px`,
-				// Its plank's top at their feet.
-				bottom: `${PLANK_DOWN - UNDER_HEIGHT}px`,
-				width: `${width()}px`,
-				height: `${UNDER_HEIGHT}px`,
-			}}
-		>
-			<PixelArt src={src()} width={width()} height={UNDER_HEIGHT} />
-			<Show when={props.spray}>
-				<Bits colours={SPRAY} from={width() - 4} />
-			</Show>
-			<Show when={props.sparks}>
-				<Bits colours={SPARKS} from={width() / 2} />
-			</Show>
-		</div>
-	)
-}
-
 const SPRAY = ['#ffffff', '#e8f1fa', '#ffffff', '#cfdff0']
 const SPARKS = ['#ffe36b', '#ff9f1c', '#fff4c2', '#ff6a1c']
 /** Where each bit flies to, from the back of the board, and when. */
@@ -237,38 +200,15 @@ const BITS = [
 	{ x: 32, y: -12, delay: 0.28 },
 ]
 
-/** Bits of snow, or sparks, flung off the back of it, over and over. */
-function Bits(props: { colours: string[]; from: number }) {
-	return (
-		<For each={BITS}>
-			{(bit, i) => (
-				<div
-					style={{
-						position: 'absolute',
-						left: `${props.from}px`,
-						top: '2px',
-						width: '4px',
-						height: '4px',
-						background: props.colours[i() % props.colours.length],
-						'--dx': `${bit.x}px`,
-						'--dy': `${bit.y}px`,
-						animation: `dirt-fly 0.35s steps(6) ${bit.delay}s infinite`,
-					}}
-				/>
-			)}
-		</For>
-	)
-}
-
 /** How long a bit takes to fly, in seconds, and how many steps it's drawn in, there and on. */
 const BIT_FLIES = 0.35
 const BIT_STEPS = 6
 
 /**
- * `Bits`, in a Draw Hook: each where its `dirt-fly` animation has it,
- * `seconds` since they started flying, flung from `from` along a box at
- * `top`. The animation steps through each half of its keyframes, there
- * and on, in 6 steps: out half way, fully there; then on, fading.
+ * Bits of snow, or sparks, flung off the back of a board, over and over,
+ * painted in a Draw Hook: `seconds` since they started flying, flung from
+ * `from` along a box at `top`. Each flies there and on, in 6 steps each
+ * way: out half way, fully there; then on, fading.
  */
 export function paintBits(
 	ctx: CanvasRenderingContext2D,
@@ -306,8 +246,8 @@ export function paintBits(
 
 /**
  * How long something's been going, in seconds, from the ticks: since it
- * was last seen to start, as a CSS animation starts as it's shown. Told
- * whether it's on every time it's drawn; undefined while it's off.
+ * was last seen to start. Told whether it's on every time it's drawn;
+ * undefined while it's off.
  */
 export function goingFor() {
 	let since: number | undefined
@@ -322,9 +262,11 @@ export function goingFor() {
 }
 
 /**
- * `BoardUnder`, in a Draw Hook: under the feet of a rider whose box is
- * `width` by `height`. Snow sprayed off it, `spray` seconds since it
- * started, if it is, and sparks off a rail, `sparks` seconds since.
+ * `board`'s skis or snowboard, in a Draw Hook, under the feet of a rider
+ * whose box is `width` by `height`, side on, its tips to the left: their
+ * sprite's flipped to face right, and it with them. Snow sprayed off it,
+ * `spray` seconds since it started, if it is, and sparks off a rail,
+ * `sparks` seconds since.
  */
 export function paintBoardUnder(
 	ctx: CanvasRenderingContext2D,
@@ -358,14 +300,10 @@ export function paintBoardUnder(
 
 // --- The bus's ----------------------------------------------------------------
 
-/** Snow sprayed off the back of the bus's sleigh, as it goes. */
-export function BusSpray(): JSX.Element {
-	return <Bits colours={SPRAY} from={0} />
-}
-
 /**
- * `BusSpray`, in a Draw Hook, from (0, 0): turned round, as it is, flung
- * back behind the sleigh, `seconds` since it started.
+ * Snow sprayed off the back of the bus's sleigh, as it goes, in a Draw
+ * Hook, from (0, 0): turned round, flung back behind the sleigh, `seconds`
+ * since it started.
  */
 export function paintBusSpray(ctx: CanvasRenderingContext2D, seconds: number) {
 	ctx.save()

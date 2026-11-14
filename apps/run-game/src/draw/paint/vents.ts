@@ -7,13 +7,12 @@ import { paintPicture } from './picture'
 import { type SteamBit, paintSteam, steamReach } from './steam'
 
 /**
- * Steam Vents, Bouncy Toadstools and Heart Valves, as their `children`
- * draw them, painted in their Draw Hooks: everything that fires whoever's
- * on it up into the air.
+ * Steam Vents, Bouncy Toadstools and Heart Valves, painted in their Draw
+ * Hooks: everything that fires whoever's on it up into the air.
  */
 
 /** A Steam Vent's clouds: each its own size, rising from its own place, one after another. */
-export const STEAM_CLOUDS = [
+const STEAM_CLOUDS = [
 	{ x: -8, size: 14, delay: 0 },
 	{ x: 6, size: 18, delay: 0.1 },
 	{ x: -2, size: 22, delay: 0.2 },
@@ -66,7 +65,7 @@ export function paintSteamVent(
 }
 
 /** How squashed a Bouncy Toadstool is, its height out of 1, `puff` out of 1 through firing someone up. */
-export function bouncerSquash(puff: number | undefined) {
+function bouncerSquash(puff: number | undefined) {
 	if (puff === undefined) return 1
 	// Down flat, then up past where it was, and settling.
 	return 1 - 0.45 * Math.cos(puff * Math.PI * 3) * (1 - puff)
@@ -93,7 +92,7 @@ export function paintBouncer(
 }
 
 /** How wide a Heart Valve's chevrons are, and how tall. */
-export const VALVE_ARROWS = 24
+const VALVE_ARROWS = 24
 const VALVE_ARROWS_HEIGHT = VALVE_ARROWS * (10 / 12)
 /** The chevrons' glow, as the valve opens. */
 const ARROWS_GLOW = 'drop-shadow(0 0 4px #fff6a8)'

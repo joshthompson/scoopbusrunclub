@@ -7,7 +7,6 @@ import {
 	JAW_FROM,
 	LIPS_FRONT,
 	LOWER_TEETH,
-	MOUTH_INSIDE,
 	MOUTH_INSIDE_STOPS,
 	MOUTH_WIDTH,
 	UPPER_TEETH,
@@ -59,33 +58,6 @@ export function createGiantMouth(world: World) {
 				y: () => jawTop - 4,
 				width: () => MOUTH_WIDTH,
 				height: () => drop() + 4,
-				children: () => (
-					<div
-						style={{
-							position: 'absolute',
-							inset: 0,
-							background: MOUTH_INSIDE,
-							visibility: open() > 0.02 ? 'visible' : 'hidden',
-						}}
-					>
-						<img
-							src={UPPER_TEETH}
-							alt=""
-							class="pixelated"
-							width={MOUTH_WIDTH - 8}
-							height={12}
-							style={{ position: 'absolute', left: '4px', top: '4px' }}
-						/>
-						<img
-							src={LOWER_TEETH}
-							alt=""
-							class="pixelated"
-							width={MOUTH_WIDTH - 8}
-							height={12}
-							style={{ position: 'absolute', left: '8px', bottom: '0px' }}
-						/>
-					</div>
-				),
 			}),
 			draw: ({ ctx, image }) => {
 				if (open() <= 0.02) return
@@ -127,19 +99,6 @@ export function createGiantMouth(world: World) {
 				width: () => GIANT_FACE.width,
 				height: () =>
 					(GIANT_FACE.height * (900 - JAW_FROM)) / GIANT_FACE.height,
-				children: () => (
-					<img
-						src={JAW}
-						alt=""
-						class="pixelated"
-						width={GIANT_FACE.width}
-						height={900 - JAW_FROM}
-						style={{
-							display: 'block',
-							visibility: open() > 0.02 ? 'visible' : 'hidden',
-						}}
-					/>
-				),
 			}),
 			draw: ({ ctx, image }) => {
 				const jaw = image(JAW)
@@ -157,19 +116,6 @@ export function createGiantMouth(world: World) {
 				y: () => art.top,
 				width: () => art.width,
 				height: () => art.height,
-				children: () => (
-					<img
-						src={art.asset}
-						alt=""
-						class="pixelated"
-						width={art.width}
-						height={art.height}
-						style={{
-							display: 'block',
-							'clip-path': `inset(0 0 0 ${hidden()}%)`,
-						}}
-					/>
-				),
 			}),
 			draw: ({ ctx, image }) => {
 				const picture = image(art.asset)

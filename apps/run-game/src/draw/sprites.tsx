@@ -14,7 +14,7 @@ import {
 	createController,
 	createObjectSignal,
 } from 'scoopjs'
-import { For, Index, type JSX, Show, createMemo, createSignal } from 'solid-js'
+import { For, type JSX, Show, createMemo, createSignal } from 'solid-js'
 import barcodeAsset from '../assets/boosts/barcode.png'
 // The website's bus, turned round to chase to the right.
 import busBackAsset from '../assets/bus/bus-back.png'
@@ -39,13 +39,7 @@ import { seeded } from '../courses/kit/seeded'
 import { cone } from '../courses/kit/sewerScenery'
 import type { CourseLook, Obstacle, PlatformDefinition } from '../courses/types'
 import { boardOf } from '../game/boards'
-import {
-	GERM_SIZE,
-	HEARTBEAT,
-	beatAt,
-	germHeight,
-	valveOpen,
-} from '../game/body'
+import { GERM_SIZE, germHeight } from '../game/body'
 import { inTunnel } from '../game/cave'
 import {
 	BARCODE_TALL,
@@ -87,7 +81,6 @@ import {
 	turbineAt,
 	whaleAt,
 } from '../game/sky'
-import { steamPuff } from '../game/steam'
 import {
 	GATE_FLAP_TICKS,
 	countdownWord,
@@ -123,16 +116,8 @@ import { MEMBERS } from '../runners/playable'
 import { zombieSprite } from '../runners/skeleton'
 import { play } from '../sfx'
 import { WallBricks } from './Backdrop'
-import { Bubble, bubbleReach, paintBubble } from './Bubble'
-import { PixelArt } from './PixelArt'
-import { Pixels } from './Pixels'
-import {
-	BusLegs,
-	LEGS_HEIGHT,
-	LEGS_OUT,
-	LEGS_WIDTH,
-	paintBusLegs,
-} from './art/busLegs'
+import { bubbleReach, paintBubble } from './Bubble'
+import { LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH, paintBusLegs } from './art/busLegs'
 import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
 import { DRILL_AT, DRILL_HEIGHT, DRILL_POINT, DRILL_WIDTH } from './art/drill'
@@ -142,68 +127,42 @@ import {
 	DUCK_NOTE_WIDTH,
 	duckNote,
 } from './art/duckNote'
-import { FikaArt, fikaPicture } from './art/fika'
-import {
-	GEESE_HEIGHT,
-	GeeseArt,
-	geeseReach,
-	geeseWidth,
-	paintGeese,
-} from './art/geese'
+import { fikaPicture } from './art/fika'
+import { GEESE_HEIGHT, geeseReach, geeseWidth, paintGeese } from './art/geese'
 import {
 	FACE_FRONT,
 	FACE_HEIGHT,
 	FACE_WIDTH,
-	GiantFurbyFace,
 	paintGiantFurbyFace,
 } from './art/giantFurby'
 import { BUS_GLIDER_HEIGHT, BUS_GLIDER_WIDTH, busGlider } from './art/glider'
-import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt, paintHands } from './art/hands'
+import { HANDS_HEIGHT, HANDS_WIDTH, paintHands } from './art/hands'
 import {
 	HAT_GLOW_OUT,
-	HatPicture,
 	WORN_HAT_REACH,
 	hatArt,
 	paintHat,
 	paintHatGlow,
 } from './art/hats'
-import {
-	KIDS_HEIGHT,
-	KIDS_REACH,
-	KidsArt,
-	kidsPainter,
-	kidsWidth,
-} from './art/kids'
-import { MudArt, mudReach, paintMud } from './art/mud'
+import { KIDS_HEIGHT, KIDS_REACH, kidsPainter, kidsWidth } from './art/kids'
+import { mudReach, paintMud } from './art/mud'
 import { ROADBLOCK, ROADBLOCK_HEIGHT, ROADBLOCK_WIDTH } from './art/roadblock'
-import {
-	Carved,
-	FOOTING_REACH,
-	Footing,
-	footingPainter,
-	paintTombstone,
-} from './art/scenery'
+import { FOOTING_REACH, footingPainter, paintTombstone } from './art/scenery'
 import {
 	GIANT_VENT_HEIGHT,
 	GIANT_VENT_REACH,
 	GIANT_VENT_WIDTH,
-	GiantVentArt,
 	SEWAGE_WIDTH,
 	SWAMP_DRAWN,
 	SWAMP_POOL_HEIGHT,
 	SWAMP_POOL_WIDTH,
-	SewageArt,
-	SwampManArt,
 	paintGiantVent,
 	paintSewage,
 	paintSwampMan,
 } from './art/sewer'
 import {
-	BoardUnder,
-	BusSpray,
 	STOOD_HEIGHT,
 	STOOD_WIDTH,
-	StoodBoardArt,
 	UNDER_LIFT,
 	goingFor,
 	paintBoardUnder,
@@ -211,14 +170,8 @@ import {
 	stoodBoardPicture,
 } from './art/skis'
 import {
-	BalloonArt,
-	GullArt,
-	RingArt,
-	StormArt,
-	TurbineArt,
 	WHALE_HEIGHT,
 	WHALE_WIDTH,
-	WhaleArt,
 	gullPicture,
 	paintBalloon,
 	paintRing,
@@ -229,11 +182,8 @@ import {
 import {
 	GATE_HEIGHT,
 	GATE_WIDTH,
-	GateArt,
-	RailArt,
 	SNOWMAN_DRAWN,
 	SNOWMAN_WIDTH,
-	SnowmanArt,
 	paintGate,
 	paintSnowman,
 	railPainter,
@@ -244,22 +194,18 @@ import {
 	SPLASH_TICKS,
 	SPLASH_UP,
 	SPLASH_WIDTH,
-	SplashArt,
 	paintSplash,
 } from './art/splash'
 import {
 	TOURISTS_DEPTH_ROOM,
 	TOURISTS_HEIGHT,
-	TouristsArt,
 	touristsPainter,
 	touristsWidth,
 } from './art/tourists'
 import {
 	HURDLE_LANES,
-	HurdleArt,
 	POTHOLE_ABOVE,
 	POTHOLE_HEIGHT,
-	PotholeArt,
 	hurdleReach,
 	hurdleSize,
 	hurdleTipping,
@@ -280,19 +226,15 @@ import { mirrored, paintPicture } from './paint/picture'
 import { paintPixelArt } from './paint/pixelArt'
 import { svgPainter } from './paint/svgPainter'
 import {
-	STEAM_CLOUDS,
 	STEAM_VENT_HEIGHT,
 	STEAM_VENT_REACH,
 	STEAM_VENT_WIDTH,
-	VALVE_ARROWS,
 	VALVE_REACH,
-	bouncerSquash,
 	paintBouncer,
 	paintSteamVent,
 	paintValve,
 } from './paint/vents'
-import { PlatformArt, platformLook, platformPainter } from './platformArt'
-import { rendererChoice } from './rendererChoice'
+import { platformLook, platformPainter } from './platformArt'
 import { rideLook } from './rideLook'
 import { createScoopable } from './scoopable'
 
@@ -473,39 +415,10 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				...createObjectSignal(100, 'frameInterval'),
 				...createObjectSignal('pause' as 'play' | 'pause', 'state'),
 				...createObjectSignal({} as JSX.CSSProperties, 'style'),
-				// Their skis or snowboard, under their feet; and their hat, on
-				// their head, wherever it is in the frame they're drawn in.
-				children: () => (
-					<>
-						<Show when={board()}>
-							{(on) => (
-								<>
-									<BoardUnder
-										board={on()}
-										width={size().width}
-										spray={spray()}
-										sparks={sparks()}
-									/>
-								</>
-							)}
-						</Show>
-						<Show when={hat()}>
-							{(on) => (
-								<WornHat
-									hat={on()}
-									whirring={floating()}
-									frame={shown()}
-									width={size().width}
-									height={size().height}
-								/>
-							)}
-						</Show>
-					</>
-				),
 			}
 		},
-		// The same, on the canvas, over them: their skis or snowboard, and
-		// their hat.
+		// Over them: their skis or snowboard, under their feet; and their hat,
+		// on their head, wherever it is in the frame they're drawn in.
 		drawReach: WORN_HAT_REACH,
 		draw({ ctx, drawDefault, image, $, $currentFrame }) {
 			drawDefault()
@@ -650,35 +563,6 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 
 /** Where each racer's head was last drawn, in the world: see `createPlayer`. */
 const headAt = new WeakMap<Body, { x: number; y: number }>()
-
-/**
- * A hat on someone's head: where the top of it is in the frame they're
- * drawn in, `width` by `height`, found from the frame itself (see
- * `headTop`); till that's known, the top of the frame. Inside their
- * sprite, so it leans, turns round and flips over with them.
- */
-function WornHat(props: {
-	hat: Hat
-	whirring?: boolean
-	frame?: string
-	width: number
-	height: number
-}) {
-	const head = () =>
-		props.frame ? headTop(props.frame, props.width, props.height) : undefined
-	const art = () => hatArt(props.hat)
-	return (
-		<HatPicture
-			hat={props.hat}
-			lit
-			whirring={props.whirring}
-			style={{
-				left: `${(head()?.x ?? props.width / 2) - art().middle}px`,
-				top: `${(head()?.y ?? 2) - art().crown}px`,
-			}}
-		/>
-	)
-}
 
 /** How far over a glider's rider is turned, lying along under it, head first. */
 const GLIDING_LEAN = 80
@@ -891,22 +775,8 @@ function createPacer(world: World, p: Pacer) {
 			...createObjectSignal('pause' as 'play' | 'pause', 'state'),
 			...createObjectSignal({} as JSX.CSSProperties, 'style'),
 			...createObjectSignal(-1, 'xScale'),
-			children: () => (
-				<Show when={board()}>
-					{(on) => (
-						<>
-							<BoardUnder
-								board={on()}
-								width={size().width}
-								spray={spray()}
-								sparks={sparks()}
-							/>
-						</>
-					)}
-				</Show>
-			),
 		}),
-		// The same, on the canvas, under their feet.
+		// Their skis or snowboard, under their feet.
 		draw({ ctx, drawDefault, image, $ }) {
 			drawDefault()
 			const on = board()
@@ -1035,7 +905,6 @@ function createFlyer(world: World, goose: Flyer) {
 	const {
 		width: FLYING_GOOSE_WIDTH,
 		height: FLYING_GOOSE_HEIGHT,
-		Art,
 		picture,
 		mirrored: turned,
 	} = flyerLook(world.course)
@@ -1047,13 +916,6 @@ function createFlyer(world: World, goose: Flyer) {
 			...createObjectSignal(goose.feetY - FLYING_GOOSE_HEIGHT, 'y'),
 			width: () => FLYING_GOOSE_WIDTH,
 			height: () => FLYING_GOOSE_HEIGHT,
-			// `state` isn't a signal: reading the tick keeps it up to date.
-			children: () => (
-				<Art
-					now={world.ticks() + goose.id * 3}
-					carrying={world.ticks() >= 0 && goose.state === 'carrying'}
-				/>
-			),
 		}),
 		draw({ ctx, image }) {
 			const src = picture(
@@ -1178,7 +1040,6 @@ function createSplash(world: World, id: string, x: number, at: number) {
 			y: () => surface + 6 - SPLASH_UP,
 			width: () => SPLASH_WIDTH,
 			height: () => SPLASH_HEIGHT,
-			children: () => <SplashArt age={world.ticks() - at} />,
 		}),
 		draw: ({ ctx }) => paintSplash(ctx, world.ticks() - at),
 		drawReach: SPLASH_REACH,
@@ -1215,9 +1076,6 @@ export function createGiantFurby(world: World) {
 				y: () => Math.round(ground - FACE_HEIGHT),
 				width: () => FACE_WIDTH,
 				height: () => FACE_HEIGHT,
-				children: () => (
-					<GiantFurbyFace open={open()} blink={blink()} look={look()} />
-				),
 			}),
 			draw: ({ ctx }) =>
 				paintGiantFurbyFace(ctx, {
@@ -1276,7 +1134,7 @@ export function createCorgis(world: World) {
  * no one on it, off and away.
  */
 function createGlider(world: World, c: Corgi) {
-	const { width, height, Art, picture, shadow } = rideLook(world.course)
+	const { width, height, picture, shadow } = rideLook(world.course)
 	/** Where it was last tick, for which way it's going, and how far it's tipped. */
 	let was = c.feetY
 	let tilt = 0
@@ -1290,7 +1148,6 @@ function createGlider(world: World, c: Corgi) {
 			width: () => width,
 			height: () => height,
 			...createObjectSignal(0, 'rotation'),
-			children: () => <Art pose="sit" />,
 		}),
 		draw({ ctx, image }) {
 			paintPicture(ctx, image, picture('sit'), 0, 0, width, height, shadow)
@@ -1325,7 +1182,6 @@ function createStoodBoard(world: World, c: Corgi) {
 			height: () => STOOD_HEIGHT,
 			...createObjectSignal(0, 'rotation'),
 			...createObjectSignal({} as JSX.CSSProperties, 'style'),
-			children: () => <StoodBoardArt board={c.id + 1} />,
 		}),
 		draw({ ctx, image }) {
 			paintPicture(
@@ -1352,7 +1208,7 @@ function createStoodBoard(world: World, c: Corgi) {
 
 function createCorgi(world: World, c: Corgi) {
 	const ride = rideLook(world.course)
-	const { width: CORGI_WIDTH, height: CORGI_HEIGHT, Art, call } = ride
+	const { width: CORGI_WIDTH, height: CORGI_HEIGHT, call } = ride
 	const { rare: rarer } = rideLook(world.course)
 	const [pose, setPose] = createSignal<CorgiPose>('sit')
 	const [facing, setFacing] = createSignal<1 | -1>(c.facing)
@@ -1370,23 +1226,8 @@ function createCorgi(world: World, c: Corgi) {
 			// The art faces right.
 			xScale: facing,
 			...createObjectSignal(0, 'rotation'),
-			children: () => (
-				<>
-					<Show when={rare() && rarer} fallback={<Art pose={pose()} />}>
-						{(look) => {
-							const RareArt = look().Art
-							return <RareArt pose={pose()} />
-						}}
-					</Show>
-					<Show when={barking()}>
-						<Bubble size={16} mirrored={facing() === -1}>
-							{call}
-						</Bubble>
-					</Show>
-				</>
-			),
 		}),
-		// The same, on the canvas.
+		// Barking, in a bubble over it.
 		drawReach: bubbleReach(CORGI_WIDTH, 16, call.length),
 		draw({ ctx, image }) {
 			const look = (rare() && rarer) || ride
@@ -1471,15 +1312,6 @@ export function createRails(world: World) {
 				y: () => top,
 				width: () => width,
 				height: () => height,
-				children: () => (
-					<RailArt
-						rail={rail}
-						width={width}
-						height={height}
-						tops={tops}
-						feet={feet}
-					/>
-				),
 			}),
 		})
 	})
@@ -1505,8 +1337,7 @@ export function createHut(world: World) {
 				body.x < hut.to &&
 				body.feetY > world.terrain.groundY(body.x) - hut.height + 2,
 		)
-	// Under the Canvas Renderer, which doesn't play a `transition`: how far
-	// its front's shown, faded a tick at a time.
+	/** How far its front's shown, faded a tick at a time. */
 	const [shown, setShown] = createSignal(1)
 	const fade = TICK_MS / 250
 	const part = (id: string, type: string, src: string, front: boolean) =>
@@ -1515,19 +1346,16 @@ export function createHut(world: World) {
 				const picture = image(src)
 				if (picture) ctx.drawImage(picture.image, 0, 0, width, height)
 			},
-			onEnterFrame:
-				front && rendererChoice.canvas
-					? () => {
-							const to = world.ticks() >= 0 && inside() ? 0 : 1
-							const now = shown()
-							if (now !== to)
-								setShown(
-									to > now
-										? Math.min(to, now + fade)
-										: Math.max(to, now - fade),
-								)
-						}
-					: undefined,
+			onEnterFrame: front
+				? () => {
+						const to = world.ticks() >= 0 && inside() ? 0 : 1
+						const now = shown()
+						if (now !== to)
+							setShown(
+								to > now ? Math.min(to, now + fade) : Math.max(to, now - fade),
+							)
+					}
+				: undefined,
 			init: () => ({
 				id,
 				type,
@@ -1535,18 +1363,8 @@ export function createHut(world: World) {
 				y: () => top,
 				width: () => width,
 				height: () => height,
-				children: () => <PixelArt src={src} width={width} height={height} />,
-				// Its front, lifted away while someone's inside. `inside` isn't
-				// a signal: reading the tick keeps it up to date.
-				style: front
-					? () =>
-							rendererChoice.canvas
-								? { opacity: shown() }
-								: {
-										opacity: world.ticks() >= 0 && inside() ? 0 : 1,
-										transition: 'opacity 0.25s',
-									}
-					: undefined,
+				// Its front, lifted away while someone's inside.
+				style: front ? () => ({ opacity: shown() }) : undefined,
 			}),
 		})
 	return [
@@ -1574,24 +1392,8 @@ function createFurby(world: World, f: Furby) {
 			xScale: facing,
 			...createObjectSignal(0, 'rotation'),
 			...createObjectSignal({} as JSX.CSSProperties, 'style'),
-			children: () => (
-				<img
-					src={f.asset}
-					alt=""
-					class="pixelated"
-					style={{
-						position: 'absolute',
-						left: 0,
-						bottom: 0,
-						width: '100%',
-						'transform-origin': 'bottom center',
-						transform: `scale(${1 + squash() * 0.6}, ${1 - squash()})`,
-					}}
-				/>
-			),
 		}),
-		// The same: as wide as it is, standing on its feet, squashed down
-		// onto them.
+		// As wide as it is, standing on its feet, squashed down onto them.
 		draw({ ctx, image }) {
 			const art = image(f.asset)
 			if (!art) return
@@ -1663,7 +1465,6 @@ export function createBusDirt(world: World) {
 	const rock = look?.cave
 	if (!look?.bus?.drill || !world.course.cave || !rock) return []
 	const shades = [rock.edge, rock.rock, '#9a8270']
-	/** The same bits, for painting on the Canvas Renderer. */
 	const bits = DIRT.map((bit) => ({
 		x: -bit.size / 2,
 		y: -bit.size / 2,
@@ -1682,25 +1483,6 @@ export function createBusDirt(world: World) {
 				width: () => 0,
 				height: () => 0,
 				...createObjectSignal({} as JSX.CSSProperties, 'style'),
-				children: () => (
-					<For each={DIRT}>
-						{(bit) => (
-							<div
-								style={{
-									position: 'absolute',
-									left: `${-bit.size / 2}px`,
-									top: `${-bit.size / 2}px`,
-									width: `${bit.size}px`,
-									height: `${bit.size}px`,
-									background: shades[bit.shade],
-									'--dx': `${bit.to.x}px`,
-									'--dy': `${bit.to.y}px`,
-									animation: `dirt-fly ${DIRT_SECONDS}s steps(8) ${bit.delay}s infinite`,
-								}}
-							/>
-						)}
-					</For>
-				),
 			}),
 			onEnterFrame({ $ }) {
 				const ride = world.bus.ride
@@ -1876,19 +1658,6 @@ export function createBus(world: World) {
 				width: () => LEGS_WIDTH,
 				height: () => LEGS_HEIGHT,
 				offset: { x: -LEGS_OUT, y: 0 },
-				init: () => ({
-					children: () => (
-						<BusLegs
-							look={legsLook}
-							far={far}
-							ground={WHEEL_BOTTOM}
-							travelled={() => {
-								world.ticks()
-								return world.bus.frontX
-							}}
-						/>
-					),
-				}),
 			}),
 		)
 	}
@@ -1947,8 +1716,8 @@ export function createBus(world: World) {
 		})
 	else part('bus-body', look.body, BUS_WIDTH, BUS_HEIGHT, { x: 0, y: 0 })
 	legs('bus-legs', false)
-	// Snow sprayed off the back of its sleigh's runners, as it goes: from
-	// the start, as its animation starts once it's on the page.
+	// Snow sprayed off the back of its sleigh's runners, as it goes, from
+	// the start.
 	const sprayFor = goingFor()
 	if (look.sleigh)
 		bus.attach(
@@ -1960,13 +1729,6 @@ export function createBus(world: World) {
 				width: () => 0,
 				height: () => 0,
 				offset: { x: BUS_WIDTH - SLEIGH_WIDTH + 14, y: WHEEL_BOTTOM - 10 },
-				init: () => ({
-					children: () => (
-						<div style={{ position: 'absolute', transform: 'scaleX(-1)' }}>
-							<BusSpray />
-						</div>
-					),
-				}),
 			}),
 		)
 	// Its own glider, bolted to its roof, out over the sea.
@@ -2186,11 +1948,6 @@ export function createBusBore(world: World) {
 				y: () => highest,
 				width: () => shown(),
 				height: () => lowest - highest,
-				children: () => (
-					<div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-						{art()}
-					</div>
-				),
 			}),
 			// Bored as far as the bus has got, and painted only where it's in view.
 			draw: ({ ctx, image, $scene }) => {
@@ -2245,45 +2002,9 @@ export function createScoopArm(world: World) {
 			...createObjectSignal(0, 'y'),
 			width: () => SCOOP_WIDTH,
 			height: () => length() + SCOOP_HEIGHT,
-			children: () => (
-				<Show when={length() > ARM_SHOWS}>
-					<For each={ARM_SECTIONS}>
-						{(thickness, i) => (
-							<div
-								style={{
-									position: 'absolute',
-									left: `${SCOOP_WIDTH / 2 - thickness / 2}px`,
-									width: `${thickness}px`,
-									height: `${(length() * (ARM_SECTIONS.length - i())) / ARM_SECTIONS.length}px`,
-									// From the bus end, the bottom when reaching up.
-									...(up()
-										? { bottom: `${SCOOP_HEIGHT - SCOOP_LIP}px` }
-										: { top: '0px' }),
-									background:
-										'repeating-linear-gradient(45deg, #f2c200 0 6px, #1d1d1d 6px 12px)',
-									border: '2px solid #1d1d1d',
-									'box-sizing': 'border-box',
-								}}
-							/>
-						)}
-					</For>
-					<img
-						src={scoop}
-						alt=""
-						style={{
-							position: 'absolute',
-							left: 0,
-							...(up() ? { top: '0px' } : { bottom: '0px' }),
-							width: `${SCOOP_WIDTH}px`,
-							height: `${SCOOP_HEIGHT}px`,
-							transform: scooping() ? 'rotate(20deg)' : 'none',
-						}}
-					/>
-				</Show>
-			),
 		}),
-		// The same, on the Canvas Renderer: each section of the arm, thinnest
-		// first, then the scoop on the end.
+		// Each section of the arm, thinnest first, from the bus end (the
+		// bottom, reaching up); then the scoop on the end.
 		draw: ({ ctx, image }) => {
 			if (length() <= ARM_SHOWS) return
 			const height = length() + SCOOP_HEIGHT
@@ -2408,78 +2129,6 @@ export function createPlatforms(world: World) {
 				...createObjectSignal(start.top, 'y'),
 				width: () => platform.width,
 				height: () => platform.depth ?? look.depth,
-				children: () => (
-					<>
-						<Show
-							when={platform.art}
-							fallback={
-								<PlatformArt
-									look={look}
-									solid={!!platform.solid}
-									width={platform.width}
-									depth={platform.depth ?? look.depth}
-								/>
-							}
-						>
-							{/* Its own picture: its top on the Platform's. */}
-							{(art) => (
-								<img
-									src={art().asset}
-									alt=""
-									class="pixelated"
-									width={art().width}
-									height={art().height}
-									style={{
-										position: 'absolute',
-										left: `${(platform.width - art().width) / 2}px`,
-										top: `${-art().top}px`,
-										'max-width': 'none',
-									}}
-								/>
-							)}
-						</Show>
-						{/* Hung from a crane, out of sight above. */}
-						<Show when={platform.move && look.cable}>
-							{/* The crane's cable, down to its hook; from the hook, a
-							    sling out to either end of the girder. */}
-							<div
-								style={{
-									position: 'absolute',
-									left: `${platform.width / 2 - 2}px`,
-									bottom: `calc(100% + ${SLING_HEIGHT}px)`,
-									width: '4px',
-									height: `${cable()}px`,
-									background: look.cable,
-								}}
-							/>
-							<svg
-								width={platform.width}
-								height={SLING_HEIGHT + 6}
-								aria-hidden="true"
-								style={{
-									position: 'absolute',
-									left: 0,
-									bottom: '100%',
-									overflow: 'visible',
-								}}
-							>
-								<polyline
-									points={`6,${SLING_HEIGHT + 6} ${platform.width / 2},4 ${platform.width - 6},${SLING_HEIGHT + 6}`}
-									fill="none"
-									stroke={look.cable}
-									stroke-width={3}
-								/>
-								<rect
-									x={platform.width / 2 - 5}
-									y={0}
-									width={10}
-									height={8}
-									fill={look.cable}
-								/>
-							</svg>
-						</Show>
-					</>
-				),
 			}),
 			onEnterFrame: platform.move
 				? ({ $ }) => {
@@ -2504,8 +2153,7 @@ function createFixture(options: {
 	height: number
 	world: World
 	frames?: string[]
-	children?: () => JSX.Element
-	/** Its Draw Hook, painting it on the canvas in place of `children`. */
+	/** Its Draw Hook, painting it: see `draw`. */
 	draw?: (painting: DrawPainting) => void
 	/** How far its Draw Hook paints past its box: see `drawReach`. */
 	drawReach?: DrawReach
@@ -2528,7 +2176,6 @@ function createFixture(options: {
 			...createObjectSignal(top, 'y'),
 			width: () => options.width,
 			height: () => options.height,
-			children: options.children,
 			style: options.style,
 			xScale: () => options.xScale ?? 1,
 		}),
@@ -2543,80 +2190,6 @@ function createFixture(options: {
  * stays off it: they're only for looking at, nothing to run into.
  */
 const SCENERY_SET_BACK = 10
-
-/**
- * A Steam Vent: its grate, and once it's puffed, steam rising off it in
- * clouds a while. When it puffed isn't a signal: reading the tick keeps it
- * up to date.
- */
-function SteamVent(props: { world: World; state: ObstacleState }) {
-	const puff = () => steamPuff(props.state.flown, props.world.ticks())
-	return (
-		<>
-			<img
-				src={steamVentAsset}
-				alt=""
-				class="pixelated"
-				width={44}
-				height={12}
-				style={{ display: 'block' }}
-			/>
-			<Show when={puff() !== undefined}>
-				<div
-					style={{
-						position: 'absolute',
-						left: '50%',
-						bottom: '8px',
-						width: '0px',
-						height: '0px',
-					}}
-				>
-					<For each={STEAM_CLOUDS}>
-						{(cloud) => (
-							<div
-								style={{
-									position: 'absolute',
-									left: `${cloud.x - cloud.size / 2}px`,
-									bottom: '0px',
-									width: `${cloud.size}px`,
-									height: `${cloud.size}px`,
-									background: 'rgba(245, 245, 245, 0.85)',
-									'box-shadow': '0 0 0 3px rgba(245, 245, 245, 0.4)',
-									animation: `steam-rise 0.5s steps(5) ${cloud.delay}s infinite`,
-								}}
-							/>
-						)}
-					</For>
-				</div>
-			</Show>
-		</>
-	)
-}
-
-/**
- * A bouncy toadstool, a Steam Vent's job: squashed flat as it fires
- * whoever's on it up, and springing back, wobbling. When it last fired
- * isn't a signal: reading the tick keeps it up to date.
- */
-function Bouncer(props: { world: World; state: ObstacleState }) {
-	const squash = () =>
-		bouncerSquash(steamPuff(props.state.flown, props.world.ticks()))
-	const own = props.world.course.look?.bouncer
-	return (
-		<img
-			src={own?.asset ?? bouncyToadstool}
-			alt=""
-			class="pixelated"
-			width={own?.width ?? 44}
-			height={own?.height ?? 32}
-			style={{
-				display: 'block',
-				transform: `scale(${2 - squash()}, ${squash()})`,
-				'transform-origin': '50% 100%',
-			}}
-		/>
-	)
-}
 
 /** A cyclist, riding towards you, or scooped and flying. */
 function createCyclist(
@@ -2714,9 +2287,8 @@ export function createScenery(world: World) {
 		const beat = (i * 37) % HOP_EVERY
 		const [lift, setLift] = createSignal(0)
 		/**
-		 * On the canvas: a tombstone with its name, recoloured, name and all,
-		 * as its filter does on the page; and a footing's grass, down past
-		 * its box.
+		 * A tombstone with its name, recoloured, name and all, by its filter;
+		 * and a footing's grass, down past its box.
 		 */
 		const draw: ((painting: DrawPainting) => void) | undefined = carved
 			? ({ ctx, image }) => {
@@ -2749,25 +2321,13 @@ export function createScenery(world: World) {
 				id: `scenery-${i}`,
 				// A gateway's near side, over whoever's going through it.
 				type: piece.front ? 'foreground' : 'scenery',
-				children: carved
-					? () => <Carved name={name ?? ''} panel={carved} scale={scale} />
-					: footing
-						? () => (
-								<Footing
-									groundY={groundY}
-									x={x}
-									width={width()}
-									base={pathTop() - setBack}
-								/>
-							)
-						: undefined,
 				x: () => x - width() / 2,
 				y: () => Math.round(top() - lift()),
 				width,
 				height,
 				style: () => ({
 					// A tombstone's Draw Hook recolours it itself.
-					filter: carved && rendererChoice.canvas ? undefined : filter,
+					filter: carved ? undefined : filter,
 					'image-rendering': scale > 1 ? 'pixelated' : undefined,
 					// Stood on the floor, leant with its slope, so both its feet
 					// are on it, uphill and down.
@@ -2819,15 +2379,6 @@ export function createRunDirector(world: World) {
 		frames: [frame],
 		// Turned round to face everyone on the line, the bubble turned back.
 		xScale: -1,
-		children: () => (
-			<Show when={countdownWord(world)}>
-				{(word) => (
-					<Bubble size={word() === 'Go!' ? 30 : 26} mirrored>
-						{word()}
-					</Bubble>
-				)}
-			</Show>
-		),
 		// "3", "2", "1" and "Go!", the biggest.
 		drawReach: bubbleReach(size.width, 30, 3),
 		draw: ({ ctx, drawDefault }) => {
@@ -2876,38 +2427,6 @@ export function createParkrunSign(world: World, x: number) {
 		height: 70,
 		world,
 		frames: [world.course.look?.sign ?? purpleSignAsset],
-		children: () => (
-			<div
-				style={{
-					position: 'absolute',
-					// Just the board's face (x 1–56, y 1–32 of its 70 × 35 pixels, at
-					// twice that), not its darker edge down the right or the shadow.
-					inset: '2px 26px 4px 2px',
-					'text-align': 'center',
-					display: 'flex',
-					'flex-direction': 'column',
-					'align-items': 'center',
-					'justify-content': 'center',
-					color: world.course.look?.signInk ?? '#f8b832',
-					'font-family': '"Jersey 10", sans-serif',
-					'line-height': 0.8,
-				}}
-			>
-				{/* Just its name: over two lines, if it's long. Two lines sit
-				    a little lower than their middle: the board's an oval, its
-				    top curving in over them where they're widest, with a thick
-				    rim along its bottom. */}
-				<span
-					style={{
-						'font-size': `${signLetters(world.course.name)}px`,
-						'line-height': 0.85,
-						'margin-top': signWraps(world.course.name) ? '6px' : 0,
-					}}
-				>
-					{world.course.name}
-				</span>
-			</div>
-		),
 		draw: ({ ctx, drawDefault }) => {
 			drawDefault()
 			// On the board's face, 112 by 64 from (2, 2), in the middle.
@@ -2957,17 +2476,15 @@ export function createBanner(world: World, x: number, text: string) {
 
 	// The line on the ground, from the path's far edge to its near one, in
 	// steps a pixel (two of the screen's) high.
-	const line: [number, number, number, number, string][] = []
+	const linePath = new Path2D()
 	const top = height - PATH_BACK - PATH_FRONT
 	for (let y = top; y < height; y += 2) {
 		const t = (y - top) / (height - top)
 		const middle = far.x + (near.x - far.x) * t
-		line.push([Math.round(middle / 2) * 2 - 6, y, 12, 2, 'white'])
+		linePath.rect(Math.round(middle / 2) * 2 - 6, y, 12, 2)
 	}
-	// The same, for the Canvas Renderer: the line, and the cloth's
-	// checks, the dark ones, 6 px each, from the inside of its border.
-	const linePath = new Path2D()
-	for (const [x, y, w, h] of line) linePath.rect(x, y, w, h)
+	// The cloth's checks, the dark ones, 6 px each, from the inside of its
+	// border.
 	const clothWidth = far.x - near.x
 	const checks = new Path2D()
 	for (let row = -1; row * 6 + 3 < CLOTH_HEIGHT; row++)
@@ -3011,50 +2528,6 @@ export function createBanner(world: World, x: number, text: string) {
 		width,
 		height,
 		world,
-		children: () => (
-			<div style={{ position: 'relative', width: '100%', height: '100%' }}>
-				<div style={{ position: 'absolute', inset: 0, opacity: 0.85 }}>
-					<Pixels width={width} height={height} rects={line} />
-				</div>
-				<div
-					style={{
-						...POLE_STYLE,
-						left: `${far.x - POLE_WIDTH / 2}px`,
-						top: `${far.foot - POLE_HEIGHT}px`,
-					}}
-				/>
-				<div
-					style={{
-						position: 'absolute',
-						left: `${near.x}px`,
-						top: `${near.foot - POLE_HEIGHT}px`,
-						width: `${far.x - near.x}px`,
-						height: `${CLOTH_HEIGHT}px`,
-						'box-sizing': 'border-box',
-						// Sloping up to the far pole's top.
-						'transform-origin': '0 0',
-						transform: `skewY(${-angle}deg)`,
-						background:
-							'repeating-conic-gradient(#0f1f29 0 25%, white 0 50%) 0 0 / 12px 12px',
-						border: '3px solid #0f1f29',
-						display: 'grid',
-						'place-items': 'center',
-					}}
-				>
-					<span
-						style={{
-							background: '#0f1f29',
-							color: '#ffd23f',
-							padding: '4px 8px 0',
-							'font-size': '20px',
-							'line-height': 1,
-						}}
-					>
-						{text}
-					</span>
-				</div>
-			</div>
-		),
 		draw: ({ ctx }) => {
 			ctx.save()
 			ctx.globalAlpha *= 0.85
@@ -3063,8 +2536,7 @@ export function createBanner(world: World, x: number, text: string) {
 			ctx.restore()
 			paintPole(ctx, far.x - POLE_WIDTH / 2, far.foot - POLE_HEIGHT)
 			// The cloth, sloping up to the far pole's top: painted once and
-			// kept, once its font's loaded, and drawn sloping pixel for pixel,
-			// as the DOM Renderer draws it.
+			// kept, once its font's loaded, and drawn sloping pixel for pixel.
 			ctx.translate(near.x, near.foot - POLE_HEIGHT)
 			ctx.transform(1, -slope, 0, 1, 0, 0)
 			fontLoaded ||= document.fonts.check(CLOTH_FONT)
@@ -3087,20 +2559,10 @@ export function createBanner(world: World, x: number, text: string) {
 		width: POLE_WIDTH,
 		height: POLE_HEIGHT,
 		world,
-		children: () => <div style={{ ...POLE_STYLE, left: 0, top: 0 }} />,
 		draw: ({ ctx }) => paintPole(ctx, 0, 0),
 	})
 
 	return [across, nearPole]
-}
-
-const POLE_STYLE: JSX.CSSProperties = {
-	position: 'absolute',
-	width: `${POLE_WIDTH}px`,
-	height: `${POLE_HEIGHT}px`,
-	'box-sizing': 'border-box',
-	background: '#9aa3a8',
-	'border-left': '2px solid #5f686d',
 }
 
 /** A banner's cloth's border, its dark checks and the patch its words are on. */
@@ -3108,45 +2570,12 @@ const BANNER_INK = '#0f1f29'
 /** What a banner's lettered in. */
 const CLOTH_FONT = `20px ${FONT_PIXEL}`
 
-/** A banner's pole, as `POLE_STYLE` draws it, painted with its top left at (`x`, `y`). */
+/** A banner's pole, grey, darker down its left, painted with its top left at (`x`, `y`). */
 function paintPole(ctx: CanvasRenderingContext2D, x: number, y: number) {
 	ctx.fillStyle = '#9aa3a8'
 	ctx.fillRect(x, y, POLE_WIDTH, POLE_HEIGHT)
 	ctx.fillStyle = '#5f686d'
 	ctx.fillRect(x, y, 2, POLE_HEIGHT)
-}
-
-/**
- * Something the bus can scoop up: where it stands until then, and flying off,
- * spinning, after. `scooped` isn't a signal: reading the tick keeps it moving.
- */
-function Scoopable(props: {
-	world: World
-	state: ObstacleState
-	children: JSX.Element
-	/** What it spins round, flying: its middle, unless it's somewhere else in its art. */
-	spin?: string
-}) {
-	const flight = () => {
-		const now = props.world.ticks()
-		const { scooped } = props.state
-		return scooped ? scoopFlight(scooped, now) : undefined
-	}
-	return (
-		<div
-			style={{
-				'transform-origin': props.spin ?? 'center',
-				transform: (() => {
-					const f = flight()
-					return f
-						? `translate(${f.x}px, ${f.y}px) rotate(${f.spin}deg)`
-						: 'none'
-				})(),
-			}}
-		>
-			{props.children}
-		</div>
-	)
 }
 
 export function createObstacle(world: World, state: ObstacleState, i: number) {
@@ -3180,18 +2609,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				height,
 				world,
 				state,
-				children: () => (
-					<Scoopable world={world} state={state}>
-						<img
-							src={src}
-							alt=""
-							class={art ? 'pixelated' : undefined}
-							width={art?.width}
-							height={art?.height}
-							style={{ display: 'block', filter: world.course.look?.rock }}
-						/>
-					</Scoopable>
-				),
 				draw: ({ ctx, image }) => {
 					const loaded = image(src)
 					if (!loaded) return
@@ -3235,31 +2652,10 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				height: CONE_HEIGHT,
 				world,
 				state,
-				children: () => (
-					<Scoopable world={world} state={state}>
-						<img
-							src={cone}
-							alt=""
-							class="pixelated"
-							width={CONE_WIDTH}
-							height={CONE_HEIGHT}
-							style={{
-								display: 'block',
-								'transform-origin': '100% 100%',
-								transform: (() => {
-									const since = knocked()
-									if (since === undefined) return undefined
-									const { slid, turn } = tipped(since)
-									return `translateX(${slid}px) rotate(${turn}deg)`
-								})(),
-							}}
-						/>
-					</Scoopable>
-				),
 				draw: ({ ctx, image }) => {
 					const since = knocked()
 					if (since !== undefined) {
-						// Over its bottom right corner, as its `transform-origin` says.
+						// Over its bottom right corner.
 						const { slid, turn } = tipped(since)
 						ctx.translate(CONE_WIDTH + slid, CONE_HEIGHT)
 						ctx.rotate((turn * Math.PI) / 180)
@@ -3285,10 +2681,9 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			const slope = (groundY(to) - groundY(from)) / (to - from)
 			const settle = groundY(o.x) - groundY(o.x + BRANCH_TREE_ALONG)
 			const lie = `translateY(${settle}px) skewY(${Math.atan(slope)}rad)`
+			// Recoloured, and cut, by its Draw Hooks, which keep it pale or grey
+			// on WebKit too.
 			const foliage = world.course.look?.foliage
-			// The Canvas Renderer can't cut it or filter it from `style`: its
-			// Draw Hooks do both, and keep it pale or grey on WebKit too.
-			const { canvas } = rendererChoice
 			const knocked = () => world.ticks() >= 0 && !!state.scooped
 			// Jumping it: its near end's drawn behind you, not over you.
 			const over = () =>
@@ -3305,13 +2700,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			const lieOrigin = { x: BRANCH_CROSS, y: BRANCH_LINE_ROW }
 			/** Its limb, flying, spins round where it crosses the path, at its top. */
 			const spin = { x: BRANCH_CROSS, y: BRANCH_LINE_ROW - BRANCH_LIMB_HEIGHT }
-			const limb = () => (
-				<PixelArt
-					src={lowBranchLimbAsset}
-					width={BRANCH_TREE_WIDTH}
-					height={BRANCH_TREE_HEIGHT}
-				/>
-			)
 			const paintLimb = (
 				ctx: CanvasRenderingContext2D,
 				image: DrawPainting['image'],
@@ -3336,7 +2724,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					id: `${id}${options.suffix}`,
 					type: options.type,
 					...where,
-					children: limb,
 					draw: ({ ctx, image }) => {
 						ctx.beginPath()
 						ctx.rect(clip.left, 0, clip.right - clip.left, BRANCH_TREE_HEIGHT)
@@ -3344,12 +2731,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						paintLimb(ctx, image)
 					},
 					style: () => ({
-						filter: canvas ? undefined : foliage,
 						transform: lie,
 						'transform-origin': `${lieOrigin.x}px ${lieOrigin.y}px`,
-						'clip-path': canvas
-							? undefined
-							: `inset(0 ${BRANCH_TREE_WIDTH - clip.right}px 0 ${clip.left}px)`,
 						visibility: options.shown() ? 'visible' : 'hidden',
 					}),
 				})
@@ -3362,13 +2745,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					id: `${id}-tree`,
 					type: 'hazard',
 					...where,
-					children: () => (
-						<PixelArt
-							src={lowBranchTreeAsset}
-							width={BRANCH_TREE_WIDTH}
-							height={BRANCH_TREE_HEIGHT}
-						/>
-					),
 					draw: ({ ctx, image }) =>
 						paintPixelArt(
 							ctx,
@@ -3379,7 +2755,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							foliage,
 						),
 					style: () => ({
-						filter: canvas ? undefined : foliage,
 						transform: lie,
 						'transform-origin': `${lieOrigin.x}px ${lieOrigin.y}px`,
 					}),
@@ -3412,18 +2787,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					state,
 					spin,
 					lie: { transform: lie, origin: lieOrigin },
-					children: () => (
-						<Scoopable
-							world={world}
-							state={state}
-							spin={`${spin.x}px ${spin.y}px`}
-						>
-							{limb()}
-						</Scoopable>
-					),
 					draw: ({ ctx, image }) => paintLimb(ctx, image),
 					style: () => ({
-						filter: canvas ? undefined : foliage,
 						visibility: knocked() ? 'visible' : 'hidden',
 					}),
 				}),
@@ -3437,13 +2802,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					height: DUCK_NOTE_HEIGHT,
 					sink: DUCK_NOTE_TAPED - BRANCH_LIMB_TOP,
 					world,
-					children: () => (
-						<PixelArt
-							src={duckNote}
-							width={DUCK_NOTE_WIDTH}
-							height={DUCK_NOTE_HEIGHT}
-						/>
-					),
 					draw: ({ ctx, image }) =>
 						paintPixelArt(
 							ctx,
@@ -3478,7 +2836,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					sink: lane.sink,
 					...hurdleSize(lane.depth, o.tall),
 					world,
-					children: () => <HurdleArt depth={lane.depth} tall={o.tall} />,
 					draw: ({ ctx }) =>
 						paintHurdle(
 							ctx,
@@ -3487,14 +2844,11 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							tipping(knocked(), world.ticks()),
 						),
 					drawReach: hurdleReach(lane.depth, o.tall),
-					style: rendererChoice.canvas
-						? undefined
-						: () => ({ '--knocked': knocked() ? 1 : 0 }),
 				})
 			})
 		case 'kids': {
 			const width = kidsWidth(o.count)
-			const paintKids = rendererChoice.canvas ? kidsPainter(o.count) : undefined
+			const paintKids = kidsPainter(o.count)
 			return createScoopable({
 				id,
 				type: 'hazard',
@@ -3503,13 +2857,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				height: KIDS_HEIGHT,
 				world,
 				state,
-				children: () => (
-					<Scoopable world={world} state={state}>
-						<KidsArt count={o.count} />
-					</Scoopable>
-				),
 				draw: ({ ctx }) => {
-					paintKids?.(ctx, (Math.max(0, world.ticks()) * TICK_MS) / 1000)
+					paintKids(ctx, (Math.max(0, world.ticks()) * TICK_MS) / 1000)
 				},
 				drawReach: KIDS_REACH,
 			})
@@ -3523,7 +2872,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: VENT_WIDTH,
 				height: VENT_HEIGHT,
 				world,
-				children: () => <VentArt />,
 				draw: ({ ctx, image }) => {
 					const vent = image(ventAsset)
 					if (vent) ctx.drawImage(vent.image, 0, 0, VENT_WIDTH, VENT_HEIGHT)
@@ -3540,12 +2888,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					height: GIANT_VENT_HEIGHT,
 					world,
 					// When it puffed isn't a signal: reading the tick keeps it up to date.
-					children: () => (
-						<GiantVentArt
-							now={() => Math.max(0, world.ticks())}
-							puffed={() => (world.ticks() >= 0 ? state.flown : undefined)}
-						/>
-					),
 					draw: ({ ctx }) =>
 						paintGiantVent(
 							ctx,
@@ -3567,7 +2909,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					width,
 					height,
 					world,
-					children: () => <Bouncer world={world} state={state} />,
 					draw: ({ ctx, image }) =>
 						paintBouncer(
 							ctx,
@@ -3588,7 +2929,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: STEAM_VENT_WIDTH,
 				height: STEAM_VENT_HEIGHT,
 				world,
-				children: () => <SteamVent world={world} state={state} />,
 				draw: ({ ctx, image }) =>
 					paintSteamVent(
 						ctx,
@@ -3610,12 +2950,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				height: HANDS_HEIGHT,
 				world,
 				// When they grabbed isn't a signal: reading the tick keeps it up to date.
-				children: () => (
-					<HandsArt
-						now={() => Math.max(0, world.ticks())}
-						grabbed={() => (world.ticks() >= 0 ? state.flown : undefined)}
-					/>
-				),
 				draw: ({ ctx }) =>
 					paintHands(
 						ctx,
@@ -3632,9 +2966,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: SWAMP_POOL_WIDTH,
 				height: SWAMP_DRAWN,
 				world,
-				children: () => (
-					<SwampManArt x={o.x} now={() => Math.max(0, world.ticks())} />
-				),
 				draw: ({ ctx }) => paintSwampMan(ctx, o.x, Math.max(0, world.ticks())),
 			})
 		case 'sewage': {
@@ -3650,14 +2981,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: SEWAGE_WIDTH,
 				height: floor - top,
 				world,
-				children: () => (
-					<SewageArt
-						x={o.x}
-						now={() => Math.max(0, world.ticks())}
-						ceiling={ceiling - top}
-						floor={floor - top}
-					/>
-				),
 				draw: ({ ctx }) =>
 					paintSewage(
 						ctx,
@@ -3677,9 +3000,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			const nearer = world.course.look?.touristsNearer ?? 0
 			const width = touristsWidth(o.count)
 			const height = TOURISTS_HEIGHT + TOURISTS_DEPTH_ROOM
-			const paintTourists = rendererChoice.canvas
-				? touristsPainter(o.x, o.count, drop)
-				: undefined
+			const paintTourists = touristsPainter(o.x, o.count, drop)
 			return createScoopable({
 				id,
 				type: 'hazard',
@@ -3689,13 +3010,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				sink: TOURISTS_DEPTH_ROOM - nearer,
 				world,
 				state,
-				children: () => (
-					<Scoopable world={world} state={state}>
-						<TouristsArt x={o.x} count={o.count} drop={drop} />
-					</Scoopable>
-				),
 				draw: ({ ctx, image }) => {
-					paintTourists?.(ctx, image)
+					paintTourists(ctx, image)
 				},
 			})
 		}
@@ -3711,11 +3027,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				height: 67,
 				world,
 				state,
-				children: () => (
-					<Scoopable world={world} state={state}>
-						<img src={tombstoneAsset} alt="" style={{ display: 'block' }} />
-					</Scoopable>
-				),
 				draw: ({ ctx, image }) => {
 					const tombstone = image(tombstoneAsset)
 					if (!tombstone) return
@@ -3742,15 +3053,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				world,
 				// Neither `flown` nor the tick they peck by is a signal: reading
 				// the tick keeps both up to date.
-				children: () => (
-					<GeeseArt
-						filter={world.course.look?.geese}
-						x={o.x}
-						count={o.count}
-						now={world.ticks()}
-						flown={world.ticks() >= 0 ? state.flown : undefined}
-					/>
-				),
 				draw: ({ ctx, image }) =>
 					paintGeese(
 						ctx,
@@ -3774,9 +3076,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				// Into the track, around the line everyone runs along.
 				sink: POTHOLE_HEIGHT - POTHOLE_ABOVE,
 				world,
-				children: () => (
-					<PotholeArt width={o.width} look={world.course.look?.pothole} />
-				),
 				draw: ({ ctx }) =>
 					paintPothole(ctx, o.width, world.course.look?.pothole),
 			})
@@ -3789,15 +3088,11 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				height: 40,
 				world,
 				sink: 20,
-				children: () => <MudArt world={world} obstacle={o} />,
-				// Recoloured as it's painted on the canvas, as WebKit's can't
-				// filter what a Draw Hook paints.
+				// Recoloured as it's painted, as WebKit's canvas can't filter what
+				// a Draw Hook paints.
 				draw: ({ ctx, image }) =>
 					paintMud(ctx, image, world, o, world.course.look?.mud),
 				drawReach: mudReach(o),
-				style: rendererChoice.canvas
-					? undefined
-					: () => ({ filter: world.course.look?.mud }),
 			})
 		case 'gulls':
 		case 'balloon':
@@ -3819,36 +3114,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: VALVE.width,
 				height: VALVE.height,
 				world,
-				children: () => {
-					const beat = () => beatAt(Math.max(0, world.ticks()))
-					const open = () => valveOpen(Math.max(0, world.ticks()))
-					return (
-						<>
-							<img
-								src={open() ? VALVE.open : VALVE.shut}
-								alt=""
-								class="pixelated"
-								width={VALVE.width}
-								height={VALVE.height}
-								style={{ display: 'block' }}
-							/>
-							<img
-								src={VALVE.arrows}
-								alt=""
-								class="pixelated"
-								width={VALVE_ARROWS}
-								height={VALVE_ARROWS * (10 / 12)}
-								style={{
-									position: 'absolute',
-									left: `${(VALVE.width - VALVE_ARROWS) / 2}px`,
-									bottom: `${VALVE.height + 10 + (open() ? Math.round(Math.sin((beat() / 24) * Math.PI) * 16) : 0)}px`,
-									opacity: open() ? 1 : 0.35 + 0.35 * (beat() / HEARTBEAT),
-									filter: open() ? 'drop-shadow(0 0 4px #fff6a8)' : undefined,
-								}}
-							/>
-						</>
-					)
-				},
 				draw: ({ ctx, image }) =>
 					paintValve(ctx, image, Math.max(0, world.ticks())),
 				drawReach: VALVE_REACH,
@@ -3869,11 +3134,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				state,
 				// Burst, flying apart, then a heap. Neither's a signal: reading
 				// the tick keeps it up to date.
-				children: () => (
-					<Scoopable world={world} state={state}>
-						<SnowmanArt since={burst()} />
-					</Scoopable>
-				),
 				draw: ({ ctx, image }) => {
 					paintSnowman(ctx, image, burst())
 				},
@@ -3913,27 +3173,9 @@ function createGerm(
 			...createObjectSignal(0, 'rotation'),
 			...createObjectSignal(220, 'frameInterval'),
 			...createObjectSignal('play' as 'play' | 'pause', 'state'),
-			...createObjectSignal({} as JSX.CSSProperties, 'style'),
-			children: () => (
-				<Show when={popped()}>
-					<img
-						src={GERM_POPPED}
-						alt=""
-						class="pixelated"
-						width={GERM_SIZE}
-						height={GERM_SIZE}
-						style={{
-							position: 'absolute',
-							inset: 0,
-							transform: `scale(${1 + (popped() ?? 0) / GERM_BURST})`,
-							opacity: 1 - (popped() ?? 0) / GERM_BURST,
-						}}
-					/>
-				</Show>
-			),
 		}),
-		// The same: its body till it's popped, then its burst, growing and
-		// fading from the middle.
+		// Its body till it's popped, then its burst, growing and fading from
+		// the middle.
 		draw({ ctx, drawDefault, image }) {
 			if (!gone()) drawDefault()
 			const since = popped()
@@ -3956,11 +3198,6 @@ function createGerm(
 			}
 			$.setX(o.x - GERM_SIZE / 2)
 			$.setY(bottom - GERM_SIZE)
-			// Popped: its body gone, its burst going. On the canvas, its Draw
-			// Hook leaves its body out.
-			$.setStyle(
-				gone() && !rendererChoice.canvas ? { 'background-image': 'none' } : {},
-			)
 		},
 	})
 	/** Popped, its body gone. */
@@ -3999,7 +3236,6 @@ function createSkyThing(
 	const now = () => Math.max(0, world.ticks())
 	const at = (
 		box: { x: number; y: number; width: number; height: number },
-		children: () => JSX.Element,
 		draw: (painting: DrawPainting) => void,
 		y?: () => number,
 	) =>
@@ -4011,7 +3247,6 @@ function createSkyThing(
 				...createObjectSignal(box.y, 'y'),
 				width: () => box.width,
 				height: () => box.height,
-				children,
 			}),
 			draw,
 			onEnterFrame: y ? ({ $ }) => $.setY(y()) : undefined,
@@ -4040,21 +3275,6 @@ function createSkyThing(
 					y: () => top,
 					width: () => width,
 					height: () => GULLS_HEIGHT,
-					children: () => (
-						<Index each={gulls()}>
-							{(gull) => (
-								<div
-									style={{
-										position: 'absolute',
-										left: `${gull().x - left - GULL_WIDTH / 2}px`,
-										top: `${gull().y - top - GULL_HEIGHT / 2}px`,
-									}}
-								>
-									<GullArt up={gull().flap} />
-								</div>
-							)}
-						</Index>
-					),
 				}),
 				draw: ({ ctx, image }) => {
 					for (const gull of gulls())
@@ -4078,7 +3298,6 @@ function createSkyThing(
 					width: BALLOON_WIDTH,
 					height: BALLOON_HEIGHT,
 				},
-				() => <BalloonArt x={o.x} />,
 				({ ctx, image }) => paintBalloon(ctx, image, o.x),
 				() => balloonAt(o, line, now()).top,
 			)
@@ -4093,14 +3312,6 @@ function createSkyThing(
 					width: STORM_WIDTH,
 					height: line - top,
 				},
-				() => (
-					<StormArt
-						brewing={storm().brewing}
-						striking={storm().striking}
-						now={now()}
-						reach={reach}
-					/>
-				),
 				({ ctx, image }) =>
 					paintStorm(ctx, image, { ...storm(), now: now(), reach }),
 			)
@@ -4114,12 +3325,6 @@ function createSkyThing(
 					width: reach * 2,
 					height: reach + o.height,
 				},
-				() => (
-					<TurbineArt
-						angles={turbineAt(o, line, now()).angles}
-						tall={o.height + 10}
-					/>
-				),
 				({ ctx }) =>
 					paintTurbine(ctx, turbineAt(o, line, now()).angles, o.height + 10),
 			)
@@ -4133,15 +3338,6 @@ function createSkyThing(
 					width: WHALE_WIDTH,
 					height: o.height + WHALE_HEIGHT,
 				},
-				() => (
-					<WhaleArt
-						up={whale().up}
-						spout={whale().spout}
-						bubbling={whale().bubbling}
-						height={o.height}
-						now={now()}
-					/>
-				),
 				({ ctx, image }) =>
 					paintWhale(ctx, image, {
 						...whale(),
@@ -4168,7 +3364,6 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				sink: -o.height,
 				world,
 				lift: (age) => Math.round(Math.sin(age / 9) * 3),
-				children: () => <FikaArt item={o.item} />,
 				draw: ({ ctx, image }) => {
 					const picture = image(fikaPicture(o.item))
 					if (picture) ctx.drawImage(picture.image, 0, 0, art.width, art.height)
@@ -4222,12 +3417,6 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				sink: -o.height,
 				world,
 				lift: (age) => Math.round(Math.sin(age / 9) * 3),
-				children: () => (
-					<>
-						<div style={HAT_GLOW} />
-						<HatPicture hat={{ kind: o.hat }} />
-					</>
-				),
 				draw: ({ ctx, image }) => {
 					paintHatGlow(ctx, art.width, art.height)
 					paintHat(ctx, image, { kind: o.hat }, 0, 0, { now: world.ticks() })
@@ -4255,13 +3444,6 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				world,
 				frames: [frame],
 				xScale: -1,
-				children: () => (
-					<Show when={state.cheering() > 0}>
-						<Bubble size={18} mirrored>
-							Go {state.cheered || world.runner.name}!
-						</Bubble>
-					</Show>
-				),
 				// "Go", and whoever's cheered on's name.
 				drawReach: bubbleReach(
 					size.width,
@@ -4295,10 +3477,7 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				width: GATE_WIDTH,
 				height: GATE_HEIGHT,
 				world,
-				children: () => (
-					<GateArt colour={o.colour} flapping={state.cheering() > 0} />
-				),
-				// Flapping from when it was gone past, as its CSS animation does.
+				// Flapping from when it was gone past.
 				draw: ({ ctx }) =>
 					paintGate(
 						ctx,
@@ -4320,7 +3499,6 @@ export function createBoost(world: World, state: BoostState, i: number) {
 					height: RING_HEIGHT,
 					sink: RING_HEIGHT / 2 - o.height,
 					world,
-					children: () => <RingArt half={side} lit={state.cheering() > 0} />,
 					draw: ({ ctx, image }) =>
 						paintRing(ctx, image, side, state.cheering() > 0),
 				})
@@ -4345,13 +3523,6 @@ const PUMPKINS = [
 ]
 const PUMPKIN_WIDTH = 29
 const PUMPKIN_HEIGHT = 23
-/** A glow round a hat sat waiting, so it's plain it's there to have. */
-const HAT_GLOW: JSX.CSSProperties = {
-	position: 'absolute',
-	inset: '-10px',
-	background:
-		'radial-gradient(closest-side, rgba(255, 244, 190, 0.55), rgba(255, 244, 190, 0))',
-}
 /** A traffic cone's size, drawn; and knocked over, how long it takes to tip, how far it skids, and for how long. */
 const CONE_WIDTH = 16
 const CONE_HEIGHT = 22
@@ -4364,7 +3535,7 @@ const HAT_FLIES = 50
 /**
  * Hats knocked off racers' heads, one for each racer: up and away behind
  * them, from where their head was, spinning and fading. (A hat on someone's
- * head is drawn with them: see `WornHat`.)
+ * head is drawn with them: see `createPlayer`.)
  */
 export function createHats(world: World) {
 	return world.racers.map((racer) => {
@@ -4382,9 +3553,6 @@ export function createHats(world: World) {
 				...createObjectSignal({} as JSX.CSSProperties, 'style'),
 				width: () => (flying() ? hatArt(flying() as Hat).width : 0),
 				height: () => (flying() ? hatArt(flying() as Hat).height : 0),
-				children: () => (
-					<Show when={flying()}>{(hat) => <HatPicture hat={hat()} />}</Show>
-				),
 			}),
 			draw({ ctx, image }) {
 				const hat = flying()
@@ -4488,13 +3656,6 @@ function createZombie(
 			sunk = zombie.sunk
 			$.setStyle({
 				filter,
-				// Below the ground, it's in the grave: on the canvas, cut off
-				// by its Draw Hook.
-				...(rendererChoice.canvas
-					? {}
-					: {
-							'clip-path': `inset(0 0 ${Math.min(ZOMBIE_HEIGHT, zombie.sunk)}px 0)`,
-						}),
 				visibility: zombie.sunk >= ZOMBIE_SINK_GONE ? 'hidden' : 'visible',
 			})
 		},
@@ -4526,18 +3687,8 @@ function createMummy(
 			height: () => MUMMY_DRAWN,
 			...createObjectSignal(0, 'rotation'),
 			...createObjectSignal(1, 'xScale'),
-			children: () => (
-				<div
-					style={{
-						width: '100%',
-						height: '100%',
-						background: `url("${mummyAsset}") ${-frame() * MUMMY_WIDTH}px 0 / ${MUMMY_WIDTH * 2}px ${MUMMY_DRAWN}px no-repeat`,
-						'image-rendering': 'pixelated',
-					}}
-				/>
-			),
 		}),
-		// The same frame, cut out of the sheet.
+		// Its frame, cut out of the sheet.
 		draw({ ctx, image }) {
 			const sheet = image(mummyAsset)
 			if (!sheet) return
@@ -4581,10 +3732,6 @@ const STREET_GRATE = 26
 
 const VENT_WIDTH = 40
 const VENT_HEIGHT = 30
-/** An air vent on a roof: a grey box with a grille, and its cowl on top. */
-const VentArt = () => (
-	<PixelArt src={ventAsset} width={VENT_WIDTH} height={VENT_HEIGHT} />
-)
 
 /**
  * Everyone whose name could be on a tombstone: the club's members and
@@ -4637,26 +3784,6 @@ const BRANCH_OVER_REACH = 80
 const BUOY_SINK = 22
 const BUOY_HEIGHT = 30
 
-/** A km sign's buoy, out at sea: red and white, its post up out of it. */
-function Buoy() {
-	return (
-		<div
-			style={{
-				position: 'absolute',
-				left: `${KM_SIGN_WIDTH / 2 - 15}px`,
-				bottom: 0,
-				width: '30px',
-				height: `${BUOY_HEIGHT}px`,
-				background:
-					'linear-gradient(to bottom, #e8473c 0 10px, #f6f7f8 10px 18px, #e8473c 18px)',
-				border: '3px solid #1d1d1d',
-				'border-radius': '6px 6px 2px 2px',
-				'box-sizing': 'border-box',
-			}}
-		/>
-	)
-}
-
 const KM_SIGN_WIDTH = 64
 const KM_SIGN_HEIGHT = 84
 const KM_BOARD_HEIGHT = 34
@@ -4681,8 +3808,8 @@ function roundedBox(
 }
 
 /**
- * A km sign, as its `children` draw it, painted in a Draw Hook: its buoy,
- * if it's `afloat`, its post, and its board, lettered.
+ * A km sign: its buoy, red and white, if it's `afloat` out at sea; its post,
+ * up out of it; and its yellow board, lettered.
  */
 function paintKmSign(
 	ctx: CanvasRenderingContext2D,
@@ -4763,8 +3890,7 @@ export function createWarnings(world: World) {
 				return `M${x - warning.from},${y - WARNING_DEPTH}h4v${WARNING_DEPTH}h-4Z`
 			})
 			.join('')
-		// The same, for the Canvas Renderer: its band, and the black of the
-		// stripes across it, 8 px of every 16, at 45°.
+		// The black of the stripes across its band, 8 px of every 16, at 45°.
 		const bandPath = new Path2D(band)
 		const every = 16 * Math.SQRT2
 		const thick = 8 * Math.SQRT2
@@ -4788,29 +3914,6 @@ export function createWarnings(world: World) {
 				y: () => top,
 				width: () => width,
 				height: () => bottom - top,
-				children: () => (
-					<svg
-						width={width}
-						height={bottom - top}
-						shape-rendering="crispEdges"
-						aria-hidden="true"
-						style={{ display: 'block', overflow: 'visible' }}
-					>
-						<defs>
-							<pattern
-								id={`warning-stripes-${i}`}
-								patternUnits="userSpaceOnUse"
-								width={16}
-								height={16}
-								patternTransform="rotate(45)"
-							>
-								<rect width={16} height={16} fill="#ffc21a" />
-								<rect width={8} height={16} fill="#1d1d1d" />
-							</pattern>
-						</defs>
-						<path d={band} fill={`url(#warning-stripes-${i})`} />
-					</svg>
-				),
 			}),
 		})
 	})
@@ -4846,49 +3949,6 @@ export function createKmSigns(world: World) {
 				? (age) => Math.round(Math.sin(age / 20 + km) * 3)
 				: undefined,
 			draw: ({ ctx }) => paintKmSign(ctx, km, afloat),
-			children: () => (
-				<div style={{ position: 'relative', width: '100%', height: '100%' }}>
-					<Show when={afloat}>
-						<Buoy />
-					</Show>
-					<div
-						style={{
-							position: 'absolute',
-							left: `${KM_SIGN_WIDTH / 2 - 3}px`,
-							top: `${KM_BOARD_HEIGHT - 2}px`,
-							width: '6px',
-							bottom: 0,
-							background: '#7a7f86',
-							'border-left': '2px solid #565a60',
-							'box-sizing': 'border-box',
-						}}
-					/>
-					<div
-						style={{
-							position: 'absolute',
-							left: 0,
-							top: 0,
-							width: '100%',
-							height: `${KM_BOARD_HEIGHT}px`,
-							display: 'flex',
-							'align-items': 'center',
-							'justify-content': 'center',
-							gap: '3px',
-							background: '#f7d117',
-							border: '3px solid #1d1d1d',
-							'box-sizing': 'border-box',
-							color: '#1d1d1d',
-							'font-family': 'var(--font-pixel)',
-							'font-size': '18px',
-							'line-height': 1,
-							'padding-top': '2px',
-						}}
-					>
-						{km}KM
-						<span style={{ 'font-size': '14px' }}>→</span>
-					</div>
-				</div>
-			),
 		})
 	})
 }
@@ -4957,7 +4017,6 @@ export function createForeground(world: World) {
 				y: () => 0,
 				width: () => width,
 				height: () => VIEW_HEIGHT,
-				children: () => art(),
 			}),
 			draw: ({ ctx, image, $scene }) => {
 				const view = $scene.canvas.get()
@@ -5201,7 +4260,6 @@ function createTower(world: World, x: number, i: number) {
 			id: `tower-back-${i}`,
 			type: 'tower-back',
 			...at,
-			children: () => backArt(),
 		}),
 		draw: picture('tower-back', backArt),
 	})
@@ -5277,7 +4335,6 @@ function createTower(world: World, x: number, i: number) {
 			id: `tower-${i}`,
 			type: 'tower',
 			...at,
-			children: () => frontArt(),
 		}),
 		draw: picture('tower', frontArt),
 	})

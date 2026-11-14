@@ -3,8 +3,9 @@ import { cachedArt } from '../canvasArt'
 
 /**
  * A shadow, or an outline, round a picture: copies of it, all in one
- * colour, at each offset, under it. `filter` is the same as CSS, for the
- * DOM Renderer's `children`; `offsets` are what it comes to, for a Draw Hook.
+ * colour, at each offset, under it. `filter` is the same as CSS, for art
+ * on a page (a course's preview); `offsets` are what it comes to, for a
+ * Draw Hook.
  */
 export interface PictureShadow {
 	colour: string

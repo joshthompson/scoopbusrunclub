@@ -1,5 +1,4 @@
 import { createController } from 'scoopjs'
-import { For } from 'solid-js'
 import { type PixelRect, pixelText, svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
 import { LONG_JUMP_PX_PER_M, PIT_FROM, PIT_LENGTH } from '../game/longJump'
@@ -113,38 +112,11 @@ export function createLongJump(world: World) {
 				y: () => top,
 				width: () => art.width,
 				height: () => art.height,
-				children: () => (
-					<div style={{ position: 'relative' }}>
-						<img
-							src={art.src}
-							alt=""
-							width={art.width}
-							height={art.height}
-							style={{ display: 'block' }}
-						/>
-						<For each={marks()}>
-							{(x) => (
-								<div
-									style={{
-										position: 'absolute',
-										left: `${Math.round(x - left) - 7}px`,
-										top: `${MARKERS - BACK - 2}px`,
-										width: '14px',
-										height: '4px',
-										background: DENT,
-										'box-shadow': `0 2px 0 ${SAND_LIGHT}`,
-									}}
-								/>
-							)}
-						</For>
-					</div>
-				),
 			}),
 			draw: ({ ctx, image }) => {
 				const pit = image(art.src)
 				if (pit) ctx.drawImage(pit.image, 0, 0, art.width, art.height)
-				// Each mark, and the lip of sand thrown up in front of it, as
-				// its shadow is on the page.
+				// Each mark, and the lip of sand thrown up in front of it.
 				for (const x of marks()) {
 					const markX = Math.round(x - left) - 7
 					const markY = MARKERS - BACK - 2

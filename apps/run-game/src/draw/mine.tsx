@@ -1,16 +1,11 @@
 import { createController, createObjectSignal } from 'scoopjs'
-import { type JSX, createSignal } from 'solid-js'
+import { createSignal } from 'solid-js'
 import { seeded } from '../courses/kit/seeded'
 import { railY } from '../game/carts'
 import { onMole } from '../game/moles'
 import { platformAt } from '../game/platforms'
 import type { World } from '../game/world'
-import {
-	CART_HEIGHT,
-	CART_WIDTH,
-	MineCartArt,
-	mineCartPicture,
-} from './art/mineCart'
+import { CART_HEIGHT, CART_WIDTH, mineCartPicture } from './art/mineCart'
 import { rectFiller } from './paint/snappedRect'
 
 /**
@@ -57,8 +52,7 @@ export function createMine(world: World) {
 	/** The secret line's rail, `x` along. */
 	const secretRail = (x: number) => railY(world, x, true)
 
-	const rects: JSX.Element[] = []
-	/** The same, in order, for the Canvas Renderer to paint. */
+	/** Its drawing, in order, to paint. */
 	const parts: MinePart[] = []
 	const rect = (x: number, yy: number, w: number, h: number, fill: string) => {
 		const box: MinePart = {
@@ -69,15 +63,6 @@ export function createMine(world: World) {
 			fill,
 		}
 		parts.push(box)
-		rects.push(
-			<rect
-				x={box.x}
-				y={box.y}
-				width={box.width}
-				height={box.height}
-				fill={fill}
-			/>,
-		)
 	}
 
 	// The gallery: hollowed out of the rock, its roof ragged, timbers
@@ -97,9 +82,6 @@ export function createMine(world: World) {
 		rect(x - 30, beam - 6, 60, 2, TIMBER_LIT)
 		// A lamp, hung off the beam, and its glow.
 		rect(x - 1, beam, 2, 6, '#2b2b2b')
-		rects.push(
-			<circle cx={at(x)} cy={y(beam + 12)} r={22} fill="url(#mine-glow)" />,
-		)
 		parts.push({ glow: [at(x), y(beam + 12)] })
 		rect(x - 3, beam + 6, 6, 8, '#3a3a3a')
 		rect(x - 2, beam + 8, 4, 4, '#ffd76a')
@@ -138,18 +120,6 @@ export function createMine(world: World) {
 		for (let x = from; x <= to; x += step)
 			d += `${d ? 'L' : 'M'}${at(x)},${y(Math.round(rail(x)) - 1)}`
 		parts.push({ rail: d, from: at(from), to: at(to) })
-		rects.push(
-			<>
-				<path d={d} stroke={STEEL_DARK} stroke-width={3} fill="none" />
-				<path
-					d={d}
-					stroke={STEEL}
-					stroke-width={1}
-					fill="none"
-					transform="translate(0,-1)"
-				/>
-			</>,
-		)
 	}
 	railLine(mine.from, mine.to, (x) => ground(x))
 	railLine(secret.from, secret.to, secretRail)
@@ -185,23 +155,6 @@ export function createMine(world: World) {
 				y: () => top,
 				width: () => width,
 				height: () => bottom - top,
-				children: () => (
-					<svg
-						width={width}
-						height={bottom - top}
-						shape-rendering="crispEdges"
-						aria-hidden="true"
-						style={{ display: 'block', overflow: 'visible' }}
-					>
-						<defs>
-							<radialGradient id="mine-glow">
-								<stop offset="0%" stop-color="rgba(255, 214, 120, 0.45)" />
-								<stop offset="100%" stop-color="rgba(255, 214, 120, 0)" />
-							</radialGradient>
-						</defs>
-						{rects}
-					</svg>
-				),
 			}),
 			draw: ({ ctx, $scene }) => {
 				// Only what's in view: it's as long as the mine.
@@ -221,7 +174,7 @@ type MinePart =
 /** How far a lamp's glow reaches round it. */
 const GLOW = 22
 
-/** The mine, as its SVG draws it, painted from `left` to `right` along it. */
+/** The mine, painted from `left` to `right` along it. */
 function paintMine(
 	ctx: CanvasRenderingContext2D,
 	parts: MinePart[],
@@ -274,7 +227,6 @@ export function createMineCarts(world: World) {
 				width: () => CART_WIDTH,
 				height: () => CART_HEIGHT,
 				origin: () => ({ x: CART_WIDTH / 2, y: CART_HEIGHT }),
-				children: () => <MineCartArt loaded={loaded()} />,
 			}),
 			draw: ({ ctx, image }) => {
 				const picture = image(mineCartPicture(loaded()))
@@ -380,7 +332,7 @@ export function createMoleTrails(world: World) {
 	const [rims, setRims] = createSignal('')
 	/** Dug further since they were last drawn. */
 	let dirty = false
-	/** The same as paths, for the Canvas Renderer: built again only once they've changed. */
+	/** The same as paths: built again only once they've changed. */
 	let rockPath: Path2D | undefined
 	let drawn: { holes: string; hole: Path2D; rim: Path2D } | undefined
 	return [
@@ -392,26 +344,6 @@ export function createMoleTrails(world: World) {
 				y: () => top,
 				width: () => width,
 				height: () => bottom - top,
-				children: () => (
-					<svg
-						width={width}
-						height={bottom - top}
-						shape-rendering="crispEdges"
-						aria-hidden="true"
-						style={{ display: 'block' }}
-					>
-						<defs>
-							<clipPath id="mole-rock">
-								<path d={rock} />
-							</clipPath>
-						</defs>
-						{/* Broken rock round its edges, and the hole, the back wall through it. */}
-						<g clip-path="url(#mole-rock)">
-							<path d={rims()} fill={look.seam} />
-							<path d={holes()} fill={look.wall} />
-						</g>
-					</svg>
-				),
 			}),
 			draw: ({ ctx }) => {
 				const hole = holes()

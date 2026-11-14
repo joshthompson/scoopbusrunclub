@@ -7,11 +7,9 @@ const BORDER = 2
 
 /**
  * A box striped yellow and black on the slant, in a 2px ink border: a
- * section of the Scoop Arm. Painted as the DOM Renderer draws its `<div>`
- * (`repeating-linear-gradient(45deg, …)` inside `border: 2px solid`,
- * `box-sizing: border-box`), so the stripes line up the same: the gradient
- * runs up and to the right across the box inside the border, from its
- * bottom left corner's side.
+ * section of the Scoop Arm. The stripes run as CSS's
+ * `repeating-linear-gradient(45deg, …)` would inside the border: up and to
+ * the right across the box, from its bottom left corner's side.
  */
 export function paintHazardStripes(
 	ctx: CanvasRenderingContext2D,

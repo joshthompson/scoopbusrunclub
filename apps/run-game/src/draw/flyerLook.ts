@@ -1,4 +1,3 @@
-import type { Component } from 'solid-js'
 import type { Course } from '../courses/types'
 import type { Sound } from '../sfx'
 import {
@@ -6,7 +5,6 @@ import {
 	CONDOR_SEAT_X,
 	CONDOR_SEAT_Y,
 	CONDOR_WIDTH,
-	CondorArt,
 	condorFrame,
 	condorFrames,
 } from './art/condor'
@@ -14,14 +12,12 @@ import {
 	DRAGON_HEIGHT,
 	DRAGON_NECK,
 	DRAGON_WIDTH,
-	DragonArt,
 	dragonBack,
 	dragonPicture,
 } from './art/dragon'
 import {
 	FLYING_GOOSE_HEIGHT,
 	FLYING_GOOSE_WIDTH,
-	FlyingGooseArt,
 	flyingGoosePicture,
 } from './art/geese'
 
@@ -29,10 +25,9 @@ import {
 export interface FlyerLook {
 	width: number
 	height: number
-	Art: Component<{ now: number; carrying: boolean }>
 	/**
-	 * The same, for a Draw Hook to paint: its picture, `now` ticks in, and
-	 * whether it's turned round, left to right, in its box.
+	 * Its picture, for a Draw Hook to paint, `now` ticks in, and whether it's
+	 * turned round, left to right, in its box.
 	 */
 	picture: (now: number, carrying: boolean) => string
 	mirrored?: boolean
@@ -54,7 +49,6 @@ export interface FlyerLook {
 const GOOSE: FlyerLook = {
 	width: FLYING_GOOSE_WIDTH,
 	height: FLYING_GOOSE_HEIGHT,
-	Art: FlyingGooseArt,
 	picture: flyingGoosePicture,
 	mirrored: true,
 	sound: 'honk',
@@ -65,7 +59,6 @@ const GOOSE: FlyerLook = {
 const DRAGON: FlyerLook = {
 	width: DRAGON_WIDTH,
 	height: DRAGON_HEIGHT,
-	Art: DragonArt,
 	picture: dragonPicture,
 	sound: 'whoosh',
 	rides: 'Dragon rides',
@@ -83,15 +76,6 @@ const CONDOR: FlyerLook = {
 	width: CONDOR_WIDTH,
 	height: CONDOR_HEIGHT,
 	// Beating its wings, swooping in; soaring, once it's got someone.
-	Art: (props) =>
-		CondorArt({
-			get now() {
-				return props.now
-			},
-			get beating() {
-				return !props.carrying
-			},
-		}),
 	picture: (now, carrying) => condorFrames(false)[condorFrame(now, !carrying)],
 	sound: 'whoosh',
 	rides: 'Condor rides',

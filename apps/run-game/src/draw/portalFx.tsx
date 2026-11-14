@@ -1,5 +1,5 @@
 import { createController } from 'scoopjs'
-import { For, type JSX, Show, createMemo } from 'solid-js'
+import { createMemo } from 'solid-js'
 import { portalTime } from '../game/portals'
 import type { World } from '../game/world'
 
@@ -48,21 +48,8 @@ export function createPortalFx(world: World) {
 				},
 				width: () => BEAM_WIDTH,
 				height: () => BEAM_HEIGHT,
-				children: () => (
-					<Show when={now()}>
-						{(t) => (
-							<Show
-								when={t().portal.kind === 'shrink'}
-								fallback={<Spray since={t().since} />}
-							>
-								<Beam t={t().t} snap={t().snap} />
-							</Show>
-						)}
-					</Show>
-				),
 			}),
 			drawReach: SPRAY_REACH,
-			// The same, on the canvas.
 			draw({ ctx }) {
 				const t = now()
 				if (!t) return
@@ -114,7 +101,7 @@ const SPRAY_REACH = (() => {
 
 /** The beam's colours, across it: clear at its edges, brightest down its middle. */
 const BEAM_STOPS: [number, string][] = [
-	// Clear in its own colour, not black, as CSS fades to `transparent`.
+	// Clear in its own colour, not black, so it fades out rather than darkening.
 	[0, 'rgba(150, 255, 190, 0)'],
 	[0.25, 'rgba(150, 255, 190, 0.35)'],
 	[0.5, 'rgba(220, 255, 230, 0.75)'],
@@ -122,6 +109,7 @@ const BEAM_STOPS: [number, string][] = [
 	[1, 'rgba(150, 255, 190, 0)'],
 ]
 
+/** The shrink ray's beam, `t` ticks after it went off, till the flash at `snap`, and its sparks. */
 function paintBeam(ctx: CanvasRenderingContext2D, t: number, snap: number) {
 	if (!beamOn(t, snap)) return
 	const alpha = ctx.globalAlpha
@@ -145,6 +133,7 @@ function paintBeam(ctx: CanvasRenderingContext2D, t: number, snap: number) {
 	}
 }
 
+/** The sneeze's spray, `since` ticks after "CHOO!", out of the nose at the beam's bottom middle. */
 function paintSpray(ctx: CanvasRenderingContext2D, since: number) {
 	if (!sprayOn(since)) return
 	ctx.globalAlpha *= 1 - since / SPRAY_TICKS
@@ -153,64 +142,4 @@ function paintSpray(ctx: CanvasRenderingContext2D, since: number) {
 		const { x, y } = dropAt(drop, since)
 		ctx.fillRect(x, y, drop.size, drop.size)
 	}
-}
-
-/** The shrink ray's beam, `t` ticks after it went off, till the flash at `snap`. */
-function Beam(props: { t: number; snap: number }) {
-	const on = () => beamOn(props.t, props.snap)
-	const strength = () => beamStrength(props.t)
-	const style = (): JSX.CSSProperties => ({
-		position: 'absolute',
-		inset: 0,
-		opacity: strength(),
-		background:
-			'linear-gradient(to right, transparent, rgba(150, 255, 190, 0.35) 25%, rgba(220, 255, 230, 0.75) 50%, rgba(150, 255, 190, 0.35) 75%, transparent)',
-		'pointer-events': 'none',
-	})
-	return (
-		<Show when={on()}>
-			<div style={style()} />
-			<For each={SPARKS}>
-				{(spark) => (
-					<div
-						style={{
-							position: 'absolute',
-							left: `${Math.round(spark.x * (BEAM_WIDTH - 4))}px`,
-							top: `${Math.round(spark.y * (BEAM_HEIGHT - 4))}px`,
-							width: '4px',
-							height: '4px',
-							background: '#f4fff6',
-							opacity: sparkOpacity(props.t, spark.beat),
-						}}
-					/>
-				)}
-			</For>
-		</Show>
-	)
-}
-
-/** The sneeze's spray, `since` ticks after "CHOO!", out of the nose at the beam's bottom middle. */
-function Spray(props: { since: number }) {
-	return (
-		<Show when={sprayOn(props.since)}>
-			<For each={DROPS}>
-				{(drop) => {
-					const at = () => dropAt(drop, props.since)
-					return (
-						<div
-							style={{
-								position: 'absolute',
-								left: `${at().x}px`,
-								top: `${at().y}px`,
-								width: `${drop.size}px`,
-								height: `${drop.size}px`,
-								background: 'rgba(214, 240, 255, 0.85)',
-								opacity: 1 - props.since / SPRAY_TICKS,
-							}}
-						/>
-					)
-				}}
-			</For>
-		</Show>
-	)
 }

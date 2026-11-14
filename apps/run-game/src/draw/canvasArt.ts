@@ -2,8 +2,7 @@ import type { JSX } from 'solid-js'
 import { render } from 'solid-js/web'
 
 /**
- * Helpers for painting the game's art on the Canvas Renderer, in Draw Hooks
- * (a Controller's `draw`), where under the DOM Renderer it's `children`.
+ * Helpers for painting the game's art in Draw Hooks (a Controller's `draw`).
  *
  * - Art that changes as the race goes on is painted every time, straight
  *   onto the hook's `ctx`.
@@ -30,8 +29,8 @@ let keptPixels = 0
  *
  * The key has to say everything that changes it (its size, its colours, a
  * Frame), since art with a key already kept isn't painted again. Painted at
- * the screen's pixel density, up to 2, so it's as sharp as under the DOM
- * Renderer; keep each one small, a phone has little room for them. Or at
+ * the screen's pixel density, up to 2, so it's as sharp as the screen
+ * shows; keep each one small, a phone has little room for them. Or at
  * `density`, for art that has no need of so many: art seen zoomed out.
  */
 export function cachedArt(

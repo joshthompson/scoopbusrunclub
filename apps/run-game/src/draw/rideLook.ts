@@ -12,7 +12,6 @@ import {
 	bloodCellPicture,
 } from './art/bloodCell'
 import {
-	BactrianArt,
 	CAMEL_BACK,
 	CAMEL_HEIGHT,
 	CAMEL_OUTLINE,
@@ -102,10 +101,11 @@ export interface RideLook {
 	back: number
 	/** How far above its feet its rider sits. */
 	saddle: number
+	/** Drawn on a page (a course's preview), in a pose. */
 	Art: Component<{ pose: CorgiPose }>
 	/**
-	 * The same, for a Draw Hook to paint: its picture in each pose, and the
-	 * outline or shadow round it.
+	 * For a Draw Hook to paint: its picture in each pose, and the outline or
+	 * shadow round it.
 	 */
 	picture: (pose: CorgiPose) => string
 	shadow?: PictureShadow
@@ -123,7 +123,6 @@ export interface RideLook {
 	 * look, and its own Collectable, ridden the same.
 	 */
 	rare?: {
-		Art: Component<{ pose: CorgiPose }>
 		picture: (pose: CorgiPose) => string
 		shadow: PictureShadow
 		kind: 'bactrian'
@@ -172,7 +171,6 @@ const CAMEL: RideLook = {
 	rides: 'Camel rides',
 	// Now and then, two humps.
 	rare: {
-		Art: BactrianArt,
 		picture: bactrianPicture,
 		shadow: CAMEL_OUTLINE,
 		kind: 'bactrian',
