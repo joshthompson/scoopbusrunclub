@@ -1,3 +1,4 @@
+import type { DrawPainting } from 'scoopjs'
 import { For, type JSX, Show } from 'solid-js'
 import {
 	type PixelRect,
@@ -6,6 +7,7 @@ import {
 } from '../../courses/kit/pixelArt'
 import type { Rail } from '../../courses/types'
 import { PixelArt } from '../PixelArt'
+import { paintPicture } from '../paint/picture'
 
 /**
  * What's on The Slopes' piste, in cells twice the size of a screen pixel: a
@@ -120,6 +122,39 @@ export function SnowmanArt(props: { since?: number }) {
 			</Show>
 		</div>
 	)
+}
+
+/**
+ * `SnowmanArt`, painted in a Draw Hook, from (0, 0) of `ctx`: stood up, or
+ * burst `since` ticks ago.
+ */
+export function paintSnowman(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	since?: number,
+) {
+	const burst = since !== undefined
+	paintPicture(
+		ctx,
+		image,
+		burst ? heap : snowman,
+		0,
+		0,
+		SNOWMAN_WIDTH,
+		SNOWMAN_DRAWN,
+	)
+	if (since === undefined || since >= BURST_TICKS) return
+	const t = since / BURST_TICKS
+	ctx.globalAlpha *= 1 - t
+	for (const bit of PUFF) {
+		ctx.fillStyle = bit.colour
+		ctx.fillRect(
+			SNOWMAN_WIDTH / 2 + bit.x * t,
+			30 + bit.y * t + 40 * t * t,
+			bit.size,
+			bit.size,
+		)
+	}
 }
 
 const PUFF = [
