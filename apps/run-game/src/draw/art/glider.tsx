@@ -1,6 +1,7 @@
 import type { JSX } from 'solid-js'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
 import { PixelArt } from '../PixelArt'
+import { pictureShadow } from '../paint/picture'
 
 /**
  * A hang glider, The Cliff's Ride, side on and facing right, in cells
@@ -92,9 +93,15 @@ const GLIDER = pixelArt(COLUMNS, ROWS, [
 ])
 
 /** An ink outline round its wing, as the corgi has, so it stands out against the sky. */
-const OUTLINE: JSX.CSSProperties = {
-	filter: 'drop-shadow(0 2px 0 rgba(0, 0, 0, 0.25))',
-}
+export const GLIDER_SHADOW = pictureShadow(
+	'rgba(0, 0, 0, 0.25)',
+	[[0, 2]],
+	'drop-shadow(0 2px 0 rgba(0, 0, 0, 0.25))',
+)
+const OUTLINE: JSX.CSSProperties = { filter: GLIDER_SHADOW.filter }
+
+/** Its picture, for a Draw Hook to paint, shadowed. */
+export const gliderPicture = () => GLIDER
 
 export function GliderArt() {
 	return (

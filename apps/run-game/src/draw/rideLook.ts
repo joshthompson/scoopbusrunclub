@@ -5,62 +5,91 @@ import type { Sound } from '../sfx'
 import {
 	BLOOD_CELL_BACK,
 	BLOOD_CELL_HEIGHT,
+	BLOOD_CELL_OUTLINE,
 	BLOOD_CELL_SADDLE,
 	BLOOD_CELL_WIDTH,
 	BloodCellArt,
+	bloodCellPicture,
 } from './art/bloodCell'
 import {
 	BactrianArt,
 	CAMEL_BACK,
 	CAMEL_HEIGHT,
+	CAMEL_OUTLINE,
 	CAMEL_SADDLE,
 	CAMEL_WIDTH,
 	CamelArt,
+	bactrianPicture,
+	camelPicture,
 } from './art/camel'
 import {
 	CORGI_HEAD,
 	CORGI_HEIGHT,
+	CORGI_OUTLINE,
 	CORGI_WIDTH,
 	CorgiArt,
 	type CorgiPose,
+	corgiPicture,
 } from './art/corgi'
 import {
 	DEER_BACK,
 	DEER_HEIGHT,
+	DEER_OUTLINE,
 	DEER_SADDLE,
 	DEER_WIDTH,
 	DeerArt,
+	deerPicture,
 } from './art/deer'
-import { GLIDER_HEIGHT, GLIDER_WIDTH, GliderArt } from './art/glider'
+import {
+	GLIDER_HEIGHT,
+	GLIDER_SHADOW,
+	GLIDER_WIDTH,
+	GliderArt,
+	gliderPicture,
+} from './art/glider'
 import {
 	GOAT_BACK,
 	GOAT_HEIGHT,
+	GOAT_OUTLINE,
 	GOAT_SADDLE,
 	GOAT_WIDTH,
 	GoatArt,
+	goatPicture,
 } from './art/goat'
 import {
 	LLAMA_BACK,
 	LLAMA_HEIGHT,
+	LLAMA_OUTLINE,
 	LLAMA_SADDLE,
 	LLAMA_WIDTH,
 	LlamaArt,
+	llamaPicture,
 } from './art/llama'
 import {
 	MOLE_BACK,
 	MOLE_HEIGHT,
+	MOLE_OUTLINE,
 	MOLE_SADDLE,
 	MOLE_WIDTH,
 	MoleArt,
+	molePicture,
 } from './art/mole'
-import { STOOD_HEIGHT, STOOD_WIDTH, StoodBoardArt } from './art/skis'
+import {
+	STOOD_HEIGHT,
+	STOOD_WIDTH,
+	StoodBoardArt,
+	stoodBoardPicture,
+} from './art/skis'
 import {
 	UNICORN_BACK,
 	UNICORN_HEIGHT,
+	UNICORN_OUTLINE,
 	UNICORN_SADDLE,
 	UNICORN_WIDTH,
 	UnicornArt,
+	unicornPicture,
 } from './art/unicorn'
+import type { PictureShadow } from './paint/picture'
 
 /**
  * What a course's Rides are, waiting on the path to be ridden: corgis,
@@ -74,6 +103,12 @@ export interface RideLook {
 	/** How far above its feet its rider sits. */
 	saddle: number
 	Art: Component<{ pose: CorgiPose }>
+	/**
+	 * The same, for a Draw Hook to paint: its picture in each pose, and the
+	 * outline or shadow round it.
+	 */
+	picture: (pose: CorgiPose) => string
+	shadow?: PictureShadow
 	/** What it says, calling to be ridden, and the sound of it. */
 	call: string
 	sound: Sound
@@ -89,6 +124,8 @@ export interface RideLook {
 	 */
 	rare?: {
 		Art: Component<{ pose: CorgiPose }>
+		picture: (pose: CorgiPose) => string
+		shadow: PictureShadow
 		kind: 'bactrian'
 		share: number
 	}
@@ -100,6 +137,8 @@ const CORGI: RideLook = {
 	back: CORGI_HEAD,
 	saddle: CORGI_SADDLE,
 	Art: CorgiArt,
+	picture: corgiPicture,
+	shadow: CORGI_OUTLINE,
 	call: 'Woof!',
 	sound: 'woof',
 	rides: 'Corgi rides',
@@ -111,6 +150,8 @@ const LLAMA: RideLook = {
 	back: LLAMA_BACK,
 	saddle: LLAMA_SADDLE,
 	Art: LlamaArt,
+	picture: llamaPicture,
+	shadow: LLAMA_OUTLINE,
 	// Llamas hum.
 	call: 'Hmmm!',
 	sound: 'cheer',
@@ -123,12 +164,20 @@ const CAMEL: RideLook = {
 	back: CAMEL_BACK,
 	saddle: CAMEL_SADDLE,
 	Art: CamelArt,
+	picture: camelPicture,
+	shadow: CAMEL_OUTLINE,
 	// Camels grumble.
 	call: 'Hrrmph!',
 	sound: 'groan',
 	rides: 'Camel rides',
 	// Now and then, two humps.
-	rare: { Art: BactrianArt, kind: 'bactrian', share: 0.1 },
+	rare: {
+		Art: BactrianArt,
+		picture: bactrianPicture,
+		shadow: CAMEL_OUTLINE,
+		kind: 'bactrian',
+		share: 0.1,
+	},
 }
 
 const DEER: RideLook = {
@@ -137,6 +186,8 @@ const DEER: RideLook = {
 	back: DEER_BACK,
 	saddle: DEER_SADDLE,
 	Art: DeerArt,
+	picture: deerPicture,
+	shadow: DEER_OUTLINE,
 	// Deer bark, as it happens.
 	call: 'Bark!',
 	sound: 'honk',
@@ -149,6 +200,8 @@ const UNICORN: RideLook = {
 	back: UNICORN_BACK,
 	saddle: UNICORN_SADDLE,
 	Art: UnicornArt,
+	picture: unicornPicture,
+	shadow: UNICORN_OUTLINE,
 	call: 'Neigh!',
 	// A sparkle of a sound.
 	sound: 'scan',
@@ -161,6 +214,8 @@ const GOAT: RideLook = {
 	back: GOAT_BACK,
 	saddle: GOAT_SADDLE,
 	Art: GoatArt,
+	picture: goatPicture,
+	shadow: GOAT_OUTLINE,
 	call: 'Meh-eh-eh!',
 	sound: 'bleat',
 	rides: 'Goat rides',
@@ -176,6 +231,8 @@ const MOLE: RideLook = {
 	back: MOLE_BACK,
 	saddle: MOLE_SADDLE,
 	Art: MoleArt,
+	picture: molePicture,
+	shadow: MOLE_OUTLINE,
 	call: 'Squeak!',
 	sound: 'furby',
 	rides: 'Mole rides',
@@ -191,6 +248,8 @@ const GLIDER: RideLook = {
 	back: GLIDER_HEIGHT,
 	saddle: 0,
 	Art: GliderArt,
+	picture: gliderPicture,
+	shadow: GLIDER_SHADOW,
 	call: '',
 	sound: 'whoosh',
 	rides: 'Glider rides',
@@ -206,6 +265,7 @@ const SKIS: RideLook = {
 	back: STOOD_HEIGHT,
 	saddle: 0,
 	Art: () => StoodBoardArt({ board: 1 }),
+	picture: () => stoodBoardPicture(1),
 	call: '',
 	sound: 'whoosh',
 	rides: 'Skis and boards',
@@ -221,6 +281,8 @@ const BLOOD_CELL: RideLook = {
 	back: BLOOD_CELL_BACK,
 	saddle: BLOOD_CELL_SADDLE,
 	Art: BloodCellArt,
+	picture: bloodCellPicture,
+	shadow: BLOOD_CELL_OUTLINE,
 	call: 'Blub!',
 	sound: 'pop',
 	rides: 'Blood cell rides',

@@ -1,6 +1,7 @@
 import type { JSX } from 'solid-js'
 import { paintedArt } from '../../courses/kit/pixelArt'
 import { PixelArt } from '../PixelArt'
+import { inkOutline } from '../paint/picture'
 import type { CorgiPose } from './corgi'
 
 /**
@@ -74,14 +75,11 @@ const ART: Record<CorgiPose, string> = {
 }
 
 /** An ink outline round it, as the corgi has, so it stands out against the artery's red. */
-const OUTLINE: JSX.CSSProperties = {
-	filter: [
-		'drop-shadow(2px 0 0 #3a0a10)',
-		'drop-shadow(-2px 0 0 #3a0a10)',
-		'drop-shadow(0 2px 0 #3a0a10)',
-		'drop-shadow(0 -2px 0 #3a0a10)',
-	].join(' '),
-}
+export const BLOOD_CELL_OUTLINE = inkOutline('#3a0a10')
+const OUTLINE: JSX.CSSProperties = { filter: BLOOD_CELL_OUTLINE.filter }
+
+/** Its picture in `pose`, for a Draw Hook to paint, outlined. */
+export const bloodCellPicture = (pose: CorgiPose) => ART[pose]
 
 export function BloodCellArt(props: { pose: CorgiPose }) {
 	return (

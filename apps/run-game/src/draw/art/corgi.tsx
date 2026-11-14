@@ -3,6 +3,7 @@ import crouch from '../../assets/rides/corgi-crouch.png'
 import leap from '../../assets/rides/corgi-leap.png'
 import sit from '../../assets/rides/corgi-sit.png'
 import { PixelArt } from '../PixelArt'
+import { inkOutline } from '../paint/picture'
 
 /**
  * A corgi, saddled for riding, side on and facing right, in cells twice the
@@ -25,14 +26,11 @@ export const CORGI_HEAD = 24
 const ART: Record<CorgiPose, string> = { sit, crouch, leap }
 
 /** An ink outline round it, so it stands out against Furby Fields. */
-const OUTLINE: JSX.CSSProperties = {
-	filter: [
-		'drop-shadow(2px 0 0 #0f1f29)',
-		'drop-shadow(-2px 0 0 #0f1f29)',
-		'drop-shadow(0 2px 0 #0f1f29)',
-		'drop-shadow(0 -2px 0 #0f1f29)',
-	].join(' '),
-}
+export const CORGI_OUTLINE = inkOutline('#0f1f29')
+const OUTLINE: JSX.CSSProperties = { filter: CORGI_OUTLINE.filter }
+
+/** Its picture in `pose`, for a Draw Hook to paint, outlined. */
+export const corgiPicture = (pose: CorgiPose) => ART[pose]
 
 export function CorgiArt(props: { pose: CorgiPose }) {
 	return (
