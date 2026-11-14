@@ -154,6 +154,7 @@ import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt } from './art/hands'
 import { HatPicture, hatArt, paintHat, paintHatGlow } from './art/hats'
 import { KIDS_HEIGHT, KidsArt, kidsWidth } from './art/kids'
 import { ROADBLOCK, ROADBLOCK_HEIGHT, ROADBLOCK_WIDTH } from './art/roadblock'
+import { Carved, Footing, footingPainter, paintTombstone } from './art/scenery'
 import {
 	GIANT_VENT_HEIGHT,
 	GIANT_VENT_WIDTH,
@@ -222,14 +223,18 @@ import {
 } from './art/track'
 import { frontParapet, frontParapetCaps } from './battlements'
 import { atSea, rideBus, startRide } from './busRide'
-import { cachedArt } from './canvasArt'
+import { cachedArt, svgArt } from './canvasArt'
 import { flyerLook } from './flyerLook'
 import { headTop } from './heads'
+import { paletteOf } from './paint/css'
 import { cssColour } from './paint/cssBackground'
 import { paintFlung } from './paint/dirtFly'
 import { paintHazardStripes } from './paint/hazardStripes'
 import { FONT_PIXEL, FONT_SIGN, fillLine, wrapLines } from './paint/lettering'
 import { mirrored, paintPicture } from './paint/picture'
+import { moveScooped, paintPixelArt } from './paint/pixelArt'
+import type { SvgDrawing } from './paint/svgCanvas'
+import { paintChunks, svgChunks } from './paint/svgChunks'
 import { PlatformArt, platformLook, platformPainter } from './platformArt'
 import { rendererChoice } from './rendererChoice'
 import { rideLook } from './rideLook'
@@ -2605,8 +2610,37 @@ export function createScenery(world: World) {
 		/** Each hopper on its own beat. */
 		const beat = (i * 37) % HOP_EVERY
 		const [lift, setLift] = createSignal(0)
+		/**
+		 * On the canvas: a tombstone with its name, recoloured, name and all,
+		 * as its filter does on the page; and a footing's grass, down past
+		 * its box.
+		 */
+		const draw: ((painting: DrawPainting) => void) | undefined = carved
+			? ({ ctx, image }) => {
+					const loaded = image(asset)
+					if (loaded)
+						paintTombstone(ctx, loaded, {
+							key: `${world.course.id}:${i}`,
+							name: name ?? '',
+							panel: carved,
+							scale,
+							filter,
+						})
+				}
+			: footing
+				? (() => {
+						const paint = footingPainter(groundY, x, () =>
+							paletteOf(world.course.look?.palette)('var(--grass-green)'),
+						)
+						return ({ ctx, drawDefault }) => {
+							drawDefault()
+							paint(ctx, width(), height(), pathTop() - setBack)
+						}
+					})()
+				: undefined
 		return createController({
 			frames: [asset],
+			draw,
 			init: () => ({
 				id: `scenery-${i}`,
 				// A gateway's near side, over whoever's going through it.
@@ -2628,7 +2662,8 @@ export function createScenery(world: World) {
 				width,
 				height,
 				style: () => ({
-					filter,
+					// A tombstone's Draw Hook recolours it itself.
+					filter: carved && rendererChoice.canvas ? undefined : filter,
 					'image-rendering': scale > 1 ? 'pixelated' : undefined,
 					// Stood on the floor, leant with its slope, so both its feet
 					// are on it, uphill and down.
@@ -3101,7 +3136,13 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			const slope = (groundY(to) - groundY(from)) / (to - from)
 			const settle = groundY(o.x) - groundY(o.x + BRANCH_TREE_ALONG)
 			const lie = `translateY(${settle}px) skewY(${Math.atan(slope)}rad)`
+			const foliage = world.course.look?.foliage
+			// The Canvas Renderer can't cut it or filter it from `style`: its
+			// Draw Hooks do both, and keep it pale or grey on WebKit too.
+			const { canvas } = rendererChoice
 			const knocked = () => world.ticks() >= 0 && !!state.scooped
+			const flight = () =>
+				state.scooped ? scoopFlight(state.scooped, world.ticks()) : undefined
 			// Jumping it: its near end's drawn behind you, not over you.
 			const over = () =>
 				world.ticks() >= 0 &&
@@ -3111,10 +3152,12 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				suffix: string
 				type: string
 				src: string
-				clip?: string
+				/** How much of it shows, across: from `left` to `right`. */
+				clip?: { left: number; right: number }
 				shown: () => boolean
-			}) =>
-				createFixture({
+			}) => {
+				const { clip } = options
+				return createFixture({
 					id: `${id}${options.suffix}`,
 					type: options.type,
 					x: o.x + BRANCH_TREE_ALONG,
@@ -3135,16 +3178,41 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							/>
 						</Scoopable>
 					),
+					draw: ({ ctx, image }) => {
+						if (clip) {
+							ctx.beginPath()
+							ctx.rect(clip.left, 0, clip.right - clip.left, BRANCH_TREE_HEIGHT)
+							ctx.clip()
+						}
+						moveScooped(
+							ctx,
+							flight(),
+							BRANCH_CROSS,
+							BRANCH_LINE_ROW - BRANCH_LIMB_HEIGHT,
+						)
+						paintPixelArt(
+							ctx,
+							image,
+							options.src,
+							BRANCH_TREE_WIDTH,
+							BRANCH_TREE_HEIGHT,
+							foliage,
+						)
+					},
 					style: () => ({
-						filter: world.course.look?.foliage,
+						filter: canvas ? undefined : foliage,
 						transform: lie,
 						'transform-origin': `${BRANCH_CROSS}px ${BRANCH_LINE_ROW}px`,
-						'clip-path': options.clip,
+						'clip-path':
+							clip && !canvas
+								? `inset(0 ${BRANCH_TREE_WIDTH - clip.right}px 0 ${clip.left}px)`
+								: undefined,
 						visibility: options.shown() ? 'visible' : 'hidden',
 					}),
 				})
-			const back = `inset(0 0 0 ${BRANCH_CROSS}px)`
-			const near = `inset(0 ${BRANCH_TREE_WIDTH - BRANCH_CROSS}px 0 0)`
+			}
+			const back = { left: BRANCH_CROSS, right: BRANCH_TREE_WIDTH }
+			const near = { left: 0, right: BRANCH_CROSS }
 			return [
 				// The tree, behind the path: behind everyone, the bus too.
 				createFixture({
@@ -3162,8 +3230,17 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							height={BRANCH_TREE_HEIGHT}
 						/>
 					),
+					draw: ({ ctx, image }) =>
+						paintPixelArt(
+							ctx,
+							image,
+							lowBranchTreeAsset,
+							BRANCH_TREE_WIDTH,
+							BRANCH_TREE_HEIGHT,
+							foliage,
+						),
 					style: () => ({
-						filter: world.course.look?.foliage,
+						filter: canvas ? undefined : foliage,
 						transform: lie,
 						'transform-origin': `${BRANCH_CROSS}px ${BRANCH_LINE_ROW}px`,
 					}),
@@ -3215,6 +3292,14 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							height={DUCK_NOTE_HEIGHT}
 						/>
 					),
+					draw: ({ ctx, image }) =>
+						paintPixelArt(
+							ctx,
+							image,
+							duckNote,
+							DUCK_NOTE_WIDTH,
+							DUCK_NOTE_HEIGHT,
+						),
 					style: () => ({
 						visibility: knocked() ? 'hidden' : 'visible',
 					}),
@@ -4208,10 +4293,6 @@ function gravestoneNames() {
 	return names.length ? names : ['Scoop']
 }
 
-/**
- * A name carved in a tombstone's panel, as on the website's tombstone sign:
- * dark, lit along each letter's bottom edge, smaller the longer it is.
- */
 /** The highest the ground gets (the least `groundY`) between `from` and `to`. */
 function highestUnder(
 	groundY: (x: number) => number,
@@ -4221,89 +4302,6 @@ function highestUnder(
 	let highest = groundY(to)
 	for (let at = from; at < to; at += 4) highest = Math.min(highest, groundY(at))
 	return highest
-}
-
-/** How far past either end of it a footing's grass runs on down the slope. */
-const FOOTING_SHOULDER = 60
-/** How far into the verge a footing's grass goes, so no sky shows between them. */
-const FOOTING_OVERLAP = 4
-
-/**
- * The field made up under something wide on a hill, from its foot down to
- * the verge wherever the ground falls away under it, and sloping off past
- * its ends: the Copper Tents, levelled on the top of Haga's hill. In the
- * verge's green, so it's all one field. `base` is its foot, in the world.
- */
-function Footing(props: {
-	groundY: (x: number) => number
-	x: number
-	width: number
-	base: number
-}) {
-	const columns = () => {
-		const { groundY, x, width } = props
-		const base = Math.round(props.base)
-		const rects: string[] = []
-		let deepest = 0
-		for (let at = -FOOTING_SHOULDER; at < width + FOOTING_SHOULDER; at += 2) {
-			const top = at < 0 ? -at / 2 : at > width ? (at - width) / 2 : 0
-			const verge = groundY(x - width / 2 + at + 1) - PATH_BACK - VERGE
-			const bottom = Math.round(verge - base) + FOOTING_OVERLAP
-			if (bottom <= top) continue
-			rects.push(`M${at + FOOTING_SHOULDER} ${Math.round(top)}h2V${bottom}h-2Z`)
-			deepest = Math.max(deepest, bottom)
-		}
-		return { path: rects.join(''), deepest }
-	}
-	return (
-		<svg
-			aria-hidden="true"
-			width={props.width + FOOTING_SHOULDER * 2}
-			height={columns().deepest}
-			shape-rendering="crispEdges"
-			style={{
-				position: 'absolute',
-				left: `${-FOOTING_SHOULDER}px`,
-				top: '100%',
-				'pointer-events': 'none',
-			}}
-		>
-			<path d={columns().path} fill="var(--grass-green)" />
-		</svg>
-	)
-}
-
-function Carved(props: {
-	name: string
-	panel: [number, number, number, number]
-	scale: number
-}) {
-	const [x, y, width, height] = props.panel.map((n) => n * props.scale)
-	const longest = Math.max(...props.name.split(' ').map((w) => w.length))
-	return (
-		<div
-			style={{
-				position: 'absolute',
-				left: `${x}px`,
-				top: `${y}px`,
-				width: `${width}px`,
-				height: `${height}px`,
-				display: 'flex',
-				'align-items': 'center',
-				'justify-content': 'center',
-				'text-align': 'center',
-				color: '#383838',
-				'text-shadow': '0 1px 0 #a6a6a6',
-				'font-family': 'var(--font-pixel)',
-				'font-size': `${longest > 6 ? 9 : longest > 4 ? 11 : 13}px`,
-				'line-height': 0.95,
-				'text-transform': 'uppercase',
-				'overflow-wrap': 'anywhere',
-			}}
-		>
-			{props.name}
-		</div>
-	)
 }
 
 /**
@@ -4604,12 +4602,38 @@ const battlementFills = (
  * long, drawn once.
  */
 export function createForeground(world: World) {
-	const stone = world.course.look?.battlements
+	const look = world.course.look
+	const stone = look?.battlements
 	if (!stone) return []
 	const { terrain } = world
 	const from = DRAWN_FROM
 	const to = terrain.finishX + 1600
 	const width = to - from
+	/** With the Ground's patterns in it, `defs`, for the canvas to read. */
+	const art = (defs?: string) => (
+		<svg
+			width={width}
+			height={VIEW_HEIGHT}
+			viewBox={`0 0 ${width} ${VIEW_HEIGHT}`}
+			shape-rendering="crispEdges"
+			aria-hidden="true"
+			style={{ display: 'block', overflow: 'visible' }}
+		>
+			<Show when={defs}>{(own) => <defs innerHTML={own()} />}</Show>
+			{/* Its fills can be the Ground's patterns: drawn from the
+			    same place, they line up with its own. */}
+			<For each={battlementFills(stone)}>
+				{(fill) => <path d={frontParapet(terrain, from, to, 4)} fill={fill} />}
+			</For>
+			<Show when={stone.cap}>
+				{(cap) => (
+					<path d={frontParapetCaps(terrain, from, to, 4, 2)} fill={cap()} />
+				)}
+			</Show>
+		</svg>
+	)
+	/** On the canvas: read once, then just the bit in view painted. */
+	let drawing: SvgDrawing | undefined
 	return [
 		createController({
 			init: () => ({
@@ -4619,36 +4643,30 @@ export function createForeground(world: World) {
 				y: () => 0,
 				width: () => width,
 				height: () => VIEW_HEIGHT,
-				children: () => (
-					<svg
-						width={width}
-						height={VIEW_HEIGHT}
-						viewBox={`0 0 ${width} ${VIEW_HEIGHT}`}
-						shape-rendering="crispEdges"
-						aria-hidden="true"
-						style={{ display: 'block', overflow: 'visible' }}
-					>
-						{/* Its fills can be the Ground's patterns: drawn from the
-						    same place, they line up with its own. */}
-						<For each={battlementFills(stone)}>
-							{(fill) => (
-								<path d={frontParapet(terrain, from, to, 4)} fill={fill} />
-							)}
-						</For>
-						<Show when={stone.cap}>
-							{(cap) => (
-								<path
-									d={frontParapetCaps(terrain, from, to, 4, 2)}
-									fill={cap()}
-								/>
-							)}
-						</Show>
-					</svg>
-				),
+				children: () => art(),
 			}),
+			draw: ({ ctx, image, $scene }) => {
+				drawing ??= svgChunks(() => art(look.groundDefs), {
+					chunkWidth: FOREGROUND_CHUNK,
+					resolve: paletteOf(look.palette),
+					key: `foreground:${world.course.id}`,
+				})
+				if (!drawing) return
+				const view = $scene.canvas.get()
+				paintChunks(
+					ctx,
+					drawing,
+					view.x() - from,
+					view.x() + view.width() - from,
+					image,
+				)
+			},
 		}),
 	]
 }
+
+/** How wide a bit of the parapet in front is read into at a time, to paint what's in view. */
+const FOREGROUND_CHUNK = 256
 
 /**
  * A guard tower over a wall's walkway, in two halves: its front, the
@@ -4793,7 +4811,8 @@ function createTower(world: World, x: number, i: number) {
 			)}
 		</For>
 	)
-	const svg = (children: JSX.Element) => (
+	/** With the Ground's patterns in it, `defs`, for the canvas to draw it as an image. */
+	const svg = (children: JSX.Element, defs?: string) => (
 		<svg
 			width={width}
 			height={height}
@@ -4802,6 +4821,7 @@ function createTower(world: World, x: number, i: number) {
 			aria-hidden="true"
 			style={{ display: 'block' }}
 		>
+			<Show when={defs}>{(own) => <defs innerHTML={own()} />}</Show>
 			{children}
 		</svg>
 	)
@@ -4811,130 +4831,153 @@ function createTower(world: World, x: number, i: number) {
 		width: () => width,
 		height: () => height,
 	}
+	/**
+	 * On the canvas, its half as an image, painted once and kept: every
+	 * tower on a course is the same, wherever it is.
+	 */
+	const picture =
+		(half: string, art: (defs?: string) => JSX.Element) =>
+		({ ctx, image }: DrawPainting) => {
+			const key = `${half}:${world.course.id}`
+			const loaded = image(
+				svgArt(key, () => art(world.course.look?.groundDefs)),
+			)
+			if (!loaded) return
+			const painted = cachedArt(key, width, height, (c) =>
+				c.drawImage(loaded.image, 0, 0, width, height),
+			)
+			ctx.drawImage(painted, 0, 0, width, height)
+		}
+	const backArt = (defs?: string) =>
+		svg(
+			<>
+				{/* Inside it, through the gateway: dark, down to the
+				    walkway's far edge. Under that, the walkway itself, the
+				    Ground's, going on through it. */}
+				<clipPath id={`tower-side-${i}`}>
+					<path
+						d={`M${[side(0, H), side(1, H)].join(' L')} ${stepped(W + S, W)} Z`}
+					/>
+				</clipPath>
+				<clipPath id={`tower-inside-${i}`}>
+					<rect x={0} y={0} width={width} height={height - depth} />
+				</clipPath>
+				{/* A little over the gateway's edges, so no sky shows round
+				    them, zoomed: the side covers what's over. */}
+				<g clip-path={`url(#tower-inside-${i})`}>
+					<path
+						d={gateway(0, 1)}
+						fill="#3a342c"
+						stroke="#3a342c"
+						stroke-width={2}
+						clip-path={`url(#tower-side-${i})`}
+					/>
+				</g>
+				<For each={sideFills}>
+					{(fill) => (
+						<path
+							d={sidePart(SPLIT - SEAM, 1)}
+							fill={fill}
+							fill-rule="evenodd"
+						/>
+					)}
+				</For>
+				{/* Its roof, going back, behind anyone stood up on it, and
+				    the battlements round its back and sides. */}
+				<polygon
+					points={[nearLeft, farLeft, farRight, nearRight]
+						.map((p) => p.join(','))
+						.join(' ')}
+					fill={stone.roof ?? stone.shade}
+				/>
+				{merlonRects(backMerlons)}
+			</>,
+			defs,
+		)
 	const back = createController({
 		init: () => ({
 			id: `tower-back-${i}`,
 			type: 'tower-back',
 			...at,
-			children: () =>
-				svg(
-					<>
-						{/* Inside it, through the gateway: dark, down to the
-						    walkway's far edge. Under that, the walkway itself, the
-						    Ground's, going on through it. */}
-						<clipPath id={`tower-side-${i}`}>
-							<path
-								d={`M${[side(0, H), side(1, H)].join(' L')} ${stepped(W + S, W)} Z`}
-							/>
-						</clipPath>
-						<clipPath id={`tower-inside-${i}`}>
-							<rect x={0} y={0} width={width} height={height - depth} />
-						</clipPath>
-						{/* A little over the gateway's edges, so no sky shows round
-						    them, zoomed: the side covers what's over. */}
-						<g clip-path={`url(#tower-inside-${i})`}>
-							<path
-								d={gateway(0, 1)}
-								fill="#3a342c"
-								stroke="#3a342c"
-								stroke-width={2}
-								clip-path={`url(#tower-side-${i})`}
-							/>
-						</g>
-						<For each={sideFills}>
-							{(fill) => (
-								<path
-									d={sidePart(SPLIT - SEAM, 1)}
-									fill={fill}
-									fill-rule="evenodd"
-								/>
-							)}
-						</For>
-						{/* Its roof, going back, behind anyone stood up on it, and
-						    the battlements round its back and sides. */}
-						<polygon
-							points={[nearLeft, farLeft, farRight, nearRight]
-								.map((p) => p.join(','))
-								.join(' ')}
-							fill={stone.roof ?? stone.shade}
-						/>
-						{merlonRects(backMerlons)}
-					</>,
-				),
+			children: () => backArt(),
 		}),
+		draw: picture('tower-back', backArt),
 	})
+	const frontArt = (defs?: string) =>
+		svg(
+			<>
+				<For each={sideFills}>
+					{(fill) => (
+						<path d={sidePart(0, SPLIT)} fill={fill} fill-rule="evenodd" />
+					)}
+				</For>
+				{/* The battlements along the front of its roof. */}
+				{merlonRects(frontMerlons)}
+				{/* Its front, in brick, or in courses of stone. */}
+				<For each={frontFills}>
+					{(fill) => (
+						<rect x={0} y={M + depth} width={W} height={H} fill={fill} />
+					)}
+				</For>
+				<Show when={!brick}>
+					<For each={courses}>
+						{(y) => (
+							<rect x={0} y={y} width={W} height={2} fill={stone.shade} />
+						)}
+					</For>
+				</Show>
+				<rect
+					x={0}
+					y={M + depth + 74}
+					width={W}
+					height={6}
+					fill={stone.shade}
+				/>
+				{/* Arrow slits, upstairs and down. */}
+				<For each={[28, 62, 96]}>
+					{(sx) => (
+						<>
+							<rect
+								x={sx}
+								y={M + depth + 26}
+								width={6}
+								height={22}
+								fill="#2b2722"
+							/>
+							<rect
+								x={sx - 2}
+								y={M + depth + 34}
+								width={10}
+								height={4}
+								fill="#2b2722"
+							/>
+						</>
+					)}
+				</For>
+				<For each={[34, 90]}>
+					{(sx) => (
+						<rect
+							x={sx}
+							y={M + depth + 102}
+							width={6}
+							height={20}
+							fill="#2b2722"
+						/>
+					)}
+				</For>
+				{/* The front edge's merlons again, over the front. */}
+				{merlonRects(merlonsAlong(nearLeft, nearRight, 7))}
+			</>,
+			defs,
+		)
 	const front = createController({
 		init: () => ({
 			id: `tower-${i}`,
 			type: 'tower',
 			...at,
-			children: () =>
-				svg(
-					<>
-						<For each={sideFills}>
-							{(fill) => (
-								<path d={sidePart(0, SPLIT)} fill={fill} fill-rule="evenodd" />
-							)}
-						</For>
-						{/* The battlements along the front of its roof. */}
-						{merlonRects(frontMerlons)}
-						{/* Its front, in brick, or in courses of stone. */}
-						<For each={frontFills}>
-							{(fill) => (
-								<rect x={0} y={M + depth} width={W} height={H} fill={fill} />
-							)}
-						</For>
-						<Show when={!brick}>
-							<For each={courses}>
-								{(y) => (
-									<rect x={0} y={y} width={W} height={2} fill={stone.shade} />
-								)}
-							</For>
-						</Show>
-						<rect
-							x={0}
-							y={M + depth + 74}
-							width={W}
-							height={6}
-							fill={stone.shade}
-						/>
-						{/* Arrow slits, upstairs and down. */}
-						<For each={[28, 62, 96]}>
-							{(sx) => (
-								<>
-									<rect
-										x={sx}
-										y={M + depth + 26}
-										width={6}
-										height={22}
-										fill="#2b2722"
-									/>
-									<rect
-										x={sx - 2}
-										y={M + depth + 34}
-										width={10}
-										height={4}
-										fill="#2b2722"
-									/>
-								</>
-							)}
-						</For>
-						<For each={[34, 90]}>
-							{(sx) => (
-								<rect
-									x={sx}
-									y={M + depth + 102}
-									width={6}
-									height={20}
-									fill="#2b2722"
-								/>
-							)}
-						</For>
-						{/* The front edge's merlons again, over the front. */}
-						{merlonRects(merlonsAlong(nearLeft, nearRight, 7))}
-					</>,
-				),
+			children: () => frontArt(),
 		}),
+		draw: picture('tower', frontArt),
 	})
 	return [back, front]
 }
