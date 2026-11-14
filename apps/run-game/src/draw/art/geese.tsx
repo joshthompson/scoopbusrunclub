@@ -7,8 +7,8 @@ import { PixelArt } from '../PixelArt'
 
 /**
  * Geese on the path at Haga, by Brunnsviken: Canada geese, standing about
- * and pecking at the grass, facing whoever's coming. Run into them and they
- * flap off, honking, up and away along the course.
+ * and pecking at the grass, facing whoever's coming. Run up to them and
+ * they flap off, honking, up and away along the course: never in the way.
  */
 
 const CELL = 2
@@ -19,8 +19,6 @@ const GOOSE_WIDTH = COLUMNS * CELL
 const SPACING = 28
 /** How tall they're drawn. */
 export const GEESE_HEIGHT = ROWS * CELL
-/** How tall they are, for running into: their bodies, not their thin necks. */
-export const GEESE_REACH_UP = 24
 
 /** How wide a gaggle of `count` is. */
 export const geeseWidth = (count: number) => (count - 1) * SPACING + GOOSE_WIDTH
@@ -60,43 +58,12 @@ const chance = (x: number, i: number) => {
 }
 
 /**
- * Whether goose `i` of a gaggle is one that flies off when it's first
- * disturbed: the one nearest whoever's coming, and about half the rest.
- * Disturbed again, or by the bus, the rest go too.
+ * When goose `i` takes off, if it has: a moment after they're disturbed,
+ * each a little after the one before, and each its own way.
  */
-const fliesFirst = (x: number, i: number) => i === 0 || chance(x, i) < 0.5
-
-/**
- * When goose `i` takes off, if it has: a moment after it's disturbed, each
- * a little after the one before, and each its own way.
- */
-export function gooseTakeoff(
-	x: number,
-	i: number,
-	flown: number | undefined,
-	flownAll: number | undefined,
-) {
-	const delay = Math.round(i * 5 + chance(x, i + 7) * 10)
-	if (flown !== undefined && fliesFirst(x, i)) return flown + delay
-	if (flownAll !== undefined) return flownAll + delay
-	return undefined
-}
-
-/** Which of a gaggle of `count` at `x` are still on the path, by index: none disturbed yet, or not those. */
-export const geeseLeft = (
-	x: number,
-	count: number,
-	flown: number | undefined,
-	flownAll: number | undefined,
-) =>
-	Array.from({ length: count }, (_, i) => i).filter(
-		(i) => flownAll === undefined && !(flown !== undefined && fliesFirst(x, i)),
-	)
-
-/** Where goose `i` of a gaggle of `count` at `x` stands, side to side. */
-export const gooseSpan = (x: number, count: number, i: number) => {
-	const left = x - geeseWidth(count) / 2 + i * SPACING
-	return { left, right: left + GOOSE_WIDTH }
+export function gooseTakeoff(x: number, i: number, flown: number | undefined) {
+	if (flown === undefined) return undefined
+	return flown + Math.round(i * 3 + chance(x, i + 7) * 6)
 }
 
 /**
@@ -108,7 +75,6 @@ export function GeeseArt(props: {
 	count: number
 	now: number
 	flown: number | undefined
-	flownAll?: number
 	/** A CSS filter over them: grey, for pigeons. */
 	filter?: string
 }) {
@@ -125,7 +91,7 @@ export function GeeseArt(props: {
 				{(i) => {
 					/** When this one took off, if it has yet. */
 					const flownAt = () => {
-						const at = gooseTakeoff(props.x, i, props.flown, props.flownAll)
+						const at = gooseTakeoff(props.x, i, props.flown)
 						return at !== undefined && props.now >= at ? at : undefined
 					}
 					const pose = () => {

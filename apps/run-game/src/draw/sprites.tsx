@@ -122,6 +122,12 @@ import { BusLegs, LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH } from './art/busLegs'
 import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
 import { DRILL_AT, DRILL_HEIGHT, DRILL_POINT, DRILL_WIDTH } from './art/drill'
+import {
+	DUCK_NOTE_HEIGHT,
+	DUCK_NOTE_TAPED,
+	DUCK_NOTE_WIDTH,
+	duckNote,
+} from './art/duckNote'
 import { FikaArt } from './art/fika'
 import { GEESE_HEIGHT, GeeseArt, geeseWidth } from './art/geese'
 import {
@@ -2837,6 +2843,27 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					src: lowBranchLimbAsset,
 					shown: knocked,
 				}),
+				// A note taped on top of its limb, over the path: an arrow,
+				// down. Gone with the limb, once the bus has knocked it off.
+				createFixture({
+					id: `${id}-note`,
+					type: 'hazard',
+					x: o.x,
+					width: DUCK_NOTE_WIDTH,
+					height: DUCK_NOTE_HEIGHT,
+					sink: DUCK_NOTE_TAPED - BRANCH_LIMB_TOP,
+					world,
+					children: () => (
+						<PixelArt
+							src={duckNote}
+							width={DUCK_NOTE_WIDTH}
+							height={DUCK_NOTE_HEIGHT}
+						/>
+					),
+					style: () => ({
+						visibility: knocked() ? 'hidden' : 'visible',
+					}),
+				}),
 			]
 		}
 		case 'hurdle':
@@ -3044,7 +3071,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						count={o.count}
 						now={world.ticks()}
 						flown={world.ticks() >= 0 ? state.flown : undefined}
-						flownAll={world.ticks() >= 0 ? state.flownAll : undefined}
 					/>
 				),
 			})
@@ -3906,6 +3932,8 @@ const BRANCH_CROSS = 70
 const BRANCH_LINE_ROW = 249
 const BRANCH_TREE_ALONG = BRANCH_TREE_WIDTH / 2 - BRANCH_CROSS
 const BRANCH_LIMB_HEIGHT = 50
+/** How high the top of its limb is, where it crosses the line. */
+const BRANCH_LIMB_TOP = 56
 const BRANCH_OVER_REACH = 80
 
 /** How far down into the sea a km sign's buoy floats. */

@@ -1,9 +1,4 @@
-import {
-	GEESE_REACH_UP,
-	geeseLeft,
-	geeseWidth,
-	gooseSpan,
-} from '../draw/art/geese'
+import { geeseWidth } from '../draw/art/geese'
 import { KIDS_REACH_UP, kidsWidth } from '../draw/art/kids'
 import { TOURISTS_HEIGHT, touristsWidth } from '../draw/art/tourists'
 import { TALL_HURDLE_CLEAR, TALL_HURDLE_HEIGHT } from '../draw/art/track'
@@ -203,6 +198,7 @@ export function stepWorld(world: World) {
 		stepFlyers(world)
 		for (const racer of world.racers)
 			if (!isHeld(world, racer)) collide(world, racer)
+		startleGeese(world)
 		if (!busHeld(world)) stepBus(world)
 	}
 	stepHeart(world)
@@ -1207,8 +1203,8 @@ function collide(world: World, racer: Racer) {
 	const riding = b.mount > 0 || b.carried > 0 || b.cart !== undefined
 	/**
 	 * Not yet had its go at them. A rock, a branch, a pothole, mud and the
-	 * children are there for everyone, once each; a hurdle and geese only for
-	 * whoever gets to them first (see `firstTo`). Either way, not
+	 * children are there for everyone, once each; a hurdle only for whoever
+	 * gets to it first (see `firstTo`). Either way, not
 	 * once the bus has been through.
 	 */
 	const freshFor = (state: ObstacleState) =>
@@ -1579,34 +1575,6 @@ function collide(world: World, racer: Racer) {
 				) {
 					hits(state)
 					stumble('Oof!')
-				}
-				break
-			}
-			case 'geese': {
-				// Once each: having run into a flock, the rest of it, flown or
-				// not, doesn't trip them again.
-				if (state.used || b.stumble > 0 || state.hit.has(racer.id)) break
-				// Into the ones still on the path: some of them are off, and into
-				// those left, the rest. Till they're all gone, they're still in
-				// everyone else's way.
-				const left = geeseLeft(o.x, o.count, state.flown, state.flownAll)
-				const into = left.some((i) => {
-					const goose = gooseSpan(o.x, o.count, i)
-					return overlaps(
-						goose.left + 4,
-						goose.right - 4,
-						ground - GEESE_REACH_UP,
-						ground,
-					)
-				})
-				if (into) {
-					hits(state)
-					if (state.flown === undefined) state.flown = world.ticks()
-					else state.flownAll = world.ticks()
-					if (!geeseLeft(o.x, o.count, state.flown, state.flownAll).length)
-						state.used = true
-					play('honk')
-					stumble('Honk!')
 				}
 				break
 			}
@@ -2013,7 +1981,8 @@ function scoop(world: World, racer: Racer, body: Body) {
  * What the bus does to what's in the way as its scoop reaches it. Hurdles it
  * knocks over, left lying on the track; rocks and children playing football
  * it scoops up, flying off like anyone else. Either way they're harmless
- * after. Geese fly off before it gets to them. Potholes, mud and the rest it
+ * after. Geese have flown off before it gets to them (see `startleGeese`).
+ * Potholes, mud and the rest it
  * just drives over. A hurdle here is the
  * runner's lane's; the rest of the row go over as the scoop reaches them
  * (see the hurdle's sprite).
@@ -2065,17 +2034,6 @@ function knockOver(world: World) {
 				play('whoosh')
 			continue
 		}
-		// Geese see it coming, and are off before it gets to them.
-		if (
-			o.kind === 'geese' &&
-			state.flownAll === undefined &&
-			bus.frontX > o.x - geeseWidth(o.count) / 2 - GEESE_SCARE
-		) {
-			state.used = true
-			state.flownAll = world.ticks()
-			const camera = world.camera()
-			if (o.x > camera && o.x < camera + world.viewWidth()) play('honk')
-		}
 		if (state.scooped || bus.frontX < o.x - 14) continue
 		if (o.kind === 'hurdle') state.used = true
 		if (
@@ -2108,8 +2066,37 @@ function knockOver(world: World) {
 	}
 }
 
+/**
+ * Geese on the path, seeing a racer coming, or the bus: they're all off,
+ * honking, up and away, before it gets to them. Never in anyone's way:
+ * nothing to jump, and nothing to trip on. The pack doesn't bother them, so
+ * they're still stood there for whoever's playing.
+ */
+function startleGeese(world: World) {
+	const { bus } = world
+	const running = world.phase() === 'running'
+	for (const state of world.obstacles) {
+		const o = state.obstacle
+		if (o.kind !== 'geese' || state.flown !== undefined) continue
+		const left = o.x - geeseWidth(o.count) / 2
+		const right = o.x + geeseWidth(o.count) / 2
+		/** Coming up to them, or among them, from behind or in front. */
+		const near = (x: number) => x > left - GEESE_STARTLE && x < right
+		const startled =
+			bus.frontX > left - GEESE_SCARE ||
+			(running && world.racers.some((r) => !r.out && near(r.body.x)))
+		if (!startled) continue
+		state.used = true
+		state.flown = world.ticks()
+		const camera = world.camera()
+		if (o.x > camera && o.x < camera + world.viewWidth()) play('honk')
+	}
+}
+
 /** How near the bus gets to geese before they fly off. */
 const GEESE_SCARE = 140
+/** How near a racer gets to geese before they fly off. */
+const GEESE_STARTLE = 70
 
 /** How fast something scooped is flung up, and how fast it spins, in degrees a tick. */
 const SCOOP_FLING = 12

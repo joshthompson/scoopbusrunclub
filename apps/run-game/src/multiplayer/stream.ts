@@ -217,10 +217,7 @@ export function createRaceStream(
 				FLYER_STATES.indexOf(goose.state),
 			]),
 			obstacles: world.obstacles.flatMap((state, i) =>
-				state.used ||
-				state.scooped ||
-				state.flown !== undefined ||
-				state.flownAll !== undefined
+				state.used || state.scooped || state.flown !== undefined
 					? [
 							[
 								i,
@@ -228,13 +225,10 @@ export function createRaceStream(
 								state.flown ?? -1,
 								state.scooped?.at ?? -1,
 								tenth(state.scooped?.vx ?? 0),
-								// Where a Zombie was scooped, and when the rest of a
-								// gaggle took off, if they have.
-								...(state.scooped?.x === undefined &&
-								state.flownAll === undefined
+								// Where a Zombie was scooped, if it was.
+								...(state.scooped?.x === undefined
 									? []
-									: [tenth(state.scooped?.x ?? 0)]),
-								...(state.flownAll === undefined ? [] : [state.flownAll]),
+									: [tenth(state.scooped.x)]),
 							] as RaceFrame['obstacles'][number],
 						]
 					: [],

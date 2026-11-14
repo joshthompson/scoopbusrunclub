@@ -367,17 +367,9 @@ export type CorgiStateFrame = [
 export type FlyerFrame = [number, number, number, number]
 /**
  * [index, used, flown (-1 if not), scooped at (-1 if not), scooped vx,
- * scooped where (a Zombie's), the rest flown (a gaggle's)]
+ * scooped where (a Zombie's)]
  */
-export type ObstacleFrame = [
-	number,
-	number,
-	number,
-	number,
-	number,
-	number?,
-	number?,
-]
+export type ObstacleFrame = [number, number, number, number, number, number?]
 /** [index, used, cheering, cheered] */
 export type BoostFrame = [number, number, number, string]
 

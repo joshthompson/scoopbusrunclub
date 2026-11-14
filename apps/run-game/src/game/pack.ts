@@ -1,5 +1,4 @@
 import type { Course } from '../courses/types'
-import { geeseWidth } from '../draw/art/geese'
 import { kidsWidth } from '../draw/art/kids'
 import { touristsWidth } from '../draw/art/tourists'
 import { guests } from '../runners/guests'
@@ -557,7 +556,7 @@ function duckUnder(world: World, x: number) {
 }
 
 /**
- * A rock, a hurdle, a puddle, a pothole or geese just ahead of `x`. Branches
+ * A rock, a hurdle, a puddle or a pothole just ahead of `x`. Branches
  * and tall hurdles they duck under instead (see `duckUnder`).
  */
 function hopAhead(world: World, x: number) {
@@ -579,19 +578,17 @@ function hopAhead(world: World, x: number) {
 								? o.x - o.width / 2
 								: o.kind === 'kids'
 									? o.x - kidsWidth(o.count) / 2
-									: o.kind === 'geese' && !used
-										? o.x - geeseWidth(o.count) / 2
-										: o.kind === 'tourists' && !state.scooped
-											? o.x - touristsWidth(o.count) / 2
-											: o.kind === 'cyclist' && !state.scooped
-												? cyclistAt(world, { ...state, obstacle: o }).x - 30
-												: // Over Hands under a graveyard, or a Swamp Man coming up out of his sludge.
-													o.kind === 'hands'
-													? o.x - 16
-													: o.kind === 'swampman' &&
-															swampManAt(o.x, world.ticks()).rise > 0
-														? o.x - 20
-														: undefined
+									: o.kind === 'tourists' && !state.scooped
+										? o.x - touristsWidth(o.count) / 2
+										: o.kind === 'cyclist' && !state.scooped
+											? cyclistAt(world, { ...state, obstacle: o }).x - 30
+											: // Over Hands under a graveyard, or a Swamp Man coming up out of his sludge.
+												o.kind === 'hands'
+												? o.x - 16
+												: o.kind === 'swampman' &&
+														swampManAt(o.x, world.ticks()).rise > 0
+													? o.x - 20
+													: undefined
 		return edge !== undefined && edge > x && edge - x < HOP_LOOKAHEAD
 	})
 }

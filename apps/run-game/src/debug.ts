@@ -5,7 +5,8 @@ import { lockAll, unlockUpTo } from './saved/progress'
  * Debug tools, run from the browser's console:
  *
  * - `unlockAll()`: every course unlocked for practice
- * - `lockAll()`: back to only the first
+ * - `lockAll()`: courses locked in this browser, back to only the first,
+ *   each opened by finishing the one before
  */
 declare global {
 	interface Window {
