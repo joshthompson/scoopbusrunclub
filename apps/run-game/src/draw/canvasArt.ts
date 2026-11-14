@@ -31,13 +31,15 @@ let keptPixels = 0
  * The key has to say everything that changes it (its size, its colours, a
  * Frame), since art with a key already kept isn't painted again. Painted at
  * the screen's pixel density, up to 2, so it's as sharp as under the DOM
- * Renderer; keep each one small, a phone has little room for them.
+ * Renderer; keep each one small, a phone has little room for them. Or at
+ * `density`, for art that has no need of so many: art seen zoomed out.
  */
 export function cachedArt(
 	key: string,
 	width: number,
 	height: number,
 	paint: (ctx: CanvasRenderingContext2D) => void,
+	density = screenDensity(),
 ): HTMLCanvasElement {
 	const found = kept.get(key)
 	if (found) {
@@ -46,7 +48,6 @@ export function cachedArt(
 		kept.set(key, found)
 		return found
 	}
-	const density = Math.min(2, Math.max(1, Math.round(devicePixelRatio || 1)))
 	const art = document.createElement('canvas')
 	art.width = Math.max(1, Math.ceil(width * density))
 	art.height = Math.max(1, Math.ceil(height * density))
@@ -67,6 +68,10 @@ export function cachedArt(
 	}
 	return art
 }
+
+/** How many of a canvas's pixels art is painted at, to each of the page's: the screen's, up to 2. */
+export const screenDensity = () =>
+	Math.min(2, Math.max(1, Math.round(devicePixelRatio || 1)))
 
 const svgs = new Map<string, string>()
 

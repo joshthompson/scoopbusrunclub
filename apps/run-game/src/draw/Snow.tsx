@@ -1,7 +1,9 @@
 import type { JSX } from 'solid-js'
 import { svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
+import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import type { World } from '../game/world'
+import { type ImageOf, paintTiled } from './paint/bands'
 
 /**
  * Snow falling, over the whole screen, up a mountain: two layers of flakes,
@@ -29,28 +31,65 @@ const LAYERS = [
 	{ tile: flakes(320, 12, 4, 9), size: 320, fall: 2.2, blow: -1.6, along: 0.9 },
 ]
 
+/** How thick it is, where the camera is: none till `from`, all of it by `full`. */
+const thickness = (
+	world: World,
+	snow: NonNullable<NonNullable<World['course']['look']>['snow']>,
+) =>
+	Math.max(
+		0,
+		Math.min(1, (world.camera() - snow.from) / (snow.full - snow.from)),
+	)
+
+/** Where a layer's tiles are, on the screen. */
+function layerAt(world: World, i: number) {
+	const { size, fall, blow, along } = LAYERS[i]
+	const t = Math.max(0, world.ticks())
+	return {
+		x: Math.round(t * blow - world.camera() * along) % size,
+		y: Math.round(t * fall + world.cameraY() * along) % size,
+	}
+}
+
+/**
+ * The same, painted onto the canvas, over the whole screen: in the
+ * screen's own pixels, from its top left.
+ */
+export function paintSnow(
+	ctx: CanvasRenderingContext2D,
+	image: ImageOf,
+	world: World,
+) {
+	const snow = world.course.look?.snow
+	if (!snow) return
+	const opacity = thickness(world, snow)
+	if (opacity <= 0) return
+	ctx.globalAlpha *= opacity
+	LAYERS.forEach(({ tile }, i) =>
+		paintTiled(
+			ctx,
+			image,
+			tile,
+			{ left: 0, top: 0, width: VIEW_WIDTH, height: VIEW_HEIGHT },
+			{ ...layerAt(world, i), down: true },
+		),
+	)
+}
+
 export function Snow(props: { world: World }) {
 	const snow = props.world.course.look?.snow
 	if (!snow) return null
-	/** How thick it is, where the camera is: none till `from`, all of it by `full`. */
-	const thickness = () =>
-		Math.max(
-			0,
-			Math.min(1, (props.world.camera() - snow.from) / (snow.full - snow.from)),
-		)
 	const layer = (i: number): JSX.CSSProperties => {
-		const { tile, size, fall, blow, along } = LAYERS[i]
-		const t = Math.max(0, props.world.ticks())
-		const x = Math.round(t * blow - props.world.camera() * along) % size
-		const y = Math.round(t * fall + props.world.cameraY() * along) % size
+		const { tile } = LAYERS[i]
+		const { x, y } = layerAt(props.world, i)
 		return {
 			position: 'absolute',
 			inset: 0,
 			'pointer-events': 'none',
 			'background-image': `url("${tile}")`,
 			'background-position': `${x}px ${y}px`,
-			opacity: thickness(),
-			visibility: thickness() > 0 ? 'visible' : 'hidden',
+			opacity: thickness(props.world, snow),
+			visibility: thickness(props.world, snow) > 0 ? 'visible' : 'hidden',
 		}
 	}
 	return (
