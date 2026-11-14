@@ -8,6 +8,7 @@ import rockAsset from '@/assets/misc/rock1.png'
 import { type RunnerName, runners, strideFrameInterval } from '@/data/runners'
 import { imageSize } from '@/utils/imageSize'
 import {
+	type DrawPainting,
 	createConnectedController,
 	createController,
 	createObjectSignal,
@@ -115,7 +116,7 @@ import { MEMBERS } from '../runners/playable'
 import { zombieSprite } from '../runners/skeleton'
 import { play } from '../sfx'
 import { WallBricks } from './Backdrop'
-import { Bubble } from './Bubble'
+import { Bubble, paintBubble } from './Bubble'
 import { PixelArt } from './PixelArt'
 import { Pixels } from './Pixels'
 import { BusLegs, LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH } from './art/busLegs'
@@ -138,7 +139,7 @@ import {
 } from './art/giantFurby'
 import { BUS_GLIDER_HEIGHT, BUS_GLIDER_WIDTH, busGlider } from './art/glider'
 import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt } from './art/hands'
-import { HatPicture, hatArt } from './art/hats'
+import { HatPicture, hatArt, paintHat, paintHatGlow } from './art/hats'
 import { KIDS_HEIGHT, KidsArt, kidsWidth } from './art/kids'
 import { ROADBLOCK, ROADBLOCK_HEIGHT, ROADBLOCK_WIDTH } from './art/roadblock'
 import {
@@ -159,6 +160,9 @@ import {
 	STOOD_WIDTH,
 	StoodBoardArt,
 	UNDER_LIFT,
+	goingFor,
+	paintBoardUnder,
+	stoodBoardPicture,
 } from './art/skis'
 import {
 	BalloonArt,
@@ -204,6 +208,7 @@ import { frontParapet, frontParapetCaps } from './battlements'
 import { atSea, rideBus, startRide } from './busRide'
 import { flyerLook } from './flyerLook'
 import { headTop } from './heads'
+import { mirrored, paintPicture } from './paint/picture'
 import { PlatformArt, platformLook } from './platformArt'
 import { rideLook } from './rideLook'
 
@@ -328,6 +333,9 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const [shown, setShown] = createSignal<string>()
 	/** Floating down in a propeller beanie: its propeller whirring. */
 	const [floating, setFloating] = createSignal(false)
+	/** How long snow's been spraying off their board, and sparks flying, as it's painted. */
+	const sprayFor = goingFor()
+	const sparksFor = goingFor()
 	/** The hat they've on, if any. `body` isn't a signal: reading the tick keeps this up to date. */
 	const hat = createMemo(
 		() => (world.ticks() >= 0 ? body.hat : undefined),
@@ -411,6 +419,39 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 					</>
 				),
 			}
+		},
+		// The same, on the canvas, over them: their skis or snowboard, and
+		// their hat.
+		draw({ ctx, drawDefault, image, $, $currentFrame }) {
+			drawDefault()
+			const width = $.width()
+			const height = $.height()
+			const now = world.ticks()
+			const on = board()
+			const spraying = sprayFor(!!on && spray(), now)
+			const sparking = sparksFor(!!on && sparks(), now)
+			if (on)
+				paintBoardUnder(ctx, image, {
+					board: on,
+					width,
+					height,
+					spray: spraying,
+					sparks: sparking,
+				})
+			const worn = hat()
+			if (!worn) return
+			const frames = $.frames?.() ?? []
+			const frame = frames[$currentFrame] ?? frames[0]
+			const head = frame ? headTop(frame, width, height) : undefined
+			const art = hatArt(worn)
+			paintHat(
+				ctx,
+				image,
+				worn,
+				(head?.x ?? width / 2) - art.middle,
+				(head?.y ?? 2) - art.crown,
+				{ lit: true, whirring: floating(), now },
+			)
 		},
 		onEnterFrame({ $, $currentFrame }) {
 			const { body } = racer
@@ -727,6 +768,9 @@ function createPacer(world: World, p: Pacer) {
 	let air = 0
 	const [spray, setSpray] = createSignal(false)
 	const [sparks, setSparks] = createSignal(false)
+	/** How long snow's been spraying off their board, and sparks flying, as it's painted. */
+	const sprayFor = goingFor()
+	const sparksFor = goingFor()
 	const { sea } = world.course
 	return createController({
 		frames: [
@@ -777,6 +821,22 @@ function createPacer(world: World, p: Pacer) {
 				</Show>
 			),
 		}),
+		// The same, on the canvas, under their feet.
+		draw({ ctx, drawDefault, image, $ }) {
+			drawDefault()
+			const on = board()
+			const now = world.ticks()
+			const spraying = sprayFor(!!on && spray(), now)
+			const sparking = sparksFor(!!on && sparks(), now)
+			if (on)
+				paintBoardUnder(ctx, image, {
+					board: on,
+					width: $.width(),
+					height: $.height(),
+					spray: spraying,
+					sparks: sparking,
+				})
+		},
 		onEnterFrame({ $ }) {
 			$.setX(p.x - $.width() / 2)
 			$.setY(p.feetY - $.height() - (p.board ? UNDER_LIFT : 0))
@@ -891,6 +951,8 @@ function createFlyer(world: World, goose: Flyer) {
 		width: FLYING_GOOSE_WIDTH,
 		height: FLYING_GOOSE_HEIGHT,
 		Art,
+		picture,
+		mirrored: turned,
 	} = flyerLook(world.course)
 	return createController({
 		init: () => ({
@@ -908,6 +970,24 @@ function createFlyer(world: World, goose: Flyer) {
 				/>
 			),
 		}),
+		draw({ ctx, image }) {
+			const src = picture(
+				world.ticks() + goose.id * 3,
+				goose.state === 'carrying',
+			)
+			const paint = () =>
+				paintPicture(
+					ctx,
+					image,
+					src,
+					0,
+					0,
+					FLYING_GOOSE_WIDTH,
+					FLYING_GOOSE_HEIGHT,
+				)
+			if (turned) mirrored(ctx, FLYING_GOOSE_WIDTH, paint)
+			else paint()
+		},
 		onEnterFrame({ $ }) {
 			$.setX(goose.x - FLYING_GOOSE_WIDTH / 2)
 			$.setY(goose.feetY - FLYING_GOOSE_HEIGHT)
@@ -1103,7 +1183,7 @@ export function createCorgis(world: World) {
  * no one on it, off and away.
  */
 function createGlider(world: World, c: Corgi) {
-	const { width, height, Art } = rideLook(world.course)
+	const { width, height, Art, picture, shadow } = rideLook(world.course)
 	/** Where it was last tick, for which way it's going, and how far it's tipped. */
 	let was = c.feetY
 	let tilt = 0
@@ -1119,6 +1199,9 @@ function createGlider(world: World, c: Corgi) {
 			...createObjectSignal(0, 'rotation'),
 			children: () => <Art pose="sit" />,
 		}),
+		draw({ ctx, image }) {
+			paintPicture(ctx, image, picture('sit'), 0, 0, width, height, shadow)
+		},
 		onEnterFrame({ $ }) {
 			$.setX(c.x - width / 2)
 			$.setY(c.feetY - height)
@@ -1151,6 +1234,17 @@ function createStoodBoard(world: World, c: Corgi) {
 			...createObjectSignal({} as JSX.CSSProperties, 'style'),
 			children: () => <StoodBoardArt board={c.id + 1} />,
 		}),
+		draw({ ctx, image }) {
+			paintPicture(
+				ctx,
+				image,
+				stoodBoardPicture(c.id + 1),
+				0,
+				0,
+				STOOD_WIDTH,
+				STOOD_HEIGHT,
+			)
+		},
 		onEnterFrame({ $ }) {
 			$.setX(c.x - STOOD_WIDTH / 2)
 			$.setY(c.feetY - STOOD_HEIGHT + 4)
@@ -1164,12 +1258,8 @@ function createStoodBoard(world: World, c: Corgi) {
 }
 
 function createCorgi(world: World, c: Corgi) {
-	const {
-		width: CORGI_WIDTH,
-		height: CORGI_HEIGHT,
-		Art,
-		call,
-	} = rideLook(world.course)
+	const ride = rideLook(world.course)
+	const { width: CORGI_WIDTH, height: CORGI_HEIGHT, Art, call } = ride
 	const { rare: rarer } = rideLook(world.course)
 	const [pose, setPose] = createSignal<CorgiPose>('sit')
 	const [facing, setFacing] = createSignal<1 | -1>(c.facing)
@@ -1203,6 +1293,26 @@ function createCorgi(world: World, c: Corgi) {
 				</>
 			),
 		}),
+		// The same, on the canvas.
+		draw({ ctx, image }) {
+			const look = (rare() && rarer) || ride
+			paintPicture(
+				ctx,
+				image,
+				look.picture(pose()),
+				0,
+				0,
+				CORGI_WIDTH,
+				CORGI_HEIGHT,
+				look.shadow,
+			)
+			if (barking())
+				paintBubble(ctx, call, {
+					width: CORGI_WIDTH,
+					size: 16,
+					mirrored: facing() === -1,
+				})
+		},
 		onEnterFrame({ $ }) {
 			$.setX(c.x - CORGI_WIDTH / 2)
 			$.setY(c.feetY - CORGI_HEIGHT)
@@ -2137,6 +2247,8 @@ function createFixture(options: {
 	world: World
 	frames?: string[]
 	children?: () => JSX.Element
+	/** Its Draw Hook, painting it on the canvas in place of `children`. */
+	draw?: (painting: DrawPainting) => void
 	style?: () => JSX.CSSProperties
 	/** Pixels up from where it would stand, every tick. */
 	lift?: (age: number) => number
@@ -2147,6 +2259,7 @@ function createFixture(options: {
 	const top = ground - options.height + (options.sink ?? 0)
 	return createController({
 		frames: options.frames,
+		draw: options.draw,
 		init: () => ({
 			id: options.id,
 			type: options.type,
@@ -3461,6 +3574,10 @@ export function createBoost(world: World, state: BoostState, i: number) {
 						<HatPicture hat={{ kind: o.hat }} />
 					</>
 				),
+				draw: ({ ctx, image }) => {
+					paintHatGlow(ctx, art.width, art.height)
+					paintHat(ctx, image, { kind: o.hat }, 0, 0, { now: world.ticks() })
+				},
 				// Picked up: gone, onto someone's head.
 				style: () => ({
 					visibility: world.ticks() >= 0 && state.used ? 'hidden' : 'visible',
@@ -3650,6 +3767,10 @@ export function createHats(world: World) {
 					<Show when={flying()}>{(hat) => <HatPicture hat={hat()} />}</Show>
 				),
 			}),
+			draw({ ctx, image }) {
+				const hat = flying()
+				if (hat) paintHat(ctx, image, hat, 0, 0, { now: world.ticks() })
+			},
 			onEnterFrame({ $ }) {
 				const { body } = racer
 				const lost = body.lostHat

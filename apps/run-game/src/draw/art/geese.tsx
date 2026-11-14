@@ -143,13 +143,19 @@ export function GeeseArt(props: {
 export const FLYING_GOOSE_WIDTH = GOOSE_WIDTH
 export const FLYING_GOOSE_HEIGHT = FLYING_HEIGHT
 
+/**
+ * A goose flying, `now` ticks in, as it's drawn: flapping, faster carrying
+ * someone. Facing left: turned round to fly on along the course.
+ */
+export const flyingGoosePicture = (now: number, carrying: boolean) =>
+	Math.floor(now / (carrying ? 4 : 6)) % 2 ? wingsDown : wingsUp
+
 /** A goose flying on along the course, flapping: faster, carrying someone. */
 export function FlyingGooseArt(props: { now: number; carrying: boolean }) {
-	const beat = () => (props.carrying ? 4 : 6)
 	return (
 		<div style={{ transform: 'scaleX(-1)' }}>
 			<PixelArt
-				src={Math.floor(props.now / beat()) % 2 ? wingsDown : wingsUp}
+				src={flyingGoosePicture(props.now, props.carrying)}
 				width={FLYING_GOOSE_WIDTH}
 				height={FLYING_GOOSE_HEIGHT}
 			/>

@@ -1,7 +1,10 @@
+import type { DrawPainting } from 'scoopjs'
 import { For, type JSX, Show } from 'solid-js'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
 import { type Board, boardOf } from '../../game/boards'
+import { TICK_MS } from '../../game/constants'
 import { PixelArt } from '../PixelArt'
+import { paintPicture } from '../paint/picture'
 
 /**
  * The Slopes' skis and snowboards, in cells twice the size of a screen
@@ -96,17 +99,25 @@ function stood(board: Board) {
 
 const stoodArt = new Map<number, string>()
 
+/** The picture of the rack's `board` stood up in the snow, painted the first time it's wanted. */
+export function stoodBoardPicture(board: number) {
+	let art = stoodArt.get(board)
+	if (!art) {
+		art = stood(boardOf(board))
+		stoodArt.set(board, art)
+	}
+	return art
+}
+
 /** A pair of skis, or a snowboard, stood up in the snow at the top, the rack's `board`. */
 export function StoodBoardArt(props: { board: number }) {
-	const src = () => {
-		let art = stoodArt.get(props.board)
-		if (!art) {
-			art = stood(boardOf(props.board))
-			stoodArt.set(props.board, art)
-		}
-		return art
-	}
-	return <PixelArt src={src()} width={STOOD_WIDTH} height={STOOD_HEIGHT} />
+	return (
+		<PixelArt
+			src={stoodBoardPicture(props.board)}
+			width={STOOD_WIDTH}
+			height={STOOD_HEIGHT}
+		/>
+	)
 }
 
 // --- Under a rider, side on ---------------------------------------------------
@@ -165,6 +176,20 @@ function under(board: Board) {
 
 const underArt = new Map<number, string>()
 
+/** The picture of `board`'s skis or snowboard under a rider, painted the first time it's wanted. */
+function underPicture(board: number) {
+	let art = underArt.get(board)
+	if (!art) {
+		art = under(boardOf(board))
+		underArt.set(board, art)
+	}
+	return art
+}
+
+/** How wide `board`'s skis or snowboard are drawn, under a rider. */
+const underWidth = (board: number) =>
+	(boardOf(board).kind === 'skis' ? SKI_COLUMNS : BOARD_COLUMNS) * CELL
+
 /**
  * Whoever's riding `board`'s skis or snowboard, under their feet, side on,
  * its tips to the left: their sprite's flipped to face right, and it with
@@ -177,17 +202,8 @@ export function BoardUnder(props: {
 	spray: boolean
 	sparks: boolean
 }) {
-	const board = () => boardOf(props.board)
-	const columns = () => (board().kind === 'skis' ? SKI_COLUMNS : BOARD_COLUMNS)
-	const src = () => {
-		let art = underArt.get(props.board)
-		if (!art) {
-			art = under(board())
-			underArt.set(props.board, art)
-		}
-		return art
-	}
-	const width = () => columns() * CELL
+	const src = () => underPicture(props.board)
+	const width = () => underWidth(props.board)
 	return (
 		<div
 			style={{
@@ -242,6 +258,102 @@ function Bits(props: { colours: string[]; from: number }) {
 			)}
 		</For>
 	)
+}
+
+/** How long a bit takes to fly, in seconds, and how many steps it's drawn in, there and on. */
+const BIT_FLIES = 0.35
+const BIT_STEPS = 6
+
+/**
+ * `Bits`, in a Draw Hook: each where its `dirt-fly` animation has it,
+ * `seconds` since they started flying, flung from `from` along a box at
+ * `top`. The animation steps through each half of its keyframes, there
+ * and on, in 6 steps: out half way, fully there; then on, fading.
+ */
+export function paintBits(
+	ctx: CanvasRenderingContext2D,
+	colours: string[],
+	from: number,
+	top: number,
+	seconds: number,
+) {
+	BITS.forEach((bit, i) => {
+		const since = seconds - bit.delay
+		let x = 0
+		let y = 0
+		let opacity = 1
+		// Waiting its turn, not yet started: where it starts.
+		if (since >= 0) {
+			const round = (since % BIT_FLIES) / BIT_FLIES
+			const half = round < 0.5 ? round * 2 : round * 2 - 1
+			const step = Math.floor(half * BIT_STEPS) / BIT_STEPS
+			if (round < 0.5) {
+				x = bit.x * 0.5 * step
+				y = bit.y * 0.85 * step
+			} else {
+				x = bit.x * (0.5 + 0.5 * step)
+				y = bit.y * (0.85 + 0.15 * step)
+				opacity = 1 - step
+			}
+		}
+		if (opacity <= 0) return
+		ctx.globalAlpha *= opacity
+		ctx.fillStyle = colours[i % colours.length]
+		ctx.fillRect(from + x, top + 2 + y, 4, 4)
+		ctx.globalAlpha /= opacity
+	})
+}
+
+/**
+ * How long something's been going, in seconds, from the ticks: since it
+ * was last seen to start, as a CSS animation starts as it's shown. Told
+ * whether it's on every time it's drawn; undefined while it's off.
+ */
+export function goingFor() {
+	let since: number | undefined
+	return (on: boolean, ticks: number) => {
+		if (!on) {
+			since = undefined
+			return undefined
+		}
+		since ??= ticks
+		return ((ticks - since) * TICK_MS) / 1000
+	}
+}
+
+/**
+ * `BoardUnder`, in a Draw Hook: under the feet of a rider whose box is
+ * `width` by `height`. Snow sprayed off it, `spray` seconds since it
+ * started, if it is, and sparks off a rail, `sparks` seconds since.
+ */
+export function paintBoardUnder(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	props: {
+		board: number
+		width: number
+		height: number
+		spray?: number
+		sparks?: number
+	},
+) {
+	const width = underWidth(props.board)
+	const left = (props.width - width) / 2
+	// Its plank's top at their feet.
+	const top = props.height - PLANK_DOWN
+	paintPicture(
+		ctx,
+		image,
+		underPicture(props.board),
+		left,
+		top,
+		width,
+		UNDER_HEIGHT,
+	)
+	if (props.spray !== undefined)
+		paintBits(ctx, SPRAY, left + width - 4, top, props.spray)
+	if (props.sparks !== undefined)
+		paintBits(ctx, SPARKS, left + width / 2, top, props.sparks)
 }
 
 // --- The bus's ----------------------------------------------------------------
