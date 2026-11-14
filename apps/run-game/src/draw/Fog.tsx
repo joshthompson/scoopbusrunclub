@@ -1,8 +1,10 @@
 import { For, type JSX, Show } from 'solid-js'
 import { svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
-import { VIEW_HEIGHT } from '../game/constants'
+import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import type { World } from '../game/world'
+import { type ImageOf, paintTiled } from './paint/bands'
+import { inLayer } from './paint/layer'
 
 /**
  * Fog, settled in, high up a mountain: wisps of mist drifting over
@@ -119,22 +121,126 @@ function deckTile(width: number, depth: number, seed: number) {
 	)
 }
 
+type FogLook = NonNullable<NonNullable<World['course']['look']>['fog']>
+type DeckLook = NonNullable<FogLook['deck']>
+
+/** How thick it is, where the camera is: none till `from`, all of it by `full`, gone again by `gone`. */
+function thickness(world: World, fog: FogLook) {
+	const x = world.camera()
+	const rise = (x - fog.from) / (fog.full - fog.from)
+	const fall = (fog.gone - x) / (fog.gone - fog.clear)
+	return Math.max(0, Math.min(1, rise, fall))
+}
+
+/** Where a layer's tiles are, on the screen. */
+function layerAt(world: World, i: number) {
+	const { width, height, drift, along } = LAYERS[i]
+	const t = Math.max(0, world.ticks())
+	return {
+		x: Math.round(t * drift - world.camera() * along) % width,
+		y: Math.round(-world.cameraY() * along * 0.5) % height,
+	}
+}
+
+/**
+ * A layer of the mist, far (0) or near (1), painted onto the canvas over
+ * the whole screen: in the screen's own pixels, from its top left.
+ */
+export function paintFog(
+	ctx: CanvasRenderingContext2D,
+	image: ImageOf,
+	world: World,
+	i: number,
+) {
+	const fog = world.course.look?.fog
+	if (!fog) return
+	const opacity = thickness(world, fog)
+	if (opacity <= 0) return
+	ctx.globalAlpha *= opacity
+	paintTiled(
+		ctx,
+		image,
+		LAYERS[i].tile,
+		{ left: 0, top: 0, width: VIEW_WIDTH, height: VIEW_HEIGHT },
+		{ ...layerAt(world, i), down: true },
+	)
+}
+
+/** The bank of cloud's two tiles, as images' URLs: made once each. */
+export const deckTiles = (deck: DeckLook) => [
+	deckTile(DECK_TILE, deck.depth, 81),
+	deckTile(DECK_TILE, deck.depth + 20, 83),
+]
+
+/**
+ * Where the bank of cloud is drawn, in the world, at the camera's `zoom`:
+ * its top, less `PUFF`, and how wide and deep, its second tile and all.
+ */
+export const deckBox = (deck: DeckLook, zoom: number) => ({
+	top: deck.top - PUFF,
+	width: deck.to - deck.from,
+	height: deck.depth + PUFF * 2 + 20 + 10 * zoom,
+})
+
+/**
+ * The bank of cloud, painted onto the canvas, in the world: from its left
+ * end, and its top (less `PUFF`), at the camera's `zoom`. Only `left` to
+ * `right` of it, what's in view.
+ */
+export function paintFogDeck(
+	ctx: CanvasRenderingContext2D,
+	image: ImageOf,
+	world: World,
+	deck: DeckLook,
+	tiles: string[],
+	view: { left: number; right: number },
+) {
+	const width = deck.to - deck.from
+	const left = Math.max(0, view.left)
+	const right = Math.min(width, view.right)
+	if (right <= left) return
+	tiles.forEach((tile, i) => {
+		const draw = (c: CanvasRenderingContext2D) =>
+			paintTiled(
+				c,
+				image,
+				tile,
+				{
+					left,
+					top: i * 10 * world.zoom(),
+					width: right - left,
+					height: deck.depth + PUFF * 2 + 20,
+				},
+				{
+					x: Math.round(Math.max(0, world.ticks()) * (i ? -0.3 : 0.2)) - left,
+				},
+			)
+		const opacity = i ? 0.9 : 1
+		// Wisping away at its near end, not cut off.
+		if (left >= DECK_FADE) {
+			ctx.save()
+			ctx.globalAlpha *= opacity
+			draw(ctx)
+			ctx.restore()
+			return
+		}
+		inLayer(ctx, opacity, draw, (c) => {
+			const fade = c.createLinearGradient(0, 0, DECK_FADE, 0)
+			fade.addColorStop(0, 'rgba(0, 0, 0, 0)')
+			fade.addColorStop(1, 'black')
+			c.fillStyle = fade
+			c.fillRect(0, -PUFF, width, deck.depth + PUFF * 4 + 40)
+		})
+	})
+}
+
 export function Fog(props: { world: World }) {
 	const fog = props.world.course.look?.fog
 	if (!fog) return null
 	const { world } = props
-	/** How thick it is, where the camera is: none till `from`, all of it by `full`, gone again by `gone`. */
-	const thickness = () => {
-		const x = world.camera()
-		const rise = (x - fog.from) / (fog.full - fog.from)
-		const fall = (fog.gone - x) / (fog.gone - fog.clear)
-		return Math.max(0, Math.min(1, rise, fall))
-	}
 	const layer = (i: number): JSX.CSSProperties => {
-		const { tile, width, height, drift, along } = LAYERS[i]
-		const t = Math.max(0, world.ticks())
-		const x = Math.round(t * drift - world.camera() * along) % width
-		const y = Math.round(-world.cameraY() * along * 0.5) % height
+		const { tile } = LAYERS[i]
+		const { x, y } = layerAt(world, i)
 		return {
 			position: 'absolute',
 			inset: 0,
@@ -142,8 +248,8 @@ export function Fog(props: { world: World }) {
 			'background-image': `url("${tile}")`,
 			'background-position': `${x}px ${y}px`,
 			'image-rendering': 'pixelated',
-			opacity: thickness(),
-			visibility: thickness() > 0 ? 'visible' : 'hidden',
+			opacity: thickness(world, fog),
+			visibility: thickness(world, fog) > 0 ? 'visible' : 'hidden',
 		}
 	}
 	return (
@@ -162,17 +268,9 @@ const DECK_TILE = 600
 /** How far in from its near end it takes to thicken, from nothing. */
 const DECK_FADE = 320
 
-function Deck(props: {
-	world: World
-	deck: NonNullable<
-		NonNullable<NonNullable<World['course']['look']>['fog']>['deck']
-	>
-}) {
+function Deck(props: { world: World; deck: DeckLook }) {
 	const { world, deck } = props
-	const tiles = [
-		deckTile(DECK_TILE, deck.depth, 81),
-		deckTile(DECK_TILE, deck.depth + 20, 83),
-	]
+	const tiles = deckTiles(deck)
 	/** Where it is on the screen, with the camera's zoom and how far up it's looking. */
 	const at = () => {
 		const zoom = world.zoom()

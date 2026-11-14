@@ -23,6 +23,12 @@ import { FrameMeter } from './FrameMeter'
 import { createLongJump } from './LongJump'
 import { SeaFront } from './Sea'
 import { Snow } from './Snow'
+import {
+	BEHIND_TYPES,
+	OVER_TYPES,
+	createBackdrop,
+	createWeather,
+} from './backdropControllers'
 import { createFootballSprite } from './football'
 import { createGiantMouth } from './giantMouth'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
@@ -76,6 +82,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 		skipChildren: rendererChoice.skipChildren,
 		// Front to back.
 		assetOrder: [
+			// Snow and fog over everything, under the Canvas Renderer.
+			...OVER_TYPES,
 			// Counting everyone down, at the front, always in sight.
 			'run-director',
 			// Guard towers over a wall's walkway, and its parapet along the
@@ -135,6 +143,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			'bus-bore',
 			'platform',
 			'scenery',
+			// The Ground and the Backdrop behind it all, under the Canvas Renderer.
+			...BEHIND_TYPES,
 		],
 		setup(scene) {
 			scene.addController(
@@ -184,6 +194,12 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 					.reverse()
 					.map((racer) => createPlayer(world, racer)),
 			)
+			// Painted on the canvas, rather than page elements round it.
+			if (rendererChoice.canvas)
+				scene.addController(
+					...createBackdrop(world, scene),
+					...createWeather(world, scene),
+				)
 		},
 	})
 	// The engine scrolls the sprites' layer by the canvas's x. To a whole
@@ -284,12 +300,15 @@ export function RaceCanvas(props: {
 									background: 'transparent',
 								}
 					}
+					// On the canvas itself, under the Canvas Renderer.
 					underlay={
-						<InScene world={props.world}>
-							<Backdrop world={props.world} />
-							<HorizonTrees world={props.world} />
-							<Ground world={props.world} />
-						</InScene>
+						rendererChoice.canvas ? undefined : (
+							<>
+								<Backdrop world={props.world} />
+								<HorizonTrees world={props.world} />
+								<Ground world={props.world} />
+							</>
+						)
 					}
 					// A Cave's rock over everyone in it, till someone racing goes in;
 					// the sea's waves over everyone in it.
@@ -313,10 +332,13 @@ export function RaceCanvas(props: {
 			<Show when={(portal()?.flash ?? 0) > 0}>
 				<div style={{ ...styles.flash, opacity: portal()?.flash }} />
 			</Show>
-			{/* Snow falling up a mountain, over the whole screen. */}
-			<Snow world={props.world} />
-			{/* Fog settled in, high up a mountain, and a bank of cloud to fall through. */}
-			<Fog world={props.world} />
+			{/* Snow falling up a mountain, over the whole screen; fog settled
+			    in, high up a mountain, and a bank of cloud to fall through. On
+			    the canvas itself, under the Canvas Renderer. */}
+			<Show when={!rendererChoice.canvas}>
+				<Snow world={props.world} />
+				<Fog world={props.world} />
+			</Show>
 			{/* Paused, or between Rounds: the whole screen shaded, not just the
 			    canvas, which goes with the camera (see `styles.css`). */}
 			<Show when={props.scene.modal.get()}>

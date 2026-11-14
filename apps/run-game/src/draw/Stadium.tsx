@@ -12,6 +12,7 @@ import {
 import { PATH_BACK, PX_PER_M, START_X, VERGE } from '../game/constants'
 import type { View } from './Backdrop'
 import { LANE_LINES, TRACK_INSIDE } from './art/track'
+import { type ImageOf, paintTiled } from './paint/bands'
 
 /**
  * A stadium behind the track, for Kristineberg: the grandstand, white with its
@@ -153,6 +154,72 @@ export function StadiumBackdrop(props: { world: View }) {
 			</div>
 		</>
 	)
+}
+
+/**
+ * The same, painted onto the canvas, in the backdrop's own coordinates,
+ * `width` across and `height` down: see `createBackdropPainter`.
+ */
+export function paintStadiumBackdrop(
+	ctx: CanvasRenderingContext2D,
+	image: ImageOf,
+	world: View,
+	width: number,
+	height: number,
+) {
+	const { terrain } = world
+	const camera = world.camera()
+	const scroll = (parallax: number) => Math.round(-camera * parallax)
+	const apronTop = APRON_TOP(terrain.groundY(START_X))
+	const band = (src: string, top: number, h: number, parallax: number) =>
+		paintTiled(
+			ctx,
+			image,
+			src,
+			{ left: 0, top, width, height: h },
+			{ x: scroll(parallax) },
+		)
+	band(
+		skyline,
+		apronTop - 40 - SKYLINE_HEIGHT,
+		SKYLINE_HEIGHT,
+		SKYLINE_PARALLAX,
+	)
+	band(flats, apronTop - 36 - CITY_HEIGHT, CITY_HEIGHT, CITY_PARALLAX)
+	band(
+		treeline,
+		apronTop - 40 - TREELINE_HEIGHT,
+		TREELINE_HEIGHT,
+		TREES_PARALLAX,
+	)
+	band(masts, 40, MAST_HEIGHT, MAST_PARALLAX)
+	// A grass bank between the flats and the track.
+	ctx.fillStyle = '#7aa957'
+	ctx.fillRect(0, apronTop - 44, width, height - (apronTop - 44))
+	band(railing, apronTop - RAIL_HEIGHT, RAIL_HEIGHT, 1)
+	// The grandstands, one a lap, right behind the track: only those in view.
+	const left = Math.round(-camera)
+	const first = Math.max(
+		0,
+		Math.floor((camera - FIRST_STAND - STAND_WIDTH) / LAP),
+	)
+	for (
+		let x = FIRST_STAND + first * LAP;
+		x < terrain.finishX + 1600 && x + left < width;
+		x += LAP
+	)
+		paintTiled(
+			ctx,
+			image,
+			grandstand,
+			{
+				left: x + left,
+				top: apronTop - STAND_HEIGHT,
+				width: STAND_WIDTH,
+				height: STAND_HEIGHT,
+			},
+			{ x: 0, down: true },
+		)
 }
 
 /** The ground's layers for a running track, as offsets from the line everyone runs along. */
