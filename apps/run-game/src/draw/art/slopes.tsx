@@ -183,6 +183,65 @@ export function GateArt(props: { colour: 'red' | 'blue'; flapping: boolean }) {
 	)
 }
 
+/**
+ * How `gate-flap` (in `styles.css`) has the flag, `ms` into it: skewed and
+ * squashed, from its left middle. It steps, three to each half of it.
+ */
+function gateFlap(ms: number): { skew: number; squash: number } {
+	const at = (ms % 250) / 250
+	const second = at >= 0.5
+	const step = Math.floor(((at % 0.5) / 0.5) * 3) / 3
+	return second
+		? { skew: -14 + 22 * step, squash: 0.86 + 0.09 * step }
+		: { skew: -14 * step, squash: 1 - 0.14 * step }
+}
+
+/**
+ * `GateArt`, painted in a Draw Hook, from (0, 0) of `ctx`; its flag
+ * flapping, if it's `flapping` ms into it.
+ */
+export function paintGate(
+	ctx: CanvasRenderingContext2D,
+	colour: 'red' | 'blue',
+	flapping?: number,
+) {
+	const fill = colour === 'red' ? '#d8342c' : '#2459c4'
+	const width = GATE_WIDTH - GATE_POLE_WIDTH * 2
+	ctx.save()
+	if (flapping !== undefined) {
+		const { skew, squash } = gateFlap(flapping)
+		const middle = FLAG_TOP + FLAG_HEIGHT / 2
+		ctx.translate(GATE_POLE_WIDTH, middle)
+		ctx.transform(1, 0, Math.tan((skew * Math.PI) / 180), 1, 0, 0)
+		ctx.scale(1, squash)
+		ctx.translate(-GATE_POLE_WIDTH, -middle)
+	}
+	// Its colour, a white band across the middle of the inside of its
+	// border, and its border, darkening what's under it.
+	ctx.fillStyle = fill
+	ctx.fillRect(GATE_POLE_WIDTH, FLAG_TOP, width, FLAG_HEIGHT)
+	const inside = FLAG_HEIGHT - 4
+	ctx.fillStyle = 'white'
+	ctx.fillRect(
+		GATE_POLE_WIDTH,
+		FLAG_TOP + 2 + inside * 0.36,
+		width,
+		inside * 0.28,
+	)
+	ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'
+	ctx.fillRect(GATE_POLE_WIDTH, FLAG_TOP, width, 2)
+	ctx.fillRect(GATE_POLE_WIDTH, FLAG_TOP + FLAG_HEIGHT - 2, width, 2)
+	ctx.fillRect(GATE_POLE_WIDTH, FLAG_TOP + 2, 2, FLAG_HEIGHT - 4)
+	ctx.fillRect(GATE_POLE_WIDTH + width - 2, FLAG_TOP + 2, 2, FLAG_HEIGHT - 4)
+	ctx.restore()
+	for (const left of [0, GATE_WIDTH - GATE_POLE_WIDTH]) {
+		ctx.fillStyle = fill
+		ctx.fillRect(left, 0, GATE_POLE_WIDTH, GATE_HEIGHT)
+		ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'
+		ctx.fillRect(left, 0, 1, GATE_HEIGHT)
+	}
+}
+
 // --- Rails, boxes and logs --------------------------------------------------------
 
 /** How far apart a rail's legs are, down to the snow. */
