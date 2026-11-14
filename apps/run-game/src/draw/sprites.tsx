@@ -28,7 +28,6 @@ import cyclist1Asset from '../assets/obstacles/cyclist-1.png'
 import cyclist2Asset from '../assets/obstacles/cyclist-2.png'
 import lowBranchLimbAsset from '../assets/obstacles/low-branch-limb.png'
 import lowBranchTreeAsset from '../assets/obstacles/low-branch-tree.png'
-import mudAsset from '../assets/obstacles/mud.png'
 import mummyAsset from '../assets/obstacles/mummy.png'
 import steamVentAsset from '../assets/obstacles/steam-vent.png'
 import ventAsset from '../assets/rooftop/vent.png'
@@ -152,7 +151,8 @@ import {
 import { BUS_GLIDER_HEIGHT, BUS_GLIDER_WIDTH, busGlider } from './art/glider'
 import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt } from './art/hands'
 import { HatPicture, hatArt, paintHat, paintHatGlow } from './art/hats'
-import { KIDS_HEIGHT, KidsArt, kidsWidth } from './art/kids'
+import { KIDS_HEIGHT, KidsArt, kidsPainter, kidsWidth } from './art/kids'
+import { MudArt, paintMud } from './art/mud'
 import { ROADBLOCK, ROADBLOCK_HEIGHT, ROADBLOCK_WIDTH } from './art/roadblock'
 import {
 	GIANT_VENT_HEIGHT,
@@ -197,6 +197,7 @@ import {
 	SNOWMAN_WIDTH,
 	SnowmanArt,
 	paintGate,
+	paintSnowman,
 	railPainter,
 } from './art/slopes'
 import {
@@ -210,6 +211,7 @@ import {
 	TOURISTS_DEPTH_ROOM,
 	TOURISTS_HEIGHT,
 	TouristsArt,
+	touristsPainter,
 	touristsWidth,
 } from './art/tourists'
 import {
@@ -219,12 +221,16 @@ import {
 	POTHOLE_HEIGHT,
 	PotholeArt,
 	hurdleSize,
+	hurdleTipping,
+	paintHurdle,
+	paintPothole,
 } from './art/track'
 import { frontParapet, frontParapetCaps } from './battlements'
 import { atSea, rideBus, startRide } from './busRide'
 import { cachedArt } from './canvasArt'
 import { flyerLook } from './flyerLook'
 import { headTop } from './heads'
+import { filtered } from './paint/css'
 import { cssColour } from './paint/cssBackground'
 import { paintFlung } from './paint/dirtFly'
 import { paintHazardStripes } from './paint/hazardStripes'
@@ -233,6 +239,7 @@ import { mirrored, paintPicture } from './paint/picture'
 import { PlatformArt, platformLook, platformPainter } from './platformArt'
 import { rendererChoice } from './rendererChoice'
 import { rideLook } from './rideLook'
+import { createScoopable } from './scoopable'
 
 /**
  * Everything in the game is drawn by one of these: engine controllers, the
@@ -3027,18 +3034,22 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							.indexOf(state) % own.length
 					]
 				: undefined
-			return createFixture({
+			const width = art?.width ?? 56
+			const height = art?.height ?? 29
+			const src = art?.asset ?? rockAsset
+			return createScoopable({
 				id,
 				type: 'hazard',
 				x: o.x,
 				sink: 3,
-				width: art?.width ?? 56,
-				height: art?.height ?? 29,
+				width,
+				height,
 				world,
+				state,
 				children: () => (
 					<Scoopable world={world} state={state}>
 						<img
-							src={art?.asset ?? rockAsset}
+							src={src}
 							alt=""
 							class={art ? 'pixelated' : undefined}
 							width={art?.width}
@@ -3047,6 +3058,23 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						/>
 					</Scoopable>
 				),
+				draw: ({ ctx, image }) => {
+					const loaded = image(src)
+					if (!loaded) return
+					// Recoloured as the course has its rocks, at its own size, unless
+					// the course's own says.
+					const rock = filtered(src, loaded, world.course.look?.rock)
+					const across = (art?.width ?? rock.width) / rock.width
+					const down = (art?.height ?? rock.height) / rock.height
+					ctx.scale(across, down)
+					ctx.drawImage(
+						rock.art,
+						-rock.pad,
+						-rock.pad,
+						rock.width + rock.pad * 2,
+						rock.height + rock.pad * 2,
+					)
+				},
 			})
 		}
 		case 'cone': {
@@ -3057,7 +3085,13 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				world.ticks() >= 0 && state.used && !state.scooped
 					? world.ticks() - (state.flown ?? world.ticks())
 					: undefined
-			return createFixture({
+			const tipped = (since: number) => {
+				const tip = Math.min(1, since / CONE_TIPS)
+				const skid = Math.min(1, since / CONE_SKIDS)
+				const slid = CONE_SKID * (1 - (1 - skid) ** 2)
+				return { slid: Math.round(slid), turn: Math.round(90 * tip) }
+			}
+			return createScoopable({
 				id,
 				type: 'hazard',
 				x: o.x,
@@ -3066,6 +3100,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: CONE_WIDTH,
 				height: CONE_HEIGHT,
 				world,
+				state,
 				children: () => (
 					<Scoopable world={world} state={state}>
 						<img
@@ -3080,15 +3115,24 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 								transform: (() => {
 									const since = knocked()
 									if (since === undefined) return undefined
-									const tip = Math.min(1, since / CONE_TIPS)
-									const skid = Math.min(1, since / CONE_SKIDS)
-									const slid = CONE_SKID * (1 - (1 - skid) ** 2)
-									return `translateX(${Math.round(slid)}px) rotate(${Math.round(90 * tip)}deg)`
+									const { slid, turn } = tipped(since)
+									return `translateX(${slid}px) rotate(${turn}deg)`
 								})(),
 							}}
 						/>
 					</Scoopable>
 				),
+				draw: ({ ctx, image }) => {
+					const since = knocked()
+					if (since !== undefined) {
+						// Over its bottom right corner, as its `transform-origin` says.
+						const { slid, turn } = tipped(since)
+						ctx.translate(CONE_WIDTH + slid, CONE_HEIGHT)
+						ctx.rotate((turn * Math.PI) / 180)
+						ctx.translate(-CONE_WIDTH, -CONE_HEIGHT)
+					}
+					paintPicture(ctx, image, cone, 0, 0, CONE_WIDTH, CONE_HEIGHT)
+				},
 			})
 		}
 		case 'branch': {
@@ -3223,8 +3267,18 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 		}
 		case 'hurdle':
 			// One in each lane, across the track. Only the runner's own is run into.
-			return HURDLE_LANES.map((lane, n) =>
-				createFixture({
+			return HURDLE_LANES.map((lane, n) => {
+				// Knocked over: the runner's own once run into, or flattened by
+				// the bus (which sets `used` too), and every other lane's as the
+				// bus's scoop reaches it. Neither's a signal: reading the tick
+				// keeps it up to date.
+				const knocked = () =>
+					world.ticks() >= 0 &&
+					(lane.running
+						? state.used
+						: world.bus.frontX >= o.x + lane.along - 14)
+				const tipping = hurdleTipping()
+				return createFixture({
 					id: `${id}-${n}`,
 					type: lane.front ? 'hazard-front' : 'hazard',
 					x: o.x + lane.along,
@@ -3232,35 +3286,39 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					...hurdleSize(lane.depth, o.tall),
 					world,
 					children: () => <HurdleArt depth={lane.depth} tall={o.tall} />,
-					// Knocked over: the runner's own once run into, or flattened by
-					// the bus (which sets `used` too), and every other lane's as the
-					// bus's scoop reaches it. Neither's a signal: reading the tick
-					// keeps it up to date.
-					style: () => ({
-						'--knocked':
-							world.ticks() >= 0 &&
-							(lane.running
-								? state.used
-								: world.bus.frontX >= o.x + lane.along - 14)
-								? 1
-								: 0,
-					}),
-				}),
-			)
-		case 'kids':
-			return createFixture({
+					draw: ({ ctx }) =>
+						paintHurdle(
+							ctx,
+							lane.depth,
+							o.tall ?? false,
+							tipping(knocked(), world.ticks()),
+						),
+					style: rendererChoice.canvas
+						? undefined
+						: () => ({ '--knocked': knocked() ? 1 : 0 }),
+				})
+			})
+		case 'kids': {
+			const width = kidsWidth(o.count)
+			const paintKids = rendererChoice.canvas ? kidsPainter(o.count) : undefined
+			return createScoopable({
 				id,
 				type: 'hazard',
 				x: o.x,
-				width: kidsWidth(o.count),
+				width,
 				height: KIDS_HEIGHT,
 				world,
+				state,
 				children: () => (
 					<Scoopable world={world} state={state}>
 						<KidsArt count={o.count} />
 					</Scoopable>
 				),
+				draw: ({ ctx }) => {
+					paintKids?.(ctx, (Math.max(0, world.ticks()) * TICK_MS) / 1000)
+				},
 			})
+		}
 		case 'vent':
 			return createFixture({
 				id,
@@ -3373,25 +3431,34 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				Math.round(groundY(o.x + along) - groundY(o.x))
 			// Nearer, down the path, if the course has them so.
 			const nearer = world.course.look?.touristsNearer ?? 0
-			return createFixture({
+			const width = touristsWidth(o.count)
+			const height = TOURISTS_HEIGHT + TOURISTS_DEPTH_ROOM
+			const paintTourists = rendererChoice.canvas
+				? touristsPainter(o.x, o.count, drop)
+				: undefined
+			return createScoopable({
 				id,
 				type: 'hazard',
 				x: o.x,
-				width: touristsWidth(o.count),
-				height: TOURISTS_HEIGHT + TOURISTS_DEPTH_ROOM,
+				width,
+				height,
 				sink: TOURISTS_DEPTH_ROOM - nearer,
 				world,
+				state,
 				children: () => (
 					<Scoopable world={world} state={state}>
 						<TouristsArt x={o.x} count={o.count} drop={drop} />
 					</Scoopable>
 				),
+				draw: ({ ctx, image }) => {
+					paintTourists?.(ctx, image)
+				},
 			})
 		}
 		case 'cyclist':
 			return createCyclist(world, state, o, id)
 		case 'tombstone':
-			return createFixture({
+			return createScoopable({
 				id,
 				type: 'hazard',
 				x: o.x,
@@ -3399,11 +3466,23 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: 40,
 				height: 67,
 				world,
+				state,
 				children: () => (
 					<Scoopable world={world} state={state}>
 						<img src={tombstoneAsset} alt="" style={{ display: 'block' }} />
 					</Scoopable>
 				),
+				draw: ({ ctx, image }) => {
+					const tombstone = image(tombstoneAsset)
+					if (!tombstone) return
+					ctx.drawImage(
+						tombstone.image,
+						0,
+						0,
+						tombstone.width,
+						tombstone.height,
+					)
+				},
 			})
 		case 'zombie':
 			return createZombie(world, state, o, id)
@@ -3442,6 +3521,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				children: () => (
 					<PotholeArt width={o.width} look={world.course.look?.pothole} />
 				),
+				draw: ({ ctx }) =>
+					paintPothole(ctx, o.width, world.course.look?.pothole),
 			})
 		case 'mud':
 			return createFixture({
@@ -3453,7 +3534,13 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				world,
 				sink: 20,
 				children: () => <MudArt world={world} obstacle={o} />,
-				style: () => ({ filter: world.course.look?.mud }),
+				// Recoloured as it's painted on the canvas, as WebKit's can't
+				// filter what a Draw Hook paints.
+				draw: ({ ctx, image }) =>
+					paintMud(ctx, image, world, o, world.course.look?.mud),
+				style: rendererChoice.canvas
+					? undefined
+					: () => ({ filter: world.course.look?.mud }),
 			})
 		case 'gulls':
 		case 'balloon':
@@ -3506,8 +3593,12 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					)
 				},
 			})
-		case 'snowman':
-			return createFixture({
+		case 'snowman': {
+			const burst = () =>
+				world.ticks() >= 0 && state.flown !== undefined
+					? world.ticks() - state.flown
+					: undefined
+			return createScoopable({
 				id,
 				type: 'hazard',
 				x: o.x,
@@ -3515,20 +3606,19 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				width: SNOWMAN_WIDTH,
 				height: SNOWMAN_DRAWN,
 				world,
+				state,
 				// Burst, flying apart, then a heap. Neither's a signal: reading
 				// the tick keeps it up to date.
 				children: () => (
 					<Scoopable world={world} state={state}>
-						<SnowmanArt
-							since={
-								world.ticks() >= 0 && state.flown !== undefined
-									? world.ticks() - state.flown
-									: undefined
-							}
-						/>
+						<SnowmanArt since={burst()} />
 					</Scoopable>
 				),
+				draw: ({ ctx, image }) => {
+					paintSnowman(ctx, image, burst())
+				},
 			})
+		}
 	}
 }
 
@@ -3913,72 +4003,6 @@ export function createBoost(world: World, state: BoostState, i: number) {
  * the back of the path (the art's foot, 258, is the middle of it), so the
  * runner goes past it, not through it.
  */
-
-/** A puddle of mud, following the ground under it. */
-/**
- * Mud's art, `assets/obstacles/mud.png`: its left end, a middle that repeats,
- * and its right end, side by side, in cells twice the size of a screen pixel.
- */
-const MUD_CAP = 24
-const MUD_TILE = 32
-const MUD_ART_HEIGHT = 28
-
-/**
- * A muddy puddle across the path: its art, a column 4 px wide at a time,
- * each on the Ground under it, so the puddle lies along the slope. Its
- * ends, and as much of its middle as it takes between them. Drawn onto one
- * canvas, so it's scaled as one picture, without seams between the columns.
- */
-function MudArt(props: {
-	world: World
-	obstacle: Extract<Obstacle, { kind: 'mud' }>
-}) {
-	const { obstacle: o, world } = props
-	const width = Math.max(2 * MUD_CAP, Math.round(o.width / 4) * 4)
-	const left = o.x - width / 2
-	const top = world.terrain.groundY(o.x) - 20
-	const canvas = (
-		<canvas
-			width={width}
-			height={40 + MUD_ART_HEIGHT}
-			style={{
-				display: 'block',
-				'margin-top': `${-MUD_ART_HEIGHT / 2}px`,
-				'image-rendering': 'pixelated',
-			}}
-		/>
-	) as HTMLCanvasElement
-	const art = new Image()
-	art.onload = () => {
-		const context = canvas.getContext('2d')
-		if (!context) return
-		context.imageSmoothingEnabled = false
-		for (let x = 0; x < width; x += 4) {
-			const from =
-				x < MUD_CAP
-					? x
-					: x >= width - MUD_CAP
-						? MUD_CAP + MUD_TILE + x - (width - MUD_CAP)
-						: MUD_CAP + ((x - MUD_CAP) % MUD_TILE)
-			// Its middle row on the Ground's line, the canvas starting half the art higher.
-			const ground = Math.round(world.terrain.groundY(left + x + 2) - top)
-			// The art's in cells of 2 px: half as many of its own pixels.
-			context.drawImage(
-				art,
-				from / 2,
-				0,
-				2,
-				MUD_ART_HEIGHT / 2,
-				x,
-				ground,
-				4,
-				MUD_ART_HEIGHT,
-			)
-		}
-	}
-	art.src = mudAsset
-	return canvas
-}
 
 const PUMPKINS = [
 	pumpkin1Asset,

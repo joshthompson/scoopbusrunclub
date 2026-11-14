@@ -4,7 +4,7 @@
  */
 
 /** A CSS `cubic-bezier()` timing function, as a function of progress. */
-function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
+export function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
 	const at = (a: number, b: number, t: number) =>
 		3 * a * (1 - t) ** 2 * t + 3 * b * (1 - t) * t ** 2 + t ** 3
 	return (x: number) => {
