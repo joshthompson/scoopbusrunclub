@@ -1,3 +1,4 @@
+import type { DrawPainting } from 'scoopjs'
 import { For, type JSX, Show, createMemo } from 'solid-js'
 import {
 	type PixelRect,
@@ -18,6 +19,8 @@ import {
 	TURBINE_BLADE,
 } from '../../game/sky'
 import { PixelArt } from '../PixelArt'
+import { paintPicture } from '../paint/picture'
+import { paintPixelArt } from '../paint/pixelArt'
 
 /**
  * The Cliff's sky, drawn: gulls, hot-air balloons, Storm Clouds, wind
@@ -121,15 +124,35 @@ function balloon([a, b]: string[]) {
 	return pixelArt(COLUMNS, BALLOON_HEIGHT / 2, cells)
 }
 const BALLOONS = BALLOON_COLOURS.map(balloon)
+/** A balloon's picture, its colours picked by `x`, so each along the way is its own. */
+const balloonPicture = (x: number) =>
+	BALLOONS[Math.floor(x / 97) % BALLOONS.length]
 
-/** A balloon, its colours picked by `x`, so each along the way is its own. */
+/** A balloon, its colours picked by `x`. */
 export function BalloonArt(props: { x: number }) {
 	return (
 		<PixelArt
-			src={BALLOONS[Math.floor(props.x / 97) % BALLOONS.length]}
+			src={balloonPicture(props.x)}
 			width={BALLOON_WIDTH}
 			height={BALLOON_HEIGHT}
 		/>
+	)
+}
+
+/** `BalloonArt`, painted in a Draw Hook, from (0, 0) of `ctx`. */
+export function paintBalloon(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	x: number,
+) {
+	paintPicture(
+		ctx,
+		image,
+		balloonPicture(x),
+		0,
+		0,
+		BALLOON_WIDTH,
+		BALLOON_HEIGHT,
 	)
 }
 
@@ -176,29 +199,44 @@ const STORM = (() => {
 	return pixelArt(w, h, cells)
 })()
 
-/** A bolt's zigzag, down from the cloud, `height` long. */
-function bolt(height: number) {
-	const points: string[] = []
+/** A bolt's zigzag, down from the cloud, `height` long: its points. */
+function boltPoints(height: number) {
+	const points: [number, number][] = []
 	const steps = Math.max(3, Math.round(height / 36))
 	for (let i = 0; i <= steps; i++)
-		points.push(
-			`${i === steps ? 0 : (i % 2 ? 1 : -1) * 9},${(i / steps) * height}`,
-		)
-	return points.join(' ')
+		points.push([i === steps ? 0 : (i % 2 ? 1 : -1) * 9, (i / steps) * height])
+	return points
 }
+
+/** A bolt's zigzag, as an SVG `polyline`'s points. */
+const bolt = (height: number) =>
+	boltPoints(height)
+		.map(([x, y]) => `${x},${y}`)
+		.join(' ')
+
+/** What a Storm Cloud's doing, `now`, and how far down to the sea its bolt goes. */
+interface Storming {
+	brewing: boolean
+	striking: boolean
+	now: number
+	reach: number
+}
+
+/** Whether it's lit up: striking, or now and then while brewing a strike. */
+const flickering = (storm: Storming) =>
+	storm.striking || (storm.brewing && Math.floor(storm.now / 4) % 3 === 0)
+
+/** The cloud, lit up. */
+const FLICKER = 'brightness(1.8)'
+/** Its bolt's glow: a `drop-shadow` on it. */
+const BOLT_GLOW = '#fff6a8'
 
 /**
  * A Storm Cloud, and, striking, its bolt down to the sea `reach` below its
  * bottom. Brewing a strike, it flickers.
  */
-export function StormArt(props: {
-	brewing: boolean
-	striking: boolean
-	now: number
-	reach: number
-}) {
-	const flicker = () =>
-		props.striking || (props.brewing && Math.floor(props.now / 4) % 3 === 0)
+export function StormArt(props: Storming) {
+	const flicker = () => flickering(props)
 	return (
 		<div style={{ position: 'relative', width: `${STORM_WIDTH}px` }}>
 			<Show when={props.striking}>
@@ -210,7 +248,7 @@ export function StormArt(props: {
 						position: 'absolute',
 						left: `${STORM_WIDTH / 2 - 20}px`,
 						top: `${STORM_HEIGHT - 10}px`,
-						filter: 'drop-shadow(0 0 6px #fff6a8)',
+						filter: `drop-shadow(0 0 6px ${BOLT_GLOW})`,
 						overflow: 'visible',
 					}}
 					aria-hidden="true"
@@ -218,7 +256,7 @@ export function StormArt(props: {
 					<polyline
 						points={bolt(props.reach)}
 						fill="none"
-						stroke="#fff6a8"
+						stroke={BOLT_GLOW}
 						stroke-width={6}
 						stroke-linejoin="bevel"
 					/>
@@ -234,12 +272,53 @@ export function StormArt(props: {
 			<div
 				style={{
 					position: 'relative',
-					filter: flicker() ? 'brightness(1.8)' : undefined,
+					filter: flicker() ? FLICKER : undefined,
 				}}
 			>
 				<PixelArt src={STORM} width={STORM_WIDTH} height={STORM_HEIGHT} />
 			</div>
 		</div>
+	)
+}
+
+/**
+ * `StormArt`, painted in a Draw Hook, from (0, 0) of `ctx`: its bolt, then
+ * the cloud over it, lit up through the same `brightness` as on the page.
+ */
+export function paintStorm(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	storm: Storming,
+) {
+	if (storm.striking) {
+		ctx.save()
+		ctx.translate(STORM_WIDTH / 2, STORM_HEIGHT - 10)
+		ctx.beginPath()
+		for (const [x, y] of boltPoints(storm.reach)) ctx.lineTo(x, y)
+		ctx.lineJoin = 'bevel'
+		// Its glow, as `drop-shadow(0 0 6px)`, cast by the wide stroke alone,
+		// which the thin one's inside of. A canvas's shadow blurs half as far
+		// for the same length, and isn't scaled by its transform, so it's
+		// doubled and scaled here.
+		const m = ctx.getTransform()
+		ctx.shadowColor = BOLT_GLOW
+		ctx.shadowBlur = 12 * Math.sqrt(Math.abs(m.a * m.d - m.b * m.c))
+		ctx.strokeStyle = BOLT_GLOW
+		ctx.lineWidth = 6
+		ctx.stroke()
+		ctx.shadowColor = 'transparent'
+		ctx.strokeStyle = '#ffffff'
+		ctx.lineWidth = 2
+		ctx.stroke()
+		ctx.restore()
+	}
+	paintPixelArt(
+		ctx,
+		image,
+		STORM,
+		STORM_WIDTH,
+		STORM_HEIGHT,
+		flickering(storm) ? FLICKER : undefined,
 	)
 }
 
@@ -327,11 +406,16 @@ function bladesAt(angle: number) {
 	return drawn
 }
 
+/** Each height of tower, drawn once. */
+const TOWERS = new Map<number, { lit: string; shade: string }>()
+
 /**
  * A turbine's tower, `tall`, as pixels: tapering out down to the sea, its
  * right side in shade.
  */
 function towerPath(tall: number) {
+	const cached = TOWERS.get(tall)
+	if (cached) return cached
 	const lit: [number, number, number][] = []
 	const shade: [number, number, number][] = []
 	for (let y = 2; y < tall / TURBINE_CELL; y++) {
@@ -341,7 +425,52 @@ function towerPath(tall: number) {
 		lit.push([-half, y, half * 2 - shaded])
 		shade.push([half - shaded, y, shaded])
 	}
-	return { lit: cellPath(lit), shade: cellPath(shade) }
+	const drawn = { lit: cellPath(lit), shade: cellPath(shade) }
+	TOWERS.set(tall, drawn)
+	return drawn
+}
+
+/** A turbine's paths, made once each, to fill on the canvas. */
+const PATHS = new Map<string, Path2D>()
+const path2D = (d: string) => {
+	let path = PATHS.get(d)
+	if (!path) {
+		path = new Path2D(d)
+		PATHS.set(d, path)
+	}
+	return path
+}
+
+/**
+ * `TurbineArt`, painted in a Draw Hook, from (0, 0) of `ctx`, its hub at
+ * (`TURBINE_BLADE + 4`, `TURBINE_BLADE + 4`), as the SVG has it.
+ */
+export function paintTurbine(
+	ctx: CanvasRenderingContext2D,
+	angles: number[],
+	tall: number,
+) {
+	const c = TURBINE_BLADE + 4
+	const tower = towerPath(tall)
+	const blades = bladesAt(angles[0] ?? 0)
+	ctx.save()
+	ctx.translate(c, c)
+	const fill = (d: string, colour: string) => {
+		ctx.fillStyle = colour
+		ctx.fill(path2D(d))
+	}
+	fill(tower.lit, TURBINE_WHITE)
+	fill(tower.shade, TURBINE_SHADE)
+	ctx.fillStyle = TURBINE_SHADE
+	ctx.fillRect(-4, -8, 18, 12)
+	fill(blades.white, TURBINE_WHITE)
+	fill(blades.shade, TURBINE_SHADE)
+	fill(blades.tip, BLADE_TIP)
+	ctx.fillStyle = TURBINE_WHITE
+	ctx.fillRect(-6, -6, 12, 12)
+	ctx.fillStyle = TURBINE_SHADE
+	ctx.fillRect(-6, 4, 12, 2)
+	ctx.restore()
 }
 
 /**
@@ -411,20 +540,42 @@ const WHALE = pixelArt(WHALE_WIDTH / 2, WHALE_HEIGHT / 2, [
 	[12, 6, 10, 1, '#5d7d9f'],
 ])
 
-/**
- * A whale, `up` of the way surfaced, its spout `spout` of the way up to
- * `height`; bubbles, `bubbling`, just before it blows. Its middle is the
- * drawing's middle, at the sea's surface `height` down.
- */
-export function WhaleArt(props: {
+/** What a whale's doing, `now`, and how high its spout goes, to the sea's surface. */
+interface Whaling {
 	up: number
 	spout: number
 	bubbling: boolean
 	height: number
 	now: number
-}) {
-	const blowhole = WHALE_WIDTH / 2 + BLOWHOLE
-	const spoutTop = () => props.height * (1 - props.spout)
+}
+
+/** Where its blowhole is, across the drawing. */
+const BLOWHOLE_X = WHALE_WIDTH / 2 + BLOWHOLE
+const SPOUT_TOP = 'rgba(255,255,255,0.95)'
+const SPOUT_FOOT = 'rgba(190,225,245,0.85)'
+/** The spray off the spout's top, each this far either side of it. */
+const SPRAY = [-22, -12, 0, 12, 22]
+const SPRAY_COLOUR = 'rgba(240,250,255,0.9)'
+const BUBBLE_COLOUR = 'rgba(255,255,255,0.8)'
+
+/** How far down the drawing its spout's top is. */
+const spoutTop = (whale: Whaling) => whale.height * (1 - whale.spout)
+/** Where the `i`th bit of spray, `dx` across, has fallen to, bobbing as it goes. */
+const sprayTop = (whale: Whaling, dx: number, i: number) =>
+	spoutTop(whale) + Math.abs(dx) * 0.6 + ((whale.now / 3 + i * 2) % 6)
+/** Where the `i`th bubble's got to, coming up, over and over. */
+const bubbleLeft = (i: number) => BLOWHOLE_X - 4 + (i - 1) * 8
+const bubbleTop = (whale: Whaling, i: number) =>
+	whale.height + 8 - ((whale.now + i * 7) % 20)
+/** Its top, down under the surface till it's come up. */
+const whaleTop = (whale: Whaling) => whale.height - 14 + (1 - whale.up) * 34
+
+/**
+ * A whale, `up` of the way surfaced, its spout `spout` of the way up to
+ * `height`; bubbles, `bubbling`, just before it blows. Its middle is the
+ * drawing's middle, at the sea's surface `height` down.
+ */
+export function WhaleArt(props: Whaling) {
 	return (
 		<div
 			style={{
@@ -437,25 +588,24 @@ export function WhaleArt(props: {
 				<div
 					style={{
 						position: 'absolute',
-						left: `${blowhole - 8}px`,
-						top: `${spoutTop() + 10}px`,
+						left: `${BLOWHOLE_X - 8}px`,
+						top: `${spoutTop(props) + 10}px`,
 						width: '16px',
 						bottom: `${WHALE_HEIGHT - 10}px`,
-						background:
-							'linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(190,225,245,0.85))',
+						background: `linear-gradient(to bottom, ${SPOUT_TOP}, ${SPOUT_FOOT})`,
 					}}
 				/>
 				{/* Its top, splaying out, and the spray falling off it. */}
-				<For each={[-22, -12, 0, 12, 22]}>
+				<For each={SPRAY}>
 					{(dx, i) => (
 						<div
 							style={{
 								position: 'absolute',
-								left: `${blowhole + dx - 6}px`,
-								top: `${spoutTop() + Math.abs(dx) * 0.6 + ((props.now / 3 + i() * 2) % 6)}px`,
+								left: `${BLOWHOLE_X + dx - 6}px`,
+								top: `${sprayTop(props, dx, i())}px`,
 								width: '12px',
 								height: '12px',
-								background: 'rgba(240,250,255,0.9)',
+								background: SPRAY_COLOUR,
 							}}
 						/>
 					)}
@@ -467,11 +617,11 @@ export function WhaleArt(props: {
 						<div
 							style={{
 								position: 'absolute',
-								left: `${blowhole - 4 + (i - 1) * 8}px`,
-								top: `${props.height + 8 - ((props.now + i * 7) % 20)}px`,
+								left: `${bubbleLeft(i)}px`,
+								top: `${bubbleTop(props, i)}px`,
 								width: '4px',
 								height: '4px',
-								background: 'rgba(255,255,255,0.8)',
+								background: BUBBLE_COLOUR,
 							}}
 						/>
 					)}
@@ -481,13 +631,43 @@ export function WhaleArt(props: {
 				style={{
 					position: 'absolute',
 					left: 0,
-					top: `${props.height - 14 + (1 - props.up) * 34}px`,
+					top: `${whaleTop(props)}px`,
 				}}
 			>
 				<PixelArt src={WHALE} width={WHALE_WIDTH} height={WHALE_HEIGHT} />
 			</div>
 		</div>
 	)
+}
+
+/**
+ * `WhaleArt`, painted in a Draw Hook, from (0, 0) of `ctx`: its spout and
+ * the spray off it, its bubbles, and the whale over them.
+ */
+export function paintWhale(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	whale: Whaling,
+) {
+	if (whale.spout > 0) {
+		// From under its spray down to just under the surface, fading blue.
+		const top = spoutTop(whale) + 10
+		const bottom = whale.height + 10
+		const gradient = ctx.createLinearGradient(0, top, 0, bottom)
+		gradient.addColorStop(0, SPOUT_TOP)
+		gradient.addColorStop(1, SPOUT_FOOT)
+		ctx.fillStyle = gradient
+		ctx.fillRect(BLOWHOLE_X - 8, top, 16, bottom - top)
+		ctx.fillStyle = SPRAY_COLOUR
+		for (const [i, dx] of SPRAY.entries())
+			ctx.fillRect(BLOWHOLE_X + dx - 6, sprayTop(whale, dx, i), 12, 12)
+	}
+	if (whale.bubbling) {
+		ctx.fillStyle = BUBBLE_COLOUR
+		for (let i = 0; i < 3; i++)
+			ctx.fillRect(bubbleLeft(i), bubbleTop(whale, i), 4, 4)
+	}
+	paintPicture(ctx, image, WHALE, 0, whaleTop(whale), WHALE_WIDTH, WHALE_HEIGHT)
 }
 
 // --- Rings ---------------------------------------------------------------------
