@@ -141,7 +141,7 @@ import {
 	duckNote,
 } from './art/duckNote'
 import { FikaArt, fikaPicture } from './art/fika'
-import { GEESE_HEIGHT, GeeseArt, geeseWidth } from './art/geese'
+import { GEESE_HEIGHT, GeeseArt, geeseWidth, paintGeese } from './art/geese'
 import {
 	FACE_FRONT,
 	FACE_HEIGHT,
@@ -150,7 +150,7 @@ import {
 	paintGiantFurbyFace,
 } from './art/giantFurby'
 import { BUS_GLIDER_HEIGHT, BUS_GLIDER_WIDTH, busGlider } from './art/glider'
-import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt } from './art/hands'
+import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt, paintHands } from './art/hands'
 import { HatPicture, hatArt, paintHat, paintHatGlow } from './art/hats'
 import { KIDS_HEIGHT, KidsArt, kidsPainter, kidsWidth } from './art/kids'
 import { MudArt, paintMud } from './art/mud'
@@ -166,6 +166,9 @@ import {
 	SWAMP_POOL_WIDTH,
 	SewageArt,
 	SwampManArt,
+	paintGiantVent,
+	paintSewage,
+	paintSwampMan,
 } from './art/sewer'
 import {
 	BoardUnder,
@@ -188,6 +191,7 @@ import {
 	WHALE_HEIGHT,
 	WHALE_WIDTH,
 	WhaleArt,
+	gullPicture,
 	paintRing,
 } from './art/sky'
 import {
@@ -243,6 +247,16 @@ import { moveScooped, paintPixelArt } from './paint/pixelArt'
 import type { SvgDrawing } from './paint/svgCanvas'
 import { paintChunks, svgChunks } from './paint/svgChunks'
 import { svgPainter } from './paint/svgPainter'
+import {
+	STEAM_CLOUDS,
+	STEAM_VENT_HEIGHT,
+	STEAM_VENT_WIDTH,
+	VALVE_ARROWS,
+	bouncerSquash,
+	paintBouncer,
+	paintSteamVent,
+	paintValve,
+} from './paint/vents'
 import { PlatformArt, platformLook, platformPainter } from './platformArt'
 import { rendererChoice } from './rendererChoice'
 import { rideLook } from './rideLook'
@@ -2521,12 +2535,8 @@ function SteamVent(props: { world: World; state: ObstacleState }) {
  * isn't a signal: reading the tick keeps it up to date.
  */
 function Bouncer(props: { world: World; state: ObstacleState }) {
-	const squash = () => {
-		const puff = steamPuff(props.state.flown, props.world.ticks())
-		if (puff === undefined) return 1
-		// Down flat, then up past where it was, and settling.
-		return 1 - 0.45 * Math.cos(puff * Math.PI * 3) * (1 - puff)
-	}
+	const squash = () =>
+		bouncerSquash(steamPuff(props.state.flown, props.world.ticks()))
 	const own = props.world.course.look?.bouncer
 	return (
 		<img
@@ -2543,15 +2553,6 @@ function Bouncer(props: { world: World; state: ObstacleState }) {
 		/>
 	)
 }
-
-/** A Steam Vent's clouds: each its own size, rising from its own place, one after another. */
-const STEAM_CLOUDS = [
-	{ x: -8, size: 14, delay: 0 },
-	{ x: 6, size: 18, delay: 0.1 },
-	{ x: -2, size: 22, delay: 0.2 },
-	{ x: 8, size: 12, delay: 0.3 },
-	{ x: -10, size: 16, delay: 0.4 },
-]
 
 /** A cyclist, riding towards you, or scooped and flying. */
 function createCyclist(
@@ -3445,6 +3446,10 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				height: VENT_HEIGHT,
 				world,
 				children: () => <VentArt />,
+				draw: ({ ctx, image }) => {
+					const vent = image(ventAsset)
+					if (vent) ctx.drawImage(vent.image, 0, 0, VENT_WIDTH, VENT_HEIGHT)
+				},
 			})
 		case 'steam':
 			if (o.giant)
@@ -3463,28 +3468,56 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							puffed={() => (world.ticks() >= 0 ? state.flown : undefined)}
 						/>
 					),
+					draw: ({ ctx }) =>
+						paintGiantVent(
+							ctx,
+							Math.max(0, world.ticks()),
+							world.ticks() >= 0 ? state.flown : undefined,
+						),
 				})
 			// A bouncy toadstool, squashing as it fires whoever's on it up.
-			if (world.course.look?.bouncers)
+			if (world.course.look?.bouncers) {
+				const own = world.course.look.bouncer
+				const width = own?.width ?? 44
+				const height = own?.height ?? 32
 				return createFixture({
 					id,
 					type: 'hazard',
 					x: o.x,
 					sink: 2,
-					width: world.course.look.bouncer?.width ?? 44,
-					height: world.course.look.bouncer?.height ?? 32,
+					width,
+					height,
 					world,
 					children: () => <Bouncer world={world} state={state} />,
+					draw: ({ ctx, image }) =>
+						paintBouncer(
+							ctx,
+							image,
+							own?.asset ?? bouncyToadstool,
+							width,
+							height,
+							world.ticks(),
+							state.flown,
+						),
 				})
+			}
 			return createFixture({
 				id,
 				type: 'hazard',
 				x: o.x,
 				sink: 8,
-				width: 44,
-				height: 12,
+				width: STEAM_VENT_WIDTH,
+				height: STEAM_VENT_HEIGHT,
 				world,
 				children: () => <SteamVent world={world} state={state} />,
+				draw: ({ ctx, image }) =>
+					paintSteamVent(
+						ctx,
+						image,
+						steamVentAsset,
+						world.ticks(),
+						state.flown,
+					),
 			})
 		case 'hands':
 			// In front of whoever's on them: clutching their ankles.
@@ -3503,6 +3536,12 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						grabbed={() => (world.ticks() >= 0 ? state.flown : undefined)}
 					/>
 				),
+				draw: ({ ctx }) =>
+					paintHands(
+						ctx,
+						Math.max(0, world.ticks()),
+						world.ticks() >= 0 ? state.flown : undefined,
+					),
 			})
 		case 'swampman':
 			return createFixture({
@@ -3516,6 +3555,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				children: () => (
 					<SwampManArt x={o.x} now={() => Math.max(0, world.ticks())} />
 				),
+				draw: ({ ctx }) => paintSwampMan(ctx, o.x, Math.max(0, world.ticks())),
 			})
 		case 'sewage': {
 			// From the street over it, down through the rock, to the floor.
@@ -3538,6 +3578,14 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						floor={floor - top}
 					/>
 				),
+				draw: ({ ctx }) =>
+					paintSewage(
+						ctx,
+						o.x,
+						Math.max(0, world.ticks()),
+						ceiling - top,
+						floor - top,
+					),
 			})
 		}
 		case 'tourists': {
@@ -3623,6 +3671,16 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						flown={world.ticks() >= 0 ? state.flown : undefined}
 					/>
 				),
+				draw: ({ ctx, image }) =>
+					paintGeese(
+						ctx,
+						image,
+						o.x,
+						o.count,
+						world.ticks(),
+						world.ticks() >= 0 ? state.flown : undefined,
+						world.course.look?.geese,
+					),
 			})
 		case 'pothole':
 			return createFixture({
@@ -3708,6 +3766,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						</>
 					)
 				},
+				draw: ({ ctx, image }) =>
+					paintValve(ctx, image, Math.max(0, world.ticks())),
 			})
 		case 'snowman': {
 			const burst = () =>
@@ -3738,9 +3798,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 	}
 }
 
-/** How far a heart valve sits down in the floor, its rim raised over it; and how wide its chevrons are. */
+/** How far a heart valve sits down in the floor, its rim raised over it. */
 const VALVE_SINK = 10
-const VALVE_ARROWS = 24
 
 /** How long a popped Germ's burst is seen for. */
 const GERM_BURST = 18
@@ -3876,21 +3935,43 @@ function createSkyThing(
 			const top = line - o.height - 60
 			const gulls = () =>
 				gullsAt(o, line, now(), world.ticks() >= 0 ? state.flown : undefined)
-			return at({ x: left, y: top, width, height: 120 }, () => (
-				<Index each={gulls()}>
-					{(gull) => (
-						<div
-							style={{
-								position: 'absolute',
-								left: `${gull().x - left - GULL_WIDTH / 2}px`,
-								top: `${gull().y - top - GULL_HEIGHT / 2}px`,
-							}}
-						>
-							<GullArt up={gull().flap} />
-						</div>
-					)}
-				</Index>
-			))
+			return createController({
+				init: () => ({
+					id,
+					type: 'hazard',
+					x: () => left,
+					y: () => top,
+					width: () => width,
+					height: () => 120,
+					children: () => (
+						<Index each={gulls()}>
+							{(gull) => (
+								<div
+									style={{
+										position: 'absolute',
+										left: `${gull().x - left - GULL_WIDTH / 2}px`,
+										top: `${gull().y - top - GULL_HEIGHT / 2}px`,
+									}}
+								>
+									<GullArt up={gull().flap} />
+								</div>
+							)}
+						</Index>
+					),
+				}),
+				draw: ({ ctx, image }) => {
+					for (const gull of gulls())
+						paintPicture(
+							ctx,
+							image,
+							gullPicture(gull.flap),
+							gull.x - left - GULL_WIDTH / 2,
+							gull.y - top - GULL_HEIGHT / 2,
+							GULL_WIDTH,
+							GULL_HEIGHT,
+						)
+				},
+			})
 		}
 		case 'balloon':
 			return at(

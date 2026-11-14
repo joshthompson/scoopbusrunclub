@@ -1,6 +1,8 @@
 import { For, Show } from 'solid-js'
 import { SEWAGE_FALL, sewageAt, swampManAt } from '../../game/sewer'
 import { GIANT_REACH, steamPuff } from '../../game/steam'
+import { cellArt } from '../paint/cells'
+import { type SteamBit, paintSteam } from '../paint/steam'
 
 /**
  * The Sewers' Obstacles, drawn: a Swamp Man rising out of his sludge, a
@@ -474,4 +476,211 @@ export function GiantVentArt(props: {
 			</div>
 		</div>
 	)
+}
+
+// --- Painted on the Canvas Renderer ----------------------------------------
+
+/**
+ * A Swamp Man, as `SwampManArt` draws him, painted in a Draw Hook: risen as
+ * far as he has out of his pool, the rest of him under it, and bubbles on
+ * it while he's under.
+ */
+export function paintSwampMan(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	now: number,
+) {
+	const man = swampManAt(x, now)
+	const left = (SWAMP_POOL_WIDTH - MAN_WIDTH * 2) / 2
+	const top = SWAMP_DRAWN - SWAMP_POOL_HEIGHT / 2 - MAN_HEIGHT * 2
+	ctx.save()
+	ctx.beginPath()
+	ctx.rect(left, top, MAN_WIDTH * 2, MAN_HEIGHT * 2)
+	ctx.clip()
+	ctx.drawImage(
+		cellArt('swamp-man', MAN_WIDTH, MAN_HEIGHT, 2, SWAMP_MAN),
+		left,
+		top + Math.round((1 - man.rise) * MAN_HEIGHT * 2),
+		MAN_WIDTH * 2,
+		MAN_HEIGHT * 2,
+	)
+	ctx.restore()
+	ctx.drawImage(
+		cellArt('swamp-pool', SWAMP_POOL_WIDTH, SWAMP_POOL_HEIGHT, 1, POOL),
+		0,
+		SWAMP_DRAWN - SWAMP_POOL_HEIGHT,
+		SWAMP_POOL_WIDTH,
+		SWAMP_POOL_HEIGHT,
+	)
+	if (man.rise !== 0) return
+	ctx.fillStyle = SLUDGE_LIGHT
+	BUBBLES.forEach((left, i) => {
+		if ((now + i * 13) % 40 < 20)
+			ctx.fillRect(left, SWAMP_DRAWN - SWAMP_POOL_HEIGHT - 2, 4, 4)
+	})
+}
+const BUBBLES = [14, 34, 48]
+
+/**
+ * A Sewage Drain, as `SewageArt` draws it, painted in a Draw Hook: its shaft
+ * and grates, and what's pouring, dripping and splashing out of it at `now`.
+ */
+export function paintSewage(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	now: number,
+	/** How far down the grate in the Ceiling is, and the floor, from the street. */
+	ceiling: number,
+	floor: number,
+) {
+	const drain = sewageAt(x, now)
+	const fall = floor - ceiling
+	const middle = SEWAGE_WIDTH / 2
+	const reached = drain.pouring
+		? Math.min(fall, (drain.poured + 1) * SEWAGE_FALL)
+		: 0
+	// Its shaft, up through the rock to the street, its sides edged.
+	const shaft = middle - GRATE / 2
+	ctx.fillStyle = '#151c11'
+	ctx.fillRect(shaft, 0, GRATE, ceiling)
+	ctx.fillStyle = '#2c3324'
+	ctx.fillRect(shaft, 0, 4, ceiling)
+	ctx.fillRect(shaft + GRATE - 4, 0, 4, ceiling)
+	// Its grates: in the street, and in the Ceiling. Bars 4 px wide, 7 apart.
+	for (const top of [0, ceiling - 6]) {
+		const left = middle - GRATE / 2 - 2
+		ctx.fillStyle = '#0e1210'
+		ctx.fillRect(left, top, GRATE + 4, 6)
+		ctx.fillStyle = '#3a3f44'
+		for (let bar = 0; bar < GRATE + 4; bar += 7)
+			ctx.fillRect(left + bar, top, Math.min(4, GRATE + 4 - bar), 6)
+	}
+	if (reached > 0) {
+		// The pour: a stream down from the grate, lighter down its middle.
+		const stream = ctx.createLinearGradient(middle - 7, 0, middle + 7, 0)
+		stream.addColorStop(0, 'rgba(92,110,36,0.55)')
+		stream.addColorStop(0.5, 'rgba(120,140,48,0.8)')
+		stream.addColorStop(1, 'rgba(92,110,36,0.55)')
+		ctx.fillStyle = stream
+		ctx.fillRect(middle - 7, ceiling, 14, reached)
+		// What's in it, tumbling, each turned about its own middle.
+		JUNK.forEach((junk, i) => {
+			const down = drain.poured * SEWAGE_FALL - i * JUNK_SPACING
+			if (down < 0) return
+			const width = junk.width * 2
+			const height = junk.height * 2
+			const left = middle - junk.width + ((i * 7) % 11) - 5
+			const top = ceiling + (down % fall)
+			ctx.save()
+			ctx.translate(left + width / 2, top + height / 2)
+			ctx.rotate((((drain.poured * 9 + i * 70) % 360) * Math.PI) / 180)
+			ctx.drawImage(
+				cellArt(`junk-${i}`, junk.width, junk.height, 2, junk.rects),
+				-width / 2,
+				-height / 2,
+				width,
+				height,
+			)
+			ctx.restore()
+		})
+		// Splashing up where it lands.
+		if (reached >= fall) {
+			ctx.fillStyle = '#7a8c30'
+			SPLASHES.forEach((dx, i) =>
+				ctx.fillRect(middle + dx, floor - 6 - ((now * 3 + i * 5) % 14), 4, 4),
+			)
+		}
+	}
+	// Drips, a wave on its way.
+	if (drain.dripping) {
+		ctx.fillStyle = '#8a9c3a'
+		DRIPS.forEach((dx, i) =>
+			ctx.fillRect(middle + dx, ceiling + ((now * 5 + i * 60) % fall), 4, 6),
+		)
+	}
+	// Its stain on the floor.
+	ctx.fillStyle = '#4f5b22'
+	ctx.beginPath()
+	ctx.roundRect(middle - 22, floor - 4, 44, 6, 3)
+	ctx.fill()
+}
+const SPLASHES = [-16, -6, 8, 18]
+const DRIPS = [-6, 5]
+
+/** Air rushing up out of a Giant Vent, as bits of steam: each a strip, rising off its grate. */
+const UPDRAFT_BITS: SteamBit[] = UPDRAFT.map((x, i) => ({
+	x: GIANT_VENT_WIDTH / 2 + x,
+	y: 4 - 40,
+	width: 4,
+	height: 40,
+	colour: 'rgba(230, 240, 245, 0.55)',
+	delay: (i * 0.17) % 0.6,
+}))
+/** A Giant Vent's clouds of steam, once it's fired someone up. */
+const GIANT_CLOUD_BITS: SteamBit[] = GIANT_CLOUDS.map((cloud) => ({
+	x: GIANT_VENT_WIDTH / 2 + cloud.x - cloud.size / 2,
+	y: 4 - cloud.size,
+	width: cloud.size,
+	height: cloud.size,
+	colour: 'rgba(245, 245, 245, 0.85)',
+	ring: { width: 4, colour: 'rgba(245, 245, 245, 0.4)' },
+	delay: cloud.delay,
+}))
+
+/** Its frame's sides, and how far in its fan is, at the top and bottom. */
+const VENT_FRAME = 6
+const VENT_FRAME_BOTTOM = 2
+const FAN_TOP = 4
+
+/**
+ * A Giant Vent, as `GiantVentArt` draws it, painted in a Draw Hook: its fan
+ * turning under its bars, air rushing up out of it, and once it's fired
+ * someone up at `puffed`, clouds of steam.
+ */
+export function paintGiantVent(
+	ctx: CanvasRenderingContext2D,
+	now: number,
+	puffed: number | undefined,
+) {
+	const inner = GIANT_VENT_WIDTH - VENT_FRAME * 2
+	const fanHeight = GIANT_VENT_HEIGHT - FAN_TOP - VENT_FRAME_BOTTOM
+	// Its fan, turning, seen through the bars: dark, with a lighter blade
+	// every 14 px, moving along, each cut off at its ends.
+	ctx.fillStyle = '#1b2126'
+	ctx.fillRect(VENT_FRAME, FAN_TOP, inner, fanHeight)
+	ctx.fillStyle = '#59626b'
+	for (let at = ((now * 3) % 14) - 4; at < inner; at += 14) {
+		const from = Math.max(0, at)
+		const to = Math.min(inner, at + 4)
+		if (to > from)
+			ctx.fillRect(VENT_FRAME + from, FAN_TOP, to - from, fanHeight)
+	}
+	// Its bars, over the fan, and a light along under its top.
+	const barsHeight = GIANT_VENT_HEIGHT - VENT_FRAME - VENT_FRAME_BOTTOM
+	ctx.fillStyle = '#6e7880'
+	for (let at = 10; at < inner; at += 14)
+		ctx.fillRect(
+			VENT_FRAME + at,
+			VENT_FRAME,
+			Math.min(4, inner - at),
+			barsHeight,
+		)
+	ctx.fillStyle = '#b9c1c7'
+	ctx.fillRect(VENT_FRAME, VENT_FRAME, inner, 2)
+	// Its frame.
+	ctx.fillStyle = '#8a949c'
+	ctx.fillRect(0, 0, GIANT_VENT_WIDTH, VENT_FRAME)
+	ctx.fillRect(0, 0, VENT_FRAME, GIANT_VENT_HEIGHT)
+	ctx.fillRect(GIANT_VENT_WIDTH - VENT_FRAME, 0, VENT_FRAME, GIANT_VENT_HEIGHT)
+	ctx.fillRect(
+		0,
+		GIANT_VENT_HEIGHT - VENT_FRAME_BOTTOM,
+		GIANT_VENT_WIDTH,
+		VENT_FRAME_BOTTOM,
+	)
+	paintSteam(ctx, now, UPDRAFT_BITS, { seconds: 0.6, steps: 6 })
+	// Its clouds rise from when it puffed, as they're put on the page then.
+	const puff = steamPuff(puffed, now)
+	if (puff !== undefined && puffed !== undefined)
+		paintSteam(ctx, now - puffed, GIANT_CLOUD_BITS, { seconds: 0.45, steps: 5 })
 }

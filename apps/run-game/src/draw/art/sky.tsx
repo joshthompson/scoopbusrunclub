@@ -53,6 +53,8 @@ const gull = (up: boolean) =>
 	])
 const GULL_UP = gull(true)
 const GULL_DOWN = gull(false)
+/** A gull's picture, its wings up or down. */
+export const gullPicture = (up: boolean) => (up ? GULL_UP : GULL_DOWN)
 
 export function GullArt(props: { up: boolean }) {
 	return (

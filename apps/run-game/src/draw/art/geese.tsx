@@ -1,9 +1,12 @@
+import type { DrawPainting } from 'scoopjs'
 import { For } from 'solid-js'
 import pecking from '../../assets/flyers/goose-pecking.png'
 import standing from '../../assets/flyers/goose-standing.png'
 import wingsDown from '../../assets/flyers/goose-wings-down.png'
 import wingsUp from '../../assets/flyers/goose-wings-up.png'
 import { PixelArt } from '../PixelArt'
+import { filtered } from '../paint/css'
+import { mirrored } from '../paint/picture'
 
 /**
  * Geese on the path at Haga, by Brunnsviken: Canada geese, standing about
@@ -64,6 +67,25 @@ const chance = (x: number, i: number) => {
 export function gooseTakeoff(x: number, i: number, flown: number | undefined) {
 	if (flown === undefined) return undefined
 	return flown + Math.round(i * 3 + chance(x, i + 7) * 6)
+}
+
+/**
+ * Goose `i` of a gaggle at `x`, at `now`, if it's still to be seen: its
+ * pose, and how far it's flown, if it's taken off.
+ */
+function gooseAt(x: number, i: number, now: number, flown: number | undefined) {
+	const at = gooseTakeoff(x, i, flown)
+	const flownAt = at !== undefined && now >= at ? at : undefined
+	if (flownAt === undefined)
+		// Each on its own beat.
+		return {
+			pose: (now + i * 47) % PECK_EVERY < PECK_TICKS ? 'down' : 'up',
+		} as const
+	if (now - flownAt > GEESE_FLIGHT_TICKS) return undefined
+	return {
+		pose: Math.floor((now - flownAt) / 5) % 2 ? 'wingsDown' : 'wingsUp',
+		flight: gooseFlight(i, now - flownAt),
+	} as const
 }
 
 /**
@@ -166,4 +188,47 @@ export function FlyingGooseArt(props: { now: number; carrying: boolean }) {
 /** One goose, for the instructions. */
 export function GooseIcon() {
 	return <PixelArt src={standing} width={GOOSE_WIDTH} height={GEESE_HEIGHT} />
+}
+
+/**
+ * `count` geese at `x`, as `GeeseArt` draws them, painted in a Draw Hook:
+ * through the course's `filter`, if it has one, recoloured once and kept,
+ * since WebKit's canvas has no `filter`.
+ */
+export function paintGeese(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	x: number,
+	count: number,
+	now: number,
+	flown: number | undefined,
+	filter: string | undefined,
+) {
+	for (let i = 0; i < count; i++) {
+		const goose = gooseAt(x, i, now, flown)
+		if (!goose) continue
+		const { src, height } = POSES[goose.pose]
+		const loaded = image(src)
+		if (!loaded) continue
+		const art = filtered(src, loaded, filter, GOOSE_WIDTH / loaded.width)
+		// Not quite in a line.
+		const left = i * SPACING
+		const top = GEESE_HEIGHT - (i % 2) * 2 - height
+		const paint = () =>
+			ctx.drawImage(
+				art.art,
+				-art.pad,
+				-art.pad,
+				art.width + art.pad * 2,
+				art.height + art.pad * 2,
+			)
+		ctx.save()
+		ctx.translate(left, top)
+		if (goose.flight) {
+			// Flying off, turned round, along the course.
+			ctx.translate(goose.flight.x, goose.flight.y)
+			mirrored(ctx, GOOSE_WIDTH, paint)
+		} else paint()
+		ctx.restore()
+	}
 }
