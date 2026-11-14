@@ -28,6 +28,9 @@ import type { World } from '../game/world'
 const OPENING = 0.06
 /** How far its jaw's cells are: 4 px, as the face's. */
 const CELL = 4
+/** How tall its teeth are, top and bottom, and how far in from its top the top ones are. */
+const TEETH = 12
+const TEETH_DOWN = 4
 
 export function createGiantMouth(world: World) {
 	const mouth = world.course.look?.mouth
@@ -93,11 +96,15 @@ export function createGiantMouth(world: World) {
 				ctx.fillStyle = inside
 				ctx.fillRect(0, 0, MOUTH_WIDTH, height)
 				const upper = image(UPPER_TEETH)
-				if (upper) ctx.drawImage(upper.image, 4, 4, MOUTH_WIDTH - 8, 12)
+				if (upper)
+					ctx.drawImage(upper.image, 4, TEETH_DOWN, MOUTH_WIDTH - 8, TEETH)
 				const lower = image(LOWER_TEETH)
 				if (lower)
-					ctx.drawImage(lower.image, 8, height - 12, MOUTH_WIDTH - 8, 12)
+					ctx.drawImage(lower.image, 8, height - TEETH, MOUTH_WIDTH - 8, TEETH)
 			},
+			// Only just open, 4 px tall, its teeth stick out of it, the top
+			// ones down past its bottom and the bottom ones up past its top.
+			drawReach: { top: TEETH - 4, bottom: TEETH_DOWN + TEETH - 4 },
 			// Opening and shutting, by who's near: the same on every screen.
 			onEnterFrame: () => {
 				const target = wanted() ? 1 : 0

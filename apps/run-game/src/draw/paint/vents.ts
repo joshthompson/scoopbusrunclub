@@ -2,9 +2,9 @@ import type { DrawPainting } from 'scoopjs'
 import { VALVE } from '../../courses/kit/bodyScenery'
 import { HEARTBEAT, beatAt, valveOpen } from '../../game/body'
 import { steamPuff } from '../../game/steam'
-import { filtered } from './css'
+import { filterReach, filtered } from './css'
 import { paintPicture } from './picture'
-import { type SteamBit, paintSteam } from './steam'
+import { type SteamBit, paintSteam, steamReach } from './steam'
 
 /**
  * Steam Vents, Bouncy Toadstools and Heart Valves, as their `children`
@@ -36,6 +36,16 @@ const STEAM_BITS: SteamBit[] = STEAM_CLOUDS.map((cloud) => ({
 	delay: cloud.delay,
 }))
 
+/** How its steam rises: in 5 steps, over half a second. */
+const STEAM_RISE = { seconds: 0.5, steps: 5 }
+
+/** How far a Steam Vent's clouds get out of its box, for its Draw Hook's `drawReach`. */
+export const STEAM_VENT_REACH = steamReach(
+	STEAM_VENT_WIDTH,
+	STEAM_VENT_HEIGHT,
+	{ bits: STEAM_BITS, steps: STEAM_RISE.steps },
+)
+
 /**
  * A Steam Vent: its grate, and once it's puffed, at `puffed`, steam rising
  * off it in clouds a while, from when it puffed, as they're put on the
@@ -52,7 +62,7 @@ export function paintSteamVent(
 	if (loaded)
 		ctx.drawImage(loaded.image, 0, 0, STEAM_VENT_WIDTH, STEAM_VENT_HEIGHT)
 	if (puffed === undefined || steamPuff(puffed, now) === undefined) return
-	paintSteam(ctx, now - puffed, STEAM_BITS, { seconds: 0.5, steps: 5 })
+	paintSteam(ctx, now - puffed, STEAM_BITS, STEAM_RISE)
 }
 
 /** How squashed a Bouncy Toadstool is, its height out of 1, `puff` out of 1 through firing someone up. */
@@ -87,6 +97,18 @@ export const VALVE_ARROWS = 24
 const VALVE_ARROWS_HEIGHT = VALVE_ARROWS * (10 / 12)
 /** The chevrons' glow, as the valve opens. */
 const ARROWS_GLOW = 'drop-shadow(0 0 4px #fff6a8)'
+/** How far they leap as it opens, and how far over it they are. */
+const ARROWS_LEAP = 16
+const ARROWS_OVER = 10
+
+/**
+ * How far a Heart Valve's chevrons get up out of its box, leaping and
+ * glowing, for the Draw Hook's `drawReach`.
+ */
+export const VALVE_REACH = {
+	top:
+		ARROWS_OVER + ARROWS_LEAP + VALVE_ARROWS_HEIGHT + filterReach(ARROWS_GLOW),
+}
 
 /**
  * A Heart Valve, flapping open on the beat at `now`, its chevrons over it
@@ -116,9 +138,11 @@ export function paintValve(
 		open ? ARROWS_GLOW : undefined,
 		VALVE_ARROWS / loaded.width,
 	)
-	const leap = open ? Math.round(Math.sin((beat / 24) * Math.PI) * 16) : 0
+	const leap = open
+		? Math.round(Math.sin((beat / 24) * Math.PI) * ARROWS_LEAP)
+		: 0
 	const left = (VALVE.width - VALVE_ARROWS) / 2
-	const top = -(10 + leap + VALVE_ARROWS_HEIGHT)
+	const top = -(ARROWS_OVER + leap + VALVE_ARROWS_HEIGHT)
 	ctx.globalAlpha *= open ? 1 : 0.35 + 0.35 * (beat / HEARTBEAT)
 	ctx.drawImage(
 		arrows.art,

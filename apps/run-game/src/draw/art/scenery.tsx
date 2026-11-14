@@ -15,6 +15,19 @@ const FOOTING_SHOULDER = 60
 const FOOTING_OVERLAP = 4
 
 /**
+ * How far a footing's grass gets out of its scenery's box, for the Draw
+ * Hook's `drawReach`: `FOOTING_SHOULDER` past either end, and down to the
+ * verge, as far as the hill falls away under it. That's only known once its
+ * picture's loaded and its size is: under Haga's Copper Tents, the only
+ * footing, it's 40 px, and this leaves a little over.
+ */
+export const FOOTING_REACH = {
+	left: FOOTING_SHOULDER,
+	right: FOOTING_SHOULDER,
+	bottom: 48,
+}
+
+/**
  * A footing's grass, as an SVG path, in columns 2 px wide from
  * `FOOTING_SHOULDER` left of the scenery to as far right of it, from the
  * scenery's foot (`base`, in the world) down: and how far down it goes.

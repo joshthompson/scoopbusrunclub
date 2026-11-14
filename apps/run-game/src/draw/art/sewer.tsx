@@ -2,7 +2,7 @@ import { For, Show } from 'solid-js'
 import { SEWAGE_FALL, sewageAt, swampManAt } from '../../game/sewer'
 import { GIANT_REACH, steamPuff } from '../../game/steam'
 import { cellArt } from '../paint/cells'
-import { type SteamBit, paintSteam } from '../paint/steam'
+import { type SteamBit, paintSteam, steamReach } from '../paint/steam'
 
 /**
  * The Sewers' Obstacles, drawn: a Swamp Man rising out of his sludge, a
@@ -627,6 +627,18 @@ const GIANT_CLOUD_BITS: SteamBit[] = GIANT_CLOUDS.map((cloud) => ({
 	delay: cloud.delay,
 }))
 
+/** How its air rushes up, and how its clouds rise, once it's puffed. */
+const UPDRAFT_RISE = { seconds: 0.6, steps: 6 }
+const GIANT_CLOUDS_RISE = { seconds: 0.45, steps: 5 }
+
+/** How far a Giant Vent's air and clouds get out of its box, for its Draw Hook's `drawReach`. */
+export const GIANT_VENT_REACH = steamReach(
+	GIANT_VENT_WIDTH,
+	GIANT_VENT_HEIGHT,
+	{ bits: UPDRAFT_BITS, steps: UPDRAFT_RISE.steps },
+	{ bits: GIANT_CLOUD_BITS, steps: GIANT_CLOUDS_RISE.steps },
+)
+
 /** Its frame's sides, and how far in its fan is, at the top and bottom. */
 const VENT_FRAME = 6
 const VENT_FRAME_BOTTOM = 2
@@ -678,9 +690,9 @@ export function paintGiantVent(
 		GIANT_VENT_WIDTH,
 		VENT_FRAME_BOTTOM,
 	)
-	paintSteam(ctx, now, UPDRAFT_BITS, { seconds: 0.6, steps: 6 })
+	paintSteam(ctx, now, UPDRAFT_BITS, UPDRAFT_RISE)
 	// Its clouds rise from when it puffed, as they're put on the page then.
 	const puff = steamPuff(puffed, now)
 	if (puff !== undefined && puffed !== undefined)
-		paintSteam(ctx, now - puffed, GIANT_CLOUD_BITS, { seconds: 0.45, steps: 5 })
+		paintSteam(ctx, now - puffed, GIANT_CLOUD_BITS, GIANT_CLOUDS_RISE)
 }

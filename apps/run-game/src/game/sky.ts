@@ -38,6 +38,21 @@ export interface Gull {
 	flap: boolean
 }
 
+/** How far a gull wheels about where it is, either way: across, and up and down. */
+const GULL_WHEEL = { x: 14, y: 8 }
+
+/** Where gull `i` of a flock wheels about: its middle. */
+const gullHome = (o: Of<'gulls'>, line: number, i: number) => ({
+	x: o.x + (i - (o.count - 1) / 2) * GULL_GAP,
+	y: line - o.height + (i % 2 ? 12 : -4),
+})
+
+/** How far gull `i` has flown off, up and back, `t` ticks after they scattered. */
+const gullAway = (i: number, t: number) => ({
+	x: -t * GULL_SCATTER_BACK * (1 + (i % 3) * 0.4),
+	y: -t * GULL_SCATTER_UP * (1 + (i % 2) * 0.3),
+})
+
 /**
  * Each of a flock's gulls, its middle, wheeling about where they are; or,
  * scattered `flown` ticks ago, flying off up and away.
@@ -50,22 +65,43 @@ export function gullsAt(
 ): Gull[] {
 	const gulls: Gull[] = []
 	for (let i = 0; i < o.count; i++) {
-		let x =
-			o.x +
-			(i - (o.count - 1) / 2) * GULL_GAP +
-			Math.sin(now / 50 + i * 1.7) * 14
-		let y =
-			line - o.height + (i % 2 ? 12 : -4) + Math.sin(now / 23 + i * 2.3) * 8
+		const home = gullHome(o, line, i)
+		let x = home.x + Math.sin(now / 50 + i * 1.7) * GULL_WHEEL.x
+		let y = home.y + Math.sin(now / 23 + i * 2.3) * GULL_WHEEL.y
 		let flap = Math.floor(now / 7 + i) % 2 === 0
 		if (flown !== undefined) {
-			const t = now - flown
-			x -= t * GULL_SCATTER_BACK * (1 + (i % 3) * 0.4)
-			y -= t * GULL_SCATTER_UP * (1 + (i % 2) * 0.3)
+			const away = gullAway(i, now - flown)
+			x += away.x
+			y += away.y
 			flap = Math.floor(now / 3 + i) % 2 === 0
 		}
 		gulls.push({ x, y, flap })
 	}
 	return gulls
+}
+
+/**
+ * Round all that's drawn of a flock's gulls: wheeling about, and scattered
+ * up and back till they're gone (`GULL_SCATTER_TICKS`).
+ */
+export function gullsDrawn(o: Of<'gulls'>, line: number): Box {
+	const box: Box = {
+		left: Number.POSITIVE_INFINITY,
+		right: Number.NEGATIVE_INFINITY,
+		top: Number.POSITIVE_INFINITY,
+		bottom: Number.NEGATIVE_INFINITY,
+	}
+	for (let i = 0; i < o.count; i++) {
+		const home = gullHome(o, line, i)
+		const away = gullAway(i, GULL_SCATTER_TICKS)
+		const across = GULL_WHEEL.x + GULL_WIDTH / 2
+		const down = GULL_WHEEL.y + GULL_HEIGHT / 2
+		box.left = Math.min(box.left, home.x + away.x - across)
+		box.right = Math.max(box.right, home.x + across)
+		box.top = Math.min(box.top, home.y + away.y - down)
+		box.bottom = Math.max(box.bottom, home.y + down)
+	}
+	return box
 }
 
 // --- Hot-air balloons --------------------------------------------------------

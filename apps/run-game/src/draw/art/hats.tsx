@@ -514,6 +514,22 @@ const BEAM = paintedArt(BEAM_CELLS, BEAM_ROWS, (x, y) => {
 })
 
 /**
+ * How far a hat on someone's head gets out of their box, at most, for
+ * their Draw Hook's `drawReach`: the miner's lamp's beam, out ahead of
+ * them, and up over their head, as does any hat's crown, a propeller
+ * beanie's propeller on top of it.
+ */
+export const WORN_HAT_REACH = {
+	left: BEAM_CELLS * CELL + MINER.middle,
+	top: Math.max(
+		BEAM_ROWS - 4 + MINER.crown,
+		...[...Object.values(ART), pumpkin()].map(
+			(art) => art.crown + (art === PROPELLER ? 3 * CELL : 0),
+		),
+	),
+}
+
+/**
  * A hat, `art` sized: on its own, or on a head. The miner's helmet with
  * its lamp's beam shining out ahead of it.
  */
@@ -654,7 +670,7 @@ export function paintHat(
 }
 
 /** How far the glow round a hat sat waiting reaches out past it, all round. */
-const HAT_GLOW_OUT = 10
+export const HAT_GLOW_OUT = 10
 
 /**
  * The glow round a hat sat waiting, `HAT_GLOW` in `createBoost`, in a Draw

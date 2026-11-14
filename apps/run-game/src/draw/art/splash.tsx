@@ -34,6 +34,38 @@ const DROPS: [number, number, number][] = [
 
 const snap = (n: number) => Math.round(n / 2) * 2
 
+/** Where drop `[vx, vy]` is, `t` ticks in: the middle of it across, and its top, out from the splash's middle, up and falling back. */
+const dropAt = (vx: number, vy: number, t: number) => ({
+	x: SPLASH_WIDTH / 2 + vx * t * 1.6,
+	y: SPLASH_UP - (vy * t - (FALL * t * t) / 2),
+})
+/** Whether a drop's fallen back into the sea, out of sight. */
+const sunk = (y: number) => y > SPLASH_UP + 4
+
+/**
+ * How far a splash's spray, and its foam, get out of its box, all the
+ * while it lasts, for its Draw Hook's `drawReach`: worked out once.
+ */
+export const SPLASH_REACH = (() => {
+	let left = 0
+	let right = 0
+	let top = 0
+	for (let t = 0; t <= SPLASH_TICKS; t++) {
+		for (const [vx, vy, size] of DROPS) {
+			const at = dropAt(vx, vy, t)
+			if (sunk(at.y)) continue
+			const x = snap(at.x - size / 2)
+			left = Math.max(left, -x)
+			right = Math.max(right, x + size - SPLASH_WIDTH)
+			top = Math.max(top, -snap(at.y))
+		}
+		const foam = snap(SPLASH_WIDTH / 2 - 12 - t * 1.1)
+		left = Math.max(left, -foam)
+		right = Math.max(right, foam + snap(24 + t * 2.2) - SPLASH_WIDTH)
+	}
+	return { left, right, top }
+})()
+
 export function SplashArt(props: { age: number }) {
 	const t = () => Math.max(0, props.age)
 	/** The column, up and back down. */
@@ -71,8 +103,8 @@ export function SplashArt(props: { age: number }) {
 			/>
 			<For each={DROPS}>
 				{([vx, vy, size]) => {
-					const x = () => middle + vx * t() * 1.6 - size / 2
-					const y = () => SPLASH_UP - (vy * t() - (FALL * t() * t()) / 2)
+					const x = () => dropAt(vx, vy, t()).x - size / 2
+					const y = () => dropAt(vx, vy, t()).y
 					return (
 						<div
 							style={{
@@ -82,7 +114,7 @@ export function SplashArt(props: { age: number }) {
 								width: `${size}px`,
 								height: `${size}px`,
 								background: size > 4 ? WATER : SPRAY,
-								visibility: y() > SPLASH_UP + 4 ? 'hidden' : 'visible',
+								visibility: sunk(y()) ? 'hidden' : 'visible',
 							}}
 						/>
 					)
@@ -123,10 +155,10 @@ export function paintSplash(ctx: CanvasRenderingContext2D, age: number) {
 		snap(column * 0.4),
 	)
 	for (const [vx, vy, size] of DROPS) {
-		const y = SPLASH_UP - (vy * t - (FALL * t * t) / 2)
-		if (y > SPLASH_UP + 4) continue
+		const { x, y } = dropAt(vx, vy, t)
+		if (sunk(y)) continue
 		ctx.fillStyle = size > 4 ? WATER : SPRAY
-		ctx.fillRect(snap(middle + vx * t * 1.6 - size / 2), snap(y), size, size)
+		ctx.fillRect(snap(x - size / 2), snap(y), size, size)
 	}
 	ctx.globalAlpha *= 0.85
 	ctx.fillStyle = WATER

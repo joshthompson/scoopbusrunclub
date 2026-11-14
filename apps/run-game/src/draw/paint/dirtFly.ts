@@ -61,3 +61,26 @@ export function paintFlung(
 	}
 	ctx.globalAlpha = alpha
 }
+
+/**
+ * How far `bits` get out of the box, `width` by `height`, of whatever
+ * they're flung off, flying out to `to` and back to where they start,
+ * for its Draw Hook's `drawReach`.
+ */
+export function flungReach(
+	bits: readonly FlungBit[],
+	width: number,
+	height: number,
+) {
+	const reach = { left: 0, top: 0, right: 0, bottom: 0 }
+	for (const bit of bits)
+		for (const out of [0, 1]) {
+			const x = bit.x + bit.to.x * out
+			const y = bit.y + bit.to.y * out
+			reach.left = Math.max(reach.left, -x)
+			reach.top = Math.max(reach.top, -y)
+			reach.right = Math.max(reach.right, x + bit.size - width)
+			reach.bottom = Math.max(reach.bottom, y + bit.size - height)
+		}
+	return reach
+}

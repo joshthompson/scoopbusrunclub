@@ -17,9 +17,15 @@ export function steamRiseAt(
 ) {
 	const progress = cycle((ticks * TICK_MS) / 1000, timing.seconds, timing.delay)
 	if (progress === undefined) return { rise: 0, scale: 1, alpha: 1 }
-	const t = steps(timing.steps, progress)
-	return { rise: -120 * t, scale: 0.6 + t, alpha: 0.95 * (1 - t) }
+	return risen(steps(timing.steps, progress))
 }
+
+/** Steam `t` of the way through rising: how far up, how big, and how faded. */
+const risen = (t: number) => ({
+	rise: -120 * t,
+	scale: 0.6 + t,
+	alpha: 0.95 * (1 - t),
+})
 
 /**
  * A bit of steam, a square `<div>` under the DOM Renderer: its top left,
@@ -68,5 +74,40 @@ export function paintSteam(
 		ctx.fillStyle = bit.colour
 		ctx.fillRect(left, top, bit.width, bit.height)
 		ctx.restore()
+	}
+}
+
+/**
+ * How far steam rising with `steam-rise` gets out of the box, `width` by
+ * `height`, of whatever it's rising off, at its biggest and highest, for
+ * its Draw Hook's `drawReach`: each group of `bits`, rising in its `steps`.
+ */
+export function steamReach(
+	width: number,
+	height: number,
+	...groups: { bits: readonly SteamBit[]; steps: number }[]
+) {
+	const reach = { left: 0, top: 0, right: 0, bottom: 0 }
+	for (const { bits, steps: n } of groups)
+		for (const bit of bits) {
+			const ring = bit.ring?.width ?? 0
+			const middle = { x: bit.x + bit.width / 2, y: bit.y + bit.height / 2 }
+			// Sat waiting, as big as it is; then each step of its rise.
+			const at = [{ rise: 0, scale: 1 }]
+			for (let step = 0; step < n; step++) at.push(risen(step / n))
+			for (const { rise, scale } of at) {
+				const across = (bit.width / 2 + ring) * scale
+				const down = (bit.height / 2 + ring) * scale
+				reach.left = Math.max(reach.left, across - middle.x)
+				reach.right = Math.max(reach.right, middle.x + across - width)
+				reach.top = Math.max(reach.top, down - middle.y - rise)
+				reach.bottom = Math.max(reach.bottom, middle.y + rise + down - height)
+			}
+		}
+	return {
+		left: Math.ceil(reach.left),
+		top: Math.ceil(reach.top),
+		right: Math.ceil(reach.right),
+		bottom: Math.ceil(reach.bottom),
 	}
 }
