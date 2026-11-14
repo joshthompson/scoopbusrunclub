@@ -27,7 +27,9 @@
  * colours, with the head left off, for `createRunnerFrames` to colour in and
  * put a head on. Those are drawn afresh every time.
  *
- * Link is a dog, and his scanner pose stands in for any job.
+ * Link, a dog, lies at his post as in his scanner pose, with each job's prop
+ * beside him (`LINK_POSTS`). Halloween's skeletons get theirs too, though they
+ * only come out when everyone's running (`SKELETON_STOOD`).
  *
  * Usage: npx tsx apps/web/scripts/gen-volunteer-poses.ts [outDir]
  * Output is committed art, so this isn't wired into dev/build. Afterwards,
@@ -711,8 +713,8 @@ function stoodFromPost(
 	return png
 }
 
-function makePost(
-	runner: Runner,
+/** Someone stood at `post`: `base`, their body, with the job drawn on. */
+function drawPost(
 	post: Post,
 	base: PNG,
 	colours: Record<string, Rgb>,
@@ -736,7 +738,7 @@ function makePost(
 			if (key(rgb) === key(colours.v) || yellowish(rgb)) return FIXED.B
 			if (key(rgb) === key(colours.s)) return FIXED.O
 		})
-	write(png, runner.folder, FILES[post])
+	return png
 }
 
 // --- tail walker ---------------------------------------------------------
@@ -807,7 +809,7 @@ function makeTemplate() {
 	// The head the template's given faces left: turned round, its eye ends up here.
 	const eye = { x: 11, y: 5 }
 	for (const post of Object.keys(FILES) as Post[])
-		makePost(custom, post, base, colours, SHOULDER, eye)
+		write(drawPost(post, base, colours, SHOULDER, eye), 'custom', FILES[post])
 
 	// The run template's rows: a member's from 7 down.
 	const walk = blank(23 * TAIL_WALK_FRAMES, template.height)
@@ -885,13 +887,17 @@ function makeLink() {
 		if (has('link', file)) continue
 		const png = blank(LINK_WIDTH, scanner.height)
 		PNG.bitblt(scanner, png, 0, 0, scanner.width, scanner.height, 0, 0)
+		// The run director's vest is blue.
 		if (post === 'runDirector')
-			recolourVest(png, { x: LINK_WIDTH, y: 20 }, (rgb) => {
-				if (yellowish(rgb)) return FIXED.B
-				if (key(rgb) === key(FIXED.s)) return FIXED.O
-			})
+			for (let py = 0; py < png.height; py++)
+				for (let px = 0; px < scanner.width; px++) {
+					const rgb = get(png, px, py)
+					if (rgb && yellowish(rgb)) set(png, px, py, FIXED.B)
+					else if (rgb && key(rgb) === key(FIXED.s)) set(png, px, py, FIXED.O)
+				}
 		if (pole !== undefined)
-			for (let py = y + 5; py < png.height; py++) set(png, x + pole, py, FIXED.G)
+			for (let py = y + 5; py < png.height; py++)
+				set(png, x + pole, py, FIXED.G)
 		paint(png, art, x, y, FIXED)
 		write(png, 'link', file)
 	}
@@ -908,9 +914,9 @@ const HALLOWEEN = '../halloween'
 const SKELETON_STOOD = `
 ...........AA..........
 ..........AAAA.........
-..........ABAB.........
+..........APAP.........
 ..........AAAA.........
-..........AABA.........
+..........AAPA.........
 ...........AA..........
 ...........A...........
 ...........A...........
@@ -939,7 +945,7 @@ const SKELETON_STOOD = `
 
 function makeSkeleton() {
 	const bone: Rgb = [255, 255, 255]
-	const colours = { ...FIXED, A: bone, B: [0, 0, 0] as Rgb, a: bone, b: bone, c: bone }
+	const colours = { ...FIXED, A: bone, a: bone, b: bone, c: bone }
 	const file = (name: string) => `skeleton-${name}`
 	const missing = (name: string) => !has(HALLOWEEN, file(name))
 	const run = read(HALLOWEEN, file('run.png')) as PNG
@@ -955,19 +961,10 @@ function makeSkeleton() {
 	paint(base, SKELETON_STOOD, 0, 0, colours)
 	for (const post of Object.keys(FILES) as Post[]) {
 		if (!missing(FILES[post])) continue
-		const png = copy(base)
-		makePost(
-			{ folder: HALLOWEEN, ...ADULT },
-			post,
-			png,
-			colours,
-			SHOULDER,
-			{ x: 11, y: 2 },
-		)
-		// `makePost` writes it as the runner's own file: put the skeleton's name on it.
-		fs.renameSync(
-			path.join(OUT_DIR, HALLOWEEN, FILES[post]),
-			path.join(OUT_DIR, HALLOWEEN, file(FILES[post])),
+		write(
+			drawPost(post, base, colours, SHOULDER, { x: 11, y: 2 }),
+			HALLOWEEN,
+			file(FILES[post]),
 		)
 	}
 
@@ -991,7 +988,8 @@ function makeSkeleton() {
 			[21, 12, 15],
 		]
 		for (const [y, x0, x1] of ribs)
-			for (let x = x0; x <= x1; x++) set(sit, x, y, y === 19 ? FIXED.O : FIXED.o)
+			for (let x = x0; x <= x1; x++)
+				set(sit, x, y, y === 19 ? FIXED.O : FIXED.o)
 		write(sit, HALLOWEEN, file('tail-sit.png'))
 	}
 }
@@ -1015,7 +1013,11 @@ for (const runner of RUNNERS) {
 		}
 		const eye = stood?.eye ?? runner.eye ?? EYE
 		for (const post of missing)
-			makePost(runner, post, base, colours, shoulder, eye, runner.noVest)
+			write(
+				drawPost(post, base, colours, shoulder, eye, runner.noVest),
+				runner.folder,
+				FILES[post],
+			)
 	}
 	if (!has(runner.folder, 'tail-walk.png')) tailWalk(runner, colours, isTop)
 	if (!has(runner.folder, 'tail-sit.png')) tailSit(runner, isTop)

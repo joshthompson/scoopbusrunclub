@@ -247,16 +247,15 @@ function poseSize(
 	}
 }
 
-/** A member's volunteer pose, for cheering and run directing. They all face right. */
-export function volunteerFrame(member: RunnerName) {
-	const { frames } = runners[member][0]()
-	return (
-		frames.runDirector?.[0] ??
-		frames.marshal?.[0] ??
-		frames.photographer?.[0] ??
-		frames.scanner?.[0] ??
-		frames.volunteerGeneric?.[0]
-	)
+/**
+ * A member at a volunteer post: run directing at the start, or marshalling
+ * along the way, cheering. They all face right.
+ */
+export function volunteerFrame(
+	member: RunnerName,
+	post: 'runDirector' | 'marshal',
+) {
+	return runners[member][0]().frames[post][0]
 }
 
 export function createPlayer(world: World, racer: Racer = world.racers[0]) {
@@ -2414,7 +2413,7 @@ const RUN_DIRECTOR_SINK = PATH_FRONT - 2
 
 export function createRunDirector(world: World) {
 	const member = world.runDirector
-	const frame = volunteerFrame(member)
+	const frame = volunteerFrame(member, 'runDirector')
 	const runner = runners[member][0]
 	const size = poseSize(frame, runner())
 	return createFixture({
@@ -2425,7 +2424,7 @@ export function createRunDirector(world: World) {
 		width: size.width,
 		height: size.height,
 		world,
-		frames: frame ? [frame] : [],
+		frames: [frame],
 		// Turned round to face everyone on the line, the bubble turned back.
 		xScale: -1,
 		children: () => (
@@ -3469,12 +3468,11 @@ export function createBoost(world: World, state: BoostState, i: number) {
 			})
 		}
 		case 'cheer': {
-			const frame = volunteerFrame(o.member)
+			const frame = volunteerFrame(o.member, 'marshal')
 			const runner = runners[o.member][0]
 			const size = poseSize(frame, runner())
 			// Marshals' signs point left, the way the header's runners go. Turned
 			// round, they point on along the course, and face the runner coming.
-			const turned = frame === runner().frames.marshal?.[0]
 			return createFixture({
 				id,
 				type: 'cheerer',
@@ -3483,11 +3481,11 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				width: size.width,
 				height: size.height,
 				world,
-				frames: frame ? [frame] : [],
-				xScale: turned ? -1 : 1,
+				frames: [frame],
+				xScale: -1,
 				children: () => (
 					<Show when={state.cheering() > 0}>
-						<Bubble size={18} mirrored={turned}>
+						<Bubble size={18} mirrored>
 							Go {state.cheered || world.runner.name}!
 						</Bubble>
 					</Show>

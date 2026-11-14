@@ -371,20 +371,19 @@ export function createRunnerController(
 
 			// --- Standing states (scanner, photographer, etc.) ---
 			if (isStandingState(state)) {
-				let frames: string[] | undefined
-				if (state === 'scanner') frames = runner().frames.scanner
-				else if (state === 'photographer') frames = runner().frames.photographer
-				else if (state === 'run-director') frames = runner().frames.runDirector
-				else if (state === 'marshal') frames = runner().frames.marshal
-				else if (state === 'number-checker')
-					frames = runner().frames.numberChecker
-
-				// Fall back to volunteerGeneric, then sit frame if no specific sprite
-				if (!frames) frames = runner().frames.volunteerGeneric
-				$.setSeated(!frames)
-				if (!frames) frames = runner().frames.sit
-
-				if (frames?.length) $.setFrames(runFrames().map(() => frames[0]))
+				const { frames } = runner()
+				const post =
+					state === 'scanner'
+						? frames.scanner
+						: state === 'photographer'
+							? frames.photographer
+							: state === 'run-director'
+								? frames.runDirector
+								: state === 'marshal'
+									? frames.marshal
+									: frames.numberChecker
+				$.setSeated(false)
+				$.setFrames(runFrames().map(() => post[0]))
 				// No movement, no scooping — just render in place
 				return
 			}
@@ -428,11 +427,9 @@ export function createRunnerController(
 			// Sitting
 			if ($.sitting() > 0) {
 				$.setSitting($.sitting() - 1)
-				const sitFrames =
-					isTailWalker && runner().frames.tailSit
-						? // biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-							runner().frames.tailSit!
-						: runner().frames.sit
+				const sitFrames = isTailWalker
+					? runner().frames.tailSit
+					: runner().frames.sit
 				if (sitFrames?.length) $.setFrames(runFrames().map(() => sitFrames[0]))
 				$.setSeated(true)
 			}
@@ -442,9 +439,8 @@ export function createRunnerController(
 				if ($.zombie()) {
 					// biome-ignore lint/style/noNonNullAssertion: only set when they have them
 					$.setFrames(runner().frames.zombie!)
-				} else if (isTailWalker && runner().frames.tailWalk) {
-					// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-					$.setFrames(runner().frames.tailWalk!)
+				} else if (isTailWalker) {
+					$.setFrames(runner().frames.tailWalk)
 				} else {
 					$.setFrames(runFrames())
 				}

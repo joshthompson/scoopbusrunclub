@@ -74,9 +74,9 @@ export function createRunnerFrames(
 	const face = generateFaceFrame(character)
 	// At a volunteer post they face out of the screen, looking right, as the
 	// club's own do: the head, drawn looking left, is turned round.
-	const post = (pixels: SpritePixelData | null) =>
+	const post = (pixels: SpritePixelData) =>
 		generateCustomSpriteFrames(character, pixels, 1, { mirrorHead: true })
-			?.frames
+			.frames
 	return {
 		frames: {
 			run: run?.frames,
@@ -88,13 +88,12 @@ export function createRunnerFrames(
 				character,
 				tailWalkPixels,
 				WALK_FRAME_COUNT,
-			)?.frames,
-			tailSit: generateCustomSpriteFrames(character, tailSitPixels, 1)?.frames,
+			).frames,
+			tailSit: generateCustomSpriteFrames(character, tailSitPixels, 1).frames,
 			scanner: post(scannerPixels),
 			photographer: post(photographerPixels),
 			runDirector: post(runDirectorPixels),
 			marshal: post(marshalPixels),
-			volunteerGeneric: undefined,
 			numberChecker: post(numberCheckerPixels),
 		},
 		// Their box is one of their run frames, head and all.
@@ -445,6 +444,13 @@ function generateFaceFrame(character: CharacterSpriteProps): string[] {
 	return [imageUrl]
 }
 
+interface CustomSprite {
+	frames: string[]
+	width: number
+	height: number
+	headPoint: Vector
+}
+
 interface SpriteOptions {
 	/** Turn the head round to look right, for a body facing out of the screen. */
 	mirrorHead?: boolean
@@ -613,12 +619,22 @@ export function drawCustomSprite(
  */
 export function generateCustomSpriteFrames(
 	character: CharacterSpriteProps,
+	spritePixels: SpritePixelData,
+	frameCount: number,
+	options?: SpriteOptions,
+): CustomSprite
+export function generateCustomSpriteFrames(
+	character: CharacterSpriteProps,
 	spritePixels: SpritePixelData | null,
 	frameCount: number,
 	options?: SpriteOptions,
-):
-	| { frames: string[]; width: number; height: number; headPoint: Vector }
-	| undefined {
+): CustomSprite | undefined
+export function generateCustomSpriteFrames(
+	character: CharacterSpriteProps,
+	spritePixels: SpritePixelData | null,
+	frameCount: number,
+	options?: SpriteOptions,
+): CustomSprite | undefined {
 	const drawn = drawCustomSprite(character, spritePixels, frameCount, options)
 	if (!drawn) return undefined
 	const {
