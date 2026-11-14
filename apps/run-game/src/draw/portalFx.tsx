@@ -61,6 +61,7 @@ export function createPortalFx(world: World) {
 					</Show>
 				),
 			}),
+			drawReach: SPRAY_REACH,
 			// The same, on the canvas.
 			draw({ ctx }) {
 				const t = now()
@@ -93,6 +94,23 @@ const dropAt = (drop: (typeof DROPS)[number], since: number) => {
 	}
 }
 const sprayOn = (since: number) => since >= 0 && since < SPRAY_TICKS
+
+/**
+ * How far the spray's drops fly out of the beam's box, all the while it
+ * lasts: on out of the nose and down, worked out once, for `drawReach`.
+ */
+const SPRAY_REACH = (() => {
+	const reach = { left: 0, top: 0, right: 0, bottom: 0 }
+	for (let since = 0; since < SPRAY_TICKS; since++)
+		for (const drop of DROPS) {
+			const { x, y } = dropAt(drop, since)
+			reach.left = Math.max(reach.left, -x)
+			reach.top = Math.max(reach.top, -y)
+			reach.right = Math.max(reach.right, x + drop.size - BEAM_WIDTH)
+			reach.bottom = Math.max(reach.bottom, y + drop.size - BEAM_HEIGHT)
+		}
+	return reach
+})()
 
 /** The beam's colours, across it: clear at its edges, brightest down its middle. */
 const BEAM_STOPS: [number, string][] = [

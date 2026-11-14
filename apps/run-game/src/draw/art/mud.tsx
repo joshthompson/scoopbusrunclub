@@ -23,6 +23,17 @@ const MUD_DRAWN = 40 + MUD_ART_HEIGHT
 const mudWidth = (o: Mud) => Math.max(2 * MUD_CAP, Math.round(o.width / 4) * 4)
 
 /**
+ * How far a puddle's drawing gets out of its box, `o.width` across, for
+ * its Draw Hook's `drawReach`: half its art above, as far below, and the
+ * whole columns past its right end.
+ */
+export const mudReach = (o: Mud) => ({
+	top: MUD_ART_HEIGHT / 2,
+	bottom: MUD_ART_HEIGHT / 2,
+	right: Math.max(0, mudWidth(o) - o.width),
+})
+
+/**
  * A puddle's art, a column 4 px wide at a time, each on the Ground under it,
  * so the puddle lies along the slope: its ends, and as much of its middle
  * as it takes between them. How wide it's drawn, and each column's `x`, the

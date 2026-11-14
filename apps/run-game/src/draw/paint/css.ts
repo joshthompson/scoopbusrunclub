@@ -329,6 +329,9 @@ const shadowReach = (steps: FilterStep[]) =>
 		),
 	)
 
+/** How far a CSS `filter`'s drop shadow reaches out round what it's on: `filtered`'s `pad`. */
+export const filterReach = (filter: string) => shadowReach(filterSteps(filter))
+
 /**
  * An image, drawn `scale` times its size, through a CSS `filter`: painted
  * once and kept, as the page shows it, since WebKit's canvas has no

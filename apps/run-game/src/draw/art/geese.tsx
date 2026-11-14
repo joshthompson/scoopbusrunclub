@@ -54,6 +54,20 @@ export function gooseFlight(i: number, t: number) {
 	}
 }
 
+/**
+ * How far a gaggle of `count`, flying off, gets past its box before it's
+ * gone (`GEESE_FLIGHT_TICKS`), for the Draw Hook's `drawReach`: on along
+ * the course and up. The last is the furthest along and the fastest and
+ * steepest, so it gets furthest either way.
+ */
+export function geeseReach(count: number) {
+	const last = count - 1
+	const { x, y } = gooseFlight(last, GEESE_FLIGHT_TICKS)
+	// Its top, flying, from the top of the box.
+	const top = GEESE_HEIGHT - (last % 2) * 2 - FLYING_HEIGHT + y
+	return { right: Math.ceil(x), top: Math.ceil(-top) }
+}
+
 /** A goose's own number, out of 1: the same on every screen, for where the gaggle's at `x`. */
 const chance = (x: number, i: number) => {
 	const n = Math.sin(x * 12.9898 + i * 78.233) * 43758.5453

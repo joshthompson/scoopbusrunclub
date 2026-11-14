@@ -138,6 +138,21 @@ export function HurdleArt(props: { depth: number; tall?: boolean }) {
 /** How long a hurdle takes to tip over, as `HurdleArt`'s `transition` does, and how. */
 const KNOCKS_MS = 120
 const easeIn = cubicBezier(0.42, 0, 1, 1)
+/** Knocked flat, as `--knocked` has it: slanted over this far, in degrees, and squashed this much. */
+const KNOCKED_SLANT = 78
+const KNOCKED_SQUASH = 0.8
+
+/**
+ * How far a knocked hurdle lies out past the right of its box, flat, for
+ * its Draw Hook's `drawReach`: its top, slanted over and squashed.
+ */
+export const hurdleReach = (depth: number, tall = false) => ({
+	right: Math.ceil(
+		hurdleSize(depth, tall).height *
+			(1 - KNOCKED_SQUASH) *
+			Math.tan((KNOCKED_SLANT * Math.PI) / 180),
+	),
+})
 
 /**
  * `HurdleArt`, painted in a Draw Hook: a hurdle `depth` deep, from (0, 0) of
@@ -160,8 +175,15 @@ export function paintHurdle(
 	if (knocked > 0) {
 		// From its bottom left, as its `transform-origin` says.
 		ctx.translate(0, height)
-		ctx.transform(1, 0, Math.tan((-78 * knocked * Math.PI) / 180), 1, 0, 0)
-		ctx.scale(1, 1 - knocked * 0.8)
+		ctx.transform(
+			1,
+			0,
+			Math.tan((-KNOCKED_SLANT * knocked * Math.PI) / 180),
+			1,
+			0,
+			0,
+		)
+		ctx.scale(1, 1 - knocked * KNOCKED_SQUASH)
 		ctx.translate(0, -height)
 	}
 	ctx.drawImage(art, 0, 0, width, height)

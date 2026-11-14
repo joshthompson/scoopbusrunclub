@@ -9,6 +9,7 @@ import { type RunnerName, runners, strideFrameInterval } from '@/data/runners'
 import { imageSize } from '@/utils/imageSize'
 import {
 	type DrawPainting,
+	type DrawReach,
 	createConnectedController,
 	createController,
 	createObjectSignal,
@@ -81,6 +82,7 @@ import {
 	TURBINE_BLADE,
 	balloonAt,
 	gullsAt,
+	gullsDrawn,
 	stormAt,
 	turbineAt,
 	whaleAt,
@@ -121,7 +123,7 @@ import { MEMBERS } from '../runners/playable'
 import { zombieSprite } from '../runners/skeleton'
 import { play } from '../sfx'
 import { WallBricks } from './Backdrop'
-import { Bubble, paintBubble } from './Bubble'
+import { Bubble, bubbleReach, paintBubble } from './Bubble'
 import { PixelArt } from './PixelArt'
 import { Pixels } from './Pixels'
 import {
@@ -141,7 +143,13 @@ import {
 	duckNote,
 } from './art/duckNote'
 import { FikaArt, fikaPicture } from './art/fika'
-import { GEESE_HEIGHT, GeeseArt, geeseWidth, paintGeese } from './art/geese'
+import {
+	GEESE_HEIGHT,
+	GeeseArt,
+	geeseReach,
+	geeseWidth,
+	paintGeese,
+} from './art/geese'
 import {
 	FACE_FRONT,
 	FACE_HEIGHT,
@@ -151,13 +159,33 @@ import {
 } from './art/giantFurby'
 import { BUS_GLIDER_HEIGHT, BUS_GLIDER_WIDTH, busGlider } from './art/glider'
 import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt, paintHands } from './art/hands'
-import { HatPicture, hatArt, paintHat, paintHatGlow } from './art/hats'
-import { KIDS_HEIGHT, KidsArt, kidsPainter, kidsWidth } from './art/kids'
-import { MudArt, paintMud } from './art/mud'
+import {
+	HAT_GLOW_OUT,
+	HatPicture,
+	WORN_HAT_REACH,
+	hatArt,
+	paintHat,
+	paintHatGlow,
+} from './art/hats'
+import {
+	KIDS_HEIGHT,
+	KIDS_REACH,
+	KidsArt,
+	kidsPainter,
+	kidsWidth,
+} from './art/kids'
+import { MudArt, mudReach, paintMud } from './art/mud'
 import { ROADBLOCK, ROADBLOCK_HEIGHT, ROADBLOCK_WIDTH } from './art/roadblock'
-import { Carved, Footing, footingPainter, paintTombstone } from './art/scenery'
+import {
+	Carved,
+	FOOTING_REACH,
+	Footing,
+	footingPainter,
+	paintTombstone,
+} from './art/scenery'
 import {
 	GIANT_VENT_HEIGHT,
+	GIANT_VENT_REACH,
 	GIANT_VENT_WIDTH,
 	GiantVentArt,
 	SEWAGE_WIDTH,
@@ -212,6 +240,7 @@ import {
 } from './art/slopes'
 import {
 	SPLASH_HEIGHT,
+	SPLASH_REACH,
 	SPLASH_TICKS,
 	SPLASH_UP,
 	SPLASH_WIDTH,
@@ -231,6 +260,7 @@ import {
 	POTHOLE_ABOVE,
 	POTHOLE_HEIGHT,
 	PotholeArt,
+	hurdleReach,
 	hurdleSize,
 	hurdleTipping,
 	paintHurdle,
@@ -243,19 +273,19 @@ import { flyerLook } from './flyerLook'
 import { headTop } from './heads'
 import { filtered, paletteOf } from './paint/css'
 import { cssColour } from './paint/cssBackground'
-import { paintFlung } from './paint/dirtFly'
+import { flungReach, paintFlung } from './paint/dirtFly'
 import { paintHazardStripes } from './paint/hazardStripes'
 import { FONT_PIXEL, FONT_SIGN, fillLine, wrapLines } from './paint/lettering'
 import { mirrored, paintPicture } from './paint/picture'
-import { moveScooped, paintPixelArt } from './paint/pixelArt'
-import type { SvgDrawing } from './paint/svgCanvas'
-import { paintChunks, svgChunks } from './paint/svgChunks'
+import { paintPixelArt } from './paint/pixelArt'
 import { svgPainter } from './paint/svgPainter'
 import {
 	STEAM_CLOUDS,
 	STEAM_VENT_HEIGHT,
+	STEAM_VENT_REACH,
 	STEAM_VENT_WIDTH,
 	VALVE_ARROWS,
+	VALVE_REACH,
 	bouncerSquash,
 	paintBouncer,
 	paintSteamVent,
@@ -476,6 +506,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		},
 		// The same, on the canvas, over them: their skis or snowboard, and
 		// their hat.
+		drawReach: WORN_HAT_REACH,
 		draw({ ctx, drawDefault, image, $, $currentFrame }) {
 			drawDefault()
 			const width = $.width()
@@ -1150,6 +1181,7 @@ function createSplash(world: World, id: string, x: number, at: number) {
 			children: () => <SplashArt age={world.ticks() - at} />,
 		}),
 		draw: ({ ctx }) => paintSplash(ctx, world.ticks() - at),
+		drawReach: SPLASH_REACH,
 	})
 }
 
@@ -1355,6 +1387,7 @@ function createCorgi(world: World, c: Corgi) {
 			),
 		}),
 		// The same, on the canvas.
+		drawReach: bubbleReach(CORGI_WIDTH, 16, call.length),
 		draw({ ctx, image }) {
 			const look = (rare() && rarer) || ride
 			paintPicture(
@@ -1688,6 +1721,8 @@ export function createBusDirt(world: World) {
 					seconds: DIRT_SECONDS,
 					steps: 8,
 				}),
+			// Its box is the drill's tip: the rock flies up and back off it.
+			drawReach: flungReach(bits, 0, 0),
 		}),
 	]
 }
@@ -2315,7 +2350,29 @@ export function createPlatforms(world: World) {
 			: platformPainter(look, { solid: !!platform.solid, width, depth })
 		const cableColour =
 			platform.move && look.cable ? cssColour(look.cable) : undefined
+		/** Its crane's cable at its longest, through a swing. */
+		const { move } = platform
+		const longest =
+			move && cableColour
+				? Math.max(
+						...Array.from({ length: 65 }, (_, k) =>
+							cableTo(
+								platform,
+								platformAt(world.terrain, platform, (k / 64) * move.ticks),
+							),
+						),
+					)
+				: 0
+		/** Its own picture, if it's wider or deeper, and its cable, up out of sight. */
+		const overhang = art ? Math.max(0, (art.width - width) / 2) : 0
+		const drawReach = {
+			left: overhang,
+			right: overhang,
+			top: Math.max(art?.top ?? 0, cableColour ? SLING_HEIGHT + longest : 0),
+			bottom: art ? Math.max(0, art.height - art.top - depth) : 0,
+		}
 		return createController({
+			drawReach,
 			draw: ({ ctx, image }) => {
 				if (art) {
 					const picture = image(art.asset)
@@ -2450,6 +2507,8 @@ function createFixture(options: {
 	children?: () => JSX.Element
 	/** Its Draw Hook, painting it on the canvas in place of `children`. */
 	draw?: (painting: DrawPainting) => void
+	/** How far its Draw Hook paints past its box: see `drawReach`. */
+	drawReach?: DrawReach
 	style?: () => JSX.CSSProperties
 	/** Pixels up from where it would stand, every tick. */
 	lift?: (age: number) => number
@@ -2461,6 +2520,7 @@ function createFixture(options: {
 	return createController({
 		frames: options.frames,
 		draw: options.draw,
+		drawReach: options.drawReach,
 		init: () => ({
 			id: options.id,
 			type: options.type,
@@ -2684,6 +2744,7 @@ export function createScenery(world: World) {
 		return createController({
 			frames: [asset],
 			draw,
+			drawReach: footing ? FOOTING_REACH : undefined,
 			init: () => ({
 				id: `scenery-${i}`,
 				// A gateway's near side, over whoever's going through it.
@@ -2767,6 +2828,8 @@ export function createRunDirector(world: World) {
 				)}
 			</Show>
 		),
+		// "3", "2", "1" and "Go!", the biggest.
+		drawReach: bubbleReach(size.width, 30, 3),
 		draw: ({ ctx, drawDefault }) => {
 			drawDefault()
 			const word = countdownWord(world)
@@ -3204,6 +3267,12 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					}
 					paintPicture(ctx, image, cone, 0, 0, CONE_WIDTH, CONE_HEIGHT)
 				},
+				// Knocked over, it tips over its corner, up past its top on the
+				// way, and lies on its side, slid on past its box.
+				drawReach: {
+					top: Math.ceil(Math.hypot(CONE_WIDTH, CONE_HEIGHT) - CONE_HEIGHT),
+					right: CONE_SKID + CONE_HEIGHT,
+				},
 			})
 		}
 		case 'branch': {
@@ -3221,72 +3290,66 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			// Draw Hooks do both, and keep it pale or grey on WebKit too.
 			const { canvas } = rendererChoice
 			const knocked = () => world.ticks() >= 0 && !!state.scooped
-			const flight = () =>
-				state.scooped ? scoopFlight(state.scooped, world.ticks()) : undefined
 			// Jumping it: its near end's drawn behind you, not over you.
 			const over = () =>
 				world.ticks() >= 0 &&
 				Math.abs(world.body.x - o.x) < BRANCH_OVER_REACH &&
 				world.body.feetY < groundY(o.x) - BRANCH_LIMB_HEIGHT
+			const where = {
+				x: o.x + BRANCH_TREE_ALONG,
+				width: BRANCH_TREE_WIDTH,
+				height: BRANCH_TREE_HEIGHT,
+				sink: BRANCH_TREE_HEIGHT - BRANCH_LINE_ROW,
+				world,
+			}
+			const lieOrigin = { x: BRANCH_CROSS, y: BRANCH_LINE_ROW }
+			/** Its limb, flying, spins round where it crosses the path, at its top. */
+			const spin = { x: BRANCH_CROSS, y: BRANCH_LINE_ROW - BRANCH_LIMB_HEIGHT }
+			const limb = () => (
+				<PixelArt
+					src={lowBranchLimbAsset}
+					width={BRANCH_TREE_WIDTH}
+					height={BRANCH_TREE_HEIGHT}
+				/>
+			)
+			const paintLimb = (
+				ctx: CanvasRenderingContext2D,
+				image: DrawPainting['image'],
+			) =>
+				paintPixelArt(
+					ctx,
+					image,
+					lowBranchLimbAsset,
+					BRANCH_TREE_WIDTH,
+					BRANCH_TREE_HEIGHT,
+					foliage,
+				)
+			/** Its limb, still on the tree: the part of it from `clip.left` to `clip.right` across. */
 			const part = (options: {
 				suffix: string
 				type: string
-				src: string
-				/** How much of it shows, across: from `left` to `right`. */
-				clip?: { left: number; right: number }
+				clip: { left: number; right: number }
 				shown: () => boolean
 			}) => {
 				const { clip } = options
 				return createFixture({
 					id: `${id}${options.suffix}`,
 					type: options.type,
-					x: o.x + BRANCH_TREE_ALONG,
-					width: BRANCH_TREE_WIDTH,
-					height: BRANCH_TREE_HEIGHT,
-					sink: BRANCH_TREE_HEIGHT - BRANCH_LINE_ROW,
-					world,
-					children: () => (
-						<Scoopable
-							world={world}
-							state={state}
-							spin={`${BRANCH_CROSS}px ${BRANCH_LINE_ROW - BRANCH_LIMB_HEIGHT}px`}
-						>
-							<PixelArt
-								src={options.src}
-								width={BRANCH_TREE_WIDTH}
-								height={BRANCH_TREE_HEIGHT}
-							/>
-						</Scoopable>
-					),
+					...where,
+					children: limb,
 					draw: ({ ctx, image }) => {
-						if (clip) {
-							ctx.beginPath()
-							ctx.rect(clip.left, 0, clip.right - clip.left, BRANCH_TREE_HEIGHT)
-							ctx.clip()
-						}
-						moveScooped(
-							ctx,
-							flight(),
-							BRANCH_CROSS,
-							BRANCH_LINE_ROW - BRANCH_LIMB_HEIGHT,
-						)
-						paintPixelArt(
-							ctx,
-							image,
-							options.src,
-							BRANCH_TREE_WIDTH,
-							BRANCH_TREE_HEIGHT,
-							foliage,
-						)
+						ctx.beginPath()
+						ctx.rect(clip.left, 0, clip.right - clip.left, BRANCH_TREE_HEIGHT)
+						ctx.clip()
+						paintLimb(ctx, image)
 					},
 					style: () => ({
 						filter: canvas ? undefined : foliage,
 						transform: lie,
-						'transform-origin': `${BRANCH_CROSS}px ${BRANCH_LINE_ROW}px`,
-						'clip-path':
-							clip && !canvas
-								? `inset(0 ${BRANCH_TREE_WIDTH - clip.right}px 0 ${clip.left}px)`
-								: undefined,
+						'transform-origin': `${lieOrigin.x}px ${lieOrigin.y}px`,
+						'clip-path': canvas
+							? undefined
+							: `inset(0 ${BRANCH_TREE_WIDTH - clip.right}px 0 ${clip.left}px)`,
 						visibility: options.shown() ? 'visible' : 'hidden',
 					}),
 				})
@@ -3298,11 +3361,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				createFixture({
 					id: `${id}-tree`,
 					type: 'hazard',
-					x: o.x + BRANCH_TREE_ALONG,
-					width: BRANCH_TREE_WIDTH,
-					height: BRANCH_TREE_HEIGHT,
-					sink: BRANCH_TREE_HEIGHT - BRANCH_LINE_ROW,
-					world,
+					...where,
 					children: () => (
 						<PixelArt
 							src={lowBranchTreeAsset}
@@ -3322,38 +3381,51 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					style: () => ({
 						filter: canvas ? undefined : foliage,
 						transform: lie,
-						'transform-origin': `${BRANCH_CROSS}px ${BRANCH_LINE_ROW}px`,
+						'transform-origin': `${lieOrigin.x}px ${lieOrigin.y}px`,
 					}),
 				}),
 				// Its limb: the back of it behind everyone; its near end over a
 				// runner under it, or behind one jumping it. Knocked off by the
-				// bus, all of it, flying, in front.
+				// bus, all of it, flying, in front, its box going with it.
 				part({
 					suffix: '-limb',
 					type: 'hazard',
-					src: lowBranchLimbAsset,
 					clip: back,
 					shown: () => !knocked(),
 				}),
 				part({
 					suffix: '-limb-near',
 					type: 'hazard-front',
-					src: lowBranchLimbAsset,
 					clip: near,
 					shown: () => !knocked() && !over(),
 				}),
 				part({
 					suffix: '-limb-near-behind',
 					type: 'hazard',
-					src: lowBranchLimbAsset,
 					clip: near,
 					shown: () => !knocked() && over(),
 				}),
-				part({
-					suffix: '-limb-flying',
+				createScoopable({
+					id: `${id}-limb-flying`,
 					type: 'hazard-front',
-					src: lowBranchLimbAsset,
-					shown: knocked,
+					...where,
+					state,
+					spin,
+					lie: { transform: lie, origin: lieOrigin },
+					children: () => (
+						<Scoopable
+							world={world}
+							state={state}
+							spin={`${spin.x}px ${spin.y}px`}
+						>
+							{limb()}
+						</Scoopable>
+					),
+					draw: ({ ctx, image }) => paintLimb(ctx, image),
+					style: () => ({
+						filter: canvas ? undefined : foliage,
+						visibility: knocked() ? 'visible' : 'hidden',
+					}),
 				}),
 				// A note taped on top of its limb, over the path: an arrow,
 				// down. Gone with the limb, once the bus has knocked it off.
@@ -3414,6 +3486,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							o.tall ?? false,
 							tipping(knocked(), world.ticks()),
 						),
+					drawReach: hurdleReach(lane.depth, o.tall),
 					style: rendererChoice.canvas
 						? undefined
 						: () => ({ '--knocked': knocked() ? 1 : 0 }),
@@ -3438,6 +3511,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				draw: ({ ctx }) => {
 					paintKids?.(ctx, (Math.max(0, world.ticks()) * TICK_MS) / 1000)
 				},
+				drawReach: KIDS_REACH,
 			})
 		}
 		case 'vent':
@@ -3478,6 +3552,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							Math.max(0, world.ticks()),
 							world.ticks() >= 0 ? state.flown : undefined,
 						),
+					drawReach: GIANT_VENT_REACH,
 				})
 			// A bouncy toadstool, squashing as it fires whoever's on it up.
 			if (world.course.look?.bouncers) {
@@ -3522,6 +3597,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						world.ticks(),
 						state.flown,
 					),
+				drawReach: STEAM_VENT_REACH,
 			})
 		case 'hands':
 			// In front of whoever's on them: clutching their ankles.
@@ -3685,6 +3761,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						world.ticks() >= 0 ? state.flown : undefined,
 						world.course.look?.geese,
 					),
+				// Flown off ahead and up, far out of their box.
+				drawReach: geeseReach(o.count),
 			})
 		case 'pothole':
 			return createFixture({
@@ -3716,6 +3794,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				// filter what a Draw Hook paints.
 				draw: ({ ctx, image }) =>
 					paintMud(ctx, image, world, o, world.course.look?.mud),
+				drawReach: mudReach(o),
 				style: rendererChoice.canvas
 					? undefined
 					: () => ({ filter: world.course.look?.mud }),
@@ -3772,6 +3851,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				},
 				draw: ({ ctx, image }) =>
 					paintValve(ctx, image, Math.max(0, world.ticks())),
+				drawReach: VALVE_REACH,
 			})
 		case 'snowman': {
 			const burst = () =>
@@ -3896,6 +3976,9 @@ function createGerm(
 	}
 }
 
+/** How tall a flock of gulls' box is: room round them to wheel about in. */
+const GULLS_HEIGHT = 120
+
 /** The sky's Obstacles' kinds, out over the sea: see `sky`. */
 type SkyObstacle = Extract<
 	Obstacle,
@@ -3941,14 +4024,22 @@ function createSkyThing(
 			const top = line - o.height - 60
 			const gulls = () =>
 				gullsAt(o, line, now(), world.ticks() >= 0 ? state.flown : undefined)
+			// Scattered, they fly up and back out of it.
+			const drawn = gullsDrawn(o, line)
 			return createController({
+				drawReach: {
+					left: Math.max(0, left - drawn.left),
+					top: Math.max(0, top - drawn.top),
+					right: Math.max(0, drawn.right - (left + width)),
+					bottom: Math.max(0, drawn.bottom - (top + GULLS_HEIGHT)),
+				},
 				init: () => ({
 					id,
 					type: 'hazard',
 					x: () => left,
 					y: () => top,
 					width: () => width,
-					height: () => 120,
+					height: () => GULLS_HEIGHT,
 					children: () => (
 						<Index each={gulls()}>
 							{(gull) => (
@@ -4141,6 +4232,7 @@ export function createBoost(world: World, state: BoostState, i: number) {
 					paintHatGlow(ctx, art.width, art.height)
 					paintHat(ctx, image, { kind: o.hat }, 0, 0, { now: world.ticks() })
 				},
+				drawReach: HAT_GLOW_OUT,
 				// Picked up: gone, onto someone's head.
 				style: () => ({
 					visibility: world.ticks() >= 0 && state.used ? 'hidden' : 'visible',
@@ -4169,6 +4261,16 @@ export function createBoost(world: World, state: BoostState, i: number) {
 							Go {state.cheered || world.runner.name}!
 						</Bubble>
 					</Show>
+				),
+				// "Go", and whoever's cheered on's name.
+				drawReach: bubbleReach(
+					size.width,
+					18,
+					'Go !'.length +
+						Math.max(
+							world.runner.name.length,
+							...world.racers.map((r) => r.runner.name.length),
+						),
 				),
 				draw: ({ ctx, drawDefault }) => {
 					drawDefault()
@@ -4841,7 +4943,11 @@ export function createForeground(world: World) {
 		</svg>
 	)
 	/** On the canvas: read once, then just the bit in view painted. */
-	let drawing: SvgDrawing | undefined
+	const paint = svgPainter(
+		`foreground:${world.course.id}`,
+		() => art(look.groundDefs),
+		{ resolve: paletteOf(look.palette), chunkWidth: FOREGROUND_CHUNK },
+	)
 	return [
 		createController({
 			init: () => ({
@@ -4854,20 +4960,8 @@ export function createForeground(world: World) {
 				children: () => art(),
 			}),
 			draw: ({ ctx, image, $scene }) => {
-				drawing ??= svgChunks(() => art(look.groundDefs), {
-					chunkWidth: FOREGROUND_CHUNK,
-					resolve: paletteOf(look.palette),
-					key: `foreground:${world.course.id}`,
-				})
-				if (!drawing) return
 				const view = $scene.canvas.get()
-				paintChunks(
-					ctx,
-					drawing,
-					view.x() - from,
-					view.x() + view.width() - from,
-					image,
-				)
+				paint(ctx, image, view.x() - from, view.x() + view.width() - from)
 			},
 		}),
 	]

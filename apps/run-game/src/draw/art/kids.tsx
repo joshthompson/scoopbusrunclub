@@ -91,6 +91,14 @@ const KEEPY_HEIGHT = 22
 const PASS_HEIGHT = 30
 /** Where the ball is kicked from: about knee height. */
 const FOOT_HEIGHT = 10
+/**
+ * How far the ball goes up out of the top of their box, at the top of a
+ * pass, for the Draw Hook's `drawReach`.
+ */
+export const KIDS_REACH = {
+	top:
+		FOOT_HEIGHT + Math.max(KEEPY_HEIGHT, PASS_HEIGHT) + BALL_SIZE - KIDS_HEIGHT,
+}
 /** How long a kicking leg stays up, either side of the kick. */
 const KICK_SECONDS = 0.09
 

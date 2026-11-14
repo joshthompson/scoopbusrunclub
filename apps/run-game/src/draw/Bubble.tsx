@@ -54,6 +54,26 @@ const OVER = 12
 /** Its tail: how wide, and how far down it reaches past its bottom edge's inside. */
 const TAIL_WIDTH = 12
 const TAIL_HEIGHT = 9
+/** How far its shadow falls, down and to the right. */
+const SHADOW = 3
+/** How wide Remi Pop's widest letters are (Q, q), for their size. */
+const WIDEST = 0.79
+
+/**
+ * How far a bubble saying at most `letters` letters, `size` px, gets out of
+ * a sprite `width` wide, for the sprite's Draw Hook's `drawReach`: up over
+ * its top, and out either side, shadow and all, as wide as it can be.
+ */
+export function bubbleReach(width: number, size: number, letters: number) {
+	const widest =
+		letters * size * WIDEST + PADDING_SIDE * 2 + BORDER * 2 + SHADOW
+	const side = Math.max(0, Math.ceil((widest - width) / 2))
+	return {
+		left: side,
+		right: side,
+		top: OVER + size + PADDING_TOP + PADDING_BOTTOM + BORDER * 2,
+	}
+}
 
 /**
  * `Bubble`, in a Draw Hook: `text` over a sprite `width` wide, `size` px,
@@ -79,7 +99,7 @@ export function paintBubble(
 	const top = -OVER - height
 	// Its shadow, then it, white, inside its border.
 	ctx.fillStyle = 'rgba(15, 31, 41, 0.35)'
-	ctx.fillRect(left + 3, top + 3, width, height)
+	ctx.fillRect(left + SHADOW, top + SHADOW, width, height)
 	ctx.fillStyle = INK
 	ctx.fillRect(left, top, width, height)
 	ctx.fillStyle = 'white'
