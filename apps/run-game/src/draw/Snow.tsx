@@ -1,4 +1,3 @@
-import type { JSX } from 'solid-js'
 import { svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
@@ -51,10 +50,7 @@ function layerAt(world: World, i: number) {
 	}
 }
 
-/**
- * The same, painted onto the canvas, over the whole screen: in the
- * screen's own pixels, from its top left.
- */
+/** Snow, painted over the whole screen: in the screen's own pixels, from its top left. */
 export function paintSnow(
 	ctx: CanvasRenderingContext2D,
 	image: ImageOf,
@@ -73,29 +69,5 @@ export function paintSnow(
 			{ left: 0, top: 0, width: VIEW_WIDTH, height: VIEW_HEIGHT },
 			{ ...layerAt(world, i), down: true },
 		),
-	)
-}
-
-export function Snow(props: { world: World }) {
-	const snow = props.world.course.look?.snow
-	if (!snow) return null
-	const layer = (i: number): JSX.CSSProperties => {
-		const { tile } = LAYERS[i]
-		const { x, y } = layerAt(props.world, i)
-		return {
-			position: 'absolute',
-			inset: 0,
-			'pointer-events': 'none',
-			'background-image': `url("${tile}")`,
-			'background-position': `${x}px ${y}px`,
-			opacity: thickness(props.world, snow),
-			visibility: thickness(props.world, snow) > 0 ? 'visible' : 'hidden',
-		}
-	}
-	return (
-		<>
-			<div style={layer(0)} />
-			<div style={layer(1)} />
-		</>
 	)
 }

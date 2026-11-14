@@ -1,4 +1,3 @@
-import { For, type JSX, Show } from 'solid-js'
 import { svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
@@ -234,85 +233,7 @@ export function paintFogDeck(
 	})
 }
 
-export function Fog(props: { world: World }) {
-	const fog = props.world.course.look?.fog
-	if (!fog) return null
-	const { world } = props
-	const layer = (i: number): JSX.CSSProperties => {
-		const { tile } = LAYERS[i]
-		const { x, y } = layerAt(world, i)
-		return {
-			position: 'absolute',
-			inset: 0,
-			'pointer-events': 'none',
-			'background-image': `url("${tile}")`,
-			'background-position': `${x}px ${y}px`,
-			'image-rendering': 'pixelated',
-			opacity: thickness(world, fog),
-			visibility: thickness(world, fog) > 0 ? 'visible' : 'hidden',
-		}
-	}
-	return (
-		<>
-			<div style={layer(0)} />
-			<Show when={fog.deck}>
-				{(deck) => <Deck world={world} deck={deck()} />}
-			</Show>
-			<div style={layer(1)} />
-		</>
-	)
-}
-
 /** The deck's tiles, along it. */
 const DECK_TILE = 600
 /** How far in from its near end it takes to thicken, from nothing. */
 const DECK_FADE = 320
-
-function Deck(props: { world: World; deck: DeckLook }) {
-	const { world, deck } = props
-	const tiles = deckTiles(deck)
-	/** Where it is on the screen, with the camera's zoom and how far up it's looking. */
-	const at = () => {
-		const zoom = world.zoom()
-		const left = (deck.from - world.camera()) / zoom
-		const top =
-			VIEW_HEIGHT - (VIEW_HEIGHT - (deck.top - PUFF - world.cameraY())) / zoom
-		return { left, top, zoom }
-	}
-	const shown = () => {
-		const { left, top, zoom } = at()
-		const width = (deck.to - deck.from) / zoom
-		return (
-			left < 960 &&
-			left + width > 0 &&
-			top < VIEW_HEIGHT &&
-			top + (deck.depth + PUFF * 2) / zoom > 0
-		)
-	}
-	return (
-		<Show when={shown()}>
-			<For each={tiles}>
-				{(tile, i) => (
-					<div
-						style={{
-							position: 'absolute',
-							'pointer-events': 'none',
-							left: `${Math.round(at().left)}px`,
-							top: `${Math.round(at().top + i() * 10)}px`,
-							width: `${deck.to - deck.from}px`,
-							height: `${deck.depth + PUFF * 2 + 20}px`,
-							'background-image': `url("${tile}")`,
-							'background-repeat': 'repeat-x',
-							'background-position-x': `${Math.round(Math.max(0, world.ticks()) * (i() ? -0.3 : 0.2))}px`,
-							transform: `scale(${1 / at().zoom})`,
-							// Wisping away at its near end, not cut off.
-							'mask-image': `linear-gradient(to right, transparent, black ${DECK_FADE}px)`,
-							'transform-origin': '0 0',
-							opacity: i() ? 0.9 : 1,
-						}}
-					/>
-				)}
-			</For>
-		</Show>
-	)
-}

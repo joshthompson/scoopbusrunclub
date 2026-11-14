@@ -1,8 +1,6 @@
-import { For } from 'solid-js'
 import { pixelArt } from '../../courses/kit/pixelArt'
 import { RUNNER_SCALE } from '../../game/constants'
 import { touristSprite } from '../../runners/tourists'
-import { PixelArt } from '../PixelArt'
 import type { ImageOf } from '../paint/bands'
 import { paintPicture } from '../paint/picture'
 
@@ -81,7 +79,7 @@ const chance = (x: number, i: number) => {
 export const touristAlong = (count: number, i: number) =>
 	i * TOURIST_SPACING + TOURIST_WIDTH / 2 - touristsWidth(count) / 2
 
-/** Who's in the group of `count` at `x`, and how they stand: see `TouristsArt`. */
+/** Who's in the group of `count` at `x`, and how they stand. */
 function touristsOf(
 	x: number,
 	count: number,
@@ -99,84 +97,11 @@ function touristsOf(
 }
 
 /**
- * A group of tourists, its feet on the path's middle, `TOURISTS_DEPTH_ROOM`
- * up from the drawing's bottom: each stood a little nearer or further back,
- * the nearer in front, and `drop` lower where the ground is, along from the
- * group's middle.
- */
-export function TouristsArt(props: {
-	x: number
-	count: number
-	drop?: (along: number) => number
-}) {
-	const tourists = touristsOf(props.x, props.count, props.drop)
-	return (
-		<div
-			style={{
-				position: 'relative',
-				height: `${TOURISTS_HEIGHT + TOURISTS_DEPTH_ROOM}px`,
-			}}
-		>
-			<For each={tourists}>
-				{(tourist, i) => {
-					const sprite = tourist.sprite
-					if (!sprite) return null
-					const width = sprite.width * RUNNER_SCALE
-					const height = sprite.height * RUNNER_SCALE
-					// Stood, or with a phone up: its frame, as the engine draws
-					// frames, the strip repeating along at the frame's offset.
-					const frame = sprite.frames[tourist.phone ? 1 : 0] ?? ''
-					const [src, at] = frame.split('#')
-					const [offset] = (at ?? '0').split(',').map(Number)
-					const bottom = `${TOURISTS_DEPTH_ROOM - tourist.depth - tourist.drop}px`
-					const z = tourist.depth + FURTHER
-					// Behind them, the way they're not facing: their right,
-					// facing left.
-					const middle = i() * TOURIST_SPACING + TOURIST_WIDTH / 2
-					const suitcaseAt =
-						middle - tourist.facing * SUITCASE_BESIDE - SUITCASE_WIDTH / 2
-					return (
-						<>
-							<div
-								style={{
-									position: 'absolute',
-									left: `${i() * TOURIST_SPACING}px`,
-									bottom,
-									'z-index': z,
-									width: `${width}px`,
-									height: `${height}px`,
-									background: `url("${src}") ${offset}px 0 / auto 100% repeat-x`,
-									'image-rendering': 'pixelated',
-									// Drawn facing left: turned round, to face right.
-									transform: tourist.facing === 1 ? 'scaleX(-1)' : undefined,
-								}}
-							/>
-							<div
-								style={{
-									position: 'absolute',
-									left: `${suitcaseAt}px`,
-									bottom,
-									'z-index': z,
-								}}
-							>
-								<PixelArt
-									src={tourist.suitcase}
-									width={SUITCASE_WIDTH}
-									height={SUITCASE_HEIGHT}
-								/>
-							</div>
-						</>
-					)
-				}}
-			</For>
-		</div>
-	)
-}
-
-/**
- * `TouristsArt`, painted in a Draw Hook: the same group, from (0, 0) of
- * `ctx`, the nearer over the further back, as their `z-index` stacks them.
- * Who they are is worked out once, as the painter's made.
+ * A group of tourists, painted in a Draw Hook from (0, 0) of `ctx`, its
+ * feet on the path's middle, `TOURISTS_DEPTH_ROOM` up from the drawing's
+ * bottom: each stood a little nearer or further back, the nearer over the
+ * further back, and `drop` lower where the ground is, along from the
+ * group's middle. Who they are is worked out once, as the painter's made.
  */
 export function touristsPainter(
 	x: number,
@@ -238,7 +163,7 @@ export function touristsPainter(
 			{ z, paint: suitcase },
 		]
 	})
-	// Stacked as the page stacks them: by z-index, then in the order they come.
+	// Nearer over further back, then in the order they come.
 	pieces.sort((a, b) => a.z - b.z)
 	return (ctx: CanvasRenderingContext2D, image: ImageOf) => {
 		for (const piece of pieces) piece.paint(ctx, image)

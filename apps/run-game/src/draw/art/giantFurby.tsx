@@ -1,4 +1,3 @@
-import { Show } from 'solid-js'
 import {
 	GIANT_FUR,
 	GIANT_FUR_DARK,
@@ -51,7 +50,7 @@ function blob(cx: number, cy: number, rx: number, ry: number) {
 	return d
 }
 
-/** How it looks this tick: as `GiantFurbyFace` takes it. */
+/** How it looks this tick. */
 export interface FaceLook {
 	/** How far open its beak is, 0 to 1. */
 	open: number
@@ -151,67 +150,6 @@ const tuft = () =>
 		CELL,
 	)
 
-export function GiantFurbyFace(props: FaceLook) {
-	const iris = () => irisAt(props.look)
-	const pupil = () => pupilAt(props.look)
-	return (
-		<svg
-			width={FACE_WIDTH}
-			height={FACE_HEIGHT}
-			viewBox={`0 0 ${FACE_WIDTH} ${FACE_HEIGHT}`}
-			shape-rendering="crispEdges"
-			style={{ display: 'block', overflow: 'visible' }}
-			aria-hidden="true"
-		>
-			{/* Its tongue, on its mouth's floor, inside. */}
-			<rect
-				x={FACE_FRONT + 4}
-				y={FACE_HEIGHT - 14}
-				width={90}
-				height={14}
-				fill={TONGUE}
-			/>
-			<rect
-				x={FACE_FRONT + 40}
-				y={FACE_HEIGHT - 14}
-				width={4}
-				height={10}
-				fill={TONGUE_DARK}
-			/>
-			{/* Its lower beak, jutting out along the floor. */}
-			<g innerHTML={lowerBeak().join('')} />
-			{/* Its eye, in pixels as big as it is: white, its iris, its pupil
-			    and the light in it, a ring of shade round it. */}
-			<path d={blob(eye.x, eye.y, 58, 50)} fill={GIANT_FUR_DARK} />
-			<path d={blob(eye.x, eye.y, 50, 42)} fill="#ffffff" />
-			<path d={blob(eye.x, eye.y + 30, 44, 14)} fill={EYE_SHADE} />
-			<path d={blob(iris().x, iris().y, 26, 26)} fill={IRIS} />
-			<path d={blob(iris().x - 6, iris().y - 6, 14, 12)} fill={IRIS_LIGHT} />
-			<path d={blob(pupil().x, pupil().y, 13, 13)} fill={PUPIL} />
-			<rect
-				x={pupil().x + CELL}
-				y={pupil().y - 3 * CELL}
-				width={2 * CELL}
-				height={2 * CELL}
-				fill="#ffffff"
-			/>
-			{/* Its eyelid, down over it, blinking. */}
-			<Show when={props.blink}>
-				<path d={blob(eye.x, eye.y, 54, 46)} fill={GIANT_FUR} />
-				<path
-					d={`M${eye.x - 52},${eye.y}h104v${CELL}h-104Z`}
-					fill={GIANT_FUR_DARK}
-				/>
-			</Show>
-			{/* A tuft over its eye. */}
-			<g innerHTML={tuft()} />
-			{/* Its upper beak, on its hinge, hanging down over its mouth or
-			    swung up: turned on it first, then drawn in its pixels. */}
-			<g innerHTML={upperBeak(props.open).join('')} />
-		</svg>
-	)
-}
-
 /** Rects' SVG markup, as one path to fill: they're all one colour. */
 function rectsPath(markup: string) {
 	const path = new Path2D()
@@ -237,10 +175,7 @@ let still: { lower: Path2D[]; tuft: Path2D } | undefined
 /** Its upper beak, built again only as it swings. */
 let swung: { open: number; beak: Path2D[] } | undefined
 
-/**
- * The same face, painted onto a canvas: for the Canvas Renderer, from
- * (0, 0), as `GiantFurbyFace` draws it.
- */
+/** The face, painted from (0, 0). */
 export function paintGiantFurbyFace(
 	ctx: CanvasRenderingContext2D,
 	{ open, blink, look }: FaceLook,
@@ -254,12 +189,16 @@ export function paintGiantFurbyFace(
 	}
 	const iris = irisAt(look)
 	const pupil = pupilAt(look)
+	// Its tongue, on its mouth's floor, inside; its lower beak, jutting out
+	// along the floor.
 	ctx.fillStyle = TONGUE
 	ctx.fillRect(FACE_FRONT + 4, FACE_HEIGHT - 14, 90, 14)
 	ctx.fillStyle = TONGUE_DARK
 	ctx.fillRect(FACE_FRONT + 40, FACE_HEIGHT - 14, 4, 10)
 	fill(BEAK, still.lower[0])
 	fill(BEAK_DARK, still.lower[1])
+	// Its eye, in pixels as big as it is: white, its iris, its pupil and the
+	// light in it, a ring of shade round it.
 	fill(GIANT_FUR_DARK, pathOf(blob(eye.x, eye.y, 58, 50)))
 	fill('#ffffff', pathOf(blob(eye.x, eye.y, 50, 42)))
 	fill(EYE_SHADE, pathOf(blob(eye.x, eye.y + 30, 44, 14)))
@@ -268,11 +207,14 @@ export function paintGiantFurbyFace(
 	fill(PUPIL, pathOf(blob(pupil.x, pupil.y, 13, 13)))
 	ctx.fillStyle = '#ffffff'
 	ctx.fillRect(pupil.x + CELL, pupil.y - 3 * CELL, 2 * CELL, 2 * CELL)
+	// Its eyelid, down over it, blinking.
 	if (blink) {
 		fill(GIANT_FUR, pathOf(blob(eye.x, eye.y, 54, 46)))
 		ctx.fillStyle = GIANT_FUR_DARK
 		ctx.fillRect(eye.x - 52, eye.y, 104, CELL)
 	}
+	// A tuft over its eye; its upper beak, on its hinge, hanging down over
+	// its mouth or swung up.
 	fill(GIANT_FUR_LIGHT, still.tuft)
 	fill(BEAK, swung.beak[0])
 	fill(BEAK_DARK, swung.beak[1])

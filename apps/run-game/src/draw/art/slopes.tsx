@@ -1,12 +1,10 @@
 import type { DrawPainting } from 'scoopjs'
-import { For, type JSX, Show } from 'solid-js'
 import {
 	type PixelRect,
 	paintedArt,
 	pixelArt,
 } from '../../courses/kit/pixelArt'
 import type { Rail } from '../../courses/types'
-import { PixelArt } from '../PixelArt'
 import { paintPicture } from '../paint/picture'
 
 /**
@@ -90,43 +88,9 @@ const heap = pixelArt(SNOWMAN_COLUMNS, SNOWMAN_ROWS, [
 /** How long it's flying apart for, burst, before it's just a heap. */
 const BURST_TICKS = 24
 
-/** A snowman, stood up, or burst, `since` ticks ago: bits of him flying, then a heap. */
-export function SnowmanArt(props: { since?: number }) {
-	const burst = () => props.since !== undefined
-	return (
-		<div style={{ position: 'relative', width: '100%', height: '100%' }}>
-			<PixelArt
-				src={burst() ? heap : snowman}
-				width={SNOWMAN_WIDTH}
-				height={SNOWMAN_DRAWN}
-			/>
-			<Show when={burst() && (props.since ?? 99) < BURST_TICKS}>
-				<For each={PUFF}>
-					{(bit) => {
-						const t = () => (props.since ?? 0) / BURST_TICKS
-						return (
-							<div
-								style={{
-									position: 'absolute',
-									left: `${SNOWMAN_WIDTH / 2 + bit.x * t()}px`,
-									top: `${30 + bit.y * t() + 40 * t() * t()}px`,
-									width: `${bit.size}px`,
-									height: `${bit.size}px`,
-									background: bit.colour,
-									opacity: 1 - t(),
-								}}
-							/>
-						)
-					}}
-				</For>
-			</Show>
-		</div>
-	)
-}
-
 /**
- * `SnowmanArt`, painted in a Draw Hook, from (0, 0) of `ctx`: stood up, or
- * burst `since` ticks ago.
+ * A snowman, painted in a Draw Hook, from (0, 0) of `ctx`: stood up, or
+ * burst `since` ticks ago, bits of him flying, then a heap.
  */
 export function paintSnowman(
 	ctx: CanvasRenderingContext2D,
@@ -177,50 +141,8 @@ const FLAG_TOP = 4
 const FLAG_HEIGHT = 24
 
 /**
- * A slalom gate, side on: a flag, red or blue, a white band across it,
- * stretched between two poles. They stand at the edges of the piste, red
- * at its back and blue at its front, in turn, so the course weaves past
- * them. Gone past, its flag flaps.
- */
-export function GateArt(props: { colour: 'red' | 'blue'; flapping: boolean }) {
-	const fill = () => (props.colour === 'red' ? '#d8342c' : '#2459c4')
-	const pole = (left: number): JSX.CSSProperties => ({
-		position: 'absolute',
-		left: `${left}px`,
-		top: 0,
-		width: `${GATE_POLE_WIDTH}px`,
-		height: `${GATE_HEIGHT}px`,
-		background: fill(),
-		'border-left': '1px solid rgba(255, 255, 255, 0.6)',
-		'box-sizing': 'border-box',
-	})
-	return (
-		<div style={{ position: 'relative', width: '100%', height: '100%' }}>
-			<div
-				style={{
-					position: 'absolute',
-					left: `${GATE_POLE_WIDTH}px`,
-					top: `${FLAG_TOP}px`,
-					width: `${GATE_WIDTH - GATE_POLE_WIDTH * 2}px`,
-					height: `${FLAG_HEIGHT}px`,
-					'box-sizing': 'border-box',
-					background: `linear-gradient(to bottom, ${fill()} 0 36%, white 36% 64%, ${fill()} 64%)`,
-					border: '2px solid rgba(0, 0, 0, 0.35)',
-					'transform-origin': '0 50%',
-					animation: props.flapping
-						? 'gate-flap 0.25s steps(3) infinite'
-						: undefined,
-				}}
-			/>
-			<div style={pole(0)} />
-			<div style={pole(GATE_WIDTH - GATE_POLE_WIDTH)} />
-		</div>
-	)
-}
-
-/**
- * How `gate-flap` (in `styles.css`) has the flag, `ms` into it: skewed and
- * squashed, from its left middle. It steps, three to each half of it.
+ * How a gate's flag flaps, `ms` into it: skewed and squashed, from its left
+ * middle, a quarter of a second a flap, in three steps each half.
  */
 function gateFlap(ms: number): { skew: number; squash: number } {
 	const at = (ms % 250) / 250
@@ -232,8 +154,11 @@ function gateFlap(ms: number): { skew: number; squash: number } {
 }
 
 /**
- * `GateArt`, painted in a Draw Hook, from (0, 0) of `ctx`; its flag
- * flapping, if it's `flapping` ms into it.
+ * A slalom gate, side on, painted in a Draw Hook, from (0, 0) of `ctx`: a
+ * flag, red or blue, a white band across it, stretched between two poles.
+ * They stand at the edges of the piste, red at its back and blue at its
+ * front, in turn, so the course weaves past them. Gone past, its flag
+ * flaps: if it's `flapping` ms into it.
  */
 export function paintGate(
 	ctx: CanvasRenderingContext2D,
@@ -299,87 +224,11 @@ function railLegs(
 }
 
 /**
- * A rail to grind, a box or a log, `rail`, along the line of `tops` (its
- * top every few px, from its left, in its box's own pixels) over `feet`
- * (the snow under it): its legs down into the snow, and it along the top.
- */
-export function RailArt(props: {
-	rail: Rail
-	width: number
-	height: number
-	tops: [number, number][]
-	feet: [number, number][]
-}) {
-	const line = (points: [number, number][], dy = 0) =>
-		points.map(([x, y]) => `${x},${y + dy}`).join(' ')
-	const legs = () => railLegs(props.tops, props.feet, props.width)
-	const look = () =>
-		RAIL_LOOKS[props.rail.look === 'roof' ? 'box' : props.rail.look]
-	return (
-		<svg
-			width={props.width}
-			height={props.height}
-			viewBox={`0 0 ${props.width} ${props.height}`}
-			shape-rendering="crispEdges"
-			style={{ display: 'block', overflow: 'visible' }}
-			aria-hidden="true"
-		>
-			<For each={legs()}>
-				{([x, top, foot]) => (
-					<>
-						<rect
-							x={x}
-							y={top}
-							width={look().legWidth}
-							height={Math.max(0, foot - top + 4)}
-							fill={look().leg}
-						/>
-						<rect
-							x={x - 2}
-							y={foot}
-							width={look().legWidth + 4}
-							height={3}
-							fill={SNOW}
-						/>
-					</>
-				)}
-			</For>
-			{/* Its side, under its top: deep for a box or a log. */}
-			<polyline
-				points={line(props.tops, look().depth / 2)}
-				fill="none"
-				stroke={look().side}
-				stroke-width={look().depth}
-			/>
-			<polyline
-				points={line(props.tops)}
-				fill="none"
-				stroke={look().top}
-				stroke-width={3}
-			/>
-			<polyline
-				points={line(props.tops, -1)}
-				fill="none"
-				stroke={look().shine}
-				stroke-width={1}
-			/>
-			<Show when={props.rail.look === 'rail'}>
-				{/* Hazard stripes, painted on it. */}
-				<polyline
-					points={line(props.tops, 2)}
-					fill="none"
-					stroke="#f5c518"
-					stroke-width={3}
-					stroke-dasharray="8 8"
-				/>
-			</Show>
-		</svg>
-	)
-}
-
-/**
- * `RailArt`, painted in a Draw Hook: the same rail, box or log, from (0, 0)
- * of `ctx`. Its lines are worked out once, and stroked each time.
+ * A rail to grind, a box or a log, `rail`, painted in a Draw Hook from
+ * (0, 0) of `ctx`, along the line of `tops` (its top every few px, from its
+ * left, in its box's own pixels) over `feet` (the snow under it): its legs
+ * down into the snow, and it along the top, its side under its top, deep
+ * for a box or a log. Its lines are worked out once, and stroked each time.
  */
 export function railPainter(props: {
 	rail: Rail
@@ -408,7 +257,7 @@ export function railPainter(props: {
 		ctx.fill(legs)
 		ctx.fillStyle = SNOW
 		ctx.fill(snow)
-		// As an SVG strokes them.
+		// Sharp at its corners, flat at its ends.
 		ctx.lineJoin = 'miter'
 		ctx.miterLimit = 4
 		ctx.lineCap = 'butt'

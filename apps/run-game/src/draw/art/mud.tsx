@@ -59,49 +59,10 @@ function mudColumns(world: World, o: Mud) {
 }
 
 /**
- * A muddy puddle across the path, its columns drawn onto one canvas, so
- * it's scaled as one picture, without seams between them.
- */
-export function MudArt(props: { world: World; obstacle: Mud }) {
-	const { width, columns } = mudColumns(props.world, props.obstacle)
-	const canvas = (
-		<canvas
-			width={width}
-			height={MUD_DRAWN}
-			style={{
-				display: 'block',
-				'margin-top': `${-MUD_ART_HEIGHT / 2}px`,
-				'image-rendering': 'pixelated',
-			}}
-		/>
-	) as HTMLCanvasElement
-	const art = new Image()
-	art.onload = () => {
-		const context = canvas.getContext('2d')
-		if (!context) return
-		context.imageSmoothingEnabled = false
-		// The art's in cells of 2 px: half as many of its own pixels.
-		for (const { x, from, ground } of columns)
-			context.drawImage(
-				art,
-				from / 2,
-				0,
-				2,
-				MUD_ART_HEIGHT / 2,
-				x,
-				ground,
-				4,
-				MUD_ART_HEIGHT,
-			)
-	}
-	art.src = mudAsset
-	return canvas
-}
-
-/**
- * `MudArt`, painted in a Draw Hook, from (0, 0) of `ctx`, recoloured by
- * `filter` (the course's, over the mud) as the page's `filter` does it: put
- * together once, and kept.
+ * A muddy puddle across the path, painted in a Draw Hook, from (0, 0) of
+ * `ctx`, its columns put together as one picture, without seams between
+ * them, recoloured by `filter` (the course's, over the mud): put together
+ * once, and kept.
  */
 export function paintMud(
 	ctx: CanvasRenderingContext2D,

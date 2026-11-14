@@ -4,9 +4,9 @@ import { type Loaded, filtered } from '../paint/css'
 import { FONT_PIXEL, baselineIn, wrapLines } from '../paint/lettering'
 
 /**
- * What a piece of scenery has on it besides its picture, for the DOM
- * Renderer's `children` and the Canvas Renderer's Draw Hook alike: a name
- * carved in a tombstone, and the field made up under something on a hill.
+ * What a piece of scenery has on it besides its picture, painted by its
+ * Draw Hook: a name carved in a tombstone, and the field made up under
+ * something on a hill.
  */
 
 /** How far past either end of it a footing's grass runs on down the slope. */
@@ -66,9 +66,10 @@ function carvedSize(name: string) {
 
 /**
  * A name carved in a tombstone's panel, `x`, `y`, `width` and `height` in
- * its box, as `Carved` letters it: in capitals, each line in the middle,
- * the lines in the middle of the panel, and a word too long for a line
- * broken wherever it has to be.
+ * its box, as on the website's tombstone sign: dark, lit along each
+ * letter's bottom edge, smaller the longer it is. In capitals, each line in
+ * the middle, the lines in the middle of the panel, and a word too long for
+ * a line broken wherever it has to be.
  */
 function paintCarved(
 	ctx: CanvasRenderingContext2D,
@@ -114,77 +115,13 @@ function breakAnywhere(
 }
 
 /**
- * The field made up under something wide on a hill, from its foot down to
- * the verge wherever the ground falls away under it, and sloping off past
- * its ends: the Copper Tents, levelled on the top of Haga's hill. In the
- * verge's green, so it's all one field. `base` is its foot, in the world.
- */
-export function Footing(props: {
-	groundY: (x: number) => number
-	x: number
-	width: number
-	base: number
-}) {
-	const columns = () =>
-		footingColumns(props.groundY, props.x, props.width, props.base)
-	return (
-		<svg
-			aria-hidden="true"
-			width={props.width + FOOTING_SHOULDER * 2}
-			height={columns().deepest}
-			shape-rendering="crispEdges"
-			style={{
-				position: 'absolute',
-				left: `${-FOOTING_SHOULDER}px`,
-				top: '100%',
-				'pointer-events': 'none',
-			}}
-		>
-			<path d={columns().path} fill="var(--grass-green)" />
-		</svg>
-	)
-}
-
-/**
- * A name carved in a tombstone's panel, as on the website's tombstone sign:
- * dark, lit along each letter's bottom edge, smaller the longer it is.
- */
-export function Carved(props: {
-	name: string
-	panel: [number, number, number, number]
-	scale: number
-}) {
-	const [x, y, width, height] = props.panel.map((n) => n * props.scale)
-	return (
-		<div
-			style={{
-				position: 'absolute',
-				left: `${x}px`,
-				top: `${y}px`,
-				width: `${width}px`,
-				height: `${height}px`,
-				display: 'flex',
-				'align-items': 'center',
-				'justify-content': 'center',
-				'text-align': 'center',
-				color: CARVED_INK,
-				'text-shadow': `0 1px 0 ${CARVED_LIT}`,
-				'font-family': 'var(--font-pixel)',
-				'font-size': `${carvedSize(props.name)}px`,
-				'line-height': CARVED_LINE_HEIGHT,
-				'text-transform': 'uppercase',
-				'overflow-wrap': 'anywhere',
-			}}
-		>
-			{props.name}
-		</div>
-	)
-}
-
-/**
- * Paints a footing's grass in a Draw Hook, under scenery `x` along: from
- * its box, `width` by `height`, its foot at `base` in the world. Its
- * columns are built once its size is known, and `green` looked up once.
+ * Paints a footing's grass in a Draw Hook, under scenery `x` along: the
+ * field made up under something wide on a hill, from its foot down to the
+ * verge wherever the ground falls away under it, and sloping off past its
+ * ends (the Copper Tents, levelled on the top of Haga's hill), in the
+ * verge's green, so it's all one field. From its box, `width` by `height`,
+ * its foot at `base` in the world. Its columns are built once its size is
+ * known, and `green` looked up once.
  */
 export function footingPainter(
 	groundY: (x: number) => number,
@@ -215,7 +152,7 @@ export function footingPainter(
 /**
  * A tombstone in a Draw Hook, `scale` times its picture's size, with `name`
  * carved in its `panel`: painted once and kept, by `key`, then recoloured
- * through its `filter`, name and all, as the page's filter does `Carved`.
+ * through its `filter`, name and all.
  * Painted again once its font's loaded, rather than kept in the one it
  * fell back on.
  */

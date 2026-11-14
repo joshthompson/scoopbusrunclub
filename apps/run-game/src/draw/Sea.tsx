@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js'
+import { For } from 'solid-js'
 import { svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
 import {
@@ -15,7 +15,7 @@ import type { View } from './Backdrop'
  * in it, sand and a path over its top, and the surf where they meet. Drawn
  * in with the Ground, in its own coordinates (`from` its left edge, world
  * y), over the Ground's own layers, which run on over the island; and its
- * waves in front of everyone (`SeaFront`), so what's in it is in it.
+ * waves in front of everyone (`createSeaFront`), so what's in it is in it.
  */
 
 const STEP = 4
@@ -400,94 +400,4 @@ export const crests = (look: {
 			)
 	}
 	return svgUrl(CREST_WIDTH, CREST_HEIGHT, cells.join(''))
-}
-
-/**
- * The sea's waves in front of everyone in it: the bus's wheels, afloat, a
- * whale, under, and anyone who's fallen in, gone under. Moved with the
- * camera, as the Ground is.
- */
-export function SeaFront(props: { world: View; from: number; to: number }) {
-	const { sea } = props.world.course
-	const look = props.world.course.look?.sea
-	if (!sea || !look) return null
-	const width = props.to - props.from
-	const top = sea.level + FRONT_WAVES
-	const left = sea.from - props.from
-	return (
-		<div
-			style={{
-				position: 'absolute',
-				top: 0,
-				left: 0,
-				width: `${width}px`,
-				height: `${VIEW_HEIGHT}px`,
-				transform: `translateX(${Math.round(props.from - props.world.camera())}px)`,
-				'will-change': 'transform',
-				'pointer-events': 'none',
-			}}
-		>
-			{/* The headwind up high, streaking by: there to be seen over the sea. */}
-			<Show
-				when={
-					props.world.camera() + VIEW_WIDTH > sea.from &&
-					props.world.camera() < sea.to
-				}
-			>
-				<div
-					style={{
-						position: 'absolute',
-						top: 0,
-						left: `${Math.round(props.world.camera() - props.from)}px`,
-					}}
-				>
-					<For each={WIND}>
-						{(streak) => (
-							<div
-								style={{
-									position: 'absolute',
-									left: `${streak.x}px`,
-									top: `${sea.level - streak.height}px`,
-									width: `${streak.width}px`,
-									height: '2px',
-									background: 'white',
-									opacity: 0,
-									'--wind': streak.opacity,
-									animation: `wind-streak ${streak.seconds}s linear ${streak.delay}s infinite`,
-								}}
-							/>
-						)}
-					</For>
-				</div>
-			</Show>
-			<Show when={left < width}>
-				{/* Its crests, rolling in, and the water on down under them. */}
-				<div
-					style={{
-						position: 'absolute',
-						left: `${left}px`,
-						right: 0,
-						top: `${top - CREST_HEIGHT + CREST_SINK}px`,
-						height: `${CREST_HEIGHT}px`,
-						'background-image': `url("${crests(look)}")`,
-						'background-repeat': 'repeat-x',
-						animation: 'wave-roll 3s steps(16) infinite',
-						opacity: 0.92,
-					}}
-				/>
-				<div
-					style={{
-						position: 'absolute',
-						left: `${left}px`,
-						right: 0,
-						top: `${top + CREST_SINK}px`,
-						// On down past the bottom, for the camera looking down.
-						height: `${VIEW_HEIGHT - top + 200}px`,
-						background: `linear-gradient(to bottom, ${look.water}, ${look.deep} 120px)`,
-						opacity: 0.92,
-					}}
-				/>
-			</Show>
-		</div>
-	)
 }

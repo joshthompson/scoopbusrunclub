@@ -1,4 +1,3 @@
-import { For, Show } from 'solid-js'
 import { SEWAGE_FALL, sewageAt, swampManAt } from '../../game/sewer'
 import { GIANT_REACH, steamPuff } from '../../game/steam'
 import { cellArt } from '../paint/cells'
@@ -11,31 +10,6 @@ import { type SteamBit, paintSteam, steamReach } from '../paint/steam'
  */
 
 type Rect = [number, number, number, number, string]
-
-/** Pixel rects in cells, `scale` screen pixels each. */
-function Cells(props: {
-	width: number
-	height: number
-	scale: number
-	rects: Rect[]
-}) {
-	return (
-		<svg
-			width={props.width * props.scale}
-			height={props.height * props.scale}
-			viewBox={`0 0 ${props.width} ${props.height}`}
-			shape-rendering="crispEdges"
-			style={{ display: 'block', overflow: 'visible' }}
-			aria-hidden="true"
-		>
-			<For each={props.rects}>
-				{([x, y, w, h, fill]) => (
-					<rect x={x} y={y} width={w} height={h} fill={fill} />
-				)}
-			</For>
-		</svg>
-	)
-}
 
 // --- Swamp Men -------------------------------------------------------------
 
@@ -89,74 +63,6 @@ const POOL: Rect[] = [
 ]
 /** How tall he's drawn, his pool and all: room for him all the way up. */
 export const SWAMP_DRAWN = MAN_HEIGHT * 2 + 4
-
-/**
- * A Swamp Man, rising out of his pool and sinking back into it, and
- * bubbles on it while he's under. His pool's at the bottom of it.
- */
-export function SwampManArt(props: { x: number; now: () => number }) {
-	const man = () => swampManAt(props.x, props.now())
-	return (
-		<div
-			style={{
-				position: 'relative',
-				width: `${SWAMP_POOL_WIDTH}px`,
-				height: `${SWAMP_DRAWN}px`,
-			}}
-		>
-			{/* Him, up out of the sludge as far as he's risen: the rest of him under it. */}
-			<div
-				style={{
-					position: 'absolute',
-					left: `${(SWAMP_POOL_WIDTH - MAN_WIDTH * 2) / 2}px`,
-					bottom: `${SWAMP_POOL_HEIGHT / 2}px`,
-					width: `${MAN_WIDTH * 2}px`,
-					height: `${MAN_HEIGHT * 2}px`,
-					overflow: 'hidden',
-				}}
-			>
-				<div
-					style={{
-						transform: `translateY(${Math.round((1 - man().rise) * MAN_HEIGHT * 2)}px)`,
-					}}
-				>
-					<Cells
-						width={MAN_WIDTH}
-						height={MAN_HEIGHT}
-						scale={2}
-						rects={SWAMP_MAN}
-					/>
-				</div>
-			</div>
-			<div style={{ position: 'absolute', left: 0, bottom: 0 }}>
-				<Cells
-					width={SWAMP_POOL_WIDTH}
-					height={SWAMP_POOL_HEIGHT}
-					scale={1}
-					rects={POOL}
-				/>
-			</div>
-			{/* Bubbling, while he's under. */}
-			<Show when={man().rise === 0}>
-				<For each={[14, 34, 48]}>
-					{(left, i) => (
-						<div
-							style={{
-								position: 'absolute',
-								left: `${left}px`,
-								bottom: `${SWAMP_POOL_HEIGHT - 2}px`,
-								width: '4px',
-								height: '4px',
-								background: SLUDGE_LIGHT,
-								opacity: (props.now() + i() * 13) % 40 < 20 ? 1 : 0,
-							}}
-						/>
-					)}
-				</For>
-			</Show>
-		</div>
-	)
-}
 
 // --- Sewage Drains ---------------------------------------------------------
 
@@ -225,154 +131,6 @@ const GRATE = 34
 /** How far apart what pours out is, falling. */
 const JUNK_SPACING = 46
 
-/**
- * A Sewage Drain, from the street, `fall` over its grate in the Ceiling, to
- * the floor, `fall` under it: its shaft up through the rock to the street,
- * a grate at either end, and, in waves, what pours out of it: drips first,
- * then the lot, tumbling down to the floor. A stain where it lands.
- */
-export function SewageArt(props: {
-	x: number
-	now: () => number
-	/** How far down the grate in the Ceiling is, and the floor, from the street. */
-	ceiling: number
-	floor: number
-}) {
-	const drain = () => sewageAt(props.x, props.now())
-	const fall = props.floor - props.ceiling
-	const middle = SEWAGE_WIDTH / 2
-	/** How far down the pour's got: from the grate to the floor. */
-	const reached = () =>
-		drain().pouring ? Math.min(fall, (drain().poured + 1) * SEWAGE_FALL) : 0
-	return (
-		<div
-			style={{
-				position: 'relative',
-				width: `${SEWAGE_WIDTH}px`,
-				height: `${props.floor}px`,
-			}}
-		>
-			{/* Its shaft, up through the rock to the street. */}
-			<div
-				style={{
-					position: 'absolute',
-					left: `${middle - GRATE / 2}px`,
-					top: '0px',
-					width: `${GRATE}px`,
-					height: `${props.ceiling}px`,
-					background: '#151c11',
-					'border-left': '4px solid #2c3324',
-					'border-right': '4px solid #2c3324',
-					'box-sizing': 'border-box',
-				}}
-			/>
-			{/* Its grates: in the street, and in the Ceiling. */}
-			<For each={[0, props.ceiling - 6]}>
-				{(top) => (
-					<div
-						style={{
-							position: 'absolute',
-							left: `${middle - GRATE / 2 - 2}px`,
-							top: `${top}px`,
-							width: `${GRATE + 4}px`,
-							height: '6px',
-							background:
-								'repeating-linear-gradient(90deg, #3a3f44 0 4px, #0e1210 4px 7px)',
-						}}
-					/>
-				)}
-			</For>
-			{/* The pour: a stream down from the grate, and what's in it tumbling. */}
-			<Show when={reached() > 0}>
-				<div
-					style={{
-						position: 'absolute',
-						left: `${middle - 7}px`,
-						top: `${props.ceiling}px`,
-						width: '14px',
-						height: `${reached()}px`,
-						background:
-							'linear-gradient(to right, rgba(92,110,36,0.55), rgba(120,140,48,0.8), rgba(92,110,36,0.55))',
-					}}
-				/>
-				<For each={JUNK}>
-					{(junk, i) => {
-						const y = () => {
-							const down = drain().poured * SEWAGE_FALL - i() * JUNK_SPACING
-							return down < 0 ? undefined : down % fall
-						}
-						return (
-							<Show when={y() !== undefined}>
-								<div
-									style={{
-										position: 'absolute',
-										left: `${middle - junk.width + ((i() * 7) % 11) - 5}px`,
-										top: `${props.ceiling + (y() ?? 0)}px`,
-										transform: `rotate(${(drain().poured * 9 + i() * 70) % 360}deg)`,
-									}}
-								>
-									<Cells
-										width={junk.width}
-										height={junk.height}
-										scale={2}
-										rects={junk.rects}
-									/>
-								</div>
-							</Show>
-						)
-					}}
-				</For>
-				{/* Splashing up where it lands. */}
-				<Show when={reached() >= fall}>
-					<For each={[-16, -6, 8, 18]}>
-						{(dx, i) => (
-							<div
-								style={{
-									position: 'absolute',
-									left: `${middle + dx}px`,
-									top: `${props.floor - 6 - ((props.now() * 3 + i() * 5) % 14)}px`,
-									width: '4px',
-									height: '4px',
-									background: '#7a8c30',
-								}}
-							/>
-						)}
-					</For>
-				</Show>
-			</Show>
-			{/* Drips, a wave on its way. */}
-			<Show when={drain().dripping}>
-				<For each={[-6, 5]}>
-					{(dx, i) => (
-						<div
-							style={{
-								position: 'absolute',
-								left: `${middle + dx}px`,
-								top: `${props.ceiling + ((props.now() * 5 + i() * 60) % fall)}px`,
-								width: '4px',
-								height: '6px',
-								background: '#8a9c3a',
-							}}
-						/>
-					)}
-				</For>
-			</Show>
-			{/* Its stain on the floor. */}
-			<div
-				style={{
-					position: 'absolute',
-					left: `${middle - 22}px`,
-					top: `${props.floor - 4}px`,
-					width: '44px',
-					height: '6px',
-					background: '#4f5b22',
-					'border-radius': '3px',
-				}}
-			/>
-		</div>
-	)
-}
-
 // --- The Giant Vent --------------------------------------------------------
 
 /** A Giant Vent's grate, across: as far as it fires anyone up. */
@@ -391,99 +149,12 @@ const GIANT_CLOUDS = [
 	{ x: 70, size: 28, delay: 0.36 },
 ]
 
-/**
- * A Giant Vent: a great grate in the floor, its fan turning under it, air
- * rushing up out of it, and once it's fired someone up, clouds of steam.
- */
-export function GiantVentArt(props: {
-	now: () => number
-	puffed: () => number | undefined
-}) {
-	const puff = () => steamPuff(props.puffed(), props.now())
-	return (
-		<div
-			style={{
-				position: 'relative',
-				width: `${GIANT_VENT_WIDTH}px`,
-				height: `${GIANT_VENT_HEIGHT}px`,
-			}}
-		>
-			{/* Its fan, turning, seen through the bars. */}
-			<div
-				style={{
-					position: 'absolute',
-					inset: '4px 6px 2px',
-					background:
-						'repeating-linear-gradient(90deg, #1b2126 0 10px, #59626b 10px 14px)',
-					'background-position': `${(props.now() * 3) % 14}px 0`,
-				}}
-			/>
-			{/* Its bars and its frame. */}
-			<div
-				style={{
-					position: 'absolute',
-					inset: 0,
-					border: '6px solid #8a949c',
-					'border-bottom-width': '2px',
-					'box-shadow': 'inset 0 2px 0 #b9c1c7',
-					background:
-						'repeating-linear-gradient(90deg, transparent 0 10px, #6e7880 10px 14px)',
-					'box-sizing': 'border-box',
-				}}
-			/>
-			<div
-				style={{
-					position: 'absolute',
-					left: '50%',
-					bottom: `${GIANT_VENT_HEIGHT - 4}px`,
-					width: '0px',
-					height: '0px',
-				}}
-			>
-				<For each={UPDRAFT}>
-					{(x, i) => (
-						<div
-							style={{
-								position: 'absolute',
-								left: `${x}px`,
-								bottom: '0px',
-								width: '4px',
-								height: '40px',
-								background: 'rgba(230, 240, 245, 0.55)',
-								animation: `steam-rise 0.6s steps(6) ${(i() * 0.17) % 0.6}s infinite`,
-							}}
-						/>
-					)}
-				</For>
-				<Show when={puff() !== undefined}>
-					<For each={GIANT_CLOUDS}>
-						{(cloud) => (
-							<div
-								style={{
-									position: 'absolute',
-									left: `${cloud.x - cloud.size / 2}px`,
-									bottom: '0px',
-									width: `${cloud.size}px`,
-									height: `${cloud.size}px`,
-									background: 'rgba(245, 245, 245, 0.85)',
-									'box-shadow': '0 0 0 4px rgba(245, 245, 245, 0.4)',
-									animation: `steam-rise 0.45s steps(5) ${cloud.delay}s infinite`,
-								}}
-							/>
-						)}
-					</For>
-				</Show>
-			</div>
-		</div>
-	)
-}
-
-// --- Painted on the Canvas Renderer ----------------------------------------
+// --- Painted ---------------------------------------------------------------
 
 /**
- * A Swamp Man, as `SwampManArt` draws him, painted in a Draw Hook: risen as
- * far as he has out of his pool, the rest of him under it, and bubbles on
- * it while he's under.
+ * A Swamp Man, rising out of his pool and sinking back into it, painted in
+ * a Draw Hook: risen as far as he has out of his pool, at its bottom, the
+ * rest of him under it, and bubbles on it while he's under.
  */
 export function paintSwampMan(
 	ctx: CanvasRenderingContext2D,
@@ -522,8 +193,11 @@ export function paintSwampMan(
 const BUBBLES = [14, 34, 48]
 
 /**
- * A Sewage Drain, as `SewageArt` draws it, painted in a Draw Hook: its shaft
- * and grates, and what's pouring, dripping and splashing out of it at `now`.
+ * A Sewage Drain, from the street, `fall` over its grate in the Ceiling, to
+ * the floor, `fall` under it, painted in a Draw Hook: its shaft up through
+ * the rock to the street, a grate at either end, and, in waves, what pours
+ * out of it at `now`: drips first, then the lot, tumbling down to the
+ * floor. A stain where it lands.
  */
 export function paintSewage(
 	ctx: CanvasRenderingContext2D,
@@ -645,7 +319,7 @@ const VENT_FRAME_BOTTOM = 2
 const FAN_TOP = 4
 
 /**
- * A Giant Vent, as `GiantVentArt` draws it, painted in a Draw Hook: its fan
+ * A Giant Vent, a great grate in the floor, painted in a Draw Hook: its fan
  * turning under its bars, air rushing up out of it, and once it's fired
  * someone up at `puffed`, clouds of steam.
  */
@@ -691,7 +365,7 @@ export function paintGiantVent(
 		VENT_FRAME_BOTTOM,
 	)
 	paintSteam(ctx, now, UPDRAFT_BITS, UPDRAFT_RISE)
-	// Its clouds rise from when it puffed, as they're put on the page then.
+	// Its clouds rise from when it puffed.
 	const puff = steamPuff(puffed, now)
 	if (puff !== undefined && puffed !== undefined)
 		paintSteam(ctx, now - puffed, GIANT_CLOUD_BITS, GIANT_CLOUDS_RISE)
