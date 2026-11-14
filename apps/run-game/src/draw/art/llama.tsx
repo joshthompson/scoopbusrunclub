@@ -3,6 +3,7 @@ import crouch from '../../assets/rides/llama-crouch.png'
 import leap from '../../assets/rides/llama-leap.png'
 import sit from '../../assets/rides/llama-sit.png'
 import { PixelArt } from '../PixelArt'
+import { inkOutline } from '../paint/picture'
 import type { CorgiPose } from './corgi'
 
 /**
@@ -26,14 +27,11 @@ export const LLAMA_SADDLE = 26
 const ART: Record<CorgiPose, string> = { sit, crouch, leap }
 
 /** An ink outline round it, as the corgi has, so it stands out. */
-const OUTLINE: JSX.CSSProperties = {
-	filter: [
-		'drop-shadow(2px 0 0 #2b2b2b)',
-		'drop-shadow(-2px 0 0 #2b2b2b)',
-		'drop-shadow(0 2px 0 #2b2b2b)',
-		'drop-shadow(0 -2px 0 #2b2b2b)',
-	].join(' '),
-}
+export const LLAMA_OUTLINE = inkOutline('#2b2b2b')
+const OUTLINE: JSX.CSSProperties = { filter: LLAMA_OUTLINE.filter }
+
+/** Its picture in `pose`, for a Draw Hook to paint, outlined. */
+export const llamaPicture = (pose: CorgiPose) => ART[pose]
 
 export function LlamaArt(props: { pose: CorgiPose }) {
 	return (

@@ -7,6 +7,8 @@ import {
 	CONDOR_SEAT_Y,
 	CONDOR_WIDTH,
 	CondorArt,
+	condorFrame,
+	condorFrames,
 } from './art/condor'
 import {
 	DRAGON_HEIGHT,
@@ -14,11 +16,13 @@ import {
 	DRAGON_WIDTH,
 	DragonArt,
 	dragonBack,
+	dragonPicture,
 } from './art/dragon'
 import {
 	FLYING_GOOSE_HEIGHT,
 	FLYING_GOOSE_WIDTH,
 	FlyingGooseArt,
+	flyingGoosePicture,
 } from './art/geese'
 
 /** What flies over a course to be ridden: geese, or on the Great Wall, a dragon. */
@@ -26,6 +30,12 @@ export interface FlyerLook {
 	width: number
 	height: number
 	Art: Component<{ now: number; carrying: boolean }>
+	/**
+	 * The same, for a Draw Hook to paint: its picture, `now` ticks in, and
+	 * whether it's turned round, left to right, in its box.
+	 */
+	picture: (now: number, carrying: boolean) => string
+	mirrored?: boolean
 	/** Heard, grabbing hold of one. What's said is its `PICKUP_WORD`. */
 	sound: Sound
 	/** What its rides are called in the summary. */
@@ -45,6 +55,8 @@ const GOOSE: FlyerLook = {
 	width: FLYING_GOOSE_WIDTH,
 	height: FLYING_GOOSE_HEIGHT,
 	Art: FlyingGooseArt,
+	picture: flyingGoosePicture,
+	mirrored: true,
 	sound: 'honk',
 	rides: 'Goose rides',
 	grip: 10,
@@ -54,6 +66,7 @@ const DRAGON: FlyerLook = {
 	width: DRAGON_WIDTH,
 	height: DRAGON_HEIGHT,
 	Art: DragonArt,
+	picture: dragonPicture,
 	sound: 'whoosh',
 	rides: 'Dragon rides',
 	grip: DRAGON_HEIGHT / 2 + 4,
@@ -79,6 +92,7 @@ const CONDOR: FlyerLook = {
 				return !props.carrying
 			},
 		}),
+	picture: (now, carrying) => condorFrames(false)[condorFrame(now, !carrying)],
 	sound: 'whoosh',
 	rides: 'Condor rides',
 	grip: CONDOR_HEIGHT / 2,
