@@ -51,8 +51,9 @@ const CHOICES: RunChoice[] = ['endless', ...COURSES.map((course) => course.id)]
 
 /**
  * Endless, at the top of the list and picked to begin with, then every course
- * under it to practise on its own, each locked until Endless has got as far
- * as it. Whichever's picked is shown off on the right.
+ * under it to practise on its own: each locked, if courses are (see
+ * `progress`), until Endless has got as far as it. Whichever's picked is
+ * shown off on the right.
  */
 export function CourseSelect(props: {
 	runner: Playable

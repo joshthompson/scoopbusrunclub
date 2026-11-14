@@ -28,36 +28,40 @@ export const posankkaLawn = pixelArt(52, 6, [
 
 /**
  * The Föri, orange, the little ferry across the Aura: its deck to stand
- * on, its wheelhouse in the middle, FÖRI on its side. 176 by 64, its deck
+ * on, its wheelhouse in the middle, FÖRI on its side. 240 by 64, its deck
  * 34 down.
  */
-export const FORI_WIDTH = 176
+export const FORI_WIDTH = 240
 export const FORI_HEIGHT = 64
 export const FORI_DECK = 34
+/** Its middle, for its wheelhouse and its name. */
+const FORI_MIDDLE = FORI_WIDTH / 2
+/** Its rail's posts, every 15 along. */
+const FORI_POSTS = Math.floor((FORI_WIDTH - 8) / 15) + 1
 export const fori = svgUrl(
 	FORI_WIDTH,
 	FORI_HEIGHT,
 	[
 		// Its wheelhouse, and its rails.
-		'<rect x="70" y="4" width="36" height="30" fill="#f3f1ea"/>',
-		'<rect x="66" y="0" width="44" height="6" fill="#f08a24"/>',
-		'<rect x="74" y="10" width="28" height="10" fill="#4f7896"/>',
-		'<rect x="86" y="10" width="2" height="10" fill="#f3f1ea"/>',
-		'<rect x="0" y="20" width="176" height="2" fill="#f3f1ea"/>',
+		`<rect x="${FORI_MIDDLE - 18}" y="4" width="36" height="30" fill="#f3f1ea"/>`,
+		`<rect x="${FORI_MIDDLE - 22}" y="0" width="44" height="6" fill="#f08a24"/>`,
+		`<rect x="${FORI_MIDDLE - 14}" y="10" width="28" height="10" fill="#4f7896"/>`,
+		`<rect x="${FORI_MIDDLE - 2}" y="10" width="2" height="10" fill="#f3f1ea"/>`,
+		`<rect x="0" y="20" width="${FORI_WIDTH}" height="2" fill="#f3f1ea"/>`,
 		...Array.from(
-			{ length: 12 },
+			{ length: FORI_POSTS },
 			(_, i) =>
 				`<rect x="${4 + i * 15}" y="20" width="2" height="14" fill="#f3f1ea"/>`,
 		),
 		// Its deck, and its hull, orange, in the water.
-		'<rect x="0" y="34" width="176" height="4" fill="#8a6a46"/>',
-		'<rect x="0" y="38" width="176" height="18" fill="#f08a24"/>',
-		'<rect x="0" y="38" width="176" height="2" fill="#ffad5a"/>',
-		'<rect x="4" y="56" width="168" height="8" fill="#c86a14"/>',
-		pixelText('FÖRI', 66, 42, 2, '#ffffff'),
+		`<rect x="0" y="34" width="${FORI_WIDTH}" height="4" fill="#8a6a46"/>`,
+		`<rect x="0" y="38" width="${FORI_WIDTH}" height="18" fill="#f08a24"/>`,
+		`<rect x="0" y="38" width="${FORI_WIDTH}" height="2" fill="#ffad5a"/>`,
+		`<rect x="4" y="56" width="${FORI_WIDTH - 8}" height="8" fill="#c86a14"/>`,
+		pixelText('FÖRI', FORI_MIDDLE - 22, 42, 2, '#ffffff'),
 		// Its cable, guiding it across.
 		'<rect x="0" y="52" width="4" height="4" fill="#3b3a3a"/>',
-		'<rect x="172" y="52" width="4" height="4" fill="#3b3a3a"/>',
+		`<rect x="${FORI_WIDTH - 4}" y="52" width="4" height="4" fill="#3b3a3a"/>`,
 	].join(''),
 )
 

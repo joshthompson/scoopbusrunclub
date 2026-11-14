@@ -99,7 +99,7 @@ const TENTS_SCALE = 2
 /** Half the Copper Tents' width, and a little more: no trees in front of them. */
 const TENTS_ROOM = 120 * TENTS_SCALE + 30
 
-/** Room either side of geese, to land a jump between them and whatever's next. */
+/** Room either side of geese, to see them fly off clear of whatever's next. */
 const GEESE_ROOM = 320
 
 /**

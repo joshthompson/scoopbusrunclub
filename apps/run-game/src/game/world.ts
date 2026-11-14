@@ -352,12 +352,10 @@ export interface ObstacleState {
 	/** Scooped up by the bus, when, and how fast it flew off: rocks, and children. */
 	scooped?: { at: number; vx: number; x?: number }
 	/**
-	 * Geese, disturbed: when some of them first took off, and when the rest
-	 * did, disturbed again (see `gooseTakeoff`). A Steam Vent: when it last
-	 * puffed.
+	 * Geese, disturbed: when they took off (see `gooseTakeoff`). A Steam
+	 * Vent: when it last puffed.
 	 */
 	flown?: number
-	flownAll?: number
 	/** A cyclist riding round a loop: how many times round it's been. */
 	lap?: number
 }

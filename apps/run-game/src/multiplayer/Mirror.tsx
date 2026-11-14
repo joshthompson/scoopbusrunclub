@@ -317,13 +317,11 @@ export default function Mirror(props: {
 			scoopedAt,
 			scoopedVx,
 			scoopedX,
-			flownAll,
 		] of a.obstacles) {
 			const state = world.obstacles[i]
 			if (!state) continue
 			state.used = !!used
 			state.flown = flown >= 0 ? flown : undefined
-			state.flownAll = flownAll
 			if (scoopedAt >= 0 && !state.scooped)
 				state.scooped = { at: scoopedAt, vx: scoopedVx, x: scoopedX }
 		}

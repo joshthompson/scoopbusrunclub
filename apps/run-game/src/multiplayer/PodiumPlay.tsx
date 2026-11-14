@@ -13,8 +13,8 @@ const JUMP = 11.6
 /** Let go of jump on the way up and it's cut to this: a tap's a hop. */
 const JUMP_CUT = 4
 const FALL_MOST = 14
-/** How many frames each run frame's shown for. */
-const STRIDE_FRAMES = 6
+/** How many frames a stride takes, however many run frames it's drawn in. */
+const STRIDE_TICKS = 24
 /** What the runners' frames are drawn at, as the engine has them: the offsets in their frames are at this scale. */
 const ENGINE_SCALE = 2
 
@@ -251,7 +251,10 @@ function Runner(props: { body: Body; frame: number }) {
 		if (b.ducking && sprite().sit) return { frame: sprite().sit, single: true }
 		if (!b.grounded) return { frame: run[1] ?? run[0] }
 		if (b.moving)
-			return { frame: run[Math.floor(b.tick / STRIDE_FRAMES) % run.length] }
+			return {
+				frame:
+					run[Math.floor((b.tick * run.length) / STRIDE_TICKS) % run.length],
+			}
 		return { frame: run[0] }
 	}
 	const place = () => {
