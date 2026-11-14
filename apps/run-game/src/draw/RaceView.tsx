@@ -1,5 +1,10 @@
-import { Canvas, Scene } from 'scoopjs'
-import { type JSX, Show, createMemo } from 'solid-js'
+import {
+	CanvasRenderer,
+	type CanvasRendererProps,
+	DomRenderer,
+	Scene,
+} from 'scoopjs'
+import { type Component, type JSX, Show, createMemo } from 'solid-js'
 import { HEARTBEAT_DUB, beatAt } from '../game/body'
 import {
 	HITBOX_HALF_WIDTH,
@@ -14,6 +19,7 @@ import { onScreen } from '../game/step'
 import type { World } from '../game/world'
 import { Backdrop, CaveCover, Ground, HorizonTrees } from './Backdrop'
 import { Fog } from './Fog'
+import { FrameMeter } from './FrameMeter'
 import { createLongJump } from './LongJump'
 import { SeaFront } from './Sea'
 import { Snow } from './Snow'
@@ -21,6 +27,7 @@ import { createFootballSprite } from './football'
 import { createGiantMouth } from './giantMouth'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPortalFx } from './portalFx'
+import { rendererChoice } from './rendererChoice'
 import {
 	createBanner,
 	createBoost,
@@ -64,7 +71,9 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 		// The camera moves every tick, so it moves one layer rather than every
 		// sprite: about half the work a tick. Nothing here sits over the
 		// overlay, nor uses ScoopJS's parallax, which the layer would change.
-		cameraLayer: true,
+		// The DOM Renderer's alone: the Canvas Renderer moves the camera itself.
+		cameraLayer: !rendererChoice.canvas,
+		skipChildren: rendererChoice.skipChildren,
 		// Front to back.
 		assetOrder: [
 			// Counting everyone down, at the front, always in sight.
@@ -183,6 +192,7 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 	const scroll = () => scene.canvas.get().setX(Math.round(world.camera()))
 	scroll()
 	scene.tickers.add(scroll)
+	window.raceScene = scene
 	return scene
 }
 
@@ -197,6 +207,10 @@ export function RaceCanvas(props: {
 	overlay?: JSX.Element
 }) {
 	const zoom = () => props.world.zoom()
+	// Either Renderer: the DOM Renderer takes the same props, bar `pixelated`.
+	const Renderer: Component<CanvasRendererProps> = rendererChoice.canvas
+		? CanvasRenderer
+		: DomRenderer
 	/**
 	 * A Portal going off (see `portals`): diving in after everyone as they
 	 * shrink, or pulling back from the nose they're sneezed out of, zoomed
@@ -223,8 +237,11 @@ export function RaceCanvas(props: {
 			    of its gradient, so the join doesn't show. */}
 			<div style={styles.sky} />
 			<div style={portalStyle()}>
-				<Canvas
+				<Renderer
 					scene={props.scene}
+					// Every sprite's `image-rendering: pixelated` (see `styles.css`),
+					// for the Canvas Renderer, which has no elements to style.
+					pixelated
 					// Looking up a mountain, the canvas goes right down off the
 					// screen, its scene still showing over the top of it.
 					runOffScreen
@@ -277,6 +294,9 @@ export function RaceCanvas(props: {
 				<div style={styles.shade} />
 			</Show>
 			{props.overlay}
+			<Show when={rendererChoice.fps}>
+				<FrameMeter />
+			</Show>
 		</div>
 	)
 }
