@@ -148,6 +148,7 @@ import {
 	FACE_HEIGHT,
 	FACE_WIDTH,
 	GiantFurbyFace,
+	paintGiantFurbyFace,
 } from './art/giantFurby'
 import { BUS_GLIDER_HEIGHT, BUS_GLIDER_WIDTH, busGlider } from './art/glider'
 import { HANDS_HEIGHT, HANDS_WIDTH, HandsArt } from './art/hands'
@@ -1154,6 +1155,12 @@ export function createGiantFurby(world: World) {
 					<GiantFurbyFace open={open()} blink={blink()} look={look()} />
 				),
 			}),
+			draw: ({ ctx }) =>
+				paintGiantFurbyFace(ctx, {
+					open: open(),
+					blink: blink(),
+					look: look(),
+				}),
 			onEnterFrame() {
 				const now = Math.max(0, world.ticks())
 				const coming = [
@@ -1518,6 +1525,16 @@ function createFurby(world: World, f: Furby) {
 				/>
 			),
 		}),
+		// The same: as wide as it is, standing on its feet, squashed down
+		// onto them.
+		draw({ ctx, image }) {
+			const art = image(f.asset)
+			if (!art) return
+			const height = (FURBY_WIDTH * art.height) / art.width
+			ctx.translate(FURBY_WIDTH / 2, FURBY_HEIGHT)
+			ctx.scale(1 + squash() * 0.6, 1 - squash())
+			ctx.drawImage(art.image, -FURBY_WIDTH / 2, -height, FURBY_WIDTH, height)
+		},
 		onEnterFrame({ $ }) {
 			$.setX(f.x - FURBY_WIDTH / 2)
 			$.setY(f.feetY - FURBY_HEIGHT)
@@ -3583,6 +3600,18 @@ function createGerm(
 				</Show>
 			),
 		}),
+		// The same: its body till it's popped, then its burst, growing and
+		// fading from the middle.
+		draw({ ctx, drawDefault, image }) {
+			if (!gone()) drawDefault()
+			const since = popped()
+			const burst = since === undefined ? undefined : image(GERM_POPPED)
+			if (since === undefined || !burst) return
+			const size = GERM_SIZE * (1 + since / GERM_BURST)
+			const at = (GERM_SIZE - size) / 2
+			ctx.globalAlpha *= 1 - since / GERM_BURST
+			ctx.drawImage(burst.image, at, at, size, size)
+		},
 		onEnterFrame({ $ }) {
 			const now = world.ticks()
 			const bottom = ground - germHeight(o, Math.max(0, now))
@@ -3595,14 +3624,17 @@ function createGerm(
 			}
 			$.setX(o.x - GERM_SIZE / 2)
 			$.setY(bottom - GERM_SIZE)
-			// Popped: its body gone, its burst going.
+			// Popped: its body gone, its burst going. On the canvas, its Draw
+			// Hook leaves its body out.
 			$.setStyle(
-				state.used && state.flown !== undefined
-					? { 'background-image': 'none' }
-					: {},
+				gone() && !rendererChoice.canvas ? { 'background-image': 'none' } : {},
 			)
 		},
 	})
+	/** Popped, its body gone. */
+	function gone() {
+		return state.used && state.flown !== undefined
+	}
 	/** How long since it was popped, while its burst's still showing. */
 	function popped() {
 		const now = world.ticks()
@@ -4079,9 +4111,25 @@ function createZombie(
 	const { sprite, filter } = zombieSprite(o)
 	const ZOMBIE_WIDTH = sprite.width * RUNNER_SCALE
 	const ZOMBIE_HEIGHT = sprite.height * RUNNER_SCALE
+	/** How far down into its grave it's sunk, out of sight below the ground. */
+	let sunk = 0
 	return createController({
 		frames: sprite.run,
 		randomStartFrame: true,
+		// Its frame, cut off at the ground as it sinks into the grave.
+		draw({ ctx, drawDefault }) {
+			if (sunk > 0) {
+				ctx.beginPath()
+				ctx.rect(
+					0,
+					0,
+					ZOMBIE_WIDTH,
+					ZOMBIE_HEIGHT - Math.min(ZOMBIE_HEIGHT, sunk),
+				)
+				ctx.clip()
+			}
+			drawDefault()
+		},
 		init: () => ({
 			id,
 			type: 'zombie',
@@ -4113,10 +4161,16 @@ function createZombie(
 			$.setY(ground - ZOMBIE_HEIGHT + zombie.sunk)
 			// Not walking until it's woken, nor once in the grave.
 			$.setState(zombie.walking && !zombie.sunk ? 'play' : 'pause')
+			sunk = zombie.sunk
 			$.setStyle({
 				filter,
-				// Below the ground, it's in the grave.
-				'clip-path': `inset(0 0 ${Math.min(ZOMBIE_HEIGHT, zombie.sunk)}px 0)`,
+				// Below the ground, it's in the grave: on the canvas, cut off
+				// by its Draw Hook.
+				...(rendererChoice.canvas
+					? {}
+					: {
+							'clip-path': `inset(0 0 ${Math.min(ZOMBIE_HEIGHT, zombie.sunk)}px 0)`,
+						}),
 				visibility: zombie.sunk >= ZOMBIE_SINK_GONE ? 'hidden' : 'visible',
 			})
 		},
@@ -4159,6 +4213,23 @@ function createMummy(
 				/>
 			),
 		}),
+		// The same frame, cut out of the sheet.
+		draw({ ctx, image }) {
+			const sheet = image(mummyAsset)
+			if (!sheet) return
+			const cell = sheet.width / 2
+			ctx.drawImage(
+				sheet.image,
+				frame() * cell,
+				0,
+				cell,
+				sheet.height,
+				0,
+				0,
+				MUMMY_WIDTH,
+				MUMMY_DRAWN,
+			)
+		},
 		onEnterFrame({ $ }) {
 			const mummy = mummyAt(world, { ...state, obstacle: o })
 			const floor = world.terrain.groundY(mummy.x)

@@ -56,6 +56,10 @@ export function createFootballSprite(world: World) {
 				height: () => size,
 				children: () => <PixelArt src={BALL} width={size} height={size} />,
 			}),
+			draw({ ctx, image }) {
+				const art = image(BALL)
+				if (art) ctx.drawImage(art.image, 0, 0, size, size)
+			},
 			onEnterFrame({ $ }) {
 				$.setX(ball.x - FOOTBALL_RADIUS)
 				$.setY(ball.y - FOOTBALL_RADIUS)
