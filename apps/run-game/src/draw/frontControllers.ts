@@ -1,6 +1,5 @@
 import { type Scene, createController } from 'scoopjs'
 import { createComponent } from 'solid-js'
-import { render } from 'solid-js/web'
 import { TICK_MS, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { DRAWN_FROM } from '../game/groundColumns'
 import type { World } from '../game/world'
@@ -23,7 +22,7 @@ import { cachedArt } from './canvasArt'
 import { cycle, ease, steps } from './paint/animation'
 import { paintTiled } from './paint/bands'
 import { cssGradient, paletteOf } from './paint/css'
-import { compileSvg } from './paint/svgCanvas'
+import { readSvg } from './paint/svgPainter'
 import { TILE, type Tiles, tileControllers, tileDensity } from './paint/tiles'
 
 /**
@@ -49,17 +48,11 @@ export function createCaveCover(world: World, scene: Scene) {
 	const resolve = paletteOf(world.course.look?.palette)
 	return caveCoverParts(cave).flatMap((part) => {
 		// The page's own drawing of it, read, then let go of.
-		const holder = document.createElement('div')
-		const dispose = render(
-			() => createComponent(CaveCoverArt, { world, cave, look, ...part }),
-			holder,
-		)
-		const svg = holder.querySelector('svg')
 		const key = `${part.id}:${world.course.id}:${drawnTo(world)}`
-		const drawing = svg
-			? compileSvg(svg, { chunkWidth: TILE, resolve, key })
-			: undefined
-		dispose()
+		const drawing = readSvg(
+			() => createComponent(CaveCoverArt, { world, cave, look, ...part }),
+			{ chunkWidth: TILE, resolve, key },
+		)
 		if (!drawing) return []
 		const width = drawnTo(world) - DRAWN_FROM
 		const columns = Math.max(0, ...drawing.chunks.keys()) + 1

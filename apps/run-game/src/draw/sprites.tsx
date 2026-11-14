@@ -247,9 +247,7 @@ import { paintFlung } from './paint/dirtFly'
 import { paintHazardStripes } from './paint/hazardStripes'
 import { FONT_PIXEL, FONT_SIGN, fillLine, wrapLines } from './paint/lettering'
 import { mirrored, paintPicture } from './paint/picture'
-import { moveScooped, paintPixelArt } from './paint/pixelArt'
-import type { SvgDrawing } from './paint/svgCanvas'
-import { paintChunks, svgChunks } from './paint/svgChunks'
+import { paintPixelArt } from './paint/pixelArt'
 import { svgPainter } from './paint/svgPainter'
 import {
 	STEAM_CLOUDS,
@@ -3221,72 +3219,66 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			// Draw Hooks do both, and keep it pale or grey on WebKit too.
 			const { canvas } = rendererChoice
 			const knocked = () => world.ticks() >= 0 && !!state.scooped
-			const flight = () =>
-				state.scooped ? scoopFlight(state.scooped, world.ticks()) : undefined
 			// Jumping it: its near end's drawn behind you, not over you.
 			const over = () =>
 				world.ticks() >= 0 &&
 				Math.abs(world.body.x - o.x) < BRANCH_OVER_REACH &&
 				world.body.feetY < groundY(o.x) - BRANCH_LIMB_HEIGHT
+			const where = {
+				x: o.x + BRANCH_TREE_ALONG,
+				width: BRANCH_TREE_WIDTH,
+				height: BRANCH_TREE_HEIGHT,
+				sink: BRANCH_TREE_HEIGHT - BRANCH_LINE_ROW,
+				world,
+			}
+			const lieOrigin = { x: BRANCH_CROSS, y: BRANCH_LINE_ROW }
+			/** Its limb, flying, spins round where it crosses the path, at its top. */
+			const spin = { x: BRANCH_CROSS, y: BRANCH_LINE_ROW - BRANCH_LIMB_HEIGHT }
+			const limb = () => (
+				<PixelArt
+					src={lowBranchLimbAsset}
+					width={BRANCH_TREE_WIDTH}
+					height={BRANCH_TREE_HEIGHT}
+				/>
+			)
+			const paintLimb = (
+				ctx: CanvasRenderingContext2D,
+				image: DrawPainting['image'],
+			) =>
+				paintPixelArt(
+					ctx,
+					image,
+					lowBranchLimbAsset,
+					BRANCH_TREE_WIDTH,
+					BRANCH_TREE_HEIGHT,
+					foliage,
+				)
+			/** Its limb, still on the tree: the part of it from `clip.left` to `clip.right` across. */
 			const part = (options: {
 				suffix: string
 				type: string
-				src: string
-				/** How much of it shows, across: from `left` to `right`. */
-				clip?: { left: number; right: number }
+				clip: { left: number; right: number }
 				shown: () => boolean
 			}) => {
 				const { clip } = options
 				return createFixture({
 					id: `${id}${options.suffix}`,
 					type: options.type,
-					x: o.x + BRANCH_TREE_ALONG,
-					width: BRANCH_TREE_WIDTH,
-					height: BRANCH_TREE_HEIGHT,
-					sink: BRANCH_TREE_HEIGHT - BRANCH_LINE_ROW,
-					world,
-					children: () => (
-						<Scoopable
-							world={world}
-							state={state}
-							spin={`${BRANCH_CROSS}px ${BRANCH_LINE_ROW - BRANCH_LIMB_HEIGHT}px`}
-						>
-							<PixelArt
-								src={options.src}
-								width={BRANCH_TREE_WIDTH}
-								height={BRANCH_TREE_HEIGHT}
-							/>
-						</Scoopable>
-					),
+					...where,
+					children: limb,
 					draw: ({ ctx, image }) => {
-						if (clip) {
-							ctx.beginPath()
-							ctx.rect(clip.left, 0, clip.right - clip.left, BRANCH_TREE_HEIGHT)
-							ctx.clip()
-						}
-						moveScooped(
-							ctx,
-							flight(),
-							BRANCH_CROSS,
-							BRANCH_LINE_ROW - BRANCH_LIMB_HEIGHT,
-						)
-						paintPixelArt(
-							ctx,
-							image,
-							options.src,
-							BRANCH_TREE_WIDTH,
-							BRANCH_TREE_HEIGHT,
-							foliage,
-						)
+						ctx.beginPath()
+						ctx.rect(clip.left, 0, clip.right - clip.left, BRANCH_TREE_HEIGHT)
+						ctx.clip()
+						paintLimb(ctx, image)
 					},
 					style: () => ({
 						filter: canvas ? undefined : foliage,
 						transform: lie,
-						'transform-origin': `${BRANCH_CROSS}px ${BRANCH_LINE_ROW}px`,
-						'clip-path':
-							clip && !canvas
-								? `inset(0 ${BRANCH_TREE_WIDTH - clip.right}px 0 ${clip.left}px)`
-								: undefined,
+						'transform-origin': `${lieOrigin.x}px ${lieOrigin.y}px`,
+						'clip-path': canvas
+							? undefined
+							: `inset(0 ${BRANCH_TREE_WIDTH - clip.right}px 0 ${clip.left}px)`,
 						visibility: options.shown() ? 'visible' : 'hidden',
 					}),
 				})
@@ -3298,11 +3290,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				createFixture({
 					id: `${id}-tree`,
 					type: 'hazard',
-					x: o.x + BRANCH_TREE_ALONG,
-					width: BRANCH_TREE_WIDTH,
-					height: BRANCH_TREE_HEIGHT,
-					sink: BRANCH_TREE_HEIGHT - BRANCH_LINE_ROW,
-					world,
+					...where,
 					children: () => (
 						<PixelArt
 							src={lowBranchTreeAsset}
@@ -3322,38 +3310,51 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					style: () => ({
 						filter: canvas ? undefined : foliage,
 						transform: lie,
-						'transform-origin': `${BRANCH_CROSS}px ${BRANCH_LINE_ROW}px`,
+						'transform-origin': `${lieOrigin.x}px ${lieOrigin.y}px`,
 					}),
 				}),
 				// Its limb: the back of it behind everyone; its near end over a
 				// runner under it, or behind one jumping it. Knocked off by the
-				// bus, all of it, flying, in front.
+				// bus, all of it, flying, in front, its box going with it.
 				part({
 					suffix: '-limb',
 					type: 'hazard',
-					src: lowBranchLimbAsset,
 					clip: back,
 					shown: () => !knocked(),
 				}),
 				part({
 					suffix: '-limb-near',
 					type: 'hazard-front',
-					src: lowBranchLimbAsset,
 					clip: near,
 					shown: () => !knocked() && !over(),
 				}),
 				part({
 					suffix: '-limb-near-behind',
 					type: 'hazard',
-					src: lowBranchLimbAsset,
 					clip: near,
 					shown: () => !knocked() && over(),
 				}),
-				part({
-					suffix: '-limb-flying',
+				createScoopable({
+					id: `${id}-limb-flying`,
 					type: 'hazard-front',
-					src: lowBranchLimbAsset,
-					shown: knocked,
+					...where,
+					state,
+					spin,
+					lie: { transform: lie, origin: lieOrigin },
+					children: () => (
+						<Scoopable
+							world={world}
+							state={state}
+							spin={`${spin.x}px ${spin.y}px`}
+						>
+							{limb()}
+						</Scoopable>
+					),
+					draw: ({ ctx, image }) => paintLimb(ctx, image),
+					style: () => ({
+						filter: canvas ? undefined : foliage,
+						visibility: knocked() ? 'visible' : 'hidden',
+					}),
 				}),
 				// A note taped on top of its limb, over the path: an arrow,
 				// down. Gone with the limb, once the bus has knocked it off.
@@ -4841,7 +4842,11 @@ export function createForeground(world: World) {
 		</svg>
 	)
 	/** On the canvas: read once, then just the bit in view painted. */
-	let drawing: SvgDrawing | undefined
+	const paint = svgPainter(
+		`foreground:${world.course.id}`,
+		() => art(look.groundDefs),
+		{ resolve: paletteOf(look.palette), chunkWidth: FOREGROUND_CHUNK },
+	)
 	return [
 		createController({
 			init: () => ({
@@ -4854,20 +4859,8 @@ export function createForeground(world: World) {
 				children: () => art(),
 			}),
 			draw: ({ ctx, image, $scene }) => {
-				drawing ??= svgChunks(() => art(look.groundDefs), {
-					chunkWidth: FOREGROUND_CHUNK,
-					resolve: paletteOf(look.palette),
-					key: `foreground:${world.course.id}`,
-				})
-				if (!drawing) return
 				const view = $scene.canvas.get()
-				paintChunks(
-					ctx,
-					drawing,
-					view.x() - from,
-					view.x() + view.width() - from,
-					image,
-				)
+				paint(ctx, image, view.x() - from, view.x() + view.width() - from)
 			},
 		}),
 	]
