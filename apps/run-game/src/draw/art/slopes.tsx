@@ -188,6 +188,22 @@ export function GateArt(props: { colour: 'red' | 'blue'; flapping: boolean }) {
 /** How far apart a rail's legs are, down to the snow. */
 const LEG_EVERY = 48
 
+/** A rail's legs, as [x, its top, its foot]: every `LEG_EVERY` px or so, and at its end. */
+function railLegs(
+	tops: [number, number][],
+	feet: [number, number][],
+	width: number,
+) {
+	const out: [number, number, number][] = []
+	for (let i = 0; i < tops.length; i++) {
+		const [x, top] = tops[i]
+		const last = i === tops.length - 1
+		if (i % Math.round(LEG_EVERY / 8) === 0 || last)
+			out.push([Math.min(x, width - 4), top, feet[i][1]])
+	}
+	return out
+}
+
 /**
  * A rail to grind, a box or a log, `rail`, along the line of `tops` (its
  * top every few px, from its left, in its box's own pixels) over `feet`
@@ -202,17 +218,7 @@ export function RailArt(props: {
 }) {
 	const line = (points: [number, number][], dy = 0) =>
 		points.map(([x, y]) => `${x},${y + dy}`).join(' ')
-	const legs = () => {
-		const out: [number, number, number][] = []
-		const { tops, feet } = props
-		for (let i = 0; i < tops.length; i++) {
-			const [x, top] = tops[i]
-			const last = i === tops.length - 1
-			if (i % Math.round(LEG_EVERY / 8) === 0 || last)
-				out.push([Math.min(x, props.width - 4), top, feet[i][1]])
-		}
-		return out
-	}
+	const legs = () => railLegs(props.tops, props.feet, props.width)
 	const look = () =>
 		RAIL_LOOKS[props.rail.look === 'roof' ? 'box' : props.rail.look]
 	return (
@@ -275,6 +281,57 @@ export function RailArt(props: {
 			</Show>
 		</svg>
 	)
+}
+
+/**
+ * `RailArt`, painted in a Draw Hook: the same rail, box or log, from (0, 0)
+ * of `ctx`. Its lines are worked out once, and stroked each time.
+ */
+export function railPainter(props: {
+	rail: Rail
+	width: number
+	tops: [number, number][]
+	feet: [number, number][]
+}) {
+	const look = RAIL_LOOKS[props.rail.look === 'roof' ? 'box' : props.rail.look]
+	const legs = new Path2D()
+	const snow = new Path2D()
+	for (const [x, top, foot] of railLegs(props.tops, props.feet, props.width)) {
+		legs.rect(x, top, look.legWidth, Math.max(0, foot - top + 4))
+		snow.rect(x - 2, foot, look.legWidth + 4, 3)
+	}
+	const line = (dy: number) => {
+		const path = new Path2D()
+		for (const [x, y] of props.tops) path.lineTo(x, y + dy)
+		return path
+	}
+	const side = line(look.depth / 2)
+	const top = line(0)
+	const shine = line(-1)
+	const stripes = props.rail.look === 'rail' ? line(2) : undefined
+	return (ctx: CanvasRenderingContext2D) => {
+		ctx.fillStyle = look.leg
+		ctx.fill(legs)
+		ctx.fillStyle = SNOW
+		ctx.fill(snow)
+		// As an SVG strokes them.
+		ctx.lineJoin = 'miter'
+		ctx.miterLimit = 4
+		ctx.lineCap = 'butt'
+		const stroke = (path: Path2D, colour: string, width: number) => {
+			ctx.strokeStyle = colour
+			ctx.lineWidth = width
+			ctx.stroke(path)
+		}
+		stroke(side, look.side, look.depth)
+		stroke(top, look.top, 3)
+		stroke(shine, look.shine, 1)
+		if (stripes) {
+			// Hazard stripes, painted on it.
+			ctx.setLineDash([8, 8])
+			stroke(stripes, '#f5c518', 3)
+		}
+	}
 }
 
 const RAIL_LOOKS: Record<

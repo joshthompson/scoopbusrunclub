@@ -8,6 +8,7 @@ import rockAsset from '@/assets/misc/rock1.png'
 import { type RunnerName, runners, strideFrameInterval } from '@/data/runners'
 import { imageSize } from '@/utils/imageSize'
 import {
+	type DrawPainting,
 	createConnectedController,
 	createController,
 	createObjectSignal,
@@ -58,6 +59,7 @@ import {
 	RUNNER_SCALE,
 	SQUASHED,
 	START_X,
+	TICK_MS,
 	VERGE,
 	VIEW_HEIGHT,
 } from '../game/constants'
@@ -115,7 +117,7 @@ import { MEMBERS } from '../runners/playable'
 import { zombieSprite } from '../runners/skeleton'
 import { play } from '../sfx'
 import { WallBricks } from './Backdrop'
-import { Bubble } from './Bubble'
+import { Bubble, paintBubble } from './Bubble'
 import { PixelArt } from './PixelArt'
 import { Pixels } from './Pixels'
 import { BusLegs, LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH } from './art/busLegs'
@@ -178,6 +180,7 @@ import {
 	SNOWMAN_DRAWN,
 	SNOWMAN_WIDTH,
 	SnowmanArt,
+	railPainter,
 } from './art/slopes'
 import {
 	SPLASH_HEIGHT,
@@ -202,9 +205,13 @@ import {
 } from './art/track'
 import { frontParapet, frontParapetCaps } from './battlements'
 import { atSea, rideBus, startRide } from './busRide'
+import { cachedArt } from './canvasArt'
 import { flyerLook } from './flyerLook'
 import { headTop } from './heads'
-import { PlatformArt, platformLook } from './platformArt'
+import { cssColour } from './paint/cssBackground'
+import { FONT_PIXEL, FONT_SIGN, fillLine, wrapLines } from './paint/lettering'
+import { PlatformArt, platformLook, platformPainter } from './platformArt'
+import { rendererChoice } from './rendererChoice'
 import { rideLook } from './rideLook'
 
 /**
@@ -1257,7 +1264,9 @@ export function createRails(world: World) {
 		const feet = xs.map((x): [number, number] => [x - left, groundY(x) - top])
 		const width = rail.to - rail.from + 8
 		const height = bottom - top
+		const paint = railPainter({ rail, width, tops, feet })
 		return createController({
+			draw: ({ ctx }) => paint(ctx),
 			init: () => ({
 				id: `rail-${i}`,
 				type: 'platform',
@@ -1299,8 +1308,29 @@ export function createHut(world: World) {
 				body.x < hut.to &&
 				body.feetY > world.terrain.groundY(body.x) - hut.height + 2,
 		)
+	// Under the Canvas Renderer, which doesn't play a `transition`: how far
+	// its front's shown, faded a tick at a time.
+	const [shown, setShown] = createSignal(1)
+	const fade = TICK_MS / 250
 	const part = (id: string, type: string, src: string, front: boolean) =>
 		createController({
+			draw: ({ ctx, image }) => {
+				const picture = image(src)
+				if (picture) ctx.drawImage(picture.image, 0, 0, width, height)
+			},
+			onEnterFrame:
+				front && rendererChoice.canvas
+					? () => {
+							const to = world.ticks() >= 0 && inside() ? 0 : 1
+							const now = shown()
+							if (now !== to)
+								setShown(
+									to > now
+										? Math.min(to, now + fade)
+										: Math.max(to, now - fade),
+								)
+						}
+					: undefined,
 			init: () => ({
 				id,
 				type,
@@ -1312,10 +1342,13 @@ export function createHut(world: World) {
 				// Its front, lifted away while someone's inside. `inside` isn't
 				// a signal: reading the tick keeps it up to date.
 				style: front
-					? () => ({
-							opacity: world.ticks() >= 0 && inside() ? 0 : 1,
-							transition: 'opacity 0.25s',
-						})
+					? () =>
+							rendererChoice.canvas
+								? { opacity: shown() }
+								: {
+										opacity: world.ticks() >= 0 && inside() ? 0 : 1,
+										transition: 'opacity 0.25s',
+									}
 					: undefined,
 			}),
 		})
@@ -2030,9 +2063,45 @@ export function createPlatforms(world: World) {
 	// A guard tower's roof is drawn as the tower.
 	return world.platforms.flatMap((platform, i) => {
 		if (platform.tower) return []
+		const { width } = platform
 		const start = platformAt(world.terrain, platform, world.ticks())
 		const [cable, setCable] = createSignal(cableTo(platform, start))
+		const depth = platform.depth ?? look.depth
+		const { art } = platform
+		const paintArt = art
+			? undefined
+			: platformPainter(look, { solid: !!platform.solid, width, depth })
+		const cableColour =
+			platform.move && look.cable ? cssColour(look.cable) : undefined
 		return createController({
+			draw: ({ ctx, image }) => {
+				if (art) {
+					const picture = image(art.asset)
+					if (picture)
+						ctx.drawImage(
+							picture.image,
+							(width - art.width) / 2,
+							-art.top,
+							art.width,
+							art.height,
+						)
+				} else paintArt?.(ctx, image)
+				if (!cableColour) return
+				// The crane's cable, down to its hook, 34 px over it; from the
+				// hook, a sling out to either end of it.
+				ctx.fillStyle = cableColour
+				ctx.fillRect(width / 2 - 2, -SLING_HEIGHT - cable(), 4, cable())
+				ctx.beginPath()
+				ctx.moveTo(6, 0)
+				ctx.lineTo(width / 2, 4 - SLING_HEIGHT - 6)
+				ctx.lineTo(width - 6, 0)
+				ctx.strokeStyle = cableColour
+				ctx.lineWidth = 3
+				ctx.lineJoin = 'miter'
+				ctx.miterLimit = 4
+				ctx.stroke()
+				ctx.fillRect(width / 2 - 5, -SLING_HEIGHT - 6, 10, 8)
+			},
 			init: () => ({
 				id: `platform-${i}`,
 				type: 'platform',
@@ -2142,6 +2211,11 @@ function createFixture(options: {
 	lift?: (age: number) => number
 	/** -1 to draw it turned round. */
 	xScale?: number
+	/**
+	 * Its Draw Hook, painting under the Canvas Renderer what its `children`
+	 * draw under the DOM Renderer.
+	 */
+	draw?: (painting: DrawPainting) => void
 }) {
 	const ground = options.world.terrain.groundY(options.x)
 	const top = ground - options.height + (options.sink ?? 0)
@@ -2161,6 +2235,7 @@ function createFixture(options: {
 		onEnterFrame: options.lift
 			? ({ $, $age }) => $.setY(top - (options.lift?.($age) ?? 0))
 			: undefined,
+		draw: options.draw,
 	})
 }
 
@@ -2436,6 +2511,16 @@ export function createRunDirector(world: World) {
 				)}
 			</Show>
 		),
+		draw: ({ ctx, drawDefault }) => {
+			drawDefault()
+			const word = countdownWord(world)
+			if (word)
+				paintBubble(ctx, word, {
+					width: size.width,
+					size: word === 'Go!' ? 30 : 26,
+					mirrored: true,
+				})
+		},
 	})
 }
 
@@ -2504,6 +2589,22 @@ export function createParkrunSign(world: World, x: number) {
 				</span>
 			</div>
 		),
+		draw: ({ ctx, drawDefault }) => {
+			drawDefault()
+			// On the board's face, 112 by 64 from (2, 2), in the middle.
+			const name = world.course.name
+			const size = signLetters(name)
+			ctx.font = `${size}px ${FONT_SIGN}`
+			ctx.fillStyle = world.course.look?.signInk ?? '#f8b832'
+			const lines = wrapLines(ctx, name, 112)
+			const line = size * 0.85
+			const drop = signWraps(name) ? 6 : 0
+			const top = 2 + (64 - lines.length * line - drop) / 2 + drop
+			lines.forEach((text, i) => {
+				const across = 58 - ctx.measureText(text).width / 2
+				fillLine(ctx, text, across, top + i * line, line)
+			})
+		},
 	})
 }
 
@@ -2544,6 +2645,43 @@ export function createBanner(world: World, x: number, text: string) {
 		const middle = far.x + (near.x - far.x) * t
 		line.push([Math.round(middle / 2) * 2 - 6, y, 12, 2, 'white'])
 	}
+	// The same, for the Canvas Renderer: the line, and the cloth's
+	// checks, the dark ones, 6 px each, from the inside of its border.
+	const linePath = new Path2D()
+	for (const [x, y, w, h] of line) linePath.rect(x, y, w, h)
+	const clothWidth = far.x - near.x
+	const checks = new Path2D()
+	for (let row = -1; row * 6 + 3 < CLOTH_HEIGHT; row++)
+		for (let column = -1; column * 6 + 3 < clothWidth; column++)
+			if ((row + column) % 2 !== 0)
+				checks.rect(3 + column * 6, 3 + row * 6, 6, 6)
+	const slope = Math.tan((angle * Math.PI) / 180)
+	const paintCloth = (ctx: CanvasRenderingContext2D) => {
+		ctx.save()
+		ctx.beginPath()
+		ctx.rect(0, 0, clothWidth, CLOTH_HEIGHT)
+		ctx.clip()
+		ctx.fillStyle = 'white'
+		ctx.fillRect(0, 0, clothWidth, CLOTH_HEIGHT)
+		ctx.fillStyle = BANNER_INK
+		ctx.fill(checks)
+		ctx.restore()
+		ctx.fillStyle = BANNER_INK
+		ctx.fillRect(0, 0, clothWidth, 3)
+		ctx.fillRect(0, CLOTH_HEIGHT - 3, clothWidth, 3)
+		ctx.fillRect(0, 0, 3, CLOTH_HEIGHT)
+		ctx.fillRect(clothWidth - 3, 0, 3, CLOTH_HEIGHT)
+		// Its words on a dark patch, 8 px either side of them and 4 px over,
+		// in the middle of the inside of its border.
+		ctx.font = CLOTH_FONT
+		const patchWidth = ctx.measureText(text).width + 16
+		const patchLeft = 3 + (clothWidth - 6 - patchWidth) / 2
+		const patchTop = 3 + (CLOTH_HEIGHT - 6 - 24) / 2
+		ctx.fillRect(patchLeft, patchTop, patchWidth, 24)
+		ctx.fillStyle = '#ffd23f'
+		fillLine(ctx, text, patchLeft + 8, patchTop + 4, 20)
+	}
+	let fontLoaded = false
 
 	const across = createFixture({
 		id: `banner-${text}`,
@@ -2598,6 +2736,28 @@ export function createBanner(world: World, x: number, text: string) {
 				</div>
 			</div>
 		),
+		draw: ({ ctx }) => {
+			ctx.save()
+			ctx.globalAlpha *= 0.85
+			ctx.fillStyle = 'white'
+			ctx.fill(linePath)
+			ctx.restore()
+			paintPole(ctx, far.x - POLE_WIDTH / 2, far.foot - POLE_HEIGHT)
+			// The cloth, sloping up to the far pole's top: painted once and
+			// kept, once its font's loaded, and drawn sloping pixel for pixel,
+			// as the DOM Renderer draws it.
+			ctx.translate(near.x, near.foot - POLE_HEIGHT)
+			ctx.transform(1, -slope, 0, 1, 0, 0)
+			fontLoaded ||= document.fonts.check(CLOTH_FONT)
+			if (!fontLoaded) return paintCloth(ctx)
+			const art = cachedArt(
+				`banner-cloth:${text}:${clothWidth}`,
+				clothWidth,
+				CLOTH_HEIGHT,
+				paintCloth,
+			)
+			ctx.drawImage(art, 0, 0, clothWidth, CLOTH_HEIGHT)
+		},
 	})
 
 	const nearPole = createFixture({
@@ -2609,6 +2769,7 @@ export function createBanner(world: World, x: number, text: string) {
 		height: POLE_HEIGHT,
 		world,
 		children: () => <div style={{ ...POLE_STYLE, left: 0, top: 0 }} />,
+		draw: ({ ctx }) => paintPole(ctx, 0, 0),
 	})
 
 	return [across, nearPole]
@@ -2621,6 +2782,19 @@ const POLE_STYLE: JSX.CSSProperties = {
 	'box-sizing': 'border-box',
 	background: '#9aa3a8',
 	'border-left': '2px solid #5f686d',
+}
+
+/** A banner's cloth's border, its dark checks and the patch its words are on. */
+const BANNER_INK = '#0f1f29'
+/** What a banner's lettered in. */
+const CLOTH_FONT = `20px ${FONT_PIXEL}`
+
+/** A banner's pole, as `POLE_STYLE` draws it, painted with its top left at (`x`, `y`). */
+function paintPole(ctx: CanvasRenderingContext2D, x: number, y: number) {
+	ctx.fillStyle = '#9aa3a8'
+	ctx.fillRect(x, y, POLE_WIDTH, POLE_HEIGHT)
+	ctx.fillStyle = '#5f686d'
+	ctx.fillRect(x, y, 2, POLE_HEIGHT)
 }
 
 /**
@@ -3490,6 +3664,15 @@ export function createBoost(world: World, state: BoostState, i: number) {
 						</Bubble>
 					</Show>
 				),
+				draw: ({ ctx, drawDefault }) => {
+					drawDefault()
+					if (state.cheering() > 0)
+						paintBubble(ctx, `Go ${state.cheered || world.runner.name}!`, {
+							width: size.width,
+							size: 18,
+							mirrored: true,
+						})
+				},
 			})
 		}
 		case 'gate':
@@ -3969,6 +4152,75 @@ const KM_SIGN_WIDTH = 64
 const KM_SIGN_HEIGHT = 84
 const KM_BOARD_HEIGHT = 34
 
+/** A path round a box, its corners rounded `radii` px: top left, top right, bottom right, bottom left. */
+function roundedBox(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	radii: [number, number, number, number],
+) {
+	const [tl, tr, br, bl] = radii
+	ctx.beginPath()
+	ctx.moveTo(x + tl, y)
+	ctx.arcTo(x + width, y, x + width, y + height, tr)
+	ctx.arcTo(x + width, y + height, x, y + height, br)
+	ctx.arcTo(x, y + height, x, y, bl)
+	ctx.arcTo(x, y, x + width, y, tl)
+	ctx.closePath()
+}
+
+/**
+ * A km sign, as its `children` draw it, painted in a Draw Hook: its buoy,
+ * if it's `afloat`, its post, and its board, lettered.
+ */
+function paintKmSign(
+	ctx: CanvasRenderingContext2D,
+	km: number,
+	afloat: boolean,
+) {
+	if (afloat) {
+		// Inside a border 3 px thick, its corners rounded: red, a white band
+		// 10 px down.
+		const left = KM_SIGN_WIDTH / 2 - 15
+		const top = KM_SIGN_HEIGHT - BUOY_HEIGHT
+		ctx.fillStyle = '#1d1d1d'
+		roundedBox(ctx, left, top, 30, BUOY_HEIGHT, [6, 6, 2, 2])
+		ctx.fill()
+		ctx.save()
+		roundedBox(ctx, left + 3, top + 3, 24, BUOY_HEIGHT - 6, [3, 3, 0, 0])
+		ctx.clip()
+		ctx.fillStyle = '#e8473c'
+		ctx.fillRect(left + 3, top + 3, 24, BUOY_HEIGHT - 6)
+		ctx.fillStyle = '#f6f7f8'
+		ctx.fillRect(left + 3, top + 13, 24, 8)
+		ctx.restore()
+	}
+	const postTop = KM_BOARD_HEIGHT - 2
+	ctx.fillStyle = '#7a7f86'
+	ctx.fillRect(KM_SIGN_WIDTH / 2 - 3, postTop, 6, KM_SIGN_HEIGHT - postTop)
+	ctx.fillStyle = '#565a60'
+	ctx.fillRect(KM_SIGN_WIDTH / 2 - 3, postTop, 2, KM_SIGN_HEIGHT - postTop)
+	ctx.fillStyle = '#1d1d1d'
+	ctx.fillRect(0, 0, KM_SIGN_WIDTH, KM_BOARD_HEIGHT)
+	ctx.fillStyle = '#f7d117'
+	ctx.fillRect(3, 3, KM_SIGN_WIDTH - 6, KM_BOARD_HEIGHT - 6)
+	// Its distance and an arrow, 3 px apart, in the middle of the inside of
+	// its border, under 2 px of padding.
+	const words = `${km}KM`
+	ctx.font = `14px ${FONT_PIXEL}`
+	const arrow = ctx.measureText('→').width
+	ctx.font = `18px ${FONT_PIXEL}`
+	const wordsWidth = ctx.measureText(words).width
+	const left = KM_SIGN_WIDTH / 2 - (wordsWidth + 3 + arrow) / 2
+	const inside = KM_BOARD_HEIGHT - 8
+	ctx.fillStyle = '#1d1d1d'
+	fillLine(ctx, words, left, 5 + (inside - 18) / 2, 18)
+	ctx.font = `14px ${FONT_PIXEL}`
+	fillLine(ctx, '→', left + wordsWidth + 3, 5 + (inside - 14) / 2, 14)
+}
+
 /**
  * A sign at each whole kilometre between the start and the finish, 1 km to
  * 4 km: a yellow board on a post, as the marshals' arrow signs are, at the
@@ -4002,7 +4254,24 @@ export function createWarnings(world: World) {
 				return `M${x - warning.from},${y - WARNING_DEPTH}h4v${WARNING_DEPTH}h-4Z`
 			})
 			.join('')
+		// The same, for the Canvas Renderer: its band, and the black of the
+		// stripes across it, 8 px of every 16, at 45°.
+		const bandPath = new Path2D(band)
+		const every = 16 * Math.SQRT2
+		const thick = 8 * Math.SQRT2
+		const height = bottom - top
+		let stripes = ''
+		for (let at = 0; at < width + height; at += every)
+			stripes += `M${at + 1},-1h${thick}L${at + thick - height - 1},${height + 1}h${-thick}Z`
+		const black = new Path2D(stripes)
 		return createController({
+			draw: ({ ctx }) => {
+				ctx.clip(bandPath)
+				ctx.fillStyle = '#ffc21a'
+				ctx.fillRect(0, 0, width, height)
+				ctx.fillStyle = '#1d1d1d'
+				ctx.fill(black)
+			},
 			init: () => ({
 				id: `warning-${i}`,
 				type: 'sign',
@@ -4067,6 +4336,7 @@ export function createKmSigns(world: World) {
 			lift: afloat
 				? (age) => Math.round(Math.sin(age / 20 + km) * 3)
 				: undefined,
+			draw: ({ ctx }) => paintKmSign(ctx, km, afloat),
 			children: () => (
 				<div style={{ position: 'relative', width: '100%', height: '100%' }}>
 					<Show when={afloat}>
