@@ -2,6 +2,7 @@ import { For, type JSX, Show } from 'solid-js'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
 import { type Board, boardOf } from '../../game/boards'
 import { PixelArt } from '../PixelArt'
+import { type FlungBit, paintFlung } from '../paint/dirtFly'
 
 /**
  * The Slopes' skis and snowboards, in cells twice the size of a screen
@@ -249,4 +250,19 @@ function Bits(props: { colours: string[]; from: number }) {
 /** Snow sprayed off the back of the bus's sleigh, as it goes. */
 export function BusSpray(): JSX.Element {
 	return <Bits colours={SPRAY} from={0} />
+}
+
+/** `BusSpray`'s bits, turned round, as it is: flung back, behind the sleigh. */
+const BUS_SPRAY: FlungBit[] = BITS.map((bit, i) => ({
+	x: -4,
+	y: 2,
+	size: 4,
+	colour: SPRAY[i % SPRAY.length],
+	to: { x: -bit.x, y: bit.y },
+	delay: bit.delay,
+}))
+
+/** The same snow, painted on the Canvas Renderer, `ticks` into the race, from (0, 0). */
+export function paintBusSpray(ctx: CanvasRenderingContext2D, ticks: number) {
+	paintFlung(ctx, ticks, BUS_SPRAY, { seconds: 0.35, steps: 6 })
 }
