@@ -5,7 +5,7 @@ import pumpkin4Asset from '@/assets/halloween/pumpkin4.png'
 import pumpkin5Asset from '@/assets/halloween/pumpkin5.png'
 import tombstoneAsset from '@/assets/halloween/tombstone.png'
 import rockAsset from '@/assets/misc/rock1.png'
-import { type RunnerName, runners } from '@/data/runners'
+import { type RunnerName, runners, strideFrameInterval } from '@/data/runners'
 import { imageSize } from '@/utils/imageSize'
 import {
 	createConnectedController,
@@ -467,7 +467,9 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			)
 			const speed = Math.abs(body.vx)
 			$.setState(body.grounded && !body.board && speed > 0.3 ? 'play' : 'pause')
-			$.setFrameInterval(Math.max(45, 190 - speed * 22))
+			$.setFrameInterval(
+				strideFrameInterval(Math.max(45, 190 - speed * 22), run.length),
+			)
 			const { sea } = world.course
 			$.setStyle({
 				opacity: body.stumble > 0 && body.stumble % 8 < 4 ? '0.4' : '1',
@@ -839,7 +841,9 @@ function createPacer(world: World, p: Pacer) {
 			)
 			const speed = Math.abs(p.vx)
 			$.setState(p.grounded && !down && speed > 0.3 ? 'play' : 'pause')
-			$.setFrameInterval(Math.max(45, 190 - speed * 22))
+			$.setFrameInterval(
+				strideFrameInterval(Math.max(45, 190 - speed * 22), sprite.run.length),
+			)
 			// Flashing while they're dazed, and can't be bounced on again.
 			$.setStyle({
 				opacity: p.dazed > 0 && p.dazed % 8 < 4 ? '0.4' : '1',
@@ -3705,7 +3709,10 @@ function createZombie(
 			height: () => ZOMBIE_HEIGHT,
 			...createObjectSignal(0, 'rotation'),
 			// A shamble: a run, slowed right down.
-			...createObjectSignal(o.skeleton ? 220 : 300, 'frameInterval'),
+			...createObjectSignal(
+				strideFrameInterval(o.skeleton ? 220 : 300, sprite.run.length),
+				'frameInterval',
+			),
 			...createObjectSignal('play' as 'play' | 'pause', 'state'),
 			...createObjectSignal({} as JSX.CSSProperties, 'style'),
 		}),

@@ -8,7 +8,19 @@ import { type Accessor, type Setter, createSignal } from 'solid-js'
 import * as assets from './runner-assets'
 
 export const RUNNER_SIZE = 2
+/** Frames to a stride in the walking strips, the skeletons', and what `frameInterval` is timed for. */
 export const FRAME_COUNT = 4
+/** Frames to a stride in the run and zombie strips: two more, in between, for a smoother run. */
+export const RUN_FRAME_COUNT = 6
+
+/**
+ * How long to show each frame of a strip of `frames` for, `interval` being how
+ * long each of a four-frame stride's is shown for: a stride takes as long
+ * however many frames it's drawn in. Shorter strips are timed as they are.
+ */
+export function strideFrameInterval(interval: number, frames: number) {
+	return frames > FRAME_COUNT ? (interval * FRAME_COUNT) / frames : interval
+}
 
 /**
  * The club's members, named by the key their page route uses. The names, ids
@@ -141,18 +153,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.joshRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.joshZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.joshSit],
@@ -186,18 +198,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.keithRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.keithZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.keithSit],
@@ -225,18 +237,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.claireRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.claireZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.claireSit],
@@ -270,18 +282,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.lyraRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.lyraZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.lyraSit],
@@ -317,18 +329,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.adamRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				31,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.adamZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				31,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.adamSit],
@@ -355,18 +367,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.annaRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.annaZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.annaSit],
@@ -401,18 +413,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.elineRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.elineZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.elineSit],
@@ -440,18 +452,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.rickRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.rickZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.rickSit],
@@ -478,18 +490,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.sophieRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.sophieZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.sophieSit],
@@ -516,18 +528,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.augustRun,
-				50 * FRAME_COUNT,
+				50 * RUN_FRAME_COUNT,
 				30,
 				50 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.augustZombie,
-				50 * FRAME_COUNT,
+				50 * RUN_FRAME_COUNT,
 				30,
 				50 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.augustSit],
@@ -556,18 +568,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.alisaRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.alisaZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.alisaSit],
@@ -635,18 +647,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.otherJoshRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.otherJoshZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.otherJoshSit],
@@ -673,18 +685,18 @@ export const runners: Record<
 		frames: {
 			run: generateFrames(
 				assets.mikaelRun,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			zombie: generateFrames(
 				assets.mikaelZombie,
-				23 * FRAME_COUNT,
+				23 * RUN_FRAME_COUNT,
 				29,
 				23 * RUNNER_SIZE,
-				FRAME_COUNT,
+				RUN_FRAME_COUNT,
 				true,
 			),
 			sit: [assets.mikaelSit],

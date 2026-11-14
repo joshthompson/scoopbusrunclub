@@ -3,6 +3,7 @@ import {
 	type RunnerState,
 	findRunnerSignal,
 	type runners,
+	strideFrameInterval,
 } from '@/data/runners'
 import { ZOMBIE_PACE, ZOMBIE_TINT, isHalloween } from '@/utils/halloween'
 import { imageSize } from '@/utils/imageSize'
@@ -212,7 +213,9 @@ export function createRunnerController(
 				state: () => 'play',
 				runnerId,
 				// A slower runner's legs go round slower too, so they don't slide.
-				frameInterval: () => runner().frameInterval / undeadPace(),
+				frameInterval: () =>
+					strideFrameInterval(runner().frameInterval, frames().length) /
+					undeadPace(),
 				x,
 				setX,
 				y,

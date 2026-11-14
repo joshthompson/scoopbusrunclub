@@ -38,7 +38,12 @@ export interface CharacterSpriteProps {
 	}
 }
 
-const FRAME_COUNT = 4
+/**
+ * Frames to a stride in the run and zombie templates, as a club member's have
+ * (`RUN_FRAME_COUNT` in `data/runners`, which imports this, so it can't be
+ * imported from there).
+ */
+const RUN_FRAME_COUNT = 6
 const RUNNER_SIZE = 2
 
 export function createRunnerFrames(
@@ -47,7 +52,7 @@ export function createRunnerFrames(
 	RunnerData,
 	'frames' | 'width' | 'height' | 'headPoint' | 'sitHeadPoint' | 'look'
 > {
-	const run = generateCustomSpriteFrames(character, runPixels, FRAME_COUNT)
+	const run = generateCustomSpriteFrames(character, runPixels, RUN_FRAME_COUNT)
 	const sit = generateCustomSpriteFrames(character, sitPixels, 1)
 	// Its first frame: stood, arms down (the other's a phone up). The strip
 	// comes back last frame first, so that's the last of them.
@@ -55,7 +60,7 @@ export function createRunnerFrames(
 	const zombie = generateCustomSpriteFrames(
 		character,
 		zombiePixels,
-		FRAME_COUNT,
+		RUN_FRAME_COUNT,
 	)
 	const face = generateFaceFrame(character)
 	return {
