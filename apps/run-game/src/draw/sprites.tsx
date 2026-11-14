@@ -1743,18 +1743,6 @@ export function createBus(world: World) {
 		},
 	})
 
-	/**
-	 * Gives a part a Draw Hook, for the Canvas Renderer, where it's drawn with
-	 * `children` on the DOM: `createConnectedController` doesn't take one.
-	 */
-	const withDraw = <C extends { draw?: unknown }>(
-		controller: C,
-		draw: C['draw'],
-	) => {
-		controller.draw = draw
-		return controller
-	}
-
 	const part = (
 		type: string,
 		asset: string,
@@ -1789,30 +1777,28 @@ export function createBus(world: World) {
 		if (!look.legs) return
 		const legsLook = look.legs
 		bus.attach(
-			withDraw(
-				createConnectedController({
-					type,
-					base: bus,
-					width: () => LEGS_WIDTH,
-					height: () => LEGS_HEIGHT,
-					offset: { x: -LEGS_OUT, y: 0 },
-					init: () => ({
-						children: () => (
-							<BusLegs
-								look={legsLook}
-								far={far}
-								ground={WHEEL_BOTTOM}
-								travelled={() => {
-									world.ticks()
-									return world.bus.frontX
-								}}
-							/>
-						),
-					}),
-				}),
-				({ ctx }) =>
+			createConnectedController({
+				type,
+				base: bus,
+				draw: ({ ctx }) =>
 					paintBusLegs(ctx, legsLook, world.bus.frontX, WHEEL_BOTTOM, far),
-			),
+				width: () => LEGS_WIDTH,
+				height: () => LEGS_HEIGHT,
+				offset: { x: -LEGS_OUT, y: 0 },
+				init: () => ({
+					children: () => (
+						<BusLegs
+							look={legsLook}
+							far={far}
+							ground={WHEEL_BOTTOM}
+							travelled={() => {
+								world.ticks()
+								return world.bus.frontX
+							}}
+						/>
+					),
+				}),
+			}),
 		)
 	}
 	if (look.legs) legs('bus-legs-far', true)
@@ -1875,23 +1861,22 @@ export function createBus(world: World) {
 	const sprayFor = goingFor()
 	if (look.sleigh)
 		bus.attach(
-			withDraw(
-				createConnectedController({
-					type: 'bus-spray',
-					base: bus,
-					width: () => 0,
-					height: () => 0,
-					offset: { x: BUS_WIDTH - SLEIGH_WIDTH + 14, y: WHEEL_BOTTOM - 10 },
-					init: () => ({
-						children: () => (
-							<div style={{ position: 'absolute', transform: 'scaleX(-1)' }}>
-								<BusSpray />
-							</div>
-						),
-					}),
+			createConnectedController({
+				type: 'bus-spray',
+				base: bus,
+				draw: ({ ctx }) =>
+					paintBusSpray(ctx, sprayFor(true, world.ticks()) ?? 0),
+				width: () => 0,
+				height: () => 0,
+				offset: { x: BUS_WIDTH - SLEIGH_WIDTH + 14, y: WHEEL_BOTTOM - 10 },
+				init: () => ({
+					children: () => (
+						<div style={{ position: 'absolute', transform: 'scaleX(-1)' }}>
+							<BusSpray />
+						</div>
+					),
 				}),
-				({ ctx }) => paintBusSpray(ctx, sprayFor(true, world.ticks()) ?? 0),
-			),
+			}),
 		)
 	// Its own glider, bolted to its roof, out over the sea.
 	if (world.course.sea)
