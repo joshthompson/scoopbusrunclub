@@ -4,6 +4,12 @@ Launch every browser you test with muted: pass `--mute-audio` to Chrome (or Chro
 
 ---
 
+# Commit Messages and PR Titles — Conventional Commits
+
+Write every commit message and PR title as `type(scope): subject`, for example `feat(web): add date bingo` or `fix(api, web): handle a cancelled parkrun`. The scope is required. Use one or more Nx project names (`web`, `api`, `game`, `run-game`, `results-scraper`), or `shared`, `cloudflare-worker-proxy` or `repo` for root-level tooling and docs. `commitlint.config.js` holds the rules. A commit-msg hook (`.husky/commit-msg`) checks commits, and CI checks PR titles, since squash merges use the title as the commit message. Never add a `Co-authored-by` trailer, for a person or an AI. The hook rejects it.
+
+---
+
 # Analytics Tracking — Mixpanel
 
 The website (`apps/web`) uses **Mixpanel** for all product analytics. Don't introduce any other analytics tools, SDKs or tracking libraries without explicit instruction. The game (`apps/game`) and the results-scraper extension aren't tracked.

@@ -35,13 +35,18 @@
 		"scraper:pack": "tsx apps/results-scraper/build.mts --pack",
 		"scraper:watch": "tsx apps/results-scraper/build.mts --watch",
 		"wake:install": "bash scripts/setup-wake-job.sh",
-		"wake:disable": "bash scripts/setup-wake-job.sh --disable"
+		"wake:disable": "bash scripts/setup-wake-job.sh --disable",
+		"prepare": "husky"
 	},
 	"license": "MIT",
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
+		"@commitlint/cli": "^21.2.4",
+		"@commitlint/config-conventional": "^21.2.4",
+		"@commitlint/config-nx-scopes": "^21.2.3",
 		"@pandacss/dev": "^1.8.2",
 		"@pandacss/postcss": "^1.8.2",
+		"husky": "^9.1.7",
 		"nx": "^21.1.2",
 		"postcss": "^8.5.8",
 		"solid-devtools": "^0.34.3",

@@ -1,0 +1,42 @@
+name: Commitlint
+
+# PRs are squash-merged, so the PR title becomes the commit message on main.
+# The commit-msg hook can't see it (or a commit made with --no-verify), so the
+# title is checked here against commitlint.config.js.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  # ScoopJS, from GitHub Packages, is part of the install.
+  packages: read
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Log in to GitHub Packages
+        run: echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: pnpm install --frozen-lockfile
+
+      # Through an env var, never ${{ }} inside the script: the title is
+      # untrusted input.
+      - name: Lint PR title
+        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint --verbose
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
