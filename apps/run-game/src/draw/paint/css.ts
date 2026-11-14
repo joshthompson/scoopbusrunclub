@@ -312,14 +312,17 @@ export interface Loaded {
 	height: number
 }
 
-/** How far a drop shadow's blur reaches out past what casts it. */
+/**
+ * How far a drop shadow's blur reaches out past what casts it: three of its
+ * standard deviations, which its blur is.
+ */
 const shadowReach = (steps: FilterStep[]) =>
 	Math.ceil(
 		Math.max(
 			0,
 			...steps.map((step) =>
 				'shadow' in step
-					? step.shadow.blur * 1.5 +
+					? step.shadow.blur * 3 +
 						Math.max(Math.abs(step.shadow.x), Math.abs(step.shadow.y))
 					: 0,
 			),
@@ -380,7 +383,10 @@ export function filtered(
 				ctx.setTransform(1, 0, 0, 1, 0, 0)
 				ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
 				ctx.shadowColor = step.shadow.colour
-				ctx.shadowBlur = step.shadow.blur * density
+				// A canvas blurs by half its `shadowBlur`, and `drop-shadow` by its
+				// blur, its standard deviation, so it's given twice as much, as
+				// ScoopJS does for a Controller's `filter`.
+				ctx.shadowBlur = 2 * step.shadow.blur * density
 				ctx.shadowOffsetX = step.shadow.x * density
 				ctx.shadowOffsetY = step.shadow.y * density
 				ctx.drawImage(copy, 0, 0)
