@@ -1,8 +1,8 @@
 /**
  * The CSS backgrounds the game's art is written with (a Platform's face, in
- * the course's `look`), painted onto a canvas the way the DOM Renderer's
- * CSS draws them: a colour, a `var(--…)` of one, a picture repeated from the
- * box's corner, or a gradient, repeating or not.
+ * the course's `look`), painted onto a canvas the way CSS draws them: a
+ * colour, a `var(--…)` of one, a picture repeated from the box's corner, or
+ * a gradient, repeating or not.
  */
 
 /** A colour as a canvas takes it: a `var(--…)` looked up in `styles.css`. */

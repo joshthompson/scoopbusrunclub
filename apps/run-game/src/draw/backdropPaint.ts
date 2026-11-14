@@ -43,8 +43,8 @@ import { inLayer } from './paint/layer'
 /**
  * The Backdrop, painted onto the canvas: the sky, the sun, the clouds, and
  * the bands of hills or horizon behind the course, each going by slower
- * the further back it is. What `Backdrop` draws on the page, the same, in
- * its own coordinates: (0, 0) its top left, `width` across, and its
+ * the further back it is. What `Backdrop` draws in a course's preview, the
+ * same, in its own coordinates: (0, 0) its top left, `width` across, and its
  * bottom `height` down.
  */
 export function createBackdropPainter(world: World, resolve: Resolve) {

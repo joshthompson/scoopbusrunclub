@@ -1,6 +1,6 @@
 /**
- * Lettering painted in a Draw Hook, laid out as the DOM Renderer's CSS lays
- * out the same words: in the same fonts, on the same lines.
+ * Lettering painted in a Draw Hook, laid out as CSS lays out words: in the
+ * game's fonts, on lines as CSS fills them.
  */
 
 /** `--font-pixel` in `styles.css`: Remi Pop, the game's lettering. */

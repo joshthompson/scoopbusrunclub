@@ -1,6 +1,6 @@
 /**
- * A CSS animation's progress, worked out from the time rather than played
- * by the page: for art painted onto a canvas that's animated there.
+ * An animation's progress, worked out from the time, with CSS's timing
+ * functions: for art painted onto the canvas that moves.
  */
 
 /** A CSS `cubic-bezier()` timing function, as a function of progress. */
@@ -28,8 +28,8 @@ export const easeInOut = cubicBezier(0.42, 0, 0.58, 1)
 
 /**
  * How far through its current go an animation `seconds` long is, `elapsed`
- * seconds after it was put on the page with `delay`: 0 to 1, or undefined
- * before it's started.
+ * seconds in, if it starts `delay` seconds in: 0 to 1, or undefined before
+ * it's started.
  */
 export function cycle(elapsed: number, seconds: number, delay = 0) {
 	const into = elapsed - delay

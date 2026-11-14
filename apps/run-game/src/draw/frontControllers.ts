@@ -26,12 +26,10 @@ import { readSvg } from './paint/svgPainter'
 import { TILE, type Tiles, tileControllers, tileDensity } from './paint/tiles'
 
 /**
- * Under the Canvas Renderer, what's over everyone in the scene, on the
- * canvas, as Controllers with Draw Hooks, rather than page elements over
- * it moved with the camera: a Cave's cover (`CaveCover`) and the sea's
- * waves in front of everyone in it (`SeaFront`). The DOM Renderer still
- * draws them as page elements, its `overlay`, and none of these are in
- * its Scene. Their types are at the end of the backdrop's `OVER_TYPES`.
+ * What's over everyone in the scene, as Controllers with Draw Hooks: a
+ * Cave's cover over the inside of it, till someone racing goes in, and the
+ * sea's waves in front of everyone in it. Their types are at the end of the
+ * backdrop's `OVER_TYPES`.
  */
 
 /** The far end of what's drawn of a course: as far as the Ground goes. */
@@ -59,7 +57,7 @@ export function createCaveCover(world: World, scene: Scene) {
 		const rows = Array.from({ length: columns }, (_, c): [number, number] => {
 			const chunk = drawing.chunks.get(c)
 			if (!chunk) return [0, -1]
-			// Cut off where the page's `<svg>` ends.
+			// Cut off where its `<svg>` ends.
 			const top = Math.max(-SKY_ROOM, chunk.top)
 			const bottom = Math.min(VIEW_HEIGHT, chunk.bottom)
 			return bottom > top
@@ -102,8 +100,8 @@ export function createCaveCover(world: World, scene: Scene) {
 }
 
 /**
- * How solid a Cave's cover is, 0 to 1, as the page's `transition` has it:
- * going, eased, over `COVER_FADE_MS` once `opened` says it's open, and
+ * How solid a Cave's cover is, 0 to 1: going, eased, over `COVER_FADE_MS`
+ * once `opened` says it's open, and
  * coming back once it's shut again, from wherever it had got to. Asked
  * every tick, whether it's in view or not, so it knows when.
  */
@@ -127,14 +125,15 @@ function coverFade(world: World, scene: Scene, opened: () => boolean) {
 	return alpha
 }
 
-/** Seconds since the race started, for what the page animates by the clock. */
+/** Seconds since the race started, for what's animated by the clock. */
 const secondsIn = (world: World) =>
 	(Math.max(0, world.ticks()) * TICK_MS) / 1000
 
 /**
  * The sea's waves in front of everyone in it: its crests rolling in, the
- * water on down under them, and the headwind streaking by up high. See
- * `SeaFront`.
+ * water on down under them, and the headwind streaking by up high. In front
+ * of the bus's wheels, afloat, a whale, under, and anyone who's fallen in,
+ * gone under, so what's in it is in it.
  */
 export function createSeaFront(world: World, scene: Scene) {
 	const { sea } = world.course
@@ -222,7 +221,7 @@ export function createSeaFront(world: World, scene: Scene) {
 						Number(streak.delay),
 					)
 					if (progress === undefined) continue
-					// Fading in, across, and out again, as `wind-streak` has it.
+					// Fading in over the first 15% of its way across, and out over the last.
 					const strength = Number(streak.opacity)
 					const fade = Math.min(1, progress / 0.15, (1 - progress) / 0.15)
 					ctx.globalAlpha = alpha * strength * fade

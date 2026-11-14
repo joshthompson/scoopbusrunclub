@@ -630,8 +630,7 @@ export function paintHat(
 ) {
 	const art = hatArt(hat)
 	if (options.lit && hat.kind === 'miner')
-		// Under the DOM Renderer it's `screen`ed over the wearer, inside their
-		// sprite: over anything else it's just drawn, as it is here.
+		// Its lamp's beam, shining ahead.
 		paintPicture(
 			ctx,
 			image,
@@ -673,8 +672,8 @@ export function paintHat(
 export const HAT_GLOW_OUT = 10
 
 /**
- * The glow round a hat sat waiting, `HAT_GLOW` in `createBoost`, in a Draw
- * Hook, round a hat `width` by `height`: painted once, and kept.
+ * The glow round a hat sat waiting, so it's plain it's there to have, in a
+ * Draw Hook, round a hat `width` by `height`: painted once, and kept.
  */
 export function paintHatGlow(
 	ctx: CanvasRenderingContext2D,

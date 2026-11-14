@@ -42,15 +42,14 @@ import { type SvgDrawing, compileSvg } from './paint/svgCanvas'
 import { TILE, tileControllers, tileDensity } from './paint/tiles'
 
 /**
- * Under the Canvas Renderer, what's drawn behind the course and over it,
- * on the canvas, as Controllers with Draw Hooks, rather than page elements
- * round it: the `Backdrop`, the `HorizonTrees` and the `Ground` behind
- * every sprite, and `Snow` and `Fog` over them all. The DOM Renderer still
- * draws them as page elements, and none of these are in its Scene.
+ * What's drawn behind the course and over it, as Controllers with Draw
+ * Hooks: the backdrop (as `Backdrop` draws it in a course's preview), the
+ * horizon's trees and the Ground behind every sprite, and snow and fog over
+ * them all.
  *
- * Each goes where the page has it, in the Scene's own coordinates: the
- * Backdrop with the camera, its bands going by at a fraction of it, and
- * the Ground in the world, in tiles painted once and kept.
+ * Each goes in the Scene's own coordinates: the backdrop with the camera,
+ * its bands going by at a fraction of it, and the Ground in the world, in
+ * tiles painted once and kept.
  */
 
 /** Their types, behind every sprite, front to back, for `assetOrder`'s end. */
@@ -186,11 +185,11 @@ function createGround(world: World, scene: Scene, resolve: Resolve) {
 }
 
 /**
- * The Ground as the page draws it (`Ground`, and `HorizonTrees` behind
- * it), read once, ready to paint a tile at a time: its SVG read into
- * chunks a tile wide, and its pits and buildings, page elements, painted
- * by hand. In the Ground's own coordinates: x from `DRAWN_FROM`, y the
- * world's.
+ * The Ground as a course's preview draws it (`Ground`, and `HorizonTrees`
+ * behind it), read once, ready to paint a tile at a time: its SVG read
+ * into chunks a tile wide, and its pits and buildings, not in the SVG,
+ * painted by hand. In the Ground's own coordinates: x from `DRAWN_FROM`, y
+ * the world's.
  */
 function createGroundArt(world: World, resolve: Resolve) {
 	const { terrain } = world
@@ -310,7 +309,7 @@ function createGroundArt(world: World, resolve: Resolve) {
 			paintBuilding(ctx, block, i, buildings, image)
 		})
 		if (drawing) {
-			// Cut off where the page's `<svg>` ends.
+			// Cut off where its `<svg>` ends.
 			ctx.save()
 			ctx.beginPath()
 			ctx.rect(0, viewTop, width, VIEW_HEIGHT - viewTop)

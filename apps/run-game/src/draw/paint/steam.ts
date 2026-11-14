@@ -2,14 +2,11 @@ import { TICK_MS } from '../../game/constants'
 import { cycle, steps } from './animation'
 
 /**
- * The `steam-rise` animation (in `styles.css`), worked out for painting on
- * the Canvas Renderer, where CSS animations don't play: steam rising 120 px
- * off a vent, growing from 0.6 of its size to 1.6, and fading as it goes,
- * in `steps` jumps over `seconds`; then again, over and over.
- *
- * Before its `delay` it sits where it is, as big as it is, not faded, as
- * CSS leaves it. `ticks` is how long it's been going: the world's ticks,
- * where under the DOM Renderer it's real time, since the page put it there.
+ * Steam rising: 120 px off a vent, growing from 0.6 of its size to 1.6,
+ * and fading as it goes, in `steps` jumps over `seconds`; then again, over
+ * and over. Before its `delay` it sits where it is, as big as it is, not
+ * faded. `ticks` is how long it's been going: the world's ticks, so it
+ * pauses with the game.
  */
 export function steamRiseAt(
 	ticks: number,
@@ -28,9 +25,8 @@ const risen = (t: number) => ({
 })
 
 /**
- * A bit of steam, a square `<div>` under the DOM Renderer: its top left,
- * its size and colour, a ring round it (its `box-shadow`'s spread), if it
- * has one, and when it starts rising.
+ * A bit of steam, a square: its top left, its size and colour, a ring round
+ * it, if it has one, and when it starts rising.
  */
 export interface SteamBit {
 	x: number
@@ -43,8 +39,8 @@ export interface SteamBit {
 }
 
 /**
- * Bits of steam rising with `steam-rise`, painted where they've got to after
- * `ticks`: each grown and shrunk about its middle, as CSS transforms it.
+ * Bits of steam rising, painted where they've got to after `ticks`: each
+ * grown and shrunk about its middle.
  */
 export function paintSteam(
 	ctx: CanvasRenderingContext2D,
@@ -78,7 +74,7 @@ export function paintSteam(
 }
 
 /**
- * How far steam rising with `steam-rise` gets out of the box, `width` by
+ * How far rising steam gets out of the box, `width` by
  * `height`, of whatever it's rising off, at its biggest and highest, for
  * its Draw Hook's `drawReach`: each group of `bits`, rising in its `steps`.
  */

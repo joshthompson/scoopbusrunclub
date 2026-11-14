@@ -4,9 +4,8 @@ import { cachedArt } from '../canvasArt'
 export type CellRect = readonly [number, number, number, number, string]
 
 /**
- * Pixel art drawn as rects of cells, `scale` screen pixels each, as an
- * `<svg>` of `<rect>`s draws it under the DOM Renderer: painted once and
- * kept by `key`, `columns` by `rows` cells, to draw at its size.
+ * Pixel art drawn as rects of cells, `scale` screen pixels each: painted
+ * once and kept by `key`, `columns` by `rows` cells, to draw at its size.
  */
 export function cellArt(
 	key: string,
