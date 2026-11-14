@@ -531,6 +531,34 @@ const RING = ring(false)
 const RING_LIT = ring(true)
 
 /**
+ * `RingArt`, painted in a Draw Hook, from (0, 0) of `ctx`: one half of it,
+ * and, lit up, its glow.
+ */
+export function paintRing(
+	ctx: CanvasRenderingContext2D,
+	image: (url: string) => { image: CanvasImageSource } | undefined,
+	half: 'near' | 'far',
+	lit: boolean,
+) {
+	const picture = image(lit ? RING_LIT : RING)
+	if (!picture) return
+	// Its half, and the glow round it above, below and at its end.
+	ctx.beginPath()
+	if (half === 'near') ctx.rect(-8, -8, RING_WIDTH / 2 + 8, RING_HEIGHT + 16)
+	else ctx.rect(RING_WIDTH / 2, -8, RING_WIDTH / 2 + 8, RING_HEIGHT + 16)
+	ctx.clip()
+	if (lit) {
+		// As `drop-shadow(0 0 6px #fff4a0)`. A canvas's shadow blurs half as
+		// far for the same length, and isn't scaled by its transform, so it's
+		// doubled and scaled here.
+		const m = ctx.getTransform()
+		ctx.shadowColor = '#fff4a0'
+		ctx.shadowBlur = 12 * Math.sqrt(Math.abs(m.a * m.d - m.b * m.c))
+	}
+	ctx.drawImage(picture.image, 0, 0, RING_WIDTH, RING_HEIGHT)
+}
+
+/**
  * A Ring, seen almost edge on: its near half, in front of whoever's going
  * through it, or its far half, behind them. Lit up, flown through.
  */

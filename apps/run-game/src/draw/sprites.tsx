@@ -87,7 +87,12 @@ import {
 	whaleAt,
 } from '../game/sky'
 import { steamPuff } from '../game/steam'
-import { countdownWord, scoopFlight, stepWorld } from '../game/step'
+import {
+	GATE_FLAP_TICKS,
+	countdownWord,
+	scoopFlight,
+	stepWorld,
+} from '../game/step'
 import { tiltAt } from '../game/terrain'
 import {
 	TOWER_ARCH,
@@ -130,7 +135,7 @@ import {
 	DUCK_NOTE_WIDTH,
 	duckNote,
 } from './art/duckNote'
-import { FikaArt } from './art/fika'
+import { FikaArt, fikaPicture } from './art/fika'
 import { GEESE_HEIGHT, GeeseArt, geeseWidth } from './art/geese'
 import {
 	FACE_FRONT,
@@ -174,6 +179,7 @@ import {
 	WHALE_HEIGHT,
 	WHALE_WIDTH,
 	WhaleArt,
+	paintRing,
 } from './art/sky'
 import {
 	GATE_HEIGHT,
@@ -183,6 +189,7 @@ import {
 	SNOWMAN_DRAWN,
 	SNOWMAN_WIDTH,
 	SnowmanArt,
+	paintGate,
 	railPainter,
 } from './art/slopes'
 import {
@@ -3686,6 +3693,10 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				world,
 				lift: (age) => Math.round(Math.sin(age / 9) * 3),
 				children: () => <FikaArt item={o.item} />,
+				draw: ({ ctx, image }) => {
+					const picture = image(fikaPicture(o.item))
+					if (picture) ctx.drawImage(picture.image, 0, 0, art.width, art.height)
+				},
 				// Picked up: gone. `used` isn't a signal, so this reads the tick.
 				style: () => ({
 					visibility: world.ticks() >= 0 && state.used ? 'hidden' : 'visible',
@@ -3800,6 +3811,15 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				children: () => (
 					<GateArt colour={o.colour} flapping={state.cheering() > 0} />
 				),
+				// Flapping from when it was gone past, as its CSS animation does.
+				draw: ({ ctx }) =>
+					paintGate(
+						ctx,
+						o.colour,
+						state.cheering() > 0
+							? (GATE_FLAP_TICKS - state.cheering()) * TICK_MS
+							: undefined,
+					),
 			})
 		case 'ring': {
 			// Its far half behind whoever's going through it, its near half in
@@ -3814,6 +3834,8 @@ export function createBoost(world: World, state: BoostState, i: number) {
 					sink: RING_HEIGHT / 2 - o.height,
 					world,
 					children: () => <RingArt half={side} lit={state.cheering() > 0} />,
+					draw: ({ ctx, image }) =>
+						paintRing(ctx, image, side, state.cheering() > 0),
 				})
 			return [half('far'), half('near')]
 		}

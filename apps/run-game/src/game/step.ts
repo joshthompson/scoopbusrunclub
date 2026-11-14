@@ -1824,7 +1824,7 @@ export const SNOWMAN_HEIGHT = 44
 /** How tall a slalom gate is: through it, or clean over it. */
 export const GATE_HEIGHT = 110
 /** How long a slalom gate's flag flaps, gone through. */
-const GATE_FLAP_TICKS = 30
+export const GATE_FLAP_TICKS = 30
 
 /**
  * How much the hill at `x` changes the bus's pace, out of its own: slowed
