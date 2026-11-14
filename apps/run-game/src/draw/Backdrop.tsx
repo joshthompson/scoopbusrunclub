@@ -53,7 +53,7 @@ export type View = Pick<World, 'camera' | 'course' | 'terrain'> &
  * How much of the camera looking up or down the backdrop goes with: a
  * little, it's a long way off.
  */
-const BACKDROP_LIFT = 0.3
+export const BACKDROP_LIFT = 0.3
 
 /**
  * How far above the top of the screen the ground's drawn, for the camera
@@ -66,21 +66,21 @@ const MOUNTAIN_ROOM = 240
 
 const layer: JSX.CSSProperties = { position: 'absolute', left: 0, right: 0 }
 
-const CLOUDS = [
+export const CLOUDS = [
 	{ asset: cloud1Asset, x: 80, y: 60 },
 	{ asset: cloud2Asset, x: 520, y: 100 },
 	{ asset: cloud1Asset, x: 900, y: 40 },
 ]
 
 /** Room off either edge for a cloud to go out of sight before it wraps round. */
-const CLOUD_ROOM = 100
-const wrap = (x: number) => {
+export const CLOUD_ROOM = 100
+export const wrap = (x: number) => {
 	const span = VIEW_WIDTH + CLOUD_ROOM * 2
 	return (((x + CLOUD_ROOM) % span) + span) % span
 }
 
 /** Something to scatter, and where its bottom goes, as a y on the screen. */
-interface Piece {
+export interface Piece {
 	asset: string
 	standsAt: (random: () => number) => number
 	/** Drawn this many times its size, from its foot. */
@@ -101,31 +101,31 @@ const standing = (
 })
 
 /** How far a voyage's next horizon fades in over, before the camera gets to it. */
-const VOYAGE_FADE = 700
+export const VOYAGE_FADE = 700
 
 /** How tall a horizon's strip of spires is: up from the bottom of its far band. */
-const SPIRES_HEIGHT = 300
+export const SPIRES_HEIGHT = 300
 
 /** How tall a band of a course's own horizon is drawn. */
-const SKYLINE_HEIGHT = 160
+export const SKYLINE_HEIGHT = 160
 /**
  * And its nearer bands, if it has any: the first starting this far below
  * the middle hills' line, each after it this much lower, and going by this
  * much faster.
  */
-const NEARER_TOP = 30
-const NEARER_STEP = 90
-const NEARER_PARALLAX = 0.26
-const NEARER_FASTER = 0.14
+export const NEARER_TOP = 30
+export const NEARER_STEP = 90
+export const NEARER_PARALLAX = 0.26
+export const NEARER_FASTER = 0.14
 
 /** Up a mountain, how much of the camera looking up the horizon rises with, till it's risen as far as it goes. */
-const HORIZON_RISE_RATE = 0.4
+export const HORIZON_RISE_RATE = 0.4
 
 /** How far a horizon's own sky goes on up over the top of the screen. */
-const HORIZON_SKY_OVER = 1200
+export const HORIZON_SKY_OVER = 1200
 
 /** Where the middle band of hills starts, which the far scenery peeks over. */
-const HORIZON = 216
+export const HORIZON = 216
 
 /**
  * Peeking `min` to `max` px over the middle hills, the rest of it hidden
@@ -144,7 +144,7 @@ const peeking = (
 	...look,
 })
 
-interface Scattering {
+export interface Scattering {
 	parallax: number
 	/**
 	 * Nothing below this y is drawn: what's meant to be hidden behind the hills
@@ -158,15 +158,16 @@ interface Scattering {
 }
 
 /**
- * Scenery dotted along a band of the backdrop, scrolling with it: one
- * container moved as the camera moves, rather than every tree and house.
+ * What's dotted along a band of the backdrop, left to right: each piece,
+ * its left edge in the band's own pixels, and how far up from the bottom
+ * of the screen its foot is.
  */
-function Scattered(props: { world: View; scattering: Scattering }) {
-	const { parallax, gap, pieces, seed, clipBelow } = props.scattering
+export function scatteredItems(world: View, scattering: Scattering) {
+	const { parallax, gap, pieces, seed } = scattering
 	const random = seeded(seed)
 	// As far as the camera ever goes, either way, at this layer's speed.
 	const from = (START_X - 1300 - VIEW_WIDTH * CAMERA_LEAD) * parallax - 100
-	const to = (props.world.terrain.finishX + 500) * parallax + VIEW_WIDTH + 100
+	const to = (world.terrain.finishX + 500) * parallax + VIEW_WIDTH + 100
 	const items: { piece: Piece; x: number; bottom: number }[] = []
 	for (let x = from; x < to; x += gap[0] + random() * (gap[1] - gap[0])) {
 		const piece = pieces[Math.floor(random() * pieces.length)]
@@ -176,6 +177,16 @@ function Scattered(props: { world: View; scattering: Scattering }) {
 			bottom: Math.round(VIEW_HEIGHT - piece.standsAt(random)),
 		})
 	}
+	return items
+}
+
+/**
+ * Scenery dotted along a band of the backdrop, scrolling with it: one
+ * container moved as the camera moves, rather than every tree and house.
+ */
+function Scattered(props: { world: View; scattering: Scattering }) {
+	const { parallax, clipBelow } = props.scattering
+	const items = scatteredItems(props.world, props.scattering)
 
 	return (
 		<div
@@ -229,7 +240,7 @@ function Scattered(props: { world: View; scattering: Scattering }) {
  * Red Swedish houses and trees out past the far hills, as in the header:
  * behind the middle band of hills, so they peek over it.
  */
-const HAGA_FAR: Scattering = {
+export const HAGA_FAR: Scattering = {
 	parallax: 0.17,
 	// Well inside the middle hills, which are solid from 16 px down.
 	clipBelow: HORIZON + 30,
@@ -250,10 +261,10 @@ const HAGA_FAR: Scattering = {
  * runs down into it, and so everything stood on it, or it slides about on
  * the grass under it.
  */
-const FIELD_PARALLAX = 0.35
+export const FIELD_PARALLAX = 0.35
 
 /** Trees on the field behind the course. */
-const HAGA_NEAR: Scattering = {
+export const HAGA_NEAR: Scattering = {
 	parallax: FIELD_PARALLAX,
 	gap: [90, 320],
 	pieces: [standing(tree1Asset, 300, 30), standing(tree2Asset, 300, 30)],
@@ -261,7 +272,7 @@ const HAGA_NEAR: Scattering = {
 }
 
 /** A course's own `far` pieces, peeking over the hills as much as Haga's houses do. */
-function farOf(pieces: BackdropPiece[]): Scattering {
+export function farOf(pieces: BackdropPiece[]): Scattering {
 	return {
 		...HAGA_FAR,
 		pieces: pieces.map(({ asset, height, scale = 1, filter }) =>
@@ -271,7 +282,7 @@ function farOf(pieces: BackdropPiece[]): Scattering {
 }
 
 /** And its `near` ones, stood on the field. */
-function nearOf(
+export function nearOf(
 	pieces: BackdropPiece[],
 	gap: [number, number] = [70, 240],
 ): Scattering {
@@ -285,7 +296,27 @@ function nearOf(
 }
 
 /** How fast a horizon's textured field goes by: slower than the path, faster than the skyline. */
-const FIELD_TEXTURE_PARALLAX = 0.5
+export const FIELD_TEXTURE_PARALLAX = 0.5
+
+/** How far a voyage's next horizon has faded in, as the camera gets to `from`. */
+export const voyageFadeIn = (world: View, from: number) =>
+	Math.max(0, Math.min(1, (world.camera() - from) / VOYAGE_FADE + 1))
+
+/**
+ * How far down the backdrop is, for the camera looking up or down. The
+ * whole canvas goes with the camera: this goes back the other way, all but
+ * a little of it.
+ */
+export function backdropLift(world: View) {
+	const look = world.course.look ?? {}
+	const cameraY = world.cameraY?.() ?? 0
+	// Up a mountain, it rises as far as it goes, then stays put.
+	if (look.horizonRise !== undefined)
+		return Math.round(
+			cameraY - Math.min(look.horizonRise, -cameraY * HORIZON_RISE_RATE),
+		)
+	return Math.round(cameraY * (1 - (look.horizonLift ?? BACKDROP_LIFT)))
+}
 
 /**
  * The sky and the header's scenery bands behind the course, each scrolling
@@ -396,19 +427,9 @@ export function Backdrop(props: { world: View }) {
 			</For>
 		</>
 	)
-	/** How far a voyage's next horizon takes to fade in, as the camera gets to it. */
-	const fadeIn = (from: number) =>
-		Math.max(0, Math.min(1, (props.world.camera() - from) / VOYAGE_FADE + 1))
+	const fadeIn = (from: number) => voyageFadeIn(props.world, from)
 
-	// The whole canvas goes with the camera looking up or down: this goes
-	// back the other way, all but a little of it.
-	const lift = () => {
-		const cameraY = props.world.cameraY?.() ?? 0
-		// Up a mountain, it rises as far as it goes, then stays put.
-		if (look.horizonRise !== undefined)
-			return `translateY(${Math.round(cameraY - Math.min(look.horizonRise, -cameraY * HORIZON_RISE_RATE))}px)`
-		return `translateY(${Math.round(cameraY * (1 - (look.horizonLift ?? BACKDROP_LIFT)))}px)`
-	}
+	const lift = () => `translateY(${backdropLift(props.world)}px)`
 
 	return (
 		<div
@@ -539,9 +560,23 @@ export function Backdrop(props: { world: View }) {
 }
 
 /** How deep the quay is, along the buildings' feet over a bridge's water, and its stones' colours. */
-const QUAY_EDGE = 6
-const QUAY_STONE = '#8a8278'
-const QUAY_LIT = '#b3ab9f'
+export const QUAY_EDGE = 6
+export const QUAY_STONE = '#8a8278'
+export const QUAY_LIT = '#b3ab9f'
+
+/** Ripples on water, light and dark: a tile, as an image's URL. */
+export const rippleTile = (water: string) =>
+	svgUrl(
+		64,
+		18,
+		[
+			`<rect width="64" height="18" fill="${water}"/>`,
+			'<rect x="4" y="3" width="14" height="2" fill="rgba(255,255,255,0.28)"/>',
+			'<rect x="34" y="9" width="10" height="2" fill="rgba(255,255,255,0.2)"/>',
+			'<rect x="22" y="14" width="18" height="2" fill="rgba(0,20,40,0.25)"/>',
+			'<rect x="50" y="5" width="8" height="2" fill="rgba(0,20,40,0.2)"/>',
+		].join(''),
+	)
 
 /**
  * Over a bridge, its water: from the bridge right back to the buildings'
@@ -560,17 +595,7 @@ function BridgeWater(props: {
 	const from = bridge.open ? DRAWN_FROM : bridge.from
 	const to = bridge.open ? props.world.terrain.finishX + 1600 : bridge.to
 	const width = to - from
-	const ripples = svgUrl(
-		64,
-		18,
-		[
-			`<rect width="64" height="18" fill="${bridge.water}"/>`,
-			'<rect x="4" y="3" width="14" height="2" fill="rgba(255,255,255,0.28)"/>',
-			'<rect x="34" y="9" width="10" height="2" fill="rgba(255,255,255,0.2)"/>',
-			'<rect x="22" y="14" width="18" height="2" fill="rgba(0,20,40,0.25)"/>',
-			'<rect x="50" y="5" width="8" height="2" fill="rgba(0,20,40,0.2)"/>',
-		].join(''),
-	)
+	const ripples = rippleTile(bridge.water)
 	/** Lined up with the Ground's ripples, from its own left edge, along and down. */
 	const along = (((DRAWN_FROM - from) % 64) + 64) % 64
 	const down = ((-(props.top + QUAY_EDGE) % 18) + 18) % 18
@@ -680,17 +705,30 @@ function Lightning() {
 	)
 }
 
-/** `flyer.count` of something crossing the sky, each at its own height and time. */
-function SkyFlyers(props: { flyer: SkyFlyer; seed: number }) {
-	const { flyer } = props
-	const random = seeded(props.seed * 97)
-	const frames = flyer.frames ?? 1
-	const scale = flyer.scale ?? 1
+/**
+ * Each of `flyer.count` crossing the sky: its height, how far into its
+ * crossing it started (a negative delay), how long it takes, and how long
+ * it bobs up and down over, if it does.
+ */
+export function skyFlyerItems(flyer: SkyFlyer, seed: number) {
+	const random = seeded(seed * 97)
 	const items = Array.from({ length: flyer.count }, () => ({
 		top: flyer.band[0] + random() * (flyer.band[1] - flyer.band[0]),
 		delay: -random() * flyer.seconds,
 		seconds: flyer.seconds * (0.8 + random() * 0.4),
+		bob: 0,
 	}))
+	// After them all, in turn, as they were first drawn.
+	if (flyer.bob) for (const item of items) item.bob = 2 + random() * 2
+	return items
+}
+
+/** `flyer.count` of something crossing the sky, each at its own height and time. */
+function SkyFlyers(props: { flyer: SkyFlyer; seed: number }) {
+	const { flyer } = props
+	const frames = flyer.frames ?? 1
+	const scale = flyer.scale ?? 1
+	const items = skyFlyerItems(flyer, props.seed)
 	return (
 		<For each={items}>
 			{(item) => (
@@ -714,7 +752,7 @@ function SkyFlyers(props: { flyer: SkyFlyer; seed: number }) {
 							animation: [
 								frames > 1 ? `flap 0.4s steps(${frames}) infinite` : undefined,
 								flyer.bob
-									? `sky-bob ${2 + random() * 2}s ease-in-out infinite`
+									? `sky-bob ${item.bob}s ease-in-out infinite`
 									: undefined,
 							]
 								.filter(Boolean)
@@ -729,16 +767,15 @@ function SkyFlyers(props: { flyer: SkyFlyer; seed: number }) {
 }
 
 /**
- * Trees just over the brow, where the course runs high: stood behind the
- * ground, feet hidden below the back of the path, so only their tops show
- * over it. They follow the course, so they're placed against its hills.
+ * Where the trees over the brow stand, in the world: each one's picture and
+ * its top left. None, on a course without trees.
  */
-export function HorizonTrees(props: { world: View }) {
-	const { terrain } = props.world
+export function horizonTreeList(world: View) {
+	const { terrain } = world
 	const random = seeded(37)
 	// None, on a course without trees.
-	const own = props.world.course.look?.horizonTrees
-	if (own === false) return null
+	const own = world.course.look?.horizonTrees
+	if (own === false) return undefined
 	/** The top of the ground: the grass behind the path. */
 	const backEdge = (x: number) => terrain.groundY(x) - PATH_BACK - VERGE
 	const trees: { asset: string; x: number; top: number }[] = []
@@ -771,6 +808,17 @@ export function HorizonTrees(props: { world: View }) {
 			top: Math.round(lowest + sink - tree.height),
 		})
 	}
+	return trees
+}
+
+/**
+ * Trees just over the brow, where the course runs high: stood behind the
+ * ground, feet hidden below the back of the path, so only their tops show
+ * over it. They follow the course, so they're placed against its hills.
+ */
+export function HorizonTrees(props: { world: View }) {
+	const trees = horizonTreeList(props.world)
+	if (!trees) return null
 
 	return (
 		<div
@@ -815,7 +863,7 @@ const BRIDGE_SLIM = 16
 /** How tall a wall's parapet behind the path is: see `ground` in the Great Wall's look. */
 const BACK_PARAPET = 10
 /** A rainbow's bands, top to bottom, and how deep each is. */
-const RAINBOW = [
+export const RAINBOW = [
 	'#ff5f7e',
 	'#ffa34d',
 	'#ffe14d',
@@ -823,7 +871,34 @@ const RAINBOW = [
 	'#4fb3ff',
 	'#9b7bff',
 ]
-const RAINBOW_BAND = 10
+export const RAINBOW_BAND = 10
+
+/**
+ * Down each Gap, from the back of the path on its lower side: a drop,
+ * behind the ground either side. In the Ground's own x, from `DRAWN_FROM`.
+ */
+export function groundPits(world: View) {
+	const { terrain } = world
+	return terrain.gaps.map((gap) => {
+		const near = terrain.groundY(gap.from - 1) - PATH_BACK
+		const far = terrain.groundY(gap.to) - PATH_BACK
+		const pitLook = world.course.look?.pit
+		return {
+			left: gap.from - DRAWN_FROM,
+			width: gap.to - gap.from,
+			// From the lower bank's back edge; or, with walls drawn in it,
+			// from the higher one's, its top cut across from one to the other.
+			top: pitLook ? Math.min(near, far) : Math.max(near, far),
+			near,
+			far,
+		}
+	})
+}
+
+/** What a Gap's drop looks like, as a CSS background: see `gap`. */
+export const gapLook = (world: View) =>
+	world.course.look?.gap ??
+	'linear-gradient(to bottom, var(--dirt-darker-brown), #140b05 90px)'
 
 /**
  * The course's ground, drawn once, in steps 4 px wide so its slopes come out
@@ -913,27 +988,8 @@ export function Ground(props: { world: View }) {
 			: Math.round(Math.max(top + PATH_FRONT + 2, under) / 2) * 2
 	})
 
-	/**
-	 * Down each Gap, from the back of the path on its lower side: a drop,
-	 * behind the ground either side.
-	 */
-	const pits = terrain.gaps.map((gap) => {
-		const near = terrain.groundY(gap.from - 1) - PATH_BACK
-		const far = terrain.groundY(gap.to) - PATH_BACK
-		const pitLook = props.world.course.look?.pit
-		return {
-			left: gap.from - DRAWN_FROM,
-			width: gap.to - gap.from,
-			// From the lower bank's back edge; or, with walls drawn in it,
-			// from the higher one's, its top cut across from one to the other.
-			top: pitLook ? Math.min(near, far) : Math.max(near, far),
-			near,
-			far,
-		}
-	})
-	const pitLook =
-		props.world.course.look?.gap ??
-		'linear-gradient(to bottom, var(--dirt-darker-brown), #140b05 90px)'
+	const pits = groundPits(props.world)
+	const pitLook = gapLook(props.world)
 
 	/**
 	 * A pyramid's face, foot to foot, under the front edge of the path up
@@ -1704,12 +1760,7 @@ export function Ground(props: { world: View }) {
  * windows, on down.
  */
 function Buildings(props: { world: View; blocks: Block[] }) {
-	const look = props.world.course.look?.buildings ?? {
-		roof: '#585b63',
-		parapet: '#8a8d96',
-		facades: ['#6b4a3a'],
-		walls: ['#6b4a3a'],
-	}
+	const look = buildingLook(props.world)
 	/** The roof's depth, back to front: the path's. */
 	const depth = PATH_BACK + PATH_FRONT
 	return (
@@ -1770,6 +1821,15 @@ function Buildings(props: { world: View; blocks: Block[] }) {
 		</For>
 	)
 }
+
+/** How a course's buildings look: its own, or plain brick. */
+export const buildingLook = (world: View) =>
+	world.course.look?.buildings ?? {
+		roof: '#585b63',
+		parapet: '#8a8d96',
+		facades: ['#6b4a3a'],
+		walls: ['#6b4a3a'],
+	}
 
 /** How much room there has to be under a Cave's Ceiling for stalactites. */
 const DRIP_ROOM = 70
@@ -2108,7 +2168,7 @@ export function WallBricks(props: {
 }
 
 /** A flame, in cells: its red outside, orange in it, and its yellow heart. */
-const FLAME: [number, number, number, number, string][] = [
+export const FLAME: [number, number, number, number, string][] = [
 	[2, 0, 2, 2, '#e8361c'],
 	[1, 2, 4, 3, '#e8361c'],
 	[0, 5, 6, 5, '#e8361c'],
@@ -2252,9 +2312,9 @@ function LedgeRock(props: {
 }
 
 /** How far down a pit its walls are drawn, from its rims: under that, it's all dark. */
-const PIT_WALLS = 240
+export const PIT_WALLS = 240
 /** How far down from its rims a pit's gone dark. */
-const PIT_DARK = 150
+export const PIT_DARK = 150
 
 /**
  * Inside a Gap: its walls going down either side, ragged, the far one lit
@@ -2265,6 +2325,50 @@ const PIT_DARK = 150
  * back edges, down from its top.
  */
 function PitInside(props: {
+	look: PitLook
+	width: number
+	near: number
+	far: number
+	seed: number
+}) {
+	const { width } = props
+	const { rects, rim, bottom } = pitInside(props)
+	return (
+		<>
+			<svg
+				width={width}
+				height={bottom}
+				shape-rendering="crispEdges"
+				aria-hidden="true"
+				style={{ position: 'absolute', left: 0, top: 0 }}
+			>
+				<For each={rects}>
+					{([x, y, w, h, fill]) => (
+						<rect x={x} y={y} width={w} height={h} fill={fill} />
+					)}
+				</For>
+			</svg>
+			{/* Darker and darker, the deeper. */}
+			<div
+				style={{
+					position: 'absolute',
+					inset: 0,
+					background: pitDarkening(rim),
+				}}
+			/>
+		</>
+	)
+}
+
+/** A pit getting darker and darker the deeper it goes, from its rim: a CSS background. */
+export const pitDarkening = (rim: number) =>
+	`linear-gradient(to bottom, transparent ${rim + 20}px, rgba(4, 6, 12, 0.6) ${rim + PIT_DARK / 2}px, rgba(4, 6, 12, 0.94) ${rim + PIT_DARK}px)`
+
+/**
+ * What's drawn inside a pit (see `PitInside`), in its own pixels: its
+ * rects, its rim, and how far down they go.
+ */
+export function pitInside(props: {
 	look: PitLook
 	width: number
 	near: number
@@ -2355,31 +2459,7 @@ function PitInside(props: {
 			}
 		}
 	}
-	return (
-		<>
-			<svg
-				width={width}
-				height={bottom}
-				shape-rendering="crispEdges"
-				aria-hidden="true"
-				style={{ position: 'absolute', left: 0, top: 0 }}
-			>
-				<For each={rects}>
-					{([x, y, w, h, fill]) => (
-						<rect x={x} y={y} width={w} height={h} fill={fill} />
-					)}
-				</For>
-			</svg>
-			{/* Darker and darker, the deeper. */}
-			<div
-				style={{
-					position: 'absolute',
-					inset: 0,
-					background: `linear-gradient(to bottom, transparent ${rim + 20}px, rgba(4, 6, 12, 0.6) ${rim + PIT_DARK / 2}px, rgba(4, 6, 12, 0.94) ${rim + PIT_DARK}px)`,
-				}}
-			/>
-		</>
-	)
+	return { rects, rim, bottom }
 }
 
 /**
@@ -2388,21 +2468,7 @@ function PitInside(props: {
  * comes from `seed`, so a pit's the same every time it's drawn.
  */
 function HellFire(props: { width: number; seed: number }) {
-	const random = seeded(Math.round(props.seed) + 666)
-	const count = Math.max(3, Math.round(props.width / 14))
-	const flames = Array.from({ length: count }, (_, i) => ({
-		left: (i / count) * props.width - 4 + random() * 8,
-		scale: 2 + Math.round(random() * 2),
-		delay: random() * 0.6,
-	}))
-	const embers = Array.from(
-		{ length: Math.round(props.width / 30) + 2 },
-		() => ({
-			left: random() * props.width,
-			delay: random() * 2.4,
-			seconds: 1.6 + random() * 1.2,
-		}),
-	)
+	const { flames, embers } = hellFire(props.width, props.seed)
 	return (
 		<>
 			<For each={flames}>
@@ -2446,6 +2512,26 @@ function HellFire(props: { width: number; seed: number }) {
 			</For>
 		</>
 	)
+}
+
+/**
+ * The flames along the bottom of a pit on fire, `width` across, and the
+ * embers rising out of it: where each is, and its beat.
+ */
+export function hellFire(width: number, seed: number) {
+	const random = seeded(Math.round(seed) + 666)
+	const count = Math.max(3, Math.round(width / 14))
+	const flames = Array.from({ length: count }, (_, i) => ({
+		left: (i / count) * width - 4 + random() * 8,
+		scale: 2 + Math.round(random() * 2),
+		delay: random() * 0.6,
+	}))
+	const embers = Array.from({ length: Math.round(width / 30) + 2 }, () => ({
+		left: random() * width,
+		delay: random() * 2.4,
+		seconds: 1.6 + random() * 1.2,
+	}))
+	return { flames, embers }
 }
 
 /** Sand, in layers: the ground's own colours, for a Cave dug under it. */
