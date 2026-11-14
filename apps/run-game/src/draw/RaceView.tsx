@@ -189,11 +189,31 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 	// The engine scrolls the sprites' layer by the canvas's x. To a whole
 	// pixel, as the ground and the backdrop scroll: a layer moved by a
 	// fraction of one is drawn a pixel out from the ground under it.
-	const scroll = () => scene.canvas.get().setX(Math.round(world.camera()))
+	const scroll = () => {
+		const camera = scene.canvas.get()
+		camera.setX(Math.round(world.camera()))
+		if (!rendererChoice.canvas) return
+		// The Canvas Renderer only paints what its camera sees, so the camera
+		// goes up and down, and takes in more zoomed out, rather than the
+		// whole canvas being moved and scaled with the course spilling out
+		// of it, as under the DOM Renderer.
+		camera.setWidth(VIEW_WIDTH * world.zoom())
+		camera.setHeight(VIEW_HEIGHT * world.zoom())
+		camera.setY(cameraTop(world))
+	}
 	scroll()
 	scene.tickers.add(scroll)
 	window.raceScene = scene
 	return scene
+}
+
+/**
+ * The top of what the camera sees, in the scene: up and down with the
+ * world's camera, and more above it zoomed out, the ground staying put at
+ * the bottom of the screen.
+ */
+function cameraTop(world: World) {
+	return Math.round(world.cameraY()) + VIEW_HEIGHT * (1 - world.zoom())
 }
 
 /**
@@ -247,32 +267,41 @@ export function RaceCanvas(props: {
 					runOffScreen
 					// Zoomed out to fit a Round's Players in, and looking up (or down)
 					// at them: everything on it goes, the backdrop putting itself back.
-					style={{
-						width: `${VIEW_WIDTH * zoom()}px`,
-						height: `${VIEW_HEIGHT}px`,
-						transform: `scale(${1 / zoom()}) translateY(${Math.round(-props.world.cameraY())}px)`,
-						'transform-origin': '0 100%',
-						overflow: 'visible',
-						background: 'transparent',
-					}}
+					style={
+						rendererChoice.canvas
+							? {
+									// Its size is the camera's: shrunk back to fill the screen.
+									transform: `scale(${1 / zoom()})`,
+									'transform-origin': '0 0',
+									background: 'transparent',
+								}
+							: {
+									width: `${VIEW_WIDTH * zoom()}px`,
+									height: `${VIEW_HEIGHT}px`,
+									transform: `scale(${1 / zoom()}) translateY(${Math.round(-props.world.cameraY())}px)`,
+									'transform-origin': '0 100%',
+									overflow: 'visible',
+									background: 'transparent',
+								}
+					}
 					underlay={
-						<>
+						<InScene world={props.world}>
 							<Backdrop world={props.world} />
 							<HorizonTrees world={props.world} />
 							<Ground world={props.world} />
-						</>
+						</InScene>
 					}
 					// A Cave's rock over everyone in it, till someone racing goes in;
 					// the sea's waves over everyone in it.
 					overlay={
-						<>
+						<InScene world={props.world}>
 							<CaveCover world={props.world} />
 							<SeaFront
 								world={props.world}
 								from={DRAWN_FROM}
 								to={props.world.terrain.finishX + 1600}
 							/>
-						</>
+						</InScene>
 					}
 					loading={() => (
 						<div style={styles.loading}>Loading {props.world.course.name}…</div>
@@ -297,6 +326,26 @@ export function RaceCanvas(props: {
 			<Show when={rendererChoice.fps}>
 				<FrameMeter />
 			</Show>
+		</div>
+	)
+}
+
+/**
+ * Page elements laid out in the scene, under the Canvas Renderer moved up
+ * and down with its camera, as under the DOM Renderer the whole canvas is.
+ * Only till they're drawn on the canvas themselves.
+ */
+function InScene(props: { world: World; children: JSX.Element }) {
+	if (!rendererChoice.canvas) return props.children
+	return (
+		<div
+			style={{
+				position: 'absolute',
+				inset: 0,
+				transform: `translateY(${-cameraTop(props.world)}px)`,
+			}}
+		>
+			{props.children}
 		</div>
 	)
 }
