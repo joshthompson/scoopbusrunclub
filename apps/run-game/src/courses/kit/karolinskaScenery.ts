@@ -1441,5 +1441,8 @@ export const GURNEY = (() => {
 		frames: [frame(0), frame(1)] as [string, string],
 		width: W * 2,
 		height: H * 2,
+		// Up on the patient's blanket, from the pillow to the foot rail: jump
+		// on, and get wheeled along, back the way you came, maybe.
+		deck: { from: 2, to: 54, top: 14 },
 	}
 })()

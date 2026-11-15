@@ -242,7 +242,18 @@ export interface CourseLook {
 	 * A cyclist's two frames, in place of the bike, `width` by `height`: a
 	 * hospital bed, pushed by a porter. Still a cyclist, to jump.
 	 */
-	cyclist?: { frames: [string, string]; width: number; height: number }
+	cyclist?: {
+		frames: [string, string]
+		width: number
+		height: number
+		/**
+		 * Somewhere on it to stand, and be wheeled along on: from `from` to
+		 * `to` across the picture, drawn riding left, its top `top` px down
+		 * from the picture's. A bed's, on top of its patient. Run into it
+		 * below that, and it's a cyclist all the same.
+		 */
+		deck?: { from: number; to: number; top: number }
+	}
 	/** A bouncer's picture, in place of the toadstool (see `bouncers`): an air sac in a lung. */
 	bouncer?: { asset: string; width: number; height: number }
 	/**

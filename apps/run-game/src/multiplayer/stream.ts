@@ -131,7 +131,7 @@ export function createRaceStream(
 						(b.mount > 0 ? RACER_FLAGS.mounted : 0) |
 						(b.facing === -1 ? RACER_FLAGS.left : 0) |
 						(b.carried > 0 ? RACER_FLAGS.carried : 0) |
-						(b.on !== undefined ? RACER_FLAGS.platform : 0) |
+						(b.on !== undefined || b.bed ? RACER_FLAGS.platform : 0) |
 						(b.squashed > 0 ? RACER_FLAGS.squashed : 0) |
 						(b.gliding ? RACER_FLAGS.gliding : 0) |
 						(b.cart !== undefined ? RACER_FLAGS.cart : 0) |

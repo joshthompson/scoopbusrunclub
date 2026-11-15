@@ -433,9 +433,9 @@ const OBSTACLES: Obstacle[] = [
 	{ kind: 'rock', x: 2060 },
 	{ kind: 'tourists', x: 2360, count: 2 },
 	{ kind: 'rock', x: 2680 },
-	// The corridor: beds being wheeled up and down it, drip stands.
+	// The corridor: a bed being wheeled up and down it, to jump, or to jump
+	// on and ride, and a drip stand.
 	{ kind: 'cyclist', x: 4300, shuttle: [3560, 4520] },
-	{ kind: 'rock', x: 3720 },
 	{ kind: 'rock', x: 4040 },
 	// The lab.
 	{ kind: 'rock', x: 4900 },

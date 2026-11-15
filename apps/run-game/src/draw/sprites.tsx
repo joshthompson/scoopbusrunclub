@@ -57,7 +57,7 @@ import {
 	VERGE,
 	VIEW_HEIGHT,
 } from '../game/constants'
-import { cyclistAt } from '../game/cyclists'
+import { CYCLIST_SINK, cyclistAt } from '../game/cyclists'
 import { FIKA_SIZE } from '../game/fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from '../game/furbies'
 import { DRAWN_FROM } from '../game/groundColumns'
@@ -661,6 +661,7 @@ const STILL_SPEED = 0.3
 function runnerLean(world: World, body: Body) {
 	return body.grounded &&
 		body.on === undefined &&
+		!body.bed &&
 		Math.abs(body.vx) >= STILL_SPEED
 		? leanOn(world, body.x)
 		: 0
@@ -2230,7 +2231,7 @@ function createCyclist(
 				return
 			}
 			$.setX(cyclist.x - WIDTH / 2)
-			$.setY(ground - HEIGHT + 2)
+			$.setY(ground - HEIGHT + CYCLIST_SINK)
 			$.setState(cyclist.riding ? 'play' : 'pause')
 		},
 	})

@@ -132,6 +132,12 @@ export interface Body {
 	stomped: number
 	/** The Platform they're stood on, by its index: on the Ground if none. */
 	on?: number
+	/**
+	 * Or the deck of the cyclist they're stood on, being wheeled along: by
+	 * its index in the world's obstacles, where its left end was last tick,
+	 * and how high, to tell they're still on it (see `deckAt`).
+	 */
+	bed?: { index: number; left: number; top: number }
 	/** Ticks left of dropping through `on`'s Platform, ducked off it. */
 	dropping: number
 	/** Which one that is. */

@@ -89,7 +89,7 @@ import {
 } from './constants'
 import { MUMMY_HEIGHT } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
-import { cyclistAt } from './cyclists'
+import { cyclistAt, deckAt, deckUnder } from './cyclists'
 import { FIKA_SIZE } from './fika'
 import {
 	CONDOR_SPEED,
@@ -562,8 +562,8 @@ function stepRunner(world: World, racer: Racer) {
 	}
 
 	if (b.grounded) {
-		// Platforms are flat.
-		const slope = b.on === undefined ? terrain.slope(b.x) : 0
+		// Platforms are flat, and so's a bed.
+		const slope = b.on === undefined && !b.bed ? terrain.slope(b.x) : 0
 		// In a Tunnel: kept down in it, ducking or not, and going through it
 		// no slower than they went in.
 		const low = inTunnel(world, b.x, b.feetY)
@@ -684,6 +684,16 @@ function stepRunner(world: World, racer: Racer) {
 	const ticks = world.ticks()
 	if (b.grounded && b.on !== undefined)
 		b.x += platformMove(terrain, world.platforms[b.on], ticks).x
+	// Or a bed, wheeled along, as far as it's gone since last tick, turned
+	// round with it at the end of its way. Not if they're off it since, up
+	// in the air or put somewhere else.
+	if (b.bed && (!b.grounded || b.on !== undefined || b.feetY !== b.bed.top))
+		b.bed = undefined
+	const deck = b.bed && deckAt(world, b.bed.index)
+	if (b.bed && deck) {
+		b.x += deck.left - b.bed.left
+		b.bed.left = deck.left
+	}
 
 	// The bus is in the way long before this, but the ground runs out here.
 	const from = b.x
@@ -707,6 +717,10 @@ function stepRunner(world: World, racer: Racer) {
 			const edge = platform.solid ? HITBOX_HALF_WIDTH : 0
 			if (b.x < at.left - edge || b.x > at.right + edge) leaveFooting(b)
 			else b.feetY = at.top
+		} else if (b.bed) {
+			// Off the end of the bed, or the bus has scooped it out from under them.
+			if (!deck || b.x < deck.left || b.x > deck.right) leaveFooting(b)
+			else b.feetY = b.bed.top = deck.top
 		} else if (overGap || stepsDown(world, from, b.x, ground - b.feetY))
 			leaveFooting(b)
 		else b.feetY = ground
@@ -748,11 +762,21 @@ function stepRunner(world: World, racer: Racer) {
 						HITBOX_HALF_WIDTH,
 					)
 				: undefined
+		// Or onto a bed, wheeled along.
+		const bed =
+			!platform && b.vy >= 0
+				? deckUnder(world, b.x, wasFeetY, b.feetY)
+				: undefined
 		if (platform && (overGap || platform.top <= ground)) {
 			b.feetY = platform.top
 			b.on = platform.index
 			land(b)
 			if (world.platforms[platform.index].tower) b.toppedTower = true
+		} else if (bed && (overGap || bed.top <= ground)) {
+			b.feetY = bed.top
+			b.on = undefined
+			land(b)
+			b.bed = { index: bed.index, left: bed.left, top: bed.top }
 		} else if (!overGap && b.feetY >= ground && b.vy >= 0) {
 			b.feetY = ground
 			b.on = undefined
@@ -809,6 +833,7 @@ function jump(b: Body, speed = JUMP_SPEED) {
 /** Off whatever they were stood on, and falling. */
 function leaveFooting(b: Body) {
 	b.on = undefined
+	b.bed = undefined
 	b.grounded = false
 	b.vy = 0
 }
@@ -1421,11 +1446,20 @@ function collide(world: World, racer: Racer) {
 					state.hit.clear()
 				}
 				const at = terrain.groundY(cyclist.x)
+				// One with a deck, a bed: only into its side, below that. On
+				// top of it, they're wheeled along on it.
+				const deck = deckAt(world, world.obstacles.indexOf(state))
 				if (
 					freshFor(state) &&
 					!state.scooped &&
 					b.stumble === 0 &&
-					overlaps(cyclist.x - 20, cyclist.x + 20, at - 40, at)
+					!(deck && b.bed?.index === deck.index) &&
+					overlaps(
+						cyclist.x - 20,
+						cyclist.x + 20,
+						deck ? deck.top + 6 : at - 40,
+						at,
+					)
 				) {
 					hits(state)
 					play('honk')
