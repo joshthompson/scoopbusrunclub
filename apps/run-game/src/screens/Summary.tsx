@@ -125,7 +125,9 @@ export function Summary(props: {
 										? flyerLook(world.course).rides
 										: bonus.kind === 'jumps' && world.course.longJump
 											? 'Long jump'
-											: BONUS_LABELS[bonus.kind]
+											: bonus.kind === 'cones' && world.course.look?.cone
+												? `${world.course.look.cone.name} knocked over`
+												: BONUS_LABELS[bonus.kind]
 							} ×${bonus.count}`,
 				points: bonus.points,
 			})),

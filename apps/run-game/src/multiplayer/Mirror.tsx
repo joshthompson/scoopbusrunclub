@@ -237,7 +237,10 @@ export default function Mirror(props: {
 			pacer.gliding = !!(from[4] & 4)
 			pacer.ducking = !!(from[4] & 8)
 			pacer.dazed = from[5]
-			pacer.spin = mix(from[6], to[6])
+			// Being shrunk, how far into it, sent in place of the spin.
+			const shrinking = !!(from[4] & 16)
+			pacer.shrink = shrinking ? mix(from[6], to[6]) : undefined
+			pacer.spin = shrinking ? 0 : mix(from[6], to[6])
 			const ski = fromSkiState(from[7] ?? 0, TRICK_KINDS)
 			pacer.board = ski.board || undefined
 			pacer.grind = ski.grinding ? 0 : undefined

@@ -121,8 +121,10 @@ export type Obstacle =
 	/**
 	 * A traffic cone, stood in the way, `height` up on a platform, if it's
 	 * not on the Ground: run into it and it's knocked over, flat, costing
-	 * points and slowing you a little. In The Sewers, knocking every one
-	 * over is its special goal all the same.
+	 * points and slowing you a little, by whoever gets to it first. In The
+	 * Sewers, knocking every one over is its special goal all the same. A
+	 * course can have something else in its place, knocked over the same
+	 * (see `CourseLook.cone`): a wet floor sign, in a hospital.
 	 */
 	| { kind: 'cone'; x: number; height?: number }
 	/**
@@ -254,13 +256,20 @@ export interface CourseLook {
 		 */
 		deck?: { from: number; to: number; top: number }
 	}
+	/**
+	 * A picture in place of the traffic cone, `width` by `height`, and what
+	 * they're called, knocking them over: a wet floor sign, in a hospital.
+	 * Still knocked over as a cone, slowing you a little.
+	 */
+	cone?: { asset: string; width: number; height: number; name: string }
 	/** A bouncer's picture, in place of the toadstool (see `bouncers`): an air sac in a lung. */
 	bouncer?: { asset: string; width: number; height: number }
 	/**
 	 * A giant's mouth, in its face (a Cave feature, `GIANT_FACE`), opening
 	 * as anyone racing gets within `opens` of it, its jaw dropping and its
 	 * tongue rolling out over the edge of the bench, from `tip` to `inside`,
-	 * the Ground everyone runs up into it. The face's top left at `face`.
+	 * the Ground everyone runs up into it; and shutting behind them as soon
+	 * as they're all in. The face's top left at `face`.
 	 */
 	mouth?: {
 		face: { x: number; y: number }

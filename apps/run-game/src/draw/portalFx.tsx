@@ -1,13 +1,15 @@
 import { createController } from 'scoopjs'
 import { createMemo } from 'solid-js'
-import { portalTime } from '../game/portals'
+import { PACER_SHRINK, portalTime, shrinkRayOver } from '../game/portals'
 import type { World } from '../game/world'
 
 /**
  * What a Portal looks like going off (see `portals`): the shrink ray's beam,
  * down onto its plate, flickering brighter as it charges, sparks about
  * everyone in it; and the sneeze's spray, bursting out of the nose. Over
- * whoever's in it. The tick's a signal: reading it keeps it going.
+ * whoever's in it. The shrink ray's beam comes on for a Pacer, too,
+ * shrinking them on its plate. The tick's a signal: reading it keeps it
+ * going.
  */
 
 /** How wide the shrink ray's beam is, and how far up over the plate it comes from. */
@@ -32,7 +34,7 @@ const DROPS = Array.from({ length: 14 }, (_, i) => ({
 export function createPortalFx(world: World) {
 	const portals = world.course.portals ?? []
 	if (!portals.length) return []
-	const now = createMemo(() => portalTime(world))
+	const now = createMemo(() => portalTime(world) ?? pacerShrinking(world))
 	return [
 		createController({
 			init: () => ({
@@ -58,6 +60,27 @@ export function createPortalFx(world: World) {
 			},
 		}),
 	]
+}
+
+/**
+ * The shrink ray going off for a Pacer, shrinking on its plate, the one
+ * furthest into it if there's more than one, when it isn't going off for
+ * the Players: as far as `portalTime` says, for theirs.
+ */
+function pacerShrinking(world: World) {
+	if (world.ticks() < 0) return undefined
+	let furthest: number | undefined
+	let ray: ReturnType<typeof shrinkRayOver>
+	for (const p of world.pack) {
+		if (p.shrink === undefined || p.shrink <= (furthest ?? -1)) continue
+		const over = shrinkRayOver(world.course, p.x)
+		if (!over) continue
+		furthest = p.shrink
+		ray = over
+	}
+	if (furthest === undefined || !ray) return undefined
+	const snap = PACER_SHRINK.gone - 4
+	return { portal: ray, t: furthest, snap, since: furthest - snap }
 }
 
 /** How bright the beam is, `t` ticks after it went off: brighter as it charges, flickering. */

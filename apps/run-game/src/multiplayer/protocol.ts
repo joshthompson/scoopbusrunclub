@@ -298,7 +298,11 @@ export const RACER_FLAGS = {
 }
 /** The hat a racer's wearing, as its `hatCode`, is the flags over this. */
 export const HAT_FLAG = 512
-/** [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding, 8 ducking), dazed, spin], and on skis, their ski state and trick's turn */
+/**
+ * [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding, 8 ducking,
+ * 16 being shrunk), dazed, spin (or being shrunk, how far into it: never
+ * both)], and on skis, their ski state and trick's turn
+ */
 export type PacerState = [
 	number,
 	number,

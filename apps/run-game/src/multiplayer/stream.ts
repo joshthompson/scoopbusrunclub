@@ -160,9 +160,12 @@ export function createRaceStream(
 				(p.grounded ? 1 : 0) |
 					(p.scooped ? 2 : 0) |
 					(p.gliding ? 4 : 0) |
-					(p.ducking ? 8 : 0),
+					(p.ducking ? 8 : 0) |
+					(p.shrink !== undefined ? 16 : 0),
 				p.dazed,
-				p.spin,
+				// Being shrunk, how far into it, in place of the spin: they're
+				// never both being shrunk and flying out of the scoop.
+				p.shrink ?? p.spin,
 				...(p.board
 					? ([skiState(p, TRICK_KINDS), Math.round(p.turn ?? 0)] as const)
 					: ([] as const)),

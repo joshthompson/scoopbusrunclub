@@ -93,7 +93,7 @@ import type {
  * their mouth, their tongue rolling out over the bench, and you run up it
  * and on into them: down
  * their windpipe, into their lungs, breathing; through their heart, its
- * valves firing you up over it on the beat; and up an artery on a red
+ * valves firing you up over it as you get onto them; and up an artery on a red
  * blood cell, Germs bobbing about all the way, there to be popped. Then
  * back up into their nose, "Ah... Ah... CHOO!", sneezed out, back to your
  * size, and out of the hospital to the finish.
@@ -429,10 +429,11 @@ const OBSTACLES: Obstacle[] = [
 	// Outside: pigeons, and visitors stood about.
 	{ kind: 'geese', x: 1000, count: 3 },
 	{ kind: 'tourists', x: 1380, count: 3 },
-	// Reception: wet floor, and a queue.
-	{ kind: 'rock', x: 2060 },
+	// Reception: wet floor signs, knocked over by whoever gets to them
+	// first, and a queue.
+	{ kind: 'cone', x: 2060 },
 	{ kind: 'tourists', x: 2360, count: 2 },
-	{ kind: 'rock', x: 2680 },
+	{ kind: 'cone', x: 2680 },
 	// The corridor: a bed being wheeled up and down it, to jump, or to jump
 	// on and ride, and a drip stand.
 	{ kind: 'cyclist', x: 4300, shuttle: [3560, 4520] },
@@ -478,7 +479,7 @@ const OBSTACLES: Obstacle[] = [
 	{ kind: 'rock', x: 17360 },
 	{ kind: 'cyclist', x: 17900, shuttle: [17560, 17980] },
 	{ kind: 'tourists', x: 18780, count: 2 },
-	{ kind: 'rock', x: 19060 },
+	{ kind: 'cone', x: 19060 },
 	// Out on the street again.
 	{ kind: 'geese', x: 19700, count: 3 },
 ]
@@ -781,7 +782,8 @@ export const karolinska: CourseDefinition = {
 			face: { x: FACE_LEFT, y: FACE_TOP },
 			tip: TONGUE_TIP,
 			inside: INSIDE,
-			opens: 620,
+			// Only once someone's near: open in time for them, at a run.
+			opens: 360,
 		},
 		cave: {
 			rock: '#dfe3e6',
@@ -803,7 +805,6 @@ export const karolinska: CourseDefinition = {
 			bore: false,
 		},
 		rocks: [
-			{ ...WET_FLOOR, from: ENTRANCE, to: CORRIDOR },
 			{ ...IV_STAND, from: CORRIDOR, to: MICRO_FROM },
 			// Crumbs on the bench, and in the mouth: breakfast.
 			{ ...CRUMB, from: MICRO_FROM, to: TRACHEA.from },
@@ -811,8 +812,9 @@ export const karolinska: CourseDefinition = {
 			{ ...CLOT, from: ARTERY.from, to: ARTERY.to },
 			{ ...NOSE_HAIR, from: ARTERY.to, to: MACRO_FROM },
 			{ ...IV_STAND, from: MACRO_FROM, to: ESCALATOR_2.from },
-			{ ...WET_FLOOR, from: ESCALATOR_2.from, to: EXIT },
 		],
+		// Wet floor signs, not traffic cones: knocked over all the same.
+		cone: WET_FLOOR,
 		cyclist: GURNEY,
 		bouncers: true,
 		bouncer: ALVEOLUS,

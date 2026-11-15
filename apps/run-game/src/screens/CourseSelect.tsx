@@ -337,31 +337,33 @@ export function CourseSelect(props: {
 										<MedalArt medal={bestMedal(course().id)} scale={1} />
 									</span>
 								</div>
-								{/* Its collectables found, its own hat once they all are. */}
+								{/* Its collectables found, and its own hat: a shadow of it
+								    till they all are. */}
 								<div style={styles.goalLine}>
 									<span style={styles.goalText}>
 										{found(course()).had}/{found(course()).of} Collectables
 									</span>
-									<Show when={allFound(course())}>
-										<span style={styles.goalIcon}>
-											<GoalHat course={course()} done size={GOAL_ICON} />
-										</span>
-									</Show>
+									<span style={styles.goalIcon}>
+										<GoalHat
+											course={course()}
+											done={allFound(course())}
+											size={GOAL_ICON}
+										/>
+									</span>
 								</div>
-								{/* Its special goal, if it has one, its picture once it's done. */}
+								{/* Its special goal, if it has one, and its picture: a
+								    shadow of it till it's done. */}
 								<Show when={course().special}>
 									{(special) => (
 										<div style={styles.goalLine}>
 											<span style={styles.goalText}>{special().goal}</span>
-											<Show when={specialDone(course().id)}>
-												<span style={styles.goalIcon}>
-													<SpecialGoalArt
-														course={course().id}
-														done
-														size={GOAL_ICON}
-													/>
-												</span>
-											</Show>
+											<span style={styles.goalIcon}>
+												<SpecialGoalArt
+													course={course().id}
+													done={specialDone(course().id)}
+													size={GOAL_ICON}
+												/>
+											</span>
 										</div>
 									)}
 								</Show>
@@ -761,8 +763,8 @@ function GoalHat(props: { course: Course; done: boolean; size: number }) {
 		>
 			<span
 				style={{
-					display: 'inline-grid',
-					'place-items': 'center',
+					position: 'relative',
+					display: 'inline-block',
 					width: `${props.size}px`,
 					height: `${props.size}px`,
 					'flex-shrink': 0,
@@ -774,13 +776,18 @@ function GoalHat(props: { course: Course; done: boolean; size: number }) {
 						const art = () => hatArt(on())
 						const fit = () =>
 							Math.min(1, props.size / Math.max(art().width, art().height))
+						// In the middle of the box, whatever its size: shrinking it
+						// doesn't shrink the room it takes up, so a hat wider than
+						// the box would overflow it to the right, off the middle.
 						return (
 							<span
 								style={{
-									position: 'relative',
+									position: 'absolute',
+									left: '50%',
+									top: '50%',
 									width: `${art().width}px`,
 									height: `${art().height}px`,
-									transform: `scale(${fit()})`,
+									transform: `translate(-50%, -50%) scale(${fit()})`,
 								}}
 							>
 								<HatPicture hat={on()} still />

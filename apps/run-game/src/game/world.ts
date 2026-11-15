@@ -221,8 +221,12 @@ export interface Pacer {
 	on?: number
 	/** How fast they went into the Tunnel they're in: they go through it no slower. */
 	tunnelSpeed?: number
-	/** Ducked under a low branch or a tall hurdle, as anyone: see `duckUnder`. */
+	/** Down, sliding, under a low branch or a tall hurdle, or down a hill, as anyone: see `duckUnder`. */
 	ducking?: boolean
+	/** Ticks left of sliding down the hill they're on, for the fun of it: see `slideDownhill`. */
+	hillSlide?: number
+	/** Ticks since they got into a shrink ray, being shrunk away on its plate: see `PACER_SHRINK`. */
+	shrink?: number
 	/** On a glider, out over the sea, as anyone: see `flyPacer`. */
 	gliding?: boolean
 	/** On skis or a snowboard, down The Slopes, as anyone: see `skiPacer`. */

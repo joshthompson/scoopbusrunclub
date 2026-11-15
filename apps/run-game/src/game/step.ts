@@ -201,6 +201,9 @@ export function stepWorld(world: World) {
 		startleGeese(world)
 		if (!busHeld(world)) stepBus(world)
 	}
+	// Everyone else out running isn't stopped, though: on into the shrink
+	// ray after the Players, and shrunk away themselves, as it goes off.
+	else stepPack(world, true)
 	stepHeart(world)
 	if (world.round) decideRound(world)
 	// The camera on the Portal going off, if one is; or as usual.
@@ -1291,10 +1294,14 @@ function collide(world: World, racer: Racer) {
 			case 'cone': {
 				// Into it: knocked over, flat, and on its way, costing a few
 				// points and a little speed. Not a stumble: no hat comes off.
+				// As big as the course's own, if it has one in its place.
 				const base = ground - (o.height ?? 0)
+				const own = world.course.look?.cone
+				const half = own ? own.width / 2 : CONE_HALF
+				const tall = own?.height ?? CONE_TALL
 				if (
 					!state.used &&
-					overlaps(o.x - CONE_HALF, o.x + CONE_HALF, base - CONE_TALL, base)
+					overlaps(o.x - half, o.x + half, base - tall, base)
 				) {
 					hits(state)
 					state.used = true

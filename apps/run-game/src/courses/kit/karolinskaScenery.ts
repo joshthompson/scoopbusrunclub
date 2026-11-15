@@ -1357,7 +1357,10 @@ export const IV_STAND = {
 	height: 60,
 }
 
-/** A yellow wet floor sign, a figure slipping on it: jumped as a rock. World pixels. */
+/**
+ * A yellow wet floor sign, a figure slipping on it: in place of a traffic
+ * cone, knocked over by whoever runs into it first. World pixels.
+ */
 export const WET_FLOOR = {
 	asset: pixelArt(14, 20, [
 		[5, 0, 4, 2, '#f2c200'],
@@ -1379,6 +1382,7 @@ export const WET_FLOOR = {
 	]),
 	width: 28,
 	height: 40,
+	name: 'Wet floor signs',
 }
 
 /**

@@ -18,13 +18,17 @@ import type { World } from '../game/world'
  * A giant's mouth, in its face (see `CourseLook['mouth']`): shut, till
  * anyone racing gets near; then its jaw drops, the dark inside of it and
  * its teeth showing, and its tongue rolls out, down over the edge of the
- * bench, for them to run up. Shut again once everyone's gone on in, or
- * past. Behind everyone, over the face: the Ground's tongue under it is
- * what's run on, there all along, and drawn by this, not the Ground.
+ * bench, for them to run up. Snapped shut again, behind them, the moment
+ * nobody's still on their way in. Behind everyone, over the face: the
+ * Ground's tongue under it is what's run on, there all along, and drawn by
+ * this, not the Ground.
  */
 
-/** How quickly it opens, or shuts, a share of the way a tick. */
-const OPENING = 0.06
+/** How quickly it opens, and shuts, a share of the way a tick: shutting much quicker. */
+const OPENING = 0.12
+const SHUTTING = 0.25
+/** How far on in past its inside someone still keeps it open: just in. */
+const IN_PAST = 40
 /** How far its jaw's cells are: 4 px, as the face's. */
 const CELL = 4
 /** How tall its teeth are, top and bottom, and how far in from its top the top ones are. */
@@ -42,7 +46,8 @@ export function createGiantMouth(world: World) {
 	/** Open, or opening: anyone racing near, and not yet on in past it. */
 	const wanted = () =>
 		world.racers.some(
-			({ body, out }) => !out && body.x > tip - opens && body.x < inside + 400,
+			({ body, out }) =>
+				!out && body.x > tip - opens && body.x < inside + IN_PAST,
 		)
 	const jawTop = face.y + JAW_FROM
 	const drop = () => Math.round((open() * JAW_DROP) / CELL) * CELL
@@ -85,7 +90,7 @@ export function createGiantMouth(world: World) {
 					setOpen(
 						Math.abs(target - now) < 0.01
 							? target
-							: now + (target - now) * OPENING * 2,
+							: now + (target - now) * (target ? OPENING : SHUTTING),
 					)
 			},
 		}),

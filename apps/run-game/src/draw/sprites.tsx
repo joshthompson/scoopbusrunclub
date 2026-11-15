@@ -64,7 +64,7 @@ import { DRAWN_FROM } from '../game/groundColumns'
 import type { Hat } from '../game/hats'
 import { mummyAt } from '../game/mummies'
 import { type PlatformAt, platformAt } from '../game/platforms'
-import { heldLook } from '../game/portals'
+import { heldLook, pacerShrunk } from '../game/portals'
 import {
 	BALLOON_HEIGHT,
 	BALLOON_WIDTH,
@@ -121,12 +121,7 @@ import { LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH, paintBusLegs } from './art/busLegs'
 import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
 import { DRILL_AT, DRILL_HEIGHT, DRILL_POINT, DRILL_WIDTH } from './art/drill'
-import {
-	DUCK_NOTE_HEIGHT,
-	DUCK_NOTE_TAPED,
-	DUCK_NOTE_WIDTH,
-	duckNote,
-} from './art/duckNote'
+import { DUCK_NOTE_HEIGHT, DUCK_NOTE_WIDTH, duckNote } from './art/duckNote'
 import { fikaPicture } from './art/fika'
 import { GEESE_HEIGHT, geeseReach, geeseWidth, paintGeese } from './art/geese'
 import {
@@ -833,6 +828,19 @@ function createPacer(world: World, p: Pacer) {
 				return
 			}
 			$.setXScale(-1)
+			// On a shrink ray's plate: stood still, shrinking down to
+			// nothing from their feet, as a Player does.
+			if (p.shrink !== undefined) {
+				const s = pacerShrunk(p.shrink)
+				$.setRotation(0)
+				$.setFrame(stand ? 0 : undefined)
+				$.setState('pause')
+				$.setStyle({
+					transform: `scale(${-s}, ${s})`,
+					'transform-origin': '50% 100%',
+				})
+				return
+			}
 			// Leaning with the hill, running; upright, stood still; lying
 			// along under a glider, tipped as it climbs and dives.
 			const dy = p.feetY - was
@@ -2630,6 +2638,12 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			})
 		}
 		case 'cone': {
+			// Or the course's own in its place, knocked over all the same: a
+			// wet floor sign.
+			const own = world.course.look?.cone
+			const width = own?.width ?? CONE_WIDTH
+			const height = own?.height ?? CONE_HEIGHT
+			const picture = own?.asset ?? cone
 			// Knocked over: tipped forward onto its side, and skidding on a
 			// little way. `flown` isn't a signal: reading the tick keeps it
 			// up to date.
@@ -2649,8 +2663,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				x: o.x,
 				// Up on a platform, if it's on one.
 				sink: 1 - (o.height ?? 0),
-				width: CONE_WIDTH,
-				height: CONE_HEIGHT,
+				width,
+				height,
 				world,
 				state,
 				draw: ({ ctx, image }) => {
@@ -2658,17 +2672,17 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					if (since !== undefined) {
 						// Over its bottom right corner.
 						const { slid, turn } = tipped(since)
-						ctx.translate(CONE_WIDTH + slid, CONE_HEIGHT)
+						ctx.translate(width + slid, height)
 						ctx.rotate((turn * Math.PI) / 180)
-						ctx.translate(-CONE_WIDTH, -CONE_HEIGHT)
+						ctx.translate(-width, -height)
 					}
-					paintPicture(ctx, image, cone, 0, 0, CONE_WIDTH, CONE_HEIGHT)
+					paintPicture(ctx, image, picture, 0, 0, width, height)
 				},
 				// Knocked over, it tips over its corner, up past its top on the
 				// way, and lies on its side, slid on past its box.
 				drawReach: {
-					top: Math.ceil(Math.hypot(CONE_WIDTH, CONE_HEIGHT) - CONE_HEIGHT),
-					right: CONE_SKID + CONE_HEIGHT,
+					top: Math.ceil(Math.hypot(width, height) - height),
+					right: CONE_SKID + height,
 				},
 			})
 		}
@@ -2741,12 +2755,15 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			const back = { left: BRANCH_CROSS, right: BRANCH_TREE_WIDTH }
 			const near = { left: 0, right: BRANCH_CROSS }
 			return [
-				// The tree, behind the path: behind everyone, the bus too.
+				// The tree, behind the path: behind everyone, the bus too. A
+				// note pinned to its trunk, over where its limb comes off it,
+				// an arrow drawn on it, down; left there once the bus has
+				// knocked the limb off.
 				createFixture({
 					id: `${id}-tree`,
 					type: 'hazard',
 					...where,
-					draw: ({ ctx, image }) =>
+					draw: ({ ctx, image }) => {
 						paintPixelArt(
 							ctx,
 							image,
@@ -2754,7 +2771,16 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							BRANCH_TREE_WIDTH,
 							BRANCH_TREE_HEIGHT,
 							foliage,
-						),
+						)
+						ctx.translate(BRANCH_NOTE.left, BRANCH_NOTE.top)
+						paintPixelArt(
+							ctx,
+							image,
+							duckNote,
+							DUCK_NOTE_WIDTH,
+							DUCK_NOTE_HEIGHT,
+						)
+					},
 					style: () => ({
 						transform: lie,
 						'transform-origin': `${lieOrigin.x}px ${lieOrigin.y}px`,
@@ -2791,28 +2817,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					draw: ({ ctx, image }) => paintLimb(ctx, image),
 					style: () => ({
 						visibility: knocked() ? 'visible' : 'hidden',
-					}),
-				}),
-				// A note taped on top of its limb, over the path: an arrow,
-				// down. Gone with the limb, once the bus has knocked it off.
-				createFixture({
-					id: `${id}-note`,
-					type: 'hazard',
-					x: o.x,
-					width: DUCK_NOTE_WIDTH,
-					height: DUCK_NOTE_HEIGHT,
-					sink: DUCK_NOTE_TAPED - BRANCH_LIMB_TOP,
-					world,
-					draw: ({ ctx, image }) =>
-						paintPixelArt(
-							ctx,
-							image,
-							duckNote,
-							DUCK_NOTE_WIDTH,
-							DUCK_NOTE_HEIGHT,
-						),
-					style: () => ({
-						visibility: knocked() ? 'hidden' : 'visible',
 					}),
 				}),
 			]
@@ -2937,6 +2941,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						steamVentAsset,
 						world.ticks(),
 						state.flown,
+						Math.round(o.x) % 60,
 					),
 				drawReach: STEAM_VENT_REACH,
 			})
@@ -3104,9 +3109,11 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 		case 'germ':
 			return createGerm(world, state, o, id)
 		case 'valve':
-			// Raised a little off the floor, flapping open on the beat, its
-			// chevrons over it lighting up and leaping: stand here. The
-			// tick's a signal: reading it keeps it beating.
+			// Raised a little off the floor, flapping open on the beat, and
+			// as it fires someone up, its chevrons over it lighting up and
+			// leaping: run onto it. The tick's a signal: reading it keeps it
+			// beating; when it last fired someone isn't, and reading the tick
+			// keeps that up to date.
 			return createFixture({
 				id,
 				type: 'hazard',
@@ -3116,7 +3123,12 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				height: VALVE.height,
 				world,
 				draw: ({ ctx, image }) =>
-					paintValve(ctx, image, Math.max(0, world.ticks())),
+					paintValve(
+						ctx,
+						image,
+						Math.max(0, world.ticks()),
+						world.ticks() >= 0 ? state.flown : undefined,
+					),
 				drawReach: VALVE_REACH,
 			})
 		case 'snowman': {
@@ -3777,8 +3789,12 @@ const BRANCH_CROSS = 70
 const BRANCH_LINE_ROW = 249
 const BRANCH_TREE_ALONG = BRANCH_TREE_WIDTH / 2 - BRANCH_CROSS
 const BRANCH_LIMB_HEIGHT = 50
-/** How high the top of its limb is, where it crosses the line. */
-const BRANCH_LIMB_TOP = 56
+/**
+ * Where its duck note's pinned in its art: on its trunk (columns 118 to
+ * 136), its pin in the bottom of its leaves, down to just over its limb's
+ * end (its top, row 148).
+ */
+const BRANCH_NOTE = { left: 116, top: 126 }
 const BRANCH_OVER_REACH = 80
 
 /** How far down into the sea a km sign's buoy floats. */

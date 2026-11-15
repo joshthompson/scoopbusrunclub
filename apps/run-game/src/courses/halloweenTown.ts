@@ -4,7 +4,6 @@ import ghost1 from '@/assets/halloween/ghost1.png'
 import ghost2 from '@/assets/halloween/ghost2.png'
 import ghost3 from '@/assets/halloween/ghost3.png'
 import ghost4 from '@/assets/halloween/ghost4.png'
-import pumpkin2 from '@/assets/halloween/pumpkin2.png'
 import skeletonSit from '@/assets/halloween/skeleton-sit.png'
 import tombstone from '@/assets/halloween/tombstone.png'
 import shrub1 from '@/assets/misc/shrub1.png'
@@ -153,8 +152,9 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	}
 	obstacles.sort((a, b) => a.x - b.x)
 
-	// A graveyard along the path: dead trees, headstones, a pumpkin patch,
-	// and now and then a skeleton sat down for a rest.
+	// A graveyard along the path: dead trees, headstones, and now and then a
+	// skeleton sat down for a rest. No pumpkins: they're to be worn, so none
+	// back here to be mistaken for one.
 	const scenery: Course['scenery'] = []
 	const pieces = [
 		{ asset: tree1Halloween, filter: 'brightness(0.7)' },
@@ -175,7 +175,6 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		},
 		{ asset: shrub1, filter: DEAD },
 		{ asset: skeletonSit, scale: 2 },
-		{ asset: pumpkin2, filter: 'brightness(0.8)' },
 	]
 	for (let at = -400; at < terrain.finishX + 900; at += 70 + random() * 200) {
 		const piece = pieces[Math.floor(random() * pieces.length)]
