@@ -4,6 +4,7 @@ import leap from '../../assets/rides/camel-leap.png'
 import sit from '../../assets/rides/camel-sit.png'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
 import { PixelArt } from '../PixelArt'
+import { inkOutline } from '../paint/picture'
 import { BACTRIAN_GRIDS } from './bactrianGrids'
 import type { CorgiPose } from './corgi'
 
@@ -28,14 +29,11 @@ export const CAMEL_SADDLE = 42
 const ART: Record<CorgiPose, string> = { sit, crouch, leap }
 
 /** An ink outline round it, as the corgi has, so it stands out. */
-const OUTLINE: JSX.CSSProperties = {
-	filter: [
-		'drop-shadow(2px 0 0 #2b2b2b)',
-		'drop-shadow(-2px 0 0 #2b2b2b)',
-		'drop-shadow(0 2px 0 #2b2b2b)',
-		'drop-shadow(0 -2px 0 #2b2b2b)',
-	].join(' '),
-}
+export const CAMEL_OUTLINE = inkOutline('#2b2b2b')
+const OUTLINE: JSX.CSSProperties = { filter: CAMEL_OUTLINE.filter }
+
+/** Its picture in `pose`, for a Draw Hook to paint, outlined. */
+export const camelPicture = (pose: CorgiPose) => ART[pose]
 
 export function CamelArt(props: { pose: CorgiPose }) {
 	return (
@@ -85,6 +83,9 @@ const BACTRIAN: Record<CorgiPose, string> = {
 	crouch: fromGrid(BACTRIAN_GRIDS.crouch),
 	leap: fromGrid(BACTRIAN_GRIDS.leap),
 }
+
+/** The Bactrian's picture in `pose`, for a Draw Hook to paint, outlined as the camel is. */
+export const bactrianPicture = (pose: CorgiPose) => BACTRIAN[pose]
 
 /**
  * A Bactrian camel, now and then one of the Pyramids' camels: two great

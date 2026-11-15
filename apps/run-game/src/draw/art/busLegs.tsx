@@ -1,4 +1,3 @@
-import { For } from 'solid-js'
 import type { BusLook } from '../../courses/types'
 
 /**
@@ -68,105 +67,73 @@ function kneeAt(hx: number, hy: number, fx: number, fy: number, out: number) {
 
 const snap = (n: number) => Math.round(n / 2) * 2
 
-export function BusLegs(props: {
-	look: NonNullable<BusLook['legs']>
-	/** How far the bus has come: what the legs step with. */
-	travelled: () => number
-	/** Where the ground is, down from the bus's top. */
-	ground: number
-	/** Its far side's, behind it, in shadow, a step out from the near side's. */
-	far?: boolean
-}) {
-	const legs = () =>
-		LEGS.map((leg, i) => {
-			const phase = props.far ? leg.phase + 0.5 : leg.phase
-			const foot = footAt(props.travelled(), phase)
-			const hx = leg.hip + LEGS_OUT + (props.far ? 6 : 0)
-			const hy = leg.down - (props.far ? 6 : 0)
-			const fx = hx + leg.reach + foot.along
-			const fy = props.ground - foot.up - (props.far ? 4 : 0)
-			const knee = kneeAt(hx, hy, fx, fy, Math.sign(leg.reach))
-			return {
-				i,
-				hip: { x: snap(hx), y: snap(hy) },
-				knee: { x: snap(knee.x), y: snap(knee.y) },
-				foot: { x: snap(fx), y: snap(fy) },
-				out: Math.sign(leg.reach),
-			}
-		})
-	const metal = () => (props.far ? props.look.shade : props.look.metal)
+/** Where each leg's hip, knee and foot are, `travelled` px along. */
+function legsAt(travelled: number, ground: number, far: boolean | undefined) {
+	return LEGS.map((leg, i) => {
+		const phase = far ? leg.phase + 0.5 : leg.phase
+		const foot = footAt(travelled, phase)
+		const hx = leg.hip + LEGS_OUT + (far ? 6 : 0)
+		const hy = leg.down - (far ? 6 : 0)
+		const fx = hx + leg.reach + foot.along
+		const fy = ground - foot.up - (far ? 4 : 0)
+		const knee = kneeAt(hx, hy, fx, fy, Math.sign(leg.reach))
+		return {
+			i,
+			hip: { x: snap(hx), y: snap(hy) },
+			knee: { x: snap(knee.x), y: snap(knee.y) },
+			foot: { x: snap(fx), y: snap(fy) },
+			out: Math.sign(leg.reach),
+		}
+	})
+}
+
+/** The ink they're outlined in, and their knees' bolts set in. */
+const INK = '#2b2b2b'
+
+/**
+ * The legs, `travelled` px along, painted from the top left of the legs'
+ * box, their feet on `ground`; the far side's in shadow, a step out from
+ * the near side's. Painted again every time, since they step with every
+ * tick.
+ */
+export function paintBusLegs(
+	ctx: CanvasRenderingContext2D,
+	look: NonNullable<BusLook['legs']>,
+	travelled: number,
+	ground: number,
+	far?: boolean,
+) {
+	const metal = far ? look.shade : look.metal
+	const bolt = far ? look.shade : look.bolt
+	ctx.lineCap = 'square'
 	const line = (
 		a: { x: number; y: number },
 		b: { x: number; y: number },
 		stroke: string,
 		width: number,
-	) => (
-		<line
-			x1={a.x}
-			y1={a.y}
-			x2={b.x}
-			y2={b.y}
-			stroke={stroke}
-			stroke-width={width}
-			stroke-linecap="square"
-		/>
-	)
-	return (
-		<svg
-			width={LEGS_WIDTH}
-			height={LEGS_HEIGHT}
-			shape-rendering="crispEdges"
-			aria-hidden="true"
-			style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible' }}
-		>
-			<For each={legs()}>
-				{(leg) => (
-					<g>
-						{/* Outlined in ink, then its metal, lit along its top. */}
-						{line(leg.hip, leg.knee, '#2b2b2b', 10)}
-						{line(leg.knee, leg.foot, '#2b2b2b', 8)}
-						{line(leg.hip, leg.knee, metal(), 6)}
-						{line(leg.knee, leg.foot, metal(), 4)}
-						{/* A clawed foot, gripping. */}
-						<rect
-							x={leg.foot.x - 5}
-							y={leg.foot.y - 4}
-							width={10}
-							height={4}
-							fill={props.look.foot}
-						/>
-						<rect
-							x={leg.foot.x + (leg.out > 0 ? 3 : -7)}
-							y={leg.foot.y - 2}
-							width={4}
-							height={4}
-							fill={props.look.foot}
-						/>
-						{/* Bolts at its knee and hip. */}
-						<rect
-							x={leg.knee.x - 4}
-							y={leg.knee.y - 4}
-							width={8}
-							height={8}
-							fill="#2b2b2b"
-						/>
-						<rect
-							x={leg.knee.x - 2}
-							y={leg.knee.y - 2}
-							width={4}
-							height={4}
-							fill={props.far ? props.look.shade : props.look.bolt}
-						/>
-						<rect
-							x={leg.hip.x - 4}
-							y={leg.hip.y - 4}
-							width={8}
-							height={8}
-							fill={props.far ? props.look.shade : props.look.bolt}
-						/>
-					</g>
-				)}
-			</For>
-		</svg>
-	)
+	) => {
+		ctx.strokeStyle = stroke
+		ctx.lineWidth = width
+		ctx.beginPath()
+		ctx.moveTo(a.x, a.y)
+		ctx.lineTo(b.x, b.y)
+		ctx.stroke()
+	}
+	for (const leg of legsAt(travelled, ground, far)) {
+		// Outlined in ink, then its metal, lit along its top.
+		line(leg.hip, leg.knee, INK, 10)
+		line(leg.knee, leg.foot, INK, 8)
+		line(leg.hip, leg.knee, metal, 6)
+		line(leg.knee, leg.foot, metal, 4)
+		// A clawed foot, gripping.
+		ctx.fillStyle = look.foot
+		ctx.fillRect(leg.foot.x - 5, leg.foot.y - 4, 10, 4)
+		ctx.fillRect(leg.foot.x + (leg.out > 0 ? 3 : -7), leg.foot.y - 2, 4, 4)
+		// Bolts at its knee and hip.
+		ctx.fillStyle = INK
+		ctx.fillRect(leg.knee.x - 4, leg.knee.y - 4, 8, 8)
+		ctx.fillStyle = bolt
+		ctx.fillRect(leg.knee.x - 2, leg.knee.y - 2, 4, 4)
+		ctx.fillRect(leg.hip.x - 4, leg.hip.y - 4, 8, 8)
+	}
 }

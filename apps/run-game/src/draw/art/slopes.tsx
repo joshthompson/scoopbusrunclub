@@ -1,11 +1,11 @@
-import { For, type JSX, Show } from 'solid-js'
+import type { DrawPainting } from 'scoopjs'
 import {
 	type PixelRect,
 	paintedArt,
 	pixelArt,
 } from '../../courses/kit/pixelArt'
 import type { Rail } from '../../courses/types'
-import { PixelArt } from '../PixelArt'
+import { paintPicture } from '../paint/picture'
 
 /**
  * What's on The Slopes' piste, in cells twice the size of a screen pixel: a
@@ -88,38 +88,37 @@ const heap = pixelArt(SNOWMAN_COLUMNS, SNOWMAN_ROWS, [
 /** How long it's flying apart for, burst, before it's just a heap. */
 const BURST_TICKS = 24
 
-/** A snowman, stood up, or burst, `since` ticks ago: bits of him flying, then a heap. */
-export function SnowmanArt(props: { since?: number }) {
-	const burst = () => props.since !== undefined
-	return (
-		<div style={{ position: 'relative', width: '100%', height: '100%' }}>
-			<PixelArt
-				src={burst() ? heap : snowman}
-				width={SNOWMAN_WIDTH}
-				height={SNOWMAN_DRAWN}
-			/>
-			<Show when={burst() && (props.since ?? 99) < BURST_TICKS}>
-				<For each={PUFF}>
-					{(bit) => {
-						const t = () => (props.since ?? 0) / BURST_TICKS
-						return (
-							<div
-								style={{
-									position: 'absolute',
-									left: `${SNOWMAN_WIDTH / 2 + bit.x * t()}px`,
-									top: `${30 + bit.y * t() + 40 * t() * t()}px`,
-									width: `${bit.size}px`,
-									height: `${bit.size}px`,
-									background: bit.colour,
-									opacity: 1 - t(),
-								}}
-							/>
-						)
-					}}
-				</For>
-			</Show>
-		</div>
+/**
+ * A snowman, painted in a Draw Hook, from (0, 0) of `ctx`: stood up, or
+ * burst `since` ticks ago, bits of him flying, then a heap.
+ */
+export function paintSnowman(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	since?: number,
+) {
+	const burst = since !== undefined
+	paintPicture(
+		ctx,
+		image,
+		burst ? heap : snowman,
+		0,
+		0,
+		SNOWMAN_WIDTH,
+		SNOWMAN_DRAWN,
 	)
+	if (since === undefined || since >= BURST_TICKS) return
+	const t = since / BURST_TICKS
+	ctx.globalAlpha *= 1 - t
+	for (const bit of PUFF) {
+		ctx.fillStyle = bit.colour
+		ctx.fillRect(
+			SNOWMAN_WIDTH / 2 + bit.x * t,
+			30 + bit.y * t + 40 * t * t,
+			bit.size,
+			bit.size,
+		)
+	}
 }
 
 const PUFF = [
@@ -142,45 +141,65 @@ const FLAG_TOP = 4
 const FLAG_HEIGHT = 24
 
 /**
- * A slalom gate, side on: a flag, red or blue, a white band across it,
- * stretched between two poles. They stand at the edges of the piste, red
- * at its back and blue at its front, in turn, so the course weaves past
- * them. Gone past, its flag flaps.
+ * How a gate's flag flaps, `ms` into it: skewed and squashed, from its left
+ * middle, a quarter of a second a flap, in three steps each half.
  */
-export function GateArt(props: { colour: 'red' | 'blue'; flapping: boolean }) {
-	const fill = () => (props.colour === 'red' ? '#d8342c' : '#2459c4')
-	const pole = (left: number): JSX.CSSProperties => ({
-		position: 'absolute',
-		left: `${left}px`,
-		top: 0,
-		width: `${GATE_POLE_WIDTH}px`,
-		height: `${GATE_HEIGHT}px`,
-		background: fill(),
-		'border-left': '1px solid rgba(255, 255, 255, 0.6)',
-		'box-sizing': 'border-box',
-	})
-	return (
-		<div style={{ position: 'relative', width: '100%', height: '100%' }}>
-			<div
-				style={{
-					position: 'absolute',
-					left: `${GATE_POLE_WIDTH}px`,
-					top: `${FLAG_TOP}px`,
-					width: `${GATE_WIDTH - GATE_POLE_WIDTH * 2}px`,
-					height: `${FLAG_HEIGHT}px`,
-					'box-sizing': 'border-box',
-					background: `linear-gradient(to bottom, ${fill()} 0 36%, white 36% 64%, ${fill()} 64%)`,
-					border: '2px solid rgba(0, 0, 0, 0.35)',
-					'transform-origin': '0 50%',
-					animation: props.flapping
-						? 'gate-flap 0.25s steps(3) infinite'
-						: undefined,
-				}}
-			/>
-			<div style={pole(0)} />
-			<div style={pole(GATE_WIDTH - GATE_POLE_WIDTH)} />
-		</div>
+function gateFlap(ms: number): { skew: number; squash: number } {
+	const at = (ms % 250) / 250
+	const second = at >= 0.5
+	const step = Math.floor(((at % 0.5) / 0.5) * 3) / 3
+	return second
+		? { skew: -14 + 22 * step, squash: 0.86 + 0.09 * step }
+		: { skew: -14 * step, squash: 1 - 0.14 * step }
+}
+
+/**
+ * A slalom gate, side on, painted in a Draw Hook, from (0, 0) of `ctx`: a
+ * flag, red or blue, a white band across it, stretched between two poles.
+ * They stand at the edges of the piste, red at its back and blue at its
+ * front, in turn, so the course weaves past them. Gone past, its flag
+ * flaps: if it's `flapping` ms into it.
+ */
+export function paintGate(
+	ctx: CanvasRenderingContext2D,
+	colour: 'red' | 'blue',
+	flapping?: number,
+) {
+	const fill = colour === 'red' ? '#d8342c' : '#2459c4'
+	const width = GATE_WIDTH - GATE_POLE_WIDTH * 2
+	ctx.save()
+	if (flapping !== undefined) {
+		const { skew, squash } = gateFlap(flapping)
+		const middle = FLAG_TOP + FLAG_HEIGHT / 2
+		ctx.translate(GATE_POLE_WIDTH, middle)
+		ctx.transform(1, 0, Math.tan((skew * Math.PI) / 180), 1, 0, 0)
+		ctx.scale(1, squash)
+		ctx.translate(-GATE_POLE_WIDTH, -middle)
+	}
+	// Its colour, a white band across the middle of the inside of its
+	// border, and its border, darkening what's under it.
+	ctx.fillStyle = fill
+	ctx.fillRect(GATE_POLE_WIDTH, FLAG_TOP, width, FLAG_HEIGHT)
+	const inside = FLAG_HEIGHT - 4
+	ctx.fillStyle = 'white'
+	ctx.fillRect(
+		GATE_POLE_WIDTH,
+		FLAG_TOP + 2 + inside * 0.36,
+		width,
+		inside * 0.28,
 	)
+	ctx.fillStyle = 'rgba(0, 0, 0, 0.35)'
+	ctx.fillRect(GATE_POLE_WIDTH, FLAG_TOP, width, 2)
+	ctx.fillRect(GATE_POLE_WIDTH, FLAG_TOP + FLAG_HEIGHT - 2, width, 2)
+	ctx.fillRect(GATE_POLE_WIDTH, FLAG_TOP + 2, 2, FLAG_HEIGHT - 4)
+	ctx.fillRect(GATE_POLE_WIDTH + width - 2, FLAG_TOP + 2, 2, FLAG_HEIGHT - 4)
+	ctx.restore()
+	for (const left of [0, GATE_WIDTH - GATE_POLE_WIDTH]) {
+		ctx.fillStyle = fill
+		ctx.fillRect(left, 0, GATE_POLE_WIDTH, GATE_HEIGHT)
+		ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'
+		ctx.fillRect(left, 0, 1, GATE_HEIGHT)
+	}
 }
 
 // --- Rails, boxes and logs --------------------------------------------------------
@@ -188,93 +207,74 @@ export function GateArt(props: { colour: 'red' | 'blue'; flapping: boolean }) {
 /** How far apart a rail's legs are, down to the snow. */
 const LEG_EVERY = 48
 
+/** A rail's legs, as [x, its top, its foot]: every `LEG_EVERY` px or so, and at its end. */
+function railLegs(
+	tops: [number, number][],
+	feet: [number, number][],
+	width: number,
+) {
+	const out: [number, number, number][] = []
+	for (let i = 0; i < tops.length; i++) {
+		const [x, top] = tops[i]
+		const last = i === tops.length - 1
+		if (i % Math.round(LEG_EVERY / 8) === 0 || last)
+			out.push([Math.min(x, width - 4), top, feet[i][1]])
+	}
+	return out
+}
+
 /**
- * A rail to grind, a box or a log, `rail`, along the line of `tops` (its
- * top every few px, from its left, in its box's own pixels) over `feet`
- * (the snow under it): its legs down into the snow, and it along the top.
+ * A rail to grind, a box or a log, `rail`, painted in a Draw Hook from
+ * (0, 0) of `ctx`, along the line of `tops` (its top every few px, from its
+ * left, in its box's own pixels) over `feet` (the snow under it): its legs
+ * down into the snow, and it along the top, its side under its top, deep
+ * for a box or a log. Its lines are worked out once, and stroked each time.
  */
-export function RailArt(props: {
+export function railPainter(props: {
 	rail: Rail
 	width: number
-	height: number
 	tops: [number, number][]
 	feet: [number, number][]
 }) {
-	const line = (points: [number, number][], dy = 0) =>
-		points.map(([x, y]) => `${x},${y + dy}`).join(' ')
-	const legs = () => {
-		const out: [number, number, number][] = []
-		const { tops, feet } = props
-		for (let i = 0; i < tops.length; i++) {
-			const [x, top] = tops[i]
-			const last = i === tops.length - 1
-			if (i % Math.round(LEG_EVERY / 8) === 0 || last)
-				out.push([Math.min(x, props.width - 4), top, feet[i][1]])
-		}
-		return out
+	const look = RAIL_LOOKS[props.rail.look === 'roof' ? 'box' : props.rail.look]
+	const legs = new Path2D()
+	const snow = new Path2D()
+	for (const [x, top, foot] of railLegs(props.tops, props.feet, props.width)) {
+		legs.rect(x, top, look.legWidth, Math.max(0, foot - top + 4))
+		snow.rect(x - 2, foot, look.legWidth + 4, 3)
 	}
-	const look = () =>
-		RAIL_LOOKS[props.rail.look === 'roof' ? 'box' : props.rail.look]
-	return (
-		<svg
-			width={props.width}
-			height={props.height}
-			viewBox={`0 0 ${props.width} ${props.height}`}
-			shape-rendering="crispEdges"
-			style={{ display: 'block', overflow: 'visible' }}
-			aria-hidden="true"
-		>
-			<For each={legs()}>
-				{([x, top, foot]) => (
-					<>
-						<rect
-							x={x}
-							y={top}
-							width={look().legWidth}
-							height={Math.max(0, foot - top + 4)}
-							fill={look().leg}
-						/>
-						<rect
-							x={x - 2}
-							y={foot}
-							width={look().legWidth + 4}
-							height={3}
-							fill={SNOW}
-						/>
-					</>
-				)}
-			</For>
-			{/* Its side, under its top: deep for a box or a log. */}
-			<polyline
-				points={line(props.tops, look().depth / 2)}
-				fill="none"
-				stroke={look().side}
-				stroke-width={look().depth}
-			/>
-			<polyline
-				points={line(props.tops)}
-				fill="none"
-				stroke={look().top}
-				stroke-width={3}
-			/>
-			<polyline
-				points={line(props.tops, -1)}
-				fill="none"
-				stroke={look().shine}
-				stroke-width={1}
-			/>
-			<Show when={props.rail.look === 'rail'}>
-				{/* Hazard stripes, painted on it. */}
-				<polyline
-					points={line(props.tops, 2)}
-					fill="none"
-					stroke="#f5c518"
-					stroke-width={3}
-					stroke-dasharray="8 8"
-				/>
-			</Show>
-		</svg>
-	)
+	const line = (dy: number) => {
+		const path = new Path2D()
+		for (const [x, y] of props.tops) path.lineTo(x, y + dy)
+		return path
+	}
+	const side = line(look.depth / 2)
+	const top = line(0)
+	const shine = line(-1)
+	const stripes = props.rail.look === 'rail' ? line(2) : undefined
+	return (ctx: CanvasRenderingContext2D) => {
+		ctx.fillStyle = look.leg
+		ctx.fill(legs)
+		ctx.fillStyle = SNOW
+		ctx.fill(snow)
+		// Sharp at its corners, flat at its ends.
+		ctx.lineJoin = 'miter'
+		ctx.miterLimit = 4
+		ctx.lineCap = 'butt'
+		const stroke = (path: Path2D, colour: string, width: number) => {
+			ctx.strokeStyle = colour
+			ctx.lineWidth = width
+			ctx.stroke(path)
+		}
+		stroke(side, look.side, look.depth)
+		stroke(top, look.top, 3)
+		stroke(shine, look.shine, 1)
+		if (stripes) {
+			// Hazard stripes, painted on it.
+			ctx.setLineDash([8, 8])
+			stroke(stripes, '#f5c518', 3)
+		}
+	}
 }
 
 const RAIL_LOOKS: Record<

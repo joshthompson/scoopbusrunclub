@@ -1,6 +1,12 @@
 import { Show, createMemo } from 'solid-js'
 import { svgUrl } from '../courses/kit/pixelArt'
 import type { Course, PlatformLook } from '../courses/types'
+import { cachedArt } from './canvasArt'
+import {
+	backgroundImage,
+	cssColour,
+	fillBackground,
+} from './paint/cssBackground'
 
 /** A Platform's colours, if its course doesn't say: a grassy ledge, in the course's own. */
 /** A Platform's look, with everything filled in but what's only for rock. */
@@ -69,6 +75,61 @@ const PUFF_EVERY = 46
 const PUFF_SIZES = [16, 12, 18, 14]
 
 /**
+ * A candyfloss cloud's cells, `width` by `depth`, as a path for each of its
+ * colours, from `over` px above its box, where its puffs stand up to.
+ */
+export function cloudCells(width: number, depth: number) {
+	// Puffs all along its top, a candyfloss-sized one every so often,
+	// big and small by turns; and smaller lumps along its underside.
+	const count = Math.max(2, Math.round(width / PUFF_EVERY))
+	const step = width / count
+	const puffs = Array.from({ length: count }, (_, i) => ({
+		x: step * (i + 0.5),
+		y: 6,
+		r: PUFF_SIZES[i % PUFF_SIZES.length],
+	}))
+	const lumps = Array.from({ length: count - 1 }, (_, i) => ({
+		x: step * (i + 1),
+		y: depth - 2,
+		r: 8,
+	}))
+	const over = Math.max(...puffs.map((p) => p.r - p.y))
+	const inBody = (x: number, y: number) => {
+		if (y < 0 || y > depth || x < 0 || x > width) return false
+		// Its ends, rounded off.
+		const cx = Math.min(Math.max(x, CLOUD_ROUND), width - CLOUD_ROUND)
+		const cy = Math.min(Math.max(y, CLOUD_ROUND), depth - CLOUD_ROUND)
+		return (x - cx) ** 2 + (y - cy) ** 2 <= CLOUD_ROUND ** 2
+	}
+	const puffAt = (x: number, y: number) =>
+		puffs.find((p) => (x - p.x) ** 2 + (y - p.y) ** 2 <= p.r ** 2)
+	const lumpAt = (x: number, y: number) =>
+		lumps.some((p) => (x - p.x) ** 2 + (y - p.y) ** 2 <= p.r ** 2)
+	const paths = { top: '', face: '', edge: '', shine: '' }
+	const C = CLOUD_CELL
+	for (let y = -Math.ceil(over / C) * C; y < depth + 8; y += C)
+		for (let x = 0; x < width; x += C) {
+			const mx = x + C / 2
+			const my = y + C / 2
+			const puff = puffAt(mx, my)
+			const lump = !puff && !inBody(mx, my) && lumpAt(mx, my)
+			if (!puff && !inBody(mx, my) && !lump) continue
+			const cell = `M${x},${y}h${C}v${C}h-${C}Z`
+			if (
+				puff &&
+				my < puff.y - puff.r * 0.4 &&
+				mx < puff.x - puff.r * 0.1 &&
+				mx > puff.x - puff.r * 0.6
+			)
+				paths.shine += cell
+			else if (my < 8 || (puff && my < puff.y)) paths.top += cell
+			else if (lump || my > depth - 6) paths.edge += cell
+			else paths.face += cell
+		}
+	return { ...paths, over: Math.ceil(over / C) * C }
+}
+
+/**
  * A candyfloss cloud, `width` by `depth`, as pixel art: its puffs up along
  * its top, its ends rounded, a band of its lightest along its
  * top and its puffs, a highlight on each puff, and its shade along its
@@ -79,57 +140,7 @@ function CloudArt(props: {
 	width: number
 	depth: number
 }) {
-	const cells = createMemo(() => {
-		const { width, depth } = props
-		// Puffs all along its top, a candyfloss-sized one every so often,
-		// big and small by turns; and smaller lumps along its underside.
-		const count = Math.max(2, Math.round(width / PUFF_EVERY))
-		const step = width / count
-		const puffs = Array.from({ length: count }, (_, i) => ({
-			x: step * (i + 0.5),
-			y: 6,
-			r: PUFF_SIZES[i % PUFF_SIZES.length],
-		}))
-		const lumps = Array.from({ length: count - 1 }, (_, i) => ({
-			x: step * (i + 1),
-			y: depth - 2,
-			r: 8,
-		}))
-		const over = Math.max(...puffs.map((p) => p.r - p.y))
-		const inBody = (x: number, y: number) => {
-			if (y < 0 || y > depth || x < 0 || x > width) return false
-			// Its ends, rounded off.
-			const cx = Math.min(Math.max(x, CLOUD_ROUND), width - CLOUD_ROUND)
-			const cy = Math.min(Math.max(y, CLOUD_ROUND), depth - CLOUD_ROUND)
-			return (x - cx) ** 2 + (y - cy) ** 2 <= CLOUD_ROUND ** 2
-		}
-		const puffAt = (x: number, y: number) =>
-			puffs.find((p) => (x - p.x) ** 2 + (y - p.y) ** 2 <= p.r ** 2)
-		const lumpAt = (x: number, y: number) =>
-			lumps.some((p) => (x - p.x) ** 2 + (y - p.y) ** 2 <= p.r ** 2)
-		const paths = { top: '', face: '', edge: '', shine: '' }
-		const C = CLOUD_CELL
-		for (let y = -Math.ceil(over / C) * C; y < depth + 8; y += C)
-			for (let x = 0; x < width; x += C) {
-				const mx = x + C / 2
-				const my = y + C / 2
-				const puff = puffAt(mx, my)
-				const lump = !puff && !inBody(mx, my) && lumpAt(mx, my)
-				if (!puff && !inBody(mx, my) && !lump) continue
-				const cell = `M${x},${y}h${C}v${C}h-${C}Z`
-				if (
-					puff &&
-					my < puff.y - puff.r * 0.4 &&
-					mx < puff.x - puff.r * 0.1 &&
-					mx > puff.x - puff.r * 0.6
-				)
-					paths.shine += cell
-				else if (my < 8 || (puff && my < puff.y)) paths.top += cell
-				else if (lump || my > depth - 6) paths.edge += cell
-				else paths.face += cell
-			}
-		return { ...paths, over: Math.ceil(over / C) * C }
-	})
+	const cells = createMemo(() => cloudCells(props.width, props.depth))
 	return (
 		<svg
 			width={props.width}
@@ -262,4 +273,101 @@ function RockShelf(props: {
 			</Show>
 		</div>
 	)
+}
+
+/** What a Draw Hook loads its pictures with: its `image(url)`. */
+type LoadImage = (
+	url: string,
+) => { image: CanvasImageSource; width: number; height: number } | undefined
+
+/**
+ * `PlatformArt`, painted in a Draw Hook: the same Platform, `width` by
+ * `depth`, from (0, 0) of `ctx`. Painted once and kept (see `cachedArt`),
+ * once the pictures it's painted with have loaded: till then, not at all,
+ * and the canvas is painted again as each arrives.
+ */
+export function platformPainter(
+	look: FullPlatformLook,
+	options: { solid?: boolean; width: number; depth: number },
+) {
+	const { width, depth } = options
+	const rock = look.cloud ? undefined : look.rock
+	const solid = !!options.solid
+	/** Its face's picture, if it's one; and the moss and drips on rock. */
+	const face = look.cloud ? undefined : backgroundImage(look.face)
+	const moss = rock && tufts(rock.moss)
+	const drip = rock && solid ? drips(rock.drip) : undefined
+	// How far it reaches out of its box: a cloud's puffs up over its top,
+	// a rock shelf's moss and its drips under it.
+	const cloud = look.cloud ? cloudCells(width, depth) : undefined
+	const over = cloud ? cloud.over : rock ? 4 : 0
+	const under = cloud ? 8 : drip ? 10 : 0
+	const key = `platform:${JSON.stringify(look)}:${solid}:${width}x${depth}`
+	const paint = (
+		c: CanvasRenderingContext2D,
+		pictures: Record<string, ReturnType<LoadImage>>,
+	) => {
+		c.imageSmoothingEnabled = false
+		c.translate(0, over)
+		if (cloud) {
+			const fills = [
+				[cloud.face, look.face],
+				[cloud.top, look.top],
+				[cloud.edge, look.edge],
+				[cloud.shine, '#ffffff'],
+			]
+			for (const [cells, fill] of fills) {
+				c.fillStyle = cssColour(fill)
+				c.fill(new Path2D(cells))
+			}
+			return
+		}
+		// Its face, inside its borders: 6 px of its top over it, 4 px of its
+		// edge under it.
+		const inside = { x: 0, y: 6, width, height: depth - 10 }
+		fillBackground(c, look.face, inside, face ? pictures[face] : undefined)
+		if (rock) {
+			// Darker the further down it goes, and at its far end; lit at its
+			// near one.
+			const shade = c.createLinearGradient(0, inside.y, 0, depth - 4)
+			shade.addColorStop(0.2, 'rgba(0, 0, 0, 0)')
+			shade.addColorStop(1, 'rgba(0, 0, 0, 0.32)')
+			c.fillStyle = shade
+			c.fillRect(inside.x, inside.y, inside.width, inside.height)
+			c.fillStyle = 'rgba(255, 255, 255, 0.07)'
+			c.fillRect(0, inside.y, 4, inside.height)
+			c.fillStyle = 'rgba(0, 0, 0, 0.28)'
+			c.fillRect(width - 4, inside.y, 4, inside.height)
+		}
+		c.fillStyle = cssColour(look.top)
+		c.fillRect(0, 0, width, 6)
+		c.fillStyle = cssColour(look.edge)
+		c.fillRect(0, depth - 4, width, 4)
+		if (!rock) return
+		c.fillStyle = rock.lit
+		c.fillRect(0, 0, width, 2)
+		const along = (url: string, x: number, y: number, w: number) => {
+			const picture = pictures[url]
+			if (!picture) return
+			fillBackground(
+				c,
+				`url("${url}")`,
+				{ x, y, width: w, height: picture.height },
+				picture,
+			)
+		}
+		if (moss) along(moss, 4, -4, width - 8)
+		if (drip) along(drip, 6, depth, width - 12)
+	}
+	return (ctx: CanvasRenderingContext2D, image: LoadImage) => {
+		const pictures: Record<string, ReturnType<LoadImage>> = {}
+		for (const url of [face, moss, drip]) {
+			if (!url) continue
+			pictures[url] = image(url)
+			if (!pictures[url]) return
+		}
+		const height = over + depth + under
+		const art = cachedArt(key, width, height, (c) => paint(c, pictures))
+		ctx.drawImage(art, 0, -over, width, height)
+	}
 }

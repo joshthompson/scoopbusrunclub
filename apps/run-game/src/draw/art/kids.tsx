@@ -1,6 +1,7 @@
 import { For, onCleanup, onMount } from 'solid-js'
 import { KIT } from '../../runners/looks'
 import { Pixels } from '../Pixels'
+import { cubicBezier } from '../paint/animation'
 
 /**
  * Children playing football on the track at Kristineberg: two or three of
@@ -90,12 +91,20 @@ const KEEPY_HEIGHT = 22
 const PASS_HEIGHT = 30
 /** Where the ball is kicked from: about knee height. */
 const FOOT_HEIGHT = 10
+/**
+ * How far the ball goes up out of the top of their box, at the top of a
+ * pass, for the Draw Hook's `drawReach`.
+ */
+export const KIDS_REACH = {
+	top:
+		FOOT_HEIGHT + Math.max(KEEPY_HEIGHT, PASS_HEIGHT) + BALL_SIZE - KIDS_HEIGHT,
+}
 /** How long a kicking leg stays up, either side of the kick. */
 const KICK_SECONDS = 0.09
 
-export function KidsArt(props: { count: number }) {
-	const { count } = props
-	const kids = Array.from({ length: count }, (_, i) => {
+/** A group of `count` children, each picked out at random, as they're drawn. */
+function kidsOf(count: number) {
+	return Array.from({ length: count }, (_, i) => {
 		const skin = pick(SKINS)
 		return {
 			skin,
@@ -107,13 +116,19 @@ export function KidsArt(props: { count: number }) {
 			facing: i % 2 === 0 ? 1 : -1,
 		}
 	})
-	/** Where the ball is at each child's foot: in front of them. */
-	const footX = (i: number) => {
-		const kid = kids[i]
-		return kid.facing === 1
-			? kid.left + 11 * CELL
-			: kid.left + KID_WIDTH - 11 * CELL - BALL_SIZE
-	}
+}
+
+/** Where the ball is at each child's foot: in front of them. */
+function footOf(kid: ReturnType<typeof kidsOf>[number]) {
+	return kid.facing === 1
+		? kid.left + 11 * CELL
+		: kid.left + KID_WIDTH - 11 * CELL - BALL_SIZE
+}
+
+export function KidsArt(props: { count: number }) {
+	const { count } = props
+	const kids = kidsOf(count)
+	const footX = (i: number) => footOf(kids[i])
 
 	let ball: HTMLDivElement | undefined
 	const legsUp: HTMLDivElement[] = []
@@ -253,4 +268,90 @@ export function KidsArt(props: { count: number }) {
 			</div>
 		</div>
 	)
+}
+
+const easeIn = cubicBezier(0.42, 0, 1, 1)
+const easeOut = cubicBezier(0, 0, 0.58, 1)
+
+/**
+ * `KidsArt`, painted in a Draw Hook: a group of `count`, picked out once,
+ * as the painter's made. Painted from (0, 0) of `ctx`, `seconds` into
+ * their game: where `KidsArt`'s animations are then, the ball on its way
+ * round and each child's leg up as they kick it.
+ */
+export function kidsPainter(count: number) {
+	const kids = kidsOf(count)
+	const duration = count * TURN_SECONDS
+	const turn = 1 / count
+	const window = KICK_SECONDS / duration
+	/** The ball's keyframes, as `KidsArt` has them: where it is, how high, and how it goes on from there. */
+	const frames: [
+		at: number,
+		x: number,
+		height: number,
+		timing: (t: number) => number,
+	][] = []
+	for (let i = 0; i < count; i++) {
+		const start = i * turn
+		const pass = start + turn * KEEPY_SHARE
+		const x = footOf(kids[i])
+		const next = footOf(kids[(i + 1) % count])
+		frames.push(
+			[start, x, FOOT_HEIGHT, easeOut],
+			[(start + pass) / 2, x, FOOT_HEIGHT + KEEPY_HEIGHT, easeIn],
+			[pass, x, FOOT_HEIGHT, easeOut],
+			[
+				(pass + start + turn) / 2,
+				(x + next) / 2,
+				FOOT_HEIGHT + PASS_HEIGHT,
+				easeIn,
+			],
+		)
+	}
+	frames.push([1, footOf(kids[0]), FOOT_HEIGHT, easeIn])
+	/** Whether child `i`'s leg is up, `progress` through the go round. */
+	const kicking = (i: number, progress: number) => {
+		const kicks = [i * turn, i * turn + turn * KEEPY_SHARE]
+		// The first child's first kick is at the very start: its lead-up is
+		// at the very end, before it comes round again.
+		if (i === 0 && progress >= 1 - window) return true
+		return kicks.some(
+			(kick) => progress >= kick - window && progress < kick + window,
+		)
+	}
+	const fill = (ctx: CanvasRenderingContext2D, cells: Cells) => {
+		for (const [x, y, w, h, colour] of cells) {
+			ctx.fillStyle = colour
+			ctx.fillRect(x, y, w, h)
+		}
+	}
+	return (ctx: CanvasRenderingContext2D, seconds: number) => {
+		const progress = (seconds % duration) / duration
+		kids.forEach((kid, i) => {
+			ctx.save()
+			ctx.translate(kid.left, 0)
+			if (kid.facing === -1) {
+				ctx.translate(KID_WIDTH, 0)
+				ctx.scale(-1, 1)
+			}
+			fill(ctx, kid.body)
+			fill(ctx, kicking(i, progress) ? kid.up : kid.down)
+			ctx.restore()
+		})
+		// The keyframe it's gone on from, eased as that one says, to the next.
+		const next = Math.max(
+			1,
+			frames.findIndex(([at]) => at > progress),
+		)
+		const [from, x0, y0, timing] = frames[next - 1]
+		const [to, x1, y1] = frames[next]
+		const t = timing((progress - from) / (to - from))
+		ctx.save()
+		ctx.translate(
+			x0 + (x1 - x0) * t,
+			KIDS_HEIGHT - BALL_SIZE - (y0 + (y1 - y0) * t),
+		)
+		fill(ctx, BALL)
+		ctx.restore()
+	}
 }

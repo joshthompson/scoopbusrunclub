@@ -3,13 +3,17 @@ import pumpkin2Asset from '@/assets/halloween/pumpkin2.png'
 import pumpkin3Asset from '@/assets/halloween/pumpkin3.png'
 import pumpkin4Asset from '@/assets/halloween/pumpkin4.png'
 import pumpkin5Asset from '@/assets/halloween/pumpkin5.png'
+import type { DrawPainting } from 'scoopjs'
 import { type JSX, Show } from 'solid-js'
 import {
 	type PixelRect,
 	paintedArt,
 	pixelArt,
 } from '../../courses/kit/pixelArt'
+import { TICK_MS } from '../../game/constants'
 import type { Hat, HatKind } from '../../game/hats'
+import { cachedArt } from '../canvasArt'
+import { paintPicture } from '../paint/picture'
 
 /**
  * The hats, as they're worn: each facing left, the way the run sprites do,
@@ -510,6 +514,22 @@ const BEAM = paintedArt(BEAM_CELLS, BEAM_ROWS, (x, y) => {
 })
 
 /**
+ * How far a hat on someone's head gets out of their box, at most, for
+ * their Draw Hook's `drawReach`: the miner's lamp's beam, out ahead of
+ * them, and up over their head, as does any hat's crown, a propeller
+ * beanie's propeller on top of it.
+ */
+export const WORN_HAT_REACH = {
+	left: BEAM_CELLS * CELL + MINER.middle,
+	top: Math.max(
+		BEAM_ROWS - 4 + MINER.crown,
+		...[...Object.values(ART), pumpkin()].map(
+			(art) => art.crown + (art === PROPELLER ? 3 * CELL : 0),
+		),
+	),
+}
+
+/**
  * A hat, `art` sized: on its own, or on a head. The miner's helmet with
  * its lamp's beam shining out ahead of it.
  */
@@ -575,6 +595,104 @@ export function HatPicture(props: {
 			/>
 		</div>
 	)
+}
+
+/** How long the propeller takes to turn round and back, in seconds: whirring, and not. */
+const PROPELLER_TURNS = 0.6
+const PROPELLER_WHIRS = 0.12
+/** How many steps it's drawn in, each half of a turn (`steps(6)`). */
+const PROPELLER_STEPS = 6
+
+/**
+ * How wide the propeller's blades are drawn, `seconds` in, as the
+ * `propeller` animation has them: from 1 across through edge on to -1,
+ * turned round, and back, in steps.
+ */
+function propellerAcross(seconds: number, whirring: boolean) {
+	const turn = whirring ? PROPELLER_WHIRS : PROPELLER_TURNS
+	const round = (seconds % turn) / turn
+	const half = round < 0.5 ? round * 2 : round * 2 - 1
+	const step = Math.floor(half * PROPELLER_STEPS) / PROPELLER_STEPS
+	return round < 0.5 ? 1 - 2 * step : -1 + 2 * step
+}
+
+/**
+ * `HatPicture`, in a Draw Hook: `hat` with its top left at `x`, `y`, its
+ * miner's lamp shining if it's `lit`, its propeller turning, `now` ticks in.
+ */
+export function paintHat(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	hat: Hat,
+	x: number,
+	y: number,
+	options: { lit?: boolean; whirring?: boolean; now: number },
+) {
+	const art = hatArt(hat)
+	if (options.lit && hat.kind === 'miner')
+		// Its lamp's beam, shining ahead.
+		paintPicture(
+			ctx,
+			image,
+			BEAM,
+			x - BEAM_CELLS * CELL,
+			y + 4 - BEAM_ROWS,
+			BEAM_CELLS * CELL,
+			BEAM_ROWS * CELL,
+		)
+	if (hat.kind === 'propeller') {
+		ctx.fillStyle = '#3a3a3a'
+		ctx.fillRect(x + 3.5 * CELL, y - 2 * CELL, CELL, 2 * CELL)
+		const across = propellerAcross(
+			(options.now * TICK_MS) / 1000,
+			!!options.whirring,
+		)
+		if (across !== 0) {
+			// Turned about its middle.
+			const middle = x - 0.5 * CELL + 4.5 * CELL
+			ctx.save()
+			ctx.translate(middle, 0)
+			ctx.scale(across, 1)
+			paintPicture(
+				ctx,
+				image,
+				BLADES,
+				-4.5 * CELL,
+				y - 3 * CELL,
+				9 * CELL,
+				CELL,
+			)
+			ctx.restore()
+		}
+	}
+	paintPicture(ctx, image, art.src, x, y, art.width, art.height)
+}
+
+/** How far the glow round a hat sat waiting reaches out past it, all round. */
+export const HAT_GLOW_OUT = 10
+
+/**
+ * The glow round a hat sat waiting, so it's plain it's there to have, in a
+ * Draw Hook, round a hat `width` by `height`: painted once, and kept.
+ */
+export function paintHatGlow(
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+) {
+	const w = width + HAT_GLOW_OUT * 2
+	const h = height + HAT_GLOW_OUT * 2
+	const glow = cachedArt(`hat-glow:${w}x${h}`, w, h, (art) => {
+		// An ellipse out to the middle of each side: a circle, stretched.
+		art.translate(w / 2, h / 2)
+		art.scale(w / 2, h / 2)
+		const fade = art.createRadialGradient(0, 0, 0, 0, 0, 1)
+		fade.addColorStop(0, 'rgba(255, 244, 190, 0.55)')
+		fade.addColorStop(1, 'rgba(255, 244, 190, 0)')
+		art.fillStyle = fade
+		art.fillRect(-1, -1, 2, 2)
+	})
+	ctx.drawImage(glow, -HAT_GLOW_OUT, -HAT_GLOW_OUT, w, h)
 }
 
 const styles = {

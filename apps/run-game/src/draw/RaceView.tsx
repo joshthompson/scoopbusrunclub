@@ -1,4 +1,4 @@
-import { Canvas, Scene } from 'scoopjs'
+import { CanvasRenderer, Scene } from 'scoopjs'
 import { type JSX, Show, createMemo } from 'solid-js'
 import { HEARTBEAT_DUB, beatAt } from '../game/body'
 import {
@@ -8,16 +8,19 @@ import {
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
 } from '../game/constants'
-import { DRAWN_FROM } from '../game/groundColumns'
 import { portalView } from '../game/portals'
 import { onScreen } from '../game/step'
 import type { World } from '../game/world'
-import { Backdrop, CaveCover, Ground, HorizonTrees } from './Backdrop'
-import { Fog } from './Fog'
+import { FrameMeter, showFrameMeter } from './FrameMeter'
 import { createLongJump } from './LongJump'
-import { SeaFront } from './Sea'
-import { Snow } from './Snow'
+import {
+	BEHIND_TYPES,
+	OVER_TYPES,
+	createBackdrop,
+	createWeather,
+} from './backdropControllers'
 import { createFootballSprite } from './football'
+import { createCaveCover, createSeaFront } from './frontControllers'
 import { createGiantMouth } from './giantMouth'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPortalFx } from './portalFx'
@@ -51,6 +54,13 @@ import {
 	createWarnings,
 } from './sprites'
 
+declare global {
+	interface Window {
+		/** The race on the screen, for `raceScene.canvasIssues()` in the console. */
+		raceScene?: Scene
+	}
+}
+
 /**
  * The scene a race is drawn on, with everything on the course in it: the
  * same for single player and a Round, which only has more runners. `step`
@@ -61,12 +71,10 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 		width: VIEW_WIDTH,
 		height: VIEW_HEIGHT,
 		frameRate: TICK_MS,
-		// The camera moves every tick, so it moves one layer rather than every
-		// sprite: about half the work a tick. Nothing here sits over the
-		// overlay, nor uses ScoopJS's parallax, which the layer would change.
-		cameraLayer: true,
 		// Front to back.
 		assetOrder: [
+			// Snow and fog over everything.
+			...OVER_TYPES,
 			// Counting everyone down, at the front, always in sight.
 			'run-director',
 			// Guard towers over a wall's walkway, and its parapet along the
@@ -126,6 +134,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			'bus-bore',
 			'platform',
 			'scenery',
+			// The Ground and the Backdrop behind it all.
+			...BEHIND_TYPES,
 		],
 		setup(scene) {
 			scene.addController(
@@ -174,16 +184,39 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...[...world.racers]
 					.reverse()
 					.map((racer) => createPlayer(world, racer)),
+				// The backdrop and the Ground, behind it all; a Cave's rock and the
+				// sea's waves, over everyone in them; and snow and fog, over it all.
+				...createBackdrop(world, scene),
+				...createCaveCover(world, scene),
+				...createSeaFront(world, scene),
+				...createWeather(world, scene),
 			)
 		},
 	})
-	// The engine scrolls the sprites' layer by the canvas's x. To a whole
-	// pixel, as the ground and the backdrop scroll: a layer moved by a
-	// fraction of one is drawn a pixel out from the ground under it.
-	const scroll = () => scene.canvas.get().setX(Math.round(world.camera()))
+	// The camera follows the world's, to a whole pixel, as the ground and the
+	// backdrop scroll: moved by a fraction of one, the sprites would be drawn
+	// a pixel out from the ground under them. It goes up and down too, and
+	// takes in more zoomed out: the canvas only paints what it sees.
+	const scroll = () => {
+		const camera = scene.canvas.get()
+		camera.setX(Math.round(world.camera()))
+		camera.setWidth(VIEW_WIDTH * world.zoom())
+		camera.setHeight(VIEW_HEIGHT * world.zoom())
+		camera.setY(cameraTop(world))
+	}
 	scroll()
 	scene.tickers.add(scroll)
+	window.raceScene = scene
 	return scene
+}
+
+/**
+ * The top of what the camera sees, in the scene: up and down with the
+ * world's camera, and more above it zoomed out, the ground staying put at
+ * the bottom of the screen.
+ */
+function cameraTop(world: World) {
+	return Math.round(world.cameraY()) + VIEW_HEIGHT * (1 - world.zoom())
 }
 
 /**
@@ -223,40 +256,20 @@ export function RaceCanvas(props: {
 			    of its gradient, so the join doesn't show. */}
 			<div style={styles.sky} />
 			<div style={portalStyle()}>
-				<Canvas
+				<CanvasRenderer
 					scene={props.scene}
+					// Every sprite's `image-rendering: pixelated`.
+					pixelated
 					// Looking up a mountain, the canvas goes right down off the
 					// screen, its scene still showing over the top of it.
 					runOffScreen
-					// Zoomed out to fit a Round's Players in, and looking up (or down)
-					// at them: everything on it goes, the backdrop putting itself back.
 					style={{
-						width: `${VIEW_WIDTH * zoom()}px`,
-						height: `${VIEW_HEIGHT}px`,
-						transform: `scale(${1 / zoom()}) translateY(${Math.round(-props.world.cameraY())}px)`,
-						'transform-origin': '0 100%',
-						overflow: 'visible',
+						// Its size is the camera's, which takes in more zoomed out
+						// (to fit a Round's Players in): shrunk back to fill the screen.
+						transform: `scale(${1 / zoom()})`,
+						'transform-origin': '0 0',
 						background: 'transparent',
 					}}
-					underlay={
-						<>
-							<Backdrop world={props.world} />
-							<HorizonTrees world={props.world} />
-							<Ground world={props.world} />
-						</>
-					}
-					// A Cave's rock over everyone in it, till someone racing goes in;
-					// the sea's waves over everyone in it.
-					overlay={
-						<>
-							<CaveCover world={props.world} />
-							<SeaFront
-								world={props.world}
-								from={DRAWN_FROM}
-								to={props.world.terrain.finishX + 1600}
-							/>
-						</>
-					}
 					loading={() => (
 						<div style={styles.loading}>Loading {props.world.course.name}…</div>
 					)}
@@ -267,16 +280,15 @@ export function RaceCanvas(props: {
 			<Show when={(portal()?.flash ?? 0) > 0}>
 				<div style={{ ...styles.flash, opacity: portal()?.flash }} />
 			</Show>
-			{/* Snow falling up a mountain, over the whole screen. */}
-			<Snow world={props.world} />
-			{/* Fog settled in, high up a mountain, and a bank of cloud to fall through. */}
-			<Fog world={props.world} />
 			{/* Paused, or between Rounds: the whole screen shaded, not just the
 			    canvas, which goes with the camera (see `styles.css`). */}
 			<Show when={props.scene.modal.get()}>
 				<div style={styles.shade} />
 			</Show>
 			{props.overlay}
+			<Show when={showFrameMeter}>
+				<FrameMeter />
+			</Show>
 		</div>
 	)
 }

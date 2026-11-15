@@ -332,10 +332,13 @@ const frames = () => {
 	return painted
 }
 
+/** Its picture, `now` ticks in, its body rippling. */
+export const dragonPicture = (now: number) => frames()[frameAt(now)]
+
 export function DragonArt(props: { now: number }) {
 	return (
 		<img
-			src={frames()[frameAt(props.now)]}
+			src={dragonPicture(props.now)}
 			alt=""
 			class="pixelated"
 			width={DRAGON_WIDTH}

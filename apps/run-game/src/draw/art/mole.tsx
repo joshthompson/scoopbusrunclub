@@ -1,6 +1,7 @@
 import type { JSX } from 'solid-js'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
 import { PixelArt } from '../PixelArt'
+import { inkOutline } from '../paint/picture'
 import type { CorgiPose } from './corgi'
 
 /**
@@ -99,14 +100,11 @@ const LEAP = pixelArt(COLUMNS, ROWS, [
 const ART: Record<CorgiPose, string> = { sit: SIT, crouch: CROUCH, leap: LEAP }
 
 /** An ink outline round it, as the corgi has, so it stands out against the rock. */
-const OUTLINE: JSX.CSSProperties = {
-	filter: [
-		'drop-shadow(2px 0 0 #120f14)',
-		'drop-shadow(-2px 0 0 #120f14)',
-		'drop-shadow(0 2px 0 #120f14)',
-		'drop-shadow(0 -2px 0 #120f14)',
-	].join(' '),
-}
+export const MOLE_OUTLINE = inkOutline('#120f14')
+const OUTLINE: JSX.CSSProperties = { filter: MOLE_OUTLINE.filter }
+
+/** Its picture in `pose`, for a Draw Hook to paint, outlined. */
+export const molePicture = (pose: CorgiPose) => ART[pose]
 
 export function MoleArt(props: { pose: CorgiPose }) {
 	return (

@@ -1,8 +1,8 @@
-import { For } from 'solid-js'
 import { pixelArt } from '../../courses/kit/pixelArt'
 import { RUNNER_SCALE } from '../../game/constants'
 import { touristSprite } from '../../runners/tourists'
-import { PixelArt } from '../PixelArt'
+import type { ImageOf } from '../paint/bands'
+import { paintPicture } from '../paint/picture'
 
 /**
  * Tourists stood about in the street: made up, as custom runners are, but
@@ -79,86 +79,93 @@ const chance = (x: number, i: number) => {
 export const touristAlong = (count: number, i: number) =>
 	i * TOURIST_SPACING + TOURIST_WIDTH / 2 - touristsWidth(count) / 2
 
-/**
- * A group of tourists, its feet on the path's middle, `TOURISTS_DEPTH_ROOM`
- * up from the drawing's bottom: each stood a little nearer or further back,
- * the nearer in front, and `drop` lower where the ground is, along from the
- * group's middle.
- */
-export function TouristsArt(props: {
-	x: number
-	count: number
-	drop?: (along: number) => number
-}) {
-	const tourists = Array.from({ length: props.count }, (_, i) => ({
-		sprite: touristSprite(1 + Math.floor(chance(props.x, i) * 1e6)),
-		facing: chance(props.x, i + 50) < 0.5 ? 1 : -1,
-		phone: chance(props.x, i + 90) < 0.5,
-		suitcase:
-			SUITCASES[Math.floor(chance(props.x, i + 170) * SUITCASES.length)],
+/** Who's in the group of `count` at `x`, and how they stand. */
+function touristsOf(
+	x: number,
+	count: number,
+	drop?: (along: number) => number,
+) {
+	return Array.from({ length: count }, (_, i) => ({
+		sprite: touristSprite(1 + Math.floor(chance(x, i) * 1e6)),
+		facing: chance(x, i + 50) < 0.5 ? 1 : -1,
+		phone: chance(x, i + 90) < 0.5,
+		suitcase: SUITCASES[Math.floor(chance(x, i + 170) * SUITCASES.length)],
 		/** Nearer (down the screen), or further back (up it). */
-		depth: Math.round(-FURTHER + chance(props.x, i + 130) * (NEARER + FURTHER)),
-		drop: props.drop?.(touristAlong(props.count, i)) ?? 0,
+		depth: Math.round(-FURTHER + chance(x, i + 130) * (NEARER + FURTHER)),
+		drop: drop?.(touristAlong(count, i)) ?? 0,
 	}))
-	return (
-		<div
-			style={{
-				position: 'relative',
-				height: `${TOURISTS_HEIGHT + TOURISTS_DEPTH_ROOM}px`,
-			}}
-		>
-			<For each={tourists}>
-				{(tourist, i) => {
-					const sprite = tourist.sprite
-					if (!sprite) return null
-					const width = sprite.width * RUNNER_SCALE
-					const height = sprite.height * RUNNER_SCALE
-					// Stood, or with a phone up: its frame, as the engine draws
-					// frames, the strip repeating along at the frame's offset.
-					const frame = sprite.frames[tourist.phone ? 1 : 0] ?? ''
-					const [src, at] = frame.split('#')
-					const [offset] = (at ?? '0').split(',').map(Number)
-					const bottom = `${TOURISTS_DEPTH_ROOM - tourist.depth - tourist.drop}px`
-					const z = tourist.depth + FURTHER
-					// Behind them, the way they're not facing: their right,
-					// facing left.
-					const middle = i() * TOURIST_SPACING + TOURIST_WIDTH / 2
-					const suitcaseAt =
-						middle - tourist.facing * SUITCASE_BESIDE - SUITCASE_WIDTH / 2
-					return (
-						<>
-							<div
-								style={{
-									position: 'absolute',
-									left: `${i() * TOURIST_SPACING}px`,
-									bottom,
-									'z-index': z,
-									width: `${width}px`,
-									height: `${height}px`,
-									background: `url("${src}") ${offset}px 0 / auto 100% repeat-x`,
-									'image-rendering': 'pixelated',
-									// Drawn facing left: turned round, to face right.
-									transform: tourist.facing === 1 ? 'scaleX(-1)' : undefined,
-								}}
-							/>
-							<div
-								style={{
-									position: 'absolute',
-									left: `${suitcaseAt}px`,
-									bottom,
-									'z-index': z,
-								}}
-							>
-								<PixelArt
-									src={tourist.suitcase}
-									width={SUITCASE_WIDTH}
-									height={SUITCASE_HEIGHT}
-								/>
-							</div>
-						</>
-					)
-				}}
-			</For>
-		</div>
-	)
+}
+
+/**
+ * A group of tourists, painted in a Draw Hook from (0, 0) of `ctx`, its
+ * feet on the path's middle, `TOURISTS_DEPTH_ROOM` up from the drawing's
+ * bottom: each stood a little nearer or further back, the nearer over the
+ * further back, and `drop` lower where the ground is, along from the
+ * group's middle. Who they are is worked out once, as the painter's made.
+ */
+export function touristsPainter(
+	x: number,
+	count: number,
+	drop?: (along: number) => number,
+) {
+	const height = TOURISTS_HEIGHT + TOURISTS_DEPTH_ROOM
+	type Piece = { z: number; paint: Paint }
+	type Paint = (ctx: CanvasRenderingContext2D, image: ImageOf) => void
+	const pieces = touristsOf(x, count, drop).flatMap((tourist, i): Piece[] => {
+		const { sprite } = tourist
+		if (!sprite) return []
+		const width = sprite.width * RUNNER_SCALE
+		const tall = sprite.height * RUNNER_SCALE
+		const frame = sprite.frames[tourist.phone ? 1 : 0] ?? ''
+		const [src, at] = frame.split('#')
+		const [offset] = (at ?? '0').split(',').map(Number)
+		// Their feet, and their suitcase's wheels, from the drawing's top.
+		const feet = height - TOURISTS_DEPTH_ROOM + tourist.depth + tourist.drop
+		const z = tourist.depth + FURTHER
+		const left = i * TOURIST_SPACING
+		const middle = left + TOURIST_WIDTH / 2
+		const suitcaseAt =
+			middle - tourist.facing * SUITCASE_BESIDE - SUITCASE_WIDTH / 2
+		const person: Paint = (ctx, image) => {
+			const strip = image(src)
+			if (!strip) return
+			ctx.save()
+			ctx.translate(left, feet - tall)
+			// Drawn facing left: turned round, to face right.
+			if (tourist.facing === 1) {
+				ctx.translate(width, 0)
+				ctx.scale(-1, 1)
+			}
+			ctx.beginPath()
+			ctx.rect(0, 0, width, tall)
+			ctx.clip()
+			// Their frame, as a background `offset` along, `auto 100%`,
+			// repeating along.
+			const tile = (strip.width * tall) / strip.height
+			let from = offset % tile
+			if (from > 0) from -= tile
+			for (let along = from; along < width; along += tile)
+				ctx.drawImage(strip.image, along, 0, tile, tall)
+			ctx.restore()
+		}
+		const suitcase: Paint = (ctx, image) =>
+			paintPicture(
+				ctx,
+				image,
+				tourist.suitcase,
+				suitcaseAt,
+				feet - SUITCASE_HEIGHT,
+				SUITCASE_WIDTH,
+				SUITCASE_HEIGHT,
+			)
+		return [
+			{ z, paint: person },
+			{ z, paint: suitcase },
+		]
+	})
+	// Nearer over further back, then in the order they come.
+	pieces.sort((a, b) => a.z - b.z)
+	return (ctx: CanvasRenderingContext2D, image: ImageOf) => {
+		for (const piece of pieces) piece.paint(ctx, image)
+	}
 }

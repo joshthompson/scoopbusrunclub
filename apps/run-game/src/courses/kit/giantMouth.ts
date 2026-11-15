@@ -42,9 +42,16 @@ function teeth(width: number, upper: boolean) {
 	return pixelArt(columns, 3, rects)
 }
 
-/** The inside of the mouth, behind its teeth: dark, darker at the back. */
 export const MOUTH_WIDTH = GIANT_FACE.width - LIPS_FRONT
-export const MOUTH_INSIDE = `linear-gradient(to right, ${INSIDE}, ${INSIDE} 60%, ${INSIDE_DEEP})`
+/**
+ * The inside of the mouth, behind its teeth, as a gradient's stops: dark,
+ * darker at the back, from 60% of the way back.
+ */
+export const MOUTH_INSIDE_STOPS: [number, string][] = [
+	[0, INSIDE],
+	[0.6, INSIDE],
+	[1, INSIDE_DEEP],
+]
 export const UPPER_TEETH = teeth(MOUTH_WIDTH - 8, true)
 export const LOWER_TEETH = teeth(MOUTH_WIDTH - 8, false)
 

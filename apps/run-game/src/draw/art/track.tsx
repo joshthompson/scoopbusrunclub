@@ -1,5 +1,8 @@
 import type { PotholeLook } from '../../courses/types'
+import { TICK_MS } from '../../game/constants'
 import { Pixels } from '../Pixels'
+import { cachedArt } from '../canvasArt'
+import { cubicBezier } from '../paint/animation'
 
 /**
  * A running track's hazards, as pixel art: a hurdle, standing or knocked
@@ -46,7 +49,8 @@ export const HURDLE_LANES = (() => {
 		const far = lines[i] + 3
 		return { far, near, middle: (far + near) / 2 }
 	})
-	const running = lanes.find((lane) => lane.far <= 0 && lane.near > 0)!
+	const running = lanes.find((lane) => lane.far <= 0 && lane.near > 0)
+	if (!running) throw new Error('No lane has the line everyone runs along')
 	return lanes.map((lane) => ({
 		depth: lane.near - lane.far,
 		sink: lane.near,
@@ -131,6 +135,81 @@ export function HurdleArt(props: { depth: number; tall?: boolean }) {
 	)
 }
 
+/** How long a hurdle takes to tip over, as `HurdleArt`'s `transition` does, and how. */
+const KNOCKS_MS = 120
+const easeIn = cubicBezier(0.42, 0, 1, 1)
+/** Knocked flat, as `--knocked` has it: slanted over this far, in degrees, and squashed this much. */
+const KNOCKED_SLANT = 78
+const KNOCKED_SQUASH = 0.8
+
+/**
+ * How far a knocked hurdle lies out past the right of its box, flat, for
+ * its Draw Hook's `drawReach`: its top, slanted over and squashed.
+ */
+export const hurdleReach = (depth: number, tall = false) => ({
+	right: Math.ceil(
+		hurdleSize(depth, tall).height *
+			(1 - KNOCKED_SQUASH) *
+			Math.tan((KNOCKED_SLANT * Math.PI) / 180),
+	),
+})
+
+/**
+ * `HurdleArt`, painted in a Draw Hook: a hurdle `depth` deep, from (0, 0) of
+ * `ctx`, tipped over as far as `knocked` says, 0 standing and 1 flat, as
+ * `--knocked` tips it. Its rects are painted once and kept.
+ */
+export function paintHurdle(
+	ctx: CanvasRenderingContext2D,
+	depth: number,
+	tall: boolean,
+	knocked: number,
+) {
+	const { width, height } = hurdleSize(depth, tall)
+	const art = cachedArt(`hurdle:${depth}:${tall}`, width, height, (art) => {
+		for (const [x, y, w, h, fill] of hurdleRects(depth, tall)) {
+			art.fillStyle = fill
+			art.fillRect(x, y, w, h)
+		}
+	})
+	if (knocked > 0) {
+		// From its bottom left, as its `transform-origin` says.
+		ctx.translate(0, height)
+		ctx.transform(
+			1,
+			0,
+			Math.tan((-KNOCKED_SLANT * knocked * Math.PI) / 180),
+			1,
+			0,
+			0,
+		)
+		ctx.scale(1, 1 - knocked * KNOCKED_SQUASH)
+		ctx.translate(0, -height)
+	}
+	ctx.drawImage(art, 0, 0, width, height)
+}
+
+/**
+ * How far over a hurdle is, for `paintHurdle`, tipping over in `KNOCKS_MS`
+ * once it's knocked, as `HurdleArt`'s transition has it; told each repaint
+ * whether it's `knocked` at tick `now`. One already over the first time
+ * it's painted is flat at once, gone over off the screen.
+ */
+export function hurdleTipping() {
+	let since: number | undefined
+	let seenStanding = false
+	return (knocked: boolean, now: number) => {
+		if (!knocked) {
+			since = undefined
+			seenStanding = true
+			return 0
+		}
+		if (!seenStanding) return 1
+		since ??= now
+		return easeIn(Math.min(1, ((now - since) * TICK_MS) / KNOCKS_MS))
+	}
+}
+
 /** A pothole's colours: in a running track's, unless its course says. */
 const TRACK_POTHOLE: Required<Pick<PotholeLook, 'rim' | 'hole' | 'deep'>> = {
 	rim: '#8f3a29',
@@ -144,36 +223,55 @@ const TRACK_POTHOLE: Required<Pick<PotholeLook, 'rim' | 'hole' | 'deep'>> = {
  * road, rain lying in its bottom.
  */
 export function PotholeArt(props: { width: number; look?: PotholeLook }) {
-	const w = props.width
-	const look = { ...TRACK_POTHOLE, ...props.look }
-	const at = (share: number) => Math.round(w * share)
 	return (
 		<Pixels
-			width={w}
+			width={props.width}
 			height={POTHOLE_HEIGHT}
-			rects={[
-				// The hole, ragged: narrower at its ends, its far wall in shadow.
-				[at(0.12), 1, w - at(0.24), 1, look.hole],
-				[2, 2, w - 4, 5, look.hole],
-				[0, 3, w, 3, look.hole],
-				[at(0.1), 7, w - at(0.2), 1, look.hole],
-				[at(0.08), 2, w - at(0.16), 2, look.deep],
-				// Its far rim, broken, catching the light.
-				[at(0.1), 0, at(0.3), 1, look.rim],
-				[at(0.48), 0, at(0.36), 1, look.rim],
-				// Rain lying in it, the sky in it.
-				...(look.water
-					? ([
-							[at(0.22), 5, at(0.48), 2, look.water],
-							[at(0.3), 5, at(0.16), 1, look.shine ?? look.water],
-						] as [number, number, number, number, string][])
-					: []),
-				// Its near lip, and crumbs of the surface about it.
-				[at(0.14), 8, w - at(0.28), 1, look.rim],
-				[1, 9, 3, 1, look.rim],
-				[at(0.58), 9, 3, 1, look.rim],
-				[w - 4, 9, 2, 1, look.rim],
-			]}
+			rects={potholeRects(props.width, props.look)}
 		/>
 	)
+}
+
+/** `PotholeArt`, painted in a Draw Hook, from (0, 0) of `ctx`. */
+export function paintPothole(
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	look?: PotholeLook,
+) {
+	for (const [x, y, w, h, fill] of potholeRects(width, look)) {
+		ctx.fillStyle = fill
+		ctx.fillRect(x, y, w, h)
+	}
+}
+
+/** A pothole `w` across, as rects. */
+function potholeRects(
+	w: number,
+	potholeLook?: PotholeLook,
+): [number, number, number, number, string][] {
+	const look = { ...TRACK_POTHOLE, ...potholeLook }
+	const at = (share: number) => Math.round(w * share)
+	return [
+		// The hole, ragged: narrower at its ends, its far wall in shadow.
+		[at(0.12), 1, w - at(0.24), 1, look.hole],
+		[2, 2, w - 4, 5, look.hole],
+		[0, 3, w, 3, look.hole],
+		[at(0.1), 7, w - at(0.2), 1, look.hole],
+		[at(0.08), 2, w - at(0.16), 2, look.deep],
+		// Its far rim, broken, catching the light.
+		[at(0.1), 0, at(0.3), 1, look.rim],
+		[at(0.48), 0, at(0.36), 1, look.rim],
+		// Rain lying in it, the sky in it.
+		...(look.water
+			? ([
+					[at(0.22), 5, at(0.48), 2, look.water],
+					[at(0.3), 5, at(0.16), 1, look.shine ?? look.water],
+				] as [number, number, number, number, string][])
+			: []),
+		// Its near lip, and crumbs of the surface about it.
+		[at(0.14), 8, w - at(0.28), 1, look.rim],
+		[1, 9, 3, 1, look.rim],
+		[at(0.58), 9, 3, 1, look.rim],
+		[w - 4, 9, 2, 1, look.rim],
+	]
 }

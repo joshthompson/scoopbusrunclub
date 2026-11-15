@@ -183,6 +183,9 @@ const ART: Record<FikaItem, string> = {
 	vitamin,
 }
 
+/** A fika item's picture, for a Draw Hook to draw at its size (see `FIKA_SIZE`). */
+export const fikaPicture = (item: FikaItem) => ART[item]
+
 /** A fika item, at its size. */
 export function FikaArt(props: { item: FikaItem }) {
 	return (

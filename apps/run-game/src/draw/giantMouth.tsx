@@ -7,7 +7,7 @@ import {
 	JAW_FROM,
 	LIPS_FRONT,
 	LOWER_TEETH,
-	MOUTH_INSIDE,
+	MOUTH_INSIDE_STOPS,
 	MOUTH_WIDTH,
 	UPPER_TEETH,
 	tongue,
@@ -27,6 +27,9 @@ import type { World } from '../game/world'
 const OPENING = 0.06
 /** How far its jaw's cells are: 4 px, as the face's. */
 const CELL = 4
+/** How tall its teeth are, top and bottom, and how far in from its top the top ones are. */
+const TEETH = 12
+const TEETH_DOWN = 4
 
 export function createGiantMouth(world: World) {
 	const mouth = world.course.look?.mouth
@@ -43,6 +46,8 @@ export function createGiantMouth(world: World) {
 		)
 	const jawTop = face.y + JAW_FROM
 	const drop = () => Math.round((open() * JAW_DROP) / CELL) * CELL
+	/** How much of the tongue, from its tip, is still back in the mouth, in %. */
+	const hidden = () => Math.round(Math.max(0, 1 - open() * 1.2) * 100)
 	return [
 		// The inside of the mouth, its teeth top and bottom, between its lips.
 		createController({
@@ -53,34 +58,25 @@ export function createGiantMouth(world: World) {
 				y: () => jawTop - 4,
 				width: () => MOUTH_WIDTH,
 				height: () => drop() + 4,
-				children: () => (
-					<div
-						style={{
-							position: 'absolute',
-							inset: 0,
-							background: MOUTH_INSIDE,
-							visibility: open() > 0.02 ? 'visible' : 'hidden',
-						}}
-					>
-						<img
-							src={UPPER_TEETH}
-							alt=""
-							class="pixelated"
-							width={MOUTH_WIDTH - 8}
-							height={12}
-							style={{ position: 'absolute', left: '4px', top: '4px' }}
-						/>
-						<img
-							src={LOWER_TEETH}
-							alt=""
-							class="pixelated"
-							width={MOUTH_WIDTH - 8}
-							height={12}
-							style={{ position: 'absolute', left: '8px', bottom: '0px' }}
-						/>
-					</div>
-				),
 			}),
+			draw: ({ ctx, image }) => {
+				if (open() <= 0.02) return
+				const height = drop() + 4
+				const inside = ctx.createLinearGradient(0, 0, MOUTH_WIDTH, 0)
+				for (const [at, colour] of MOUTH_INSIDE_STOPS)
+					inside.addColorStop(at, colour)
+				ctx.fillStyle = inside
+				ctx.fillRect(0, 0, MOUTH_WIDTH, height)
+				const upper = image(UPPER_TEETH)
+				if (upper)
+					ctx.drawImage(upper.image, 4, TEETH_DOWN, MOUTH_WIDTH - 8, TEETH)
+				const lower = image(LOWER_TEETH)
+				if (lower)
+					ctx.drawImage(lower.image, 8, height - TEETH, MOUTH_WIDTH - 8, TEETH)
+			},
+			// Only just open, 4 px tall, its teeth stick out of it, the top
+			// ones down past its bottom and the bottom ones up past its top.
+			drawReach: { top: TEETH - 4, bottom: TEETH_DOWN + TEETH - 4 },
 			// Opening and shutting, by who's near: the same on every screen.
 			onEnterFrame: () => {
 				const target = wanted() ? 1 : 0
@@ -103,20 +99,12 @@ export function createGiantMouth(world: World) {
 				width: () => GIANT_FACE.width,
 				height: () =>
 					(GIANT_FACE.height * (900 - JAW_FROM)) / GIANT_FACE.height,
-				children: () => (
-					<img
-						src={JAW}
-						alt=""
-						class="pixelated"
-						width={GIANT_FACE.width}
-						height={900 - JAW_FROM}
-						style={{
-							display: 'block',
-							visibility: open() > 0.02 ? 'visible' : 'hidden',
-						}}
-					/>
-				),
 			}),
+			draw: ({ ctx, image }) => {
+				const jaw = image(JAW)
+				if (jaw && open() > 0.02)
+					ctx.drawImage(jaw.image, 0, 0, GIANT_FACE.width, 900 - JAW_FROM)
+			},
 		}),
 		// Its tongue, rolling out of it, over the bench: from its tip, out of
 		// sight back in the mouth till it's open.
@@ -128,20 +116,16 @@ export function createGiantMouth(world: World) {
 				y: () => art.top,
 				width: () => art.width,
 				height: () => art.height,
-				children: () => (
-					<img
-						src={art.asset}
-						alt=""
-						class="pixelated"
-						width={art.width}
-						height={art.height}
-						style={{
-							display: 'block',
-							'clip-path': `inset(0 0 0 ${Math.round(Math.max(0, 1 - open() * 1.2) * 100)}%)`,
-						}}
-					/>
-				),
 			}),
+			draw: ({ ctx, image }) => {
+				const picture = image(art.asset)
+				if (!picture || hidden() >= 100) return
+				const from = (art.width * hidden()) / 100
+				ctx.beginPath()
+				ctx.rect(from, 0, art.width - from, art.height)
+				ctx.clip()
+				ctx.drawImage(picture.image, 0, 0, art.width, art.height)
+			},
 		}),
 	]
 }
