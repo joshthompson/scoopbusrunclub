@@ -297,19 +297,22 @@ const building: Cave = {
 			? 900
 			: undefined,
 	features: [
-		// Over the way in: its canopy, and its name.
-		{
+		// Over the way in: its canopy, and its name. On the inside, and on its
+		// cover too, the same, over it: the cover starts a little way in, and
+		// would hide the right end of it till someone's inside.
+		...[false, true].map((outside) => ({
 			asset: ENTRANCE_ART.asset,
 			x: ENTRANCE + 60,
 			width: ENTRANCE_ART.width,
 			height: ENTRANCE_ART.height,
-			on: 'behind',
+			on: 'behind' as const,
 			sink: behind(
 				ENTRANCE + 60,
 				ENTRANCE_ART.height,
 				G0 - 170 - ENTRANCE_ART.height,
 			),
-		},
+			outside,
+		})),
 		// The escalators' sides, up, and back down.
 		{
 			asset: ESCALATOR_UP.asset,
@@ -438,10 +441,8 @@ const OBSTACLES: Obstacle[] = [
 	{ kind: 'rock', x: 4040 },
 	// The lab.
 	{ kind: 'rock', x: 4900 },
-	// Shrunk: crumbs on the bench, and Germs.
-	{ kind: 'rock', x: 7150 },
+	// Shrunk: Germs on the bench.
 	germ(7450),
-	{ kind: 'rock', x: 7700 },
 	germ(7930),
 	// Up the nose: hairs, snot, a Germ.
 	{ kind: 'rock', x: 8720 },
@@ -730,7 +731,7 @@ const LAID_OUT = withHat(
 
 export const karolinska: CourseDefinition = {
 	id: 'karolinska',
-	name: 'Karolinska',
+	name: 'The Hospital',
 	blurb:
 		'Into the hospital and up to the lab, where a shrink ray makes you tiny: up a giant’s tongue, and on through them, nose, lungs, heart and all, till they sneeze you out.',
 	terrain,

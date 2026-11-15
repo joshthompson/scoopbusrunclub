@@ -17,6 +17,10 @@ export interface Playable {
 	custom?: CustomRunner
 	/** A bonus runner, found on a course and unlocked (see `BONUS_RUNNERS`). */
 	bonus?: boolean
+	/** A bonus runner's: what unlocks them, said when it does. */
+	unlockedBy?: string
+	/** White all over, so lost on a light card: shown on a dark one, on the select screen. */
+	darkCard?: boolean
 	/** The look they're made from, if they're made from one: a custom runner's, or a guest's. */
 	look?: CharacterSpriteProps
 	sprite: {
@@ -41,6 +45,12 @@ export interface Playable {
 		skiTuck?: string
 		/** Their face, as the website's celebrations show it. */
 		face?: string
+		/**
+		 * How far over they're turned, lying along under a glider, in degrees:
+		 * head first, as everyone is, if not said. Link, on all fours, hangs
+		 * under it as he is.
+		 */
+		glideLean?: number
 		/** One frame's size, in the sprite's own pixels. */
 		width: number
 		height: number
@@ -97,6 +107,25 @@ const MEMBER_SKI_TUCKS = byMember(
 	}),
 )
 
+/** Members turned some other way on a glider, lying under it (see `glideLean`). */
+const MEMBER_GLIDE_LEANS: Partial<Record<RunnerName, number>> = {
+	// A dog: already lying along, on all fours.
+	link: 0,
+}
+
+/**
+ * Members locked at first, as bonus runners are, until something unlocks
+ * them: what does, said when it does. Still out on the courses with the
+ * pack, locked or not; just not yours to run as yet.
+ */
+const MEMBER_UNLOCKS: Partial<Record<RunnerName, string>> = {
+	// A dog: yours once you've ridden one.
+	link: 'Rode a corgi',
+}
+
+/** Link's runner id: unlocked by riding a corgi (see `MEMBER_UNLOCKS`). */
+export const LINK_ID = 'member:link'
+
 /** Members who can play: everyone with a run and a duck (their sit sprite). */
 export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 	.filter((member) => {
@@ -112,6 +141,7 @@ export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 			id: `member:${member}`,
 			name: runner.name,
 			member,
+			unlockedBy: MEMBER_UNLOCKS[member],
 			sprite: {
 				run: runner.frames.run ?? [],
 				sit: runner.frames.sit?.[0],
@@ -121,11 +151,20 @@ export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 				skiTuck: MEMBER_SKI_TUCKS[member] ?? poses?.skiTuck,
 				snowboard: MEMBER_SNOWBOARDS[member] ?? poses?.snowboard,
 				face: runner.frames.face?.[0],
+				glideLean: MEMBER_GLIDE_LEANS[member],
 				width: runner.width,
 				height: runner.height,
 			},
 		}
 	})
+
+/** The club, by name: every member but those to unlock, everyone's to run as. */
+export const CLUB = MEMBERS.filter((m) => !m.unlockedBy).sort((a, b) =>
+	a.name.localeCompare(b.name),
+)
+
+/** The members to unlock (see `MEMBER_UNLOCKS`), with the bonus runners. */
+export const LOCKED_MEMBERS = MEMBERS.filter((m) => m.unlockedBy)
 
 /** Drawing a custom runner's sprites is canvas work, so each look is only drawn once. */
 const drawn = new Map<string, ReturnType<typeof createRunnerFrames>>()

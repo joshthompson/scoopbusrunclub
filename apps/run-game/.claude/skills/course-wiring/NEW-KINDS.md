@@ -8,7 +8,7 @@ Nearly every kind below comes with new art: draw it with the `pixel-art` skill.
 
 ## Fika item
 
-Newest: `butterTea`.
+Newest: `hotDog` (Midnattsloppet's).
 
 - `FikaItem` union, `FIKA_SIZE`, and the course's `<NAME>_FIKA` list in `game/fika.ts`
 - its art drawn in the course's `courses/kit/<course>Fika.ts`, and listed in `ART`, `draw/art/fika.tsx`
@@ -17,7 +17,7 @@ Newest: `butterTea`.
 
 ## Hat
 
-Newest: `bobbleHat`.
+Newest: `discoBall`.
 
 - `HatKind` union, and its line in the comment list above it, in `game/hats.ts`
 - `HAT_RULES` (speed, whether it falls off or takes a knock)
@@ -28,7 +28,7 @@ Newest: `bobbleHat`.
 
 ## Ride or flyer
 
-Newest: `'goat'` (ride), `'condor'` (flyer).
+Newest: `'skateboard'` (ride, with `RideLook`'s `runInto`, `stood` and `trick`), `'condor'` (flyer).
 
 - the `ride` or `flyer` union on `Course` in `courses/types.ts`, and its doc comment listing which course has which
 - `draw/rideLook.ts` (ride) or `draw/flyerLook.ts` (flyer), with its art in `draw/art/<name>.tsx`
@@ -50,7 +50,7 @@ Newest: `'cone'` (obstacle), `'gate'` (boost).
 
 ## Look field
 
-Newest: `battlements`.
+Newest: `gate` (a shower in place of a slalom gate), and Midnattsloppet's `pyro`, `searchlights` and `smoke` (`draw/nightRace.ts`).
 
 - an optional field on `CourseLook` in `courses/types.ts`, doc-commented with the course that uses it
 - drawn in `draw/Backdrop.tsx`, `draw/RaceView.tsx` or `draw/sprites.tsx`, whichever layer it belongs in (behind the runners, the ground, or in front)

@@ -18,8 +18,9 @@ import type { World } from '../game/world'
  * A giant's mouth, in its face (see `CourseLook['mouth']`): shut, till
  * anyone racing gets near; then its jaw drops, the dark inside of it and
  * its teeth showing, and its tongue rolls out, down over the edge of the
- * bench, for them to run up. Snapped shut again, behind them, the moment
- * nobody's still on their way in. Behind everyone, over the face: the
+ * bench, for them to run up. The moment nobody's still on their way in,
+ * its tongue whips back in, and then it snaps shut behind them. Behind
+ * everyone, over the face: the
  * Ground's tongue under it is what's run on, there all along, and drawn by
  * this, not the Ground.
  */
@@ -27,6 +28,12 @@ import type { World } from '../game/world'
 /** How quickly it opens, and shuts, a share of the way a tick: shutting much quicker. */
 const OPENING = 0.12
 const SHUTTING = 0.25
+/**
+ * How quickly its tongue rolls back in, done with, a share of all of it a
+ * tick: all the way in, in a third of a second, before the mouth starts to
+ * shut. Slow enough to see: its tip's off the screen, behind, by then.
+ */
+const TONGUE_IN = 0.05
 /** How far on in past its inside someone still keeps it open: just in. */
 const IN_PAST = 40
 /** How far its jaw's cells are: 4 px, as the face's. */
@@ -43,6 +50,8 @@ export function createGiantMouth(world: World) {
 	const lips = face.x + LIPS_FRONT
 	const art = tongue(inside - tip, (x) => terrain.groundY(tip + x))
 	const [open, setOpen] = createSignal(0)
+	/** How much of the tongue is out of the mouth, 0 to 1. */
+	const [out, setOut] = createSignal(0)
 	/** Open, or opening: anyone racing near, and not yet on in past it. */
 	const wanted = () =>
 		world.racers.some(
@@ -52,7 +61,7 @@ export function createGiantMouth(world: World) {
 	const jawTop = face.y + JAW_FROM
 	const drop = () => Math.round((open() * JAW_DROP) / CELL) * CELL
 	/** How much of the tongue, from its tip, is still back in the mouth, in %. */
-	const hidden = () => Math.round(Math.max(0, 1 - open() * 1.2) * 100)
+	const hidden = () => Math.round((1 - out()) * 100)
 	return [
 		// The inside of the mouth, its teeth top and bottom, between its lips.
 		createController({
@@ -83,8 +92,11 @@ export function createGiantMouth(world: World) {
 			// ones down past its bottom and the bottom ones up past its top.
 			drawReach: { top: TEETH - 4, bottom: TEETH_DOWN + TEETH - 4 },
 			// Opening and shutting, by who's near: the same on every screen.
+			// Opening, its tongue rolls out as its jaw drops; done with, its
+			// tongue's back in first, its jaw held open till it is.
 			onEnterFrame: () => {
-				const target = wanted() ? 1 : 0
+				const wants = wanted()
+				const target = wants || out() > 0 ? 1 : 0
 				const now = open()
 				if (now !== target)
 					setOpen(
@@ -92,6 +104,13 @@ export function createGiantMouth(world: World) {
 							? target
 							: now + (target - now) * (target ? OPENING : SHUTTING),
 					)
+				// Out no further than its jaw's down, and back out again, if
+				// someone else comes along as it's going in, no quicker than in.
+				setOut(
+					wants
+						? Math.min(1, open() * 1.2, out() + TONGUE_IN)
+						: Math.max(0, out() - TONGUE_IN),
+				)
 			},
 		}),
 		// Its jaw, its chin and lower lip, dropping.

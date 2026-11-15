@@ -1,4 +1,3 @@
-import moon from '@/assets/background/moon8.png'
 import batAsset from '@/assets/halloween/bat.png'
 import ghost1 from '@/assets/halloween/ghost1.png'
 import ghost2 from '@/assets/halloween/ghost2.png'
@@ -17,6 +16,8 @@ import purpleSignHalloween from '../assets/signs/purple-sign-halloween.png'
 import { START_X } from '../game/constants'
 import { HALLOWEEN_FIKA } from '../game/fika'
 import { type Gap, createTerrain } from '../game/terrain'
+import { SKELETON } from '../runners/bonus'
+import { fullMoon } from './kit/fullMoon'
 import { seeded } from './kit/seeded'
 import type {
 	Boost,
@@ -116,6 +117,13 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		const progress = (x - START_X) / terrain.length
 		x += 380 + random() * (520 - progress * 260)
 	}
+	// Not the last Pumpkin: it was so near the line, past the last Zombie,
+	// that finishing in one (the special goal) was hardly a challenge.
+	for (let i = boosts.length - 1; i >= 0; i--)
+		if (boosts[i].kind === 'pumpkin') {
+			boosts.splice(i, 1)
+			break
+		}
 
 	// Zombies, every so often, more the further round: their own random
 	// numbers, so the rest stays where it is. Where they rise: they walk
@@ -200,10 +208,12 @@ export const halloweenTown: CourseDefinition = {
 	blurb:
 		'Under a blood moon: open graves, Zombies coming at you, and Pumpkins to wear.',
 	terrain,
-	// Over the line with a Pumpkin still on: one knock smashes it off.
+	// Over the line with a Pumpkin still on: one knock smashes it off. And
+	// with that, the Skeleton's yours to run as.
 	special: {
 		goal: 'Finish wearing a pumpkin',
 		done: (run) => run.finished && run.hat === 'pumpkin',
+		unlocks: SKELETON.id,
 	},
 	runDirectors: ['august', 'keith'],
 	cheerers: CHEERERS,
@@ -228,8 +238,8 @@ export const halloweenTown: CourseDefinition = {
 			'brightness(0.24) saturate(0.6) hue-rotate(260deg)',
 			'brightness(0.42) saturate(0.45)',
 		],
-		// A blood moon, glowing.
-		sunAsset: moon,
+		// A blood moon, full, glowing.
+		sunAsset: fullMoon,
 		sunScale: 2,
 		sun: 'brightness(0.62) sepia(1) saturate(9) hue-rotate(-42deg) drop-shadow(0 0 10px #ff2a12)',
 		clouds: 'brightness(0.3) saturate(0.5)',

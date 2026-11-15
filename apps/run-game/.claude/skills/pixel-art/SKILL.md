@@ -48,6 +48,7 @@ Facing below means the direction the source art faces.
 | Type | Where | Size and specifics |
 |---|---|---|
 | **Runners** (members) | `apps/web/src/assets/runners/<member>/` | 23×29 a frame, facing left; `run.png` is 4 frames (92×29). The website uses the same art. A new pose (like `ski/`, `board/`, `stand/` in `src/assets`) needs one PNG per member, plus a version built from the custom-runner template for custom runners and guests (`runners/skiPoses.ts` shows how) |
+| **Runners** (bonus: the Yeti, Bat Person) | `src/assets/runners/<who>/` | PNGs, a pixel a cell, facing left, like the members': `run.png` is a strip of 23×29 frames (6, like the members; the count goes in `runFrames`), then `stand`, `sit`, `ski`, `ski-tuck`, `snowboard` (if they have one) and `face`. Wired up in `runners/bonus.ts`. Kept as PNGs, not code: a runner's tilted on slopes and gliders, and code art's rects show hairline seams when turned |
 | **Hats** | `draw/art/hats.tsx` | Facing left, like the runners. Small: about 8–12 × 4–8 cells. Each needs `crown` (how far down it sits over the head) and `middle` |
 | **Fika** | `courses/kit/<course>Fika.ts` | About 8–14 × 7–14 cells; its size goes in `FIKA_SIZE` as cells × `CELL`. Wrappers, plates and steam make it read |
 | **Rides** | `draw/art/<ride>.tsx` | Facing right, poses `sit`/`crouch`/`leap` (`CorgiPose`), plus exported heights for its back and saddle. Big enough to carry a runner: the goat is 26×24 cells |

@@ -14,9 +14,11 @@ import chimney3 from '../assets/rooftop/chimney-3.png'
 import chimney4 from '../assets/rooftop/chimney-4.png'
 import dish from '../assets/rooftop/dish.png'
 import waterTower from '../assets/rooftop/water-tower.png'
-import { GROUND_Y, START_X } from '../game/constants'
+import { GROUND_Y, PATH_BACK, START_X } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { type Block, createRooftops } from '../game/terrain'
+import { BAT_PERSON } from '../runners/bonus'
+import { JIB, JIB_LEFT, JIB_TOP, towerCrane } from './kit/craneArt'
 import { withHat } from './kit/hats'
 import { seeded } from './kit/seeded'
 import { swing } from './kit/swing'
@@ -162,6 +164,122 @@ function plan(): Plan {
 const { blocks, platforms } = plan()
 const terrain = createRooftops(blocks, DISTANCE_M)
 
+/** How far the hideout's lift goes up, over its roof. */
+const HIDEOUT_RISE = 420
+/** How long it takes to go up and back down again: half that, up. */
+const HIDEOUT_LIFT_TICKS = 160
+/** How long someone has to stand on it for it to go: longer than running across it takes. */
+const HIDEOUT_LIFT_WAIT = 24
+/** Its walkway's girders, along, and the gap before each but the first, and how much higher each is. */
+const WALKWAY = [
+	{ width: 240, gap: 0, up: 0 },
+	{ width: 240, gap: 80, up: 30 },
+	{ width: 260, gap: 90, up: -10 },
+	{ width: 220, gap: 70, up: 20 },
+	{ width: 260, gap: 80, up: 0 },
+]
+/** How far over the walkway the cranes' jibs are, its girders hung from them. */
+const JIB_OVER = 70
+/** How far back a crane stands on its roof. */
+const CRANE_SET_BACK = 8
+/** A crane's picture: half its width, and how far right of its middle its mast is. */
+const CRANE_HALF = towerCrane(1).width
+const CRANE_OFF_MIDDLE = (JIB_LEFT - towerCrane(1).width / 2) * 2
+
+/**
+ * Bat Person's hideout: a girder on a crane, on a long flat roof a little
+ * under halfway round, where there's nothing to climb, so it looks no use;
+ * but stand on it and it waits no more: up it goes, over the roofs, to a row
+ * of girders hung off the cranes up there, a hop from one to the next, and at the end of them, him,
+ * waiting to be found. Off the end, it's a drop back down onto a roof.
+ */
+const HIDEOUT = (() => {
+	const after = START_X + (FINISH_X - START_X) * 0.45
+	const free = (b: Block) =>
+		!platforms.some(
+			(p) =>
+				p.x < b.to + 120 &&
+				p.x + p.width + Math.max(0, p.move?.x ?? 0) > b.from - 120,
+		)
+	const roof = blocks.find(
+		(b) => b.from > after && b.to - b.from >= 560 && free(b),
+	)
+	if (!roof) return undefined
+	const liftX = roof.from + 220
+	const lift: PlatformDefinition = {
+		x: liftX,
+		width: GIRDER,
+		height: 16,
+		// Waiting for whoever gets to it, to go up: not swinging up and down
+		// on its own, to be caught just right with the bus behind.
+		move: {
+			y: HIDEOUT_RISE,
+			ticks: HIDEOUT_LIFT_TICKS,
+			waits: HIDEOUT_LIFT_WAIT,
+		},
+	}
+	const deck = terrain.groundY(liftX) - 16 - HIDEOUT_RISE
+	const walkway: PlatformDefinition[] = []
+	let x = liftX + GIRDER
+	let level = deck
+	for (const girder of WALKWAY) {
+		x += girder.gap
+		level -= girder.up
+		walkway.push({
+			x,
+			width: girder.width,
+			height: terrain.groundY(x) - level,
+			// Hung off a crane, still: its cable up to it.
+			move: { y: 0, ticks: 600 },
+		})
+		x += girder.width
+	}
+	// The last one out over a roof, a good way in: off its end, down onto it.
+	const last = walkway[walkway.length - 1]
+	const overRoof = (at: number) =>
+		blocks.some((b) => at > b.from + 60 && at + 160 < b.to)
+	while (!overRoof(last.x + last.width) && last.width < 700) {
+		last.width += 20
+	}
+	const end = last.x + last.width
+	return {
+		platforms: [lift, ...walkway],
+		found: {
+			runner: BAT_PERSON.id,
+			x: end - 50,
+			y: terrain.groundY(last.x) - last.height,
+		},
+		// Cranes on the roofs behind, each wholly on one roof, its jib out
+		// over the walkway, just over a girder, and reaching over its cable,
+		// which it hangs from.
+		cranes: walkway.flatMap((girder) => {
+			const cable = girder.x + girder.width / 2
+			const jibTop = terrain.groundY(girder.x) - girder.height - JIB_OVER
+			for (
+				let mast = cable + JIB_LEFT * 2 - 12;
+				mast >= cable - 30;
+				mast -= 10
+			) {
+				const middle = mast - CRANE_OFF_MIDDLE
+				if (
+					!blocks.some(
+						(b) => middle - CRANE_HALF > b.from && middle + CRANE_HALF < b.to,
+					)
+				)
+					continue
+				const foot = terrain.groundY(middle) - PATH_BACK - CRANE_SET_BACK
+				const art = towerCrane(
+					Math.max(40, Math.round((foot - jibTop) / 2) - JIB),
+				)
+				girder.hook = foot - art.height * 2 + (JIB_TOP + JIB) * 2
+				return [{ x: Math.round(middle), art }]
+			}
+			return []
+		}),
+	}
+})()
+if (HIDEOUT) platforms.push(...HIDEOUT.platforms)
+
 /** Room kept clear at either end of a roof, for jumping off it and landing. */
 const EDGE_ROOM = 160
 
@@ -174,6 +292,12 @@ const clear = (x: number) =>
 
 /** How far short of a higher roof's wall a Steam Vent is, to be fired up onto it from. */
 const STEAM_SHORT = 80
+/**
+ * Past a Steam Vent, where you come down on the roof it fires you onto, and
+ * where you've found your feet again after: nothing to jump between the two.
+ */
+const STEAM_LANDS = 300
+const STEAM_CLEAR = 750
 
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	const random = seeded(2501)
@@ -217,6 +341,25 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		if ([...obstacles, ...boosts].some((o) => Math.abs(o.x - x) < 90)) continue
 		obstacles.push({ kind: 'steam', x })
 	}
+	// Nothing to jump just where a Steam Vent lands you, still going fast
+	// from it: on past there, once you've found your feet. (Anything under
+	// the way you fly is fine: you're over it.)
+	for (const steam of obstacles.filter((o) => o.kind === 'steam')) {
+		for (const o of obstacles) {
+			if (o.kind === 'steam') continue
+			if (o.x < steam.x + STEAM_LANDS || o.x >= steam.x + STEAM_CLEAR) continue
+			let x = steam.x + STEAM_CLEAR
+			while (
+				x < terrain.finishX - 500 &&
+				(!clear(x) ||
+					[...obstacles, ...boosts].some(
+						(p) => p !== o && Math.abs(p.x - x) < 200,
+					))
+			)
+				x += 40
+			o.x = x
+		}
+	}
 	obstacles.sort((a, b) => a.x - b.x)
 
 	// What's on a city's roofs: aerials, water tanks, chimneys, dishes. Only
@@ -239,6 +382,15 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			setBack: -ON_ROOF,
 		})
 	}
+	// The cranes over the hideout, each stood on a roof behind.
+	for (const crane of HIDEOUT?.cranes ?? [])
+		scenery.push({
+			x: crane.x,
+			asset: crane.art.asset,
+			scale: 2,
+			setBack: CRANE_SET_BACK,
+			onFloor: true,
+		})
 	return { obstacles, boosts, scenery }
 }
 
@@ -278,6 +430,11 @@ export const cityRooftop: CourseDefinition = {
 		'Roof to roof over the city: drops, high walls, and girders swinging off cranes. The hardest one.',
 	terrain,
 	platforms,
+	found: HIDEOUT?.found,
+	special: {
+		goal: 'Find Bat Person',
+		done: (run) => !!run.metFound,
+	},
 	runDirectors: ['josh', 'eline'],
 	cheerers: CHEERERS,
 	look: {

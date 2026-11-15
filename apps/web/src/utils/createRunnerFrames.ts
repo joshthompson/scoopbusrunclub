@@ -36,6 +36,9 @@ export interface CharacterSpriteProps {
 			| 'ponytail'
 			| 'bun'
 			| 'curly'
+			| 'mohawk'
+			| 'afro'
+			| 'mullet'
 		hairColor?: HexColor
 		accessory?: 'cap' | 'headband' | 'glasses'
 		accessoryColor?: HexColor
@@ -272,20 +275,42 @@ function parseTemplate(template: string): string[][] {
 		.map((line) => line.trim().split(''))
 }
 
-function compositeLayer(base: string[][], overlay: string[][]): void {
-	for (let y = 0; y < base.length; y++) {
-		for (let x = 0; x < base[y].length; x++) {
-			const char = overlay[y]?.[x]
-			if (char && char !== '.') {
-				base[y][x] = char
+/** Lay `overlay` over `base`, its top row on `base`'s row `top`. */
+function compositeLayer(base: string[][], overlay: string[][], top = 0): void {
+	for (let y = 0; y < overlay.length; y++) {
+		for (let x = 0; x < overlay[y].length; x++) {
+			const char = overlay[y][x]
+			if (char !== '.' && base[top + y]?.[x] !== undefined) {
+				base[top + y][x] = char
 			}
 		}
 	}
 }
 
-function generateHeadImageData(character: CharacterSpriteProps): ImageData {
-	const grid = parseTemplate(HEAD.base)
+/**
+ * How many rows a look's hair stands up above the head: a style taller than
+ * `HEAD.base` (a mohawk, an afro) has its extra rows on top of it.
+ */
+function hairRise(character: CharacterSpriteProps): number {
+	const { hair } = character.head
+	if (!hair) return 0
+	return Math.max(
+		0,
+		parseTemplate(HEAD.hair[hair]).length - parseTemplate(HEAD.base).length,
+	)
+}
 
+/**
+ * The head as a look wears it: `HEAD.base`, its hair, facial hair and
+ * accessory over it, and room on top for hair that stands up above it.
+ */
+function headGrid(character: CharacterSpriteProps): string[][] {
+	const base = parseTemplate(HEAD.base)
+	const rise = hairRise(character)
+	const grid = [
+		...Array.from({ length: rise }, () => base[0].map(() => '.')),
+		...base,
+	]
 	if (character.head.hair) {
 		compositeLayer(grid, parseTemplate(HEAD.hair[character.head.hair]))
 	}
@@ -293,11 +318,21 @@ function generateHeadImageData(character: CharacterSpriteProps): ImageData {
 		compositeLayer(
 			grid,
 			parseTemplate(HEAD.facialHair[character.head.facialHair]),
+			rise,
 		)
 	}
 	if (character.head.accessory) {
-		compositeLayer(grid, parseTemplate(HEAD.extra[character.head.accessory]))
+		compositeLayer(
+			grid,
+			parseTemplate(HEAD.extra[character.head.accessory]),
+			rise,
+		)
 	}
+	return grid
+}
+
+function generateHeadImageData(character: CharacterSpriteProps): ImageData {
+	const grid = headGrid(character)
 
 	const height = grid.length
 	const width = grid[0].length
@@ -360,20 +395,7 @@ function generateHeadImageData(character: CharacterSpriteProps): ImageData {
 }
 
 function generateFaceFrame(character: CharacterSpriteProps): string[] {
-	const grid = parseTemplate(HEAD.base)
-
-	if (character.head.hair) {
-		compositeLayer(grid, parseTemplate(HEAD.hair[character.head.hair]))
-	}
-	if (character.head.facialHair) {
-		compositeLayer(
-			grid,
-			parseTemplate(HEAD.facialHair[character.head.facialHair]),
-		)
-	}
-	if (character.head.accessory) {
-		compositeLayer(grid, parseTemplate(HEAD.extra[character.head.accessory]))
-	}
+	const grid = headGrid(character)
 
 	// Find the last row that isn't all neck/connection/transparent
 	let lastVisibleRow = 0
@@ -474,7 +496,8 @@ function flipImageData(image: ImageData) {
 
 /**
  * The middle of the face in `HEAD.base`, which is where anything worn on the
- * head is centred.
+ * head is centred: as many rows further down as the hair stands up above it
+ * (`hairRise`).
  */
 const HEAD_FACE_CENTRE: Vector = { x: 4, y: 3 }
 
@@ -674,7 +697,8 @@ export function generateCustomSpriteFrames(
 				headExtensionAboveSprite +
 				spriteRedPixels[0].y -
 				headRedPixel.y +
-				HEAD_FACE_CENTRE.y,
+				HEAD_FACE_CENTRE.y +
+				hairRise(character),
 		},
 	}
 }
@@ -704,6 +728,9 @@ function skinColor(skin: SkinColor): HexColor {
  * A - ACCESSORY (e.g. hat)
  * B - Beard
  * x - Neck connection point
+ *
+ * A hair style taller than `base` stands up above the head: its extra rows
+ * go on top (see `hairRise`), and the sprite's that much taller.
  */
 
 const HEAD = {
@@ -787,6 +814,45 @@ const HEAD = {
       .........
       .........
       .........
+    `,
+		// Shaved at the sides, a crest from the forehead back over the top,
+		// standing up in spikes above the head.
+		mohawk: `
+      ....H.H..
+      ...HHHHH.
+      ...HHHH..
+      .....HH..
+      .....H...
+      .........
+      .........
+      .........
+      .........
+      .........
+    `,
+		// Big and round, out all round the head and up above it.
+		afro: `
+      ..HHHHH..
+      .HHHHHHH.
+      .HHHHHHHH
+      .H...HHHH
+      .....HHHH
+      .....HHHH
+      .....HHH.
+      .........
+      .........
+      .........
+    `,
+		// Short on top and round the ears, long at the back: thicker as it
+		// goes, down over the neck and out over the shoulders.
+		mullet: `
+      ...HH....
+      ..HHHH...
+      .....H...
+      .....HH..
+      .....HHH.
+      .....HHH.
+      ....HHHH.
+      .....HHHH
     `,
 	},
 	facialHair: {

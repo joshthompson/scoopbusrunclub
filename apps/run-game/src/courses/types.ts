@@ -274,6 +274,39 @@ export interface CourseLook {
 	}
 	/** What's in its Secret's cavern, if it has one (see `Secret`). */
 	secret?: SecretLook
+	/**
+	 * A picture in place of the slalom gate, `width` by `height`, and what
+	 * they're called, going through them: a shower over the road, at a
+	 * night race, spraying runners as they go under it. Still a gate, for a
+	 * boost, once each. `front`, the same size, over whoever's going
+	 * through; `word`, what pops up, rather than "Gate!".
+	 */
+	gate?: {
+		/** Its frames, shown in turn, every `frameTicks`: one, if it's still. */
+		asset: string[]
+		front?: string[]
+		frameTicks?: number
+		width: number
+		height: number
+		name: string
+		word: string
+	}
+	/**
+	 * Pyrotechnics, on a start line at each `x` (where its banner is): a
+	 * cannon either side of the road, just off its edges, firing fireballs
+	 * up into the air on "Go!", as at a big city race's start.
+	 */
+	pyro?: number[]
+	/**
+	 * Searchlights, each on a trailer at the road's far edge `at` each x,
+	 * sweeping the sky, in turn each of `colours`: Midnattsloppet's.
+	 */
+	searchlights?: { at: number[]; colours: string[] }
+	/**
+	 * Smoke machines, at each `x`: smoke billowing out of them, low over the
+	 * road, drifting back across it, and lit by whatever light's on it.
+	 */
+	smoke?: number[]
 	/** A bouncer's picture, in place of the toadstool (see `bouncers`): an air sac in a lung. */
 	bouncer?: { asset: string; width: number; height: number }
 	/**
@@ -443,32 +476,11 @@ export interface CourseLook {
 	 */
 	voyage?: { from: number; horizon: NonNullable<CourseLook['horizon']> }[]
 	/**
-	 * A bridge the course ends on, from `from` on: over water, its underside
-	 * this colour, the water in front of it and behind.
+	 * Bridges the path goes over, one after another along it, each over its
+	 * own water: see `BridgeLook`. Gamla Stan's, over to Helgeandsholmen,
+	 * off it, and out over Guldbron at the end.
 	 */
-	bridge?: {
-		from: number
-		/** Where it ends, on land again. */
-		to: number
-		/** Its side, the top of its side catching the light, and its underbelly, in shadow. */
-		underside: string
-		highlight: string
-		underbelly: string
-		water: string
-		rail: string
-		/**
-		 * The quay wall at its ends, where the water meets the land, facing
-		 * the water: drawn as at the far end, and turned round at the near one.
-		 */
-		quay?: string
-		/**
-		 * Open water, out to the horizon, all along the course, under
-		 * whatever's across it: no quay along its far side.
-		 */
-		open?: boolean
-		/** The quay's stone under the path before it too, not only past it: a quay at either end. */
-		stoneBefore?: boolean
-	}
+	bridges?: BridgeLook[]
 	/**
 	 * A rainbow the path goes up and over, `from` to `to`: its bands under
 	 * the path, nothing under it but the field, its ground `base` there.
@@ -774,6 +786,14 @@ export interface PlatformDefinition {
 		ticks: number
 		/** How far through its swing it is at tick 0, out of 1. */
 		phase?: number
+		/**
+		 * A lift that waits: still, where it's written, till a Player's stood
+		 * on it this many ticks (not just run across it), then out and back
+		 * the once, and waiting again (see `setOffPlatforms`). No `phase`.
+		 */
+		waits?: number
+		/** When a lift that `waits` was set off, if it's on its way: a race's own (see `racePlatforms`). */
+		since?: number
 	}
 	/** How deep it's drawn, if not its course's Platforms' depth: a terrace, down to the ground. */
 	depth?: number
@@ -786,15 +806,71 @@ export interface PlatformDefinition {
 	 * A picture in place of the slab, `width` by `height`, its top `top` px
 	 * down from the picture's: a little ferry, its deck to stand on.
 	 */
-	art?: { asset: string; width: number; height: number; top: number }
+	art?: {
+		asset: string
+		width: number
+		height: number
+		top: number
+		/** Its near side, the same size, in front of whoever's on it: a rope bridge's handrail. */
+		front?: string
+	}
 	/**
 	 * A guard tower's roof (see `towerRoof`): drawn as the tower is, not as a
 	 * Platform. Up on one, off a dragon, is the Great Wall's special goal.
 	 */
 	tower?: boolean
+	/**
+	 * How high its cable hangs from, if it's on one: a crane's jib. Up out
+	 * of sight, if not said.
+	 */
+	hook?: number
+	/**
+	 * A rope bridge: it sags under whoever's on it, `give` px with one in its
+	 * middle, and springs back, bouncing (see `ropeBridge`). Its `art`, and
+	 * its `art.front`, are bent to it as it does. One that `breaks` snaps
+	 * under a Player who's jumped on it that many times running: its two
+	 * halves swing down to hang from the banks, the Player hanging on to the
+	 * end of one (see `breakBridge`). Not in a Round.
+	 */
+	rope?: { give: number; breaks?: number }
+	/** A rope bridge that's snapped, where, and when: a race's own (see `racePlatforms`). */
+	broken?: { x: number; at: number }
 }
 
 /** Scenery along the course: a tree, a shrub, a flower, or a furby. */
+/**
+ * A bridge, from `from` to `to`: over water, its underside this colour,
+ * the water in front of it and behind.
+ */
+export interface BridgeLook {
+	from: number
+	/** Where it ends, on land again. */
+	to: number
+	/** Its side, the top of its side catching the light, and its underbelly, in shadow. */
+	underside: string
+	highlight: string
+	underbelly: string
+	water: string
+	rail: string
+	/**
+	 * The quay wall at its ends, where the water meets the land, facing
+	 * the water: drawn as at the far end, and turned round at the near one.
+	 */
+	quay?: string
+	/**
+	 * Open water, out to the horizon, all along the course, under
+	 * whatever's across it: no quay along its far side.
+	 */
+	open?: boolean
+	/** The quay's stone under the path before it too, not only past it: a quay at either end. */
+	stoneBefore?: boolean
+	/**
+	 * Where the quay's stone under the path past it stops, if it does: at
+	 * the next bridge, off an island. It goes on to the end if not.
+	 */
+	stoneUntil?: number
+}
+
 export interface Scenery {
 	x: number
 	asset: string
@@ -804,6 +880,13 @@ export interface Scenery {
 	filter?: string
 	/** Hops on the spot now and then. */
 	hops?: boolean
+	/**
+	 * Animated: these pictures in turn, each for `frameTicks`, by the race's
+	 * tick, so the same on every screen; `asset` its first, and its size.
+	 * A band playing.
+	 */
+	frames?: string[]
+	frameTicks?: number
 	/**
 	 * How far back from the path it stands, up the field behind it, if not
 	 * the usual: a crystal on a Cave's floor, with no field, stands right
@@ -855,6 +938,7 @@ export type CourseId =
 	| 'everest'
 	| 'slopes'
 	| 'karolinska'
+	| 'midnattsloppet'
 
 /**
  * A Portal: a machine that shrinks everyone down, or a sneeze that blows
@@ -903,6 +987,27 @@ export interface Course {
 	scenery: Scenery[]
 	/** How many of the Pacers are skeletons, out of 1: on Halloween Town. */
 	skeletons?: number
+	/**
+	 * Everyone in the pack in the race's own T-shirt, this colour, as at
+	 * Midnattsloppet, where everyone runs in the same one. Anyone made from
+	 * a look wears it; club members drawn by hand, in their own kit, stay
+	 * home.
+	 */
+	raceShirt?: string
+	/**
+	 * How many Pacers are out at once, `x` along, if not the usual
+	 * (`PACK_SIZE`): a big city race's crowd, thick at the start. As many
+	 * line up at the start.
+	 */
+	crowd?: (x: number) => number
+	/**
+	 * Its tune in other versions, the same tune played on other
+	 * instruments, each from `from` along (where the runner is, in the
+	 * camera's view) till the next: a rock band's, past a rock band, and a
+	 * choir's, up to a church. Each fades into the next mid-tune, in step,
+	 * as the bars go by. Before the first, the course's own (see `TUNES`).
+	 */
+	tunes?: { from: number; tune: string }[]
 	/** Guard towers over the walkway, where they stand: see `createTower`. */
 	towers?: number[]
 	/**
@@ -959,6 +1064,12 @@ export interface Course {
 		 * with the flow, faster than running, over everything in the way.
 		 */
 		| 'bloodCell'
+		/**
+		 * At Midnattsloppet, skateboards, lying on the road: step on at a
+		 * run and ride it, stood up, faster than running. Jump, and it
+		 * kickflips under you.
+		 */
+		| 'skateboard'
 	/** Its Portals, a shrink and then a grow, in order along it: see `Portal`. */
 	portals?: Portal[]
 	/**
@@ -1024,6 +1135,13 @@ export interface Course {
 	leap?: { edge: number; catchAt: number; land: number }
 	/** A Secret: a way down one of its Gaps into a cavern under it. See `Secret`. */
 	secret?: Secret
+	/**
+	 * A bonus runner, stood somewhere hard to get to, waiting to be found:
+	 * get to them, and the first time, they're yours to run as (see
+	 * `BONUS_RUNNERS`). Bat Person, up on the girders over City Rooftop.
+	 * By their runner id, at `x`, their feet at `y`.
+	 */
+	found?: { runner: string; x: number; y: number }
 	/** A mine, with mine carts to ride: see `Mine`. */
 	mine?: Mine
 	/**
@@ -1075,7 +1193,8 @@ export interface Secret {
 /**
  * What's in a Secret's cavern, drawn: on Everest, the Yetis' den. Its
  * `furnishings` stand against its back wall, `x` along the course their
- * middles: sofas, by which of its `sofas`, tellies and lamps. And whoever's
+ * middles: sofas, by which of its `sofas`, tellies and lamps; or hang on
+ * it, up over them: its portrait. And whoever's
  * at its far end, to throw you out, its `launcher`: facing left, the way
  * you come, `kneel`ing, waiting, `hands` where you run into, from the
  * picture's top left; and `thrown`, while you're on your way up. All in
@@ -1085,6 +1204,8 @@ export interface SecretLook {
 	sofas: { asset: string; width: number; height: number }[]
 	telly: { frames: [string, string]; width: number; height: number }
 	lamp: { asset: string; width: number; height: number }
+	/** A picture to hang on its back wall, up over its furniture: the family portrait. */
+	portrait: { asset: string; width: number; height: number }
 	launcher: {
 		kneel: string
 		thrown: string
@@ -1093,7 +1214,11 @@ export interface SecretLook {
 		thrownHeight: number
 		hands: { x: number; y: number }
 	}
-	furnishings: { x: number; kind: 'sofa' | 'telly' | 'lamp'; which?: number }[]
+	furnishings: {
+		x: number
+		kind: 'sofa' | 'telly' | 'lamp' | 'portrait'
+		which?: number
+	}[]
 }
 
 export interface Mine {
@@ -1154,6 +1279,8 @@ export interface Hut {
 export interface SpecialGoal {
 	goal: string
 	done: (run: SpecialRun) => boolean
+	/** A bonus runner it unlocks, by runner id, the first time it's done (see `BONUS_RUNNERS`). */
+	unlocks?: string
 }
 
 /** What a go at a course did, for its special goal to be judged by. */
@@ -1174,6 +1301,10 @@ export interface SpecialRun {
 	germsPopped?: number
 	/** Been down the course's Secret, and back out of it. */
 	foundSecret?: boolean
+	/** Got to the course's hidden bonus runner (see `Course['found']`). */
+	metFound?: boolean
+	/** Jumped on a rope bridge till it broke under them. */
+	brokeBridge?: boolean
 }
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */

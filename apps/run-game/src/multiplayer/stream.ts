@@ -1,5 +1,6 @@
 import type { CartState } from '../game/carts'
 import { hatCode } from '../game/hats'
+import { waitingLifts } from '../game/platforms'
 import {
 	type CorgiState,
 	type FlyerState,
@@ -55,7 +56,8 @@ export const pacerIntro = (p: Pacer): PacerIntro => ({
 	name: p.name,
 	member: p.member,
 	guest: p.guest,
-	look: p.guest || p.member || p.skeleton ? undefined : p.look,
+	// Anyone with a look of their own, a member too, in a race's T-shirt.
+	look: p.skeleton ? undefined : p.look,
 	skeleton: p.skeleton || undefined,
 })
 
@@ -198,6 +200,9 @@ export function createRaceStream(
 							c.spin,
 						]),
 					}
+				: {}),
+			...(waitingLifts(world).length
+				? { lifts: waitingLifts(world).map((p) => p.move?.since ?? -1) }
 				: {}),
 			...(world.ball
 				? {

@@ -9,9 +9,14 @@ import {
 	touchControls,
 	unpackControls,
 } from '../input'
-import { bonusRunner, unlockedBonusRunners } from '../runners/bonus'
+import { bonusRunner, unlockedRunners } from '../runners/bonus'
 import { type CustomRunner, customRunners } from '../runners/customRunners'
-import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
+import {
+	CLUB,
+	MEMBERS,
+	type Playable,
+	customPlayable,
+} from '../runners/playable'
 import {
 	APP_ID,
 	type GameMode,
@@ -82,18 +87,14 @@ export const LOST_SEAT_MS = 60_000
 const VIEW_EVERY_MS = 250
 
 /**
- * The Host's own custom runners, then the bonus runners unlocked here, then
- * every member: who a Local Player can be.
+ * The Host's own custom runners, then anyone unlocked here, then the club:
+ * who a Local Player can be.
  */
 export const localCharacters = (): Playable[] => [
 	...customRunners().map(customPlayable).reverse(),
-	...unlockedBonusRunners(),
-	...MEMBERS_BY_NAME,
+	...unlockedRunners(),
+	...CLUB,
 ]
-
-export const MEMBERS_BY_NAME = [...MEMBERS].sort((a, b) =>
-	a.name.localeCompare(b.name),
-)
 
 /** Who a seat's Player runs as, if they've picked. */
 export function seatPlayable(seat: Seat): Playable | undefined {
@@ -131,6 +132,8 @@ export function createRoom(code: string) {
 	const [seats, setSeats] = createStore<Seat[]>([])
 	const [stage, setStage] = createSignal<RoomStage>('lobby')
 	const [paused, setPaused] = createSignal(false)
+	/** A Round on its start screen: its Starter's Player number (see `PadView`). */
+	const [waitingForStarter, setWaitingForStarter] = createSignal<number>()
 	const [course, setCourse] = createSignal('')
 	/** How each seat's doing in the Round, for their phone: the Party says. */
 	let statusOf: (
@@ -459,6 +462,7 @@ export function createRoom(code: string) {
 			of: round?.of,
 			points: seat.points,
 			paused: paused(),
+			waitingForStarter: waitingForStarter(),
 			course: course(),
 			roomMode: lobby().roomMode,
 			gameMode: lobby().gameMode,
@@ -520,6 +524,10 @@ export function createRoom(code: string) {
 		paused,
 		setPaused(next: boolean) {
 			setPaused(next)
+			tellPhones()
+		},
+		setWaitingForStarter(number: number | undefined) {
+			setWaitingForStarter(number)
 			tellPhones()
 		},
 		course,

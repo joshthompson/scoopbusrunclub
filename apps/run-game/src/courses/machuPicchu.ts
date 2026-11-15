@@ -1,5 +1,11 @@
 import type { RunnerName } from '@/data/runners'
-import { PATH_BACK, PATH_FRONT, START_X, VERGE } from '../game/constants'
+import {
+	PATH_BACK,
+	PATH_FRONT,
+	SCENERY_SET_BACK,
+	START_X,
+	VERGE,
+} from '../game/constants'
 import { type Gap, type Terrain, withGaps } from '../game/terrain'
 import { withHat } from './kit/hats'
 import {
@@ -315,6 +321,9 @@ const HOUSE = 62
 /** Patallacta: terraces up the hillside, Inca Cola on top. */
 const PATALLACTA = flight(X(1760), 3, 50)
 
+/** How many jumps running on the rope bridge it takes, before it snaps. */
+const BRIDGE_BREAKS = 3
+
 /** The rope bridge over the gorge: level with the path, still holding. */
 const BRIDGE_ART = ropeBridgeArt(GORGE.to - GORGE.from)
 const BRIDGE: PlatformDefinition = {
@@ -324,6 +333,9 @@ const BRIDGE: PlatformDefinition = {
 	// Solid: duck on it and you slide along it, not down through it.
 	solid: 6,
 	art: BRIDGE_ART,
+	// It gives under you, and bounces; jump on it five times running and it
+	// snaps, Machu Picchu's special goal.
+	rope: { give: 14, breaks: BRIDGE_BREAKS },
 }
 
 /**
@@ -526,6 +538,41 @@ function busy(along: number) {
 	return false
 }
 
+/**
+ * A low branch's tree, either side of its `x`: from where its limb crosses
+ * the path, `BRANCH_BEHIND` back, to its far side. As `BRANCH_CROSS` and
+ * `BRANCH_TREE_WIDTH` in the drawing.
+ */
+const BRANCH_BEHIND = 70
+const BRANCH_WIDTH = 190
+/** How far along a low branch is moved, at most, to somewhere level. */
+const BRANCH_SETTLE = 700
+
+/**
+ * Each low branch's tree only where the trail's level under it. It's sheared
+ * to the slope under it, so up the stone stairs its crown leans and its trunk
+ * stands up off the path; moved along to the nearest level spot, clear of
+ * everything else, or a rock in its place.
+ */
+function settleBranches(obstacles: Obstacle[]) {
+	const half = BRANCH_WIDTH / 2
+	const middle = (x: number) => x - BRANCH_BEHIND + half
+	obstacles.forEach((o, i) => {
+		if (o.kind !== 'branch' || level(middle(o.x), half)) return
+		const free = (x: number) =>
+			level(middle(x), half) &&
+			!busy(x - START_X) &&
+			!obstacles.some((p) => p !== o && Math.abs(p.x - x) < 300)
+		for (let d = 10; d <= BRANCH_SETTLE; d += 10)
+			for (const x of [o.x + d, o.x - d])
+				if (free(x)) {
+					o.x = x
+					return
+				}
+		obstacles[i] = { kind: 'rock', x: o.x }
+	})
+}
+
 /** The citadel's doorways, across the path, between its houses. */
 const DOORWAYS = [15000, 15245, 16260]
 
@@ -587,6 +634,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			member: CHEERERS[Math.floor(random() * CHEERERS.length)],
 		}
 	}
+	settleBranches(obstacles)
 	boosts.push(...highCans())
 	// Everyone out cheering at the Sun Gate, and in the plaza.
 	boosts.push(cheer(X(SUN_GATE + 300)), cheer(X(16500)))
@@ -624,6 +672,21 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 	const out: Scenery[] = []
 	const taken = (x: number, room: number) =>
 		out.some((s) => !s.front && Math.abs(s.x - x) < room)
+	/**
+	 * Whether `piece`, stood further back than something already there and
+	 * overlapping it, would be drawn over it: scenery's drawn in order, so
+	 * it'd hang in the air in front of what's nearer, like a bush over a sign.
+	 */
+	const overNearer = (piece: Scenery) => {
+		const back = (s: Scenery) => s.setBack ?? SCENERY_SET_BACK
+		const half = (s: Scenery) => (artWidth(s.asset) * (s.scale ?? 2)) / 2
+		return out.some(
+			(s) =>
+				!s.front &&
+				back(s) < back(piece) &&
+				Math.abs(s.x - piece.x) < half(s) + half(piece),
+		)
+	}
 	/** Clear of tourists, so they aren't hidden behind it, and of the platforms' walls. */
 	const clearOf = (x: number) =>
 		!obstacles.some((o) => o.kind === 'tourists' && Math.abs(o.x - x) < 60) &&
@@ -685,14 +748,6 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 	add({ x: X(2500), asset: thatchedHouse }, true)
 	add({ x: X(8480), asset: thatchedHouse }, true)
 	add({ x: X(8600), asset: ruinWall(40, 18, 291) }, true)
-	// The rope bridge's near side, its handrail and posts, over whoever's on it.
-	out.push({
-		x: (GORGE.from + GORGE.to) / 2,
-		asset: BRIDGE_ART.front,
-		scale: 2,
-		setBack: BRIDGE_ART.top - PATH_BACK - BRIDGE_ART.height,
-		front: true,
-	})
 	// What's left of the bridges over the ravines, and the cliff path's
 	// gap, hanging down either side.
 	for (const gap of [BREAK, ...RAVINES]) {
@@ -720,7 +775,10 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 		setBack: -CLIFF_DEPTH * 2 - PATH_BACK - PATH_FRONT,
 	})
 
-	// Along the way: each part of it its own.
+	// Along the way: each part of it its own. Never over what's nearer.
+	const place = (piece: Scenery) => {
+		if (!overNearer(piece)) add(piece)
+	}
 	for (let x = -300; x < FINISH + 900; x += 90 + random() * 170) {
 		const along = x - START_X
 		if (taken(x, 70) || !clearOf(x)) continue
@@ -730,28 +788,28 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 		const zone = zoneOf(along)
 		const roll = random()
 		if (zone === 'trail') {
-			if (roll < 0.34) add({ x, asset: mossTree })
-			else if (roll < 0.62) add({ x, asset: treeFern })
-			else if (roll < 0.84) add({ x, asset: orchids })
+			if (roll < 0.34) place({ x, asset: mossTree })
+			else if (roll < 0.62) place({ x, asset: treeFern })
+			else if (roll < 0.84) place({ x, asset: orchids })
 			else if (roll < 0.94)
-				add({
+				place({
 					x,
 					asset: ruinWall(28 + Math.floor(random() * 20), 12, Math.floor(x)),
 				})
 		} else if (zone === 'citadel') {
 			if (roll < 0.4)
-				add({
+				place({
 					x,
 					asset: citadelHouse(40 + Math.floor(random() * 30), Math.floor(x)),
 				})
-			else if (roll < 0.62) add({ x, asset: terraceSteps })
-			else if (roll < 0.74) add({ x, asset: orchids })
+			else if (roll < 0.62) place({ x, asset: terraceSteps })
+			else if (roll < 0.74) place({ x, asset: orchids })
 		} else {
 			if (along < LAND - 300) continue
 			// Not in front of the train.
 			if (along > TRAIN - 140 && along < TRAIN + 3 * 186 + 40) continue
 			if (roll < 0.36)
-				add({
+				place({
 					x,
 					asset: townHouse(
 						['#e8b04a', '#d96a4a', '#5aa6c8', '#e8e0cf', '#8bc06a'][
@@ -760,8 +818,8 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 						Math.floor(x),
 					),
 				})
-			else if (roll < 0.6) add({ x, asset: bananaPlant })
-			else if (roll < 0.75) add({ x, asset: treeFern })
+			else if (roll < 0.6) place({ x, asset: bananaPlant })
+			else if (roll < 0.75) place({ x, asset: treeFern })
 		}
 	}
 	// The train, in at Aguas Calientes, at the platform behind the path.
@@ -778,6 +836,11 @@ export const machuPicchu: CourseDefinition = {
 	terrain,
 	platforms: PLATFORMS,
 	ride: 'llama',
+	// Jumped on till it snaps.
+	special: {
+		goal: 'Break the bridge',
+		done: (run) => !!run.brokeBridge,
+	},
 	corgis: LLAMAS,
 	flyer: 'condor',
 	leap: { edge: X(EDGE), catchAt: CATCH_AT, land: X(LAND) },

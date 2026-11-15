@@ -2,8 +2,15 @@ import type { RunnerName } from '@/data/runners'
 import busAsset from '../assets/bus/bus.png'
 import scoopAsset from '../assets/bus/scoop.png'
 import windowAsset from '../assets/bus/windows.png'
-import { PATH_BACK, PATH_FRONT, START_X, VERGE } from '../game/constants'
+import {
+	PATH_BACK,
+	PATH_FRONT,
+	START_X,
+	VERGE,
+	VIEW_HEIGHT,
+} from '../game/constants'
 import { EVEREST_FIKA } from '../game/fika'
+import { CAMERA_HEADROOM, MAX_ZOOM } from '../game/step'
 import { type Gap, type Terrain, withGaps } from '../game/terrain'
 import { YETI } from '../runners/bonus'
 import {
@@ -26,6 +33,7 @@ import {
 	DEN_SIGN,
 	LAMP,
 	LAUNCHER,
+	PORTRAIT,
 	TELLY,
 	YETI_SOFAS,
 } from './kit/everestSecret'
@@ -266,6 +274,16 @@ const terrain: Terrain = withGaps(
  * back up out of it, high over the camp, and down on the mountain past it.
  * Finding him is the special goal.
  */
+/**
+ * How far under the crevasse's lip the den's roof is: deeper than a Round's
+ * camera, zoomed right out, ever looks under the course, so it's never seen
+ * from up there. Zoomed out, it keeps the highest anyone's stood its
+ * headroom under the top of the screen, and the rest of the screen's under
+ * them; and more, for the mountain being lower behind the crevasse, where a
+ * leader can be with the den just in view ahead.
+ */
+const DEN_ROOF_UNDER = VIEW_HEIGHT * MAX_ZOOM - CAMERA_HEADROOM + 280
+
 const DEN = (() => {
 	const [along, width] = CREVASSES[CREVASSES.length - 1]
 	const gap = { from: START_X + along, to: START_X + along + width }
@@ -274,8 +292,8 @@ const DEN = (() => {
 		gap,
 		from: gap.from - 140,
 		to: launch + 120,
-		// A screen and more under the crevasse's lip.
-		floor: Math.round(groundY(gap.from)) + 580,
+		// Way down under the crevasse's lip: see `DEN_ROOF_UNDER`.
+		floor: Math.round(groundY(gap.from)) + DEN_ROOF_UNDER + 230,
 		room: 230,
 		launch,
 		peak: 360,
@@ -561,11 +579,13 @@ export const everest: CourseDefinition = {
 			},
 		},
 		// The Yetis' den: a lamp as you land, two sofas, each with its telly
-		// to its left, turned to it, another lamp, and the run up to the Yeti.
+		// to its left, turned to it, another lamp, the family portrait on
+		// the wall, and the run up to the Yeti.
 		secret: {
 			sofas: YETI_SOFAS,
 			telly: TELLY,
 			lamp: LAMP,
+			portrait: PORTRAIT,
 			launcher: LAUNCHER,
 			furnishings: [
 				{ x: START_X + 11320, kind: 'lamp' },
@@ -574,6 +594,8 @@ export const everest: CourseDefinition = {
 				{ x: START_X + 11760, kind: 'telly' },
 				{ x: START_X + 11860, kind: 'sofa', which: 1 },
 				{ x: START_X + 12000, kind: 'lamp' },
+				// The family, on the wall at the far end, by the Yeti.
+				{ x: START_X + 12200, kind: 'portrait' },
 			],
 		},
 	},

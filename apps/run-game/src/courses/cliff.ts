@@ -386,4 +386,9 @@ export const cliff: CourseDefinition = {
 		rock: 'sepia(0.4) brightness(1.1)',
 	},
 	...laidOut,
+	// Through every Ring.
+	special: {
+		goal: 'Get all the Rings',
+		done: (run) => (run.counts.rings ?? 0) >= rings,
+	},
 }

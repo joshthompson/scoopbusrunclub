@@ -1,4 +1,4 @@
-import { For, type JSX, Show } from 'solid-js'
+import { For, type JSX, Show, createEffect, on } from 'solid-js'
 import { SpecialGoalArt } from '../draw/art/goals'
 import { MedalArt } from '../draw/art/medal'
 import { flyerLook } from '../draw/flyerLook'
@@ -9,7 +9,6 @@ import type { BonusKind, Result, World } from '../game/world'
 import { ONLINE, type Tally } from '../online/runScores'
 import type { Playable } from '../runners/playable'
 import { identity } from '../saved/identity'
-import { RunStrip } from '../ui/RunStrip'
 import { ScoreFace } from '../ui/ScoreFace'
 import { onHover } from '../ui/hover'
 import type { Mode } from './Game'
@@ -24,8 +23,13 @@ export interface Placing {
 	endlessPlace?: number
 	/** A course just unlocked for practice, by finishing the one before it. */
 	unlocked?: string
-	/** A bonus runner just unlocked, found on the way round, for the first time. */
-	newRunner?: Playable
+	/**
+	 * Bonus runners just unlocked, for the first time: found on the way
+	 * round, or for finishing every course. Most often none, now and then
+	 * one, and two at once can happen. Shown off before this, one at a time
+	 * (see `UnlockReveal`), not on it.
+	 */
+	newRunners: Playable[]
 	/** The medal this go got, if any, and whether it's the course's best yet. */
 	medal?: Medal
 	newMedal?: boolean
@@ -129,9 +133,11 @@ export function Summary(props: {
 										? flyerLook(world.course).rides
 										: bonus.kind === 'jumps' && world.course.longJump
 											? 'Long jump'
-											: bonus.kind === 'cones' && world.course.look?.cone
-												? `${world.course.look.cone.name} ${world.course.look.cone.crumbled ? 'flattened' : 'knocked over'}`
-												: BONUS_LABELS[bonus.kind]
+											: bonus.kind === 'gates' && world.course.look?.gate
+												? world.course.look.gate.name
+												: bonus.kind === 'cones' && world.course.look?.cone
+													? `${world.course.look.cone.name} ${world.course.look.cone.crumbled ? 'flattened' : 'knocked over'}`
+													: BONUS_LABELS[bonus.kind]
 							} ×${bonus.count}`,
 				points: bonus.points,
 			})),
@@ -151,14 +157,29 @@ export function Summary(props: {
 	const indexed = () => props.actions.map((action, i) => ({ action, i }))
 	const sendAction = () => indexed().find((a) => a.action.send)
 	const rest = () => indexed().filter((a) => !a.action.send)
+	/** The buttons, by index, to scroll to: see below. */
+	const buttons: HTMLButtonElement[] = []
+	// The panel scrolls, with a lot on it: a button picked with the arrows
+	// is scrolled to, if it's out of sight. Not to begin with, though: the
+	// top, how it went, is what's to see first.
+	createEffect(
+		on(
+			() => props.picked,
+			(i) => buttons[i]?.scrollIntoView({ block: 'nearest' }),
+			{ defer: true },
+		),
+	)
 	const button = (
 		{ action, i }: { action: SummaryAction; i: number },
 		style: JSX.CSSProperties,
-		on: JSX.CSSProperties,
+		picked: JSX.CSSProperties,
 	) => (
 		<button
+			ref={(el) => {
+				buttons[i] = el
+			}}
 			type="button"
-			style={{ ...style, ...(i === props.picked ? on : {}) }}
+			style={{ ...style, ...(i === props.picked ? picked : {}) }}
 			onMouseEnter={onHover(() => props.onPick(i))}
 			onClick={action.choose}
 		>
@@ -193,29 +214,6 @@ export function Summary(props: {
 							{world.runner.name} beat the bus by {metres(props.result.busGap)}
 						</Show>
 					</div>
-					{/* A new runner, unlocked: up top, running, glowing, not to be missed. */}
-					<Show when={props.placing?.newRunner}>
-						{(runner) => (
-							<div style={styles.newRunner}>
-								<RunStrip
-									frame={runner().sprite.run[0] ?? ''}
-									width={runner().sprite.width}
-									height={runner().sprite.height}
-									scale={3}
-									stride={0.4}
-								/>
-								<div style={styles.newRunnerText}>
-									<span style={styles.newRunnerTitle}>
-										New runner unlocked!
-									</span>
-									<span style={styles.newRunnerName}>{runner().name}</span>
-									<span style={styles.newRunnerHint}>
-										Pick them on the runner screen
-									</span>
-								</div>
-							</div>
-						)}
-					</Show>
 					{/* The medal it got: or a shadow of one, and what it'd take. */}
 					<div style={styles.medal}>
 						<MedalArt medal={props.placing?.medal} scale={3} />
@@ -401,6 +399,11 @@ const styles = {
 		gap: '10px',
 		width: '500px',
 		'max-height': 'calc(100% - 40px)',
+		// Scrolled, with more on it than fits: a special goal and a great
+		// many bonuses at once. New runners aren't on it (see `UnlockReveal`).
+		'overflow-y': 'auto',
+		'scrollbar-width': 'thin',
+		'scrollbar-color': 'rgba(255, 255, 255, 0.5) transparent',
 		'box-sizing': 'border-box',
 		padding: '18px 24px',
 		background: 'var(--ink)',
@@ -410,33 +413,6 @@ const styles = {
 	heading: { 'text-align': 'center' },
 	title: { 'font-size': '40px', 'line-height': 1 },
 	subtitle: { 'margin-top': '6px', 'font-size': '16px', opacity: 0.85 },
-	/** A new runner, unlocked: gold-edged, popping in, and glowing on. */
-	newRunner: {
-		display: 'flex',
-		'align-items': 'center',
-		'justify-content': 'center',
-		gap: '14px',
-		margin: '10px auto 2px',
-		padding: '6px 18px 6px 10px',
-		width: 'fit-content',
-		background: 'linear-gradient(#3a6aa8, #22406e)',
-		border: '3px solid #ffd23f',
-		animation:
-			'new-runner-pop 0.5s ease-out both, new-runner-glow 1.4s ease-in-out 0.5s infinite',
-	},
-	newRunnerText: {
-		display: 'flex',
-		'flex-direction': 'column',
-		'align-items': 'flex-start',
-		gap: '2px',
-	},
-	newRunnerTitle: { 'font-size': '20px', color: '#ffd23f' },
-	newRunnerName: { 'font-size': '28px', 'line-height': 1 },
-	newRunnerHint: {
-		'font-family': '"Cabin", sans-serif',
-		'font-size': '12px',
-		opacity: 0.8,
-	},
 	medal: {
 		display: 'flex',
 		'align-items': 'center',

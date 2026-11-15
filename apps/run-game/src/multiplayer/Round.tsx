@@ -1,11 +1,20 @@
-import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
+import {
+	For,
+	type JSX,
+	Show,
+	createEffect,
+	createSignal,
+	onCleanup,
+	untrack,
+} from 'solid-js'
 import type { Course } from '../courses/types'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { PX_PER_M } from '../game/constants'
-import { POPUP_TICKS, onScreen, roundOver } from '../game/step'
+import { POPUP_TICKS, onScreen, roundOver, stepWorld } from '../game/step'
 import { type Racer, type RacerEntry, createWorld } from '../game/world'
-import { touchScreen } from '../input'
+import { type Controls, touchScreen } from '../input'
 import { PauseMenu, SOUND_ITEMS } from '../screens/PauseMenu'
+import { RaceStartOverlay, createRaceStart } from '../ui/RaceStart'
 import { Stage } from '../ui/Stage'
 
 /**
@@ -20,6 +29,18 @@ export function Round(props: {
 	/** How many Rounds there are, if it isn't a Backyard Ultra. */
 	of?: number
 	racers: RacerEntry[]
+	/**
+	 * Its Starter, who starts it from its start screen by pressing jump:
+	 * their Player number, colour and name, and their controls.
+	 */
+	starter?: {
+		number: number
+		colour: string
+		name: string
+		controls: () => Controls
+	}
+	/** On its start screen, held for the Starter, or not any more. */
+	onWaiting?: (waiting: boolean) => void
 	onPause: (paused: boolean) => void
 	onOver: (order: Racer[]) => void
 	/** The world, for the Room to tell phones how their Player's doing. */
@@ -34,7 +55,11 @@ export function Round(props: {
 		baby: props.baby,
 	})
 	props.onWorld(world)
-	const scene = createRaceScene(world)
+	// Held, the world not moving on, while it's got ready and on its start
+	// screen; the Scene ticking all the same, so everything on it is placed.
+	const scene = createRaceScene(world, (w) => {
+		if (!start.holding()) stepWorld(w)
+	})
 
 	if (props.onTick) scene.tickers.add(props.onTick)
 	let told = false
@@ -44,10 +69,34 @@ export function Round(props: {
 		props.onOver(world.order() ?? world.racers)
 	})
 
-	// Pausing is the engine's, as in single player (see `Game`), and only the
-	// Host's: Esc or P, or the button.
 	const [paused, setPaused] = createSignal(false)
+	// Covered while it's got ready, then its start screen, held till its
+	// Starter presses jump: every Round's a course raced for the first time.
+	const start = createRaceStart({
+		world,
+		scene,
+		intro: true,
+		starter: () =>
+			props.starter?.controls() ?? {
+				left: false,
+				right: false,
+				up: false,
+				down: false,
+			},
+		onGo: () => {
+			for (const r of world.racers) r.body.wasUp = true
+			props.onWaiting?.(false)
+		},
+	})
+	createEffect(() => {
+		if (start.stage() === 'waiting') untrack(() => props.onWaiting?.(true))
+	})
+	onCleanup(() => props.onWaiting?.(false))
+
+	// Pausing is the engine's, as in single player (see `Game`), and only the
+	// Host's: Esc or P, or the button. Not till it's under way.
 	const pause = (next: boolean) => {
+		if (start.holding()) return
 		setPaused(next)
 		props.onPause(next)
 		scene.modal.set(next ? document.createElement('span') : undefined)
@@ -77,6 +126,16 @@ export function Round(props: {
 							number={props.number}
 							of={props.of}
 							onPause={() => pause(true)}
+						/>
+						<RaceStartOverlay
+							start={start}
+							title={props.course.name}
+							kicker={`Round ${props.number}${props.of ? ` of ${props.of}` : ''}`}
+							prompt={
+								props.starter
+									? `P${props.starter.number}${props.starter.name ? ` ${props.starter.name}` : ''}: press jump to start`
+									: 'Press Enter to start'
+							}
 						/>
 						<Show when={paused()}>
 							<PauseMenu

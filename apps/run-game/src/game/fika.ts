@@ -72,6 +72,13 @@ export type FikaItem =
 	| 'grapes'
 	| 'oxygen'
 	| 'vitamin'
+	/**
+	 * Midnattsloppet's: a paper cup of water and a cup of blueberry soup,
+	 * from the drinks station, and a korv med bröd from a kiosk.
+	 */
+	| 'waterCup'
+	| 'blueberrySoup'
+	| 'hotDog'
 
 export const FIKA_ITEMS: FikaItem[] = [
 	'coffee',
@@ -185,6 +192,17 @@ export const HOSPITAL_FIKA: FikaItem[] = [
 /** Inside someone: bubbles of oxygen, and vitamins. */
 export const BODY_FIKA: FikaItem[] = ['oxygen', 'vitamin', 'oxygen']
 
+/**
+ * Midnattsloppet's, down Södermalm at night: water and blueberry soup off
+ * the drinks station's tables, and a korv med bröd from a kiosk.
+ */
+export const MIDNATTSLOPPET_FIKA: FikaItem[] = [
+	'waterCup',
+	'hotDog',
+	'blueberrySoup',
+	'waterCup',
+]
+
 /** In Turku: a Karelian pie, a coffee, salmiakki. */
 export const TURKU_FIKA: FikaItem[] = ['karelianPie', 'coffee', 'salmiakki']
 
@@ -237,4 +255,7 @@ export const FIKA_SIZE: Record<FikaItem, { width: number; height: number }> = {
 	grapes: { width: 12 * CELL, height: 12 * CELL },
 	oxygen: { width: 11 * CELL, height: 11 * CELL },
 	vitamin: { width: 12 * CELL, height: 7 * CELL },
+	waterCup: { width: 8 * CELL, height: 10 * CELL },
+	blueberrySoup: { width: 8 * CELL, height: 10 * CELL },
+	hotDog: { width: 14 * CELL, height: 7 * CELL },
 }

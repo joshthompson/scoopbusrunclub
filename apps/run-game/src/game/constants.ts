@@ -33,6 +33,11 @@ export const DEPTH_SLANT = 56
  * high stretches, the scenery behind would otherwise be distant hills.
  */
 export const VERGE = 24
+/**
+ * How far back from the path the scenery stands, so the grass at a tree's foot
+ * stays off it: they're only for looking at, nothing to run into.
+ */
+export const SCENERY_SET_BACK = 10
 /** Where the runner starts, and where the start line is. */
 export const START_X = 200
 /**
@@ -344,13 +349,14 @@ export const BUS_RAMP_TICKS = 2400
  * little, but never with too big a lead.
  */
 export const BUS_LEASH_FULL = 900
-export const BUS_LEASH_MAX = 1200
+/** 400 m. */
+export const BUS_LEASH_MAX = 1600
 /**
- * In a multiplayer Round, longer: 450 m. It's the leader that pulls the
+ * In a multiplayer Round, longer: 550 m. It's the leader that pulls the
  * bus along, so this is how far behind them anyone can be before it's got
  * them.
  */
-export const ROUND_BUS_LEASH_MAX = 1800
+export const ROUND_BUS_LEASH_MAX = 2200
 /** How much the leash lengthens a tick at the end of it, up to `BUS_LEASH_FULL`, and just past it. */
 export const BUS_LEASH_GROWTH = 3
 export const BUS_LEASH_LATE_GROWTH = 0.6

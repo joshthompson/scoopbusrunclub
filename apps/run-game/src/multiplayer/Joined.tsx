@@ -346,6 +346,15 @@ function InRoom(props: {
 								Watching: you’re in from the next Round
 							</div>
 						</Show>
+						<Show when={!menu() && view()?.waitingForStarter}>
+							{(number) => (
+								<div style={styles.starting}>
+									{view()?.isStarter
+										? 'Press jump to start'
+										: `Waiting for P${number()} to start`}
+								</div>
+							)}
+						</Show>
 						<Show when={view()?.paused && !menu()}>
 							<div style={styles.paused}>Paused at the big screen</div>
 						</Show>
@@ -458,7 +467,11 @@ function InRoom(props: {
 											? 'Catching up with the race…'
 											: v().paused
 												? 'Paused at the big screen'
-												: 'Watch the race on the big screen'
+												: v().waitingForStarter
+													? v().isStarter
+														? 'Press jump to start'
+														: `Waiting for P${v().waitingForStarter} to start`
+													: 'Watch the race on the big screen'
 									}
 								>
 									<Show when={mode() === 'controller'}>
@@ -731,6 +744,22 @@ const styles = {
 		'white-space': 'nowrap',
 		'z-index': 2,
 		animation: 'blink 1.2s steps(2) infinite',
+	},
+	/** A Round on its start screen: who's to start it, over the top, leaving the buttons to press. */
+	starting: {
+		position: 'absolute',
+		top: '12px',
+		left: '50%',
+		transform: 'translateX(-50%)',
+		padding: '8px 14px 5px',
+		background: 'var(--ink)',
+		color: 'white',
+		border: '3px solid white',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '18px',
+		'white-space': 'nowrap',
+		'pointer-events': 'none',
+		'z-index': 3,
 	},
 	paused: {
 		position: 'absolute',

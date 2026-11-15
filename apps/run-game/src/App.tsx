@@ -47,7 +47,14 @@ type Screen =
 	| { kind: MenuScreen }
 	| { kind: 'edit'; runner?: CustomRunner }
 	| { kind: 'courses'; runner: Playable }
-	| { kind: 'play'; runner: Playable; course: Course; mode: Mode }
+	| {
+			kind: 'play'
+			runner: Playable
+			course: Course
+			mode: Mode
+			/** Another go at it: no start screen this time. */
+			restart?: boolean
+	  }
 	| { kind: 'party' }
 	/** Joined to someone else's Room, from this computer: `code`, if it came with one. */
 	| { kind: 'join'; code?: string }
@@ -112,7 +119,8 @@ export function App(props: {
 		},
 	})
 	/** Endless's next course, round to the first again after the last. */
-	const next = (play: Play, score: number, hat?: Hat): Play => {
+	const next = (was: Play, score: number, hat?: Hat): Play => {
+		const play = { ...was, restart: false }
 		// Practising: the next course along, to practise.
 		if (play.mode.kind !== 'endless') {
 			const index = COURSES.findIndex((course) => course.id === play.course.id)
@@ -129,8 +137,10 @@ export function App(props: {
 		}
 	}
 	/** The same again, as a new object so the game's rebuilt: Endless from the start. */
-	const retry = (play: Play): Play =>
-		play.mode.kind === 'endless' ? endless(play.runner) : { ...play }
+	const retry = (play: Play): Play => ({
+		...(play.mode.kind === 'endless' ? endless(play.runner) : play),
+		restart: true,
+	})
 
 	return (
 		<Switch>
@@ -258,6 +268,7 @@ export function App(props: {
 							setScreen({ kind: 'courses', runner: play.runner })
 						}
 						onMenu={go('title')}
+						restart={play.restart}
 					/>
 				)}
 			</Match>

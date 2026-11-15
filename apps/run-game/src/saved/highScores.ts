@@ -58,6 +58,15 @@ export const table = (id: TableId) => tables()[id] ?? []
 /** A table's top score, or 0 with nobody in it yet. */
 export const topScore = (id: TableId) => table(id)[0]?.score ?? 0
 
+/** The courses with a finish in their table, by id. */
+export const finishedInTables = () =>
+	Object.entries(tables())
+		.filter(
+			([id, entries]) =>
+				id !== 'endless' && entries.some((entry) => entry.finished),
+		)
+		.map(([id]) => id)
+
 /** Today, as YYYY-MM-DD, in this browser's own time zone. */
 export function today() {
 	const now = new Date()

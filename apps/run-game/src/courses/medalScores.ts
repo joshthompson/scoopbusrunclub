@@ -31,4 +31,5 @@ export const MEDAL_SCORES: Record<CourseId, MedalPoints | null> = {
 	everest: { bronze: 5000, silver: 7500, gold: 9750 },
 	slopes: { bronze: 5000, silver: 8000, gold: 10750 },
 	karolinska: null,
+	midnattsloppet: null,
 }

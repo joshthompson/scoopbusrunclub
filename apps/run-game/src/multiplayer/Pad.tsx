@@ -12,9 +12,9 @@ import {
 } from 'solid-js'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { type Action, anyControls } from '../input'
-import { unlockedBonusRunners } from '../runners/bonus'
+import { unlockedRunners } from '../runners/bonus'
 import { type CustomRunner, customRunners } from '../runners/customRunners'
-import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
+import { CLUB, type Playable, customPlayable } from '../runners/playable'
 import { RunnerEditor } from '../screens/RunnerEditor'
 import { ArrowPad } from '../ui/ArrowPad'
 import { RunStrip } from '../ui/RunStrip'
@@ -35,10 +35,6 @@ import { statusText } from './status'
 
 /** The race on the phone, for Remote Play: the game itself, so only loaded then. */
 const Mirror = lazy(() => import('./Mirror'))
-
-const MEMBERS_BY_NAME = [...MEMBERS].sort((a, b) =>
-	a.name.localeCompare(b.name),
-)
 
 /** How this phone played last time, under this, to start on next time. */
 const MODE_KEY = 'pad-mode'
@@ -288,11 +284,11 @@ function Controller(props: {
 		props.onLeave()
 	}
 
-	/** Their own runners first, then any bonus runners they've unlocked, then the club. */
+	/** Their own runners first, then anyone they've unlocked, then the club. */
 	const characters = (): Playable[] => [
 		...customRunners().map(customPlayable).reverse(),
-		...unlockedBonusRunners(),
-		...MEMBERS_BY_NAME,
+		...unlockedRunners(),
+		...CLUB,
 	]
 	const mine = () => {
 		const v = view()
@@ -623,6 +619,15 @@ function Controller(props: {
 							<ArrowPad press={press} />
 						</Show>
 
+						<Show when={v().waitingForStarter}>
+							{(number) => (
+								<div style={styles.starting}>
+									{v().isStarter
+										? 'Press ↑ to start'
+										: `Waiting for P${number()} to start`}
+								</div>
+							)}
+						</Show>
 						<Show when={v().paused}>
 							<div style={styles.paused}>Paused</div>
 						</Show>
@@ -1155,6 +1160,22 @@ const styles = {
 		'white-space': 'nowrap',
 		'z-index': 2,
 		animation: 'blink 1.2s steps(2) infinite',
+	},
+	/** A Round on its start screen: who's to start it, over the top, leaving the buttons to press. */
+	starting: {
+		position: 'absolute',
+		top: '12px',
+		left: '50%',
+		transform: 'translateX(-50%)',
+		padding: '8px 14px 5px',
+		background: 'var(--ink)',
+		color: 'white',
+		border: '3px solid white',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '18px',
+		'white-space': 'nowrap',
+		'pointer-events': 'none',
+		'z-index': 3,
 	},
 	paused: {
 		position: 'absolute',

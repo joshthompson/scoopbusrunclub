@@ -31,13 +31,23 @@ import lowBranchLimbAsset from '../assets/obstacles/low-branch-limb.png'
 import lowBranchTreeAsset from '../assets/obstacles/low-branch-tree.png'
 import mummyAsset from '../assets/obstacles/mummy.png'
 import steamVentAsset from '../assets/obstacles/steam-vent.png'
-import ventAsset from '../assets/rooftop/vent.png'
 import purpleSignAsset from '../assets/signs/purple-sign.png'
 import { GERM_FRAMES, GERM_POPPED, VALVE } from '../courses/kit/bodyScenery'
 import { bouncyToadstool } from '../courses/kit/furbyScenery'
+import {
+	ROOFTOP_VENT_FRONT,
+	ROOFTOP_VENT_HEIGHT,
+	ROOFTOP_VENT_WIDTH,
+	rooftopVent,
+} from '../courses/kit/rooftopVent'
 import { seeded } from '../courses/kit/seeded'
 import { cone } from '../courses/kit/sewerScenery'
-import type { CourseLook, Obstacle, PlatformDefinition } from '../courses/types'
+import type {
+	Boost,
+	CourseLook,
+	Obstacle,
+	PlatformDefinition,
+} from '../courses/types'
 import { boardOf } from '../game/boards'
 import { GERM_SIZE, germHeight } from '../game/body'
 import { inTunnel } from '../game/cave'
@@ -51,6 +61,7 @@ import {
 	PATH_FRONT,
 	PX_PER_M,
 	RUNNER_SCALE,
+	SCENERY_SET_BACK,
 	SQUASHED,
 	START_X,
 	TICK_MS,
@@ -63,8 +74,9 @@ import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from '../game/furbies'
 import { DRAWN_FROM } from '../game/groundColumns'
 import type { Hat } from '../game/hats'
 import { mummyAt } from '../game/mummies'
-import { type PlatformAt, platformAt } from '../game/platforms'
+import { type PlatformAt, platformAt, platformOut } from '../game/platforms'
 import { heldLook, pacerShrunk } from '../game/portals'
+import { brokenHalf, sagOf } from '../game/ropeBridge'
 import {
 	BALLOON_HEIGHT,
 	BALLOON_WIDTH,
@@ -109,6 +121,7 @@ import type {
 	World,
 } from '../game/world'
 import { ZOMBIE_SINK_GONE, zombieAt } from '../game/zombies'
+import { bonusRunner } from '../runners/bonus'
 import { customRunners } from '../runners/customRunners'
 import { guests } from '../runners/guests'
 import type { Playable } from '../runners/playable'
@@ -285,8 +298,10 @@ export function volunteerFrame(
 }
 
 export function createPlayer(world: World, racer: Racer = world.racers[0]) {
-	/** Up on a corgi's back, or a llama's, riding one. */
-	const { saddle } = rideLook(world.course)
+	/** Up on a corgi's back, or a llama's, riding one: or stood up on a skateboard. */
+	const { saddle, stood } = rideLook(world.course)
+	/** Riding, sat down on it, rather than stood on it. */
+	const sat = (b: Body) => b.mount > 0 && !stood
 	/** Sat on a dragon's back, riding it, rather than hanging under a goose. */
 	const seated = flyerLook(world.course).seat !== undefined
 	const { sprite } = racer.runner
@@ -310,7 +325,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const ducking = () =>
 		world.ticks() >= 0 &&
 		(body.ducking ||
-			body.mount > 0 ||
+			sat(body) ||
 			(seated && body.carried > 0) ||
 			(body.board > 0 && crouched(body))) &&
 		!!sit
@@ -342,7 +357,9 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		Math.abs(body.vx) < STILL_SPEED
 	// On a glider, lying along under its wing, head first, legs together:
 	// the stand frame, turned over. On skis, stood up on them.
-	const lying = () => world.ticks() >= 0 && (body.gliding || body.board > 0)
+	const lying = () =>
+		world.ticks() >= 0 &&
+		(body.gliding || body.board > 0 || (!!stood && body.mount > 0))
 	/** How they're tipped, lying on a glider: nose up climbing, down diving. */
 	let was = body.feetY
 	let tilt = 0
@@ -481,15 +498,16 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			} else {
 				$.setXScale(xScale)
 				$.setRotation(
-					body.gliding ? GLIDING_LEAN + tilt : runnerLean(world, body),
+					body.gliding
+						? (sprite.glideLean ?? GLIDING_LEAN) + tilt
+						: runnerLean(world, body),
 				)
 			}
 			// Sat down, the one sit frame: switching to it from a run frame
 			// would otherwise leave the engine on a frame it doesn't have. In
 			// the air, legs out in one stride.
 			const sitting =
-				(body.ducking || body.mount > 0 || (seated && body.carried > 0)) &&
-				!!sit
+				(body.ducking || sat(body) || (seated && body.carried > 0)) && !!sit
 			// Stood still: the one stand frame.
 			$.setFrame(
 				sitting || standing() || (lying() && stand)
@@ -559,7 +577,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 /** Where each racer's head was last drawn, in the world: see `createPlayer`. */
 const headAt = new WeakMap<Body, { x: number; y: number }>()
 
-/** How far over a glider's rider is turned, lying along under it, head first. */
+/** How far over a glider's rider is turned, lying along under it, head first: unless their sprite says otherwise. */
 const GLIDING_LEAN = 80
 
 /** Tucked, faster than this, snow sprays off the back of them. */
@@ -848,7 +866,7 @@ function createPacer(world: World, p: Pacer) {
 			tilt += (Math.max(-12, Math.min(12, dy * 3)) - tilt) * 0.2
 			$.setRotation(
 				p.gliding
-					? GLIDING_LEAN + tilt
+					? (sprite.glideLean ?? GLIDING_LEAN) + tilt
 					: p.grounded && !standing()
 						? leanOn(world, p.x)
 						: 0,
@@ -1224,6 +1242,10 @@ function createCorgi(world: World, c: Corgi) {
 	const [barking, setBarking] = createSignal(false)
 	/** The rarer one: on a Remote Player's screen, known once the Host says. */
 	const [rare, setRare] = createSignal(!!c.rare)
+	/** Its trick, in the air under its rider, if it does one: how far through it it is. */
+	const [trickFrame, setTrickFrame] = createSignal<string>()
+	/** When it left the ground under them, if it's off it. */
+	let leftAt: number | undefined
 	return createController({
 		init: () => ({
 			id: `corgi-${c.id}`,
@@ -1243,7 +1265,7 @@ function createCorgi(world: World, c: Corgi) {
 			paintPicture(
 				ctx,
 				image,
-				look.picture(pose()),
+				trickFrame() ?? look.picture(pose()),
 				0,
 				0,
 				CORGI_WIDTH,
@@ -1268,6 +1290,17 @@ function createCorgi(world: World, c: Corgi) {
 			const floor =
 				world.terrain.groundY(c.x) - (c.state === 'waiting' ? (c.up ?? 0) : 0)
 			const airborne = c.feetY < floor - 2
+			// Jumped on, ridden: its trick, from leaving the ground, the last
+			// frame held till it's down.
+			const { trick } = ride
+			if (trick && c.state === 'ridden' && airborne) {
+				leftAt ??= world.ticks()
+				const step = Math.floor((world.ticks() - leftAt) / trick.ticks)
+				setTrickFrame(trick.frames[Math.min(step, trick.frames.length - 1)])
+			} else {
+				leftAt = undefined
+				setTrickFrame(undefined)
+			}
 			setPose(
 				c.state === 'scooped' || airborne
 					? 'leap'
@@ -2062,6 +2095,8 @@ export function createPlatforms(world: World) {
 	 * a Cave, up to its rock.
 	 */
 	const cableTo = (platform: PlatformDefinition, at: PlatformAt) => {
+		if (platform.hook !== undefined)
+			return Math.max(0, at.top - SLING_HEIGHT - platform.hook)
 		const ceiling = cave?.ceiling(at.left + platform.width / 2)
 		return ceiling === undefined
 			? 1400
@@ -2086,34 +2121,135 @@ export function createPlatforms(world: World) {
 			move && cableColour
 				? Math.max(
 						...Array.from({ length: 65 }, (_, k) =>
-							cableTo(
-								platform,
-								platformAt(world.terrain, platform, (k / 64) * move.ticks),
-							),
+							cableTo(platform, platformOut(world.terrain, platform, k / 64)),
 						),
 					)
 				: 0
 		/** Its own picture, if it's wider or deeper, and its cable, up out of sight. */
 		const overhang = art ? Math.max(0, (art.width - width) / 2) : 0
+		/** A rope bridge's, as far down as it sags. */
+		const sags = platform.rope ? Math.ceil(platform.rope.give * 2) : 0
+		/** One that breaks, its halves hanging down from the banks, as long as it is, and turned. */
+		const hangs = platform.rope?.breaks ? platform.width : 0
+		const turned = hangs && art ? art.height : 0
 		const drawReach = {
-			left: overhang,
-			right: overhang,
+			left: overhang + turned,
+			right: overhang + turned,
 			top: Math.max(art?.top ?? 0, cableColour ? SLING_HEIGHT + longest : 0),
-			bottom: art ? Math.max(0, art.height - art.top - depth) : 0,
+			bottom: art
+				? Math.max(0, art.height - art.top - depth) + sags + hangs
+				: 0,
 		}
-		return createController({
+		/** How far down it's sagged `dx` across its picture: a rope bridge's, bent under whoever's on it. */
+		const sagUnder = (dx: number) =>
+			platform.rope
+				? Math.round(
+						sagOf(
+							world.ropeBridges,
+							i,
+							platform.x + (width - (art?.width ?? width)) / 2 + dx,
+						) / 2,
+					) * 2
+				: 0
+		/** Its picture, or its near side's: bent, a rope bridge's, under whoever's on it. */
+		const paintPicture = (
+			ctx: CanvasRenderingContext2D,
+			picture: { image: CanvasImageSource; width: number },
+		) => {
+			if (!art) return
+			const x0 = (width - art.width) / 2
+			if (platform.broken) {
+				paintBroken(ctx, picture, x0)
+				return
+			}
+			if (!platform.rope) {
+				ctx.drawImage(picture.image, x0, -art.top, art.width, art.height)
+				return
+			}
+			// In strips, each down as far as it's sagged in its middle.
+			const scale = picture.width / art.width
+			for (let dx = 0; dx < art.width; dx += BRIDGE_STRIP) {
+				const w = Math.min(BRIDGE_STRIP, art.width - dx)
+				ctx.drawImage(
+					picture.image,
+					dx * scale,
+					0,
+					w * scale,
+					art.height * scale,
+					x0 + dx,
+					-art.top + sagUnder(dx + w / 2),
+					w,
+					art.height,
+				)
+			}
+		}
+		/**
+		 * A broken rope bridge's picture: its posts still standing on the
+		 * banks, and either half of it, from its bank to where it broke,
+		 * swung down from there (see `brokenHalf`).
+		 */
+		const paintBroken = (
+			ctx: CanvasRenderingContext2D,
+			picture: { image: CanvasImageSource; width: number },
+			x0: number,
+		) => {
+			if (!art) return
+			const scale = picture.width / art.width
+			/** Its picture from `from` to `to`, across, at `dx` along, as it is. */
+			const strip = (from: number, to: number, dx: number) =>
+				ctx.drawImage(
+					picture.image,
+					from * scale,
+					0,
+					(to - from) * scale,
+					art.height * scale,
+					dx,
+					-art.top,
+					to - from,
+					art.height,
+				)
+			const bank = -x0
+			const cut = (platform.broken?.x ?? platform.x) - platform.x + bank
+			strip(0, bank, x0)
+			strip(width + bank, art.width, width + x0 + bank)
+			for (const side of ['near', 'far'] as const) {
+				const half = brokenHalf(world.terrain, platform, side, world.ticks())
+				const pivot = side === 'near' ? 0 : width
+				ctx.save()
+				ctx.translate(pivot, 0)
+				ctx.rotate(half.angle)
+				if (side === 'near') strip(bank, cut, 0)
+				else strip(cut, width + bank, cut - bank - width)
+				ctx.restore()
+			}
+		}
+		// A rope bridge's near side, its handrail, in front of whoever's on it.
+		const front = art?.front
+		const nearSide = front
+			? [
+					createController({
+						drawReach,
+						draw: ({ ctx, image }) => {
+							const picture = image(front)
+							if (picture) paintPicture(ctx, picture)
+						},
+						init: () => ({
+							id: `platform-front-${i}`,
+							type: 'foreground',
+							...createObjectSignal(start.left, 'x'),
+							...createObjectSignal(start.top, 'y'),
+							width: () => platform.width,
+							height: () => platform.depth ?? look.depth,
+						}),
+					}),
+				]
+			: []
+		const slab = createController({
 			drawReach,
 			draw: ({ ctx, image }) => {
 				if (art) {
 					const picture = image(art.asset)
-					if (picture)
-						ctx.drawImage(
-							picture.image,
-							(width - art.width) / 2,
-							-art.top,
-							art.width,
-							art.height,
-						)
+					if (picture) paintPicture(ctx, picture)
 				} else paintArt?.(ctx, image)
 				if (!cableColour) return
 				// The crane's cable, down to its hook, 34 px over it; from the
@@ -2148,8 +2284,12 @@ export function createPlatforms(world: World) {
 					}
 				: undefined,
 		})
+		return [slab, ...nearSide]
 	})
 }
+
+/** How wide each strip of a rope bridge's picture is, bent to it: two of its cells. */
+const BRIDGE_STRIP = 4
 
 /** Something that stays put, drawn standing on the ground at `x`. */
 function createFixture(options: {
@@ -2194,11 +2334,52 @@ function createFixture(options: {
 	})
 }
 
+/** A course's own slalom gate (see `CourseLook['gate']`): its back, and its front over whoever's in it. */
+function createOwnGate(
+	world: World,
+	o: Extract<Boost, { kind: 'gate' }>,
+	id: string,
+	own: NonNullable<CourseLook['gate']>,
+) {
+	const part = (frames: string[], front: boolean) =>
+		createFixture({
+			id: `${id}-${front ? 'front' : 'back'}`,
+			type: front ? 'banner-front' : 'banner',
+			x: o.x,
+			sink: front ? PATH_FRONT - 4 : 4 - PATH_BACK,
+			width: own.width,
+			height: own.height,
+			world,
+			frames: [frames[0]],
+			draw: paintFrames(world, frames, own.frameTicks, own),
+		})
+	return own.front
+		? [part(own.asset, false), part(own.front, true)]
+		: [part(own.asset, false)]
+}
+
 /**
- * How far back from the path the scenery stands, so the grass at a tree's foot
- * stays off it: they're only for looking at, nothing to run into.
+ * A Draw Hook painting `frames` in turn, each for `ticks` of the race's
+ * tick, at `size`: so the same frame's on every screen. Reading the tick
+ * keeps it painting.
  */
-const SCENERY_SET_BACK = 10
+function paintFrames(
+	world: World,
+	frames: string[],
+	ticks: number | undefined,
+	size:
+		| { width: number; height: number }
+		| (() => { width: number; height: number }),
+) {
+	return ({ ctx, image }: DrawPainting) => {
+		const frame =
+			frames[Math.floor(world.ticks() / (ticks ?? 12)) % frames.length]
+		const loaded = image(frame)
+		if (!loaded) return
+		const { width, height } = typeof size === 'function' ? size() : size
+		ctx.drawImage(loaded.image, 0, 0, width, height)
+	}
+}
 
 /** A cyclist, riding towards you, or scooped and flying. */
 function createCyclist(
@@ -2299,29 +2480,34 @@ export function createScenery(world: World) {
 		 * A tombstone with its name, recoloured, name and all, by its filter;
 		 * and a footing's grass, down past its box.
 		 */
-		const draw: ((painting: DrawPainting) => void) | undefined = carved
-			? ({ ctx, image }) => {
-					const loaded = image(asset)
-					if (loaded)
-						paintTombstone(ctx, loaded, {
-							key: `${world.course.id}:${i}`,
-							name: name ?? '',
-							panel: carved,
-							scale,
-							filter,
-						})
-				}
-			: footing
-				? (() => {
-						const paint = footingPainter(groundY, x, () =>
-							paletteOf(world.course.look?.palette)('var(--grass-green)'),
-						)
-						return ({ ctx, drawDefault }) => {
-							drawDefault()
-							paint(ctx, width(), height(), pathTop() - setBack)
-						}
-					})()
-				: undefined
+		const draw: ((painting: DrawPainting) => void) | undefined = piece.frames
+			? paintFrames(world, piece.frames, piece.frameTicks, () => ({
+					width: width(),
+					height: height(),
+				}))
+			: carved
+				? ({ ctx, image }) => {
+						const loaded = image(asset)
+						if (loaded)
+							paintTombstone(ctx, loaded, {
+								key: `${world.course.id}:${i}`,
+								name: name ?? '',
+								panel: carved,
+								scale,
+								filter,
+							})
+					}
+				: footing
+					? (() => {
+							const paint = footingPainter(groundY, x, () =>
+								paletteOf(world.course.look?.palette)('var(--grass-green)'),
+							)
+							return ({ ctx, drawDefault }) => {
+								drawDefault()
+								paint(ctx, width(), height(), pathTop() - setBack)
+							}
+						})()
+					: undefined
 		return createController({
 			frames: [asset],
 			draw,
@@ -2371,6 +2557,33 @@ const VOLUNTEER_SINK = 4 - PATH_BACK
  */
 const RUN_DIRECTOR_PAST = 90
 const RUN_DIRECTOR_SINK = PATH_FRONT - 2
+
+/**
+ * The course's hidden bonus runner, if it has one (see `Course['found']`),
+ * stood waiting where they are, facing whoever's coming: Bat Person, up on
+ * the girders over City Rooftop.
+ */
+export function createFound(world: World) {
+	const { found } = world.course
+	const runner = found && bonusRunner(found.runner)
+	if (!found || !runner) return []
+	const { sprite } = runner
+	const frame = sprite.stand ?? sprite.run[0]
+	const size = poseSize(frame, sprite)
+	return [
+		createController({
+			frames: [frame],
+			init: () => ({
+				id: 'found',
+				type: 'cheerer',
+				x: () => Math.round(found.x - size.width / 2),
+				y: () => found.y - size.height,
+				width: () => size.width,
+				height: () => size.height,
+			}),
+		}),
+	]
+}
 
 export function createRunDirector(world: World) {
 	const member = world.runDirector
@@ -2881,16 +3094,19 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			})
 		}
 		case 'vent':
+			// Right across the path, its foot just in from its near edge: at its
+			// middle, where everyone runs, it's where it's run into, and as high.
 			return createFixture({
 				id,
 				type: 'hazard',
 				x: o.x,
-				sink: 2,
+				// A pixel of its own higher, a cell: up off the roof's front edge.
+				sink: ROOFTOP_VENT_FRONT - 2,
 				width: VENT_WIDTH,
 				height: VENT_HEIGHT,
 				world,
 				draw: ({ ctx, image }) => {
-					const vent = image(ventAsset)
+					const vent = image(rooftopVent)
 					if (vent) ctx.drawImage(vent.image, 0, 0, VENT_WIDTH, VENT_HEIGHT)
 				},
 			})
@@ -3490,7 +3706,11 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				},
 			})
 		}
-		case 'gate':
+		case 'gate': {
+			// Or the course's own in its place: a shower over the road, its
+			// back behind whoever goes through, its front over them.
+			const own = world.course.look?.gate
+			if (own) return createOwnGate(world, o, id, own)
 			// At the edge of the piste, red at its back, behind whoever goes
 			// past it, blue at its front, in front of them: in turn, so the
 			// course weaves past them. Flapping, gone past.
@@ -3512,6 +3732,7 @@ export function createBoost(world: World, state: BoostState, i: number) {
 							: undefined,
 					),
 			})
+		}
 		case 'ring': {
 			// Its far half behind whoever's going through it, its near half in
 			// front of them; lit up, as someone does.
@@ -3757,8 +3978,9 @@ const CELL_SINK = 4
 /** How far down from the top of a street over a Cave a Sewage Drain's grate is: in the road. */
 const STREET_GRATE = 26
 
-const VENT_WIDTH = 40
-const VENT_HEIGHT = 30
+/** City Rooftop's air vent, drawn a pixel a cell, at twice that. */
+const VENT_WIDTH = ROOFTOP_VENT_WIDTH * 2
+const VENT_HEIGHT = ROOFTOP_VENT_HEIGHT * 2
 
 /**
  * Everyone whose name could be on a tombstone: the club's members and

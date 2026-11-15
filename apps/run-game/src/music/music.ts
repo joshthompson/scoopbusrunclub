@@ -1,5 +1,6 @@
 import { createEffect, createRoot, createSignal } from 'solid-js'
 import { audioContext, wake } from '../audio'
+import type { Course } from '../courses/types'
 import { musicOn } from '../saved/settings'
 import { type Parsed, isDrum, parse, playVoice } from './synth'
 import {
@@ -22,6 +23,11 @@ import {
 const VOLUME = 0.32
 /** How many bars one tune takes to fade into the next: two beats. */
 const FADE_BARS = 0.5
+/**
+ * And one version of a tune into another (see `playVersion`): slower, two
+ * bars, so the band seems to change round under it.
+ */
+const VERSION_FADE_BARS = 2
 /** How far ahead notes are lined up, in seconds, and how often that's topped up. */
 const LOOKAHEAD = 0.15
 const TICK_MS = 25
@@ -52,6 +58,8 @@ let playing:
 	| {
 			context: AudioContext
 			master: GainNode
+			/** The beat's own fader: quieter under a tune that wants it so (see `Tune['beat']`). */
+			beatFader: GainNode
 			timer: ReturnType<typeof setInterval>
 			/** The next step to line up, counted from when the music started, and when it sounds. */
 			step: number
@@ -86,21 +94,73 @@ export function playTune(id: string) {
 	if (!playing) return
 	const current = playing.layers.find((layer) => layer.until === undefined)
 	if (current?.id === id) return
+	fadeTo(id, FADE_BARS)
+}
+
+/**
+ * The version of `course`'s tune for `x` along it (see `Course['tunes']`):
+ * the last whose `from` that's past, or its own.
+ */
+export function tuneAlong(course: Pick<Course, 'id' | 'tunes'>, x: number) {
+	let tune: string = course.id
+	for (const version of course.tunes ?? [])
+		if (x >= version.from) tune = version.tune
+	return tune
+}
+
+/** The tune `id` is a version of, its course's: `midnattsloppet` for `midnattsloppet:rock`. */
+const tuneOf = (id: string) => id.split(':')[0]
+
+/**
+ * Another version of the tune that's on, `id` (`<course>:<version>`, or the
+ * course's own): faded into over a couple of bars from the next, carrying
+ * on from where the tune's got to rather than starting it over, so it's
+ * the same tune played by someone else. Only if it's that tune that's on:
+ * nothing, in the menus.
+ */
+export function playVersion(id: string) {
+	if (tuneOf(wanted) !== tuneOf(id) || wanted === id) return
+	wanted = id
+	if (playing) fadeTo(id, VERSION_FADE_BARS, true)
+}
+
+/**
+ * Fades whatever's on out, and `id` in, over `bars` from the next bar.
+ * `inStep`, it comes in where the last one's got to, not from its start.
+ */
+function fadeTo(id: string, bars: number, inStep = false) {
+	if (!playing) return
 	const { step, at, context } = playing
+	const current = playing.layers.find((layer) => layer.until === undefined)
 	// The next bar, if there's time to get it lined up; the one after if not.
 	let bar = Math.ceil(step / STEPS_PER_BAR) * STEPS_PER_BAR
 	if (bar - step < 2) bar += STEPS_PER_BAR
 	const start = at + (bar - step) * STEP_SECONDS
-	const fade = FADE_BARS * STEPS_PER_BAR * STEP_SECONDS
+	const fade = bars * STEPS_PER_BAR * STEP_SECONDS
 	for (const layer of playing.layers) {
 		if (layer.until !== undefined) continue
 		const gain = layer.fader.gain
 		gain.cancelScheduledValues(start)
 		gain.setValueAtTime(gain.value, Math.max(context.currentTime, start - 0.01))
 		gain.linearRampToValueAtTime(0, start + fade)
-		layer.until = bar + FADE_BARS * STEPS_PER_BAR
+		layer.until = bar + bars * STEPS_PER_BAR
 	}
-	playing.layers.push(layer(id, bar, start, fade))
+	const next = layer(id, bar, start, fade)
+	if (inStep && current) next.from = current.from
+	playing.layers.push(next)
+	beatTo(tuneFor(id).beat ?? 1, start, fade)
+}
+
+/** The beat faded to `level`, over `fade` seconds from `start`. */
+function beatTo(level: number, start: number, fade: number) {
+	if (!playing) return
+	const gain = playing.beatFader.gain
+	gain.cancelScheduledValues(start)
+	gain.setValueAtTime(
+		gain.value,
+		Math.max(playing.context.currentTime, start - 0.01),
+	)
+	gain.linearRampToValueAtTime(level, start + fade)
 }
 
 /** A new layer for tune `id`, coming in at step `from`, at `start`, over `fade` seconds. */
@@ -128,9 +188,16 @@ function start() {
 		compressor.threshold.value = -14
 		compressor.ratio.value = 4
 		master.connect(compressor).connect(context.destination)
+		const beatFader = context.createGain()
+		beatFader.gain.setValueAtTime(
+			tuneFor(wanted).beat ?? 1,
+			context.currentTime,
+		)
+		beatFader.connect(master)
 		playing = {
 			context,
 			master,
+			beatFader,
 			timer: setInterval(tick, TICK_MS),
 			step: 0,
 			at: context.currentTime + 0.05,
@@ -181,7 +248,7 @@ function tick() {
 /** Step `step`'s notes, at `time`: the beat's, and every tune's that's playing. */
 function line(step: number, time: number) {
 	if (!playing) return
-	const { context, master } = playing
+	const { context, beatFader } = playing
 	const notes = (tracks: Parsed[], at: number, out: AudioNode) => {
 		for (const track of tracks) {
 			const event = track.events[at]
@@ -200,7 +267,7 @@ function line(step: number, time: number) {
 			)
 		}
 	}
-	notes(beat.tracks, step % beat.steps, master)
+	notes(beat.tracks, step % beat.steps, beatFader)
 	for (const layer of playing.layers) {
 		if (step < layer.from || (layer.until !== undefined && step >= layer.until))
 			continue
@@ -214,6 +281,7 @@ export function musicNow() {
 	return {
 		step: playing.step,
 		state: playing.context.state,
+		beat: Math.round(playing.beatFader.gain.value * 100) / 100,
 		layers: playing.layers.map((layer) => ({
 			id: layer.id,
 			gain: Math.round(layer.fader.gain.value * 100) / 100,

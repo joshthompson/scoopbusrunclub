@@ -3,6 +3,7 @@ import { COURSES } from '../courses'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { hatCode, hatFromCode } from '../game/hats'
+import { waitingLifts } from '../game/platforms'
 import {
 	type Flyer,
 	type Out,
@@ -73,9 +74,12 @@ function pacerFrom(intro: PacerIntro): Pacer {
 		id: intro.id,
 		name: intro.name,
 		skeleton: intro.skeleton,
+		// A member's own, unless they've a look on: a race's T-shirt.
 		sprite: intro.skeleton
 			? SKELETON_SPRITE
-			: (known?.sprite ?? lookSprite(intro.look ?? DEFAULT_AVATAR)),
+			: intro.look
+				? lookSprite(intro.look)
+				: (known?.sprite ?? lookSprite(DEFAULT_AVATAR)),
 		x: -10_000,
 		feetY: 0,
 		vx: 0,
@@ -272,6 +276,11 @@ export default function Mirror(props: {
 			world.ball.out =
 				a.ball[3] === 1 ? 'home' : a.ball[3] === 2 ? 'scooped' : undefined
 		}
+		// A lift that waits, on its way, or waiting.
+		waitingLifts(world).forEach((lift, i) => {
+			const since = a.lifts?.[i] ?? -1
+			if (lift.move) lift.move.since = since < 0 ? undefined : since
+		})
 		world.carts.forEach((cart, i) => {
 			const from = a.carts?.[i]
 			if (!from) return

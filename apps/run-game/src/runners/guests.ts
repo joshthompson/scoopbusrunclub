@@ -18,7 +18,8 @@ export { guests }
 /** A guest from the backend, as a runner: undefined without a look this game can draw. */
 function asRunner(guest: unknown): Playable | undefined {
 	const id = stringIn(guest, '_id')
-	const name = stringIn(guest, 'name')
+	// Trimmed: some are typed in on the website with a space on the end.
+	const name = stringIn(guest, 'name')?.trim()
 	const avatar = isObject(guest) ? guest.avatar : undefined
 	if (!id || !name || !isObject(avatar) || !('head' in avatar)) return undefined
 	const look = avatar as unknown as CharacterSpriteProps

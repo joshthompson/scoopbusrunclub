@@ -157,13 +157,14 @@ textarea {
 }
 
 /* The menus (ui/Menu.tsx) */
+/* Over `LOGO_CYCLE` (2.6s): up and down in 0.4s, then still till the next. */
 @keyframes logo-bounce {
 	0%,
-	60%,
+	15.4%,
 	100% {
 		transform: translateY(0) rotate(0);
 	}
-	30% {
+	7.7% {
 		transform: translateY(-10px) rotate(-3deg);
 	}
 }

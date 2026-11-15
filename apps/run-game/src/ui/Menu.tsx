@@ -148,6 +148,15 @@ export function Menu(props: {
 	)
 }
 
+/**
+ * The logo's letters bounce in a Mexican wave: each up and down quickly,
+ * 0.4s, the next just after, so two or three are up at a time; then the
+ * whole name still a while before the next wave, every 2.6s. The bounce's
+ * share of the cycle is in `logo-bounce`'s keyframes (styles.css).
+ */
+const LOGO_STAGGER = 0.08
+const LOGO_CYCLE = 2.6
+
 /** The game's name, each letter bouncing in turn. */
 export function Logo(props: { size?: number }) {
 	/** Each word's letters, and how far into the whole name each one is, for its bounce's delay. */
@@ -170,7 +179,7 @@ export function Logo(props: { size?: number }) {
 								<span
 									style={{
 										display: 'inline-block',
-										animation: `logo-bounce 2.6s ${letter.index * 0.07}s ease-in-out infinite`,
+										animation: `logo-bounce ${LOGO_CYCLE}s ${letter.index * LOGO_STAGGER}s ease-in-out infinite`,
 									}}
 								>
 									{letter.char}

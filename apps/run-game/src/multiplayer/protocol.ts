@@ -163,6 +163,11 @@ export interface PadView {
 	/** Their Standings. */
 	points: number
 	paused: boolean
+	/**
+	 * A Round on its start screen, held till its Starter presses jump: the
+	 * Starter's Player number. Not, once it's under way.
+	 */
+	waitingForStarter?: number
 	course: string
 	/** How the Room's set to go, and how its Rounds are raced, for everyone to see. */
 	roomMode: RoomMode
@@ -402,6 +407,11 @@ export interface RaceFrame {
 	corgis: CorgiStateFrame[]
 	/** The Caves' mine carts, if there are any: [x, rail y, state, spin], its state by `CART_STATES`. */
 	carts?: [number, number, number, number][]
+	/**
+	 * When each Platform that waits was set off, in order, if the course has
+	 * any: -1, still waiting (see `setOffPlatforms`).
+	 */
+	lifts?: number[]
 	/** Haga's football, if there is one: [x, y, spin, out: 0 no, 1 home, 2 scooped]. */
 	ball?: [number, number, number, number]
 	/** Geese flying over. */

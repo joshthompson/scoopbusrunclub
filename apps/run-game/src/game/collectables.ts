@@ -78,6 +78,9 @@ export const COLLECTABLE_NAMES = {
 	'fika:grapes': 'Grapes',
 	'fika:oxygen': 'Oxygen',
 	'fika:vitamin': 'Vitamins',
+	'fika:waterCup': 'Water',
+	'fika:blueberrySoup': 'Blåbärssoppa',
+	'fika:hotDog': 'Korv med bröd',
 	'ride:corgi': 'Corgi',
 	'ride:llama': 'Llama',
 	'ride:camel': 'Camel',
@@ -94,6 +97,7 @@ export const COLLECTABLE_NAMES = {
 	'ride:mole': 'Mole',
 	'ride:minecart': 'Mine cart',
 	'ride:bloodCell': 'Red blood cell',
+	'ride:skateboard': 'Skateboard',
 	pumpkin: 'Pumpkin',
 	'hat:miner': "Miner's helmet",
 	'hat:skiHelmet': 'Ski helmet',
@@ -110,6 +114,7 @@ export const COLLECTABLE_NAMES = {
 	'hat:flyingHelmet': 'Flying helmet',
 	'hat:bobbleHat': 'Bobble hat',
 	'hat:headMirror': 'Head mirror',
+	'hat:discoBall': 'Disco ball',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
 
@@ -163,6 +168,9 @@ export const PICKUP_WORD = {
 	'fika:grapes': 'Get well soon!',
 	'fika:oxygen': 'Oxygen!',
 	'fika:vitamin': 'Vitamins!',
+	'fika:waterCup': 'Vatten!',
+	'fika:blueberrySoup': 'Blåbär!',
+	'fika:hotDog': 'Korv!',
 	'ride:corgi': 'Giddy up!',
 	'ride:llama': 'Giddy up!',
 	'ride:camel': 'Giddy up!',
@@ -176,6 +184,7 @@ export const PICKUP_WORD = {
 	'ride:mole': 'Dig dig!',
 	'ride:minecart': 'All aboard!',
 	'ride:bloodCell': 'Go with the flow!',
+	'ride:skateboard': 'Skate!',
 	'ride:goat': 'G.O.A.T.!',
 	'ride:skis': 'Skis on!',
 	'ride:snowboard': 'Shred!',
@@ -195,6 +204,7 @@ export const PICKUP_WORD = {
 	'hat:flyingHelmet': 'Chocks away!',
 	'hat:bobbleHat': 'Toppluva!',
 	'hat:headMirror': 'Say aah!',
+	'hat:discoBall': 'Disco!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>
 
@@ -257,6 +267,11 @@ export const COLLECTABLE_ABOUT = {
 	'fika:grapes': 'Grapes, as brought to anyone in hospital.',
 	'fika:oxygen': 'A bubble of oxygen, in the bloodstream.',
 	'fika:vitamin': 'Vitamins, inside someone. Good for them.',
+	'fika:waterCup':
+		'A paper cup of water, from the drinks station. Drink it on the run.',
+	'fika:blueberrySoup': 'Warm blueberry soup, as every Swedish race hands out.',
+	'fika:hotDog':
+		'Korv med bröd, from a kiosk on Södermalm, still open at midnight.',
 	'ride:corgi': 'A corgi, sat on the path, barking for a rider.',
 	'ride:llama': 'A llama, humming for a rider.',
 	'ride:camel': 'A camel, grumbling for a rider.',
@@ -274,6 +289,7 @@ export const COLLECTABLE_ABOUT = {
 	'ride:mole': 'A mole, squeaking for a rider.',
 	'ride:minecart': 'A mine cart, heaped with ore, waiting on the rails.',
 	'ride:bloodCell': 'A red blood cell, bobbing in the bloodstream.',
+	'ride:skateboard': 'A skateboard, left on the road on Södermalm.',
 	pumpkin: 'A carved pumpkin, worn on your head.',
 	'hat:miner': 'Its lamp lit, in a secret gallery reached by mine cart.',
 	'hat:skiHelmet': 'Safety first, on the slopes.',
@@ -291,6 +307,8 @@ export const COLLECTABLE_ABOUT = {
 	'hat:flyingHelmet': 'A leather flying helmet, high in the sky off the cliff.',
 	'hat:bobbleHat': 'Up the mountain: get to it on a goat.',
 	'hat:headMirror': "A doctor's head mirror, high in the lungs.",
+	'hat:discoBall':
+		'A disco ball, over your whole head, up on the rock band’s speakers.',
 	barcode: "Floating just before every parkrun's finish. Don't forget it!",
 } satisfies Record<Collectable, string>
 
@@ -319,6 +337,8 @@ const RIDE_BEHAVIOUR = {
 	minecart: 'Run into it and hold on to the end of the line.',
 	bloodCell:
 		'Jump on and go with the flow, faster than running. Duck to get off.',
+	skateboard:
+		'Run onto it and roll, faster than running. Jump to kickflip; duck to get off.',
 } satisfies Record<RideKind, string>
 
 /** What a hat does while it's on, from its rules: nothing, if it just looks good. */

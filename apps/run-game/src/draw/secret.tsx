@@ -8,7 +8,8 @@ import { rectFiller } from './paint/snappedRect'
  * A Secret (see `Secret`), drawn: the shaft down from its Gap, and the
  * cavern under the course, hollowed out of the mountain, in front of its
  * rock and behind everyone in it. And what's in it: on Everest, the Yetis'
- * den, their sofas, tellies and lamps, and the Yeti at its far end, waiting
+ * den, their sofas, tellies and lamps, the family portrait on the wall,
+ * and the Yeti at its far end, waiting
  * to throw you back up out of it.
  */
 
@@ -49,6 +50,8 @@ const DEEP = 400
 
 /** How far back from the path, up the floor, its things stand: against the back wall. */
 const SET_BACK = 6
+/** How high up the back wall a picture hangs, its bottom over the floor: up over the sofas. */
+const HUNG = 120
 
 export function createSecret(world: World) {
 	const secret = world.course.secret
@@ -186,6 +189,7 @@ export function createSecret(world: World) {
 		width: number,
 		height: number,
 		frames: string[],
+		up = 0,
 	) =>
 		createController({
 			frames,
@@ -193,7 +197,7 @@ export function createSecret(world: World) {
 				id,
 				type: 'secret-prop',
 				x: () => Math.round(x - width / 2),
-				y: () => floor - SET_BACK - height,
+				y: () => floor - SET_BACK - up - height,
 				width: () => width,
 				height: () => height,
 				// A telly's screen flickering; anything else, as it is.
@@ -212,6 +216,15 @@ export function createSecret(world: World) {
 				sofa.asset,
 			])
 		}
+		if (thing.kind === 'portrait')
+			return standing(
+				`secret-portrait-${i}`,
+				thing.x,
+				art.portrait.width,
+				art.portrait.height,
+				[art.portrait.asset],
+				HUNG,
+			)
 		if (thing.kind === 'telly')
 			return standing(
 				`secret-telly-${i}`,

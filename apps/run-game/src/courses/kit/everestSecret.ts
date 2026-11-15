@@ -511,6 +511,105 @@ export const LAMP: Picture = {
 	height: LAMP_H * CELL,
 }
 
+// --- The family portrait --------------------------------------------------------
+
+const FRAME = '#8a5a2e'
+const FRAME_LIT = '#b47c44'
+const FRAME_DARK = '#5e3a1c'
+const PORTRAIT_SKY = '#8cc4ec'
+const PORTRAIT_ROCK = '#71819c'
+const PORTRAIT_ROCK_SHADE = '#5c6a84'
+const PORTRAIT_SNOW = '#f4f7fb'
+const BOW = '#e0607e'
+const BOW_DARK = '#b8405e'
+const STRING = '#3a2a1a'
+const NAIL = '#9aa3ad'
+
+/** How wide its frame is, and how far its string goes up over it to the nail. */
+const PORTRAIT_W = 34
+const PORTRAIT_FRAMED = 26
+const PORTRAIT_STRING = 5
+
+/**
+ * A yeti's head and shoulders, for the portrait, its head's middle `cx`,
+ * `cy`, `size` across: shaggy, its face bare, an eye a dark cell either
+ * side, grinning for the camera.
+ */
+function posing(cx: number, cy: number, size: number): Paint[] {
+	const r = size / 2
+	return [
+		solid(shaggy(oval(cx, cy + r * 2.1, r * 1.45, r * 1.15))),
+		solid(shaggy(oval(cx, cy, r, r))),
+		solid(oval(cx, cy + r * 0.25, r * 0.62, r * 0.48), BARE),
+		box(Math.floor(cx - r * 0.38), Math.floor(cy), 1, 1, INK),
+		box(Math.floor(cx + r * 0.38), Math.floor(cy), 1, 1, INK),
+		box(Math.floor(cx) - 1, Math.floor(cy + r * 0.45), 3, 1, MOUTH),
+	]
+}
+
+/**
+ * The family portrait, framed, hung on the den's back wall on a string
+ * from a nail: the yetis, posed in front of Everest, snow on its top,
+ * under a blue sky. Dad on the left, Mum on the right with a pink bow on her head,
+ * and the little one between them, in front. 34 by 31.
+ */
+export const PORTRAIT: Picture = (() => {
+	const top = PORTRAIT_STRING
+	const inner = (x: number, y: number) =>
+		x > 2 && x < PORTRAIT_W - 2 && y > top + 2 && y < top + PORTRAIT_FRAMED - 2
+	const layers: Paint[] = [
+		// Its string, up from the top of its frame to the nail.
+		(x, y) =>
+			y < top && Math.abs(Math.abs(x - PORTRAIT_W / 2) - y * 2.2) < 1.2
+				? STRING
+				: undefined,
+		box(PORTRAIT_W / 2 - 1, 0, 2, 1, NAIL),
+		// Its frame: lit along its top and left, in shadow along its bottom
+		// and right.
+		box(0, top, PORTRAIT_W, PORTRAIT_FRAMED, FRAME),
+		box(0, top, PORTRAIT_W, 1, FRAME_LIT),
+		box(0, top, 1, PORTRAIT_FRAMED, FRAME_LIT),
+		box(0, top + PORTRAIT_FRAMED - 1, PORTRAIT_W, 1, FRAME_DARK),
+		box(PORTRAIT_W - 1, top, 1, PORTRAIT_FRAMED, FRAME_DARK),
+		box(2, top + 2, PORTRAIT_W - 4, 1, FRAME_DARK),
+		box(2, top + 2, 1, PORTRAIT_FRAMED - 4, FRAME_DARK),
+		// The sky, and Everest under it: grey rock, in shadow down its
+		// right, snow on its top.
+		(x, y) => (inner(x, y) ? PORTRAIT_SKY : undefined),
+		(x, y) => {
+			if (!inner(x, y)) return undefined
+			const down = y - top
+			const peak = 5 + Math.abs(x - 17) * 0.8
+			if (down < peak) return undefined
+			if (down < peak + 2.5) return PORTRAIT_SNOW
+			return x > 17 ? PORTRAIT_ROCK_SHADE : PORTRAIT_ROCK
+		},
+		// Dad, Mum, and the little one in front of them.
+		...posing(10.5, top + 10.5, 8),
+		...posing(23.5, top + 11.5, 7.5),
+		box(23, top + 7, 2, 2, BOW),
+		box(26, top + 7, 2, 2, BOW),
+		box(25, top + 7, 1, 2, BOW_DARK),
+		...posing(17, top + 16, 5.5),
+		// Its frame again, over the bottom of them, so they're inside it.
+		(x, y) =>
+			!inner(x, y) && y >= top && y < top + PORTRAIT_FRAMED
+				? y === top + PORTRAIT_FRAMED - 1 + 0.5 || x === PORTRAIT_W - 0.5
+					? FRAME_DARK
+					: y === top + 0.5 || x === 0.5
+						? FRAME_LIT
+						: (x > 2 && x < 3) || (y > top + 2 && y < top + 3)
+							? FRAME_DARK
+							: FRAME
+				: undefined,
+	]
+	return {
+		asset: layered(PORTRAIT_W, top + PORTRAIT_FRAMED, layers),
+		width: PORTRAIT_W * CELL,
+		height: (top + PORTRAIT_FRAMED) * CELL,
+	}
+})()
+
 // --- The Yeti, who throws you out ------------------------------------------
 
 const LAUNCHER_W = 36

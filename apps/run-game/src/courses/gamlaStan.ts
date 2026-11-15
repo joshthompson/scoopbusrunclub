@@ -14,15 +14,36 @@ import {
 } from '../game/constants'
 import { GAMLA_STAN_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
-import { GAMLA_STAN_COBBLES, GAMLA_STAN_SIDE_COBBLES } from './kit/cobbles'
+import {
+	GAMLA_STAN_COBBLES,
+	GAMLA_STAN_SIDE_COBBLES,
+	GRANITE_SLABS,
+} from './kit/cobbles'
+import {
+	DROTTNINGGATAN,
+	ROSENBAD_WIDTH,
+	oldTownAlley,
+	oldTownHouse,
+	ragAndBone,
+	riksdag,
+	rosenbad,
+} from './kit/gamlaStanScenery'
 import { withHat } from './kit/hats'
 import { type PixelRect, pixelArt } from './kit/pixelArt'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
-import type { Boost, Course, CourseDefinition, Obstacle } from './types'
+import type {
+	Boost,
+	BridgeLook,
+	Course,
+	CourseDefinition,
+	Obstacle,
+} from './types'
 
 /**
- * Gamla Stan, a placeholder: through Stockholm's old town, on the cobbles
+ * Gamla Stan, a placeholder: from the bottom of Drottninggatan, past the
+ * homeless fox by Rosenbad, over Riksbron onto Helgeandsholmen, by the
+ * Riksdag, and over Stallbron into Stockholm's old town; on the cobbles
  * between its coloured houses, its churches' spires over them. Tourists,
  * pigeons, steam from the street's grates, and a café on every corner; and
  * over Guldbron at the end, cyclists coming the other way.
@@ -47,6 +68,58 @@ const heights = Array.from({ length: DISTANCE_M / STEP_M + 1 }, (_, i) => {
 })
 
 const island = createTerrain(heights, STEP_M, DISTANCE_M)
+
+/**
+ * The way in, from the start: the end of Drottninggatan, then Riksbron
+ * over Norrström to Helgeandsholmen, Riksgatan across it past the Riksdag,
+ * and Stallbron, short, off it into Gamla Stan.
+ */
+const RIKSBRON = START_X + 260
+const RIKSBRON_END = START_X + 700
+const STALLBRON = START_X + 1460
+const STALLBRON_END = START_X + 1700
+/**
+ * Rag and Bone, the homeless fox, on the corner just behind the start, and
+ * Rosenbad behind it, its corner tower by the bridge: their middles. Their
+ * art's a cell a pixel, drawn at 2.
+ */
+const FOX = START_X - 28
+const ROSENBAD = RIKSBRON - 40 - ROSENBAD_WIDTH
+/**
+ * Drottninggatan's buildings up the street from Rosenbad, side by side
+ * back from it: each at its middle.
+ */
+const drottninggatan = () => {
+	let right = ROSENBAD - ROSENBAD_WIDTH
+	return DROTTNINGGATAN.toReversed().map(({ width, asset }) => {
+		right -= width * 2
+		return { x: right + width, asset, scale: 2 }
+	})
+}
+/**
+ * The old town's houses along the street from Stallbron to Guldbron,
+ * shops in their ground floors, side by side, an alley off between them
+ * now and then: each on the street where it is, up and down with it.
+ * Laid out with their own seed, so the course's own layout's as it was.
+ */
+const oldTownStreet = () => {
+	const random = seeded(1259)
+	const pieces: Course['scenery'] = []
+	let alleyBefore = true
+	for (let left = STALLBRON_END + 40, n = 0; ; n++) {
+		const alley: boolean = !alleyBefore && random() < 0.22
+		const { asset, width } = alley
+			? oldTownAlley(1260 + n)
+			: oldTownHouse(1260 + n)
+		if (left + width * 2 > BRIDGE - 140) break
+		pieces.push({ x: left + width, asset, scale: 2, footing: true })
+		left += width * 2
+		alleyBefore = alley
+	}
+	return pieces
+}
+/** The Riksdag, across the middle of Helgeandsholmen. */
+const RIKSDAG = (RIKSBRON_END + STALLBRON) / 2
 
 /**
  * Where Guldbron starts, the gold bridge over to Slussen, with the finish
@@ -141,8 +214,26 @@ const CYCLISTS = [0, 0.25, 0.5, 0.75].map(
 	(along) => CYCLE_SHUTTLE[0] + (CYCLE_SHUTTLE[1] - CYCLE_SHUTTLE[0]) * along,
 )
 
-/** The cobbles, pushed down out of sight where the path's over the bridge. */
-const offBridge = (x: number) => (x > BRIDGE && x < BRIDGE_END ? 1000 : 0)
+/**
+ * Granite slabs on Drottninggatan and Helgeandsholmen, cobbles in Gamla
+ * Stan, and the bridges' decks plain: each pushed down out of sight
+ * where it isn't.
+ */
+const OUT_OF_SIGHT = 1000
+const slabsOff = (x: number) =>
+	x < RIKSBRON || (x >= RIKSBRON_END && x < STALLBRON) ? 0 : OUT_OF_SIGHT
+const cobblesOff = (x: number) =>
+	x < STALLBRON_END || (x > BRIDGE && x < BRIDGE_END) ? OUT_OF_SIGHT : 0
+
+/** Riksbron and Stallbron: granite, grey, over Norrström's water. */
+const GRANITE_BRIDGE = {
+	underside: '#9a958d',
+	highlight: '#c2bdb4',
+	underbelly: '#5f5b55',
+	water: '#3f6f8f',
+	rail: '#2b3036',
+	quay: quayWall,
+} satisfies Partial<BridgeLook>
 
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	const random = seeded(1252)
@@ -199,13 +290,22 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 			}),
 		),
 	)
+	// Drottninggatan, Rosenbad, the Riksdag, the fox, and the old town's
+	// streets, behind the lamps.
+	const scenery: Course['scenery'] = [
+		...drottninggatan(),
+		...oldTownStreet(),
+		{ x: ROSENBAD, asset: rosenbad, scale: 2 },
+		{ x: RIKSDAG, asset: riksdag, scale: 2 },
+		{ x: FOX, asset: ragAndBone, scale: 2 },
+	]
 	// Street lamps along the way, as far as the bridge, and on again at
-	// Slussen, past it, by Katarinahissen.
-	const scenery: Course['scenery'] = []
+	// Slussen, past it, by Katarinahissen: none by the fox.
 	for (let at = -300; at < terrain.finishX + 1600; at += 300 + random() * 120)
 		if (
 			(at < BRIDGE - 60 || at > BRIDGE_END + 40) &&
-			Math.abs(at - KATARINAHISSEN) > 100
+			Math.abs(at - KATARINAHISSEN) > 100 &&
+			Math.abs(at - FOX) > 60
 		)
 			scenery.push({ x: Math.round(at), asset: lamp })
 	scenery.push({ x: KATARINAHISSEN, asset: katarinahissen })
@@ -262,26 +362,46 @@ export const gamlaStan: CourseDefinition = {
 			[-PATH_BACK - VERGE, 'var(--grass-green)'],
 			[-PATH_BACK - VERGE, 'url(#gamla-stan-side-cobbles)'],
 			[-PATH_BACK, 'var(--grass-darker-green)'],
-			// Guldbron's deck, plain: no cobbles over the bridge.
+			// The bridges' decks, plain, granite slabs either side of Riksbron,
+			// and cobbles from Stallbron on.
 			[-PATH_BACK + 2, 'var(--dirt-brown)'],
-			[-PATH_BACK + 2, 'url(#gamla-stan-cobbles)', false, offBridge],
+			[-PATH_BACK + 2, 'url(#granite-slabs)', false, slabsOff],
+			[-PATH_BACK + 2, 'url(#gamla-stan-cobbles)', false, cobblesOff],
 			[PATH_FRONT, 'var(--grass-darker-green)'],
 			[PATH_FRONT + 2, 'var(--grass-dark-green)'],
 			[PATH_FRONT + 4, 'var(--grass-green)'],
 			[PATH_FRONT + 4, 'url(#gamla-stan-side-cobbles)'],
 		],
-		groundDefs: GAMLA_STAN_COBBLES + GAMLA_STAN_SIDE_COBBLES,
-		// Guldbron: gold underneath, over Riddarfjärden's water.
-		bridge: {
-			from: BRIDGE,
-			to: BRIDGE_END,
-			underside: '#e8b52a',
-			highlight: '#ffe58a',
-			underbelly: '#9c6b12',
-			quay: quayWall,
-			water: '#3f6f8f',
-			rail: '#2b3036',
-		},
+		groundDefs: GAMLA_STAN_COBBLES + GAMLA_STAN_SIDE_COBBLES + GRANITE_SLABS,
+		bridges: [
+			// Riksbron, onto Helgeandsholmen: its quay's stone under the path
+			// all across the island, to Stallbron.
+			{
+				...GRANITE_BRIDGE,
+				from: RIKSBRON,
+				to: RIKSBRON_END,
+				stoneUntil: STALLBRON,
+			},
+			// Stallbron, off it, into Gamla Stan: no quay's stone past it, the
+			// old town's cobbles.
+			{
+				...GRANITE_BRIDGE,
+				from: STALLBRON,
+				to: STALLBRON_END,
+				stoneUntil: STALLBRON_END,
+			},
+			// Guldbron: gold underneath, over Riddarfjärden's water.
+			{
+				from: BRIDGE,
+				to: BRIDGE_END,
+				underside: '#e8b52a',
+				highlight: '#ffe58a',
+				underbelly: '#9c6b12',
+				quay: quayWall,
+				water: '#3f6f8f',
+				rail: '#2b3036',
+			},
+		],
 		horizonTrees: false,
 		geese: 'grayscale(1) brightness(0.9)',
 	},

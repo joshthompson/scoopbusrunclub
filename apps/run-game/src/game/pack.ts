@@ -2,14 +2,20 @@ import type { Course } from '../courses/types'
 import { kidsWidth } from '../draw/art/kids'
 import { touristsWidth } from '../draw/art/tourists'
 import { guests } from '../runners/guests'
-import { DEFAULT_AVATAR, pickAny, randomAvatar } from '../runners/looks'
-import { MEMBERS, type Playable, lookSprite } from '../runners/playable'
+import {
+	type Avatar,
+	DEFAULT_AVATAR,
+	pickAny,
+	randomAvatar,
+} from '../runners/looks'
+import { CLUB, type Playable, lookSprite } from '../runners/playable'
 import { SKELETON_SPRITE } from '../runners/skeleton'
 import { play } from '../sfx'
 import { BOARDS } from './boards'
 import { ceilingAt, inTunnel, rockOver } from './cave'
 import {
 	BUS_LEASH_MAX,
+	BUS_START_X,
 	CAMERA_LEAD,
 	DAZED_SPEED,
 	DAZED_TICKS,
@@ -23,6 +29,7 @@ import {
 	PACER_EVERY_TICKS,
 	PACER_FASTEST,
 	PACER_SLOWEST,
+	PACK_SIZE,
 	RUNNER_SCALE,
 	RUN_TOP_SPEED,
 	SLIDE_KEEP,
@@ -43,6 +50,7 @@ import { atSea, flyPacer } from './gliders'
 import { mummyAt } from './mummies'
 import { landingOn, platformAt, platformMove } from './platforms'
 import { PACER_SHRINK, isHeld, shrinkRayOver, shrunkAt } from './portals'
+import { sagOf } from './ropeBridge'
 import { swampManAt } from './sewer'
 import { skiPacer } from './skis'
 import { steamFires } from './steam'
@@ -110,7 +118,7 @@ export const SCOOP_HEARD = BUS_LEASH_MAX - VIEW_WIDTH * CAMERA_LEAD + 50
 
 /** What `lineUp` needs: the world's still being made when it's called. */
 interface Lineup {
-	course: Pick<Course, 'skeletons' | 'ride'>
+	course: Pick<Course, 'skeletons' | 'ride' | 'raceShirt' | 'crowd'>
 	racers: { runner: Playable }[]
 	terrain: Terrain
 	pack: Pacer[]
@@ -120,30 +128,56 @@ interface Lineup {
 
 /**
  * Someone to join: now and then someone the club knows, a member or one of
- * its guests, as long as they're not running already (or racing).
+ * its guests, as long as they're not running already (or racing). Never
+ * Link, or anyone else to unlock: one pacing you would look like they're
+ * yours to run as already.
  */
 function newcomer(
 	world: Lineup,
 ): Pick<Pacer, 'name' | 'member' | 'guest' | 'look' | 'sprite' | 'skeleton'> {
 	if (Math.random() < (world.course.skeletons ?? 0))
 		return { name: 'Skeleton', skeleton: true, sprite: SKELETON_SPRITE }
-	const members = [...MEMBERS, ...guests()].filter(
+	const shirt = world.course.raceShirt
+	const members = [...CLUB, ...guests()].filter(
 		(m) =>
+			// In the race's own T-shirt, only those made from a look.
+			(!shirt || m.look) &&
 			!world.racers.some(
 				(r) => r.runner.id === m.id || r.runner.name === m.name,
-			) && !world.pack.some((p) => p.name === m.name),
+			) &&
+			!world.pack.some((p) => p.name === m.name),
 	)
 	if (members.length && Math.random() < MEMBER_SHARE) {
-		const { id, name, member, sprite } = pickAny(members)
+		const { id, name, member, sprite, look } = pickAny(members)
+		const dressed = shirt && look ? inShirt(look, shirt) : undefined
 		return {
 			name,
 			member,
 			guest: id.startsWith('guest:') ? id : undefined,
-			sprite,
+			look: dressed,
+			sprite: dressed ? lookSprite(dressed) : sprite,
 		}
 	}
-	const look = randomAvatar(DEFAULT_AVATAR)
+	const random = randomAvatar(DEFAULT_AVATAR)
+	const look = shirt ? inShirt(random, shirt) : random
 	return { name: pickAny(NAMES), look, sprite: lookSprite(look) }
+}
+
+/** `look`, in a race's T-shirt, `colour`: see `raceShirt`. */
+const inShirt = (look: Avatar, colour: string): Avatar => ({
+	...look,
+	topType: 'tshirt',
+	topColor: colour,
+})
+
+/**
+ * How many Pacers can be out at once at `x`: the course's crowd, if it has
+ * one, less the Players in a Round, as `packSize` is.
+ */
+function packSizeAt(world: Lineup, x: number) {
+	const { crowd } = world.course
+	if (!crowd) return world.packSize
+	return Math.max(0, crowd(x) - (PACK_SIZE - world.packSize))
 }
 
 /**
@@ -174,10 +208,31 @@ function join(world: Lineup, x: number, skiing = false) {
  */
 export function lineUp(world: Lineup) {
 	const last = START_X - (world.racers.length - 1) * START_GAP
-	for (const offset of [-36, -72, -108, -150, -195].slice(0, world.packSize))
+	const size = packSizeAt(world, START_X)
+	const offsets = world.course.crowd
+		? // A crowd: packed in behind, as far back as the bus.
+			Array.from({ length: size }, (_, i) =>
+				Math.max(
+					BUS_START_X + 60 - last,
+					-30 - Math.round((i * CROWD_BACK) / Math.max(1, size - 1)),
+				),
+			)
+		: [-36, -72, -108, -150, -195].slice(0, size)
+	for (const offset of offsets)
 		join(world, last + offset + Math.round(Math.random() * 16))
 	world.packState.nextJoin = PACER_EVERY_TICKS
 }
+
+/** How far back from the last Player a crowd lines up. */
+const CROWD_BACK = 380
+
+/**
+ * Ticks till the next Pacer joins: sooner the bigger the pack's meant to
+ * be at `x`, so a crowd keeps up.
+ */
+const nextJoin = (world: Lineup, x: number) =>
+	((PACER_EVERY_TICKS + Math.random() * PACER_EVERY_SPREAD) * PACK_SIZE) /
+	Math.max(PACK_SIZE, packSizeAt(world, x))
 
 /**
  * One tick of the pack: joining, running, being bounced on, and leaving.
@@ -191,18 +246,23 @@ export function stepPack(world: World, frozen = false) {
 	if (phase === 'countdown') return
 
 	if (phase === 'running' && !frozen && --packState.nextJoin <= 0) {
-		packState.nextJoin = PACER_EVERY_TICKS + Math.random() * PACER_EVERY_SPREAD
 		// Just off the screen ahead, to be caught up with: on the Ground, not
 		// over a Gap, nor out at sea.
 		const x = world.camera() + world.viewWidth() + 80
+		packState.nextJoin = nextJoin(world, x)
 		const running = pack.filter((p) => !p.scooped).length
-		if (
-			running < world.packSize &&
-			x < terrain.finishX - 300 &&
-			!terrain.inGap(x) &&
-			!shrunkAt(world.course, x)
-		)
-			join(world, x, world.course.ride === 'skis')
+		const size = packSizeAt(world, x)
+		// A crowd joins in bunches, a few at a time, as it's caught up with.
+		const bunch = Math.max(1, Math.round(size / PACK_SIZE))
+		for (let k = 0, at = x; k < Math.min(bunch, size - running); k++) {
+			if (
+				at < terrain.finishX - 300 &&
+				!terrain.inGap(at) &&
+				!shrunkAt(world.course, at)
+			)
+				join(world, Math.round(at), world.course.ride === 'skis')
+			at += 18 + Math.random() * 30
+		}
 	}
 
 	for (const pacer of pack) {
@@ -353,12 +413,12 @@ function movePacer(world: World, p: Pacer) {
 	if (p.grounded) {
 		if (p.on !== undefined) {
 			const at = platformAt(terrain, world.platforms[p.on], ticks)
-			if (p.x < at.left || p.x > at.right) {
-				// Off the end of it.
+			if (world.platforms[p.on].broken || p.x < at.left || p.x > at.right) {
+				// Off the end of it, or it's broken under them.
 				p.on = undefined
 				p.grounded = false
 				p.vy = 0
-			} else p.feetY = at.top
+			} else p.feetY = at.top + sagOf(world.ropeBridges, p.on, p.x)
 		} else if (
 			(ground - p.feetY > STEP_DOWN && !terrain.inGap(p.x)) ||
 			atSea(world, p.x)
@@ -383,16 +443,32 @@ function movePacer(world: World, p: Pacer) {
 		}
 		const platform =
 			p.vy >= 0
-				? landingOn(terrain, world.platforms, ticks, p.x, wasFeetY, p.feetY)
+				? landingOn(
+						terrain,
+						world.platforms,
+						ticks,
+						p.x,
+						wasFeetY,
+						p.feetY,
+						undefined,
+						0,
+						(index, x) => sagOf(world.ropeBridges, index, x),
+					)
 				: undefined
 		if (platform && platform.top <= ground) {
 			p.feetY = platform.top
 			p.on = platform.index
 			p.vy = 0
 			p.grounded = true
-		} else if (p.feetY >= ground && p.vy >= 0 && !atSea(world, p.x)) {
+		} else if (
+			p.feetY >= ground &&
+			p.vy >= 0 &&
+			!atSea(world, p.x) &&
+			!brokenUnder(world, p.x)
+		) {
 			// Over a Gap too: Pacers never fall. Into the sea, they do: down,
-			// out of sight, and gone.
+			// out of sight, and gone; and down a gorge whose bridge has
+			// broken under them.
 			p.feetY = ground
 			p.on = undefined
 			p.vy = 0
@@ -419,7 +495,7 @@ function decide(world: World, p: Pacer) {
 
 	// Something to get up onto, right here: a Platform within a jump.
 	const board = world.platforms.findIndex((platform, i) => {
-		if (i === p.on) return false
+		if (i === p.on || platform.broken) return false
 		const at = platformAt(terrain, platform, ticks)
 		return (
 			at.top < p.feetY - 3 &&
@@ -468,6 +544,7 @@ function decide(world: World, p: Pacer) {
 		}
 		// A girder level with them, there against its edge: on, and across.
 		const level = world.platforms.findIndex((platform) => {
+			if (platform.broken) return false
 			const at = platformAt(terrain, platform, ticks)
 			return (
 				Math.abs(at.top - p.feetY) < 3 &&
@@ -512,7 +589,10 @@ function decide(world: World, p: Pacer) {
 				platform.x + platform.width <= wall + 4 &&
 				platform.x + platform.width > wall - 560,
 		)
-		const lift = near.find((platform) => platform.move?.y)
+		// Not one that waits for a Player to set it off: it never would.
+		const lift = near.find(
+			(platform) => platform.move?.y && !platform.move.waits,
+		)
 		const plank = near
 			.map((platform) => ({
 				platform,
@@ -840,3 +920,10 @@ export function scoopPack(world: World) {
 			play('whoosh')
 	}
 }
+
+/** Whether `x` is over a rope bridge that's broken: down the gorge it was over. */
+const brokenUnder = (world: World, x: number) =>
+	world.platforms.some(
+		(platform) =>
+			platform.broken && x > platform.x && x < platform.x + platform.width,
+	)

@@ -1,5 +1,6 @@
 import { STAND_HEIGHT } from './constants'
 import { platformAt } from './platforms'
+import { sagOf } from './ropeBridge'
 import type { World } from './world'
 
 /**
@@ -7,7 +8,22 @@ import type { World } from './world'
  * whoever's in a Cave, to hit their head on, and too low, to duck under.
  */
 
-type Overhead = Pick<World, 'course' | 'terrain' | 'platforms' | 'ticks'>
+type Overhead = Pick<
+	World,
+	'course' | 'terrain' | 'platforms' | 'ropeBridges' | 'ticks'
+>
+
+/**
+ * Where solid Platform `index` is at `x`: its ends, and its top and its
+ * underside, down as far as it's sagged there if it's a rope bridge, with
+ * whoever's on it. Stood on one, sagging under them, it's under them.
+ */
+function shelfAt(world: Overhead, index: number, x: number) {
+	const platform = world.platforms[index]
+	const at = platformAt(world.terrain, platform, world.ticks())
+	const top = at.top + sagOf(world.ropeBridges, index, x)
+	return { ...at, top, under: top + (platform.solid ?? 0) }
+}
 
 /**
  * The Ceiling at `x`, if it's over `y`: not if they're up over it, on a
@@ -25,12 +41,10 @@ function overhead(world: Overhead, x: number, y: number) {
  */
 export function ceilingAt(world: Overhead, x: number, head: number) {
 	let ceiling = overhead(world, x, head)
-	const ticks = world.ticks()
-	for (const platform of world.platforms) {
-		if (!platform.solid) continue
-		const at = platformAt(world.terrain, platform, ticks)
-		if (x < at.left || x > at.right) continue
-		const under = at.top + platform.solid
+	for (const [index, platform] of world.platforms.entries()) {
+		if (!platform.solid || platform.broken) continue
+		const { left, right, under } = shelfAt(world, index, x)
+		if (x < left || x > right) continue
 		if (under > head + 1) continue
 		if (ceiling === undefined || under > ceiling) ceiling = under
 	}
@@ -45,12 +59,10 @@ export function ceilingAt(world: Overhead, x: number, head: number) {
  */
 export function rockOver(world: Overhead, x: number, feetY: number) {
 	let ceiling = overhead(world, x, feetY - 1)
-	const ticks = world.ticks()
-	for (const platform of world.platforms) {
-		if (!platform.solid) continue
-		const at = platformAt(world.terrain, platform, ticks)
-		if (x < at.left || x > at.right || at.top >= feetY - 1) continue
-		const under = at.top + platform.solid
+	for (const [index, platform] of world.platforms.entries()) {
+		if (!platform.solid || platform.broken) continue
+		const { left, right, top, under } = shelfAt(world, index, x)
+		if (x < left || x > right || top >= feetY - 1) continue
 		if (ceiling === undefined || under > ceiling) ceiling = under
 	}
 	return ceiling

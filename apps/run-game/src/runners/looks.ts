@@ -119,6 +119,9 @@ export const ROWS: Row[] = [
 			{ value: 'ponytail', label: 'Ponytail' },
 			{ value: 'bun', label: 'Bun' },
 			{ value: 'curly', label: 'Curly' },
+			{ value: 'afro', label: 'Afro' },
+			{ value: 'mohawk', label: 'Mohawk' },
+			{ value: 'mullet', label: 'Mullet' },
 		],
 		get: (a) => a.head.hair ?? '',
 		set: (a, hair) =>

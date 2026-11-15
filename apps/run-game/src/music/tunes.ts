@@ -23,6 +23,11 @@ export interface Tune {
 	/** How long it is before it goes round again, in bars. */
 	bars: number
 	tracks: Track[]
+	/**
+	 * How loud the beat under it is, out of its usual: hardly there under a
+	 * choir. Full, if not said.
+	 */
+	beat?: number
 }
 
 /** Bars, a line each, as one pattern. */
@@ -91,6 +96,187 @@ const MENU: Tune = {
 			gain: 0.045,
 			gate: 0.6,
 		},
+	],
+}
+
+/** Midnattsloppet's chords, a bar each, or two in a bar: each its bass note and the three notes of it. */
+const MIDNATT_CHORD = {
+	Am: { root: 'A', low: 'A1', tones: ['A3', 'C4', 'E4'] },
+	F: { root: 'F', low: 'F1', tones: ['F3', 'A3', 'C4'] },
+	C: { root: 'C', low: 'C2', tones: ['G3', 'C4', 'E4'] },
+	G: { root: 'G', low: 'G1', tones: ['G3', 'B3', 'D4'] },
+	Em: { root: 'E', low: 'E1', tones: ['G3', 'B3', 'E4'] },
+	E: { root: 'E', low: 'E1', tones: ['G#3', 'B3', 'E4'] },
+} as const
+type MidnattChord = keyof typeof MIDNATT_CHORD
+
+/**
+ * Its 16 bars' chords, each for how many steps: the tune twice, then off
+ * to F and G and E minor, and the tune once more, turning on E at the end
+ * to bring it back round to A minor.
+ */
+const MIDNATT_BARS: [MidnattChord, number][][] = [
+	...(['Am', 'F', 'C', 'G', 'Am', 'F', 'C', 'G'] as const).map(
+		(chord): [MidnattChord, number][] => [[chord, 16]],
+	),
+	...(['F', 'G', 'Em', 'Am', 'Am', 'F', 'C'] as const).map(
+		(chord): [MidnattChord, number][] => [[chord, 16]],
+	),
+	[
+		['G', 8],
+		['E', 8],
+	],
+]
+
+/**
+ * A pattern over its chords: `beat` gives each beat's four steps, from its
+ * chord and where in the bar it is.
+ */
+const overChords = (
+	beat: (chord: (typeof MIDNATT_CHORD)[MidnattChord], step: number) => string,
+) =>
+	MIDNATT_BARS.map((bar) =>
+		bar
+			.flatMap(([chord, steps]) =>
+				Array.from({ length: steps / 4 }, (_, i) =>
+					beat(MIDNATT_CHORD[chord], i * 4),
+				),
+			)
+			.join(' '),
+	).join(' ')
+
+/** Each chord held, the `which` note of it, for as long as it lasts. */
+const heldChord = (which: number) =>
+	overChords((chord, step) =>
+		step === 0 ? `${chord.tones[which]} _ _ _` : '_ _ _ _',
+	)
+
+/** A note an octave up. */
+const up = (note: string) => note.replace(/\d$/, (o) => String(Number(o) + 1))
+
+/**
+ * The tune, the same in every version: up through A minor and down again,
+ * twice, the second time higher; up to the top over F and G; and home.
+ */
+const MIDNATT_MELODY = bars(
+	'A4 _ _ - C5 - E5 _ _ - D5 - C5 _ B4 -',
+	'C5 _ _ - A4 - F4 _ _ _ - - A4 - C5 -',
+	'E5 _ _ - G5 - E5 _ _ - D5 - C5 _ D5 -',
+	'D5 _ _ _ B4 _ _ - G4 _ _ - - - - -',
+	'A4 _ _ - C5 - E5 _ _ - A5 - G5 _ E5 -',
+	'F5 _ _ - E5 - C5 _ _ - A4 - C5 _ F5 -',
+	'G5 _ _ - E5 - C5 _ _ - E5 - G5 _ A5 -',
+	'B5 _ _ _ A5 _ G5 _ D5 _ _ _ - - - -',
+	'A5 _ _ _ _ _ G5 - F5 _ _ - E5 - F5 -',
+	'G5 _ _ _ _ _ F5 - D5 _ _ - B4 - D5 -',
+	'E5 _ _ _ G5 _ _ - B5 _ _ - G5 - E5 -',
+	'A5 _ _ _ _ _ _ _ E5 _ _ - C5 - E5 -',
+	'A4 _ _ - C5 - E5 _ _ - D5 - C5 _ B4 -',
+	'C5 _ _ - A4 - F4 _ _ _ - - A4 - C5 -',
+	'E5 _ _ - G5 - C6 _ _ - B5 - G5 _ E5 -',
+	'D5 _ _ - B4 - G4 _ G#4 _ _ _ B4 _ _ -',
+)
+
+/**
+ * The DJ's, in the streets: a bass pumping on the off-beats, supersaw
+ * chords stabbing, a plucked arpeggio running up them, and the tune on top.
+ */
+const MIDNATT_EDM: Tune = {
+	bars: 16,
+	tracks: [
+		{
+			voice: 'bass',
+			pattern: overChords((chord) => `- - ${chord.root}2 -`),
+			gain: 0.13,
+			gate: 0.6,
+		},
+		...[0, 1, 2].map(
+			(which): Track => ({
+				voice: 'supersaw',
+				pattern: overChords((chord, step) =>
+					step % 8 === 0
+						? `${chord.tones[which]} - - ${chord.tones[which]}`
+						: `- - ${chord.tones[which]} -`,
+				),
+				gain: 0.022,
+				gate: 0.45,
+			}),
+		),
+		{
+			voice: 'pluck',
+			pattern: overChords((chord, step) => {
+				const [a, b, c] = chord.tones.map(up)
+				return step % 8 === 0 ? `${a} ${b} ${c} ${b}` : `${c} ${b} ${a} ${b}`
+			}),
+			gain: 0.03,
+			gate: 0.5,
+		},
+		{ voice: 'supersaw', pattern: MIDNATT_MELODY, gain: 0.045, gate: 0.8 },
+	],
+}
+
+/**
+ * The rock band's, at the docks: power chords chugging on the guitar, the
+ * bass with it, the snare cracking harder, and the tune on lead guitar.
+ */
+const MIDNATT_ROCK: Tune = {
+	bars: 16,
+	tracks: [
+		{
+			voice: 'bass',
+			pattern: overChords((chord) => `${chord.low} - ${chord.low} -`),
+			gain: 0.1,
+			gate: 0.8,
+		},
+		{
+			voice: 'guitar',
+			pattern: overChords((chord) => {
+				const note = up(chord.low)
+				return `${note} ${note} - ${note}`
+			}),
+			gain: 0.032,
+			gate: 0.7,
+		},
+		{ voice: 'snare', pattern: '- - - - x - - - - - - - x - - x', gain: 0.07 },
+		{ voice: 'hat', pattern: 'x - x - x - x - x - x - x - x -', gain: 0.03 },
+		{ voice: 'guitar', pattern: MIDNATT_MELODY, gain: 0.022, gate: 0.9 },
+	],
+}
+
+/**
+ * The choir's, up at Sofiakyrkan: the beat all but gone, the chords sung
+ * and held, a deep bass under them, a bell now and then, and the tune sung
+ * over it all.
+ */
+const MIDNATT_CHOIR: Tune = {
+	bars: 16,
+	beat: 0.12,
+	tracks: [
+		{
+			voice: 'sub',
+			pattern: overChords((chord, step) =>
+				step === 0 ? `${chord.low.replace(/1$/, '2')} _ _ _` : '_ _ _ _',
+			),
+			gain: 0.09,
+			gate: 0.95,
+		},
+		...[0, 1, 2].map(
+			(which): Track => ({
+				voice: 'choir',
+				pattern: heldChord(which),
+				gain: 0.03,
+				gate: 0.95,
+			}),
+		),
+		{
+			voice: 'bell',
+			pattern: bars(
+				'A5 - - - - - - - - - - - - - - -',
+				'- - - - - - - - - - - - - - - -',
+			),
+			gain: 0.03,
+		},
+		{ voice: 'choir', pattern: MIDNATT_MELODY, gain: 0.045, gate: 0.95 },
 	],
 }
 
@@ -1180,6 +1366,15 @@ export const TUNES: Record<string, Tune> = {
 			},
 		],
 	},
+
+	// Midnattsloppet: one tune, in A minor, in three versions, for whoever's
+	// playing it as you pass (see `Course['tunes']`): the DJ's, in the
+	// streets; the rock band's, at the docks; and the choir's, up at
+	// Sofiakyrkan. Each the same melody over the same chords, so one can
+	// fade into the next mid-tune.
+	midnattsloppet: MIDNATT_EDM,
+	'midnattsloppet:rock': MIDNATT_ROCK,
+	'midnattsloppet:choir': MIDNATT_CHOIR,
 }
 
 /** A course with no tune of its own yet gets Haga's. */

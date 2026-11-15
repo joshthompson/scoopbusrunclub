@@ -53,6 +53,7 @@ const WHERE: Record<CourseId, string> = {
 	everest: 'on',
 	slopes: 'on',
 	karolinska: 'in',
+	midnattsloppet: 'at',
 }
 
 /** Where on `course` something is: "in Haga", "on The Slopes". */

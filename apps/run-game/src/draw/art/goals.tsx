@@ -196,6 +196,124 @@ export const YETI = rowsArt(
 	},
 )
 
+/**
+ * Find Bat Person: his face, his black bat hood pulled down over his eyes,
+ * its ears up, the whites of his eyes through its slits, his chin under it.
+ */
+export const BAT_PERSON = rowsArt(
+	[
+		'.H.........H.',
+		'.HH.......HH.',
+		'.hHH.....HHh.',
+		'.hhHHHHHHHhh.',
+		'hhhhhhhhhhhhh',
+		'hhhhhhhhhhhhh',
+		'hheeehhheeehh',
+		'hhhhhhhhhhhhh',
+		'hhkkkkkkkkkhh',
+		'.hkkkkkkkkkh.',
+		'.hkkiiiiikkh.',
+		'..kkkkkkkkK..',
+		'...kkkkkkK...',
+		'....KKKKK....',
+	],
+	{
+		h: '#2c2c38',
+		H: '#4a4a5c',
+		e: '#f4f4f0',
+		k: '#f0c49a',
+		K: '#cf9b70',
+		i: '#3b1f1a',
+	},
+)
+
+/**
+ * Get all the Rings: one, face on, gold, the light on its top left, its
+ * inside edge in shade, the sky through it.
+ */
+export const RING = rowsArt(
+	[
+		'....LLLLL....',
+		'..LLGGGGGGG..',
+		'.LGGDDDDDGGG.',
+		'.LGD.....DGG.',
+		'LGD.......DGG',
+		'LGD.......DGG',
+		'LGD.......DGG',
+		'LGD.......DGG',
+		'GGD.......DGG',
+		'.GGD.....DGG.',
+		'.GGGDDDDDGGG.',
+		'..GGGGGGGGG..',
+		'....GGGGG....',
+	],
+	{
+		L: '#ffe680',
+		G: '#f7c531',
+		D: '#b8860b',
+	},
+)
+
+/**
+ * Break the bridge: a rope bridge snapped in the middle, its posts on the
+ * banks, its two halves of planks hanging down towards the break.
+ */
+export const BROKEN_BRIDGE_ICON = rowsArt(
+	[
+		'P...........P',
+		'Pr.........rP',
+		'PBr.......rBP',
+		'PBBr.....rBBP',
+		'P.BBr...rBB.P',
+		'P..BBr.rBB..P',
+		'P...BB.BB...P',
+		'P....B.B....P',
+		'P...........P',
+	],
+	{
+		P: '#5a3f26',
+		B: '#95693a',
+		r: '#b89b5a',
+	},
+)
+
+/**
+ * Bounce on 20 heads: a running shoe come down on a runner's head, in
+ * Midnattsloppet's blue T-shirt, and the bounce off it, flicking out.
+ */
+const HEAD_BOUNCE = rowsArt(
+	[
+		'........Ff...',
+		'.......RRRR..',
+		'.....WRRRRR..',
+		'..RRWRRRRRR..',
+		'.Rrrrrrrrrr..',
+		'.SSSSSSSSSS..',
+		'Y...........Y',
+		'.Y..HHHHH..Y.',
+		'...HHHHHHH...',
+		'...FFFFHHH...',
+		'..FKFFFFHH...',
+		'...FFFFFFH...',
+		'....FFFFf....',
+		'.....FFf.....',
+		'..BBBBBBBBB..',
+		'.BBBBBBBBBBB.',
+	],
+	{
+		R: '#e8473c',
+		r: '#b8322a',
+		W: '#ffffff',
+		S: '#eef1f4',
+		Y: '#ffd84a',
+		H: '#6a4428',
+		F: '#f0c49a',
+		f: '#cf9b70',
+		K: '#1d1d1d',
+		B: '#1f6bff',
+	},
+)
+
 /** Each special goal's picture: any without, a trophy. */
 const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	haga: FOOTBALL,
@@ -207,6 +325,10 @@ const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	'great-wall': TOWER,
 	karolinska: GERM,
 	everest: YETI,
+	'city-rooftop': BAT_PERSON,
+	cliff: RING,
+	'machu-picchu': BROKEN_BRIDGE_ICON,
+	midnattsloppet: HEAD_BOUNCE,
 }
 
 /**

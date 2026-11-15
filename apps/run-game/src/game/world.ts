@@ -21,7 +21,9 @@ import {
 import { createFootball } from './football'
 import type { Hat } from './hats'
 import { lineUp } from './pack'
+import { racePlatforms } from './platforms'
 import type { PortalRun } from './portals'
+import { createRopeBridges } from './ropeBridge'
 import type { Terrain } from './terrain'
 
 /**
@@ -186,6 +188,23 @@ export interface Body {
 	foundSecret?: boolean
 	/** The bonus runner they unlocked on this course, by runner id, if they did: for the finish screen. */
 	unlocked?: string
+	/** Got to the course's hidden bonus runner, this go (see `Course['found']`). */
+	metFound?: boolean
+	/** How many times running they've jumped off a rope bridge that `breaks`: on the ground, back to none. */
+	bridgeJumps?: number
+	/**
+	 * Hanging on to the end of one half of a rope bridge they've broken,
+	 * Platform `index`'s, `near` or `far`, swinging down with it, and then
+	 * hanging there, till they jump up out (see `breakBridge`).
+	 */
+	hanging?: { index: number; side: 'near' | 'far' }
+	/**
+	 * Jumped up out of the gorge off it, `dir` the bank's way: straight up
+	 * the bank's side till they're up over its top, at `top`, then on onto it.
+	 */
+	climbing?: { dir: number; top: number }
+	/** Broke a rope bridge, jumping on it: Machu Picchu's special goal. */
+	brokeBridge?: boolean
 }
 
 /**
@@ -313,6 +332,8 @@ export interface Corgi {
 	rare?: boolean
 	/** A glider's, flying off with no one on it: how long it's been going. */
 	adrift?: number
+	/** Up off the ground under its rider, last tick: for a trick, as it leaves it. */
+	aloft?: boolean
 }
 
 /**
@@ -636,7 +657,7 @@ export function createWorld(
 	const popup = (text: string, x: number, y: number) =>
 		setPopups((all) => [...all, { id: popupId++, text, x, y, born: ticks() }])
 
-	/** How much of the course the camera shows: 1, or up to `MAX_ZOOM` zoomed out to frame a Round. */
+	/** How much of the course the camera shows: 1, or up to `MAX_ZOOM` zoomed out to frame a Round (more, with someone down a Secret). */
 	const [zoom, setZoom] = createSignal(1)
 	/** Who's won a Round, and in what order everyone came, once it's decided. */
 	const [order, setOrder] = createSignal<Racer[]>()
@@ -730,7 +751,9 @@ export function createWorld(
 		/** Its football, if it has one: see `Football`. Plain state, like the body. */
 		ball: createFootball({ football: course.football, terrain }),
 		/** The course's Platforms, which move with the tick: see `platformAt`. */
-		platforms: course.platforms ?? [],
+		platforms: racePlatforms(course.platforms ?? []),
+		/** Its rope bridges, sagging under whoever's on them: see `ropeBridge`. Plain state. */
+		ropeBridges: createRopeBridges(course.platforms ?? []),
 		/** A Portal at work, if one is: see `portals`. Plain state, like the body. */
 		portal: undefined as PortalRun | undefined,
 		/** The course's Portals that have gone off, and let everyone through, by index. */

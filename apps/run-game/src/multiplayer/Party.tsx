@@ -306,6 +306,19 @@ export default function Party(props: { onLeave: () => void }) {
 			]
 		})
 
+	/** The Starter, who starts each Round from its start screen: see `Round`. */
+	const starterNow = () => {
+		const seat = room.starter()
+		const runner = seat && seatPlayable(seat)
+		if (!seat) return undefined
+		return {
+			number: room.seats.indexOf(seat) + 1,
+			colour: seat.colour,
+			name: runner?.name ?? '',
+			controls: room.controlsFor(seat),
+		}
+	}
+
 	function roundDone(order: Racer[]) {
 		for (const racer of order)
 			if (racer.body.hat) hats.set(racer.id, racer.body.hat)
@@ -445,6 +458,12 @@ export default function Party(props: { onLeave: () => void }) {
 						number={number}
 						of={roundsOf()}
 						racers={untrack(racersNow)}
+						starter={starterNow()}
+						onWaiting={(waiting) =>
+							room.setWaitingForStarter(
+								waiting ? starterNow()?.number : undefined,
+							)
+						}
 						onWorld={streamRound}
 						onTick={() => stream?.tick()}
 						onPause={room.setPaused}

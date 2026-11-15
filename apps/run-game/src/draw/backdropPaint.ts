@@ -3,7 +3,7 @@ import bg1Asset from '@/assets/misc/bg1.png'
 import bg2Asset from '@/assets/misc/bg2.png'
 import bg3Asset from '@/assets/misc/bg3.png'
 import sunAsset from '@/assets/misc/sun.png'
-import type { CourseLook } from '../courses/types'
+import type { BridgeLook, CourseLook } from '../courses/types'
 import { TICK_MS, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { DRAWN_FROM } from '../game/groundColumns'
 import type { World } from '../game/world'
@@ -22,12 +22,15 @@ import {
 	NEARER_TOP,
 	QUAY_EDGE,
 	QUAY_LIT,
+	QUAY_SLANT,
+	QUAY_SPREAD,
 	QUAY_STONE,
 	SKYLINE_HEIGHT,
 	SPIRES_HEIGHT,
 	type Scattering,
 	farOf,
 	nearOf,
+	quaySlantRows,
 	rippleTile,
 	scatteredItems,
 	skyFlyerItems,
@@ -66,7 +69,10 @@ export function createBackdropPainter(world: World, resolve: Resolve) {
 	const legs = look.horizon
 		? [{ from: undefined, horizon: look.horizon }, ...(look.voyage ?? [])]
 		: []
-	const ripples = look.bridge ? rippleTile(look.bridge.water) : undefined
+	const bridges = (look.bridges ?? []).map((bridge) => ({
+		bridge,
+		ripples: rippleTile(bridge.water),
+	}))
 	const skyTop = resolve('var(--sky-blue-top)')
 	const skyBottom = resolve('var(--sky-blue-bottom)')
 	const grass = resolve('var(--grass-green)')
@@ -199,8 +205,9 @@ export function createBackdropPainter(world: World, resolve: Resolve) {
 			if (shown >= 1) bands(ctx)
 			else inLayer(ctx, shown, bands)
 		})
-		if (look.horizon && look.bridge && ripples)
-			paintBridgeWater(ctx, image, world, look.bridge, ripples, height)
+		if (look.horizon)
+			for (const { bridge, ripples } of bridges)
+				paintBridgeWater(ctx, image, world, bridge, ripples, height)
 
 		if (look.stadium) paintStadiumBackdrop(ctx, image, world, width, height)
 		if (hills) {
@@ -396,18 +403,35 @@ function paintBridgeWater(
 	ctx: CanvasRenderingContext2D,
 	image: ImageOf,
 	world: World,
-	bridge: NonNullable<CourseLook['bridge']>,
+	bridge: BridgeLook,
 	ripples: string,
 	height: number,
 ) {
 	const top = HORIZON - 40 + SKYLINE_HEIGHT - 1
-	const from = bridge.open ? DRAWN_FROM : bridge.from
-	const to = bridge.open ? world.terrain.finishX + 1600 : bridge.to
+	/** How far out under the land either side it goes at the far quay: none, out on open water. */
+	const spread = bridge.open ? 0 : QUAY_SPREAD
+	const from = (bridge.open ? DRAWN_FROM : bridge.from) - spread
+	const to = (bridge.open ? world.terrain.finishX + 1600 : bridge.to) + spread
 	const width = to - from
 	const left = Math.round(from - world.camera())
 	const along = (((DRAWN_FROM - from) % 64) + 64) % 64
 	const down = ((-(top + QUAY_EDGE) % 18) + 18) % 18
 	const waterTop = top + (bridge.open ? 0 : QUAY_EDGE)
+	const rows = quaySlantRows(spread)
+	ctx.save()
+	if (!bridge.open) {
+		// Its shape: its edges stepping in, down the slant, then straight down.
+		const shape = new Path2D()
+		for (const { y, inset } of rows)
+			shape.rect(left + inset, top + y, width - 2 * inset, 2)
+		shape.rect(
+			left + spread,
+			top + QUAY_SLANT,
+			width - 2 * spread,
+			height - top - QUAY_SLANT,
+		)
+		ctx.clip(shape)
+	}
 	ctx.fillStyle = bridge.water
 	ctx.fillRect(left, waterTop, width, height - waterTop)
 	paintTiled(
@@ -417,13 +441,27 @@ function paintBridgeWater(
 		{ left, top: waterTop, width, height: height - waterTop },
 		{ x: along, y: down, down: true },
 	)
+	if (!bridge.open) {
+		// The quay along the buildings' feet, lit along its top.
+		ctx.fillStyle = QUAY_LIT
+		ctx.fillRect(left, top, width, 2)
+		ctx.fillStyle = QUAY_STONE
+		ctx.fillRect(left, top + 2, width, QUAY_EDGE - 2)
+	}
+	ctx.restore()
 	if (bridge.open) return
-	// The quay along the buildings' feet, lit along its top.
-	ctx.fillStyle = QUAY_LIT
-	ctx.fillRect(left, top, width, 2)
+	// The land's stone edges, either end, slanting away from the bridge,
+	// then down into the water.
 	ctx.fillStyle = QUAY_STONE
-	ctx.fillRect(left, top + 2, width, QUAY_EDGE - 2)
-	// The land's stone edges, either end, down into the water.
-	ctx.fillRect(left, top, 4, height - top)
-	ctx.fillRect(left + width - 4, top, 4, height - top)
+	for (const { y, inset } of rows) {
+		ctx.fillRect(left + inset, top + y, 4, 2)
+		ctx.fillRect(left + width - inset - 4, top + y, 4, 2)
+	}
+	ctx.fillRect(left + spread, top + QUAY_SLANT, 4, height - top - QUAY_SLANT)
+	ctx.fillRect(
+		left + width - spread - 4,
+		top + QUAY_SLANT,
+		4,
+		height - top - QUAY_SLANT,
+	)
 }

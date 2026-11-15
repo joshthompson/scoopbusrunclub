@@ -1,5 +1,7 @@
 import { rideLook } from '../draw/rideLook'
+import { LINK_ID } from '../runners/playable'
 import { collect } from '../saved/collected'
+import { unlockRunner } from '../saved/unlocked'
 import { play } from '../sfx'
 import { PICKUP_WORD } from './collectables'
 import {
@@ -49,6 +51,8 @@ export function stepCorgis(world: World) {
 	const gliders = world.course.ride === 'glider'
 	/** Skis and snowboards: once taken, theirs the whole way down, drawn on them. */
 	const skis = world.course.ride === 'skis'
+	/** A trick its Rides do, jumped: a skateboard's kickflip; and what they call out, if anything. */
+	const { trick, call } = rideLook(world.course)
 
 	for (const c of corgis) {
 		if (c.state === 'scooped') {
@@ -78,6 +82,12 @@ export function stepCorgis(world: World) {
 			} else {
 				c.x = rider.x
 				c.facing = rider.facing
+				// Up off the ground with them: a skateboard's kickflip.
+				if (trick && !c.aloft && !rider.grounded) {
+					world.popup(trick.word, rider.x, rider.feetY - 70)
+					play('trick')
+				}
+				c.aloft = !rider.grounded
 				// Its feet are theirs, up off the ground in a leap too; a
 				// glider over them, lying under it, its bar in their hands.
 				if (gliders) {
@@ -117,6 +127,7 @@ export function stepCorgis(world: World) {
 		c.barking =
 			!gliders &&
 			!skis &&
+			!!call &&
 			running &&
 			c.state === 'waiting' &&
 			Math.abs(dx) < CORGI_CALL
@@ -155,6 +166,7 @@ function riderOf(world: World, id: string | undefined) {
 			facing: b.facing,
 			height: racer.runner.sprite.height * RUNNER_SCALE,
 			on: world.course.ride === 'glider' ? b.gliding : b.mount > 0,
+			grounded: b.grounded,
 			out: !!racer.out,
 			crashed: racer.out === 'fallen',
 		}
@@ -167,6 +179,7 @@ function riderOf(world: World, id: string | undefined) {
 		facing: 1 as const,
 		height: pacer.sprite.height * RUNNER_SCALE,
 		on: !!pacer.gliding,
+		grounded: pacer.grounded,
 		out: pacer.scooped,
 		crashed: false,
 	}
@@ -178,12 +191,12 @@ function riderOf(world: World, id: string | undefined) {
  */
 function mount(world: World, racer: Racer) {
 	const b = racer.body
-	const runInto = world.course.ride === 'mole'
+	const ride = rideLook(world.course)
+	const runInto = !!ride.runInto
 	if (!runInto && (b.grounded || b.vy <= 0)) return
 	/** Where their feet were last tick. */
 	const was = b.feetY - b.vy
 
-	const ride = rideLook(world.course)
 	for (const c of world.corgis) {
 		if (c.state !== 'waiting') continue
 		if (Math.abs(b.x - c.x) > backReach(ride.width)) continue
@@ -220,8 +233,18 @@ function mount(world: World, racer: Racer) {
 			back - 40,
 		)
 		play(ride.sound)
+		if (kind === 'corgi') rodeCorgi(world, racer)
 		return
 	}
+}
+
+/** The first corgi ever ridden: Link, the club's dog, is theirs to run as. */
+function rodeCorgi(world: World, racer: Racer) {
+	const b = racer.body
+	if (!unlockRunner(LINK_ID)) return
+	b.unlocked = LINK_ID
+	play('cheer')
+	world.popup('Link unlocked!', b.x, b.feetY - 110)
 }
 
 /** Whichever corgis the bus has caught up with go flying, the same as anyone. */
