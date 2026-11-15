@@ -13,6 +13,7 @@ import {
 	createWorld,
 } from '../game/world'
 import { NOTHING_HELD } from '../input'
+import { bonusRunner } from '../runners/bonus'
 import { guests } from '../runners/guests'
 import { DEFAULT_AVATAR } from '../runners/looks'
 import {
@@ -57,6 +58,8 @@ function playableFor(intro: RacerIntro): Playable {
 		return { ...customPlayable(intro.custom), id: intro.character }
 	return (
 		MEMBERS.find((m) => m.id === intro.character) ??
+		// A bonus runner, unlocked on whoever's phone, if not this one.
+		bonusRunner(intro.character) ??
 		// Nobody it knows: anyone at all, rather than nothing.
 		MEMBERS[0]
 	)

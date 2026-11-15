@@ -259,9 +259,21 @@ export interface CourseLook {
 	/**
 	 * A picture in place of the traffic cone, `width` by `height`, and what
 	 * they're called, knocking them over: a wet floor sign, in a hospital.
-	 * Still knocked over as a cone, slowing you a little.
+	 * Still knocked over as a cone, slowing you a little. Or, with a
+	 * `crumbled` picture, the same size, squashed down flat into it rather
+	 * than tipped over: a sandcastle, on a beach. `word`, what pops up,
+	 * rather than "Bonk!".
 	 */
-	cone?: { asset: string; width: number; height: number; name: string }
+	cone?: {
+		asset: string
+		width: number
+		height: number
+		name: string
+		crumbled?: string
+		word?: string
+	}
+	/** What's in its Secret's cavern, if it has one (see `Secret`). */
+	secret?: SecretLook
 	/** A bouncer's picture, in place of the toadstool (see `bouncers`): an air sac in a lung. */
 	bouncer?: { asset: string; width: number; height: number }
 	/**
@@ -1010,6 +1022,8 @@ export interface Course {
 	 * one carries it down, `busFloor` its way down.
 	 */
 	leap?: { edge: number; catchAt: number; land: number }
+	/** A Secret: a way down one of its Gaps into a cavern under it. See `Secret`. */
+	secret?: Secret
 	/** A mine, with mine carts to ride: see `Mine`. */
 	mine?: Mine
 	/**
@@ -1036,6 +1050,52 @@ export interface Course {
  * in the rock that there's no getting to any other way, a hat waiting in
  * it, and back down to the rest.
  */
+/**
+ * A Secret: one Gap, `gap`, that's a way in, not a fall. Whoever goes down
+ * it isn't out: they drop on down its shaft, a screen and more, into a
+ * cavern under the course, from `from` to `to` along, its floor at the
+ * height `floor` (a y on the screen, level all along it) and its roof
+ * `room` over that. At its far end, at `launch`, someone's waiting in the
+ * way to throw them back up onto the course: up `peak` over it, and down
+ * again about `land` along. Thrown out, they've unlocked the bonus runner
+ * `unlocks`, by their runner id, if it has one (see `BONUS_RUNNERS`).
+ */
+export interface Secret {
+	gap: { from: number; to: number }
+	from: number
+	to: number
+	floor: number
+	room: number
+	launch: number
+	peak: number
+	land: number
+	unlocks?: string
+}
+
+/**
+ * What's in a Secret's cavern, drawn: on Everest, the Yetis' den. Its
+ * `furnishings` stand against its back wall, `x` along the course their
+ * middles: sofas, by which of its `sofas`, tellies and lamps. And whoever's
+ * at its far end, to throw you out, its `launcher`: facing left, the way
+ * you come, `kneel`ing, waiting, `hands` where you run into, from the
+ * picture's top left; and `thrown`, while you're on your way up. All in
+ * world pixels.
+ */
+export interface SecretLook {
+	sofas: { asset: string; width: number; height: number }[]
+	telly: { frames: [string, string]; width: number; height: number }
+	lamp: { asset: string; width: number; height: number }
+	launcher: {
+		kneel: string
+		thrown: string
+		width: number
+		kneelHeight: number
+		thrownHeight: number
+		hands: { x: number; y: number }
+	}
+	furnishings: { x: number; kind: 'sofa' | 'telly' | 'lamp'; which?: number }[]
+}
+
 export interface Mine {
 	from: number
 	to: number
@@ -1112,6 +1172,8 @@ export interface SpecialRun {
 	toppedTower?: boolean
 	/** How many Germs they popped, landing on them. */
 	germsPopped?: number
+	/** Been down the course's Secret, and back out of it. */
+	foundSecret?: boolean
 }
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */

@@ -128,6 +128,12 @@ export interface Body {
 	 * it, along its way down to the valley floor (see `rideCondor`).
 	 */
 	condorFrom?: { x: number; y: number }
+	/**
+	 * Down a Secret's Gap (see `Secret`): `in` its cavern, its floor their
+	 * Ground, or on down its shaft to it; or `flung`, thrown back up out of
+	 * it, flying, till they're up over the course again (see `secret.ts`).
+	 */
+	secret?: 'in' | 'flung'
 	/** Ticks before another Player can bounce on their head again. */
 	stomped: number
 	/** The Platform they're stood on, by its index: on the Ground if none. */
@@ -176,6 +182,10 @@ export interface Body {
 	toppedTower?: boolean
 	/** Germs popped, landing on them: Karolinska's special goal. */
 	germsPopped?: number
+	/** Been down a Secret, and thrown back up out of it: Everest's special goal. */
+	foundSecret?: boolean
+	/** The bonus runner they unlocked on this course, by runner id, if they did: for the finish screen. */
+	unlocked?: string
 }
 
 /**

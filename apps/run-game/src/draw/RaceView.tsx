@@ -24,6 +24,7 @@ import { createCaveCover, createSeaFront } from './frontControllers'
 import { createGiantMouth } from './giantMouth'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPortalFx } from './portalFx'
+import { createSecret } from './secret'
 import {
 	createBanner,
 	createBoost,
@@ -128,6 +129,9 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			'mud',
 			// The Caves' mine: its rails, trestles and secret gallery.
 			'mine',
+			// A Secret's cavern under the course: what's in it, then its hollow.
+			'secret-prop',
+			'secret',
 			// The ways moles have dug through the rock, its shelves too.
 			'mole-trail',
 			// The hole the bus bores through a Cave's rock, its shelves too.
@@ -159,6 +163,7 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createHut(world),
 				...createBusBore(world),
 				...createMine(world),
+				...createSecret(world),
 				...createMoleTrails(world),
 				...createMineCarts(world),
 				...createFootballSprite(world),

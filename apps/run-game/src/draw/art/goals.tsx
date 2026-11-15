@@ -166,6 +166,36 @@ const GERM = rowsArt(
 	{ G: '#7ac143', L: '#c4ec86', D: '#4f8a2a', S: '#e8604a', K: '#2b2722' },
 )
 
+/** Find the Yeti: his face, shaggy and white, pale blue in it, grinning. */
+export const YETI = rowsArt(
+	[
+		'....L.L.L....',
+		'..LLWLWLWLL..',
+		'.LWWWWWWWWWL.',
+		'.WWWWWWWWWWWS',
+		'WWWWWWWWWWWWS',
+		'WWFFWWWWWFFWS',
+		'WWFFFFFFFFFWS',
+		'WWFKFFFFFKFWS',
+		'SWFFFFfFFFFWS',
+		'SWFMFFFFFMFWS',
+		'.SWFMTMTMFWS.',
+		'.SWWFFFFFWWS.',
+		'..SWSWSWSWS..',
+		'...S.S.S.S...',
+	],
+	{
+		L: '#ffffff',
+		W: '#eef1f7',
+		S: '#b9c0dc',
+		F: '#a6c0e0',
+		f: '#7f9cc6',
+		M: '#3b3350',
+		T: '#ffffff',
+		K: '#1d1d1d',
+	},
+)
+
 /** Each special goal's picture: any without, a trophy. */
 const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	haga: FOOTBALL,
@@ -176,6 +206,7 @@ const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	slopes: SHOE,
 	'great-wall': TOWER,
 	karolinska: GERM,
+	everest: YETI,
 }
 
 /**

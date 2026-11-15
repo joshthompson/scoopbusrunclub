@@ -1,5 +1,6 @@
 import { For, type JSX, Show, createEffect, onCleanup } from 'solid-js'
 import { touchScreen } from '../input'
+import { unlockedBonusRunners } from '../runners/bonus'
 import { type CustomRunner, customRunners } from '../runners/customRunners'
 import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
 import { play } from '../sfx'
@@ -28,11 +29,15 @@ export function CharacterSelect(props: {
 	onEdit: (runner?: CustomRunner) => void
 	onBack: () => void
 }) {
-	/** Making one first, then your own runners, newest first, then the club. */
+	/**
+	 * Making one first, then your own runners, newest first, then any bonus
+	 * runners unlocked, then the club.
+	 */
 	const entries = (): Entry[] => [
 		{ kind: 'new', id: 'new' },
 		...[
 			...customRunners().map(customPlayable).reverse(),
+			...unlockedBonusRunners(),
 			...MEMBERS_BY_NAME,
 		].map((runner): Entry => ({ kind: 'runner', id: runner.id, runner })),
 	]
@@ -171,7 +176,9 @@ export function CharacterSelect(props: {
 										? touchScreen()
 											? 'Your runner · Edit to change'
 											: 'Your runner · E to change'
-										: 'Club member'}
+										: runner().bonus
+											? 'Bonus runner · Unlocked!'
+											: 'Club member'}
 								</div>
 							</>
 						)

@@ -2669,6 +2669,18 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				state,
 				draw: ({ ctx, image }) => {
 					const since = knocked()
+					const crumbled = own?.crumbled
+					if (since !== undefined && crumbled) {
+						// Squashed down, from its top, into a heap of itself.
+						if (since >= CONE_CRUMBLES) {
+							paintPicture(ctx, image, crumbled, 0, 0, width, height)
+							return
+						}
+						const squash = 1 - since / CONE_CRUMBLES
+						const tall = Math.max(1, Math.round(height * squash))
+						paintPicture(ctx, image, picture, 0, height - tall, width, tall)
+						return
+					}
 					if (since !== undefined) {
 						// Over its bottom right corner.
 						const { slid, turn } = tipped(since)
@@ -3542,6 +3554,8 @@ const CONE_HEIGHT = 22
 const CONE_TIPS = 6
 const CONE_SKID = 40
 const CONE_SKIDS = 18
+/** A sandcastle, run into: how long it takes to squash down flat. */
+const CONE_CRUMBLES = 6
 /** How long a knocked-off hat's seen flying. */
 const HAT_FLIES = 50
 

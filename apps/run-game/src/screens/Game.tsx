@@ -28,6 +28,7 @@ import {
 	submitScore,
 	wouldPlace,
 } from '../online/runScores'
+import { bonusRunner } from '../runners/bonus'
 import type { Playable } from '../runners/playable'
 import { markSpecialDone } from '../saved/goals'
 import { record, today, topScore } from '../saved/highScores'
@@ -218,6 +219,9 @@ export function Game(props: {
 			const entry = { runner: props.runner.name, date: today() }
 			const courseBestBefore = topScore(props.course.id)
 			const placing: Placing = { courseBestBefore }
+			// A bonus runner unlocked, finding them on the way: shown off.
+			if (world.body.unlocked)
+				placing.newRunner = bonusRunner(world.body.unlocked)
 			if (world.courseScore() > 0)
 				placing.coursePlace = record(props.course.id, {
 					...entry,
@@ -254,6 +258,7 @@ export function Game(props: {
 					rodeWearing: world.body.rodeWearing,
 					toppedTower: world.body.toppedTower,
 					germsPopped: world.body.germsPopped,
+					foundSecret: world.body.foundSecret,
 				})
 			) {
 				placing.special = true

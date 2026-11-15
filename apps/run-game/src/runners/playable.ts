@@ -8,13 +8,15 @@ import { type SkiPoses, skiPosesFor } from './skiPoses'
 
 /** Anyone you can run as: a club member, or a custom runner of your own. */
 export interface Playable {
-	/** `member:<key>` or `custom:<id>`. */
+	/** `member:<key>`, `custom:<id>` or `bonus:<key>`. */
 	id: string
 	name: string
 	/** The club member they are, if they're one: nobody volunteers while they're running. */
 	member?: RunnerName
 	/** Their custom runner, if they're one. */
 	custom?: CustomRunner
+	/** A bonus runner, found on a course and unlocked (see `BONUS_RUNNERS`). */
+	bonus?: boolean
 	/** The look they're made from, if they're made from one: a custom runner's, or a guest's. */
 	look?: CharacterSpriteProps
 	sprite: {

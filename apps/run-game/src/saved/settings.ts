@@ -6,6 +6,7 @@ import { forgetHighScores } from './highScores'
 import { forgetIdentity } from './identity'
 import { forgetMedals } from './medals'
 import { forgetProgress } from './progress'
+import { forgetUnlockedRunners } from './unlocked'
 
 import { STORAGE_PREFIX } from './storagePrefix'
 
@@ -85,4 +86,5 @@ export function clearLocalData() {
 	forgetSpecialGoals()
 	forgetCollected()
 	forgetIdentity()
+	forgetUnlockedRunners()
 }

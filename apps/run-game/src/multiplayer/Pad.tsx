@@ -12,6 +12,7 @@ import {
 } from 'solid-js'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { type Action, anyControls } from '../input'
+import { unlockedBonusRunners } from '../runners/bonus'
 import { type CustomRunner, customRunners } from '../runners/customRunners'
 import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
 import { RunnerEditor } from '../screens/RunnerEditor'
@@ -287,9 +288,10 @@ function Controller(props: {
 		props.onLeave()
 	}
 
-	/** Their own runners first, then the club. */
+	/** Their own runners first, then any bonus runners they've unlocked, then the club. */
 	const characters = (): Playable[] => [
 		...customRunners().map(customPlayable).reverse(),
+		...unlockedBonusRunners(),
 		...MEMBERS_BY_NAME,
 	]
 	const mine = () => {

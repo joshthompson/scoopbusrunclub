@@ -19,7 +19,7 @@ A computer-controlled runner sharing the course with the Players.
 _Avoid_: Bot, AI, NPC, the pack (in prose)
 
 **Character**:
-The runner a Player races as: a club member or a custom runner. Each Character can be used by at most one Player per Room.
+The runner a Player races as: a club member, a custom runner, or an Unlocked Bonus Runner. Each Character can be used by at most one Player per Room.
 _Avoid_: Avatar, skin, runner (for the choice itself)
 
 **Course**:
@@ -51,7 +51,7 @@ What the backend hands each Run and each Practice as it starts. A score is only 
 _Avoid_: Signature, signing (nothing's signed: whatever signed it would be in the player's browser to copy)
 
 **Unlocked**:
-Said of a Course that can be Practised on this device: the first always, and any other once the Course before it has been finished here, in a Run or in Practice. Unlocking has nothing to do with Rounds.
+Said of a Course that can be Practised on this device: the first always, and any other once the Course before it has been finished here, in a Run or in Practice. Unlocking has nothing to do with Rounds. A Bonus Runner is Unlocked, to be picked as a Character, once it's been found on this device.
 
 **Ground**:
 The lowest surface along a Course, following its hills, which runners stand on unless they're on a Platform. It can have Gaps.
@@ -64,8 +64,16 @@ The side of higher Ground, such as the next rooftop along or the far side of a G
 A Wall that only stops a runner, never throws them back: each step of the Great Wall's staircase. They jump up it.
 
 **Gap**:
-A stretch of a Course with no Ground and no Platform underneath: going down one leaves a runner Fallen.
+A stretch of a Course with no Ground and no Platform underneath: going down one leaves a runner Fallen, unless it's a Secret.
 _Avoid_: Pit, hole (potholes are Obstacles you can trip in and get out of)
+
+**Secret**:
+A Gap that is a way in rather than a fall. Whoever goes down it isn't Fallen: they drop a long way down its shaft into a cavern under the Course, at the same place along it, run along its floor, and at its far end are thrown back up onto the Course, high over it. Everest's is the Yetis' den, down the last crevasse of the Icefall, and finding it is Everest's special goal.
+_Avoid_: Hidden level, bonus level, cave (a Cave is over the Ground; a Secret is under it)
+
+**Bonus Runner**:
+A Character that isn't a club member or anyone's own, found on a Course and Unlocked by finding it, kept on that device. The Yeti, thrown out of Everest's Secret, is the first.
+_Avoid_: Secret character, hidden character
 
 **Platform**:
 A raised surface a runner can land on above the Ground, such as a ledge, a rooftop or a crane girder. Runners jump up through one from below, and drop off it by running off the end or ducking.

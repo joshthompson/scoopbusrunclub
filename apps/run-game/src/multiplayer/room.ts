@@ -9,6 +9,7 @@ import {
 	touchControls,
 	unpackControls,
 } from '../input'
+import { bonusRunner, unlockedBonusRunners } from '../runners/bonus'
 import { type CustomRunner, customRunners } from '../runners/customRunners'
 import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
 import {
@@ -80,9 +81,13 @@ export const LOST_SEAT_MS = 60_000
 /** How often phones are told what to show, even when nothing's changed. */
 const VIEW_EVERY_MS = 250
 
-/** Every member, then the Host's own custom runners: who a Local Player can be. */
+/**
+ * The Host's own custom runners, then the bonus runners unlocked here, then
+ * every member: who a Local Player can be.
+ */
 export const localCharacters = (): Playable[] => [
 	...customRunners().map(customPlayable).reverse(),
+	...unlockedBonusRunners(),
 	...MEMBERS_BY_NAME,
 ]
 
@@ -96,6 +101,8 @@ export function seatPlayable(seat: Seat): Playable | undefined {
 	if (seat.custom) return { ...customPlayable(seat.custom), id: seat.character }
 	return (
 		MEMBERS.find((m) => m.id === seat.character) ??
+		// Unlocked on their phone, if not here.
+		bonusRunner(seat.character) ??
 		localCharacters().find((c) => c.id === seat.character)
 	)
 }

@@ -4,6 +4,7 @@ import barcodeAsset from '../../assets/boosts/barcode.png'
 import type { Collectable } from '../../game/collectables'
 import type { FikaItem } from '../../game/fika'
 import type { Hat, PickupHat } from '../../game/hats'
+import { BloodCellArt } from './bloodCell'
 import { BactrianArt, CamelArt } from './camel'
 import { CondorArt } from './condor'
 import { CorgiArt } from './corgi'
@@ -75,6 +76,8 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <MoleArt pose="sit" />
 		case 'ride:minecart':
 			return <MineCartArt />
+		case 'ride:bloodCell':
+			return <BloodCellArt pose="sit" />
 		case 'barcode':
 			return (
 				<img

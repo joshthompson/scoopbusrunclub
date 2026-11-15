@@ -4,7 +4,9 @@ import { TOURISTS_HEIGHT, touristsWidth } from '../draw/art/tourists'
 import { TALL_HURDLE_CLEAR, TALL_HURDLE_HEIGHT } from '../draw/art/track'
 import { flyerLook } from '../draw/flyerLook'
 import { rideLook } from '../draw/rideLook'
+import { bonusRunner } from '../runners/bonus'
 import { collect } from '../saved/collected'
+import { unlockRunner } from '../saved/unlocked'
 import { play } from '../sfx'
 import {
 	GERM_GIVE,
@@ -109,6 +111,16 @@ import { mummyAt } from './mummies'
 import { bounceOff, scoopPack, stepPack } from './pack'
 import { landingOn, platformAt, platformMove } from './platforms'
 import { busHeld, isHeld, portalCamera, stepPortals } from './portals'
+import {
+	atLaunch,
+	fling,
+	flyOut,
+	goingIn,
+	keepIn,
+	secretCeiling,
+	secretRoof,
+	underground,
+} from './secret'
 import {
 	HANDS_HOLD,
 	HANDS_REACH,
@@ -499,6 +511,13 @@ function stepRunner(world: World, racer: Racer) {
 		b.wasUp = up
 		return
 	}
+	if (b.secret === 'flung') {
+		// Thrown up out of a Secret: nothing to do but fly, till they're up
+		// over the course again.
+		if (flyOut(world, b)) cameOut(world, racer)
+		b.wasUp = up
+		return
+	}
 	if (b.carried > 0 && up && !b.wasUp) {
 		// Jumping off a goose: up off it, as off the ground. Off a dragon's
 		// back, pushing off it, higher: high enough, just before a guard
@@ -566,7 +585,8 @@ function stepRunner(world: World, racer: Racer) {
 
 	if (b.grounded) {
 		// Platforms are flat, and so's a bed.
-		const slope = b.on === undefined && !b.bed ? terrain.slope(b.x) : 0
+		const slope =
+			b.on === undefined && !b.bed && !b.secret ? terrain.slope(b.x) : 0
 		// In a Tunnel: kept down in it, ducking or not, and going through it
 		// no slower than they went in.
 		const low = inTunnel(world, b.x, b.feetY)
@@ -701,7 +721,11 @@ function stepRunner(world: World, racer: Racer) {
 	// The bus is in the way long before this, but the ground runs out here.
 	const from = b.x
 	b.x = Math.max(LEFT_EDGE, b.x + b.vx)
-	if (racing) {
+	// Down a Secret's Gap, past its lip: on the way into it, not falling.
+	if (racing && goingIn(world, b)) b.secret = 'in'
+	// And in it, kept in it: nothing on the course over it in the way.
+	if (b.secret) keepIn(world, b, bodyHeight(b))
+	else if (racing) {
 		callOut(world, b, from)
 		hitWall(world, racer, from)
 		hitTower(world, racer, from)
@@ -709,8 +733,10 @@ function stepRunner(world: World, racer: Racer) {
 		if (!mole) hitRockFace(world, racer, from)
 	}
 
-	const ground = terrain.groundY(b.x)
-	const overGap = terrain.inGap(b.x)
+	// Down in a Secret, its floor's their Ground, with no Gap in it.
+	const secret = b.secret ? world.course.secret : undefined
+	const ground = secret ? secret.floor : terrain.groundY(b.x)
+	const overGap = !secret && terrain.inGap(b.x)
 	if (b.grounded) {
 		if (b.on !== undefined) {
 			const platform = world.platforms[b.on]
@@ -735,13 +761,15 @@ function stepRunner(world: World, racer: Racer) {
 		// mole: up into the rock it digs.
 		if (b.vy < 0 && !mole) {
 			const height = bodyHeight(b)
-			const over = ceilingAt(world, b.x, wasFeetY - height)
+			const over = secret
+				? secretCeiling(world, b.x)
+				: ceilingAt(world, b.x, wasFeetY - height)
 			// And the Cave's Ceiling over their front: under a roof sloping
 			// down ahead, a Tunnel's mouth, it's their front that bumps it,
 			// rather than rising on into the rock.
-			const ahead = world.course.cave?.ceiling(
-				b.x + b.facing * HITBOX_HALF_WIDTH,
-			)
+			const ahead = secret
+				? undefined
+				: world.course.cave?.ceiling(b.x + b.facing * HITBOX_HALF_WIDTH)
 			const ceiling =
 				ahead !== undefined && ahead <= wasFeetY - height + 1
 					? Math.max(ahead, over ?? ahead)
@@ -792,6 +820,8 @@ function stepRunner(world: World, racer: Racer) {
 			fall(world, racer)
 	}
 	if (b.grounded) b.floor = b.feetY
+	// At a Secret's far end: thrown back up out of it.
+	if (racing && atLaunch(world, b)) thrownOut(world, racer)
 	// Down from the long jump: how far.
 	if (b.grounded && b.launchX !== undefined) landLongJump(world, racer)
 }
@@ -1114,6 +1144,35 @@ function fall(world: World, racer: Racer) {
 	)
 }
 
+/**
+ * At a Secret's far end: thrown back up out of it, high over the course,
+ * by whoever's waiting there. The first time, whoever that is is theirs to
+ * run as, if they're a bonus runner.
+ */
+function thrownOut(world: World, racer: Racer) {
+	const b = racer.body
+	fling(world, b)
+	b.foundSecret = true
+	play('whoosh')
+	world.popup('Wheee!', b.x, b.feetY - 90)
+}
+
+/**
+ * Out of a Secret, thrown, at the top of their flight over the course: the
+ * first time, whoever threw them is theirs to run as, if they're a bonus
+ * runner. Said here, where they can see it, rather than down in the rock.
+ */
+function cameOut(world: World, racer: Racer) {
+	const b = racer.body
+	const unlocks = world.course.secret?.unlocks
+	const bonus = unlocks && bonusRunner(unlocks)
+	if (bonus && unlockRunner(bonus.id)) {
+		b.unlocked = bonus.id
+		play('cheer')
+		world.popup(`${bonus.name} unlocked!`, b.x, b.feetY - 90)
+	}
+}
+
 /** How far past a Gap, or the sea, someone's put back on their feet in Baby Mode. */
 const RESPAWN_PAST = 60
 /** And how long they're stumbling, getting going again. */
@@ -1196,6 +1255,8 @@ function collide(world: World, racer: Racer) {
 	const { terrain } = world
 	const b = racer.body
 	if (world.phase() !== 'running' || racer.out) return
+	// Down in a Secret, under it all: nothing on the course to run into.
+	if (b.secret) return
 
 	// On a glider: lying along under its wing, it over them.
 	const box = b.gliding
@@ -1308,8 +1369,13 @@ function collide(world: World, racer: Racer) {
 					state.flown = world.ticks()
 					b.vx *= CONE_KEEP
 					world.addBonus('cones', -CONE_POINTS)
-					world.popup(scored(world, 'Bonk!', `-${CONE_POINTS}`), b.x, top)
-					play('stomp')
+					world.popup(
+						scored(world, own?.word ?? 'Bonk!', `-${CONE_POINTS}`),
+						b.x,
+						top,
+					)
+					// A sandcastle's a soft thing to run into.
+					play(own?.crumbled ? 'squelch' : 'stomp')
 				}
 				break
 			}
@@ -2270,6 +2336,19 @@ function leapView(world: World, b: Body) {
 	return { high: b.feetY - 40, low: b.feetY + under }
 }
 
+/**
+ * Down a Secret: on the way down its shaft, the camera goes down with them,
+ * keeping what's under them in view; and once down in its cavern, the
+ * cavern, from over its roof to under its floor.
+ */
+function secretView(world: World, b: Body) {
+	const secret = world.course.secret
+	if (!secret || !underground(world, b)) return undefined
+	if (b.feetY < secretRoof(world))
+		return { high: b.feetY - 40, low: b.feetY + 220 }
+	return { high: secret.floor - 150, low: secret.floor }
+}
+
 /** How much sky over a glider's highest, and sea under the surface, the camera shows gliding. */
 const GLIDE_SKY_ROOM = 90
 const GLIDE_SEA_ROOM = 40
@@ -2303,7 +2382,9 @@ function stepCamera(world: World) {
 	const wantZoom = gliding?.zoom ?? 1
 	if (Math.abs(wantZoom - zoom) > 0.001)
 		world.setZoom(zoom + (wantZoom - zoom) * ZOOM_EASE)
-	const leaping = gliding ? undefined : leapView(world, b)
+	const leaping = gliding
+		? undefined
+		: (leapView(world, b) ?? secretView(world, b))
 	const view = gliding ?? leaping ?? lookAt(b)
 	// Up a mountain, up the climb ahead too; down one, down the slope ahead.
 	if (!gliding && !leaping && !flyingHigh(b))
@@ -2383,7 +2464,7 @@ function frameEveryone(world: World) {
 		glide?.high ?? Number.POSITIVE_INFINITY,
 		...running.map(
 			(r) =>
-				leapView(world, r.body)?.high ??
+				(leapView(world, r.body) ?? secretView(world, r.body))?.high ??
 				(flyingHigh(r.body)
 					? lookAt(r.body).high
 					: upAhead(world, r.body.x, r.body.facing, lookAt(r.body).high)),
@@ -2393,7 +2474,7 @@ function frameEveryone(world: World) {
 		glide?.low ?? Number.NEGATIVE_INFINITY,
 		...running.map(
 			(r) =>
-				leapView(world, r.body)?.low ??
+				(leapView(world, r.body) ?? secretView(world, r.body))?.low ??
 				downAhead(
 					world,
 					r.body,

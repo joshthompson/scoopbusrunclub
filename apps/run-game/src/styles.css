@@ -70,6 +70,26 @@ textarea {
  * Run strips are drawn right to left (see `generateFrames(…, reverse)` in the
  * web app), so they play by stepping the image to the right.
  */
+/* A new runner unlocked, on the finish screen: popping in, then glowing. */
+@keyframes new-runner-pop {
+	from {
+		transform: scale(0.4);
+		opacity: 0;
+	}
+	70% {
+		transform: scale(1.08);
+		opacity: 1;
+	}
+	to {
+		transform: scale(1);
+	}
+}
+@keyframes new-runner-glow {
+	50% {
+		box-shadow: 0 0 18px 4px rgba(255, 210, 63, 0.65);
+	}
+}
+
 @keyframes run-strip {
 	from {
 		background-position-x: var(--strip);
