@@ -29,7 +29,7 @@ What every course has as of the Challenges commit (`4db1312`). A course is **up 
 | 9 | **Own hat**: exactly one, placed somewhere it *takes doing* to reach (off a Ride, a head bounce, a secret route), with `withHat()` (`kit/hats.ts`) or by hand. It is the icon of the course's collectables goal (`courseHat`). | course file |
 | 10 | **A Ride or flyer**: `ride` + `corgis` (+ `corgisUp`), and/or `flyer` + `flyovers` | course file |
 | 11 | **Special goal**: `special: { goal, done(run) }`, `goal` a short imperative ("Long jump 10 m"), plus its picture in `SPECIAL` (or it falls back to a trophy) | course file + `src/draw/art/goals.tsx` |
-| 12 | **Own tune** in `TUNES`, keyed by id (else it plays Haga's) | `src/music/tunes.ts` |
+| 12 | **Own tune** in `TUNES`, keyed by id (else it plays Haga's), 16 bars like the rest (see the comment atop the file) | `src/music/tunes.ts` |
 | 13 | **Fits a Round's camera**: climbs no more than `MAX_CLIMB` within the bus's leash. `COURSES` logs a `console.error` at load for any that do. | checked in `src/courses/index.ts` |
 | 14 | **Within the server's ceilings**: no more of anything than `MOST_PER_COURSE` allows, or its online scores get rejected | `apps/api/convex/runScores.ts` |
 

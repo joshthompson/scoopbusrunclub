@@ -8,8 +8,11 @@ import type { Track } from './synth'
  *
  * Each track is a pattern of one token a step (see `synth.ts`): `C4` a note,
  * `-` a rest, `_` the note before held on. A tune's tracks are written a bar
- * to a line, four bars long; a shorter pattern goes round again to fill it.
- * Change a note, and that's the tune changed.
+ * to a line, 16 bars long, about half a minute, so it's a while before it
+ * comes round again: its tune, the tune again with a new turn to it, a
+ * middle bit on other chords, and the tune once more to bring it home. A
+ * shorter pattern, a bell now and then, goes round again to fill it. Change
+ * a note, and that's the tune changed.
  */
 
 export const BPM = 128
@@ -40,7 +43,7 @@ export const BEAT: Tune = {
 
 /** The menus': bright, in C, round and round while you pick. */
 const MENU: Tune = {
-	bars: 4,
+	bars: 16,
 	tracks: [
 		{
 			voice: 'bass',
@@ -49,6 +52,18 @@ const MENU: Tune = {
 				'A1 - A2 - A1 - A2 - A1 - A2 - A1 - A2 -',
 				'F1 - F2 - F1 - F2 - F1 - F2 - F1 - F2 -',
 				'G1 - G2 - G1 - G2 - G1 - G2 - G1 - G2 -',
+				'C2 - C3 - C2 - C3 - C2 - C3 - C2 - C3 -',
+				'A1 - A2 - A1 - A2 - A1 - A2 - A1 - A2 -',
+				'F1 - F2 - F1 - F2 - F1 - F2 - F1 - F2 -',
+				'G1 - G2 - G1 - G2 - G1 - G2 - G1 - G2 -',
+				'F1 - F2 - F1 - F2 - F1 - F2 - F1 - F2 -',
+				'G1 - G2 - G1 - G2 - G1 - G2 - G1 - G2 -',
+				'E1 - E2 - E1 - E2 - E1 - E2 - E1 - E2 -',
+				'A1 - A2 - A1 - A2 - A1 - A2 - A1 - A2 -',
+				'C2 - C3 - C2 - C3 - C2 - C3 - C2 - C3 -',
+				'A1 - A2 - A1 - A2 - A1 - A2 - A1 - A2 -',
+				'F1 - F2 - F1 - F2 - F1 - F2 - F1 - F2 -',
+				'G1 - G2 - G1 - G2 - G1 - G2 - A1 - B1 -',
 			),
 			gain: 0.12,
 			gate: 0.5,
@@ -60,6 +75,18 @@ const MENU: Tune = {
 				'A5 - G5 - E5 _ _ - C5 - E5 - A4 _ _ -',
 				'F5 - A5 - C6 _ _ - A5 - F5 - A5 _ _ -',
 				'G5 - F5 - D5 _ _ - B4 - D5 - G5 _ _ _',
+				'E5 - G5 - C6 _ _ - D6 - E6 - D6 _ C6 -',
+				'A5 - C6 - E6 _ _ - C6 - A5 - E5 _ _ -',
+				'F5 - A5 - C6 _ _ - D6 - C6 - A5 _ F5 -',
+				'G5 - A5 - B5 _ _ - D6 - B5 - G5 _ _ _',
+				'A5 _ _ - G5 - F5 - C5 - F5 - A5 _ _ -',
+				'B5 _ _ - A5 - G5 - D5 - G5 - B5 _ _ -',
+				'G5 _ _ - E5 - B4 - E5 - G5 - B5 _ _ -',
+				'C6 _ _ - B5 - A5 - E5 - A5 - C6 _ B5 -',
+				'E5 - G5 - C6 _ _ - G5 - E5 - G5 _ _ -',
+				'A5 - G5 - E5 _ _ - C5 - E5 - A4 _ _ -',
+				'F5 - A5 - C6 _ _ - D6 - C6 - A5 _ _ -',
+				'G5 - F5 - D5 - B4 - G4 - B4 - D5 _ F5 -',
 			),
 			gain: 0.045,
 			gate: 0.6,
@@ -71,13 +98,26 @@ const MENU: Tune = {
 export const TUNES: Record<string, Tune> = {
 	menu: MENU,
 
-	// A sunny Saturday morning: G major, skipping along.
+	// A sunny Saturday morning: G major, skipping along, and off to C and B
+	// minor in the middle.
 	haga: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'bass',
 				pattern: bars(
+					'G1 - - G1 - - G2 - G1 - - G1 - - D2 -',
+					'D2 - - D2 - - D3 - D2 - - D2 - - A1 -',
+					'E2 - - E2 - - E3 - E2 - - E2 - - B1 -',
+					'C2 - - C2 - - C3 - D2 - - D2 - - D3 -',
+					'G1 - - G1 - - G2 - G1 - - G1 - - D2 -',
+					'D2 - - D2 - - D3 - D2 - - D2 - - A1 -',
+					'E2 - - E2 - - E3 - E2 - - E2 - - B1 -',
+					'C2 - - C2 - - D2 - G1 - - G1 - - G2 -',
+					'C2 - - C2 - - C3 - C2 - - C2 - - G1 -',
+					'D2 - - D2 - - D3 - D2 - - D2 - - A1 -',
+					'B1 - - B1 - - B2 - B1 - - B1 - - F#1 -',
+					'A1 - - A1 - - A2 - D2 - - D2 - - D3 -',
 					'G1 - - G1 - - G2 - G1 - - G1 - - D2 -',
 					'D2 - - D2 - - D3 - D2 - - D2 - - A1 -',
 					'E2 - - E2 - - E3 - E2 - - E2 - - B1 -',
@@ -93,6 +133,18 @@ export const TUNES: Record<string, Tune> = {
 					'F#5 _ E5 - D5 - A4 - D5 - E5 - F#5 _ _ -',
 					'G5 - E5 - B4 - E5 - G5 - B5 - A5 _ G5 -',
 					'E5 - G5 - E5 - C5 - D5 _ _ - - - - -',
+					'B4 - D5 - G5 - B5 - D6 - B5 - G5 _ A5 -',
+					'F#5 _ A5 - D6 - A5 - F#5 - E5 - D5 _ _ -',
+					'G5 - B5 - E6 - B5 - G5 - E5 - G5 _ A5 -',
+					'E5 - C5 - E5 - F#5 - G5 _ _ - - - - -',
+					'E5 _ _ - G5 - C6 _ _ - B5 - A5 - G5 -',
+					'F#5 _ _ - A5 - D6 _ _ - C6 - B5 - A5 -',
+					'B5 _ _ - F#5 - D5 _ _ - F#5 - B5 - D6 -',
+					'C6 _ _ - B5 - A5 - E5 - F#5 _ A5 - - -',
+					'B4 - D5 - G5 - D5 - B4 - D5 - G5 _ A5 -',
+					'F#5 _ E5 - D5 - A4 - D5 - E5 - F#5 _ _ -',
+					'G5 - E5 - B4 - E5 - G5 - B5 - D6 _ C6 -',
+					'B5 - A5 - G5 - E5 - D5 _ _ - F#5 - A5 -',
 				),
 				gain: 0.045,
 				gate: 0.6,
@@ -100,13 +152,26 @@ export const TUNES: Record<string, Tune> = {
 		],
 	},
 
-	// Through the woods: D dorian, a folky pluck.
+	// Through the woods: D dorian, a folky pluck, out into F and A minor in
+	// the middle.
 	huddinge: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'sub',
 				pattern: bars(
+					'D2 _ _ - D2 - A2 - D2 _ _ - D2 - C2 -',
+					'C2 _ _ - C2 - G2 - C2 _ _ - C2 - E2 -',
+					'D2 _ _ - D2 - A2 - D2 _ _ - D2 - C2 -',
+					'G1 _ _ - G1 - D2 - G1 _ _ - B1 - C2 -',
+					'D2 _ _ - D2 - A2 - D2 _ _ - D2 - C2 -',
+					'C2 _ _ - C2 - G2 - C2 _ _ - C2 - E2 -',
+					'D2 _ _ - D2 - A2 - D2 _ _ - D2 - C2 -',
+					'G1 _ _ - G1 - D2 - G1 _ _ - B1 - C2 -',
+					'F2 _ _ - F2 - C3 - F2 _ _ - F2 - E2 -',
+					'C2 _ _ - C2 - G2 - C2 _ _ - C2 - B1 -',
+					'G1 _ _ - G1 - D2 - G1 _ _ - G1 - B1 -',
+					'A1 _ _ - A1 - E2 - A1 _ _ - C2 - E2 -',
 					'D2 _ _ - D2 - A2 - D2 _ _ - D2 - C2 -',
 					'C2 _ _ - C2 - G2 - C2 _ _ - C2 - E2 -',
 					'D2 _ _ - D2 - A2 - D2 _ _ - D2 - C2 -',
@@ -121,19 +186,43 @@ export const TUNES: Record<string, Tune> = {
 					'E5 - G5 - C6 - B5 - G5 - E5 - C5 - - -',
 					'F5 - A5 - D6 - C6 - A5 - G5 - F5 - E5 -',
 					'D5 - B4 - G4 - B4 - D5 _ _ - E5 _ _ -',
+					'A5 - F5 - D5 - F5 - A5 - C6 - D6 - - -',
+					'C6 - G5 - E5 - G5 - C6 - E6 - D6 - C6 -',
+					'D6 - C6 - A5 - F5 - D5 - F5 - A5 - G5 -',
+					'D5 - G5 - B5 - A5 - G5 _ _ - B4 _ C5 _',
+					'C6 - A5 - F5 - A5 - C6 - D6 - C6 - A5 -',
+					'G5 - E5 - C5 - E5 - G5 - A5 - G5 - E5 -',
+					'D5 - G5 - B5 - D6 - B5 - G5 - D5 - B4 -',
+					'C5 - E5 - A5 - C6 - B5 - A5 - G5 - E5 -',
+					'D5 - F5 - A5 - G5 - F5 - E5 - D5 - - -',
+					'E5 - G5 - C6 - B5 - G5 - E5 - C5 - - -',
+					'F5 - A5 - D6 - C6 - A5 - G5 - F5 - E5 -',
+					'D5 - B4 - G4 - B4 - D5 _ _ - E5 _ _ -',
 				),
 				gain: 0.08,
 			},
 		],
 	},
 
-	// Round the track: E minor, driving.
+	// Round the track: E minor, driving, and a long-held middle over A minor.
 	kristineberg: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'bass',
 				pattern: bars(
+					'E2 E2 E3 E2 E2 E2 E3 E2 E2 E2 E3 E2 E2 E2 E3 E2',
+					'C2 C2 C3 C2 C2 C2 C3 C2 C2 C2 C3 C2 C2 C2 C3 C2',
+					'D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2',
+					'B1 B1 B2 B1 B1 B1 B2 B1 B1 B1 B2 B1 B1 B1 B2 B1',
+					'E2 E2 E3 E2 E2 E2 E3 E2 E2 E2 E3 E2 E2 E2 E3 E2',
+					'C2 C2 C3 C2 C2 C2 C3 C2 C2 C2 C3 C2 C2 C2 C3 C2',
+					'D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2',
+					'B1 B1 B2 B1 B1 B1 B2 B1 B1 B1 B2 B1 B1 B1 B2 B1',
+					'A1 A1 A2 A1 A1 A1 A2 A1 A1 A1 A2 A1 A1 A1 A2 A1',
+					'E2 E2 E3 E2 E2 E2 E3 E2 E2 E2 E3 E2 E2 E2 E3 E2',
+					'C2 C2 C3 C2 C2 C2 C3 C2 C2 C2 C3 C2 C2 C2 C3 C2',
+					'D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2',
 					'E2 E2 E3 E2 E2 E2 E3 E2 E2 E2 E3 E2 E2 E2 E3 E2',
 					'C2 C2 C3 C2 C2 C2 C3 C2 C2 C2 C3 C2 C2 C2 C3 C2',
 					'D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2',
@@ -149,6 +238,18 @@ export const TUNES: Record<string, Tune> = {
 					'C5 - - C5 - - E5 - - - G5 - A5 - G5 -',
 					'D5 - - D5 - - F#5 - - - A5 - B5 - A5 -',
 					'B5 _ _ - A5 - G5 - F#5 _ _ - D#5 _ _ -',
+					'E5 - - E5 - - G5 - - - B5 - A5 - G5 -',
+					'E5 - - E5 - - G5 - - - C6 - B5 - G5 -',
+					'F#5 - - F#5 - - A5 - - - D6 - C6 - A5 -',
+					'B5 _ _ - D#6 - F#6 - B5 _ _ - - - - -',
+					'A5 _ _ _ _ _ C6 _ _ _ B5 _ A5 _ E5 _',
+					'G5 _ _ _ _ _ B5 _ _ _ A5 _ G5 _ E5 _',
+					'E5 _ _ _ _ _ G5 _ _ _ C6 _ B5 _ G5 _',
+					'F#5 _ _ _ A5 _ _ _ D6 _ _ _ C6 _ A5 _',
+					'B4 - - B4 - - E5 - - - G5 - F#5 - E5 -',
+					'C5 - - C5 - - E5 - - - G5 - A5 - G5 -',
+					'D5 - - D5 - - F#5 - - - A5 - B5 - A5 -',
+					'B5 _ _ - A5 - G5 - F#5 _ _ - D#5 _ _ -',
 				),
 				gain: 0.045,
 				gate: 0.6,
@@ -156,13 +257,26 @@ export const TUNES: Record<string, Tune> = {
 		],
 	},
 
-	// The old town: A harmonic minor, on a lute.
+	// The old town: A harmonic minor, on a lute, with a turn through F and C
+	// in the middle.
 	'gamla-stan': {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'sub',
 				pattern: bars(
+					'A1 _ _ _ E2 _ _ _ A1 _ _ _ E2 _ _ _',
+					'D2 _ _ _ A2 _ _ _ D2 _ _ _ A2 _ _ _',
+					'E2 _ _ _ B1 _ _ _ E2 _ _ _ B1 _ _ _',
+					'A1 _ _ _ E2 _ _ _ A1 _ _ _ - - - -',
+					'A1 _ _ _ E2 _ _ _ A1 _ _ _ E2 _ _ _',
+					'D2 _ _ _ A2 _ _ _ D2 _ _ _ A2 _ _ _',
+					'E2 _ _ _ B1 _ _ _ E2 _ _ _ B1 _ _ _',
+					'A1 _ _ _ E2 _ _ _ A1 _ _ _ - - - -',
+					'F1 _ _ _ C2 _ _ _ F1 _ _ _ C2 _ _ _',
+					'C2 _ _ _ G2 _ _ _ C2 _ _ _ G2 _ _ _',
+					'D2 _ _ _ A2 _ _ _ D2 _ _ _ A2 _ _ _',
+					'E2 _ _ _ B1 _ _ _ E2 _ _ _ G#1 _ _ _',
 					'A1 _ _ _ E2 _ _ _ A1 _ _ _ E2 _ _ _',
 					'D2 _ _ _ A2 _ _ _ D2 _ _ _ A2 _ _ _',
 					'E2 _ _ _ B1 _ _ _ E2 _ _ _ B1 _ _ _',
@@ -177,19 +291,44 @@ export const TUNES: Record<string, Tune> = {
 					'D5 - F5 - A5 - D6 - C6 - A5 - F5 - D5 -',
 					'E5 - G#5 - B5 - E6 - D6 - B5 - G#5 - E5 -',
 					'A5 _ _ - E5 _ _ - C5 - B4 - A4 _ _ -',
+					'E5 - A5 - C6 - E6 - D6 - C6 - B5 - A5 -',
+					'F5 - A5 - D6 - F6 - E6 - D6 - C6 - A5 -',
+					'G#5 - B5 - E6 - D6 - B5 - G#5 - E5 - G#5 -',
+					'A5 _ _ - C6 _ _ - B5 - G#5 - E5 _ _ -',
+					'A5 _ _ - G5 - F5 - C5 - F5 - A5 - C6 -',
+					'E6 _ _ - D6 - C6 - G5 - C6 - E6 - G5 -',
+					'F5 _ _ - E5 - D5 - A4 - D5 - F5 - A5 -',
+					'G#5 _ _ - A5 - B5 - D6 - C6 - B5 _ G#5 _',
+					'A4 - C5 - E5 - A5 - G#5 - A5 - E5 - C5 -',
+					'D5 - F5 - A5 - D6 - C6 - A5 - F5 - D5 -',
+					'E5 - G#5 - B5 - E6 - D6 - B5 - G#5 - E5 -',
+					'A5 _ _ - E5 _ _ - C5 - B4 - A4 _ _ -',
 				),
 				gain: 0.08,
 			},
 		],
 	},
 
-	// Across the sand: E Phrygian dominant, a snake charmer's.
+	// Across the sand: E Phrygian dominant, a snake charmer's, and down the
+	// steps of A minor, G, F and E in the middle.
 	pyramids: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'bass',
 				pattern: bars(
+					'E2 - E2 - E2 - F2 - E2 - E2 - E2 - D2 -',
+					'F2 - F2 - F2 - G#2 - F2 - F2 - E2 - - -',
+					'E2 - E2 - E2 - F2 - E2 - E2 - E2 - D2 -',
+					'D2 - D2 - D2 - D2 - E2 - E2 - E2 - E2 -',
+					'E2 - E2 - E2 - F2 - E2 - E2 - E2 - D2 -',
+					'F2 - F2 - F2 - G#2 - F2 - F2 - E2 - - -',
+					'E2 - E2 - E2 - F2 - E2 - E2 - E2 - D2 -',
+					'D2 - D2 - D2 - D2 - E2 - E2 - E2 - E2 -',
+					'A1 - A1 - A1 - C2 - A1 - A1 - A1 - B1 -',
+					'G1 - G1 - G1 - B1 - G1 - G1 - G1 - A1 -',
+					'F1 - F1 - F1 - A1 - F1 - F1 - F1 - E1 -',
+					'E2 - E2 - E2 - F2 - E2 - E2 - E2 - D2 -',
 					'E2 - E2 - E2 - F2 - E2 - E2 - E2 - D2 -',
 					'F2 - F2 - F2 - G#2 - F2 - F2 - E2 - - -',
 					'E2 - E2 - E2 - F2 - E2 - E2 - E2 - D2 -',
@@ -205,6 +344,18 @@ export const TUNES: Record<string, Tune> = {
 					'F5 - G#5 - A5 - G#5 - F5 - E5 - F5 - - -',
 					'G#5 - A5 - B5 - C6 - B5 - A5 - G#5 - F5 -',
 					'E5 - D5 - C5 - B4 - C5 - B4 - E4 _ _ -',
+					'B4 - C5 - E5 - F5 - G#5 - F5 - E5 - - -',
+					'A5 - G#5 - F5 - E5 - F5 - G#5 - A5 _ _ -',
+					'B5 - C6 - B5 - A5 - G#5 - F5 - E5 - F5 -',
+					'A5 - G#5 - F5 - D5 - E5 _ _ - - - - -',
+					'C6 _ _ - B5 - A5 - E5 _ _ - A5 - C6 -',
+					'B5 _ _ - A5 - G5 - D5 _ _ - G5 - B5 -',
+					'A5 _ _ - G5 - F5 - C5 _ _ - F5 - A5 -',
+					'G#5 _ _ - F5 - E5 - B4 _ _ - D5 - F5 -',
+					'E5 - F5 - G#5 - F5 - E5 - - - B4 - - -',
+					'F5 - G#5 - A5 - G#5 - F5 - E5 - F5 - - -',
+					'G#5 - A5 - B5 - C6 - B5 - A5 - G#5 - F5 -',
+					'E5 - D5 - C5 - B4 - C5 - B4 - E4 _ _ -',
 				),
 				gain: 0.045,
 				gate: 0.6,
@@ -212,13 +363,26 @@ export const TUNES: Record<string, Tune> = {
 		],
 	},
 
-	// Along the wall: C pentatonic, plucked like a guzheng, a bell now and then.
+	// Along the wall: C pentatonic, plucked like a guzheng, a bell now and
+	// then, and a higher, slower middle over A minor.
 	'great-wall': {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'sub',
 				pattern: bars(
+					'C2 _ _ - G2 _ _ - C2 _ _ - G2 _ _ -',
+					'A1 _ _ - E2 _ _ - A1 _ _ - E2 _ _ -',
+					'G1 _ _ - D2 _ _ - G1 _ _ - D2 _ _ -',
+					'C2 _ _ - G2 _ _ - C2 _ _ - - - - -',
+					'C2 _ _ - G2 _ _ - C2 _ _ - G2 _ _ -',
+					'A1 _ _ - E2 _ _ - A1 _ _ - E2 _ _ -',
+					'G1 _ _ - D2 _ _ - G1 _ _ - D2 _ _ -',
+					'C2 _ _ - G2 _ _ - C2 _ _ - - - - -',
+					'A1 _ _ - E2 _ _ - A1 _ _ - E2 _ _ -',
+					'D2 _ _ - A2 _ _ - D2 _ _ - A2 _ _ -',
+					'C2 _ _ - G2 _ _ - C2 _ _ - G2 _ _ -',
+					'G1 _ _ - D2 _ _ - G1 _ _ - D2 _ _ -',
 					'C2 _ _ - G2 _ _ - C2 _ _ - G2 _ _ -',
 					'A1 _ _ - E2 _ _ - A1 _ _ - E2 _ _ -',
 					'G1 _ _ - D2 _ _ - G1 _ _ - D2 _ _ -',
@@ -233,6 +397,18 @@ export const TUNES: Record<string, Tune> = {
 					'A5 - C6 - A5 - G5 - E5 - G5 - A5 - - -',
 					'G5 - E5 - D5 - E5 - G5 - A5 - G5 _ D5 -',
 					'E5 - D5 - C5 - D5 - E5 _ _ - C5 _ _ -',
+					'G5 - A5 - C6 - A5 - G5 - E5 - D5 - - -',
+					'C6 - E6 - D6 - C6 - A5 - C6 - E6 - - -',
+					'D6 - C6 - A5 - G5 - D5 - E5 - G5 _ A5 -',
+					'C6 - A5 - G5 - E5 - D5 _ _ - C5 _ _ -',
+					'A5 _ _ - C6 _ _ - E6 - D6 - C6 - A5 -',
+					'D6 _ _ - C6 - A5 - G5 _ _ - A5 - D6 -',
+					'E6 _ _ - D6 - C6 - G5 - A5 - C6 - E6 -',
+					'D6 _ _ - C6 - A5 - G5 _ _ - - - - -',
+					'E5 - G5 - A5 - G5 - E5 - D5 - C5 - - -',
+					'A5 - C6 - A5 - G5 - E5 - G5 - A5 - - -',
+					'G5 - E5 - D5 - E5 - G5 - A5 - G5 _ D5 -',
+					'E5 - D5 - C5 - D5 - E5 _ _ - C5 _ _ -',
 				),
 				gain: 0.08,
 			},
@@ -241,19 +417,38 @@ export const TUNES: Record<string, Tune> = {
 				pattern: bars(
 					'C6 - - - - - - - - - - - - - - -',
 					'- - - - - - - - - - - - - - - -',
+					'G5 - - - - - - - - - - - - - - -',
+					'- - - - - - - - - - - - - - - -',
+					'E6 - - - - - - - - - - - - - - -',
+					'- - - - - - - - - - - - - - - -',
+					'D6 - - - - - - - - - - - - - - -',
+					'- - - - - - - - - - - - - - - -',
 				),
 				gain: 0.03,
 			},
 		],
 	},
 
-	// Up the mountain: A minor pentatonic, pan pipes over a charango.
+	// Up the mountain: A minor pentatonic, pan pipes over a charango, and a
+	// middle that climbs from D minor.
 	'machu-picchu': {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'pluck',
 				pattern: bars(
+					'A2 - E3 - A2 - E3 - A2 - E3 - A2 - E3 -',
+					'C3 - G3 - C3 - G3 - C3 - G3 - C3 - G3 -',
+					'G2 - D3 - G2 - D3 - G2 - D3 - G2 - D3 -',
+					'A2 - E3 - A2 - E3 - A2 - E3 - A2 - E3 -',
+					'A2 - E3 - A2 - E3 - A2 - E3 - A2 - E3 -',
+					'C3 - G3 - C3 - G3 - C3 - G3 - C3 - G3 -',
+					'G2 - D3 - G2 - D3 - G2 - D3 - G2 - D3 -',
+					'A2 - E3 - A2 - E3 - A2 - E3 - A2 - E3 -',
+					'D3 - A3 - D3 - A3 - D3 - A3 - D3 - A3 -',
+					'A2 - E3 - A2 - E3 - A2 - E3 - A2 - E3 -',
+					'C3 - G3 - C3 - G3 - C3 - G3 - C3 - G3 -',
+					'G2 - D3 - G2 - D3 - G2 - D3 - G2 - D3 -',
 					'A2 - E3 - A2 - E3 - A2 - E3 - A2 - E3 -',
 					'C3 - G3 - C3 - G3 - C3 - G3 - C3 - G3 -',
 					'G2 - D3 - G2 - D3 - G2 - D3 - G2 - D3 -',
@@ -268,19 +463,44 @@ export const TUNES: Record<string, Tune> = {
 					'E5 _ G5 - A5 - G5 _ _ - E5 - D5 - C5 -',
 					'D5 _ E5 - G5 - E5 _ _ - D5 - B4 - G4 -',
 					'A4 _ _ - C5 - B4 - A4 _ _ _ _ _ _ -',
+					'E5 _ D5 - C5 - A4 _ _ - C5 - D5 - E5 -',
+					'G5 _ A5 - C6 - A5 _ _ - G5 - E5 - G5 -',
+					'D5 _ E5 - G5 - A5 _ _ - G5 - E5 - D5 -',
+					'E5 _ _ - D5 - C5 - A4 _ _ _ _ _ _ -',
+					'A5 _ _ _ G5 - A5 - D6 _ _ _ C6 - A5 -',
+					'C6 _ _ _ A5 - G5 - E5 _ _ _ D5 - C5 -',
+					'E5 _ _ _ G5 - A5 - C6 _ _ _ D6 - E6 -',
+					'D6 _ _ _ C6 - A5 - G5 _ _ _ _ _ _ -',
+					'A4 _ C5 - D5 - E5 _ _ - D5 - C5 - A4 -',
+					'E5 _ G5 - A5 - G5 _ _ - E5 - D5 - C5 -',
+					'D5 _ E5 - G5 - E5 _ _ - D5 - B4 - G4 -',
+					'A4 _ _ - C5 - B4 - A4 _ _ _ _ _ _ -',
 				),
 				gain: 0.07,
 			},
 		],
 	},
 
-	// Among the graves: D minor, creeping, a bell tolling.
+	// Among the graves: D minor, creeping, a bell tolling, and a middle that
+	// slips down to E flat.
 	'halloween-town': {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'sub',
 				pattern: bars(
+					'D2 _ _ _ - - D2 - D2 _ _ _ - - A1 -',
+					'Bb1 _ _ _ - - Bb1 - Bb1 _ _ _ - - F1 -',
+					'G1 _ _ _ - - G1 - G1 _ _ _ - - D2 -',
+					'A1 _ _ _ - - A1 - A1 _ _ _ - - C#2 -',
+					'D2 _ _ _ - - D2 - D2 _ _ _ - - A1 -',
+					'Bb1 _ _ _ - - Bb1 - Bb1 _ _ _ - - F1 -',
+					'G1 _ _ _ - - G1 - G1 _ _ _ - - D2 -',
+					'A1 _ _ _ - - A1 - A1 _ _ _ - - C#2 -',
+					'G1 _ _ _ - - G1 - G1 _ _ _ - - D2 -',
+					'D2 _ _ _ - - D2 - D2 _ _ _ - - A1 -',
+					'Eb2 _ _ _ - - Eb2 - Eb2 _ _ _ - - Bb1 -',
+					'A1 _ _ _ - - A1 - A1 _ _ _ - - C#2 -',
 					'D2 _ _ _ - - D2 - D2 _ _ _ - - A1 -',
 					'Bb1 _ _ _ - - Bb1 - Bb1 _ _ _ - - F1 -',
 					'G1 _ _ _ - - G1 - G1 _ _ _ - - D2 -',
@@ -291,6 +511,18 @@ export const TUNES: Record<string, Tune> = {
 			{
 				voice: 'triangle',
 				pattern: bars(
+					'D5 - - F5 - - A5 - G#5 - - - A5 _ _ -',
+					'D6 - - Bb5 - - F5 - E5 - - - F5 _ _ -',
+					'G5 - - Bb5 - - D6 - C#6 - - - D6 _ _ -',
+					'E5 - F5 - E5 - C#5 - A4 _ _ - - - - -',
+					'A5 - - G5 - - F5 - E5 - - - D5 _ _ -',
+					'F5 - - D5 - - Bb4 - A4 - - - Bb4 _ _ -',
+					'Bb5 - - A5 - - G5 - D5 - - - G5 _ _ -',
+					'A5 - G5 - F5 - E5 - C#5 _ _ - A4 _ _ -',
+					'G5 - - Bb5 - - D6 - - - Bb5 - G5 _ _ -',
+					'F5 - - A5 - - D6 - - - A5 - F5 _ _ -',
+					'Eb5 - - G5 - - Bb5 - - - G5 - Eb6 _ _ -',
+					'C#6 - - A5 - - E5 - - - C#5 - A4 _ _ -',
 					'D5 - - F5 - - A5 - G#5 - - - A5 _ _ -',
 					'D6 - - Bb5 - - F5 - E5 - - - F5 _ _ -',
 					'G5 - - Bb5 - - D6 - C#6 - - - D6 _ _ -',
@@ -309,13 +541,25 @@ export const TUNES: Record<string, Tune> = {
 		],
 	},
 
-	// Silly and bouncy: F major, high up.
+	// Silly and bouncy: F major, high up, and a hoppier middle from D minor.
 	'furby-fields': {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'square',
 				pattern: bars(
+					'F2 - - F3 - - F2 - C3 - - C3 - - F2 -',
+					'Bb1 - - Bb2 - - Bb1 - F2 - - F2 - - Bb1 -',
+					'C2 - - C3 - - C2 - G2 - - G2 - - C2 -',
+					'F2 - - F3 - - F2 - C3 - - C3 - - F2 -',
+					'F2 - - F3 - - F2 - C3 - - C3 - - F2 -',
+					'Bb1 - - Bb2 - - Bb1 - F2 - - F2 - - Bb1 -',
+					'C2 - - C3 - - C2 - G2 - - G2 - - C2 -',
+					'F2 - - F3 - - F2 - C3 - - C3 - - F2 -',
+					'D2 - - D3 - - D2 - A2 - - A2 - - D2 -',
+					'G1 - - G2 - - G1 - D2 - - D2 - - G1 -',
+					'Bb1 - - Bb2 - - Bb1 - F2 - - F2 - - Bb1 -',
+					'C2 - - C3 - - C2 - G2 - - G2 - - E2 -',
 					'F2 - - F3 - - F2 - C3 - - C3 - - F2 -',
 					'Bb1 - - Bb2 - - Bb1 - F2 - - F2 - - Bb1 -',
 					'C2 - - C3 - - C2 - G2 - - G2 - - C2 -',
@@ -331,6 +575,18 @@ export const TUNES: Record<string, Tune> = {
 					'D6 Bb5 F5 Bb5 D6 - - - F6 D6 Bb5 D6 F6 - - -',
 					'E6 C6 G5 C6 E6 - - - G6 E6 C6 E6 G6 - - -',
 					'F6 - E6 - D6 - C6 - A5 - G5 - F5 _ _ -',
+					'A5 C6 F6 C6 A5 - - - C6 A5 F5 A5 C6 - - -',
+					'Bb5 D6 F6 D6 Bb5 - - - D6 Bb5 F5 Bb5 D6 - - -',
+					'C6 E6 G6 E6 C6 - - - E6 C6 G5 C6 E6 - - -',
+					'F6 - C6 - A5 - F5 - C6 - - - F6 _ _ -',
+					'F6 - F6 - E6 - D6 - A5 - - - D6 - - -',
+					'G6 - G6 - F6 - D6 - Bb5 - - - D6 - - -',
+					'F6 - D6 - Bb5 - D6 - F6 - - - D6 - - -',
+					'E6 - G6 - E6 - C6 - G5 - A5 - Bb5 - C6 -',
+					'C6 A5 F5 A5 C6 - - - D6 C6 A5 C6 F6 - - -',
+					'D6 Bb5 F5 Bb5 D6 - - - F6 D6 Bb5 D6 F6 - - -',
+					'E6 C6 G5 C6 E6 - - - G6 E6 C6 E6 G6 - - -',
+					'F6 - E6 - D6 - C6 - A5 - G5 - F5 _ _ -',
 				),
 				gain: 0.03,
 				gate: 0.6,
@@ -338,13 +594,26 @@ export const TUNES: Record<string, Tune> = {
 		],
 	},
 
-	// Roof to roof at night: A minor sevenths, funky.
+	// Roof to roof at night: A minor sevenths, funky, and a smoother middle
+	// round D minor, G and C.
 	'city-rooftop': {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'bass',
 				pattern: bars(
+					'A1 - A2 - - A1 - G2 - A1 - - E2 - G2 -',
+					'D2 - D3 - - D2 - C3 - D2 - - A2 - C3 -',
+					'F1 - F2 - - F1 - E2 - F1 - - C2 - E2 -',
+					'E1 - E2 - - E1 - D2 - E1 - - B1 - D2 -',
+					'A1 - A2 - - A1 - G2 - A1 - - E2 - G2 -',
+					'D2 - D3 - - D2 - C3 - D2 - - A2 - C3 -',
+					'F1 - F2 - - F1 - E2 - F1 - - C2 - E2 -',
+					'E1 - E2 - - E1 - D2 - E1 - - B1 - D2 -',
+					'D2 - D3 - - D2 - C3 - D2 - - A2 - C3 -',
+					'G1 - G2 - - G1 - F2 - G1 - - D2 - F2 -',
+					'C2 - C3 - - C2 - B2 - C2 - - G2 - B2 -',
+					'E1 - E2 - - E1 - D2 - E1 - - B1 - D2 -',
 					'A1 - A2 - - A1 - G2 - A1 - - E2 - G2 -',
 					'D2 - D3 - - D2 - C3 - D2 - - A2 - C3 -',
 					'F1 - F2 - - F1 - E2 - F1 - - C2 - E2 -',
@@ -360,6 +629,18 @@ export const TUNES: Record<string, Tune> = {
 					'- - F#5 - A5 - - C6 - - A5 - F#5 - - -',
 					'- - A5 - C6 - - E6 - - C6 - A5 - - -',
 					'- - G#5 - B5 - - D6 - - B5 - G#5 _ _ -',
+					'- - C6 - B5 - - A5 - - G5 - E5 - G5 -',
+					'- - A5 - C6 - - D6 - - C6 - A5 - F#5 -',
+					'- - C6 - E6 - - F6 - - E6 - C6 - A5 -',
+					'- - B5 - D6 - - E6 - - D6 - B5 - G#5 -',
+					'F5 _ _ - A5 - C6 _ _ - E6 _ D6 - C6 -',
+					'B5 _ _ - D6 - F6 _ _ - E6 _ D6 - B5 -',
+					'E6 _ _ - C6 - G5 _ _ - B5 _ C6 - E6 -',
+					'D6 _ _ - B5 - G#5 _ _ - E5 _ _ _ - -',
+					'- - E5 - G5 - - A5 - - G5 - E5 - - -',
+					'- - F#5 - A5 - - C6 - - A5 - F#5 - - -',
+					'- - A5 - C6 - - E6 - - C6 - A5 - - -',
+					'- - G#5 - B5 - - D6 - - B5 - G#5 _ _ -',
 				),
 				gain: 0.03,
 				gate: 0.7,
@@ -367,13 +648,26 @@ export const TUNES: Record<string, Tune> = {
 		],
 	},
 
-	// Underground: D minor, low and slow, water dripping.
+	// Underground: D minor, low and slow, water dripping, and deeper still
+	// in the middle, down through G minor and E flat.
 	caves: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'sub',
 				pattern: bars(
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'Bb1 _ _ _ _ _ _ _ F1 _ _ _ _ _ _ _',
+					'A1 _ _ _ _ _ _ _ E1 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'Bb1 _ _ _ _ _ _ _ F1 _ _ _ _ _ _ _',
+					'A1 _ _ _ _ _ _ _ E1 _ _ _ _ _ _ _',
+					'G1 _ _ _ _ _ _ _ D2 _ _ _ _ _ _ _',
+					'F1 _ _ _ _ _ _ _ C2 _ _ _ _ _ _ _',
+					'Eb2 _ _ _ _ _ _ _ Bb1 _ _ _ _ _ _ _',
+					'A1 _ _ _ _ _ _ _ E1 _ _ _ _ _ _ _',
 					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
 					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
 					'Bb1 _ _ _ _ _ _ _ F1 _ _ _ _ _ _ _',
@@ -388,6 +682,18 @@ export const TUNES: Record<string, Tune> = {
 					'F4 - - - E4 - - - D4 - - - A3 - - -',
 					'Bb3 - - - D4 - - - F4 - - - E4 - - -',
 					'E4 - - - C#4 - - - A3 _ _ _ _ _ _ -',
+					'A4 - - - F4 - - - D4 - - - E4 - - -',
+					'F4 - - - A4 - - - D5 - - - C5 - - -',
+					'D5 - - - Bb4 - - - F4 - - - A4 - - -',
+					'G4 - - - E4 - - - C#4 _ _ _ A3 _ _ -',
+					'G4 - - - Bb4 - - - D5 - - - C5 - - -',
+					'A4 - - - F4 - - - C5 - - - A4 - - -',
+					'G4 - - - Bb4 - - - Eb5 - - - D5 - - -',
+					'C#5 - - - E5 - - - A4 _ _ _ _ _ _ -',
+					'D4 - - - F4 - - - A4 - - - G4 - - -',
+					'F4 - - - E4 - - - D4 - - - A3 - - -',
+					'Bb3 - - - D4 - - - F4 - - - E4 - - -',
+					'E4 - - - C#4 - - - A3 _ _ _ _ _ _ -',
 				),
 				gain: 0.09,
 			},
@@ -396,6 +702,12 @@ export const TUNES: Record<string, Tune> = {
 				pattern: bars(
 					'- - - - - - - - - - - A5 - - - -',
 					'- - - - - - - - - - - - - - D6 -',
+					'- - - - - F5 - - - - - - - - - -',
+					'- - - - - - - - - - - - - - - -',
+					'- - - - - - - - - - - A5 - - - -',
+					'- - - - - - - - - - - - - - D6 -',
+					'- - - D6 - - - - - - - - - - - -',
+					'- - - - - - - - - E6 - - - - - -',
 				),
 				gain: 0.035,
 			},
@@ -403,13 +715,25 @@ export const TUNES: Record<string, Tune> = {
 	},
 
 	// Down the drain: E minor, a dripping, plodding bass, and a creepy
-	// whistle overhead.
+	// whistle overhead, and a middle that sinks through A minor and F.
 	sewers: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'bass',
 				pattern: bars(
+					'E2 - - E2 - - G2 - E2 - - B1 - - D2 -',
+					'E2 - - E2 - - G2 - A2 - - G2 - - F#2 -',
+					'C2 - - C2 - - E2 - C2 - - G1 - - B1 -',
+					'B1 - - B1 - - D#2 - F#2 - - D#2 - - B1 -',
+					'E2 - - E2 - - G2 - E2 - - B1 - - D2 -',
+					'E2 - - E2 - - G2 - A2 - - G2 - - F#2 -',
+					'C2 - - C2 - - E2 - C2 - - G1 - - B1 -',
+					'B1 - - B1 - - D#2 - F#2 - - D#2 - - B1 -',
+					'A1 - - A1 - - C2 - A1 - - E1 - - G1 -',
+					'E2 - - E2 - - G2 - E2 - - B1 - - D2 -',
+					'F2 - - F2 - - A2 - F2 - - C2 - - E2 -',
+					'B1 - - B1 - - D#2 - F#2 - - D#2 - - B1 -',
 					'E2 - - E2 - - G2 - E2 - - B1 - - D2 -',
 					'E2 - - E2 - - G2 - A2 - - G2 - - F#2 -',
 					'C2 - - C2 - - E2 - C2 - - G1 - - B1 -',
@@ -425,6 +749,18 @@ export const TUNES: Record<string, Tune> = {
 					'- - A4 - - - - - - - B4 - - - - -',
 					'- - G4 - - - - - - - E4 - - - - -',
 					'- - F#4 - - - - - - - D#4 - - - - -',
+					'- - E5 - - - - - - - B4 - - - - -',
+					'- - C5 - - - - - - - E5 - - - - -',
+					'- - E5 - - - - - - - C5 - - - - -',
+					'- - D#5 - - - - - - - B4 - - - - -',
+					'- - C5 - - - - - - - E5 - - - - -',
+					'- - B4 - - - - - - - G4 - - - - -',
+					'- - A4 - - - - - - - C5 - - - - -',
+					'- - F#4 - - - - - - - A4 - - - - -',
+					'- - B4 - - - - - - - G4 - - - - -',
+					'- - A4 - - - - - - - B4 - - - - -',
+					'- - G4 - - - - - - - E4 - - - - -',
+					'- - F#4 - - - - - - - D#4 - - - - -',
 				),
 				gain: 0.08,
 			},
@@ -435,19 +771,44 @@ export const TUNES: Record<string, Tune> = {
 					'- - - - - - B5 - - - - - - - - -',
 					'- - - - - - - - - - - - - - G6 -',
 					'- - - - - - F#5 - - - - - D#6 - - -',
+					'- - - - - - - - - - - - - - B5 -',
+					'- - - - - - E6 - - - - - - - - -',
+					'- - - - - - - - - - - - - - E6 -',
+					'- - - - - - B5 - - - - - F#6 - - -',
+					'- - - - - - - - - - - - - - A5 -',
+					'- - - - - - G6 - - - - - - - - -',
+					'- - - - - - - - - - - - - - F6 -',
+					'- - - - - - D#6 - - - - - B5 - - -',
+					'- - - - - - - - - - - - - - E6 -',
+					'- - - - - - B5 - - - - - - - - -',
+					'- - - - - - - - - - - - - - G6 -',
+					'- - - - - - F#5 - - - - - D#6 - - -',
 				),
 				gain: 0.03,
 			},
 		],
 	},
 	// On the ferry to Turku: D major, a dansband's, an oom-pah bass and a
-	// bouncing tune, as in the dance bar on every crossing.
+	// bouncing tune, as in the dance bar on every crossing, and a swaying
+	// middle from G.
 	'scoop-line': {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'bass',
 				pattern: bars(
+					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
+					'G1 - D2 - G1 - D2 - G1 - D2 - G1 - B1 -',
+					'A1 - E2 - A1 - E2 - A1 - E2 - A1 - C#2 -',
+					'D2 - A2 - D2 - A2 - D2 - - - A1 - - -',
+					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
+					'G1 - D2 - G1 - D2 - G1 - D2 - G1 - B1 -',
+					'A1 - E2 - A1 - E2 - A1 - E2 - A1 - C#2 -',
+					'D2 - A2 - D2 - A2 - D2 - - - A1 - - -',
+					'G1 - D2 - G1 - D2 - G1 - D2 - G1 - B1 -',
+					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
+					'E2 - B2 - E2 - B2 - E2 - B2 - E2 - G2 -',
+					'A1 - E2 - A1 - E2 - A1 - E2 - A1 - C#2 -',
 					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
 					'G1 - D2 - G1 - D2 - G1 - D2 - G1 - B1 -',
 					'A1 - E2 - A1 - E2 - A1 - E2 - A1 - C#2 -',
@@ -459,6 +820,18 @@ export const TUNES: Record<string, Tune> = {
 			{
 				voice: 'square',
 				pattern: bars(
+					'F#5 - F#5 - A5 - F#5 - E5 - D5 - E5 _ _ -',
+					'D5 - D5 - G5 - B5 - A5 - G5 - F#5 _ _ -',
+					'E5 - E5 - A5 - C#6 - B5 - A5 - G5 - E5 -',
+					'F#5 - A5 - D6 _ _ - A5 - F#5 - D5 _ _ -',
+					'A5 - A5 - F#5 - A5 - B5 - A5 - F#5 _ _ -',
+					'B5 - B5 - D6 - B5 - A5 - G5 - B5 _ _ -',
+					'C#6 - C#6 - A5 - E5 - G5 - F#5 - E5 - C#5 -',
+					'D5 - F#5 - A5 - D6 _ _ - - - - - - -',
+					'B5 _ _ - A5 - G5 - D5 _ _ - G5 - B5 -',
+					'A5 _ _ - F#5 - D5 - A4 _ _ - D5 - F#5 -',
+					'G5 _ _ - E5 - B4 - E5 - G5 - B5 - G5 -',
+					'A5 _ _ - C#6 - E6 _ _ - C#6 - A5 - G5 -',
 					'F#5 - F#5 - A5 - F#5 - E5 - D5 - E5 _ _ -',
 					'D5 - D5 - G5 - B5 - A5 - G5 - F#5 _ _ -',
 					'E5 - E5 - A5 - C#6 - B5 - A5 - G5 - E5 -',
@@ -480,13 +853,26 @@ export const TUNES: Record<string, Tune> = {
 		],
 	},
 	// Off the cliff and out to sea: G major, soaring, a bass that rocks
-	// like the waves and a bright melody gliding over it.
+	// like the waves and a bright melody gliding over it, and a long, high
+	// swell through C, D and B minor in the middle.
 	cliff: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'bass',
 				pattern: bars(
+					'G1 - - G2 - - D2 - G1 - - G2 - - B1 -',
+					'E1 - - E2 - - B1 - E1 - - E2 - - G1 -',
+					'C2 - - C3 - - G2 - C2 - - C3 - - E2 -',
+					'D2 - - D3 - - A2 - D2 - - F#2 - - A2 -',
+					'G1 - - G2 - - D2 - G1 - - G2 - - B1 -',
+					'E1 - - E2 - - B1 - E1 - - E2 - - G1 -',
+					'C2 - - C3 - - G2 - C2 - - C3 - - E2 -',
+					'D2 - - D3 - - A2 - D2 - - F#2 - - A2 -',
+					'C2 - - C3 - - G2 - C2 - - C3 - - E2 -',
+					'D2 - - D3 - - A2 - D2 - - D3 - - F#2 -',
+					'B1 - - B2 - - F#2 - B1 - - B2 - - D2 -',
+					'E2 - - E3 - - B2 - E2 - - E3 - - G2 -',
 					'G1 - - G2 - - D2 - G1 - - G2 - - B1 -',
 					'E1 - - E2 - - B1 - E1 - - E2 - - G1 -',
 					'C2 - - C3 - - G2 - C2 - - C3 - - E2 -',
@@ -498,6 +884,18 @@ export const TUNES: Record<string, Tune> = {
 			{
 				voice: 'square',
 				pattern: bars(
+					'B5 _ _ - D6 _ _ - G6 _ _ _ _ _ - -',
+					'G6 - F#6 - E6 _ _ - B5 _ _ _ _ _ - -',
+					'C6 - E6 - G6 _ _ - E6 - C6 - G5 _ _ -',
+					'A5 - B5 - C6 - D6 _ _ _ F#5 _ _ _ - -',
+					'D6 _ _ - B5 _ _ - G5 _ _ _ _ _ - -',
+					'G6 _ _ - E6 _ _ - B5 _ _ _ _ _ - -',
+					'G5 - C6 - E6 _ _ - G6 - E6 - C6 _ _ -',
+					'D6 - C6 - B5 - A5 _ _ _ D6 _ _ _ - -',
+					'E6 _ _ _ _ _ G6 _ _ _ C6 _ _ _ - -',
+					'F#6 _ _ _ _ _ D6 _ _ _ A5 _ _ _ - -',
+					'F#6 - E6 - D6 _ _ - B5 _ _ _ F#5 _ _ -',
+					'G5 - B5 - E6 _ _ _ _ _ D6 _ _ _ - -',
 					'B5 _ _ - D6 _ _ - G6 _ _ _ _ _ - -',
 					'G6 - F#6 - E6 _ _ - B5 _ _ _ _ _ - -',
 					'C6 - E6 - G6 _ _ - E6 - C6 - G5 _ _ -',
@@ -518,13 +916,26 @@ export const TUNES: Record<string, Tune> = {
 	},
 
 	// Up Everest: D minor pentatonic over a low drone, a bansuri's line
-	// climbing a little higher every bar, and a singing bowl ringing out.
+	// climbing a little higher every bar, and a singing bowl ringing out,
+	// then a breath on the way down, and a middle through B flat and C.
 	everest: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'sub',
 				pattern: bars(
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ C2 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'F2 _ _ _ _ _ _ _ G2 _ _ _ A2 _ _ _',
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ C2 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'F2 _ _ _ _ _ _ _ G2 _ _ _ A2 _ _ _',
+					'Bb1 _ _ _ _ _ _ _ F2 _ _ _ _ _ _ _',
+					'C2 _ _ _ _ _ _ _ G2 _ _ _ _ _ _ _',
+					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
+					'G1 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
 					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
 					'D2 _ _ _ _ _ _ _ C2 _ _ _ _ _ _ _',
 					'D2 _ _ _ _ _ _ _ A1 _ _ _ _ _ _ _',
@@ -539,12 +950,36 @@ export const TUNES: Record<string, Tune> = {
 					'D3 - A3 - D4 - A3 - C3 - G3 - C4 - G3 -',
 					'D3 - A3 - D4 - A3 - D3 - A3 - D4 - A3 -',
 					'F3 - C4 - F4 - C4 - G3 - D4 - A3 - E4 -',
+					'D3 - A3 - D4 - A3 - D3 - A3 - D4 - A3 -',
+					'D3 - A3 - D4 - A3 - C3 - G3 - C4 - G3 -',
+					'D3 - A3 - D4 - A3 - D3 - A3 - D4 - A3 -',
+					'F3 - C4 - F4 - C4 - G3 - D4 - A3 - E4 -',
+					'Bb2 - F3 - Bb3 - F3 - Bb2 - F3 - Bb3 - F3 -',
+					'C3 - G3 - C4 - G3 - C3 - G3 - C4 - G3 -',
+					'D3 - A3 - D4 - A3 - D3 - A3 - D4 - A3 -',
+					'G3 - D4 - G4 - D4 - A3 - E4 - A4 - E4 -',
+					'D3 - A3 - D4 - A3 - D3 - A3 - D4 - A3 -',
+					'D3 - A3 - D4 - A3 - C3 - G3 - C4 - G3 -',
+					'D3 - A3 - D4 - A3 - D3 - A3 - D4 - A3 -',
+					'F3 - C4 - F4 - C4 - G3 - D4 - A3 - E4 -',
 				),
 				gain: 0.05,
 			},
 			{
 				voice: 'whistle',
 				pattern: bars(
+					'D5 _ _ - F5 - G5 _ A5 _ _ _ G5 - F5 -',
+					'G5 _ _ - A5 - C6 _ A5 _ _ _ G5 - F5 -',
+					'A5 _ _ - C6 - D6 _ C6 _ _ _ A5 - G5 -',
+					'C6 _ _ - D6 - F6 _ E6 _ _ _ D6 _ _ -',
+					'D6 _ _ - C6 - A5 _ G5 _ _ _ F5 - D5 -',
+					'F5 _ _ - G5 - A5 _ G5 _ _ _ F5 - D5 -',
+					'A5 _ _ - G5 - F5 _ D5 _ _ _ F5 - G5 -',
+					'A5 _ _ - C6 - D6 _ C6 _ _ _ A5 _ _ -',
+					'F5 _ _ _ _ _ D5 _ F5 _ G5 _ _ _ _ _',
+					'G5 _ _ _ _ _ E5 _ G5 _ C6 _ _ _ _ _',
+					'A5 _ _ _ _ _ F5 _ A5 _ D6 _ _ _ _ _',
+					'D6 _ _ _ _ _ B5 _ A5 _ _ _ _ _ _ -',
 					'D5 _ _ - F5 - G5 _ A5 _ _ _ G5 - F5 -',
 					'G5 _ _ - A5 - C6 _ A5 _ _ _ G5 - F5 -',
 					'A5 _ _ - C6 - D6 _ C6 _ _ _ A5 - G5 -',
@@ -565,13 +1000,26 @@ export const TUNES: Record<string, Tune> = {
 
 	// Karolinska: A minor, a fantastic voyage. A heart's "lub-dub" for a
 	// bass, arpeggios bubbling over it like air through the lungs, and the
-	// hospital's chime, "ding, dong, ding, dong", as on its tannoy.
+	// hospital's chime, "ding, dong, ding, dong", as on its tannoy. Then the
+	// whistle has the tune a while, and the middle lifts through F, G and C.
 	karolinska: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'sub',
 				pattern: bars(
+					'A1 - A1 - - - - - A1 - A1 - - - - -',
+					'F1 - F1 - - - - - F1 - F1 - - - - -',
+					'D2 - D2 - - - - - D2 - D2 - - - - -',
+					'E1 - E1 - - - - - E1 - E1 - - - G#1 -',
+					'A1 - A1 - - - - - A1 - A1 - - - - -',
+					'F1 - F1 - - - - - F1 - F1 - - - - -',
+					'D2 - D2 - - - - - D2 - D2 - - - - -',
+					'E1 - E1 - - - - - E1 - E1 - - - G#1 -',
+					'F1 - F1 - - - - - F1 - F1 - - - - -',
+					'G1 - G1 - - - - - G1 - G1 - - - - -',
+					'C2 - C2 - - - - - C2 - C2 - - - - -',
+					'E1 - E1 - - - - - E1 - E1 - - - G#1 -',
 					'A1 - A1 - - - - - A1 - A1 - - - - -',
 					'F1 - F1 - - - - - F1 - F1 - - - - -',
 					'D2 - D2 - - - - - D2 - D2 - - - - -',
@@ -586,12 +1034,36 @@ export const TUNES: Record<string, Tune> = {
 					'F4 A4 C5 F5 C5 A4 F4 A4 C5 F5 A5 F5 C5 A4 F4 A4',
 					'D4 F4 A4 D5 A4 F4 D4 F4 A4 D5 F5 D5 A4 F4 D4 F4',
 					'E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 G#5 E5 B4 G#4 E4 B4',
+					'A4 C5 E5 A5 E5 C5 A4 C5 E5 A5 C6 A5 E5 C5 A4 C5',
+					'F4 A4 C5 F5 C5 A4 F4 A4 C5 F5 A5 F5 C5 A4 F4 A4',
+					'D4 F4 A4 D5 A4 F4 D4 F4 A4 D5 F5 D5 A4 F4 D4 F4',
+					'E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 G#5 E5 B4 G#4 E4 B4',
+					'F4 A4 C5 F5 C5 A4 F4 A4 C5 F5 A5 F5 C5 A4 F4 A4',
+					'G4 B4 D5 G5 D5 B4 G4 B4 D5 G5 B5 G5 D5 B4 G4 B4',
+					'C5 E5 G5 C6 G5 E5 C5 E5 G5 C6 E6 C6 G5 E5 C5 E5',
+					'E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 G#5 E5 B4 G#4 E4 B4',
+					'A4 C5 E5 A5 E5 C5 A4 C5 E5 A5 C6 A5 E5 C5 A4 C5',
+					'F4 A4 C5 F5 C5 A4 F4 A4 C5 F5 A5 F5 C5 A4 F4 A4',
+					'D4 F4 A4 D5 A4 F4 D4 F4 A4 D5 F5 D5 A4 F4 D4 F4',
+					'E4 G#4 B4 E5 B4 G#4 E4 G#4 B4 E5 G#5 E5 B4 G#4 E4 B4',
 				),
 				gain: 0.03,
 			},
 			{
 				voice: 'bell',
 				pattern: bars(
+					'E6 - - - C6 - - - D6 - - - G5 _ _ -',
+					'- - - - - - - - - - - - - - - -',
+					'G5 - - - D6 - - - E6 - - - C6 _ _ -',
+					'- - - - - - - - B5 - - - G#5 - - -',
+					'- - - - - - - - - - - - - - - -',
+					'- - - - - - - - - - - - - - - -',
+					'- - - - - - - - - - - - - - - -',
+					'- - - - - - - - B5 - - - G#5 - - -',
+					'- - - - - - - - - - - - - - - -',
+					'- - - - - - - - - - - - - - - -',
+					'E6 - - - C6 - - - D6 - - - G5 _ _ -',
+					'- - - - - - - - - - - - - - - -',
 					'E6 - - - C6 - - - D6 - - - G5 _ _ -',
 					'- - - - - - - - - - - - - - - -',
 					'G5 - - - D6 - - - E6 - - - C6 _ _ -',
@@ -606,6 +1078,18 @@ export const TUNES: Record<string, Tune> = {
 					'C6 _ _ _ B5 _ A5 _ F5 _ _ _ - - - -',
 					'- - - - - - - - - - - - D5 _ F5 _',
 					'A5 _ _ _ G#5 _ B5 _ E6 _ _ _ - - - -',
+					'A5 _ _ _ C6 _ _ _ E6 _ _ _ D6 _ C6 _',
+					'A5 _ _ _ _ _ _ _ C6 _ A5 _ F5 _ _ _',
+					'D5 _ F5 _ A5 _ D6 _ C6 _ _ _ A5 _ F5 _',
+					'E5 _ _ _ G#5 _ _ _ B5 _ _ _ E6 _ _ _',
+					'C6 _ _ _ _ _ _ _ A5 _ _ _ F5 _ _ _',
+					'D6 _ _ _ _ _ _ _ B5 _ _ _ G5 _ _ _',
+					'E6 _ _ _ _ _ D6 _ C6 _ _ _ G5 _ _ _',
+					'G#5 _ _ _ B5 _ _ _ E6 _ _ _ D6 _ B5 _',
+					'- - - - - - - - - - - - E5 _ A5 _',
+					'C6 _ _ _ B5 _ A5 _ F5 _ _ _ - - - -',
+					'- - - - - - - - - - - - D5 _ F5 _',
+					'A5 _ _ _ G#5 _ B5 _ E6 _ _ _ - - - -',
 				),
 				gain: 0.045,
 			},
@@ -613,13 +1097,26 @@ export const TUNES: Record<string, Tune> = {
 	},
 
 	// Down The Slopes: après-ski, bright, in G, an oompah of a bass under a
-	// chorus to sing along to, arpeggios sparkling over it, sleigh bells.
+	// chorus to sing along to, arpeggios sparkling over it, sleigh bells,
+	// and a middle from C to sway to with your mug in the air.
 	slopes: {
-		bars: 4,
+		bars: 16,
 		tracks: [
 			{
 				voice: 'bass',
 				pattern: bars(
+					'G2 - D3 - G2 - D3 - G2 - D3 - G2 - B2 -',
+					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
+					'E2 - B2 - E2 - B2 - E2 - B2 - E2 - G2 -',
+					'C2 - G2 - C2 - G2 - D2 - A2 - D2 - F#2 -',
+					'G2 - D3 - G2 - D3 - G2 - D3 - G2 - B2 -',
+					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
+					'E2 - B2 - E2 - B2 - E2 - B2 - E2 - G2 -',
+					'C2 - G2 - C2 - G2 - D2 - A2 - D2 - F#2 -',
+					'C2 - G2 - C2 - G2 - C2 - G2 - C2 - E2 -',
+					'G2 - D3 - G2 - D3 - G2 - D3 - G2 - B2 -',
+					'A1 - E2 - A1 - E2 - A1 - E2 - A1 - C2 -',
+					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
 					'G2 - D3 - G2 - D3 - G2 - D3 - G2 - B2 -',
 					'D2 - A2 - D2 - A2 - D2 - A2 - D2 - F#2 -',
 					'E2 - B2 - E2 - B2 - E2 - B2 - E2 - G2 -',
@@ -635,12 +1132,36 @@ export const TUNES: Record<string, Tune> = {
 					'F#4 A4 D5 F#5 D5 A4 F#4 A4 F#4 A4 D5 F#5 D5 A4 F#4 A4',
 					'E4 G4 B4 E5 B4 G4 E4 G4 E4 G4 B4 E5 B4 G4 E4 G4',
 					'E4 G4 C5 E5 C5 G4 E4 G4 F#4 A4 D5 F#5 D5 A4 F#4 A4',
+					'G4 B4 D5 G5 D5 B4 G4 B4 G4 B4 D5 G5 D5 B4 G4 B4',
+					'F#4 A4 D5 F#5 D5 A4 F#4 A4 F#4 A4 D5 F#5 D5 A4 F#4 A4',
+					'E4 G4 B4 E5 B4 G4 E4 G4 E4 G4 B4 E5 B4 G4 E4 G4',
+					'E4 G4 C5 E5 C5 G4 E4 G4 F#4 A4 D5 F#5 D5 A4 F#4 A4',
+					'E4 G4 C5 E5 C5 G4 E4 G4 E4 G4 C5 E5 C5 G4 E4 G4',
+					'D4 G4 B4 D5 B4 G4 D4 G4 D4 G4 B4 D5 B4 G4 D4 G4',
+					'E4 A4 C5 E5 C5 A4 E4 A4 E4 A4 C5 E5 C5 A4 E4 A4',
+					'F#4 A4 D5 F#5 D5 A4 F#4 A4 F#4 A4 C5 F#5 D5 A4 F#4 A4',
+					'G4 B4 D5 G5 D5 B4 G4 B4 G4 B4 D5 G5 D5 B4 G4 B4',
+					'F#4 A4 D5 F#5 D5 A4 F#4 A4 F#4 A4 D5 F#5 D5 A4 F#4 A4',
+					'E4 G4 B4 E5 B4 G4 E4 G4 E4 G4 B4 E5 B4 G4 E4 G4',
+					'E4 G4 C5 E5 C5 G4 E4 G4 F#4 A4 D5 F#5 D5 A4 F#4 A4',
 				),
 				gain: 0.03,
 			},
 			{
 				voice: 'square',
 				pattern: bars(
+					'B5 - D6 - G6 _ _ - F#6 - E6 - D6 _ _ -',
+					'A5 - D6 - F#6 _ _ - E6 - D6 - A5 _ _ -',
+					'G5 - B5 - E6 _ _ - D6 - B5 - G5 _ _ -',
+					'C6 - E6 - G6 _ _ - E6 - D6 _ _ _ - -',
+					'D6 - B5 - G5 _ _ - A5 - B5 - D6 _ _ -',
+					'A5 - F#5 - D6 _ _ - E6 - F#6 - D6 _ _ -',
+					'E6 - D6 - B5 _ _ - G5 - B5 - E6 _ _ -',
+					'E6 - D6 - C6 - B5 - A5 - B5 - A5 _ _ _',
+					'E6 _ _ - E6 - D6 - C6 _ _ - G5 _ _ -',
+					'D6 _ _ - D6 - C6 - B5 _ _ - G5 _ _ -',
+					'C6 _ _ - C6 - B5 - A5 _ _ - E5 _ _ -',
+					'F#5 - A5 - D6 _ _ - C6 - B5 - A5 _ _ -',
 					'B5 - D6 - G6 _ _ - F#6 - E6 - D6 _ _ -',
 					'A5 - D6 - F#6 _ _ - E6 - D6 - A5 _ _ -',
 					'G5 - B5 - E6 _ _ - D6 - B5 - G5 _ _ -',
