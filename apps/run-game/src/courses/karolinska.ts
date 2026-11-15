@@ -429,10 +429,8 @@ const OBSTACLES: Obstacle[] = [
 	// Outside: pigeons, and visitors stood about.
 	{ kind: 'geese', x: 1000, count: 3 },
 	{ kind: 'tourists', x: 1380, count: 3 },
-	// Reception: wet floor signs, knocked over by whoever gets to them
-	// first, and a queue.
+	// Reception: wet floor signs, knocked over by whoever gets to them first.
 	{ kind: 'cone', x: 2060 },
-	{ kind: 'tourists', x: 2360, count: 2 },
 	{ kind: 'cone', x: 2680 },
 	// The corridor: a bed being wheeled up and down it, to jump, or to jump
 	// on and ride, and a drip stand.
