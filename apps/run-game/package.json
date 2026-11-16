@@ -14,7 +14,7 @@
 	},
 	"dependencies": {
 		"jsqr": "^1.4.0",
-		"scoopjs": "link:../../../scoopjs/packages/core",
+		"scoopjs": "npm:@joshthompson/scoopjs@^0.3.0",
 		"solid-js": "^1.9.5",
 		"trystero": "0.26.0",
 		"uqr": "^0.1.3"
