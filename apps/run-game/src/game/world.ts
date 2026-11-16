@@ -62,6 +62,10 @@ export interface Racer {
 	/** Plain state, like the body: why they stopped, and the tick they did. */
 	out?: Out
 	outAt: number
+	/** Over the line: where they slow to a stop, to dance. */
+	danceX?: number
+	/** The tick they started dancing, stopped there; undefined till they have. */
+	dancingSince?: number
 }
 
 /**

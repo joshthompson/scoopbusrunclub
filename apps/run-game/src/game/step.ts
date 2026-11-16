@@ -190,6 +190,20 @@ export const OVERSPEED_GRIP = 0.008
 const RUN_OFF_SPEED = 6
 /** How far past the right of the screen they get before the summary comes up. */
 const RUN_OFF_PAST = 60
+/**
+ * Over the line, how far past it the first one in slows to a stop, to dance:
+ * in front of the bus, parked behind them, and in view. Everyone in after
+ * them stops `DANCE_APART` further back, down to `DANCE_NEAREST`.
+ */
+const DANCE_PAST = 340
+const DANCE_APART = 40
+const DANCE_NEAREST = 120
+/** How hard they slow down to stop there, a tick: they ease off from about 250px out. */
+const DANCE_BRAKE = 0.07
+/** How long they dance before the summary comes up. */
+const DANCE_TICKS = 100
+/** However they've got on over the line, how long before the summary comes up anyway. */
+const FINISHED_MOST_TICKS = 420
 /** How long the runner flies after being scooped before the result shows. */
 const SCOOPED_TICKS = 70
 /** How far down a Gap, below the Ground's line, a runner's Fallen. */
@@ -228,6 +242,7 @@ export function stepWorld(world: World) {
 				stepRunner(world, racer)
 				hearHouse(world, racer, wasX)
 			}
+		for (const racer of world.racers) noteDancing(world, racer)
 		stepPack(world)
 		stepFurbies(world)
 		stepCorgis(world)
@@ -295,8 +310,12 @@ function stepPhase(world: World, frozen = false) {
 		if (!frozen) world.setRaceTicks(world.raceTicks() + 1)
 		for (const racer of world.racers) {
 			if (racer.out || racer.body.x < world.terrain.finishX) continue
+			const ahead = world.racers.filter((r) => r.out === 'finished').length
 			racer.out = 'finished'
 			racer.outAt = world.ticks()
+			racer.danceX =
+				world.terrain.finishX +
+				Math.max(DANCE_NEAREST, DANCE_PAST - ahead * DANCE_APART)
 			play('finished')
 			if (racer === world.racers[0] && !world.round) {
 				world.setPhase('finished')
@@ -307,11 +326,17 @@ function stepPhase(world: World, frozen = false) {
 		return
 	}
 	if (world.round) return
-	// Over the line: the summary once they've run off the screen.
+	// Over the line: the summary once they've stopped and danced a while
+	// (or, if they've somehow not, run off the screen, or long enough).
+	const player = world.racers[0]
 	if (
 		phase === 'finished' &&
 		!world.result() &&
-		world.body.x > world.camera() + VIEW_WIDTH + RUN_OFF_PAST
+		((player.dancingSince !== undefined &&
+			world.ticks() - player.dancingSince > DANCE_TICKS) ||
+			world.body.x > world.camera() + VIEW_WIDTH + RUN_OFF_PAST ||
+			(player.out === 'finished' &&
+				world.ticks() - player.outAt > FINISHED_MOST_TICKS))
 	)
 		world.setResult({
 			kind: 'finished',
@@ -461,6 +486,36 @@ function decideRound(world: World) {
 		)
 	}
 }
+
+/**
+ * Over the line, slowing down to stop where they're to dance (`danceX`):
+ * `vx` kept down to what stops them there, braking evenly, and never
+ * backwards, down a hill or not.
+ */
+export function slowToDance(racer: Racer, vx: number) {
+	if (racer.out !== 'finished' || racer.danceX === undefined) return vx
+	const left = Math.max(0, racer.danceX - racer.body.x)
+	return Math.max(0, Math.min(vx, Math.sqrt(2 * DANCE_BRAKE * left)))
+}
+
+/**
+ * Over the line and stood still, on their feet: dancing, from the tick they
+ * stopped (`dancingSince`). Not up in the air, on a glider, or on anything.
+ */
+function noteDancing(world: World, racer: Racer) {
+	const b = racer.body
+	const dancing =
+		racer.out === 'finished' &&
+		b.grounded &&
+		!b.gliding &&
+		b.mount === 0 &&
+		b.carried === 0 &&
+		Math.abs(b.vx) < DANCING_STILL
+	if (!dancing) racer.dancingSince = undefined
+	else racer.dancingSince ??= world.ticks()
+}
+/** How slow someone has to be going to be stood still, dancing. */
+export const DANCING_STILL = 0.3
 
 /** Whether a decided Round's done with: the winner's run on, and the last scooped landed. */
 export function roundOver(world: World) {
@@ -707,6 +762,7 @@ function stepRunner(world: World, racer: Racer) {
 			b.vx += hillPull(slope) * HILL_PULL
 			if (slowTo !== undefined && Math.abs(b.vx) > slowTo) b.vx *= 0.93
 			if (b.squashed > 0 && Math.abs(b.vx) > SQUASHED_TOP_SPEED) b.vx *= 0.95
+			b.vx = slowToDance(racer, b.vx)
 		}
 
 		// Through a long jump's sand: slowed down in it.

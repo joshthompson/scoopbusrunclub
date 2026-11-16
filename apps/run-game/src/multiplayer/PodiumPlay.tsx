@@ -14,6 +14,8 @@ const JUMP = 11.6
 /** Let go of jump on the way up and it's cut to this: a tap's a hop. */
 const JUMP_CUT = 4
 const FALL_MOST = 14
+/** How long a frame is, in milliseconds: they're stepped 60 a second. */
+const TICK_MS = 1000 / 60
 /** How many frames a stride takes, however many run frames it's drawn in. */
 const STRIDE_TICKS = 24
 /** What the runners' frames are drawn at, as the engine has them: the offsets in their frames are at this scale. */
@@ -40,6 +42,8 @@ interface Body {
 	ducking: boolean
 	tick: number
 	jumpHeld: boolean
+	/** Where in their dance they started, so nobody's dancing in step. */
+	danceStart: number
 }
 
 /** Where a step is, within the screen. */
@@ -155,6 +159,9 @@ export function PodiumPlay(props: {
 				tick: 0,
 				// Held as it starts (the jump that finished the Round): not a jump.
 				jumpHeld: true,
+				danceStart: Math.floor(
+					Math.random() * (runner.sprite.dance?.frames.length ?? 1),
+				),
 			})
 		}
 		return made
@@ -292,10 +299,24 @@ function Runner(props: { body: Body; frame: number }) {
 	const sprite = () => props.body.runner.sprite
 	const width = () => sprite().width * props.body.scale
 	const height = () => sprite().height * props.body.scale
+	/** Stood about, on their feet: dancing, if they've a dance. */
+	const dance = () => {
+		void props.frame
+		const b = props.body
+		const moves = sprite().dance
+		return b.grounded && !b.moving && !b.ducking ? moves : undefined
+	}
 	const current = () => {
 		void props.frame
 		const b = props.body
 		const run = sprite().run
+		const dancing = dance()
+		if (dancing) {
+			const step = Math.floor((b.tick * TICK_MS) / dancing.interval)
+			return {
+				frame: dancing.frames[(b.danceStart + step) % dancing.frames.length],
+			}
+		}
 		if (b.ducking && sprite().sit) return { frame: sprite().sit, single: true }
 		if (!b.grounded) return { frame: run[1] ?? run[0] }
 		if (b.moving)
@@ -305,6 +326,10 @@ function Runner(props: { body: Body; frame: number }) {
 			}
 		return { frame: run[0] }
 	}
+	/** The box their frame's drawn in: a dance frame's a little taller, on the same feet. */
+	const frameWidth = () => (dance()?.width ?? sprite().width) * props.body.scale
+	const frameHeight = () =>
+		(dance()?.height ?? sprite().height) * props.body.scale
 	const place = () => {
 		void props.frame
 		return { x: props.body.x, feet: props.body.feet }
@@ -320,47 +345,57 @@ function Runner(props: { body: Body; frame: number }) {
 			}}
 		>
 			<NameTag name={props.body.runner.name} colour={props.body.seat.colour} />
-			<Show
-				when={current().single}
-				fallback={
-					<div
+			<div
+				style={{
+					position: 'absolute',
+					left: `${(width() - frameWidth()) / 2}px`,
+					bottom: 0,
+					width: `${frameWidth()}px`,
+					height: `${frameHeight()}px`,
+				}}
+			>
+				<Show
+					when={current().single}
+					fallback={
+						<div
+							class="pixelated"
+							style={{
+								width: '100%',
+								height: '100%',
+								...frameStyle(current().frame, props.body.scale),
+								// Drawn facing left.
+								transform: props.body.facing === 1 ? 'scaleX(-1)' : undefined,
+							}}
+						/>
+					}
+				>
+					<img
+						src={current().frame}
+						alt=""
 						class="pixelated"
 						style={{
-							width: '100%',
-							height: '100%',
-							...frameStyle(current().frame, props.body.scale),
-							// Drawn facing left.
-							transform: props.body.facing === 1 ? 'scaleX(-1)' : undefined,
+							position: 'absolute',
+							bottom: 0,
+							left: '50%',
+							// At its own size, as big as the rest of them.
+							zoom: props.body.scale,
+							transform: `translateX(-50%)${props.body.facing === 1 ? ' scaleX(-1)' : ''}`,
 						}}
 					/>
-				}
-			>
-				<img
-					src={current().frame}
-					alt=""
-					class="pixelated"
-					style={{
-						position: 'absolute',
-						bottom: 0,
-						left: '50%',
-						// At its own size, as big as the rest of them.
-						zoom: props.body.scale,
-						transform: `translateX(-50%)${props.body.facing === 1 ? ' scaleX(-1)' : ''}`,
-					}}
-				/>
-			</Show>
-			{/* Their hat, and their medal round their neck, with them wherever
+				</Show>
+				{/* Their hat, and their medal round their neck, with them wherever
 			    they go. */}
-			<Worn
-				frame={current().frame}
-				single={current().single}
-				width={width()}
-				height={height()}
-				scale={props.body.scale}
-				flipped={props.body.facing === 1}
-				hat={props.body.seat.hat}
-				place={props.body.place}
-			/>
+				<Worn
+					frame={current().frame}
+					single={current().single}
+					width={frameWidth()}
+					height={frameHeight()}
+					scale={props.body.scale}
+					flipped={props.body.facing === 1}
+					hat={props.body.seat.hat}
+					place={props.body.place}
+				/>
+			</div>
 		</div>
 	)
 }

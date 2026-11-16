@@ -1,20 +1,24 @@
 import skeletonFace from '@/assets/halloween/skeleton-face.png'
 import skeletonSit from '@/assets/halloween/skeleton-sit.png'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
+import batPersonDance from '../assets/runners/bat-person/dance.png'
 import batPersonFace from '../assets/runners/bat-person/face.png'
 import batPersonRun from '../assets/runners/bat-person/run.png'
 import batPersonSit from '../assets/runners/bat-person/sit.png'
 import batPersonSkiTuck from '../assets/runners/bat-person/ski-tuck.png'
 import batPersonSki from '../assets/runners/bat-person/ski.png'
 import batPersonStand from '../assets/runners/bat-person/stand.png'
+import msCrocodileDance from '../assets/runners/ms-crocodile/dance.png'
 import msCrocodileFace from '../assets/runners/ms-crocodile/face.png'
 import msCrocodileRun from '../assets/runners/ms-crocodile/run.png'
 import msCrocodileSit from '../assets/runners/ms-crocodile/sit.png'
 import msCrocodileStand from '../assets/runners/ms-crocodile/stand.png'
+import skeletonDance from '../assets/runners/skeleton/dance.png'
 import skeletonSkiTuck from '../assets/runners/skeleton/ski-tuck.png'
 import skeletonSki from '../assets/runners/skeleton/ski.png'
 import skeletonSnowboard from '../assets/runners/skeleton/snowboard.png'
 import skeletonStand from '../assets/runners/skeleton/stand.png'
+import vikingDance from '../assets/runners/viking/dance.png'
 import vikingFace from '../assets/runners/viking/face.png'
 import vikingRun from '../assets/runners/viking/run.png'
 import vikingSit from '../assets/runners/viking/sit.png'
@@ -22,6 +26,7 @@ import vikingSkiTuck from '../assets/runners/viking/ski-tuck.png'
 import vikingSki from '../assets/runners/viking/ski.png'
 import vikingSnowboard from '../assets/runners/viking/snowboard.png'
 import vikingStand from '../assets/runners/viking/stand.png'
+import yetiDance from '../assets/runners/yeti/dance.png'
 import yetiFace from '../assets/runners/yeti/face.png'
 import yetiRun from '../assets/runners/yeti/run.png'
 import yetiSit from '../assets/runners/yeti/sit.png'
@@ -31,6 +36,8 @@ import yetiSnowboard from '../assets/runners/yeti/snowboard.png'
 import yetiStand from '../assets/runners/yeti/stand.png'
 import { RUNNER_SCALE } from '../game/constants'
 import { runnerUnlocked } from '../saved/unlocked'
+import { danceForKey } from './dance'
+import { stripDance } from './dancing'
 import { LOCKED_MEMBERS, type Playable, lookSprite } from './playable'
 import { SKELETON_SPRITE } from './skeleton'
 
@@ -63,6 +70,10 @@ const runFrames = (strip: string, frames: number) =>
 			`${strip}#${-WIDTH * RUNNER_SCALE * n},0,${WIDTH * frames},${HEIGHT}`,
 	)
 
+/** A dance, from its strip in `assets/runners/<who>/dance.png` (see `scripts/make-dances.ts`). */
+const dance = (strip: string, who: string) =>
+	stripDance(strip, danceForKey(who), WIDTH, HEIGHT)
+
 /**
  * The Yeti: big, hunched and friendly, shaggy white fur, lavender down its
  * back and under its belly, a hump of shoulders behind its head, a pale
@@ -84,6 +95,7 @@ export const YETI: Playable = {
 		skiTuck: yetiSkiTuck,
 		snowboard: yetiSnowboard,
 		face: yetiFace,
+		dance: dance(yetiDance, 'yeti'),
 		width: WIDTH,
 		height: HEIGHT,
 	},
@@ -108,6 +120,7 @@ export const BAT_PERSON: Playable = {
 		ski: batPersonSki,
 		skiTuck: batPersonSkiTuck,
 		face: batPersonFace,
+		dance: dance(batPersonDance, 'bat-person'),
 		width: WIDTH,
 		height: HEIGHT,
 	},
@@ -134,6 +147,7 @@ export const VIKING: Playable = {
 		skiTuck: vikingSkiTuck,
 		snowboard: vikingSnowboard,
 		face: vikingFace,
+		dance: dance(vikingDance, 'viking'),
 		width: WIDTH,
 		height: HEIGHT,
 	},
@@ -162,6 +176,7 @@ export const SKELETON: Playable = {
 		skiTuck: skeletonSkiTuck,
 		snowboard: skeletonSnowboard,
 		face: skeletonFace,
+		dance: dance(skeletonDance, 'skeleton'),
 	},
 }
 
@@ -184,6 +199,7 @@ export const MS_CROCODILE: Playable = {
 		sit: msCrocodileSit,
 		stand: msCrocodileStand,
 		face: msCrocodileFace,
+		dance: dance(msCrocodileDance, 'ms-crocodile'),
 		width: WIDTH,
 		height: HEIGHT,
 	},
