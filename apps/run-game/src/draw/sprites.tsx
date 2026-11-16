@@ -96,6 +96,7 @@ import {
 	whaleAt,
 } from '../game/sky'
 import {
+	DANCING_STILL,
 	GATE_FLAP_TICKS,
 	countdownWord,
 	scoopFlight,
@@ -313,12 +314,29 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const stand = sprite.stand
 	const skiTuck = sprite.skiTuck
 	const skiStance = sprite.ski
+	const dance = sprite.dance
 	const runSize = {
 		width: sprite.width * RUNNER_SCALE,
 		height: sprite.height * RUNNER_SCALE,
 	}
 
 	const { body } = racer
+	/**
+	 * Over the line and stopped, on their feet: dancing, if they've a dance.
+	 * `body` isn't a signal: reading the tick keeps this up to date.
+	 */
+	const dancing = () =>
+		world.ticks() >= 0 &&
+		!!dance &&
+		racer.out === 'finished' &&
+		body.grounded &&
+		!body.gliding &&
+		body.mount === 0 &&
+		body.carried === 0 &&
+		Math.abs(body.vx) < DANCING_STILL
+	/** Where in their dance they start: anywhere, so nobody's in step. */
+	const danceStart = Math.floor(Math.random() * (dance?.frames.length ?? 1))
+	let wasDancing = false
 	/** On skis or a snowboard: which, if so. `body` isn't a signal: reading the tick keeps this up to date. */
 	const board = createMemo(() => (world.ticks() >= 0 ? body.board : 0))
 	/** Crouched on them: curled up in a trick, or in a heap, wiped out. */
@@ -395,18 +413,24 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			...(skiTuck ? [skiTuck] : []),
 			...(skiStance ? [skiStance] : []),
 			...(sprite.snowboard ? [sprite.snowboard] : []),
+			...(dance?.frames ?? []),
 		],
 		init() {
 			const size = () =>
 				// Stood, as tall and wide as a run frame: a custom runner's stand
 				// is one frame of a strip, not a picture of its own.
-				tucked()
-					? poseSize(skiTuck, sprite)
-					: ducking()
-						? poseSize(sit, sprite)
-						: onSkis()
-							? poseSize(stanceOf(sprite, body.board), sprite)
-							: runSize
+				dancing() && dance
+					? {
+							width: dance.width * RUNNER_SCALE,
+							height: dance.height * RUNNER_SCALE,
+						}
+					: tucked()
+						? poseSize(skiTuck, sprite)
+						: ducking()
+							? poseSize(sit, sprite)
+							: onSkis()
+								? poseSize(stanceOf(sprite, body.board), sprite)
+								: runSize
 			return {
 				id: `player-${racer.id}`,
 				type: 'player',
@@ -415,15 +439,17 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				width: () => size().width,
 				height: () => size().height,
 				frames: () =>
-					tucked() && skiTuck
-						? [skiTuck]
-						: ducking() && sit
-							? [sit]
-							: onSkis()
-								? [stanceOf(sprite, body.board) ?? stand ?? run[0]]
-								: (standing() || lying()) && stand
-									? [stand]
-									: run,
+					dancing() && dance
+						? dance.frames
+						: tucked() && skiTuck
+							? [skiTuck]
+							: ducking() && sit
+								? [sit]
+								: onSkis()
+									? [stanceOf(sprite, body.board) ?? stand ?? run[0]]
+									: (standing() || lying()) && stand
+										? [stand]
+										: run,
 				...createObjectSignal(undefined as number | undefined, 'frame'),
 				// Run sprites face left, the way the header's runners run.
 				...createObjectSignal(-1, 'xScale'),
@@ -512,19 +538,33 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			// the air, legs out in one stride.
 			const sitting =
 				(body.ducking || sat(body) || (seated && body.carried > 0)) && !!sit
-			// Stood still: the one stand frame.
-			$.setFrame(
-				sitting || standing() || (lying() && stand)
-					? 0
-					: body.grounded && !body.board
-						? undefined
-						: 1,
-			)
-			const speed = Math.abs(body.vx)
-			$.setState(body.grounded && !body.board && speed > 0.3 ? 'play' : 'pause')
-			$.setFrameInterval(
-				strideFrameInterval(Math.max(45, 190 - speed * 22), run.length),
-			)
+			const isDancing = dancing()
+			if (isDancing && dance) {
+				// Dancing: upright, facing the way they were, from wherever in
+				// it they start, and on through it from there.
+				$.setXScale(xScale)
+				$.setRotation(0)
+				$.setFrame(wasDancing ? undefined : danceStart)
+				$.setState('play')
+				$.setFrameInterval(dance.interval)
+			} else {
+				// Stood still: the one stand frame.
+				$.setFrame(
+					sitting || standing() || (lying() && stand)
+						? 0
+						: body.grounded && !body.board
+							? undefined
+							: 1,
+				)
+				const speed = Math.abs(body.vx)
+				$.setState(
+					body.grounded && !body.board && speed > 0.3 ? 'play' : 'pause',
+				)
+				$.setFrameInterval(
+					strideFrameInterval(Math.max(45, 190 - speed * 22), run.length),
+				)
+			}
+			wasDancing = isDancing
 			const { sea } = world.course
 			const haunted = hauntLook(world, racer, now())
 			if (haunted.shake) $.setX($.x() + haunted.shake)
