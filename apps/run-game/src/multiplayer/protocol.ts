@@ -300,9 +300,11 @@ export const RACER_FLAGS = {
 	gliding: 128,
 	/** In a mine cart. */
 	cart: 256,
+	/** Killed by a haunted house's monster, and come back as a ghost. */
+	ghost: 512,
 }
 /** The hat a racer's wearing, as its `hatCode`, is the flags over this. */
-export const HAT_FLAG = 512
+export const HAT_FLAG = 1024
 /**
  * [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding, 8 ducking,
  * 16 being shrunk), dazed, spin (or being shrunk, how far into it: never

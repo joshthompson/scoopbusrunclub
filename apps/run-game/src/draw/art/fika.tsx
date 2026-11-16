@@ -23,10 +23,11 @@ import {
 	pickAndMix,
 	salmiakki,
 } from '../../courses/kit/ferryFika'
+import { ale } from '../../courses/kit/gamlaStanFika'
 import { grapes, oxygen, vitamin } from '../../courses/kit/karolinskaFika'
 import {
 	blueberrySoup,
-	hotDog,
+	pizzaSlice,
 	waterCup,
 } from '../../courses/kit/midnattsloppetFika'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
@@ -188,7 +189,8 @@ const ART: Record<FikaItem, string> = {
 	vitamin,
 	waterCup,
 	blueberrySoup,
-	hotDog,
+	pizzaSlice,
+	ale,
 }
 
 /** A fika item's picture, for a Draw Hook to draw at its size (see `FIKA_SIZE`). */

@@ -374,24 +374,45 @@ const churchWindow = (
 ]
 
 /**
- * Sofiakyrkan, on the top of Vita bergen: pale plaster, national romantic,
- * 1906. Its great gable faces the park, a tall window glowing in it over
- * the doors, open, warm light spilling down the steps; its wings either
- * side under copper roofs; and over it all its big tower, a belfry, a
- * green copper dome, ribbed, and a lantern on top, lit, under a gilt
- * cross. 140 by 120.
+ * A floodlight's beam, faint warm light, fanning up the wall from a lamp at
+ * `x`, `y`, `h` tall, and no wider than `most` either side: on the wall,
+ * not out over the sky beside it.
  */
-export const sofiaKyrkan = (() => {
-	const W = 140
-	const H = 120
-	const mid = W / 2
+const FLOOD = '#fff1c00e'
+const floodlight = (
+	x: number,
+	y: number,
+	h: number,
+	most: number,
+): PixelRect[] => {
 	const r: PixelRect[] = []
+	for (let up = 0; up < h; up += 4) {
+		const hw = Math.min(most, 2 + Math.round(up * 0.45))
+		r.push([x - hw, y - up - 4, hw * 2, 4, FLOOD])
+	}
+	// The lamp itself, on the plinth, and the glare off it.
+	r.push(...glow(x - 2, y - 2, 4, 2, 3))
+	r.push([x - 3, y - 1, 6, 3, GRANITE_SHADE])
+	r.push([x - 2, y - 2, 4, 1, WARM_LIT])
+	return r
+}
 
-	// The tower's dome: copper, rounded, lit on its left, ribbed.
-	for (let y = 14; y < 36; y++) {
-		const hw = Math.round(5 + 13 * Math.sqrt((y - 13) / 22))
+/** A copper dome, `hw` at its widest, from `top` down to `bottom`, ribbed, lit on its left. */
+const dome = (
+	mid: number,
+	top: number,
+	bottom: number,
+	widest: number,
+	ribs: number[],
+): PixelRect[] => {
+	const r: PixelRect[] = []
+	const tall = bottom - top
+	for (let y = top; y < bottom; y++) {
+		const hw = Math.round(
+			widest * 0.22 + widest * 0.78 * Math.sqrt((y - top + 1) / tall),
+		)
 		r.push([mid - hw, y, hw * 2, 1, COPPER])
-		r.push([mid - hw, y, Math.ceil(hw * 0.6), 1, COPPER_LIT])
+		r.push([mid - hw, y, Math.ceil(hw * 0.55), 1, COPPER_LIT])
 		r.push([
 			mid + hw - Math.ceil(hw * 0.35),
 			y,
@@ -399,104 +420,205 @@ export const sofiaKyrkan = (() => {
 			1,
 			COPPER_SHADE,
 		])
-		if (y > 15)
-			for (const rib of [-0.55, 0.15, 0.7])
+		if (y > top + 2)
+			for (const rib of ribs)
 				r.push([mid + Math.round(hw * rib), y, 1, 1, COPPER_SHADE])
 	}
-	r.push([mid - 18, 35, 36, 1, COPPER_SHADE])
-	// The lantern on top, its window lit, its cap, and the cross.
-	r.push(...glow(mid - 2, 9, 4, 4, 2))
-	r.push([mid - 4, 7, 8, 7, COPPER])
-	r.push([mid - 4, 7, 2, 7, COPPER_LIT])
-	r.push([mid - 2, 9, 4, 4, WARM])
-	r.push([mid - 2, 9, 4, 1, WARM_LIT])
-	r.push([mid - 5, 6, 10, 1, COPPER_LIT])
-	r.push([mid - 4, 5, 8, 1, COPPER])
-	r.push([mid - 2, 4, 4, 1, COPPER])
-	r.push([mid - 1, 0, 2, 4, GILT])
-	r.push([mid - 2, 1, 4, 1, GILT])
+	r.push([mid - widest, bottom - 1, widest * 2, 1, COPPER_SHADE])
+	return r
+}
 
-	// The tower, square, under its cornice, little copper spires on its corners.
-	r.push([50, 38, 40, 36, PLASTER])
-	r.push([50, 38, 3, 36, PLASTER_LIT])
-	r.push([87, 38, 3, 36, PLASTER_SHADE])
-	r.push([48, 36, 44, 2, PLASTER_LIT])
-	r.push([48, 38, 44, 1, PLASTER_SHADE])
-	for (const x of [48, 87]) {
-		r.push([x, 30, 5, 6, COPPER])
-		r.push([x + 1, 27, 3, 3, COPPER])
-		r.push([x + 2, 25, 1, 2, COPPER])
-		r.push([x, 30, 2, 6, COPPER_LIT])
-		r.push([x + 1, 27, 1, 3, COPPER_LIT])
+/** A lantern on top of a dome, `w` wide, its windows lit, and a gilt cross over it, its foot at `bottom`. */
+const lantern = (mid: number, bottom: number, w: number): PixelRect[] => {
+	const h = Math.round(w * 1.1)
+	const top = bottom - h
+	return [
+		...glow(mid - w / 4, top + 3, w / 2, h - 5, 3),
+		[mid - w / 2, top, w, h, COPPER],
+		[mid - w / 2, top, 2, h, COPPER_LIT],
+		[mid - w / 4, top + 3, w / 2, h - 5, WARM],
+		[mid - w / 4, top + 3, w / 2, 1, WARM_LIT],
+		[mid - 1, top + 3, 1, h - 5, WARM_SHADE],
+		[mid - w / 2 - 2, top - 1, w + 4, 2, COPPER_LIT],
+		[mid - w / 2, top - 3, w, 2, COPPER],
+		[mid - w / 4, top - 5, w / 2, 2, COPPER],
+		// The cross, gilt, catching the floodlights.
+		[mid - 1, top - 5 - w, 2, w, GILT],
+		[
+			mid - Math.round(w / 3),
+			top - 5 - Math.round(w * 0.7),
+			Math.round(w / 3) * 2,
+			2,
+			GILT,
+		],
+	]
+}
+
+/**
+ * Sofiakyrkan, on the top of Vita bergen: pale plaster, national romantic,
+ * 1906, floodlit for the race. Its great gable faces the park, a rose
+ * window in it, and under that a tall window glowing over its doors, open,
+ * warm light spilling down its steps. Its wings either side under copper
+ * roofs, a corner tower at each end with a dome of its own; and over it all
+ * its big tower, a belfry, a drum of lit windows, a great ribbed copper
+ * dome, and a lantern on top under a gilt cross. Floodlights along its
+ * plinth wash light up its walls. 280 by 240.
+ */
+/** How tall it is, in cells: for the camera to look up to the top of it. */
+export const SOFIA_KYRKAN_HEIGHT = 240
+
+export const sofiaKyrkan = (() => {
+	const W = 280
+	const H = SOFIA_KYRKAN_HEIGHT
+	const mid = W / 2
+	const r: PixelRect[] = []
+
+	// The great dome, its lantern and cross.
+	r.push(...lantern(mid, 30, 16))
+	r.push(...dome(mid, 30, 76, 44, [-0.72, -0.36, 0, 0.36, 0.72]))
+	// Its drum, a ring of lit windows between pilasters, a cornice over it.
+	r.push([96, 74, 88, 3, PLASTER_LIT])
+	r.push([96, 77, 88, 1, PLASTER_SHADE])
+	r.push([100, 78, 80, 32, PLASTER])
+	r.push([100, 78, 3, 32, PLASTER_LIT])
+	r.push([177, 78, 3, 32, PLASTER_SHADE])
+	for (const x of [106, 124, 148, 166])
+		r.push(...churchWindow(x, 84, 8, 18, [4], []))
+	for (const x of [118, 140, 160]) r.push([x, 80, 2, 28, PLASTER_LIT])
+
+	// The tower, square, under its cornice, copper spires on its corners.
+	r.push([96, 112, 88, 46, PLASTER])
+	r.push([96, 112, 4, 46, PLASTER_LIT])
+	r.push([180, 112, 4, 46, PLASTER_SHADE])
+	r.push([92, 108, 96, 3, PLASTER_LIT])
+	r.push([92, 111, 96, 1, PLASTER_SHADE])
+	for (const x of [92, 178]) {
+		r.push([x, 96, 10, 12, COPPER])
+		r.push([x + 2, 90, 6, 6, COPPER])
+		r.push([x + 4, 84, 2, 6, COPPER])
+		r.push([x, 96, 3, 12, COPPER_LIT])
+		r.push([x + 2, 90, 2, 6, COPPER_LIT])
+		r.push([x + 4, 82, 2, 2, GILT])
 	}
 	// Its belfry, an arched opening either side, louvred.
-	for (const x of [55, 80]) {
-		r.push(...arch(x, 42, 5, 14, LOUVRE))
-		for (let y = 45; y < 56; y += 2) r.push([x, y, 5, 1, LOUVRE_SLAT])
+	for (const x of [106, 160]) {
+		r.push(...arch(x, 116, 14, 30, LOUVRE))
+		for (let y = 121; y < 146; y += 3) r.push([x, y, 14, 1, LOUVRE_SLAT])
+		r.push([x - 2, 146, 18, 2, PLASTER_LIT])
 	}
 
-	// The wings' roof, copper, hipped at the ends, going on behind the gable.
-	for (let y = 62; y < 75; y++) {
-		const inset = Math.round((74 - y) * 0.8)
-		r.push([2 + inset, y, W - 4 - 2 * inset, 1, y === 62 ? COPPER_LIT : COPPER])
-		r.push([2 + inset, y, 2, 1, COPPER_LIT])
-		r.push([W - 4 - inset, y, 2, 1, COPPER_SHADE])
+	// The corner towers, one at each end, each with its own dome.
+	for (const cx of [32, 248]) {
+		r.push(...lantern(cx, 62, 8))
+		r.push(...dome(cx, 62, 90, 20, [-0.5, 0.2]))
+		r.push([cx - 20, 89, 40, 3, PLASTER_LIT])
+		r.push([cx - 18, 92, 36, 120, PLASTER])
+		r.push([cx - 18, 92, 3, 120, PLASTER_LIT])
+		r.push([cx + 15, 92, 3, 120, PLASTER_SHADE])
+		r.push(...churchWindow(cx - 5, 100, 10, 26, [5], [13]))
+		r.push(...churchWindow(cx - 5, 150, 10, 34, [5], [17]))
 	}
-	r.push([2, 74, W - 4, 1, COPPER_SHADE])
-	// The wings' walls, their ends lit and in shade, a shadow under the eaves.
-	r.push([4, 75, W - 8, 31, PLASTER])
-	r.push([4, 75, 2, 31, PLASTER_LIT])
-	r.push([W - 6, 75, 2, 31, PLASTER_SHADE])
-	r.push([4, 75, W - 8, 1, PLASTER_SHADE])
-	// Their tall windows, two a wing.
-	for (const x of [12, 30, 103, 121])
-		r.push(...churchWindow(x, 81, 7, 21, [3], [10]))
+
+	// The wings' roof, copper, going on behind the gable.
+	for (let y = 124; y < 150; y++) {
+		const inset = Math.round((149 - y) * 0.4)
+		r.push([50 + inset, y, 180 - 2 * inset, 1, y === 124 ? COPPER_LIT : COPPER])
+		r.push([50 + inset, y, 3, 1, COPPER_LIT])
+	}
+	r.push([50, 149, 180, 1, COPPER_SHADE])
+	// The wings' walls, a shadow under their eaves, two tall windows a wing.
+	r.push([50, 150, 180, 62, PLASTER])
+	r.push([50, 150, 180, 2, PLASTER_SHADE])
+	for (const x of [58, 76, 194, 212])
+		r.push(...churchWindow(x, 162, 10, 38, [5], [14, 26]))
 
 	// The great gable, stepping up to its point, its coping lit, a stone
-	// finial on top.
-	const peak = 46
-	const eaves = 72
+	// finial and a cross on top.
+	const peak = 92
+	const eaves = 146
 	for (let y = peak; y < eaves; y++) {
-		const hw = Math.round(4 + ((y - peak) * 20) / (eaves - peak))
+		const hw = Math.round(8 + ((y - peak) * 40) / (eaves - peak))
 		r.push([mid - hw, y, hw * 2, 1, PLASTER])
-		r.push([mid - hw, y, 2, 1, PLASTER_LIT])
-		r.push([mid + hw - 2, y, 2, 1, PLASTER_LIT])
+		r.push([mid - hw, y, 3, 1, PLASTER_LIT])
+		r.push([mid + hw - 3, y, 3, 1, PLASTER_LIT])
 	}
-	r.push([mid - 4, peak, 8, 1, PLASTER_LIT])
-	r.push([mid - 2, 42, 4, 4, PLASTER_LIT])
-	r.push([mid - 1, 41, 2, 1, PLASTER_LIT])
-	r.push([46, eaves, 48, 34, PLASTER])
-	r.push([46, eaves, 2, 34, PLASTER_LIT])
-	r.push([92, eaves, 2, 34, PLASTER_SHADE])
-	// It stands out from the wings: its shadow on the right-hand one.
-	r.push([94, 75, 2, 31, PLASTER_SHADE])
-	// Its great window: three lights, two bars across.
-	r.push(...churchWindow(61, 54, 17, 36, [5, 11], [12, 24]))
+	r.push([mid - 8, peak, 16, 2, PLASTER_LIT])
+	r.push([mid - 4, 84, 8, 8, PLASTER_LIT])
+	r.push([mid - 1, 74, 2, 10, GILT])
+	r.push([mid - 4, 77, 8, 2, GILT])
+	// Its rose window, round, lit, its tracery a cross and a ring.
+	const rose = { x: mid, y: 122, r: 13 }
+	r.push(...glow(rose.x - rose.r, rose.y - rose.r, rose.r * 2, rose.r * 2, 4))
+	for (let dy = -rose.r - 2; dy <= rose.r + 2; dy++) {
+		const outer = Math.round(
+			Math.sqrt(Math.max(0, (rose.r + 2) ** 2 - dy * dy)),
+		)
+		const inner = Math.round(Math.sqrt(Math.max(0, rose.r ** 2 - dy * dy)))
+		r.push([rose.x - outer, rose.y + dy, outer * 2, 1, REVEAL])
+		if (Math.abs(dy) <= rose.r)
+			r.push([
+				rose.x - inner,
+				rose.y + dy,
+				inner * 2,
+				1,
+				dy < -6 ? WARM_LIT : WARM,
+			])
+	}
+	r.push([rose.x - 1, rose.y - rose.r, 2, rose.r * 2, WARM_SHADE])
+	r.push([rose.x - rose.r, rose.y - 1, rose.r * 2, 2, WARM_SHADE])
+	for (let a = 0; a < 16; a++) {
+		const t = (a / 16) * Math.PI * 2
+		r.push([
+			Math.round(rose.x + Math.cos(t) * 7),
+			Math.round(rose.y + Math.sin(t) * 7),
+			1,
+			1,
+			WARM_SHADE,
+		])
+	}
+	r.push([rose.x - 3, rose.y - 3, 6, 6, FLAME_CORE])
+	// The gable's wall, standing out from the wings, its shadow on the right-hand one.
+	r.push([92, eaves, 96, 66, PLASTER])
+	r.push([92, eaves, 3, 66, PLASTER_LIT])
+	r.push([185, eaves, 3, 66, PLASTER_SHADE])
+	r.push([188, 150, 4, 62, PLASTER_SHADE])
+	// Its great window: four lights, a bar across.
+	r.push(...churchWindow(mid - 14, 150, 28, 30, [7, 14, 21], [14]))
 
 	// The plinth, granite, its courses.
-	r.push([4, 106, W - 8, 14, GRANITE])
-	r.push([4, 106, W - 8, 1, GRANITE_LIT])
-	r.push([4, 112, W - 8, 1, GRANITE_SHADE])
-	r.push([46, 106, 48, 14, GRANITE])
-	r.push([46, 106, 48, 1, GRANITE_LIT])
-	// The doors, open, in a granite portal: warm light inside.
-	r.push(...glow(64, 96, 12, 16, 3))
-	r.push(...arch(62, 94, 16, 18, GRANITE_LIT))
-	r.push(...arch(64, 96, 12, 16, WARM))
-	r.push([66, 96, 8, 1, WARM_LIT])
-	r.push([65, 97, 10, 2, WARM_LIT])
-	r.push([64, 99, 2, 13, DOOR])
-	r.push([74, 99, 2, 13, DOOR])
-	r.push([66, 110, 8, 2, WARM_SHADE])
+	r.push([8, 212, W - 16, 28, GRANITE])
+	r.push([8, 212, W - 16, 2, GRANITE_LIT])
+	r.push([8, 224, W - 16, 1, GRANITE_SHADE])
+	r.push([8, 232, W - 16, 1, GRANITE_SHADE])
+	// The doors, open, in a deep granite portal: warm light inside.
+	r.push(...glow(mid - 12, 192, 24, 32, 5))
+	r.push(...arch(mid - 18, 186, 36, 38, GRANITE_LIT))
+	r.push(...arch(mid - 15, 189, 30, 35, GRANITE))
+	r.push(...arch(mid - 12, 192, 24, 32, WARM))
+	r.push([mid - 10, 192, 20, 2, WARM_LIT])
+	r.push([mid - 11, 194, 22, 4, WARM_LIT])
+	r.push([mid - 12, 198, 4, 26, DOOR])
+	r.push([mid + 8, 198, 4, 26, DOOR])
+	r.push([mid - 8, 220, 16, 4, WARM_SHADE])
 	// The steps down from them, the light spilling down them.
-	r.push([60, 112, 20, 2, STEP])
-	r.push([60, 112, 20, 1, STEP_LIT])
-	r.push([56, 114, 28, 3, STEP])
-	r.push([56, 114, 28, 1, STEP_LIT])
-	r.push([52, 117, 36, 3, STEP])
-	r.push([52, 117, 36, 1, STEP_LIT])
-	r.push([60, 112, 20, 8, GLOW])
-	r.push([56, 114, 28, 6, GLOW])
+	for (const [k, w] of [
+		[0, 40],
+		[1, 52],
+		[2, 64],
+		[3, 76],
+	] as const) {
+		const y = 224 + k * 4
+		r.push([mid - w / 2, y, w, 4, STEP])
+		r.push([mid - w / 2, y, w, 1, STEP_LIT])
+		r.push([mid - w / 2 + 4, y, w - 8, 4, GLOW])
+	}
+
+	// Floodlit: lamps along the plinth, their light fanning up the walls,
+	// and a warm wash over the lot.
+	for (const x of [32, 248]) r.push(...floodlight(x, 212, 120, 16))
+	for (const x of [71, 209]) r.push(...floodlight(x, 212, 60, 19))
+	for (const x of [114, 166]) r.push(...floodlight(x, 212, 64, 20))
+	r.push([14, 150, W - 28, 62, '#ffd88a0c'])
 	return pixelArt(W, H, r)
 })()
 
@@ -504,11 +626,19 @@ export const sofiaKyrkan = (() => {
 /* The choir                                                                   */
 /* -------------------------------------------------------------------------- */
 
-/** Their robes, deep red, a white collar. */
-const ROBE = '#4c2431'
-const ROBE_LIT = '#61303f'
-const ROBE_SHADE = '#381a24'
-const COLLAR = '#b4b5bf'
+/** Their gowns, white, lit warm by their candles; a gold stole over them. */
+const ROBE = '#e6e1ea'
+const ROBE_LIT = '#fffaf0'
+const ROBE_SHADE = '#b9b2c6'
+const COLLAR = '#d9b45a'
+/** The light on them all, a soft warm halo round the choir. */
+const HALO = '#ffd88a12'
+/** A dome of light, `hw` either side of `mid` and `h` up from `bottom`, a row at a time, rounded off. */
+const halo = (mid: number, bottom: number, hw: number, h: number) =>
+	Array.from({ length: h }, (_, k): PixelRect => {
+		const w = Math.round(hw * Math.sqrt(1 - ((k + 1) / (h + 1)) ** 2))
+		return [mid - w, bottom - h + (h - 1 - k), w * 2, 1, HALO]
+	})
 const FOLDER = '#1d1d24'
 const FOLDER_LIT = '#34343e'
 const SKIN = '#a98069'
@@ -537,12 +667,15 @@ const singer = (
 ): PixelRect[] => {
 	const skin = candle ? SKIN_WARM : SKIN
 	const r: PixelRect[] = [
-		// The robe, lit down its left, in shade down its right.
+		// The gown, lit down its left, in shade down its right, its folds,
+		// and the stole hanging down its front.
 		[x, top + 8, 8, feet - top - 8, ROBE],
-		[x, top + 9, 1, feet - top - 9, ROBE_LIT],
+		[x, top + 9, 2, feet - top - 9, ROBE_LIT],
 		[x + 7, top + 9, 1, feet - top - 9, ROBE_SHADE],
+		[x + 4, top + 16, 1, feet - top - 16, ROBE_SHADE],
 		[x, top + 8, 8, 1, ROBE_LIT],
-		[x + 2, top + 8, 4, 1, COLLAR],
+		[x + 2, top + 8, 1, feet - top - 10, COLLAR],
+		[x + 5, top + 8, 1, feet - top - 10, COLLAR],
 		// The head: hair, a face, eyes, and the mouth open.
 		[x + 1, top, 6, 2, hair],
 		[x + 1, top + 2, 6, 5, skin],
@@ -575,17 +708,23 @@ const singer = (
 }
 
 /**
- * The choir, out on the church's steps in their robes, singing: two rows,
- * the back one a step up, between the heads of the front one; folders of
- * music, and here and there a candle. 80 by 36.
+ * The choir, out on the church's steps in white gowns, gold stoles over
+ * them, singing: two rows, the back one a step up, between the heads of
+ * the front one; folders of music, and most of them a candle, alight,
+ * the lot of them glowing in its light. 80 by 36.
  */
 export const choir = (() => {
 	const r: PixelRect[] = [
-		// The steps they're stood on.
+		// The light round them, warm, a dome of it softening out.
+		...halo(40, 36, 40, 34),
+		...halo(40, 36, 30, 28),
+		...halo(40, 36, 20, 22),
+		// The steps they're stood on, lit.
 		[4, 28, 72, 4, STONE],
 		[4, 28, 72, 1, STONE_LIT],
 		[0, 32, 80, 4, STONE],
 		[0, 32, 80, 1, STONE_LIT],
+		[6, 28, 68, 8, GLOW],
 	]
 	for (let i = 0; i < 6; i++)
 		r.push(
@@ -595,7 +734,7 @@ export const choir = (() => {
 				29,
 				HAIRS[(i + 3) % HAIRS.length],
 				i % 3 === 1,
-				i === 3,
+				i % 2 === 1,
 			),
 		)
 	for (let i = 0; i < 7; i++)
@@ -606,7 +745,7 @@ export const choir = (() => {
 				33,
 				HAIRS[i % HAIRS.length],
 				i % 2 === 0,
-				i === 1 || i === 5,
+				i % 3 !== 2,
 			),
 		)
 	return pixelArt(80, 36, r)

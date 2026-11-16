@@ -8,7 +8,7 @@ Nearly every kind below comes with new art: draw it with the `pixel-art` skill.
 
 ## Fika item
 
-Newest: `hotDog` (Midnattsloppet's).
+Newest: `pizzaSlice` (Midnattsloppet's).
 
 - `FikaItem` union, `FIKA_SIZE`, and the course's `<NAME>_FIKA` list in `game/fika.ts`
 - its art drawn in the course's `courses/kit/<course>Fika.ts`, and listed in `ART`, `draw/art/fika.tsx`

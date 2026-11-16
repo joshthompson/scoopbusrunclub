@@ -206,6 +206,8 @@ export default function Mirror(props: {
 			// Knocked off since the last frame: flying.
 			// In a mine cart: which doesn't matter here, only that they are.
 			body.cart = flags & 256 ? 0 : undefined
+			// A ghost, killed in a haunted house.
+			body.ghost = !!(flags & 512)
 			// Knocked off since the last frame, or swapped: flying.
 			const hat = Math.floor(flags / HAT_FLAG)
 			if (body.hat && hatCode(body.hat) !== hat)

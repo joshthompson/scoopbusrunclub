@@ -137,6 +137,7 @@ export function createRaceStream(
 						(b.squashed > 0 ? RACER_FLAGS.squashed : 0) |
 						(b.gliding ? RACER_FLAGS.gliding : 0) |
 						(b.cart !== undefined ? RACER_FLAGS.cart : 0) |
+						(b.ghost ? RACER_FLAGS.ghost : 0) |
 						(hatCode(b.hat) * HAT_FLAG),
 					b.stumble,
 					b.spin,

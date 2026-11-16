@@ -503,10 +503,10 @@ const styles = {
 		top: '84px',
 		height: '398px',
 		overflow: 'hidden auto',
-		padding: '6px 8px 8px',
+		padding: '4px 8px 8px',
 		display: 'flex',
 		'flex-direction': 'column',
-		gap: '6px',
+		gap: '4px',
 		// Rows between the first and last scroll into view with the padding too.
 		'scroll-padding': '8px',
 		'box-sizing': 'border-box',
@@ -522,11 +522,20 @@ const styles = {
 		gap: '4px',
 		'flex-shrink': 0,
 	},
+	/**
+	 * Plain white, no outline or shadow. Clear of the selected card's ring
+	 * and its lift (see `cardSelected`), a card in the row under it, and
+	 * drawn over them anyway.
+	 */
 	heading: {
 		...OUTLINED,
+		'text-shadow': 'none',
+		position: 'relative',
+		'z-index': 1,
 		'font-size': '14px',
 		'line-height': 1,
 		'padding-top': '2px',
+		'margin-bottom': '4px',
 		width: `${COLUMNS * CARD_WIDTH + (COLUMNS - 1) * 6}px`,
 		'align-self': 'center',
 		'white-space': 'nowrap',

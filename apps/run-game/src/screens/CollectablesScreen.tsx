@@ -25,18 +25,56 @@ import { onHover } from '../ui/hover'
 const COLUMNS = 6
 
 /**
- * Everything there is to collect, all in one grid: fika, rides, hats, a
- * pumpkin and a parkrun barcode. What's been had, with how many times; what
- * hasn't, a shadow of it. Beside the grid, the card the keys are on, bigger:
- * its name, what it is and does, and where it's from; or, not had yet,
- * "???" and which course to look on. The arrows (or WASD) go from card to
- * card, down off the last row to Back.
+ * The grid's groups, in order: fika and the barcode, things to pick up;
+ * hats, a Pumpkin among them; and Rides.
+ */
+const GROUPS: { title: string; ids: Collectable[] }[] = [
+	{
+		title: 'Items',
+		ids: COLLECTABLES.filter(
+			(id) => id.startsWith('fika:') || id === 'barcode',
+		),
+	},
+	{
+		title: 'Hats',
+		ids: COLLECTABLES.filter((id) => id.startsWith('hat:') || id === 'pumpkin'),
+	},
+	{ title: 'Rides', ids: COLLECTABLES.filter((id) => id.startsWith('ride:')) },
+]
+/** Every card, group by group: the order the keys go through them. */
+const CARDS = GROUPS.flatMap((g) => g.ids)
+/** Where group `g`'s first card is in `CARDS`. */
+const firstOf = (g: number) =>
+	GROUPS.slice(0, g).reduce((n, { ids }) => n + ids.length, 0)
+/** Each row of cards, by their place in `CARDS`, group by group: for up and down. */
+const ROWS: number[][] = GROUPS.flatMap((group, g) => {
+	const first = firstOf(g)
+	return Array.from({ length: Math.ceil(group.ids.length / COLUMNS) }, (_, r) =>
+		group.ids
+			.slice(r * COLUMNS, (r + 1) * COLUMNS)
+			.map((_, k) => first + r * COLUMNS + k),
+	)
+})
+/** Which row card `i` is in, and how far along it. */
+const placeOf = (i: number) => {
+	const row = ROWS.findIndex((r) => r.includes(i))
+	return { row, column: ROWS[row].indexOf(i) }
+}
+
+/**
+ * Everything there is to collect, in a grid, grouped: items (fika and a
+ * parkrun barcode), hats (a Pumpkin among them), and rides. What's been
+ * had, with how many times; what hasn't, a shadow of it. Beside the grid,
+ * the card the keys are on, bigger: its name, what it is and does, and
+ * where it's from; or, not had yet, "???" and which course to look on. The
+ * arrows (or WASD) go from card to card, up and down row by row from one
+ * group into the next, and down off the last row to Back.
  */
 export function CollectablesScreen(props: { onBack: () => void }) {
 	const found = () => COLLECTABLES.filter(hasCollected).length
 	/** The card the keys are on; or, past the last, Back. */
 	const [selected, setSelected] = createSignal(0)
-	const onBack = () => selected() === COLLECTABLES.length
+	const onBack = () => selected() === CARDS.length
 	const select = (at: number) => {
 		if (at === selected()) return
 		setSelected(at)
@@ -45,31 +83,43 @@ export function CollectablesScreen(props: { onBack: () => void }) {
 
 	const cards: HTMLElement[] = []
 	// Keep the card the keys are on in view, scrolling the grid as they go.
-	createEffect(() => cards[selected()]?.scrollIntoView({ block: 'nearest' }))
+	// On a group's first row, its heading too.
+	const headings: HTMLElement[] = []
+	createEffect(() => {
+		const at = selected()
+		const g = GROUPS.findIndex((_, k) => at < firstOf(k + 1))
+		if (g >= 0 && at - firstOf(g) < COLUMNS)
+			headings[g]?.scrollIntoView({ block: 'nearest' })
+		cards[at]?.scrollIntoView({ block: 'nearest' })
+	})
 
 	const onKey = (event: KeyboardEvent) => {
 		if (onBack()) return
 		const at = selected()
-		const last = COLLECTABLES.length - 1
-		const move: Record<string, number> = {
+		const last = CARDS.length - 1
+		const along: Record<string, number> = {
 			ArrowLeft: -1,
 			a: -1,
 			ArrowRight: 1,
 			d: 1,
-			ArrowUp: -COLUMNS,
-			w: -COLUMNS,
-			ArrowDown: COLUMNS,
-			s: COLUMNS,
 		}
-		if (event.key in move) {
+		const upDown: Record<string, number> = {
+			ArrowUp: -1,
+			w: -1,
+			ArrowDown: 1,
+			s: 1,
+		}
+		if (event.key in along) {
 			event.preventDefault()
-			const step = move[event.key]
-			// Down off the last row: to Back. Up off the top row: nowhere.
-			if (step === COLUMNS && at + step > last) {
-				if (Math.floor(at / COLUMNS) === Math.floor(last / COLUMNS))
-					select(COLLECTABLES.length)
-				else select(last)
-			} else select(Math.max(0, Math.min(last, at + step)))
+			select(Math.max(0, Math.min(last, at + along[event.key])))
+		} else if (event.key in upDown) {
+			event.preventDefault()
+			// To the row above or below, as far along as it goes; down off the
+			// last row, to Back; up off the top one, nowhere.
+			const { row, column } = placeOf(at)
+			const to = ROWS[row + upDown[event.key]]
+			if (to) select(to[Math.min(column, to.length - 1)])
+			else if (upDown[event.key] > 0) select(CARDS.length)
 		}
 		if (event.key === 'Escape') {
 			play('back')
@@ -90,26 +140,45 @@ export function CollectablesScreen(props: { onBack: () => void }) {
 				</div>
 				<div style={styles.body}>
 					<div style={styles.grid}>
-						<For each={COLLECTABLES}>
-							{(id, i) => (
-								<Card
-									id={id}
-									selected={selected() === i()}
-									ref={(el) => {
-										cards[i()] = el
-									}}
-									onHover={() => select(i())}
-								/>
-							)}
+						<For each={GROUPS}>
+							{(group, g) => {
+								const first = () => firstOf(g())
+								return (
+									<>
+										<div
+											style={styles.group}
+											ref={(el) => {
+												headings[g()] = el
+											}}
+										>
+											{group.title}
+											<span style={styles.groupTally}>
+												{group.ids.filter(hasCollected).length} of{' '}
+												{group.ids.length}
+											</span>
+										</div>
+										<For each={group.ids}>
+											{(id, i) => (
+												<Card
+													id={id}
+													selected={selected() === first() + i()}
+													ref={(el) => {
+														cards[first() + i()] = el
+													}}
+													onHover={() => select(first() + i())}
+												/>
+											)}
+										</For>
+									</>
+								)
+							}}
 						</For>
 					</div>
-					<Details
-						id={COLLECTABLES[Math.min(selected(), COLLECTABLES.length - 1)]}
-					/>
+					<Details id={CARDS[Math.min(selected(), CARDS.length - 1)]} />
 				</div>
 				<div
 					style={{ width: '200px', margin: '6px auto 0' }}
-					onMouseEnter={onHover(() => select(COLLECTABLES.length))}
+					onMouseEnter={onHover(() => select(CARDS.length))}
 				>
 					<Menu
 						items={[{ label: 'Back', choose: props.onBack }]}
@@ -117,10 +186,7 @@ export function CollectablesScreen(props: { onBack: () => void }) {
 						active={onBack()}
 						// Up off Back: to the last row's first card.
 						onLeave={(way) => {
-							if (way < 0)
-								select(
-									Math.floor((COLLECTABLES.length - 1) / COLUMNS) * COLUMNS,
-								)
+							if (way < 0) select(ROWS[ROWS.length - 1][0])
 						}}
 					/>
 				</div>
@@ -294,6 +360,20 @@ const styles = {
 	},
 	from: {
 		'margin-top': 'auto',
+		'font-size': '12px',
+		opacity: 0.7,
+	},
+	/** A group's heading, across the grid, and how many of it have been found. */
+	group: {
+		'grid-column': '1 / -1',
+		display: 'flex',
+		'justify-content': 'space-between',
+		'align-items': 'baseline',
+		'font-size': '15px',
+		padding: '4px 2px 0',
+		'border-bottom': '2px solid rgba(255, 255, 255, 0.18)',
+	},
+	groupTally: {
 		'font-size': '12px',
 		opacity: 0.7,
 	},

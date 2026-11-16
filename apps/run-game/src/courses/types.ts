@@ -31,11 +31,17 @@ export type Obstacle =
 	| { kind: 'tombstone'; x: number }
 	/**
 	 * A Zombie: a runner, a club member, `who` picking which, risen from the
-	 * grave and walking the wrong way, towards you, from `x`. Now and then a
-	 * skeleton. Jump it, or stumble. Into an open grave it walks, it's gone;
-	 * the bus scoops any it reaches.
+	 * grave at `x`, stood there till anyone racing's near, and then walking
+	 * the wrong way, towards you. Short of an open grave, or the end of its
+	 * `range` if it has one, it turns round and walks back, to and fro.
+	 * Jump it, or stumble. The bus scoops any it reaches.
 	 */
-	| { kind: 'zombie'; x: number; who: number; skeleton?: boolean }
+	| {
+			kind: 'zombie'
+			x: number
+			who: number
+			range?: [from: number, to: number]
+	  }
 	/**
 	 * A Steam Vent, a grate in the ground: now and then it puffs, and whoever's
 	 * on it as it does is fired up into the air.
@@ -309,6 +315,19 @@ export interface CourseLook {
 	smoke?: number[]
 	/** A bouncer's picture, in place of the toadstool (see `bouncers`): an air sac in a lung. */
 	bouncer?: { asset: string; width: number; height: number }
+	/**
+	 * Pictures in place of the Germ, bobbing, `width` by `height`, its
+	 * bottom at the Germ's: a ghost, in a haunted house. Still popped, landed
+	 * on, and still a stumble run into, with `word` popping up rather than
+	 * "Atishoo!". `popped`, its burst.
+	 */
+	germ?: {
+		frames: string[]
+		popped: string
+		width: number
+		height: number
+		word: string
+	}
 	/**
 	 * A giant's mouth, in its face (a Cave feature, `GIANT_FACE`), opening
 	 * as anyone racing gets within `opens` of it, its jaw dropping and its
@@ -1021,6 +1040,12 @@ export interface Course {
 	 * coming is in view, not off the top of the screen.
 	 */
 	lookAhead?: number
+	/**
+	 * Stretches where the camera looks up, as far as it can and still keep
+	 * whoever's running in view, to have `top` (a y) at the top of the
+	 * screen: something tall there, Sofiakyrkan, the whole of it in view.
+	 */
+	lookUp?: { from: number; to: number; top: number }[]
 	/** Platforms over the Ground, in order along the course. */
 	platforms?: PlatformDefinition[]
 	/** A Cave it runs through, under a hill. */
@@ -1139,9 +1164,11 @@ export interface Course {
 	 * A bonus runner, stood somewhere hard to get to, waiting to be found:
 	 * get to them, and the first time, they're yours to run as (see
 	 * `BONUS_RUNNERS`). Bat Person, up on the girders over City Rooftop.
-	 * By their runner id, at `x`, their feet at `y`.
+	 * By their runner id, at `x`, their feet at `y`; and what they say,
+	 * found: Bat Person's theme, or the Viking's "Skål!". With `over`,
+	 * passing over them that high counts too (in a room, jumping by).
 	 */
-	found?: { runner: string; x: number; y: number }
+	found?: { runner: string; x: number; y: number; says: string; over?: number }
 	/** A mine, with mine carts to ride: see `Mine`. */
 	mine?: Mine
 	/**
@@ -1157,6 +1184,26 @@ export interface Course {
 	 * manhole, and back up out of it. The Ground, where it's undefined.
 	 */
 	busFloor?: (x: number) => number | undefined
+	/** A haunted house on the course, to run through: see `HauntedHouse`. */
+	haunted?: HauntedHouse
+}
+
+/**
+ * A haunted house (a Cave, see `cave`), in Halloween Town. Bats burst out
+ * of its `door` at whoever gets within `bats` of it. Its way out is a
+ * window on its upper floor, at `window.x`, its floor `window.floor` (a
+ * y): through it, the glass smashes. Up in its attic, its floor at
+ * `monster.floor`, a monster waits at `monster.x`: anyone up there within
+ * its `reach` is caught, and killed, and comes back up out of a grave at
+ * `grave`, past the house, as a ghost, for the rest of the race (see
+ * `haunted.ts`).
+ */
+export interface HauntedHouse {
+	door: number
+	bats: number
+	window: { x: number; floor: number }
+	monster: { x: number; floor: number; reach: number }
+	grave: number
 }
 
 /**
@@ -1177,6 +1224,12 @@ export interface Course {
  * way to throw them back up onto the course: up `peak` over it, and down
  * again about `land` along. Thrown out, they've unlocked the bonus runner
  * `unlocks`, by their runner id, if it has one (see `BONUS_RUNNERS`).
+ *
+ * Or, with `manhole`, its way in's no Gap at all but an open manhole in
+ * the street, over `gap`, a ladder poking up out of it: run onto it and
+ * down they go, feet first; jump it, and they don't (Gamla Stan's tavern). And
+ * with `duct`, nobody throws them: it's an air duct at `launch` that blows
+ * them straight up it, out of a grate in the street, and on over to `land`.
  */
 export interface Secret {
 	gap: { from: number; to: number }
@@ -1188,24 +1241,23 @@ export interface Secret {
 	peak: number
 	land: number
 	unlocks?: string
+	manhole?: boolean
+	duct?: boolean
 }
 
 /**
- * What's in a Secret's cavern, drawn: on Everest, the Yetis' den. Its
- * `furnishings` stand against its back wall, `x` along the course their
- * middles: sofas, by which of its `sofas`, tellies and lamps; or hang on
- * it, up over them: its portrait. And whoever's
- * at its far end, to throw you out, its `launcher`: facing left, the way
- * you come, `kneel`ing, waiting, `hands` where you run into, from the
- * picture's top left; and `thrown`, while you're on your way up. All in
- * world pixels.
+ * What's in a Secret's cavern, drawn. Its `walls`: what it's hollowed out
+ * of, Everest's ice (the Yetis' den), or the brick vaults of an old cellar
+ * (the tavern under Gamla Stan). Its `furnishings` stand against its back
+ * wall, `x` along the course their middles, or hang on it, `hung` up over
+ * its floor. And whoever's at its far end, to throw you out, its
+ * `launcher`: facing left, the way you come, `kneel`ing, waiting, `hands`
+ * where you run into, from the picture's top left; and `thrown`, while
+ * you're on your way up (or a duct: still, then blowing). All in world
+ * pixels.
  */
 export interface SecretLook {
-	sofas: { asset: string; width: number; height: number }[]
-	telly: { frames: [string, string]; width: number; height: number }
-	lamp: { asset: string; width: number; height: number }
-	/** A picture to hang on its back wall, up over its furniture: the family portrait. */
-	portrait: { asset: string; width: number; height: number }
+	walls: 'ice' | 'vaults'
 	launcher: {
 		kneel: string
 		thrown: string
@@ -1214,11 +1266,57 @@ export interface SecretLook {
 		thrownHeight: number
 		hands: { x: number; y: number }
 	}
-	furnishings: {
-		x: number
-		kind: 'sofa' | 'telly' | 'lamp' | 'portrait'
-		which?: number
-	}[]
+	furnishings: { x: number; prop: SecretProp }[]
+	/**
+	 * Its manhole, if that's its way in (see `Secret`): the open `hole`,
+	 * lying flat in the street, and the top of the `ladder` down it, poking
+	 * up out of it, its left rail `ladderAt` in from the hole's left. Its
+	 * shaft's walls, `brick` and `mortar`, the dark down it, and the
+	 * ladder's iron.
+	 */
+	manhole?: {
+		hole: SecretPicture
+		ladder: SecretPicture
+		ladderAt: number
+		shaft: { brick: string; mortar: string; dark: string; rung: string }
+	}
+	/**
+	 * Its duct, if that's its way out (see `Secret`): the `grate` in the
+	 * street over it, and the duct's colours, for its shaft up through the
+	 * rock to it, `width` wide.
+	 */
+	duct?: {
+		grate: SecretPicture
+		width: number
+		steel: string
+		lit: string
+		shade: string
+		seam: string
+		air: string
+	}
+}
+
+/** A picture in or over a Secret: its image, and its size in world pixels. */
+export interface SecretPicture {
+	asset: string
+	width: number
+	height: number
+}
+
+/**
+ * A thing in a Secret's cavern: its picture, or pictures, flickering
+ * between them (a telly's screen, a candle's flame). Lit, with `glow`: a
+ * light round it, `x` from its middle and `y` up from the floor. With a
+ * `rug` in front of it, on the floor. Hung on the wall, `hung` up off the
+ * floor.
+ */
+export interface SecretProp {
+	frames: string[]
+	width: number
+	height: number
+	glow?: { x: number; y: number; reach: number; colour: string }
+	rug?: boolean
+	hung?: number
 }
 
 export interface Mine {
@@ -1305,6 +1403,8 @@ export interface SpecialRun {
 	metFound?: boolean
 	/** Jumped on a rope bridge till it broke under them. */
 	brokeBridge?: boolean
+	/** Killed by a haunted house's monster, and come back as a ghost. */
+	ghost?: boolean
 }
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */

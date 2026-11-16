@@ -11,6 +11,13 @@ import skeletonSkiTuck from '../assets/runners/skeleton/ski-tuck.png'
 import skeletonSki from '../assets/runners/skeleton/ski.png'
 import skeletonSnowboard from '../assets/runners/skeleton/snowboard.png'
 import skeletonStand from '../assets/runners/skeleton/stand.png'
+import vikingFace from '../assets/runners/viking/face.png'
+import vikingRun from '../assets/runners/viking/run.png'
+import vikingSit from '../assets/runners/viking/sit.png'
+import vikingSkiTuck from '../assets/runners/viking/ski-tuck.png'
+import vikingSki from '../assets/runners/viking/ski.png'
+import vikingSnowboard from '../assets/runners/viking/snowboard.png'
+import vikingStand from '../assets/runners/viking/stand.png'
 import yetiFace from '../assets/runners/yeti/face.png'
 import yetiRun from '../assets/runners/yeti/run.png'
 import yetiSit from '../assets/runners/yeti/sit.png'
@@ -26,7 +33,8 @@ import { SKELETON_SPRITE } from './skeleton'
 /**
  * Bonus runners: not club members, and not anyone's own, but found out on
  * the courses, and unlocked to run as by finding them. The Yeti, under
- * Everest, the first; Bat Person, up on the girders over City Rooftop.
+ * Everest, the first; Bat Person, up on the girders over City Rooftop; the
+ * Viking, in the tavern under Gamla Stan.
  * The Skeleton isn't found, but earned: Halloween Town's special goal, over
  * the line in a pumpkin. Nor is Deri: he's for finishing every course.
  *
@@ -101,6 +109,32 @@ export const BAT_PERSON: Playable = {
 }
 
 /**
+ * The Viking: old, no helmet, his long white hair down his back under a
+ * leather headband, a big white beard, braided at its end, over a blue
+ * tunic, fur over his shoulders, and a round shield on his back, red and
+ * white in quarters. His far arm and leg are in shadow. Six frames to his
+ * run, as the members have, his axe in his near hand, swinging with it.
+ * Stood still, he leans on it; on skis, it's his other pole.
+ */
+export const VIKING: Playable = {
+	id: 'bonus:viking',
+	name: 'Viking',
+	bonus: true,
+	unlockedBy: 'Found in the tavern under Gamla Stan',
+	sprite: {
+		run: runFrames(vikingRun, 6),
+		sit: vikingSit,
+		stand: vikingStand,
+		ski: vikingSki,
+		skiTuck: vikingSkiTuck,
+		snowboard: vikingSnowboard,
+		face: vikingFace,
+		width: WIDTH,
+		height: HEIGHT,
+	},
+}
+
+/**
  * The Skeleton: the website's Halloween skeleton, as Halloween Town's pack
  * has it, with its sit pose to duck in and its face. For finishing Halloween
  * Town in a pumpkin (its special goal). Its other poses are drawn for it
@@ -159,7 +193,13 @@ export const DERI: Playable = {
 	sprite: lookSprite(DERI_LOOK),
 }
 
-export const BONUS_RUNNERS: Playable[] = [YETI, BAT_PERSON, SKELETON, DERI]
+export const BONUS_RUNNERS: Playable[] = [
+	YETI,
+	BAT_PERSON,
+	VIKING,
+	SKELETON,
+	DERI,
+]
 
 /** A bonus runner, by their runner id: unlocked here or not, to show anyone who's running as them. */
 export const bonusRunner = (id: string) =>

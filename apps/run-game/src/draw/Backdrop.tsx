@@ -1955,14 +1955,16 @@ export const COVER_FADE_MS = 350
 
 /**
  * A Cave's cover's parts, each `from` to `to`: the first with the Cave's
- * own way in showing, if it says how much.
+ * own way in showing, if it says how much, and the last its way out. In
+ * between, one part's cover runs right up to the next's, no gap between.
  */
 export function caveCoverParts(cave: NonNullable<World['course']['cave']>) {
 	const parts = cave.parts ?? [{ from: cave.from, to: cave.to }]
 	return parts.map((part, i) => ({
 		from: part.from,
 		to: part.to,
-		mouth: i === 0 ? cave.mouth : undefined,
+		mouth: i === 0 ? cave.mouth : 0,
+		end: i === parts.length - 1 ? MOUTH_SHOWN : 0,
 		id: `cave-cover-${i}`,
 	}))
 }
@@ -1974,6 +1976,8 @@ type CavePartProps = {
 	from: number
 	to: number
 	mouth?: number
+	/** How much of its far end the cover leaves showing: its way out. */
+	end?: number
 	id: string
 }
 
@@ -2029,7 +2033,8 @@ export function CaveCoverArt(props: CavePartProps) {
 			? ` M${x - DRAWN_FROM},${Math.round(top / 2) * 2} H${x - DRAWN_FROM + STEP} V${Math.round(bottom / 2) * 2} H${x - DRAWN_FROM} Z`
 			: ''
 	const mouth = props.mouth ?? MOUTH_SHOWN
-	for (let x = props.from + mouth; x < props.to - MOUTH_SHOWN; x += STEP) {
+	const end = props.end ?? MOUTH_SHOWN
+	for (let x = props.from + mouth; x < props.to - end; x += STEP) {
 		const middle = x + STEP / 2
 		const ceiling = cave.ceiling(middle)
 		const foot = cave.foot(middle)

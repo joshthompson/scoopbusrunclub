@@ -3,7 +3,7 @@ import { pixelArt } from './pixelArt'
 /**
  * Midnattsloppet's fika, each a cell to a pixel, drawn twice the size, as
  * fika is: off the drinks station's tables, a paper cup of water and a
- * cup of warm blueberry soup; and from a kiosk, a korv med bröd.
+ * cup of warm blueberry soup; and from a kiosk, a slice of pizza.
  */
 
 const STEAM = 'rgba(255,255,255,0.85)'
@@ -64,37 +64,49 @@ export const blueberrySoup = pixelArt(8, 10, [
 	[2, 9, 4, 1, KRAFT_SHADE],
 ])
 
-const BUN_LIT = '#f3c987'
-const BUN = '#dfa25a'
-const BUN_SHADE = '#b2763a'
-const KORV_LIT = '#d9705a'
-const KORV = '#b4432f'
-const KORV_SHADE = '#86301f'
-const KETCHUP = '#d8232a'
-const MUSTARD = '#f5cb1f'
+const CRUST_LIT = '#f0c27e'
+const CRUST = '#d49a52'
+const CRUST_SHADE = '#a46c34'
+const CHEESE_LIT = '#ffe9a6'
+const CHEESE = '#f7d46c'
+const CHEESE_SHADE = '#d6a948'
+const SAUCE = '#c7452b'
+const BASIL = '#3f8f3a'
+const BASIL_LIT = '#5fb252'
+const OLIVE = '#2b2722'
 
 /**
- * A korv med bröd: a sausage in a bun, poking out of it at both ends,
- * ketchup and mustard zigzagged along it. 14 by 7.
+ * A slice of pizza, a margherita's: its crust along the top, lit, the
+ * cheese melting down to its tip, tomato sauce showing at its edges, and
+ * basil and an olive on it. Nothing meaty. 12 by 12.
  */
-export const hotDog = pixelArt(14, 7, [
-	// The bun, behind it.
-	[3, 0, 8, 1, BUN_LIT],
-	[2, 1, 10, 1, BUN],
-	// The sausage, lit along its top, rounded at its ends.
-	[1, 2, 12, 2, KORV],
-	[0, 3, 14, 1, KORV],
-	[1, 2, 12, 1, KORV_LIT],
-	[0, 4, 1, 1, KORV_SHADE],
-	[13, 4, 1, 1, KORV_SHADE],
-	// Ketchup and mustard, zigzagged along it.
-	...[3, 5, 7, 9].flatMap((x): [number, number, number, number, string][] => [
-		[x, 2, 1, 1, KETCHUP],
-		[x + 1, 3, 1, 1, KETCHUP],
-		[x + 1, 2, 1, 1, MUSTARD],
-	]),
-	// The bun, in front of it.
-	[1, 4, 12, 1, BUN_LIT],
-	[1, 5, 12, 1, BUN],
-	[2, 6, 10, 1, BUN_SHADE],
+export const pizzaSlice = pixelArt(12, 12, [
+	// The crust, along the top, lit, shaded under.
+	[0, 0, 12, 1, CRUST_LIT],
+	[0, 1, 12, 1, CRUST],
+	[1, 2, 10, 1, CRUST_SHADE],
+	// The cheese, narrowing to the tip, a row at a time, sauce at its edges.
+	...Array.from(
+		{ length: 9 },
+		(_, k): [number, number, number, number, string][] => {
+			const y = 3 + k
+			const half = Math.max(0, Math.round(5 - k * 0.6))
+			const left = 6 - half - 1
+			const width = half * 2 + 1
+			return [
+				[left, y, width, 1, CHEESE],
+				[left, y, 1, 1, SAUCE],
+				[left + width - 1, y, 1, 1, CHEESE_SHADE],
+			]
+		},
+	).flat(),
+	[3, 3, 5, 1, CHEESE_LIT],
+	// A drip of cheese, down from it.
+	[5, 11, 1, 1, CHEESE_SHADE],
+	// Basil leaves, and an olive.
+	[3, 4, 2, 1, BASIL_LIT],
+	[3, 5, 2, 1, BASIL],
+	[6, 6, 2, 1, BASIL],
+	[7, 4, 1, 1, OLIVE],
+	[5, 8, 1, 1, SAUCE],
 ])

@@ -11,9 +11,12 @@ import {
 	PATH_FRONT,
 	START_X,
 	VERGE,
+	VIEW_HEIGHT,
 } from '../game/constants'
 import { GAMLA_STAN_FIKA } from '../game/fika'
+import { CAMERA_HEADROOM, MAX_ZOOM } from '../game/step'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
+import { VIKING } from '../runners/bonus'
 import {
 	GAMLA_STAN_COBBLES,
 	GAMLA_STAN_SIDE_COBBLES,
@@ -28,6 +31,16 @@ import {
 	riksdag,
 	rosenbad,
 } from './kit/gamlaStanScenery'
+import {
+	DUCT,
+	DUCT_COLOURS,
+	GRATE,
+	LADDER,
+	LADDER_AT,
+	MANHOLE,
+	SHAFT,
+	TAVERN,
+} from './kit/gamlaStanTavern'
 import { withHat } from './kit/hats'
 import { type PixelRect, pixelArt } from './kit/pixelArt'
 import { scatter } from './kit/scatter'
@@ -38,6 +51,7 @@ import type {
 	Course,
 	CourseDefinition,
 	Obstacle,
+	Secret,
 } from './types'
 
 /**
@@ -47,6 +61,12 @@ import type {
  * between its coloured houses, its churches' spires over them. Tourists,
  * pigeons, steam from the street's grates, and a café on every corner; and
  * over Guldbron at the end, cyclists coming the other way.
+ *
+ * And under it all, in an old cellar's brick vaults, a tavern: down an
+ * open manhole in the street, a ladder poking up out of it. Run onto it
+ * and down you go; jump it, and you run on over the top. Ale
+ * in it, and an old Viking at its bar, to be found (the special goal), and
+ * at its far end an air duct to blow you back up into the street.
  */
 
 const CHEERERS: RunnerName[] = [
@@ -329,11 +349,97 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	return { obstacles, boosts, scenery, corgis }
 }
 
+/**
+ * The tavern under the street, and the way down to it and up out of it.
+ * Laid out round what's on the street over it, so the course's own layout
+ * stays as it was: the open manhole somewhere clear on Stortorget, the
+ * duct's grate somewhere clear further on, with room to come down past it.
+ */
+const laidOut = layOut()
+
+/** Whether there's nothing on the street within `room` of `x`. */
+const clearAt = (x: number, room: number) =>
+	![...laidOut.obstacles, ...laidOut.boosts].some(
+		(o) => Math.abs(o.x - x) < room,
+	) && !(laidOut.corgis ?? []).some((c) => Math.abs(c - x) < room)
+/** The first clear spot from `x` on: see `clearAt`. */
+const clearFrom = (x: number, room: number, also = (_: number) => true) => {
+	let at = Math.round(x)
+	while (!clearAt(at, room) || !also(at)) at += 20
+	return at
+}
+
+/** How wide the manhole is, and so its shaft. */
+const MANHOLE_WIDE = MANHOLE.width
+/** How far along from the manhole the duct is, at the least. */
+const TAVERN_LONG = 1300
+/** How far past the duct's grate you come down, blown up out of it. */
+const BLOWN_ON = 260
+/**
+ * How far under the street the tavern's vaults are: deeper than a Round's
+ * camera, zoomed right out, ever looks under the course (as the Yetis' den
+ * is under Everest), so it's never seen from up there.
+ */
+const ROOF_UNDER = VIEW_HEIGHT * MAX_ZOOM - CAMERA_HEADROOM + 280
+const ROOM = 220
+
+const TAVERN_AT = (() => {
+	const manhole = clearFrom(START_X + 6500, 120)
+	const launch = clearFrom(manhole + TAVERN_LONG, 100, (x) =>
+		clearAt(x + BLOWN_ON, 100),
+	)
+	const gap = {
+		from: manhole - MANHOLE_WIDE / 2,
+		to: manhole + MANHOLE_WIDE / 2,
+	}
+	return {
+		manhole,
+		secret: {
+			gap,
+			from: gap.from - 140,
+			to: launch + 80,
+			floor: Math.round(terrain.groundY(manhole)) + ROOF_UNDER + ROOM,
+			room: ROOM,
+			launch,
+			peak: 200,
+			land: launch + BLOWN_ON,
+			manhole: true,
+			duct: true,
+		} satisfies Secret,
+	}
+})()
+const TAVERN_SECRET = TAVERN_AT.secret
+/** The bar, near its far end, and the Viking stood at it, waiting for you. */
+const BAR = TAVERN_SECRET.launch - 300
+const VIKING_AT = BAR + 20
+
+/**
+ * Ale, in the tavern, a tankard each for everyone who gets down there: by
+ * the barrels, as you land; up over a table, to jump for; and at the bar,
+ * by the Viking.
+ */
+const ALE = [
+	[TAVERN_AT.manhole + 380, 26],
+	[TAVERN_AT.manhole + 760, 100],
+	[BAR - 120, 26],
+].map(
+	([x, over]): Boost => ({
+		kind: 'fika',
+		x,
+		// Down in the tavern: under the street, over the tavern's floor.
+		height: Math.round(terrain.groundY(x)) - TAVERN_SECRET.floor + over,
+		item: 'ale',
+		everyone: true,
+	}),
+)
+
+const { manhole: MANHOLE_AT } = TAVERN_AT
+
 export const gamlaStan: CourseDefinition = {
 	id: 'gamla-stan',
 	name: 'Gamla Stan',
 	blurb:
-		'Through Stockholm’s old town and over Guldbron: tourists, pigeons, steam vents, corgis to ride, and cyclists on the bridge.',
+		'Through Stockholm’s old town and over Guldbron: tourists, pigeons, steam vents, corgis to ride, and cyclists on the bridge. And a manhole, open, a ladder down it…',
 	terrain,
 	runDirectors: ['keith', 'josh'],
 	cheerers: CHEERERS,
@@ -404,12 +510,55 @@ export const gamlaStan: CourseDefinition = {
 		],
 		horizonTrees: false,
 		geese: 'grayscale(1) brightness(0.9)',
+		// The tavern: barrels as you land, a long table, the hearth, a shield
+		// over it, another table, a barrel, and the bar, its sign over it;
+		// lanterns along the walls; and the duct at its far end.
+		secret: {
+			walls: 'vaults',
+			launcher: DUCT,
+			furnishings: [
+				{ x: MANHOLE_AT + 150, prop: TAVERN.barrels },
+				{ x: MANHOLE_AT + 260, prop: TAVERN.lantern },
+				{ x: MANHOLE_AT + 400, prop: TAVERN.table },
+				{ x: MANHOLE_AT + 600, prop: TAVERN.hearth },
+				{ x: MANHOLE_AT + 600, prop: TAVERN.shield },
+				{ x: MANHOLE_AT + 780, prop: TAVERN.table },
+				{ x: MANHOLE_AT + 900, prop: TAVERN.lantern },
+				{ x: MANHOLE_AT + 980, prop: TAVERN.barrel },
+				{ x: BAR, prop: TAVERN.bar },
+				{ x: BAR, prop: TAVERN.sign },
+				{ x: BAR + 130, prop: TAVERN.lantern },
+			],
+			manhole: {
+				hole: MANHOLE,
+				ladder: LADDER,
+				ladderAt: LADDER_AT,
+				shaft: SHAFT,
+			},
+			duct: { grate: GRATE, ...DUCT_COLOURS },
+		},
+	},
+	secret: TAVERN_SECRET,
+	found: {
+		runner: VIKING.id,
+		x: VIKING_AT,
+		y: TAVERN_SECRET.floor,
+		says: 'Skål!',
+		// Jumping by him, anywhere under the tavern's vaults.
+		over: ROOM,
+	},
+	special: {
+		goal: 'Find the viking',
+		done: (run) => !!run.metFound,
 	},
 	// A Royal Guard's helmet, high over a steam vent: stop on it, and it
 	// fires you straight up to it; running on over it, you're carried on
 	// past under it.
 	...withHat(
-		layOut(),
+		{
+			...laidOut,
+			boosts: [...laidOut.boosts, ...ALE].sort((a, b) => a.x - b.x),
+		},
 		'guardHelmet',
 		({ obstacles }) => {
 			const vents = obstacles.filter((o) => o.kind === 'steam')

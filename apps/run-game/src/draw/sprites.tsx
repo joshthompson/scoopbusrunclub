@@ -73,6 +73,7 @@ import { FIKA_SIZE } from '../game/fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from '../game/furbies'
 import { DRAWN_FROM } from '../game/groundColumns'
 import type { Hat } from '../game/hats'
+import { CAUGHT_TICKS, inClutches, risingFromGrave } from '../game/haunted'
 import { mummyAt } from '../game/mummies'
 import { type PlatformAt, platformAt, platformOut } from '../game/platforms'
 import { heldLook, pacerShrunk } from '../game/portals'
@@ -120,7 +121,7 @@ import type {
 	TrickKind,
 	World,
 } from '../game/world'
-import { ZOMBIE_SINK_GONE, zombieAt } from '../game/zombies'
+import { zombieAt } from '../game/zombies'
 import { bonusRunner } from '../runners/bonus'
 import { customRunners } from '../runners/customRunners'
 import { guests } from '../runners/guests'
@@ -374,6 +375,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	/** How long snow's been spraying off their board, and sparks flying, as it's painted. */
 	const sprayFor = goingFor()
 	const sparksFor = goingFor()
+	const now = () => world.ticks()
 	/** The hat they've on, if any. `body` isn't a signal: reading the tick keeps this up to date. */
 	const hat = createMemo(
 		() => (world.ticks() >= 0 ? body.hat : undefined),
@@ -522,8 +524,14 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				strideFrameInterval(Math.max(45, 190 - speed * 22), run.length),
 			)
 			const { sea } = world.course
+			const haunted = hauntLook(world, racer, now())
+			if (haunted.shake) $.setX($.x() + haunted.shake)
 			$.setStyle({
-				opacity: body.stumble > 0 && body.stumble % 8 < 4 ? '0.4' : '1',
+				opacity: String(
+					(body.stumble > 0 && body.stumble % 8 < 4 ? 0.4 : 1) *
+						haunted.opacity,
+				),
+				filter: haunted.filter,
 				// Fallen into the sea: gone under.
 				visibility:
 					racer.out === 'fallen' && sea && body.feetY > sea.level + 30
@@ -576,6 +584,43 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 
 /** Where each racer's head was last drawn, in the world: see `createPlayer`. */
 const headAt = new WeakMap<Body, { x: number; y: number }>()
+
+/** When each racer was first seen in a haunted house's monster's clutches, on this screen. */
+const caughtSince = new WeakMap<Body, number>()
+/** A ghost, as drawn: as white as they'll go, and see-through. */
+const GHOST_FILTER = 'grayscale(1) brightness(2.6)'
+const GHOST_OPACITY = 0.6
+/** How long before they're gone that someone in the monster's clutches starts fading away. */
+const CAUGHT_FADE = 30
+
+/**
+ * How someone looks, by what a haunted house has done to them (see
+ * `haunted.ts`), going by where they are, so a Remote Player's screen
+ * draws the same: in its monster's clutches, shaking, and fading away as
+ * it finishes them; a ghost, whiter and see-through, and fading in as
+ * they come up out of the grave.
+ */
+function hauntLook(world: World, racer: Racer, now: number) {
+	const { body } = racer
+	if (!racer.out && inClutches(world, body)) {
+		const since = now - (caughtSince.get(body) ?? now)
+		if (!caughtSince.has(body)) caughtSince.set(body, now)
+		const left = CAUGHT_TICKS - since
+		return {
+			shake: since % 6 < 3 ? -2 : 2,
+			opacity: Math.max(0, Math.min(1, left / CAUGHT_FADE)),
+			filter: undefined,
+		}
+	}
+	caughtSince.delete(body)
+	if (!body.ghost) return { shake: 0, opacity: 1, filter: undefined }
+	const rising = risingFromGrave(world, body)
+	return {
+		shake: 0,
+		opacity: GHOST_OPACITY * (rising ?? 1),
+		filter: GHOST_FILTER,
+	}
+}
 
 /** How far over a glider's rider is turned, lying along under it, head first: unless their sprite says otherwise. */
 const GLIDING_LEAN = 80
@@ -3401,16 +3446,22 @@ function createGerm(
 	id: string,
 ) {
 	const ground = world.terrain.groundY(o.x)
+	// A course's own, in its place: a ghost, in a haunted house.
+	const own = world.course.look?.germ
+	const frames = own?.frames ?? GERM_FRAMES
+	const burstArt = own?.popped ?? GERM_POPPED
+	const width = own?.width ?? GERM_SIZE
+	const height = own?.height ?? GERM_SIZE
 	return createController({
-		frames: [...GERM_FRAMES, GERM_POPPED],
+		frames: [...frames, burstArt],
 		init: () => ({
 			id,
 			type: 'zombie',
-			...createObjectSignal(o.x - GERM_SIZE / 2, 'x'),
-			...createObjectSignal(ground - o.low - GERM_SIZE, 'y'),
-			width: () => GERM_SIZE,
-			height: () => GERM_SIZE,
-			frames: () => GERM_FRAMES,
+			...createObjectSignal(o.x - width / 2, 'x'),
+			...createObjectSignal(ground - o.low - height, 'y'),
+			width: () => width,
+			height: () => height,
+			frames: () => frames,
 			...createObjectSignal(0, 'rotation'),
 			...createObjectSignal(220, 'frameInterval'),
 			...createObjectSignal('play' as 'play' | 'pause', 'state'),
@@ -3420,25 +3471,25 @@ function createGerm(
 		draw({ ctx, drawDefault, image }) {
 			if (!gone()) drawDefault()
 			const since = popped()
-			const burst = since === undefined ? undefined : image(GERM_POPPED)
+			const burst = since === undefined ? undefined : image(burstArt)
 			if (since === undefined || !burst) return
 			const size = GERM_SIZE * (1 + since / GERM_BURST)
-			const at = (GERM_SIZE - size) / 2
+			const at = (width - size) / 2
 			ctx.globalAlpha *= 1 - since / GERM_BURST
-			ctx.drawImage(burst.image, at, at, size, size)
+			ctx.drawImage(burst.image, at, height - GERM_SIZE + at, size, size)
 		},
 		onEnterFrame({ $ }) {
 			const now = world.ticks()
 			const bottom = ground - germHeight(o, Math.max(0, now))
 			if (state.scooped) {
 				const flight = scoopFlight(state.scooped, now)
-				$.setX(o.x - GERM_SIZE / 2 + flight.x)
-				$.setY(bottom - GERM_SIZE + flight.y)
+				$.setX(o.x - width / 2 + flight.x)
+				$.setY(bottom - height + flight.y)
 				$.setRotation(flight.spin)
 				return
 			}
-			$.setX(o.x - GERM_SIZE / 2)
-			$.setY(bottom - GERM_SIZE)
+			$.setX(o.x - width / 2)
+			$.setY(bottom - height)
 		},
 	})
 	/** Popped, its body gone. */
@@ -3838,9 +3889,9 @@ export function createHats(world: World) {
 }
 
 /**
- * A Zombie: a club member, gone green and glowing, or now and then a
- * skeleton, coming the wrong way, slowly. Into an open grave, it sinks out of
- * sight; scooped, it flies off like anyone else.
+ * A Zombie: a club member, gone green and glowing, coming the wrong way,
+ * slowly, and turning round and back short of a grave; scooped, it flies
+ * off like anyone else.
  */
 function createZombie(
 	world: World,
@@ -3851,25 +3902,9 @@ function createZombie(
 	const { sprite, filter } = zombieSprite(o)
 	const ZOMBIE_WIDTH = sprite.width * RUNNER_SCALE
 	const ZOMBIE_HEIGHT = sprite.height * RUNNER_SCALE
-	/** How far down into its grave it's sunk, out of sight below the ground. */
-	let sunk = 0
 	return createController({
 		frames: sprite.run,
 		randomStartFrame: true,
-		// Its frame, cut off at the ground as it sinks into the grave.
-		draw({ ctx, drawDefault }) {
-			if (sunk > 0) {
-				ctx.beginPath()
-				ctx.rect(
-					0,
-					0,
-					ZOMBIE_WIDTH,
-					ZOMBIE_HEIGHT - Math.min(ZOMBIE_HEIGHT, sunk),
-				)
-				ctx.clip()
-			}
-			drawDefault()
-		},
 		init: () => ({
 			id,
 			type: 'zombie',
@@ -3878,9 +3913,11 @@ function createZombie(
 			width: () => ZOMBIE_WIDTH,
 			height: () => ZOMBIE_HEIGHT,
 			...createObjectSignal(0, 'rotation'),
+			// Run sprites face left: the way it walks, till it turns round.
+			...createObjectSignal(1, 'xScale'),
 			// A shamble: a run, slowed right down.
 			...createObjectSignal(
-				strideFrameInterval(o.skeleton ? 220 : 300, sprite.run.length),
+				strideFrameInterval(300, sprite.run.length),
 				'frameInterval',
 			),
 			...createObjectSignal('play' as 'play' | 'pause', 'state'),
@@ -3898,14 +3935,11 @@ function createZombie(
 				return
 			}
 			$.setX(zombie.x - ZOMBIE_WIDTH / 2)
-			$.setY(ground - ZOMBIE_HEIGHT + zombie.sunk)
-			// Not walking until it's woken, nor once in the grave.
-			$.setState(zombie.walking && !zombie.sunk ? 'play' : 'pause')
-			sunk = zombie.sunk
-			$.setStyle({
-				filter,
-				visibility: zombie.sunk >= ZOMBIE_SINK_GONE ? 'hidden' : 'visible',
-			})
+			$.setY(ground - ZOMBIE_HEIGHT)
+			$.setXScale(zombie.facing === 1 ? -1 : 1)
+			// Not walking until it's woken.
+			$.setState(zombie.walking ? 'play' : 'pause')
+			$.setStyle({ filter })
 		},
 	})
 }

@@ -24,6 +24,7 @@ import {
 import { createFootballSprite } from './football'
 import { createCaveCover, createSeaFront } from './frontControllers'
 import { createGiantMouth } from './giantMouth'
+import { createHauntedHouse } from './hauntedHouse'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPyro, createSearchlights, createSmoke } from './nightRace'
 import { createPortalFx } from './portalFx'
@@ -78,6 +79,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 		frameRate: TICK_MS,
 		// Front to back.
 		assetOrder: [
+			// A haunted house's bats, bursting out of it at you, over its cover.
+			'bats',
 			// Snow and fog over everything.
 			...OVER_TYPES,
 			// Counting everyone down, at the front, always in sight.
@@ -160,6 +163,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createScenery(world),
 				// A giant's mouth, opening, over its face: after the scenery, over it.
 				...createGiantMouth(world),
+				// A haunted house's bats, window, monster and grave.
+				...createHauntedHouse(world),
 				// Just ahead of the runner, so they toe the line rather than stand on it.
 				...createBanner(world, START_X + HITBOX_HALF_WIDTH + 4, 'START'),
 				createParkrunSign(world, START_X - 190),

@@ -66,6 +66,27 @@ export function keepIn(world: World, b: Body, height: number) {
 	)
 }
 
+/** How far inside a manhole's rim someone's middle has to be to go down it. */
+const RIM = 6
+
+/**
+ * Run onto a Secret's open manhole this tick (see `Secret['manhole']`), on
+ * the street, not jumping over it: on their way down it. Not on a Ride,
+ * nor carried, nor in a cart: they'd only ride on over it.
+ */
+export function dropsIn(world: World, b: Body) {
+	const secret = world.course.secret
+	if (!secret?.manhole || b.secret) return false
+	if (b.mount > 0 || b.carried > 0 || b.cart !== undefined) return false
+	if (b.on !== undefined || b.bed) return false
+	const { gap } = secret
+	return (
+		b.x > gap.from + RIM &&
+		b.x < gap.to - RIM &&
+		b.feetY >= world.terrain.groundY(b.x) - 2
+	)
+}
+
 /** The cavern's roof over `x`, to bump a head on, jumping: none under its shaft. */
 export const secretCeiling = (world: World, x: number) =>
 	inShaft(world, x) ? undefined : secretRoof(world)
@@ -94,7 +115,7 @@ export function fling(world: World, b: Body) {
 	b.on = undefined
 	b.bed = undefined
 	b.vy = -up
-	b.vx = (secret.land - b.x) / (up / GRAVITY + down)
+	b.vx = secret.duct ? 0 : (secret.land - b.x) / (up / GRAVITY + down)
 	b.facing = 1
 }
 
@@ -105,6 +126,16 @@ export function fling(world: World, b: Body) {
  * down. Whether that's now: out of it.
  */
 export function flyOut(world: World, b: Body) {
+	const secret = world.course.secret
+	// Blown up a duct: straight up it, till they're out of the grate at its
+	// top; then on, over to where they're to come down.
+	if (secret?.duct) {
+		const { groundY } = world.terrain
+		const out = b.feetY < groundY(b.x)
+		const drop = groundY(secret.land) - b.feetY
+		const time = (-b.vy + Math.sqrt(b.vy * b.vy + 2 * GRAVITY * drop)) / GRAVITY
+		b.vx = out ? (secret.land - b.x) / Math.max(1, time) : 0
+	}
 	b.x += b.vx
 	b.vy += GRAVITY
 	b.feetY += b.vy

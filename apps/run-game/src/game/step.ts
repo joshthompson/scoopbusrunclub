@@ -18,6 +18,7 @@ import {
 } from './body'
 import { boardCarts, rideCart, stepCarts } from './carts'
 import { ceilingAt, inTunnel, rockOver } from './cave'
+import { cheats } from './cheats'
 import { PICKUP_WORD } from './collectables'
 import {
 	AIR_PUSH,
@@ -106,6 +107,7 @@ import { scoopFurbies, stepFurbies } from './furbies'
 import { atSea, glidingBox, stepGliding } from './gliders'
 import { DRAWN_FROM } from './groundColumns'
 import { HAT_RULES, type Hat, WORN_FIKA, sameHat } from './hats'
+import { hearHouse, stepHaunt } from './haunted'
 import { callOut, landLongJump, longJumpTakeOff, sandDrag } from './longJump'
 import { MOLE_HOP, burrowing, onMole } from './moles'
 import { mummyAt } from './mummies'
@@ -120,6 +122,7 @@ import { busHeld, isHeld, portalCamera, stepPortals } from './portals'
 import { brokenHalf, sagOf, stepRopeBridges } from './ropeBridge'
 import {
 	atLaunch,
+	dropsIn,
 	fling,
 	flyOut,
 	goingIn,
@@ -154,6 +157,7 @@ import {
 import { steamFires } from './steam'
 import { TOWER_DOOR, TOWER_HEIGHT, towerSpan } from './towers'
 import {
+	BABY_BUS_PARKED,
 	type Body,
 	type BoostState,
 	type ObstacleState,
@@ -162,7 +166,7 @@ import {
 	bodyHeight,
 	isCaught,
 } from './world'
-import { zombieAt } from './zombies'
+import { wakeZombies, zombieAt } from './zombies'
 
 /** How long a popup stays up. */
 export const POPUP_TICKS = 45
@@ -209,7 +213,11 @@ export function stepWorld(world: World) {
 		// A lift waiting for someone, set off by whoever's stood on it.
 		setOffPlatforms(world)
 		for (const racer of world.racers)
-			if (!isHeld(world, racer)) stepRunner(world, racer)
+			if (!isHeld(world, racer)) {
+				const wasX = racer.body.x
+				stepRunner(world, racer)
+				hearHouse(world, racer, wasX)
+			}
 		stepPack(world)
 		stepFurbies(world)
 		stepCorgis(world)
@@ -217,6 +225,7 @@ export function stepWorld(world: World) {
 		stepCarts(world)
 		stepFootball(world)
 		stepFlyers(world)
+		wakeZombies(world)
 		for (const racer of world.racers)
 			if (!isHeld(world, racer)) collide(world, racer)
 		startleGeese(world)
@@ -534,6 +543,12 @@ function stepRunner(world: World, racer: Racer) {
 		b.wasUp = up
 		return
 	}
+	if (racing && stepHaunt(world, racer)) {
+		// In a haunted house's monster's clutches, or coming back up out of
+		// a grave as a ghost: nothing to do but wait.
+		b.wasUp = up
+		return
+	}
 	if (b.secret === 'flung') {
 		// Thrown up out of a Secret: nothing to do but fly, till they're up
 		// over the course again.
@@ -763,6 +778,15 @@ function stepRunner(world: World, racer: Racer) {
 	b.x = Math.max(LEFT_EDGE, b.x + b.vx)
 	// Down a Secret's Gap, past its lip: on the way into it, not falling.
 	if (racing && goingIn(world, b)) b.secret = 'in'
+	// Or run onto an open manhole: down it, feet first.
+	else if (racing && dropsIn(world, b)) {
+		b.secret = 'in'
+		b.grounded = false
+		b.jumping = false
+		b.vy = Math.max(0, b.vy)
+		play('whoosh')
+		world.popup('Down the manhole!', b.x, b.feetY - 80)
+	}
 	// And in it, kept in it: nothing on the course over it in the way.
 	if (b.secret) keepIn(world, b, bodyHeight(b))
 	else if (racing) {
@@ -1294,7 +1318,11 @@ function thrownOut(world: World, racer: Racer) {
 	fling(world, b)
 	b.foundSecret = true
 	play('whoosh')
-	world.popup('Wheee!', b.x, b.feetY - 90)
+	world.popup(
+		world.course.secret?.duct ? 'Whoosh!' : 'Wheee!',
+		b.x,
+		b.feetY - 90,
+	)
 }
 
 /**
@@ -1327,13 +1355,14 @@ function meetFound(world: World, racer: Racer) {
 	if (!found || b.metFound) return
 	if (
 		Math.abs(b.x - found.x) > FOUND_REACH ||
-		Math.abs(b.feetY - found.y) > FOUND_HEIGHT
+		b.feetY > found.y + FOUND_HEIGHT ||
+		b.feetY < found.y - (found.over ?? FOUND_HEIGHT)
 	)
 		return
 	const bonus = bonusRunner(found.runner)
 	if (!bonus) return
 	b.metFound = true
-	world.popup('Na na na na na!', found.x, found.y - 80)
+	world.popup(found.says, found.x, found.y - 80)
 	if (unlockRunner(bonus.id)) {
 		b.unlocked = bonus.id
 		play('cheer')
@@ -1436,8 +1465,8 @@ function collide(world: World, racer: Racer) {
 	const { terrain } = world
 	const b = racer.body
 	if (world.phase() !== 'running' || racer.out) return
-	// Down in a Secret, under it all: nothing on the course to run into.
-	if (b.secret) return
+	// Held by a monster, or coming up out of a grave: nor then.
+	if (b.haunt) return
 
 	// On a glider: lying along under its wing, it over them.
 	const box = b.gliding
@@ -1480,7 +1509,8 @@ function collide(world: World, racer: Racer) {
 	const freshFor = (state: ObstacleState) =>
 		!state.used && !state.hit.has(racer.id)
 	const hits = (state: ObstacleState | BoostState) => state.hit.add(racer.id)
-	for (const state of riding ? [] : world.obstacles) {
+	// Down in a Secret, under it all: nothing on the course to run into.
+	for (const state of riding || b.secret ? [] : world.obstacles) {
 		const o = state.obstacle
 		// Only what's near enough to touch: where it is now, for a cyclist,
 		// a Zombie or a Mummy on the move.
@@ -1731,7 +1761,6 @@ function collide(world: World, racer: Racer) {
 				if (
 					freshFor(state) &&
 					!state.scooped &&
-					zombie.sunk === 0 &&
 					b.stumble === 0 &&
 					overlaps(
 						zombie.x - 12,
@@ -1905,7 +1934,7 @@ function collide(world: World, racer: Racer) {
 				if (b.hat && HAT_RULES[b.hat.kind].germProof) {
 					play('stomp')
 					world.popup('Reflected!', b.x, top)
-				} else stumble('Atishoo!')
+				} else stumble(world.course.look?.germ?.word ?? 'Atishoo!')
 				break
 			}
 			case 'valve':
@@ -1941,6 +1970,9 @@ function collide(world: World, racer: Racer) {
 	for (const state of world.boosts) {
 		const o = state.boost
 		if (Math.abs(o.x - b.x) > 200) continue
+		// Down in a Secret, only what's down there with them: fika, under
+		// the Ground (a tavern's ale).
+		if (b.secret && (o.kind !== 'fika' || o.height >= 0)) continue
 		const ground = terrain.groundY(o.x)
 		switch (o.kind) {
 			case 'fika': {
@@ -2162,6 +2194,17 @@ function stepBus(world: World) {
 
 	// Baby Mode: no bus, parked well out of the way.
 	if (phase === 'countdown' || world.baby) return
+	// Or switched off from the console, to test a course slowly; and back on,
+	// a leash's length behind whoever's furthest back.
+	if (cheats.busOff) {
+		bus.frontX = BABY_BUS_PARKED
+		bus.speed = 0
+		return
+	}
+	if (bus.frontX === BABY_BUS_PARKED) {
+		const back = Math.min(...world.racers.map((r) => r.body.x))
+		bus.frontX = back - BUS_LEASH_FULL
+	}
 
 	// Parked until a moment after "Go!", but run back into it and it'll still scoop.
 	const driving = world.raceTicks() - BUS_HOLD_TICKS
@@ -2325,7 +2368,7 @@ function knockOver(world: World) {
 		if (o.kind === 'zombie') {
 			if (state.scooped) continue
 			const zombie = zombieAt(world, { ...state, obstacle: o })
-			if (zombie.sunk > 0 || bus.frontX < zombie.x - 12) continue
+			if (bus.frontX < zombie.x - 12) continue
 			state.used = true
 			state.scooped = {
 				at: world.ticks(),
@@ -2512,10 +2555,10 @@ function downAhead(world: World, b: Body, low: number) {
  * `zoom`: no further down than where it starts, which is the course's
  * lowest.
  */
-function cameraYFor(high: number, low: number, zoom = 1) {
+function cameraYFor(high: number, low: number, zoom = 1, deep = false) {
 	const up = high - CAMERA_HEADROOM - VIEW_HEIGHT * (1 - zoom)
 	const down = low + CAMERA_FOOTROOM - VIEW_HEIGHT
-	return Math.min(0, Math.max(up, down))
+	return deep ? Math.max(up, down) : Math.min(0, Math.max(up, down))
 }
 
 /**
@@ -2583,11 +2626,19 @@ function stepCamera(world: World) {
 		? undefined
 		: (leapView(world, b) ?? secretView(world, b))
 	const view = gliding ?? leaping ?? lookAt(b)
+	// Down a Secret, the camera goes down under the Ground after them, as
+	// far as it takes: under Gamla Stan's street, that's under where it
+	// ever looks otherwise.
+	const deep = !gliding && !!secretView(world, b)
 	// Up a mountain, up the climb ahead too; down one, down the slope ahead.
 	if (!gliding && !leaping && !flyingHigh(b))
 		view.high = upAhead(world, b.x, b.facing, view.high)
+	// Somewhere tall, looking up at it.
+	const up = world.course.lookUp?.find((u) => b.x >= u.from && b.x < u.to)
+	if (up && !gliding && !leaping)
+		view.high = Math.min(view.high, up.top + CAMERA_HEADROOM)
 	if (!gliding && !leaping) view.low = downAhead(world, b, view.low)
-	const targetY = cameraYFor(view.high, view.low, world.zoom())
+	const targetY = cameraYFor(view.high, view.low, world.zoom(), deep)
 	const cameraY = world.cameraY()
 	// Quick after them, flying high, or dropping a long way.
 	const dropping = b.feetY > b.floor + CAMERA_DROP_ROOM
@@ -2597,7 +2648,10 @@ function stepCamera(world: World) {
 		const eased = cameraY + (targetY - cameraY) * lift
 		// And never so slow their feet go off the bottom of the screen.
 		const keepFeet = b.feetY + CAMERA_FOOTROOM - VIEW_HEIGHT
-		world.setCameraY(Math.min(0, Math.max(eased, keepFeet)))
+		const y = Math.max(eased, keepFeet)
+		// Never lower than the street but down a Secret; back up out of one,
+		// easing back up to it, rather than jumping.
+		world.setCameraY(deep ? y : Math.min(Math.max(0, cameraY), y))
 	}
 	// More of the screen ahead, whichever way they're running. Through the
 	// countdown, the bus parked behind everyone is in view too.
@@ -2704,7 +2758,7 @@ function frameEveryone(world: World) {
 	)
 	const zoom = world.zoom() + (want - world.zoom()) * ZOOM_EASE
 	world.setZoom(zoom)
-	const targetY = cameraYFor(high, low, zoom)
+	const targetY = cameraYFor(high, low, zoom, deep)
 	world.setCameraY(world.cameraY() + (targetY - world.cameraY()) * CAMERA_LIFT)
 	const width = VIEW_WIDTH * zoom
 	// Room to spare goes behind the leader, evenly either side of everyone.

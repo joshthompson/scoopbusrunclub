@@ -205,6 +205,14 @@ export interface Body {
 	climbing?: { dir: number; top: number }
 	/** Broke a rope bridge, jumping on it: Machu Picchu's special goal. */
 	brokeBridge?: boolean
+	/**
+	 * In a haunted house's monster's clutches, since tick `at`: `caught`, up
+	 * in its attic, held there; then `rising`, up out of a grave past the
+	 * house (see `haunted.ts`).
+	 */
+	haunt?: { stage: 'caught' | 'rising'; at: number }
+	/** Killed by its monster, and come back a ghost: Halloween Town's special goal. */
+	ghost?: boolean
 }
 
 /**
@@ -394,7 +402,8 @@ export interface ObstacleState {
 	scooped?: { at: number; vx: number; x?: number }
 	/**
 	 * Geese, disturbed: when they took off (see `gooseTakeoff`). A Steam
-	 * Vent: when it last puffed.
+	 * Vent: when it last puffed. A Zombie: when it woke, by the race's
+	 * clock (see `wakeZombies`).
 	 */
 	flown?: number
 	/** A cyclist riding round a loop: how many times round it's been. */
@@ -758,6 +767,15 @@ export function createWorld(
 		portal: undefined as PortalRun | undefined,
 		/** The course's Portals that have gone off, and let everyone through, by index. */
 		portalsDone: new Set<number>(),
+		/**
+		 * A haunted house's bats, when they burst out of its door, and its
+		 * window, when it was smashed, if they have been (see `haunted.ts`).
+		 * Plain state: the sounds only. What's drawn goes by where everyone is.
+		 */
+		house: {
+			batsAt: undefined as number | undefined,
+			smashedAt: undefined as number | undefined,
+		},
 		corgis: (course.corgis ?? []).map(
 			(x, id): Corgi => ({
 				id,

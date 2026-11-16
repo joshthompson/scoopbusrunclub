@@ -80,7 +80,8 @@ export const COLLECTABLE_NAMES = {
 	'fika:vitamin': 'Vitamins',
 	'fika:waterCup': 'Water',
 	'fika:blueberrySoup': 'Blåbärssoppa',
-	'fika:hotDog': 'Korv med bröd',
+	'fika:pizzaSlice': 'Pizza slice',
+	'fika:ale': 'Ale',
 	'ride:corgi': 'Corgi',
 	'ride:llama': 'Llama',
 	'ride:camel': 'Camel',
@@ -170,7 +171,8 @@ export const PICKUP_WORD = {
 	'fika:vitamin': 'Vitamins!',
 	'fika:waterCup': 'Vatten!',
 	'fika:blueberrySoup': 'Blåbär!',
-	'fika:hotDog': 'Korv!',
+	'fika:pizzaSlice': 'Pizza!',
+	'fika:ale': 'Skål!',
 	'ride:corgi': 'Giddy up!',
 	'ride:llama': 'Giddy up!',
 	'ride:camel': 'Giddy up!',
@@ -270,8 +272,10 @@ export const COLLECTABLE_ABOUT = {
 	'fika:waterCup':
 		'A paper cup of water, from the drinks station. Drink it on the run.',
 	'fika:blueberrySoup': 'Warm blueberry soup, as every Swedish race hands out.',
-	'fika:hotDog':
-		'Korv med bröd, from a kiosk on Södermalm, still open at midnight.',
+	'fika:pizzaSlice':
+		'A slice of pizza, from a kiosk on Södermalm, still open at midnight.',
+	'fika:ale':
+		'A tankard of ale, in a tavern under the old town. Mind the manholes.',
 	'ride:corgi': 'A corgi, sat on the path, barking for a rider.',
 	'ride:llama': 'A llama, humming for a rider.',
 	'ride:camel': 'A camel, grumbling for a rider.',

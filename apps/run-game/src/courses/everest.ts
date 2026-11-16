@@ -46,6 +46,7 @@ import type {
 	Obstacle,
 	Scenery,
 	Secret,
+	SecretProp,
 } from './types'
 
 /**
@@ -302,6 +303,34 @@ const DEN = (() => {
 		unlocks: YETI.id,
 	} satisfies Secret
 })()
+
+/**
+ * The Yetis' den's furniture, against its back wall: lamps, their warm
+ * light; tellies, their screens flickering, their blue light; sofas, each
+ * on a rug; and the family portrait, hung up over it all.
+ */
+const LAMP_PROP: SecretProp = {
+	frames: [LAMP.asset],
+	width: LAMP.width,
+	height: LAMP.height,
+	glow: { x: 0, y: LAMP.height - 8, reach: 60, colour: '#ffd76a' },
+}
+const TELLY_PROP: SecretProp = {
+	...TELLY,
+	glow: { x: 6, y: TELLY.height - 12, reach: 46, colour: '#9ad7ff' },
+}
+const SOFA_PROPS: SecretProp[] = YETI_SOFAS.map((sofa) => ({
+	frames: [sofa.asset],
+	width: sofa.width,
+	height: sofa.height,
+	rug: true,
+}))
+const PORTRAIT_PROP: SecretProp = {
+	frames: [PORTRAIT.asset],
+	width: PORTRAIT.width,
+	height: PORTRAIT.height,
+	hung: 120,
+}
 
 /** Whether `along` is in a camp, or just either side of one. */
 const inCamp = (along: number, room = 0) =>
@@ -582,20 +611,17 @@ export const everest: CourseDefinition = {
 		// to its left, turned to it, another lamp, the family portrait on
 		// the wall, and the run up to the Yeti.
 		secret: {
-			sofas: YETI_SOFAS,
-			telly: TELLY,
-			lamp: LAMP,
-			portrait: PORTRAIT,
+			walls: 'ice',
 			launcher: LAUNCHER,
 			furnishings: [
-				{ x: START_X + 11320, kind: 'lamp' },
-				{ x: START_X + 11440, kind: 'telly' },
-				{ x: START_X + 11540, kind: 'sofa', which: 0 },
-				{ x: START_X + 11760, kind: 'telly' },
-				{ x: START_X + 11860, kind: 'sofa', which: 1 },
-				{ x: START_X + 12000, kind: 'lamp' },
+				{ x: START_X + 11320, prop: LAMP_PROP },
+				{ x: START_X + 11440, prop: TELLY_PROP },
+				{ x: START_X + 11540, prop: SOFA_PROPS[0] },
+				{ x: START_X + 11760, prop: TELLY_PROP },
+				{ x: START_X + 11860, prop: SOFA_PROPS[1] },
+				{ x: START_X + 12000, prop: LAMP_PROP },
 				// The family, on the wall at the far end, by the Yeti.
-				{ x: START_X + 12200, kind: 'portrait' },
+				{ x: START_X + 12200, prop: PORTRAIT_PROP },
 			],
 		},
 	},

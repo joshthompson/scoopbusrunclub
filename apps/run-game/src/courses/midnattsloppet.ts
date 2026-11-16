@@ -10,12 +10,14 @@ import {
 	PATH_BACK,
 	PATH_FRONT,
 	PX_PER_M,
+	SCENERY_SET_BACK,
 	START_X,
 	VERGE,
 } from '../game/constants'
 import { type FikaItem, MIDNATTSLOPPET_FIKA } from '../game/fika'
 import { type Terrain, withGaps } from '../game/terrain'
 import {
+	SOFIA_KYRKAN_HEIGHT,
 	WOODEN_HOUSES,
 	choir,
 	marschall,
@@ -388,8 +390,8 @@ function layOut() {
 		obstacles.push({ kind: 'rock', x })
 	// The showers, one after another over the road.
 	for (const x of SHOWERS) boosts.push({ kind: 'gate', x, colour: 'red' })
-	// A korv from the kiosk, held out high.
-	boosts.push({ kind: 'fika', x: KIOSK, height: 95, item: 'hotDog' })
+	// A slice of pizza from the kiosk, held out high.
+	boosts.push({ kind: 'fika', x: KIOSK, height: 95, item: 'pizzaSlice' })
 	// Bananas, off the stand; and their skins, dropped past it.
 	for (const i of [0, 1, 2])
 		boosts.push({
@@ -606,6 +608,15 @@ export const midnattsloppet: CourseDefinition = {
 	raceShirt: RACE_BLUE,
 	// A crowd: thick at the start, thinning out by the docks.
 	crowd: (x) => (x < DOCKS ? 26 : x < CHURCH ? 14 : 12),
+	// Up top, looking up at Sofiakyrkan: the whole of it, dome and cross.
+	lookUp: [
+		{
+			from: CHURCH,
+			to: DOWNHILL,
+			top:
+				CHURCH_Y - PATH_BACK - SCENERY_SET_BACK - SOFIA_KYRKAN_HEIGHT * 2 - 8,
+		},
+	],
 	// Well before each set piece: a new version waits for the next bar and
 	// takes two more to fade in, by which time anyone quick has gone a
 	// couple of thousand px. The band's from the docks till the choir, up

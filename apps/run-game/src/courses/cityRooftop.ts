@@ -248,6 +248,7 @@ const HIDEOUT = (() => {
 			runner: BAT_PERSON.id,
 			x: end - 50,
 			y: terrain.groundY(last.x) - last.height,
+			says: 'Na na na na na!',
 		},
 		// Cranes on the roofs behind, each wholly on one roof, its jib out
 		// over the walkway, just over a girder, and reaching over its cable,

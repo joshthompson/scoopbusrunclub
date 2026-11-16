@@ -1,10 +1,7 @@
-import pumpkinAsset from '@/assets/halloween/pumpkin1.png'
 import { Show } from 'solid-js'
-import spiderCupcakeAsset from '../../assets/boosts/spider-cupcake.png'
 import { paintedArt } from '../../courses/kit/pixelArt'
 import { cone } from '../../courses/kit/sewerScenery'
 import type { CourseId } from '../../courses/types'
-import { FIKA_SIZE } from '../../game/fika'
 import { PixelArt } from '../PixelArt'
 import { BALL } from '../football'
 import { TrophyArt } from './trophy'
@@ -42,8 +39,26 @@ function rowsArt(rows: string[], colours: Record<string, string>): GoalIcon {
 /** Score a goal: the football. */
 const FOOTBALL: GoalIcon = { src: BALL, width: 11 * CELL, height: 11 * CELL }
 
-/** Finish wearing a pumpkin: one, carved. */
-const PUMPKIN: GoalIcon = { src: pumpkinAsset, width: 29, height: 23 }
+/** Become a ghost: one, a sheet with eyes, its hem wavy, see-through at its edge. */
+const GHOST = rowsArt(
+	[
+		'....WWWWW....',
+		'...WWWWWWW...',
+		'..WWWWWWWWW..',
+		'.WWWWWWWWWWS.',
+		'.WWKKWWWKKWS.',
+		'.WWKKWWWKKWS.',
+		'.WWWWWWWWWWS.',
+		'.WWWWKKKWWWS.',
+		'.WWWWKKKWWWS.',
+		'.WWWWWWWWWWS.',
+		'.WWWWWWWWWWS.',
+		'.WWWWWWWWWWS.',
+		'.WSWWSWWWSWS.',
+		'.S..S.S..S.S.',
+	],
+	{ W: '#f4f2ff', S: '#b9b4d6', K: '#2b2236' },
+)
 
 /** Deer riding deer: a deer's head, its antlers up off it. */
 const DEER = rowsArt(
@@ -197,6 +212,43 @@ export const YETI = rowsArt(
 )
 
 /**
+ * Find the Viking: his face, old, no helmet, his long white hair round it
+ * under a leather headband, a ginger moustache gone mostly grey, and his
+ * big white beard, its braid tied at its end.
+ */
+export const VIKING = rowsArt(
+	[
+		'...HHHHHHH...',
+		'..HHHHHHHHH..',
+		'.HBBBBBBBBBH.',
+		'.HSSSSSSSSSH.',
+		'HHSKSSSSSKSHH',
+		'HHSSSSnSSSSHH',
+		'HHsSSnnnSSsHH',
+		'HHWGGGGGGGWHH',
+		'HHWWWWmWWWWHH',
+		'hHWWWWWWWWWHh',
+		'hhWWWWWWWWWhh',
+		'.hhWWWWWWWhh.',
+		'...hWWWWWh...',
+		'.....WWW.....',
+		'......B......',
+	],
+	{
+		H: '#eeebe4',
+		h: '#aba69c',
+		B: '#47301f',
+		S: '#e5ad86',
+		s: '#bf8462',
+		n: '#bf8462',
+		K: '#1d1d1d',
+		G: '#c4834e',
+		W: '#f7f5f0',
+		m: '#8a4a3a',
+	},
+)
+
+/**
  * Find Bat Person: his face, his black bat hood pulled down over his eyes,
  * its ears up, the whites of his eyes through its slits, his chin under it.
  */
@@ -317,7 +369,7 @@ const HEAD_BOUNCE = rowsArt(
 /** Each special goal's picture: any without, a trophy. */
 const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	haga: FOOTBALL,
-	'halloween-town': PUMPKIN,
+	'halloween-town': GHOST,
 	huddinge: DEER,
 	kristineberg: LONG_JUMP,
 	sewers: CONE,
@@ -326,6 +378,7 @@ const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	karolinska: GERM,
 	everest: YETI,
 	'city-rooftop': BAT_PERSON,
+	'gamla-stan': VIKING,
 	cliff: RING,
 	'machu-picchu': BROKEN_BRIDGE_ICON,
 	midnattsloppet: HEAD_BOUNCE,
@@ -333,12 +386,10 @@ const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 
 /**
  * For a collectables goal, in place of the course's own hat, where that's
- * its special goal's picture: Halloween Town's spider cupcake, its own fika,
- * its pumpkin being for finishing in one.
+ * its special goal's picture. None, now: Halloween Town's was its spider
+ * cupcake, while its special goal was finishing in a pumpkin.
  */
-export const COLLECTABLES_ICON: Partial<Record<CourseId, GoalIcon>> = {
-	'halloween-town': { src: spiderCupcakeAsset, ...FIKA_SIZE.spiderCupcake },
-}
+export const COLLECTABLES_ICON: Partial<Record<CourseId, GoalIcon>> = {}
 
 /**
  * A goal's picture, fitted into `size` px if given: a shadow of it, till

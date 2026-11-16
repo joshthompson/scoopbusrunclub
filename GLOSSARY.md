@@ -68,7 +68,7 @@ A stretch of a Course with no Ground and no Platform underneath: going down one 
 _Avoid_: Pit, hole (potholes are Obstacles you can trip in and get out of)
 
 **Secret**:
-A Gap that is a way in rather than a fall. Whoever goes down it isn't Fallen: they drop a long way down its shaft into a cavern under the Course, at the same place along it, run along its floor, and at its far end are thrown back up onto the Course, high over it. Everest's is the Yetis' den, down the last crevasse of the Icefall, and finding it is Everest's special goal.
+A Gap that is a way in rather than a fall. Whoever goes down it isn't Fallen: they drop a long way down its shaft into a cavern under the Course, at the same place along it, run along its floor, and at its far end are thrown back up onto the Course, high over it. Everest's is the Yetis' den, down the last crevasse of the Icefall, and finding it is Everest's special goal. Gamla Stan's has no Gap: its way in is an open manhole in the street, a ladder poking out of it, that runners drop down by running onto it (or jump to stay on the street), into a tavern in an old cellar, where the Viking waits to be found; and its way out is an air duct that blows you straight back up out of a grate in the street.
 _Avoid_: Hidden level, bonus level, cave (a Cave is over the Ground; a Secret is under it)
 
 **Bonus Runner**:
@@ -124,7 +124,11 @@ A club member risen from the grave, now and then just a skeleton, walking the wr
 _Avoid_: Pacer (Pacers race the right way)
 
 **Germ**:
-A virus floating inside someone, in The Hospital, bobbing up and down: run under it or jump it, or stumble. Land on top of it and it pops, a bounce off it as off a head.
+A virus floating inside someone, in The Hospital, bobbing up and down: run under it or jump it, or stumble. Land on top of it and it pops, a bounce off it as off a head. In the Haunted House, ghosts bob about its rooms the same way.
+
+**Haunted House**:
+In Halloween Town, a house up on a hill: a Cave, dark till someone's in it, and then every floor of it at once. Bats burst out of its door at whoever's coming. Its way out is the window at the end of its upper floor, which smashes as they jump out through it. Anyone who climbs on up into its attic is caught by the **Monster** that lives there, killed, and comes back up out of a grave past the house as a **Ghost**: whiter and see-through, for the rest of the race. Becoming one is Halloween Town's special goal.
+_Avoid_: Mansion; dying (a Ghost isn't out, and runs on)
 
 **Heart Valve**:
 A flap in the floor of the heart, in The Hospital, that opens on every beat, firing whoever's on it up into the air: the only way over the ridges between the heart's chambers.
