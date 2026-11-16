@@ -73,8 +73,13 @@ export default function Pad() {
 	const [code, setCode] = createSignal(
 		fromLink.length === CODE_LENGTH ? fromLink : '',
 	)
-	const [mode, setMode] = createSignal<PadMode | undefined>(
-		last && last.code === code() ? last.mode : undefined,
+	/**
+	 * How it plays: as it did in this Room, if it's coming back, or as it
+	 * last played anywhere (the big screen, the first time). Never asked
+	 * first: the lobby's Watch the Race switches it.
+	 */
+	const [mode, setMode] = createSignal<PadMode>(
+		last && last.code === code() ? last.mode : lastMode(MODE_KEY, 'controller'),
 	)
 	const choose = (next: PadMode) => {
 		rememberMode(MODE_KEY, next)
@@ -83,11 +88,10 @@ export default function Pad() {
 	const leave = () => {
 		rememberRoom(ROOM_KEY, undefined)
 		setCode('')
-		setMode(undefined)
 	}
 	/** Joining again, from scratch, as a new page: the same seat, by this device, and played the same way. */
 	const again = () => {
-		rememberRoom(ROOM_KEY, { code: code(), mode: mode() ?? 'controller' })
+		rememberRoom(ROOM_KEY, { code: code(), mode: mode() })
 		joinAfresh(code())
 	}
 	const screens = () => (
@@ -101,20 +105,14 @@ export default function Pad() {
 					}}
 				/>
 			</Match>
-			<Match when={!mode()}>
-				<ModePicker code={code()} onPick={choose} onBack={leave} />
-			</Match>
 			<Match when={code()} keyed>
 				{(joined) => (
 					<Controller
 						code={joined}
-						mode={mode() ?? 'controller'}
+						mode={mode()}
 						onMode={choose}
 						onJoined={() =>
-							rememberRoom(ROOM_KEY, {
-								code: code(),
-								mode: mode() ?? 'controller',
-							})
+							rememberRoom(ROOM_KEY, { code: code(), mode: mode() })
 						}
 						onLeave={leave}
 						onRejoin={again}
@@ -186,50 +184,6 @@ function CodeEntry(props: {
 				</a>
 			</div>
 		</Show>
-	)
-}
-
-/** Watching the race on the big screen, or on the phone. */
-function ModePicker(props: {
-	code: string
-	onPick: (mode: PadMode) => void
-	onBack: () => void
-}) {
-	const last = lastMode(MODE_KEY, 'controller')
-	const option = (mode: PadMode, title: string, text: string) => (
-		<button
-			type="button"
-			style={{
-				...styles.modeButton,
-				...(mode === last ? { 'border-color': '#ffd23f' } : {}),
-			}}
-			onClick={() => props.onPick(mode)}
-		>
-			<span style={{ 'font-size': '26px' }}>{title}</span>
-			<span style={styles.modeText}>{text}</span>
-		</button>
-	)
-	return (
-		<div style={styles.centre}>
-			<div style={styles.heading}>Where will you watch the race?</div>
-			<div style={styles.text}>Room {props.code}</div>
-			{option(
-				'controller',
-				'On the big screen',
-				'In the same room as it. Your phone’s just the buttons.',
-			)}
-			{option(
-				'remote',
-				'On this phone',
-				'Somewhere else? The race on your phone, the buttons under it.',
-			)}
-			<div style={{ ...styles.text, 'font-size': '15px' }}>
-				You can change this in the lobby
-			</div>
-			<button type="button" style={styles.smallButton} onClick={props.onBack}>
-				Another Room
-			</button>
-		</div>
 	)
 }
 
@@ -735,7 +689,8 @@ function LobbyScreen(props: {
 										height={runner().sprite.height}
 										scale={2.5}
 										stride={0.9}
-										style={{ 'margin-bottom': '8px' }}
+										// Centred if it fits; if not, its front (on the left) kept.
+										style={{ 'margin-bottom': '8px', 'margin-inline': 'auto' }}
 									/>
 								)}
 							</Show>
@@ -1206,13 +1161,17 @@ const styles = {
 		border: '3px solid white',
 		'box-shadow': '0 0 0 3px var(--ink)',
 	},
+	/**
+	 * Their runner, cropped to the box: one too wide for it (August and his
+	 * pram) keeps its front, the runner, and loses the back.
+	 */
 	youRunner: {
 		display: 'flex',
 		'align-items': 'flex-end',
-		'justify-content': 'center',
 		width: '96px',
 		'min-height': '120px',
 		'flex-shrink': 0,
+		overflow: 'hidden',
 		padding: 0,
 		border: '3px solid white',
 		background:
@@ -1430,20 +1389,6 @@ const styles = {
 		'font-family': 'var(--font-pixel)',
 		'font-size': '18px',
 	},
-	modeButton: {
-		display: 'flex',
-		'flex-direction': 'column',
-		'align-items': 'center',
-		gap: '6px',
-		width: 'min(320px, 86vw)',
-		padding: '14px 16px 10px',
-		background: 'var(--ink)',
-		color: 'white',
-		border: '4px solid white',
-		'box-shadow': '0 0 0 4px var(--ink)',
-		'font-family': 'var(--font-pixel)',
-	},
-	modeText: { 'font-size': '15px', opacity: 0.8 },
 	homeLink: {
 		'margin-top': '8px',
 		color: 'var(--ink)',
@@ -1491,7 +1436,13 @@ const styles = {
 	whoTop: { 'font-size': '13px' },
 	whoName: { 'white-space': 'nowrap', 'line-height': 1.1 },
 	pencil: { 'margin-left': '6px', 'font-size': '0.75em', opacity: 0.85 },
-	status: { 'margin-left': 'auto', 'font-size': '20px', 'text-align': 'right' },
+	/** Tight enough that two lines ("Not ready yet") fit the bar's height, so it stays put as it changes. */
+	status: {
+		'margin-left': 'auto',
+		'font-size': '20px',
+		'line-height': 1.1,
+		'text-align': 'right',
+	},
 	lobby: {
 		flex: 1,
 		display: 'flex',

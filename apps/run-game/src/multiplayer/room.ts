@@ -353,12 +353,16 @@ export function createRoom(code: string) {
 		if (message.type === 'hello') {
 			const id = `phone:${message.device}`
 			const back = seats.find((s) => s.id === id)
+			// What they go by, as the device has it saved: blank, their runner's name.
+			const said = message.name !== undefined
+			const name = cleanPlayerName(message.name ?? '') || undefined
 			if (back)
 				update(id, (s) => {
 					s.peer = peer
 					s.lostAt = undefined
 					s.mode = message.mode
 					s.screen = message.screen
+					if (said) s.name = name
 				})
 			else if (
 				!addSeat({
@@ -368,6 +372,7 @@ export function createRoom(code: string) {
 					peer,
 					mode: message.mode,
 					screen: message.screen,
+					name,
 				})
 			)
 				view.send(fullView(), peer)
