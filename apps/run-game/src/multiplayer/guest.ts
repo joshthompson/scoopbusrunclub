@@ -1,18 +1,15 @@
 import { createEffect, createSignal, onCleanup } from 'solid-js'
-import { type Room, joinRoom } from 'trystero'
 import { type Controls, packControls } from '../input'
 import type { Playable } from '../runners/playable'
 import { STORAGE_PREFIX } from '../saved/settings'
 import type { Feed } from './Mirror'
-import {
-	APP_ID,
-	type PadMessage,
-	type PadMode,
-	type PadView,
-	type RaceFrame,
-	type RaceStart,
-	action,
-	trysteroRoom,
+import { openRoom } from './connection'
+import type {
+	PadMessage,
+	PadMode,
+	PadView,
+	RaceFrame,
+	RaceStart,
 } from './protocol'
 
 /**
@@ -78,6 +75,13 @@ const QUIET_MS = 2500
  */
 const REJOIN_MS = 6000
 const REJOIN_AGAIN_MS = 15_000
+/**
+ * Not found yet after this long: looked for again from scratch, and again
+ * this long after, till it is. A first try that went wrong (a relay that
+ * dropped a message, a connection that never came up) isn't waited on for
+ * good.
+ */
+const REFIND_MS = 12_000
 /** And nothing for this long: the Room's closed, most likely. */
 const GONE_MS = 45_000
 
@@ -125,17 +129,18 @@ export function joinAsGuest(props: {
 	/**
 	 * In the Room: every peer's said hello to, the Host's the one that
 	 * answers. Other devices in the Room are peers too, and say nothing back.
-	 * Started again, from scratch, if the Host goes quiet (see `REJOIN_MS`).
+	 * Started again, from scratch, if the Host goes quiet (see `REJOIN_MS`),
+	 * or isn't found (see `REFIND_MS`).
 	 */
 	function connect() {
-		const room: Room = joinRoom({ appId: APP_ID }, trysteroRoom(props.code))
-		const pad = action<PadMessage>(room, 'pad')
-		const input = action<number>(room, 'input')
-		const fromHost = action<PadView>(room, 'view')
-		const race = action<RaceStart>(room, 'race')
-		const frames = action<RaceFrame>(room, 'frame')
+		const room = openRoom(props.code)
+		const pad = room.action<PadMessage>('pad')
+		const input = room.action<number>('input')
+		const fromHost = room.action<PadView>('view')
+		const race = room.action<RaceStart>('race')
+		const frames = room.action<RaceFrame>('frame')
 
-		room.onPeerJoin((peer) => void pad.send(hello(), peer))
+		room.onPeerJoin((peer) => pad.send(hello(), peer))
 		fromHost.on((next, peer) => {
 			heardAt = Date.now()
 			setReconnecting(false)
@@ -193,16 +198,19 @@ export function joinAsGuest(props: {
 
 	const send = (message: PadMessage) => {
 		const to = host()
-		if (to) void link.pad.send(message, to)
+		if (to) link.pad.send(message, to)
 	}
 
 	// Keeping in touch: quiet a moment, reconnecting; quiet a while, starting
-	// again; quiet for good, gone. Not found to begin with, lost.
+	// again; quiet for good, gone. Not found to begin with, looked for again,
+	// and in a while, lost (though still looked for).
 	const watchdog = window.setInterval(() => {
 		const now = Date.now()
 		const quiet = now - (heardAt ?? startedAt)
 		if (heardAt && quiet > QUIET_MS) setReconnecting(true)
 		if (heardAt && quiet > REJOIN_MS && now - rejoinedAt > REJOIN_AGAIN_MS)
+			void rejoin()
+		if (!heardAt && now - Math.max(startedAt, rejoinedAt) > REFIND_MS)
 			void rejoin()
 		if (!heardAt && quiet > FIND_MS) setLost(true)
 		if (heardAt && quiet > GONE_MS) setGone(true)
@@ -217,7 +225,7 @@ export function joinAsGuest(props: {
 
 	const sendHeld = () => {
 		const to = host()
-		if (to) void link.input.send(packControls(props.held()), to)
+		if (to) link.input.send(packControls(props.held()), to)
 	}
 	createEffect(sendHeld)
 	const resend = window.setInterval(sendHeld, RESEND_MS)
