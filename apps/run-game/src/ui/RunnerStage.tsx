@@ -30,8 +30,17 @@ export function RunnerStage(props: {
  * A name on one line, in a size that fits: never wrapped, which is what made
  * the old cards' names jump about.
  */
-export const nameSize = (name: string, sizes: [number, number, number]) =>
-	name.length <= 8 ? sizes[0] : name.length <= 12 ? sizes[1] : sizes[2]
+export const nameSize = (
+	name: string,
+	sizes: [number, number, number],
+	/** The longest a name can be for each of the first two sizes. */
+	longest: [number, number] = [8, 12],
+) =>
+	name.length <= longest[0]
+		? sizes[0]
+		: name.length <= longest[1]
+			? sizes[1]
+			: sizes[2]
 
 const styles = {
 	stage: {

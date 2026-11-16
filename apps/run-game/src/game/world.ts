@@ -184,6 +184,21 @@ export interface Body {
 	toppedTower?: boolean
 	/** Germs popped, landing on them: Karolinska's special goal. */
 	germsPopped?: number
+	/**
+	 * How many of a River's crocodiles they're on, bouncing in turn from the
+	 * first, without touching down; and the most they've managed, every one
+	 * of them the Pyramids' special goal.
+	 */
+	crocChain?: number
+	crocBest?: number
+	/**
+	 * How fast they were going as they left the ground, or last bounced off
+	 * something: steering in the air goes no further off it than
+	 * `AIR_STEER_ON` and `AIR_STEER_BACK`. None, on the ground.
+	 */
+	airBase?: number
+	/** In a River, wading, last tick: to splash in only on the way in. */
+	wading?: boolean
 	/** Been down a Secret, and thrown back up out of it: Everest's special goal. */
 	foundSecret?: boolean
 	/** The bonus runner they unlocked on this course, by runner id, if they did: for the finish screen. */

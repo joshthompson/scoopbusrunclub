@@ -88,6 +88,7 @@ export const COLLECTABLE_NAMES = {
 	'ride:bactrian': 'Bactrian camel',
 	'ride:deer': 'Deer',
 	'ride:unicorn': 'Unicorn',
+	'ride:horse': 'Royal Guard horse',
 	'ride:glider': 'Glider',
 	'ride:goat': 'Mountain goat',
 	'ride:skis': 'Skis',
@@ -179,6 +180,7 @@ export const PICKUP_WORD = {
 	'ride:bactrian': 'Two humps!',
 	'ride:deer': 'Giddy up!',
 	'ride:unicorn': 'Giddy up!',
+	'ride:horse': 'Giddy up!',
 	'ride:glider': 'Wheee!',
 	'ride:goose': 'Honk honk!',
 	'ride:dragon': 'Dragon ride!',
@@ -276,12 +278,14 @@ export const COLLECTABLE_ABOUT = {
 		'A slice of pizza, from a kiosk on Södermalm, still open at midnight.',
 	'fika:ale':
 		'A tankard of ale, in a tavern under the old town. Mind the manholes.',
-	'ride:corgi': 'A corgi, sat on the path, barking for a rider.',
+	'ride:corgi': 'A corgi, sat on the track, barking for a rider.',
 	'ride:llama': 'A llama, humming for a rider.',
 	'ride:camel': 'A camel, grumbling for a rider.',
 	'ride:bactrian': 'A rare two-humped camel: one race in ten.',
 	'ride:deer': 'A deer, barking for a rider. They really do.',
 	'ride:unicorn': 'A unicorn, sparkling.',
+	'ride:horse':
+		"A horse of the Royal Guard's, saddled, waiting in the old town's streets.",
 	'ride:glider': 'A hang glider, parked along the top of the cliff.',
 	'ride:goat': 'A mountain goat, sure-footed, for the climb.',
 	'ride:skis': 'A pair of skis, stood up in the snow at the top.',
@@ -330,6 +334,8 @@ const RIDE_BEHAVIOUR = {
 	unicorn:
 		'Jump on to ride it over everything. Jump again to leap; duck to get off.',
 	goat: 'Jump on to ride it over everything. Jump again to leap; duck to get off.',
+	horse:
+		'Jump on to ride it over everything. Jump again to leap; duck to get off.',
 	glider:
 		"Run into it to fly out to sea. Steer up and down; don't touch the water.",
 	skis: 'Yours all the way down. Tuck to speed up, do tricks off kickers, grind rails.',

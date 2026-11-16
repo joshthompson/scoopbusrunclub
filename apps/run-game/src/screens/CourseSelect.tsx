@@ -507,7 +507,7 @@ const styles = {
 	rowSelected: {
 		background: 'white',
 		border: '3px solid var(--ink)',
-		'box-shadow': '0 0 0 3px #ffd23f, 4px 4px 0 3px #b33a2a',
+		'box-shadow': '0 0 0 3px #ffd23f, 2px 2px 0 3px #b33a2a',
 	},
 	locked: {
 		background: 'rgba(255, 255, 255, 0.35)',

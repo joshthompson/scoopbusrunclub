@@ -145,6 +145,15 @@ export type Obstacle =
 	 * open, and whoever's stood on it is fired up into the air.
 	 */
 	| { kind: 'valve'; x: number }
+	/**
+	 * A crocodile in a River (see `River`), lying across the way at `x`,
+	 * only its back, its eyes and its nostrils out of the water. Land on its
+	 * back and it's a bounce off it, as off a head, and it dips under you;
+	 * miss it and you're in the water, wading. Never in the way: you wade
+	 * on past it. Bouncing on every one in turn, without touching down, is
+	 * the Pyramids' special goal.
+	 */
+	| { kind: 'crocodile'; x: number }
 
 /** Something on the course, at `x` along it, that speeds you up. */
 export type Boost =
@@ -519,6 +528,8 @@ export interface CourseLook {
 	buildings?: BuildingLook
 	/** The sea's colours, and its island's sand, if it has a sea: see `Course['sea']`. */
 	sea?: SeaLook
+	/** A River's colours, if it has one: see `Course['river']`. */
+	river?: RiverLook
 	/**
 	 * How much nearer than the path's middle Tourists stand, down the
 	 * screen: in front of what's on a ferry's floor, a lorry, a shelf,
@@ -1060,9 +1071,10 @@ export interface Course {
 	 */
 	corgisUp?: number[]
 	/**
-	 * What those are: corgis, or on Machu Picchu, llamas, at the Pyramids,
-	 * camels, in Huddinge's forest, deer, in Furby Fields, unicorns, on
-	 * The Cliff, gliders, parked along its top, or up Everest, mountain goats.
+	 * What those are: corgis (at Kristineberg), or on Machu Picchu, llamas,
+	 * at the Pyramids, camels, in Huddinge's forest, deer, in Furby Fields,
+	 * unicorns, on The Cliff, gliders, parked along its top, up Everest,
+	 * mountain goats, or in Gamla Stan, the Royal Guard's horses.
 	 */
 	ride?:
 		| 'corgi'
@@ -1072,6 +1084,7 @@ export interface Course {
 		| 'glider'
 		| 'unicorn'
 		| 'goat'
+		| 'horse'
 		/**
 		 * In The Caves, moles: hopping along with you on their back, over and
 		 * over, and digging on through whatever rock's in the way, leaving
@@ -1134,6 +1147,8 @@ export interface Course {
 	 * at least, under full steam. A glider comes down on the island, past it.
 	 */
 	sea?: { from: number; to: number; level: number; busSpeed: number }
+	/** A River across the course, to wade or cross on its crocodiles: see `River`. */
+	river?: River
 	/** How high a glider can go, at most: a y, its rider's feet. */
 	sky?: number
 	/**
@@ -1165,10 +1180,18 @@ export interface Course {
 	 * get to them, and the first time, they're yours to run as (see
 	 * `BONUS_RUNNERS`). Bat Person, up on the girders over City Rooftop.
 	 * By their runner id, at `x`, their feet at `y`; and what they say,
-	 * found: Bat Person's theme, or the Viking's "Skål!". With `over`,
-	 * passing over them that high counts too (in a room, jumping by).
+	 * found: Bat Person's theme. With `over`, passing over them that high
+	 * counts too (in a room, jumping by). Or, `waiting`, sat down till
+	 * anyone comes near, and up to say hello (see `FoundWaiting`).
 	 */
-	found?: { runner: string; x: number; y: number; says: string; over?: number }
+	found?: {
+		runner: string
+		x: number
+		y: number
+		says?: string
+		over?: number
+		waiting?: FoundWaiting
+	}
 	/** A mine, with mine carts to ride: see `Mine`. */
 	mine?: Mine
 	/**
@@ -1226,10 +1249,11 @@ export interface HauntedHouse {
  * `unlocks`, by their runner id, if it has one (see `BONUS_RUNNERS`).
  *
  * Or, with `manhole`, its way in's no Gap at all but an open manhole in
- * the street, over `gap`, a ladder poking up out of it: run onto it and
- * down they go, feet first; jump it, and they don't (Gamla Stan's tavern). And
- * with `duct`, nobody throws them: it's an air duct at `launch` that blows
- * them straight up it, out of a grate in the street, and on over to `land`.
+ * the street, over `gap`, a ladder poking up out of it: run onto it slowly
+ * and down they go, feet first; jump it, or run straight on over it, and
+ * they don't (Gamla Stan's tavern). And with `duct`, nobody throws them:
+ * it's an air duct at `launch` that blows them straight up it, out of a
+ * grate in the street, and on over to `land`.
  */
 export interface Secret {
 	gap: { from: number; to: number }
@@ -1301,6 +1325,23 @@ export interface SecretPicture {
 	asset: string
 	width: number
 	height: number
+}
+
+/**
+ * A course's hidden bonus runner (see `Course['found']`), sat waiting: on
+ * their `seat`, in their sit pose, sunk `sink` into it, till anyone comes
+ * within `near` of them along, on their level (`over`, in a room). Then
+ * they're up on their feet, in `up` (a picture of theirs, their stand
+ * pose's size), and saying one of `says` in a bubble over them, till
+ * everyone's gone by: the Viking, up off his keg in the tavern under Gamla
+ * Stan, raising his ale.
+ */
+export interface FoundWaiting {
+	seat: SecretPicture
+	sink: number
+	up: string
+	near: number
+	says: readonly string[]
 }
 
 /**
@@ -1405,6 +1446,35 @@ export interface SpecialRun {
 	brokeBridge?: boolean
 	/** Killed by a haunted house's monster, and come back as a ghost. */
 	ghost?: boolean
+	/** The most of a River's crocodiles they bounced on in turn, from the first, without touching down. */
+	crocodiles?: number
+}
+
+/**
+ * A River across the course, the Nile on the Pyramids, from bank to bank,
+ * `from` to `to`, its surface level at `level` (a y). The Ground's its bed,
+ * `depth` under the surface, sloping down off each bank: whoever's on it is
+ * wading, the water over their shins, slowed down (and so is the bus).
+ * Its crocodiles are Obstacles (`kind: 'crocodile'`), to cross on.
+ */
+export interface River {
+	from: number
+	to: number
+	level: number
+	depth: number
+}
+
+/**
+ * A River's colours: its `water` at the surface, darkening to `deep`, the
+ * `shine` of the light on its ripples, the `bank` at its edges, and the
+ * `wet` sand where it meets the water.
+ */
+export interface RiverLook {
+	water: string
+	deep: string
+	shine: string
+	bank: string
+	wet: string
 }
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */

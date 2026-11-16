@@ -2,6 +2,7 @@ import type { RunnerName } from '@/data/runners'
 import oldTownChurches from '../assets/horizons/old-town-churches.png'
 import oldTownFar from '../assets/horizons/old-town-far.png'
 import oldTownNear from '../assets/horizons/old-town-near.png'
+import vikingToast from '../assets/runners/viking/toast.png'
 import katarinahissen from '../assets/scenery/katarinahissen.png'
 import lamp from '../assets/scenery/lamp.png'
 import quayWall from '../assets/scenery/quay-wall.png'
@@ -14,7 +15,6 @@ import {
 	VIEW_HEIGHT,
 } from '../game/constants'
 import { GAMLA_STAN_FIKA } from '../game/fika'
-import { CAMERA_HEADROOM, MAX_ZOOM } from '../game/step'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
 import { VIKING } from '../runners/bonus'
 import {
@@ -35,6 +35,7 @@ import {
 	DUCT,
 	DUCT_COLOURS,
 	GRATE,
+	KEG,
 	LADDER,
 	LADDER_AT,
 	MANHOLE,
@@ -63,10 +64,11 @@ import type {
  * over Guldbron at the end, cyclists coming the other way.
  *
  * And under it all, in an old cellar's brick vaults, a tavern: down an
- * open manhole in the street, a ladder poking up out of it. Run onto it
- * and down you go; jump it, and you run on over the top. Ale
- * in it, and an old Viking at its bar, to be found (the special goal), and
- * at its far end an air duct to blow you back up into the street.
+ * open manhole in the street, a ladder poking up out of it. Slow down onto
+ * it and down you go; jump it, or run at it flat out, and you're on over
+ * the top. Ale in it, and an old Viking at its bar, to be found (the
+ * special goal), and at its far end an air duct to blow you back up into
+ * the street.
  */
 
 const CHEERERS: RunnerName[] = [
@@ -212,9 +214,9 @@ const stretchAt = (x: number): Stretch => {
  * they were going, from a jog to boosted.
  */
 const VENT_FIKA_AHEAD = 130
-/** How much room a corgi waits in, clear of anything else either side. */
-const CORGI_ROOM = 160
 const VENT_FIKA_HEIGHT = 200
+/** How much room a horse waits in, clear of anything else either side. */
+const HORSE_ROOM = 160
 
 /** How likely each thing is, in each stretch: tourists, pigeons, a steam vent, fika; and the rest, a cheer. */
 const MIX: Record<Stretch, [number, number, number, number]> = {
@@ -335,13 +337,14 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 		x: KATARINAHISSEN + WALKWAY_ON_FROM + WALKWAY_ON / 2,
 		asset: walkwayOn,
 	})
-	// Corgis, out for a walk in the old town, waiting to be ridden: in a
-	// clear bit of street, each, well before the bridge.
+	// The Royal Guard's horses, saddled, stood waiting in the old town's
+	// streets to be ridden: in a clear bit of street, each, well before the
+	// bridge.
 	const corgis: number[] = []
 	for (const share of [0.18, 0.47, 0.76]) {
 		let x = START_X + (BRIDGE - START_X) * share
 		while (
-			[...obstacles, ...boosts].some((o) => Math.abs(o.x - x) < CORGI_ROOM)
+			[...obstacles, ...boosts].some((o) => Math.abs(o.x - x) < HORSE_ROOM)
 		)
 			x += 20
 		corgis.push(Math.round(x))
@@ -376,11 +379,14 @@ const TAVERN_LONG = 1300
 /** How far past the duct's grate you come down, blown up out of it. */
 const BLOWN_ON = 260
 /**
- * How far under the street the tavern's vaults are: deeper than a Round's
- * camera, zoomed right out, ever looks under the course (as the Yetis' den
- * is under Everest), so it's never seen from up there.
+ * How far down the tavern's vaults are, their roof: just under where the
+ * camera ever looks with nobody down there. Zooming out, a Round's camera
+ * shrinks the course towards the bottom of the screen, so it never sees
+ * further down than `VIEW_HEIGHT`, the bottom of the Ground, zoomed in or
+ * out. And deep enough that the camera down in the tavern, looking at its
+ * floor, its vaults and the rock over them, sees none of the street.
  */
-const ROOF_UNDER = VIEW_HEIGHT * MAX_ZOOM - CAMERA_HEADROOM + 280
+const ROOF = VIEW_HEIGHT + 160
 const ROOM = 220
 
 const TAVERN_AT = (() => {
@@ -398,7 +404,7 @@ const TAVERN_AT = (() => {
 			gap,
 			from: gap.from - 140,
 			to: launch + 80,
-			floor: Math.round(terrain.groundY(manhole)) + ROOF_UNDER + ROOM,
+			floor: ROOF + ROOM,
 			room: ROOM,
 			launch,
 			peak: 200,
@@ -409,9 +415,15 @@ const TAVERN_AT = (() => {
 	}
 })()
 const TAVERN_SECRET = TAVERN_AT.secret
-/** The bar, near its far end, and the Viking stood at it, waiting for you. */
+/**
+ * The bar, near its far end, and the Viking sat on a keg just past its
+ * end, waiting for you: against the whitewash, not the bar's oak, so his
+ * ale stands out, raised.
+ */
 const BAR = TAVERN_SECRET.launch - 300
-const VIKING_AT = BAR + 20
+const VIKING_AT = BAR + 100
+/** How near you get before he's up off his keg, raising his ale to you. */
+const VIKING_NEAR = 240
 
 /**
  * Ale, in the tavern, a tankard each for everyone who gets down there: by
@@ -439,10 +451,11 @@ export const gamlaStan: CourseDefinition = {
 	id: 'gamla-stan',
 	name: 'Gamla Stan',
 	blurb:
-		'Through Stockholm’s old town and over Guldbron: tourists, pigeons, steam vents, corgis to ride, and cyclists on the bridge. And a manhole, open, a ladder down it…',
+		'Through Stockholm’s old town and over Guldbron: tourists, pigeons, steam vents, the Royal Guard’s horses to ride, and cyclists on the bridge. And a manhole, open, a ladder down it…',
 	terrain,
 	runDirectors: ['keith', 'josh'],
 	cheerers: CHEERERS,
+	ride: 'horse',
 	look: {
 		palette: {
 			'--sky-blue-top': '#9fd3f0',
@@ -543,9 +556,15 @@ export const gamlaStan: CourseDefinition = {
 		runner: VIKING.id,
 		x: VIKING_AT,
 		y: TAVERN_SECRET.floor,
-		says: 'Skål!',
 		// Jumping by him, anywhere under the tavern's vaults.
 		over: ROOM,
+		waiting: {
+			seat: KEG,
+			sink: 8,
+			up: vikingToast,
+			near: VIKING_NEAR,
+			says: ['Skål!', 'For Valhalla!'],
+		},
 	},
 	special: {
 		goal: 'Find the viking',

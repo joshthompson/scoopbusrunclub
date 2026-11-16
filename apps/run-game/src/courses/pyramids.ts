@@ -10,7 +10,9 @@ import { START_X } from '../game/constants'
 import { PATH_BACK, PATH_FRONT, VERGE } from '../game/constants'
 import { PYRAMIDS_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
+import { MS_CROCODILE } from '../runners/bonus'
 import { duckPost } from './kit/duckSigns'
+import { bush, papyrus, reeds } from './kit/nileScenery'
 import { SAND_FAR_RIPPLES, SAND_RIPPLES, SAND_TRACK } from './kit/sand'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
@@ -46,6 +48,46 @@ const heights = Array.from({ length: DISTANCE_M / STEP_M + 1 }, (_, i) => {
 })
 
 const dunes = createTerrain(heights, STEP_M, DISTANCE_M, { bumps: false })
+
+/**
+ * The Nile, across the way soon after the start, before the first pyramid:
+ * wide, the dunes levelling out down to its banks either side. Its bed's a
+ * little under its water, its banks sloping down to it: whoever misses its
+ * crocodiles is in up to their shins, wading.
+ */
+const NILE_FROM = START_X + 700
+const NILE_TO = NILE_FROM + 1250
+const NILE_LEVEL = Math.round(dunes.groundY((NILE_FROM + NILE_TO) / 2))
+/** How far either side of it the dunes take to level out to its banks. */
+const NILE_LEVELS = 300
+/** How deep its bed is under its water, and how far in its banks take to slope down to that. */
+const NILE_DEPTH = 22
+const NILE_BANK = 24
+/**
+ * How much of its banks' steepness holds back anyone wading out up one:
+ * drawn as steep as they are, but climbed like a gentle slope, or out of
+ * the water would be a crawl (as the Sphinx's passage out).
+ */
+const NILE_BANK_PULL = 0.15
+/**
+ * Its crocodiles, from its near bank, each a bounce on from the last at a
+ * run, steered in the air: a short hop, held back; a long one, holding
+ * on; and one between. Holding on all the way, or letting go, won't do.
+ */
+const CROCODILES = [200, 430, 710, 965].map((at) => NILE_FROM + at)
+
+/** The Ground, by the Nile: levelled out to its banks, and down to its bed in it. None away from it. */
+function nile(x: number) {
+	if (x <= NILE_FROM - NILE_LEVELS || x >= NILE_TO + NILE_LEVELS)
+		return undefined
+	if (x < NILE_FROM || x > NILE_TO) {
+		const off = x < NILE_FROM ? NILE_FROM - x : x - NILE_TO
+		const level = ease(1 - off / NILE_LEVELS)
+		return dunes.groundY(x) + (NILE_LEVEL - dunes.groundY(x)) * level
+	}
+	const into = Math.min(x - NILE_FROM, NILE_TO - x)
+	return NILE_LEVEL + NILE_DEPTH * ease(Math.min(1, into / NILE_BANK))
+}
 
 /** Each pyramid's steps: low enough to run up, a block at a time. */
 const RISER = 10
@@ -155,13 +197,18 @@ const terrain: Terrain = withGaps({
 	finishX: dunes.finishX,
 	groundY: (x) => {
 		const pyramid = pyramidAt(x)
-		return pyramid ? pyramid.face(x) : dunes.groundY(x) - dune(x) + sunk(x)
+		if (pyramid) return pyramid.face(x)
+		return nile(x) ?? dunes.groundY(x) - dune(x) + sunk(x)
 	},
 	slope: (x) => {
 		const pyramid = pyramidAt(x)
 		if (pyramid) {
 			if (Math.abs(x - pyramid.x) <= SUMMIT) return 0
 			return x < pyramid.x ? -CLIMB_SLOPE : FACE_SLOPE
+		}
+		if (nile(x) !== undefined) {
+			const slope = (terrain.groundY(x + 4) - terrain.groundY(x - 4)) / 8
+			return x > NILE_FROM && x < NILE_TO ? slope * NILE_BANK_PULL : slope
 		}
 		if (x > DUNE_FROM && x < DUNE_TO) {
 			const slope = (terrain.groundY(x + 4) - terrain.groundY(x - 4)) / 8
@@ -258,11 +305,13 @@ const MUMMIES = [
 	{ x: TOMB_FROM + 470, pace: 60 },
 ]
 
-/** Nothing on the pyramids, or near their feet: they're climb enough. Nor in or near the Sphinx. */
+/** Nothing on the pyramids, or near their feet: they're climb enough. Nor in or near the Sphinx, nor the Nile. */
 const clear = (x: number) =>
 	!PYRAMIDS.some(
 		({ feet: [left, right] }) => x > left - 200 && x < right + 200,
-	) && !(x > DUNE_FROM - 200 && x < DUNE_TO + 100)
+	) &&
+	!(x > DUNE_FROM - 200 && x < DUNE_TO + 100) &&
+	!(x > NILE_FROM - 250 && x < NILE_TO + 250)
 
 /** A couple of camels, knelt on the sand waiting to be ridden: one before each of the first two pyramids, to ride up over it. */
 function camels() {
@@ -317,12 +366,20 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	boosts.sort((a, b) => a.x - b.x)
 	// The tomb's Mummies.
 	for (const mummy of MUMMIES) obstacles.push({ kind: 'mummy', ...mummy })
+	// The Nile's crocodiles.
+	for (const x of CROCODILES) obstacles.push({ kind: 'crocodile', x })
 	obstacles.sort((a, b) => a.x - b.x)
-	// A palm now and then, an oasis, but not on a pyramid, nor by the Sphinx.
+	// A palm now and then, an oasis, but not on a pyramid, nor by the
+	// Sphinx, nor in the Nile.
 	const scenery: Course['scenery'] = []
 	for (let at = -300; at < terrain.finishX + 900; at += 300 + random() * 700)
-		if (!pyramidAt(at) && !(at > SPHINX - 300 && at < SPHINX_END + 100))
+		if (
+			!pyramidAt(at) &&
+			!(at > SPHINX - 300 && at < SPHINX_END + 100) &&
+			!(at > NILE_FROM - 80 && at < NILE_TO + 80)
+		)
 			scenery.push({ x: Math.round(at), asset: palm })
+	scenery.push(...nileBanks())
 	// The sarcophagus in the Sphinx's tomb, stood against the wall.
 	scenery.push({
 		x: TOMB_FROM + TOMB / 2 + 40,
@@ -334,6 +391,35 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	// A signpost on the sand before its way in, telling you to duck.
 	scenery.push({ x: SPHINX - PORCH - 80, asset: duckPost, setBack: 0 })
 	return { obstacles, boosts, scenery, corgis }
+}
+
+/**
+ * Along the Nile's banks: papyrus and reeds, a bush or two, behind the path
+ * and in front of it, either side of the water. Bunched up by the water,
+ * thinning out away from it.
+ */
+/** Where the near bank's reeds stand: in the sand a little in front of the path. */
+const NEAR_SIDE = -PATH_BACK - PATH_FRONT - 12
+
+function nileBanks(): Course['scenery'] {
+	const out: Course['scenery'] = []
+	for (const [edge, side] of [
+		[NILE_FROM, -1],
+		[NILE_TO, 1],
+	] as const) {
+		const at = (off: number) => Math.round(edge + side * off)
+		out.push(
+			// Behind the path.
+			{ x: at(26), asset: papyrus, scale: 2, setBack: 4 },
+			{ x: at(70), asset: reeds, scale: 2, setBack: 10 },
+			{ x: at(120), asset: bush, scale: 2, setBack: 6 },
+			{ x: at(190), asset: reeds, scale: 2, setBack: 14 },
+			// In front of it, in the sand on its near side.
+			{ x: at(40), asset: reeds, scale: 2, setBack: NEAR_SIDE, front: true },
+			{ x: at(96), asset: bush, scale: 2, setBack: NEAR_SIDE, front: true },
+		)
+	}
+	return out
 }
 
 /** Nothing at all, to draw: the porch's roof is drawn as the Sphinx's own. */
@@ -366,7 +452,7 @@ export const pyramids: CourseDefinition = {
 	id: 'pyramids',
 	name: 'Pyramids',
 	blurb:
-		'Across the sand at Giza and up and over the pyramids: stones, and quicksand to bog you down.',
+		'Across the Nile on its crocodiles, then the sand at Giza and up and over the pyramids: stones, and quicksand to bog you down.',
 	terrain,
 	runDirectors: ['anna', 'august'],
 	cheerers: CHEERERS,
@@ -407,6 +493,14 @@ export const pyramids: CourseDefinition = {
 			block: '#d9b779',
 			mortar: '#a8834a',
 		},
+		// The Nile: green-blue, its banks wet sand.
+		river: {
+			water: '#3f8fae',
+			deep: '#245f7a',
+			shine: '#bfe8f2',
+			bank: '#c99b4a',
+			wet: '#8a6a32',
+		},
 		// Quicksand, not mud.
 		mud: 'sepia(1) saturate(1.3) brightness(1.55) hue-rotate(-8deg)',
 		// Sandstone, not grey granite.
@@ -422,6 +516,20 @@ export const pyramids: CourseDefinition = {
 	},
 	cave: sphinx,
 	platforms: [PORCH_ROOF],
+	river: {
+		from: NILE_FROM,
+		to: NILE_TO,
+		level: NILE_LEVEL,
+		depth: NILE_DEPTH,
+	},
+	// Across the Nile, bouncing from each of its crocodiles to the next, in
+	// turn, never touching down: and with that, Ms Crocodile's yours to run
+	// as.
+	special: {
+		goal: 'Bounce across the crocodiles',
+		done: (run) => (run.crocodiles ?? 0) >= CROCODILES.length,
+		unlocks: MS_CROCODILE.id,
+	},
 	...layOut(),
 	ride: 'camel',
 }

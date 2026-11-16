@@ -28,6 +28,7 @@ import { createHauntedHouse } from './hauntedHouse'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPyro, createSearchlights, createSmoke } from './nightRace'
 import { createPortalFx } from './portalFx'
+import { createRiver, createRiverFront } from './river'
 import { createSecret } from './secret'
 import {
 	createBanner,
@@ -143,6 +144,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			'banner',
 			'sign',
 			'mud',
+			// A River's water behind the path, under its crocodiles.
+			'river',
 			// The Caves' mine: its rails, trestles and secret gallery.
 			'mine',
 			// A Secret's cavern under the course: what's in it, then its hollow.
@@ -185,6 +188,7 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createMine(world),
 				...createSecret(world),
 				...createMoleTrails(world),
+				...createRiver(world),
 				...createMineCarts(world),
 				...createFootballSprite(world),
 				...world.obstacles.flatMap((state, i) =>
@@ -214,6 +218,7 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createBackdrop(world, scene),
 				...createCaveCover(world, scene),
 				...createSeaFront(world, scene),
+				...createRiverFront(world),
 				...createWeather(world, scene),
 				// A night race's show: fire, searchlights and smoke.
 				...createPyro(world),

@@ -56,6 +56,15 @@ import {
 	goatPicture,
 } from './art/goat'
 import {
+	HORSE_BACK,
+	HORSE_HEIGHT,
+	HORSE_OUTLINE,
+	HORSE_SADDLE,
+	HORSE_WIDTH,
+	HorseArt,
+	horsePicture,
+} from './art/horse'
+import {
 	LLAMA_BACK,
 	LLAMA_HEIGHT,
 	LLAMA_OUTLINE,
@@ -239,6 +248,20 @@ const GOAT: RideLook = {
 	rides: 'Goat rides',
 }
 
+/** A horse of the Royal Guard's, stood waiting in the street, saddled. */
+const HORSE: RideLook = {
+	width: HORSE_WIDTH,
+	height: HORSE_HEIGHT,
+	back: HORSE_BACK,
+	saddle: HORSE_SADDLE,
+	Art: HorseArt,
+	picture: horsePicture,
+	shadow: HORSE_OUTLINE,
+	call: 'Neigh!',
+	sound: 'neigh',
+	rides: 'Horse rides',
+}
+
 /**
  * A mole: hopping along with you on its back, over and over, and on
  * through whatever rock's in the way (see `moles`), faster than running.
@@ -341,6 +364,7 @@ const RIDES = {
 	unicorn: UNICORN,
 	glider: GLIDER,
 	goat: GOAT,
+	horse: HORSE,
 	mole: MOLE,
 	skis: SKIS,
 	bloodCell: BLOOD_CELL,

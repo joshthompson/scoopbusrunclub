@@ -77,6 +77,7 @@ import { CAUGHT_TICKS, inClutches, risingFromGrave } from '../game/haunted'
 import { mummyAt } from '../game/mummies'
 import { type PlatformAt, platformAt, platformOut } from '../game/platforms'
 import { heldLook, pacerShrunk } from '../game/portals'
+import { inRiver } from '../game/river'
 import { brokenHalf, sagOf } from '../game/ropeBridge'
 import {
 	BALLOON_HEIGHT,
@@ -245,6 +246,7 @@ import {
 } from './paint/vents'
 import { platformLook, platformPainter } from './platformArt'
 import { rideLook } from './rideLook'
+import { createCrocodile } from './river'
 import { createScoopable } from './scoopable'
 
 /**
@@ -1046,13 +1048,19 @@ const SPLASH_DEPTH = 14
 
 /**
  * Splashes, as anyone goes into the sea: off the cliff with no glider, or
- * crashed into it on one. Seen from where they are, so the same on every
+ * crashed into it on one; or into a River, missing its crocodiles. Seen from where they are, so the same on every
  * screen; each added as it happens, and gone once it's over.
  */
 export function createSplashes(world: World) {
-	const { sea } = world.course
-	if (!sea) return []
-	const line = sea.level + SPLASH_DEPTH
+	const { sea, river } = world.course
+	if (!sea && !river) return []
+	/** The water's surface at `x`, if it's out at sea or in a River. */
+	const surface = (x: number) =>
+		sea && atSea(world, x)
+			? sea.level
+			: river && inRiver(world, x)
+				? river.level
+				: undefined
 	/** Where everyone's feet were last tick. */
 	const was = new Map<string, number>()
 	const live: { id: string; at: number }[] = []
@@ -1078,11 +1086,13 @@ export function createSplashes(world: World) {
 				) => {
 					const before = was.get(key)
 					was.set(key, feetY)
-					if (flying || before === undefined || !atSea(world, x)) return
+					const level = surface(x)
+					if (flying || before === undefined || level === undefined) return
+					const line = level + SPLASH_DEPTH
 					if (before >= line || feetY < line) return
 					const id = `splash-${next++}`
 					live.push({ id, at: now })
-					$scene.addController(createSplash(world, id, x, now))
+					$scene.addController(createSplash(world, id, x, now, level))
 				}
 				for (const r of world.racers)
 					into(
@@ -1102,8 +1112,13 @@ export function createSplashes(world: World) {
 	]
 }
 
-function createSplash(world: World, id: string, x: number, at: number) {
-	const surface = world.course.sea?.level ?? world.terrain.groundY(x)
+function createSplash(
+	world: World,
+	id: string,
+	x: number,
+	at: number,
+	surface: number,
+) {
 	return createController({
 		init: () => ({
 			id,
@@ -2613,6 +2628,7 @@ export function createFound(world: World) {
 	const runner = found && bonusRunner(found.runner)
 	if (!found || !runner) return []
 	const { sprite } = runner
+	if (found.waiting) return [createFoundWaiting(world)]
 	const frame = sprite.stand ?? sprite.run[0]
 	const size = poseSize(frame, sprite)
 	return [
@@ -2628,6 +2644,93 @@ export function createFound(world: World) {
 			}),
 		}),
 	]
+}
+
+/** How long a bonus runner who's waiting stays up after everyone's gone by, in ticks, before sitting back down. */
+const FOUND_SIT_AFTER = 90
+/** How big their bubble's words are. */
+const FOUND_SAYS_SIZE = 20
+
+/**
+ * The course's hidden bonus runner, sat waiting (see `FoundWaiting`): the
+ * Viking on his keg at the bar, up on his feet as anyone comes near,
+ * raising his ale, and saying so. Who's near goes by where everyone is,
+ * so it's the same on every screen; and so does which of their words
+ * they say, by the tick they got up.
+ */
+function createFoundWaiting(world: World) {
+	const found = world.course.found
+	const runner = found && bonusRunner(found.runner)
+	const waiting = found?.waiting
+	if (!found || !runner || !waiting) throw new Error('Nobody waiting')
+	const { sprite } = runner
+	const { seat } = waiting
+	const width = sprite.width * RUNNER_SCALE
+	const height = sprite.height * RUNNER_SCALE
+	/** Anyone still running near enough, along, and on their level. */
+	const near = () =>
+		world.racers.some(
+			({ body, out }) =>
+				!out &&
+				Math.abs(body.x - found.x) < waiting.near &&
+				body.feetY <= found.y + 40 &&
+				body.feetY >= found.y - (found.over ?? 40),
+		)
+	/** Up till this tick, if they're up: what they're saying, if so. */
+	const [upUntil, setUpUntil] = createSignal(0)
+	const [says, setSays] = createSignal(waiting.says[0])
+	const up = () => world.ticks() < upUntil()
+	const longest = Math.max(...waiting.says.map((s) => s.length))
+	return createController({
+		frames: [sprite.sit ?? waiting.up],
+		init: () => ({
+			id: 'found',
+			type: 'cheerer',
+			x: () => Math.round(found.x - width / 2),
+			y: () => found.y - height,
+			width: () => width,
+			height: () => height,
+		}),
+		drawReach: bubbleReach(width, FOUND_SAYS_SIZE, longest),
+		onEnterFrame: () => {
+			if (!near()) return
+			const tick = world.ticks()
+			// Just up: something to say.
+			if (!up())
+				setSays(waiting.says[Math.floor(tick / 7) % waiting.says.length])
+			setUpUntil(tick + FOUND_SIT_AFTER)
+		},
+		draw: ({ ctx, image }) => {
+			// The seat, under them, sat or stood in front of it.
+			const seatTop = height - seat.height
+			paintPicture(
+				ctx,
+				image,
+				seat.asset,
+				Math.round((width - seat.width) / 2),
+				seatTop,
+				seat.width,
+				seat.height,
+			)
+			if (up()) {
+				paintPicture(ctx, image, waiting.up, 0, 0, width, height)
+				paintBubble(ctx, says(), { width, size: FOUND_SAYS_SIZE })
+				return
+			}
+			const sit = sprite.sit && image(sprite.sit)
+			if (!sprite.sit || !sit) return
+			const sitHeight = sit.height * RUNNER_SCALE
+			paintPicture(
+				ctx,
+				image,
+				sprite.sit,
+				0,
+				seatTop + waiting.sink - sitHeight,
+				sit.width * RUNNER_SCALE,
+				sitHeight,
+			)
+		},
+	})
 }
 
 export function createRunDirector(world: World) {
@@ -3381,6 +3484,8 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			return createSkyThing(world, state, o, id)
 		case 'germ':
 			return createGerm(world, state, o, id)
+		case 'crocodile':
+			return createCrocodile(world, state, o, id)
 		case 'valve':
 			// Raised a little off the floor, flapping open on the beat, and
 			// as it fires someone up, its chevrons over it lighting up and

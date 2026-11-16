@@ -587,7 +587,7 @@ const styles = {
 		background: '#ffd23f',
 		color: 'var(--ink)',
 		border: '3px solid white',
-		'box-shadow': '4px 4px 0 #b33a2a',
+		'box-shadow': '2px 2px 0 #b33a2a',
 	},
 	cursor: {
 		width: '18px',
@@ -706,7 +706,7 @@ const styles = {
 	actionSelected: {
 		background: '#ffd23f',
 		color: 'var(--ink)',
-		'box-shadow': '4px 4px 0 #b33a2a',
+		'box-shadow': '2px 2px 0 #b33a2a',
 	},
 	hint: {
 		...OUTLINED,

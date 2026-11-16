@@ -286,6 +286,29 @@ const BARREL: Picture = {
 	height: 20 * CELL,
 }
 
+/**
+ * A keg, stood on its end, to sit on: oak staves, lit down its left, two
+ * iron hoops round it, and its lid, lit, the top of it. The Viking's seat,
+ * at the bar. 12 by 10.
+ */
+export const KEG: Picture = picture(12, 10, [
+	// Its lid, and its rim round it.
+	[1, 0, 10, 1, OAK_LIT],
+	[0, 1, 12, 1, OAK_DARK],
+	// Its staves.
+	[0, 2, 12, 7, OAK],
+	[0, 2, 2, 7, OAK_LIT],
+	[10, 2, 2, 7, OAK_SHADE],
+	[4, 2, 1, 7, OAK_SHADE],
+	[7, 2, 1, 7, OAK_SHADE],
+	[1, 9, 10, 1, OAK_DARK],
+	// Its hoops.
+	...[3, 7].flatMap((y): PixelRect[] => [
+		[0, y, 12, 1, HOOP],
+		[0, y, 2, 1, HOOP_LIT],
+	]),
+])
+
 /** Three barrels, two on the floor and one up on them, no cradle under it. 38 by 36. */
 const BARRELS: Picture = {
 	asset: paintedArt(

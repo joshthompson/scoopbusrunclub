@@ -301,6 +301,7 @@ export function Game(props: {
 					metFound: world.body.metFound,
 					brokeBridge: world.body.brokeBridge,
 					ghost: world.body.ghost,
+					crocodiles: world.body.crocBest,
 				})
 			) {
 				placing.special = true

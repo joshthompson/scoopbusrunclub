@@ -102,8 +102,19 @@ export const JUMP_SPEED = 9.5
  */
 export const JUMP_CUT = 2
 export const GRAVITY = 0.45
-/** Air control, a little either way. */
+/** Air control on skis, a little either way. */
 export const AIR_PUSH = 0.04
+/**
+ * Air control running: holding left or right in the air steers a jump,
+ * this much a tick, up to `AIR_STEER_ON` faster than they took off (or
+ * last bounced off something), or `AIR_STEER_BACK` slower: enough to land
+ * where they meant to, not enough to fly. Less on than back, since
+ * everyone's holding on as they run: a jump's only a little longer for
+ * it, but held back, it's a good deal shorter.
+ */
+export const AIR_STEER = 0.2
+export const AIR_STEER_ON = 1.5
+export const AIR_STEER_BACK = 3
 /** How tall the runner's hitbox is, standing and ducking. */
 export const STAND_HEIGHT = 52
 export const DUCK_HEIGHT = 28

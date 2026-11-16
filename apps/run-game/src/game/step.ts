@@ -21,7 +21,9 @@ import { ceilingAt, inTunnel, rockOver } from './cave'
 import { cheats } from './cheats'
 import { PICKUP_WORD } from './collectables'
 import {
-	AIR_PUSH,
+	AIR_STEER,
+	AIR_STEER_BACK,
+	AIR_STEER_ON,
 	BARCODE_BOOST,
 	BARCODE_POINTS,
 	BARCODE_TALL,
@@ -119,6 +121,14 @@ import {
 	setOffPlatforms,
 } from './platforms'
 import { busHeld, isHeld, portalCamera, stepPortals } from './portals'
+import {
+	RIVER_BUS_PACE,
+	WADE_TOP_SPEED,
+	bounceOnCrocodile,
+	inRiver,
+	touchedDown,
+	wading,
+} from './river'
 import { brokenHalf, sagOf, stepRopeBridges } from './ropeBridge'
 import {
 	atLaunch,
@@ -629,6 +639,7 @@ function stepRunner(world: World, racer: Racer) {
 	}
 
 	if (b.grounded) {
+		b.airBase = undefined
 		// Platforms are flat, and so's a bed.
 		const slope =
 			b.on === undefined && !b.bed && !b.secret ? terrain.slope(b.x) : 0
@@ -669,9 +680,14 @@ function stepRunner(world: World, racer: Racer) {
 				b.vx = (b.vx < 0 ? -1 : 1) * Math.max(Math.abs(b.vx), b.tunnelSpeed)
 			}
 		} else {
-			const running = b.muddy
+			// Bogged down in mud, or wading a River.
+			const slowTo = b.muddy
 				? MUD_TOP_SPEED
-				: RUN_TOP_SPEED + (b.hat ? HAT_RULES[b.hat.kind].speed : 0)
+				: wading(world, b)
+					? WADE_TOP_SPEED
+					: undefined
+			const running =
+				slowTo ?? RUN_TOP_SPEED + (b.hat ? HAT_RULES[b.hat.kind].speed : 0)
 			// Squashed by a furby: slower, till they spring back up.
 			const top =
 				(b.squashed > 0 ? Math.min(running, SQUASHED_TOP_SPEED) : running) +
@@ -689,7 +705,7 @@ function stepRunner(world: World, racer: Racer) {
 				b.vx += (target - b.vx) * (boosted ? OVERSPEED_GRIP : RUN_GRIP)
 			} else b.vx *= COAST_KEEP
 			b.vx += hillPull(slope) * HILL_PULL
-			if (b.muddy && Math.abs(b.vx) > MUD_TOP_SPEED) b.vx *= 0.93
+			if (slowTo !== undefined && Math.abs(b.vx) > slowTo) b.vx *= 0.93
 			if (b.squashed > 0 && Math.abs(b.vx) > SQUASHED_TOP_SPEED) b.vx *= 0.95
 		}
 
@@ -737,9 +753,26 @@ function stepRunner(world: World, racer: Racer) {
 				b.vx = b.climbing.dir * CLIMB_ON
 				b.climbing = undefined
 			} else b.vx = 0
-		} else {
-			if (right) b.vx += AIR_PUSH
-			if (left) b.vx -= AIR_PUSH
+		} else if (b.launchX === undefined) {
+			// Steering, a little on or a good deal back, off how fast they
+			// took off, the way they're facing. Not on a measured jump, a long
+			// jump's or off a ski jump: that's how far their run-up took them.
+			b.airBase ??= b.vx
+			const forward = b.airBase < 0 ? -1 : 1
+			const on = forward > 0 ? right && !left : left && !right
+			const back = forward > 0 ? left && !right : right && !left
+			const most = b.airBase + forward * AIR_STEER_ON
+			const least = b.airBase - forward * AIR_STEER_BACK
+			if (on)
+				b.vx =
+					forward > 0
+						? Math.max(b.vx, Math.min(most, b.vx + AIR_STEER))
+						: Math.min(b.vx, Math.max(most, b.vx - AIR_STEER))
+			if (back)
+				b.vx =
+					forward > 0
+						? Math.min(b.vx, Math.max(least, b.vx - AIR_STEER))
+						: Math.max(b.vx, Math.min(least, b.vx + AIR_STEER))
 		}
 		// A propeller beanie: holding jump on the way down, floating down.
 		b.floating =
@@ -1362,7 +1395,8 @@ function meetFound(world: World, racer: Racer) {
 	const bonus = bonusRunner(found.runner)
 	if (!bonus) return
 	b.metFound = true
-	world.popup(found.says, found.x, found.y - 80)
+	// Waiting, they've said it already, stood up as they came.
+	if (found.says) world.popup(found.says, found.x, found.y - 80)
 	if (unlockRunner(bonus.id)) {
 		b.unlocked = bonus.id
 		play('cheer')
@@ -1498,6 +1532,15 @@ function collide(world: World, racer: Racer) {
 	}
 
 	b.muddy = false
+	// Into a River, off its bank or down off a crocodile: a splash, once,
+	// on the way in.
+	touchedDown(b)
+	const wet = wading(world, b)
+	if (wet && !b.wading) {
+		play('squelch')
+		world.popup('Splash!', b.x, top)
+	}
+	b.wading = wet
 	/** On a corgi, over rocks, under branches and through the mud. Or carried over them, or in a cart. */
 	const riding = b.mount > 0 || b.carried > 0 || b.cart !== undefined
 	/**
@@ -1940,6 +1983,11 @@ function collide(world: World, racer: Racer) {
 			case 'valve':
 				if (onValve(world, b, o.x)) state.flown = world.ticks()
 				break
+			case 'crocodile':
+				// Down onto its back: a bounce. Missed, there's nothing to run
+				// into: it's under the water, and they wade on past it.
+				bounceOnCrocodile(world, racer, state)
+				break
 			case 'mud':
 				// Bogging everyone down, and costing each of them once.
 				if (
@@ -2229,8 +2277,12 @@ function stepBus(world: World) {
 			)
 		}
 		// Slowed going uphill, as everyone is: its wheels' slope. Down a ski
-		// slope, faster, but never faster than anyone can go.
-		const pace = bus.speed * busHill(world, bus.frontX)
+		// slope, faster, but never faster than anyone can go. Through a
+		// River, slowed down as much as anyone wading it.
+		const pace =
+			bus.speed *
+			busHill(world, bus.frontX) *
+			(inRiver(world, bus.frontX) ? RIVER_BUS_PACE : 1)
 		// Off a Leap, in a giant condor's talons: no faster than the condors
 		// carrying everyone down ahead of it, so it can't catch them while
 		// there's nothing they can do about it.

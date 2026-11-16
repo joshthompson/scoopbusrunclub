@@ -25,6 +25,7 @@ export type Sound =
 	| 'whoosh'
 	| 'woof'
 	| 'bleat'
+	| 'neigh'
 	| 'honk'
 	| 'furby'
 	| 'trick'
@@ -136,6 +137,19 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 			],
 			volume: 0.045,
 			slide: 0.9,
+		},
+		/** A horse, calling to be ridden: a whinny, high and shaking, falling away. */
+		neigh: {
+			notes: [
+				[880, 0.06, 'sawtooth'],
+				[980, 0.06, 'sawtooth'],
+				[860, 0.06, 'sawtooth'],
+				[940, 0.06, 'sawtooth'],
+				[760, 0.08, 'sawtooth'],
+				[520, 0.14, 'sawtooth'],
+			],
+			volume: 0.04,
+			slide: 0.85,
 		},
 		/** A trick landed: a bright run up, and a ding. */
 		trick: {

@@ -17,7 +17,11 @@ export interface Playable {
 	custom?: CustomRunner
 	/** A bonus runner, found on a course and unlocked (see `BONUS_RUNNERS`). */
 	bonus?: boolean
-	/** A bonus runner's: what unlocks them, said when it does. */
+	/**
+	 * What unlocks them, said when it does and on the select screen once it
+	 * has: where they were found ("Found in Gamla Stan"), or what it took
+	 * ("Unlocked by completing all courses").
+	 */
 	unlockedBy?: string
 	/** White all over, so lost on a light card: shown on a dark one, on the select screen. */
 	darkCard?: boolean
@@ -120,7 +124,7 @@ const MEMBER_GLIDE_LEANS: Partial<Record<RunnerName, number>> = {
  */
 const MEMBER_UNLOCKS: Partial<Record<RunnerName, string>> = {
 	// A dog: yours once you've ridden one.
-	link: 'Rode a corgi',
+	link: 'Unlocked by riding a corgi at Kristineberg',
 }
 
 /** Link's runner id: unlocked by riding a corgi (see `MEMBER_UNLOCKS`). */

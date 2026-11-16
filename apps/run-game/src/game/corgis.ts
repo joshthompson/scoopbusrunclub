@@ -20,11 +20,11 @@ import { scored } from './step'
 import type { Racer, World } from './world'
 
 /**
- * Gamla Stan's corgis: sat on the path, barking for someone to hop on. Land
+ * Kristineberg's corgis: sat on the track, barking for someone to hop on. Land
  * on one's back and you ride it a few seconds, galloping, over everything in
  * the way (see `stepRunner` and `collide`). Jump and it leaps, with you on
- * it; duck to get off early. Every course's Rides, llamas, camels and deer
- * too; and on The Cliff, its gliders (see `gliders`).
+ * it; duck to get off early. Every course's Rides, llamas, camels, deer and
+ * Gamla Stan's horses too; and on The Cliff, its gliders (see `gliders`).
  */
 
 /** Landing this far into its back still counts as on it. */

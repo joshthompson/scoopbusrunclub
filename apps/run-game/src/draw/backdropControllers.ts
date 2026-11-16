@@ -56,10 +56,16 @@ import { TILE, tileControllers, tileDensity } from './paint/tiles'
 export const BEHIND_TYPES = ['ground', 'backdrop']
 /**
  * And over every sprite, front to back, for its start: under the snow and
- * fog, the sea's waves in front of everyone in it, and a Cave's cover (see
- * `frontControllers`).
+ * fog, the sea's waves and a River's water in front of everyone in them,
+ * and a Cave's cover (see `frontControllers` and `river`).
  */
-export const OVER_TYPES = ['fog', 'snow', 'sea-front', 'cave-cover']
+export const OVER_TYPES = [
+	'fog',
+	'snow',
+	'sea-front',
+	'river-front',
+	'cave-cover',
+]
 
 /** What the camera sees, in the Scene. */
 const cameraOf = (scene: Scene) => scene.canvas.get()

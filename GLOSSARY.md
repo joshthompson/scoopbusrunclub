@@ -68,11 +68,11 @@ A stretch of a Course with no Ground and no Platform underneath: going down one 
 _Avoid_: Pit, hole (potholes are Obstacles you can trip in and get out of)
 
 **Secret**:
-A Gap that is a way in rather than a fall. Whoever goes down it isn't Fallen: they drop a long way down its shaft into a cavern under the Course, at the same place along it, run along its floor, and at its far end are thrown back up onto the Course, high over it. Everest's is the Yetis' den, down the last crevasse of the Icefall, and finding it is Everest's special goal. Gamla Stan's has no Gap: its way in is an open manhole in the street, a ladder poking out of it, that runners drop down by running onto it (or jump to stay on the street), into a tavern in an old cellar, where the Viking waits to be found; and its way out is an air duct that blows you straight back up out of a grate in the street.
+A Gap that is a way in rather than a fall. Whoever goes down it isn't Fallen: they drop a long way down its shaft into a cavern under the Course, at the same place along it, run along its floor, and at its far end are thrown back up onto the Course, high over it. Everest's is the Yetis' den, down the last crevasse of the Icefall, and finding it is Everest's special goal. Gamla Stan's has no Gap: its way in is an open manhole in the street, a ladder poking out of it, that runners drop down by slowing down onto it (or run over it flat out, or jump it, to stay on the street), into a tavern in an old cellar, where the Viking waits to be found; and its way out is an air duct that blows you straight back up out of a grate in the street.
 _Avoid_: Hidden level, bonus level, cave (a Cave is over the Ground; a Secret is under it)
 
 **Bonus Runner**:
-A Character that isn't a club member or anyone's own, found on a Course and Unlocked by finding it, kept on that device. The Yeti, thrown out of Everest's Secret, is the first.
+A Character that isn't a club member or anyone's own, found on a Course and Unlocked by finding it, kept on that device. The Yeti, thrown out of Everest's Secret, is the first. Some are earned by a Course's special goal instead: the Skeleton, and Ms Crocodile, for bouncing across the Nile on its Crocodiles.
 _Avoid_: Secret character, hidden character
 
 **Platform**:
@@ -123,6 +123,10 @@ _Avoid_: Zombie (Zombies walk Halloween Town)
 A club member risen from the grave, now and then just a skeleton, walking the wrong way along Halloween Town: an Obstacle. One that walks into an open grave is gone, and the Scoop Bus Scoops any it reaches. (Skeletons also run the right way, as Pacers.)
 _Avoid_: Pacer (Pacers race the right way)
 
+**Crocodile**:
+One of a River's Obstacles, lying across the way in its water, only its back, eyes and nostrils out of it. Land on its back and it's a bounce off it, as off a head, and it dips under you; no springboard, though: you go on as fast as you came, steering in the air to land on the next. Never in the way: miss it and you're wading. The Pyramids' special goal is bouncing from each of the Nile's four to the next, in turn, without touching down.
+_Avoid_: Alligator
+
 **Germ**:
 A virus floating inside someone, in The Hospital, bobbing up and down: run under it or jump it, or stumble. Land on top of it and it pops, a bounce off it as off a head. In the Haunted House, ghosts bob about its rooms the same way.
 
@@ -163,12 +167,16 @@ A parkrun barcode, floating in the run-in just before every parkrun Course's fin
 _Avoid_: Barcode (on its own: a real parkrunner's barcode is theirs, not a thing on a Course)
 
 **Ride**:
-Something that carries a runner along for a while: a corgi, in Gamla Stan, or on Machu Picchu a llama, at the Pyramids a camel (now and then, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon. One on the ground leaps when its rider jumps, with them on its back; ducking gets them off it.
+Something that carries a runner along for a while: a corgi, at Kristineberg, or in Gamla Stan a Royal Guard's horse, on Machu Picchu a llama, at the Pyramids a camel (now and then, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon. One on the ground leaps when its rider jumps, with them on its back; ducking gets them off it.
 _Avoid_: Mount, vehicle
 
 **Glider**:
 The Cliff's Ride: a hang glider, parked along the top of the cliff, more of them than a Room has Players. Run into one and you're off on it, lying along under it, out over the Sea, steering it up and down, faster or slower, for good: it only comes down once it's over the island. Down into the Sea on one, you crash, and you're Fallen. Pacers take the spare ones; those that don't get one go off the cliff.
 _Avoid_: Kite, plane
+
+**River**:
+Water across a Course, bank to bank, the Nile near the start of the Pyramids: not a Gap, but shallow, its bed a little under its surface. Miss its Crocodiles and you're in it up to your shins, wading, slowed right down, and so is the bus.
+_Avoid_: Sea (falling into that is Fallen), lake
 
 **Sea**:
 The Cliff's Gap, from the foot of its cliff out to the island. Down into it is Fallen, there and then.

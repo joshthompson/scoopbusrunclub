@@ -7,6 +7,10 @@ import batPersonSit from '../assets/runners/bat-person/sit.png'
 import batPersonSkiTuck from '../assets/runners/bat-person/ski-tuck.png'
 import batPersonSki from '../assets/runners/bat-person/ski.png'
 import batPersonStand from '../assets/runners/bat-person/stand.png'
+import msCrocodileFace from '../assets/runners/ms-crocodile/face.png'
+import msCrocodileRun from '../assets/runners/ms-crocodile/run.png'
+import msCrocodileSit from '../assets/runners/ms-crocodile/sit.png'
+import msCrocodileStand from '../assets/runners/ms-crocodile/stand.png'
 import skeletonSkiTuck from '../assets/runners/skeleton/ski-tuck.png'
 import skeletonSki from '../assets/runners/skeleton/ski.png'
 import skeletonSnowboard from '../assets/runners/skeleton/snowboard.png'
@@ -36,7 +40,8 @@ import { SKELETON_SPRITE } from './skeleton'
  * Everest, the first; Bat Person, up on the girders over City Rooftop; the
  * Viking, in the tavern under Gamla Stan.
  * The Skeleton isn't found, but earned: Halloween Town's special goal, over
- * the line in a pumpkin. Nor is Deri: he's for finishing every course.
+ * the line in a pumpkin. Nor is Ms Crocodile: she's the Pyramids', across
+ * the Nile on every crocodile. Nor is Deri: he's for finishing every course.
  *
  * Their pictures are PNGs in `assets/runners/<who>/`, a pixel a cell, facing
  * left, as the members' are: `run.png` a strip of frames side by side, and
@@ -70,7 +75,7 @@ export const YETI: Playable = {
 	id: 'bonus:yeti',
 	name: 'Yeti',
 	bonus: true,
-	unlockedBy: 'Found in his den under Everest',
+	unlockedBy: 'Found under Everest',
 	sprite: {
 		run: runFrames(yetiRun, 6),
 		sit: yetiSit,
@@ -95,7 +100,7 @@ export const BAT_PERSON: Playable = {
 	id: 'bonus:bat-person',
 	name: 'Bat Person',
 	bonus: true,
-	unlockedBy: 'Found on the girders over City Rooftop',
+	unlockedBy: 'Found on City Rooftop',
 	sprite: {
 		run: runFrames(batPersonRun, 6),
 		sit: batPersonSit,
@@ -113,14 +118,14 @@ export const BAT_PERSON: Playable = {
  * leather headband, a big white beard, braided at its end, over a blue
  * tunic, fur over his shoulders, and a round shield on his back, red and
  * white in quarters. His far arm and leg are in shadow. Six frames to his
- * run, as the members have, his axe in his near hand, swinging with it.
- * Stood still, he leans on it; on skis, it's his other pole.
+ * run, the members' stride, his axe over his shoulder, its head up behind
+ * him. Stood still, he leans on it; on skis, it's his other pole.
  */
 export const VIKING: Playable = {
 	id: 'bonus:viking',
 	name: 'Viking',
 	bonus: true,
-	unlockedBy: 'Found in the tavern under Gamla Stan',
+	unlockedBy: 'Found in Gamla Stan',
 	sprite: {
 		run: runFrames(vikingRun, 6),
 		sit: vikingSit,
@@ -146,7 +151,7 @@ export const SKELETON: Playable = {
 	id: 'bonus:skeleton',
 	name: 'Skeleton',
 	bonus: true,
-	unlockedBy: 'Finished Halloween Town in a pumpkin',
+	unlockedBy: 'Unlocked by becoming a ghost in Halloween Town',
 	// White bones: out at night, not on a white card.
 	darkCard: true,
 	sprite: {
@@ -157,6 +162,30 @@ export const SKELETON: Playable = {
 		skiTuck: skeletonSkiTuck,
 		snowboard: skeletonSnowboard,
 		face: skeletonFace,
+	},
+}
+
+/**
+ * Ms Crocodile: a crocodile from the Nile who loves to run, up on her back
+ * legs as anyone does, in an orange crop top, purple running shorts, white
+ * socks and orange trainers, a purple headband with an orange bow on it,
+ * her tail swishing behind her. Drawn on the members' run (the custom
+ * runner template's), so six frames to her stride as theirs. For bouncing
+ * across the Nile on its crocodiles, the Pyramids' special goal. On skis or
+ * a snowboard, she stands as she does still.
+ */
+export const MS_CROCODILE: Playable = {
+	id: 'bonus:ms-crocodile',
+	name: 'Ms Crocodile',
+	bonus: true,
+	unlockedBy: "Unlocked by bouncing across the Pyramids' crocodiles",
+	sprite: {
+		run: runFrames(msCrocodileRun, 6),
+		sit: msCrocodileSit,
+		stand: msCrocodileStand,
+		face: msCrocodileFace,
+		width: WIDTH,
+		height: HEIGHT,
 	},
 }
 
@@ -188,7 +217,7 @@ export const DERI: Playable = {
 	id: 'bonus:deri',
 	name: 'Deri',
 	bonus: true,
-	unlockedBy: 'Finished every course',
+	unlockedBy: 'Unlocked by completing all courses',
 	look: DERI_LOOK,
 	sprite: lookSprite(DERI_LOOK),
 }
@@ -198,6 +227,7 @@ export const BONUS_RUNNERS: Playable[] = [
 	BAT_PERSON,
 	VIKING,
 	SKELETON,
+	MS_CROCODILE,
 	DERI,
 ]
 

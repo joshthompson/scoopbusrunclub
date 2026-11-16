@@ -181,6 +181,34 @@ const GERM = rowsArt(
 	{ G: '#7ac143', L: '#c4ec86', D: '#4f8a2a', S: '#e8604a', K: '#2b2722' },
 )
 
+/**
+ * Bounce on every crocodile: a crocodile's head, side on, in the water,
+ * its eye and its grin, ripples either side of it.
+ */
+const CROCODILE = rowsArt(
+	[
+		'.......GGG...',
+		'......GYKGG..',
+		'..GGGGGGGGGG.',
+		'.GLLLLLLLGGG.',
+		'GGGGGGGGGGGG.',
+		'GTDTDTDTGGGG.',
+		'.BBBBBBBGGGD.',
+		'WWWWWWWWWWWWW',
+		'.WW..WWW..WW.',
+	],
+	{
+		G: '#5f9a3e',
+		L: '#7fb655',
+		D: '#3f6f2a',
+		B: '#d2dc8e',
+		Y: '#f2d14a',
+		K: '#1d1d1d',
+		T: '#fffaf0',
+		W: '#6fbcd8',
+	},
+)
+
 /** Find the Yeti: his face, shaggy and white, pale blue in it, grinning. */
 export const YETI = rowsArt(
 	[
@@ -376,6 +404,7 @@ const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	slopes: SHOE,
 	'great-wall': TOWER,
 	karolinska: GERM,
+	pyramids: CROCODILE,
 	everest: YETI,
 	'city-rooftop': BAT_PERSON,
 	'gamla-stan': VIKING,

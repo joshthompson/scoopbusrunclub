@@ -256,11 +256,13 @@ export function CharacterSelect(props: {
 											? 'Your runner · Edit to change'
 											: 'Your runner · E to change'
 										: runner().bonus
-											? 'Bonus runner · Unlocked!'
-											: runner().unlockedBy
-												? 'Club member · Unlocked!'
-												: 'Club member'}
+											? 'Bonus runner'
+											: 'Club member'}
 								</div>
+								{/* Unlocked: where they were found, or what it took. */}
+								<Show when={runner().unlockedBy}>
+									{(how) => <div style={styles.previewUnlocked}>{how()}</div>}
+								</Show>
 							</>
 						)
 					}}
@@ -368,7 +370,8 @@ export function CharacterSelect(props: {
 																<span
 																	style={{
 																		...styles.cardName,
-																		'font-size': `${nameSize(runner().name, [10, 9, 8])}px`,
+																		// A card's narrow: past ten letters, the smallest.
+																		'font-size': `${nameSize(runner().name, [10, 9, 8], [8, 10])}px`,
 																	}}
 																>
 																	{runner().name}
@@ -476,6 +479,15 @@ const styles = {
 		'font-size': '14px',
 		opacity: 0.8,
 		'white-space': 'nowrap',
+	},
+	/** How someone unlocked was: under their tag, a line or two. */
+	previewUnlocked: {
+		'font-family': '"Cabin", sans-serif',
+		'font-size': '13px',
+		color: '#ffd23f',
+		'text-align': 'center',
+		'line-height': 1.25,
+		'max-width': '100%',
 	},
 	/** Run! Big enough for a thumb, and pulsing, so it's plain it's what to press. */
 	go: {
@@ -597,7 +609,7 @@ const styles = {
 		background: 'white',
 		color: 'var(--ink)',
 		border: '3px solid var(--ink)',
-		'box-shadow': '0 0 0 3px #ffd23f, 4px 4px 0 3px #b33a2a',
+		'box-shadow': '0 0 0 3px #ffd23f, 2px 2px 0 3px #b33a2a',
 		transform: 'translateY(-2px)',
 	},
 	/** For a runner lost on a light card (see `darkCard`): night behind them, picked or not. */

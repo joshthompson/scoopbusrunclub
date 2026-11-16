@@ -885,6 +885,8 @@ export function bounceOff(world: World, racer: Racer, head: number, x: number) {
 	// A bounce, not a jump of their own: letting go doesn't cut it short.
 	b.jumping = false
 	b.vx = boost(world, b.vx, b.facing, STOMP_BOOST)
+	// Steering on from here, a bounce's own speed.
+	b.airBase = b.vx
 
 	const points = Math.min(STOMP_POINTS_MAX, STOMP_POINTS * 2 ** b.combo)
 	b.combo++

@@ -68,17 +68,24 @@ export function keepIn(world: World, b: Body, height: number) {
 
 /** How far inside a manhole's rim someone's middle has to be to go down it. */
 const RIM = 6
+/**
+ * How slow someone has to be going to go down a manhole: about half
+ * running speed. Any faster and they're over it before they can fall in,
+ * so it takes letting go and slowing down for it, with the bus coming.
+ */
+const MANHOLE_SLOW = 3.5
 
 /**
  * Run onto a Secret's open manhole this tick (see `Secret['manhole']`), on
- * the street, not jumping over it: on their way down it. Not on a Ride,
- * nor carried, nor in a cart: they'd only ride on over it.
+ * the street, not jumping over it, and slowly: on their way down it. Not
+ * on a Ride, nor carried, nor in a cart: they'd only ride on over it.
  */
 export function dropsIn(world: World, b: Body) {
 	const secret = world.course.secret
 	if (!secret?.manhole || b.secret) return false
 	if (b.mount > 0 || b.carried > 0 || b.cart !== undefined) return false
 	if (b.on !== undefined || b.bed) return false
+	if (Math.abs(b.vx) > MANHOLE_SLOW) return false
 	const { gap } = secret
 	return (
 		b.x > gap.from + RIM &&
