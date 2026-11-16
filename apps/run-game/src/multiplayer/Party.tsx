@@ -370,7 +370,10 @@ export default function Party(props: { onLeave: () => void }) {
 	/** All done: the top three on the Podium, then back to the lobby. */
 	function toPodium() {
 		stopTimer()
-		setPodium(room.everyone().map((seat) => ({ ...seat })))
+		// Each in the hat they finished the last Round in.
+		setPodium(
+			room.everyone().map((seat) => ({ ...seat, hat: hats.get(seat.id) })),
+		)
 		room.setStage('podium')
 		setLobbyIn(PODIUM_SECONDS)
 		timer = window.setInterval(() => {

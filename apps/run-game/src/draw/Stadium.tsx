@@ -3,6 +3,7 @@ import flats from '../assets/stadium/flats.png'
 import grandstand from '../assets/stadium/grandstand.png'
 import masts from '../assets/stadium/masts.png'
 import railing from '../assets/stadium/railing.png'
+import { kristinebergFar } from '../courses/kit/backdrops'
 import {
 	SKYLINE_HEIGHT,
 	TREELINE_HEIGHT,
@@ -49,6 +50,10 @@ const CITY = image(flats)
 // --- The city far off, and the trees in front of the flats ---------------------
 
 const SKYLINE_PARALLAX = 0.1
+/** Further off than the skyline: hills and Västerbron, in the haze. */
+const FAR_HEIGHT = 200
+const FAR_PARALLAX = 0.05
+const FAR = image(kristinebergFar)
 const SKYLINE = image(skyline)
 const TREES_PARALLAX = 0.4
 const TREES = image(treeline)
@@ -104,6 +109,8 @@ export function StadiumBackdrop(props: { world: View }) {
 
 	return (
 		<>
+			{/* Far off, in the haze: wooded hills, and Västerbron. */}
+			{band(FAR, apronTop - 40 - FAR_HEIGHT, FAR_HEIGHT, FAR_PARALLAX)}
 			{band(
 				SKYLINE,
 				apronTop - 40 - SKYLINE_HEIGHT,
@@ -179,6 +186,8 @@ export function paintStadiumBackdrop(
 			{ left: 0, top, width, height: h },
 			{ x: scroll(parallax) },
 		)
+	// Far off, in the haze: wooded hills, and Västerbron.
+	band(kristinebergFar, apronTop - 40 - FAR_HEIGHT, FAR_HEIGHT, FAR_PARALLAX)
 	band(
 		skyline,
 		apronTop - 40 - SKYLINE_HEIGHT,

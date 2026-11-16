@@ -182,12 +182,7 @@ textarea {
 	}
 }
 
-/* The multiplayer Podium (multiplayer/Podium.tsx): its steps rising, and confetti. */
-@keyframes podium-rise {
-	from {
-		transform: scaleY(0);
-	}
-}
+/* The multiplayer Podium (multiplayer/Podium.tsx): its confetti. */
 
 @keyframes confetti-fall {
 	from {

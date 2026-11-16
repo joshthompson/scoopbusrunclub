@@ -351,6 +351,13 @@ export function Backdrop(props: { world: View }) {
 		/>
 	)
 
+	/** The course's own bands among the hills, after `over`. */
+	const hillBands = (over: 'far' | 'middle') => (
+		<For each={(look.hillBands ?? []).filter((b) => b.over === over)}>
+			{(b) => band(b.asset, b.top, b.height, b.parallax, undefined)}
+		</For>
+	)
+
 	/** A horizon's bands, far to near, each its colour on down below it. */
 	const horizonBands = (horizon: NonNullable<typeof look.horizon>) => (
 		<>
@@ -368,6 +375,10 @@ export function Backdrop(props: { world: View }) {
 					/>
 				)}
 			</Show>
+			{/* Further off still, back to front. */}
+			<For each={horizon.farther ?? []}>
+				{(b) => band(b.asset, b.top, b.height, b.parallax, undefined)}
+			</For>
 			{/* Spires and towers rising out of the far roofs, behind them. */}
 			<Show when={horizon.spires}>
 				{(spires) =>
@@ -404,7 +415,7 @@ export function Backdrop(props: { world: View }) {
 			/>
 			<For each={horizon.nearer ?? []}>
 				{(nearer, i) => {
-					const top = HORIZON + NEARER_TOP + i() * NEARER_STEP
+					const top = nearer.top ?? HORIZON + NEARER_TOP + i() * NEARER_STEP
 					return (
 						<>
 							{band(
@@ -542,7 +553,9 @@ export function Backdrop(props: { world: View }) {
 			>
 				{band(bg3Asset, 196, 43, 0.12, look.hills?.[0])}
 				<Scattered world={props.world} scattering={far} />
+				{hillBands('far')}
 				{band(bg2Asset, 216, 46, 0.22, look.hills?.[1])}
+				{hillBands('middle')}
 				{/* Level with the middle hills, as in the header: any lower and the
 				    sky shows through between them. */}
 				{band(bg1Asset, HORIZON, 150, FIELD_PARALLAX, look.hills?.[2])}

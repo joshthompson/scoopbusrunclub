@@ -3,11 +3,13 @@ import type { Controls } from '../input'
 import { play } from '../sfx'
 import { OUTLINED } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
-import { nameSize } from '../ui/RunnerStage'
 import { onHover } from '../ui/hover'
 import { Medal, ordinal, pts } from './Medal'
-import { PodiumPlay } from './PodiumPlay'
+import { NameTag, PodiumPlay } from './PodiumPlay'
+import { PODIUM_GROUND, PodiumScene } from './PodiumScene'
 import { type Placing, standingsOf } from './Results'
+import { Worn } from './Worn'
+import { PODIUM_CELL, STEP_COLUMNS, STEP_ROWS, podiumStep } from './podiumArt'
 import { COLOURS, type Seat, seatPlayable } from './room'
 
 /** The keys that move between the buttons, and which way. */
@@ -18,8 +20,7 @@ const MOVES: Record<string, number> = {
 	ArrowDown: 1,
 }
 
-/** Each step's height, 1st to 3rd, and the order they stand in: 2nd, 1st, 3rd. */
-const STEP_HEIGHT = [104, 82, 62]
+/** The order the steps stand in: 2nd, 1st, 3rd. */
 const STEP_ORDER = [1, 0, 2]
 
 /** Confetti: where each bit starts across the screen, how it falls, and its colour. */
@@ -34,9 +35,10 @@ const CONFETTI = Array.from({ length: 36 }, (_, i) => ({
 }))
 
 /**
- * The end of a Room's go: the Standings' top three on the Podium, with
- * their medals, and everyone else under it. Back to the lobby by itself,
- * or straight away with Enter.
+ * The end of a Room's go, out on Haga: the Standings' top three on the
+ * Podium, put up on its path, their medals round their necks, everyone
+ * else beside it, and the Standings up in the corner, points and all.
+ * Back to the lobby by itself, or straight away with Enter.
  */
 export function Podium(props: {
 	/** How the Room went: Marathon, Backyard Ultra… */
@@ -60,7 +62,6 @@ export function Podium(props: {
 }) {
 	const standings = () => standingsOf(props.seats, props.placings)
 	const top = () => standings().slice(0, 3)
-	const rest = () => standings().slice(3)
 
 	onMount(() => play('cheer'))
 
@@ -113,6 +114,7 @@ export function Podium(props: {
 
 	return (
 		<div style={styles.screen} ref={screen}>
+			<PodiumScene />
 			<div style={styles.confetti} aria-hidden="true">
 				<For each={CONFETTI}>
 					{(bit) => (
@@ -164,19 +166,24 @@ export function Podium(props: {
 				)}
 			</Show>
 
-			<Show when={rest().length}>
-				<div style={styles.rest}>
-					<For each={rest()}>
-						{(seat, i) => (
-							<span style={styles.also}>
-								<span style={{ color: '#ffd23f' }}>{ordinal(i() + 4)}</span>{' '}
-								<span style={{ ...styles.chip, background: seat.colour }} />{' '}
-								{seatPlayable(seat)?.name} · {pts(seat.points)}
+			{/* The Standings, everyone, up in the corner. */}
+			<div style={styles.board}>
+				<div style={styles.boardTitle}>Standings</div>
+				<For each={standings()}>
+					{(seat, i) => (
+						<div style={styles.row}>
+							<span style={styles.rank}>
+								<Show when={i() < 3} fallback={ordinal(i() + 1)}>
+									<Medal place={(i() + 1) as 1 | 2 | 3} size={1.5} />
+								</Show>
 							</span>
-						)}
-					</For>
-				</div>
-			</Show>
+							<span style={{ ...styles.chip, background: seat.colour }} />
+							<span style={styles.rowName}>{seatPlayable(seat)?.name}</span>
+							<span style={styles.rowPoints}>{pts(seat.points)}</span>
+						</div>
+					)}
+				</For>
+			</div>
 
 			<div style={styles.footer}>
 				<span style={styles.next}>Back to the lobby in {props.lobbyIn}…</span>
@@ -203,7 +210,7 @@ export function Podium(props: {
 	)
 }
 
-/** One Player on their step: their medal, them, the step, and who they are. */
+/** One Player on their step: them, their medal round their neck, and the step. */
 function Step(props: {
 	seat: Seat
 	place: 1 | 2 | 3
@@ -213,64 +220,52 @@ function Step(props: {
 }) {
 	const runner = () => seatPlayable(props.seat)
 	const winner = () => props.place === 1
+	const scale = () => (winner() ? 3 : 2.5)
 	return (
 		<div style={styles.column}>
-			<div
-				style={{
-					'transform-origin': 'top center',
-					animation: `medal-swing ${winner() ? 1.2 : 1.6}s ease-in-out infinite`,
-				}}
-			>
-				<Medal place={props.place} size={winner() ? 5 : 4} />
-			</div>
 			<Show when={runner()}>
 				{(r) => (
-					<Show
-						when={!props.loose}
-						fallback={
-							<div
-								style={{
-									width: `${r().sprite.width * (winner() ? 3 : 2.5)}px`,
-									height: `${r().sprite.height * (winner() ? 3 : 2.5)}px`,
-								}}
-							/>
-						}
+					<div
+						style={{
+							position: 'relative',
+							width: `${r().sprite.width * scale()}px`,
+							height: `${r().sprite.height * scale()}px`,
+						}}
 					>
-						<RunStrip
-							frame={r().sprite.run[0] ?? ''}
-							width={r().sprite.width}
-							height={r().sprite.height}
-							scale={winner() ? 3 : 2.5}
-							stride={winner() ? 0.4 : 0.6}
-						/>
-					</Show>
+						<Show when={!props.loose}>
+							<RunStrip
+								frame={r().sprite.run[0] ?? ''}
+								width={r().sprite.width}
+								height={r().sprite.height}
+								scale={scale()}
+								stride={winner() ? 0.4 : 0.6}
+							/>
+							<Worn
+								frame={r().sprite.run[0]}
+								width={r().sprite.width * scale()}
+								height={r().sprite.height * scale()}
+								scale={scale()}
+								hat={props.seat.hat}
+								place={props.place}
+							/>
+							<NameTag name={r().name} colour={props.seat.colour} />
+						</Show>
+					</div>
 				)}
 			</Show>
-			<div
+			{/* Stood on the ground, pixel art, square: their place on it, and
+			    their points. */}
+			<img
 				ref={(step) => props.onStep?.(step)}
+				src={podiumStep(props.place, props.seat.points, props.seat.colour)}
+				alt={`${props.place}`}
+				class="pixelated"
 				style={{
-					...styles.step,
-					height: `${STEP_HEIGHT[props.place - 1]}px`,
-					'border-top-color': props.seat.colour,
-					animation: `podium-rise 0.5s cubic-bezier(0.2, 1.3, 0.4, 1) ${
-						(3 - props.place) * 0.25
-					}s both`,
+					display: 'block',
+					width: `${STEP_COLUMNS * PODIUM_CELL}px`,
+					height: `${STEP_ROWS[props.place - 1] * PODIUM_CELL}px`,
 				}}
-			>
-				<span style={styles.stepNumber}>{props.place}</span>
-			</div>
-			<div style={styles.caption}>
-				<div
-					style={{
-						...styles.name,
-						'font-size': `${nameSize(runner()?.name ?? '', [20, 16, 13])}px`,
-					}}
-				>
-					<span style={{ ...styles.chip, background: props.seat.colour }} />{' '}
-					{runner()?.name}
-				</div>
-				<div style={styles.points}>{pts(props.seat.points)}</div>
-			</div>
+			/>
 		</div>
 	)
 }
@@ -295,13 +290,25 @@ const styles = {
 	bit: { position: 'absolute', top: 0 },
 	title: {
 		...OUTLINED,
+		position: 'relative',
 		'font-size': '36px',
 		animation: 'title-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both',
 	},
-	subtitle: { ...OUTLINED, 'font-size': '18px', 'margin-top': '4px' },
+	subtitle: {
+		...OUTLINED,
+		position: 'relative',
+		'font-size': '18px',
+		'margin-top': '4px',
+	},
+	// Stood on Haga's path, in the middle: its steps' feet on the path's line.
 	podium: {
-		flex: 1,
-		'min-height': 0,
+		position: 'absolute',
+		left: 0,
+		right: 0,
+		top: 0,
+		height: `${PODIUM_GROUND}px`,
+		width: 'fit-content',
+		margin: '0 auto',
 		display: 'flex',
 		'align-items': 'flex-end',
 		'justify-content': 'center',
@@ -310,46 +317,8 @@ const styles = {
 		display: 'flex',
 		'flex-direction': 'column',
 		'align-items': 'center',
-		width: '200px',
+		width: '170px',
 		gap: '4px',
-	},
-	step: {
-		'align-self': 'stretch',
-		display: 'flex',
-		'justify-content': 'center',
-		'padding-top': '10px',
-		'box-sizing': 'border-box',
-		background: 'rgba(15, 31, 41, 0.92)',
-		border: '3px solid white',
-		'border-top-width': '8px',
-		'box-shadow': '0 0 0 3px var(--ink)',
-		'transform-origin': 'bottom',
-		// Stood on its top, not on its border.
-		'margin-top': '-4px',
-	},
-	stepNumber: { ...OUTLINED, 'font-size': '40px', 'line-height': 1 },
-	caption: {
-		display: 'flex',
-		'flex-direction': 'column',
-		'align-items': 'center',
-		gap: '2px',
-		'margin-top': '10px',
-		'min-height': '48px',
-		'max-width': '100%',
-	},
-	// Not clipped: the outline round the letters, and their tops, show.
-	// Long names are made smaller to fit (see `nameSize`), not cut off.
-	name: {
-		...OUTLINED,
-		'white-space': 'nowrap',
-		'line-height': 1.3,
-		padding: '0 4px',
-	},
-	points: {
-		...OUTLINED,
-		color: '#ffd23f',
-		'font-size': '15px',
-		'line-height': 1.3,
 	},
 	chip: {
 		display: 'inline-block',
@@ -358,24 +327,57 @@ const styles = {
 		border: '2px solid white',
 		'vertical-align': 'middle',
 	},
-	rest: {
-		display: 'flex',
-		'flex-wrap': 'wrap',
-		'justify-content': 'center',
-		gap: '4px 16px',
-		'max-width': '820px',
-		'margin-top': '6px',
-		padding: '6px 12px 3px',
-		background: 'rgba(15, 31, 41, 0.75)',
+	/** The Standings, up in the top right corner. */
+	board: {
+		position: 'absolute',
+		top: '14px',
+		right: '16px',
+		width: '220px',
+		padding: '8px 12px 6px',
+		'box-sizing': 'border-box',
+		background: 'rgba(15, 31, 41, 0.88)',
+		border: '3px solid white',
+		'box-shadow': '0 0 0 3px var(--ink), 6px 6px 0 3px rgba(15, 31, 41, 0.35)',
 		color: 'white',
-		'font-size': '14px',
+		'z-index': 2,
 	},
-	also: { 'white-space': 'nowrap' },
-	footer: {
+	boardTitle: {
+		'font-size': '16px',
+		color: '#ffd23f',
+		'text-align': 'center',
+		'margin-bottom': '4px',
+	},
+	row: {
 		display: 'flex',
 		'align-items': 'center',
+		gap: '6px',
+		height: '24px',
+		'font-size': '14px',
+		'white-space': 'nowrap',
+	},
+	rank: {
+		width: '28px',
+		display: 'flex',
+		'justify-content': 'center',
+		color: '#ffd23f',
+	},
+	rowName: {
+		flex: 1,
+		overflow: 'hidden',
+		'text-overflow': 'ellipsis',
+	},
+	rowPoints: { color: '#ffd23f' },
+	// Along the grass in front of the path.
+	footer: {
+		position: 'absolute',
+		left: 0,
+		right: 0,
+		bottom: '14px',
+		display: 'flex',
+		'align-items': 'center',
+		'justify-content': 'center',
 		gap: '12px',
-		'margin-top': '10px',
+		'z-index': 2,
 	},
 	next: {
 		...OUTLINED,

@@ -11,6 +11,7 @@ import { PATH_BACK, PATH_FRONT, VERGE } from '../game/constants'
 import { PYRAMIDS_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
 import { MS_CROCODILE } from '../runners/bonus'
+import { nearDunes } from './kit/backdrops'
 import { duckPost } from './kit/duckSigns'
 import { bush, papyrus, reeds } from './kit/nileScenery'
 import { SAND_FAR_RIPPLES, SAND_RIPPLES, SAND_TRACK } from './kit/sand'
@@ -474,6 +475,8 @@ export const pyramids: CourseDefinition = {
 			fill: '#ecc985',
 			// The sand on back to the dunes: rippled, further off.
 			field: SAND_FAR_RIPPLES,
+			// And dunes nearer than the pyramids, a palm here and there.
+			nearer: [{ asset: nearDunes, height: 100, fill: 'transparent' }],
 		},
 		// Rippled sand either side, and the path trodden flat through it.
 		ground: [

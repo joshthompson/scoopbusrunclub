@@ -1,6 +1,7 @@
 import { createSignal, onCleanup } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import { type Room, joinRoom } from 'trystero'
+import type { Hat } from '../game/hats'
 import {
 	type Controls,
 	NOTHING_HELD,
@@ -79,6 +80,8 @@ export interface Seat {
 	points: number
 	/** Joined while a Round was on: in from the next. */
 	waiting: boolean
+	/** On the Podium: the hat they finished the last Round in, still on. */
+	hat?: Hat
 }
 
 /** How long a phone that drops out keeps its seat, for coming back. */

@@ -211,9 +211,16 @@ export function createBackdropPainter(world: World, resolve: Resolve) {
 
 		if (look.stadium) paintStadiumBackdrop(ctx, image, world, width, height)
 		if (hills) {
+			/** The course's own bands among the hills, after `over`. */
+			const hillBands = (over: 'far' | 'middle') => {
+				for (const b of look.hillBands ?? [])
+					if (b.over === over) band(b.asset, b.top, b.height, b.parallax)
+			}
 			band(bg3Asset, 196, 43, 0.12, look.hills?.[0])
 			paintScattered(ctx, image, hills.far, camera, width, height)
+			hillBands('far')
 			band(bg2Asset, 216, 46, 0.22, look.hills?.[1])
+			hillBands('middle')
 			// Level with the middle hills, as in the header: any lower and the
 			// sky shows through between them.
 			band(bg1Asset, HORIZON, 150, FIELD_PARALLAX, look.hills?.[2])
@@ -263,6 +270,9 @@ function paintHorizon(
 		sky.addColorStop(1, horizon.sky[1])
 		fillDown(-HORIZON_SKY_OVER, sky)
 	}
+	// Further off still, back to front.
+	for (const b of horizon.farther ?? [])
+		band(b.asset, b.top, b.height, b.parallax)
 	// Spires and towers rising out of the far roofs, behind them.
 	if (horizon.spires)
 		band(
@@ -285,7 +295,7 @@ function paintHorizon(
 			{ x: scroll(FIELD_TEXTURE_PARALLAX), down: true },
 		)
 	;(horizon.nearer ?? []).forEach((nearer, i) => {
-		const top = HORIZON + NEARER_TOP + i * NEARER_STEP
+		const top = nearer.top ?? HORIZON + NEARER_TOP + i * NEARER_STEP
 		band(nearer.asset, top, nearer.height, NEARER_PARALLAX + i * NEARER_FASTER)
 		fillDown(top + nearer.height - 1, nearer.fill)
 	})

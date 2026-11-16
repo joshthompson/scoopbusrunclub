@@ -393,6 +393,13 @@ export interface CourseLook {
 		rope: string
 		ladder: string
 	}
+	/**
+	 * More bands among the hills (Haga's, recoloured by `hills`): each
+	 * after the far hills (`over: 'far'`, the far pieces peeking over them)
+	 * or the middle ones (`over: 'middle'`), before the next. A forest's
+	 * ridges of pines, one behind another.
+	 */
+	hillBands?: (BackdropBand & { over: 'far' | 'middle' })[]
 	/** What peeks over the far hills, in place of Haga's houses and pines. */
 	far?: BackdropPiece[]
 	/** What stands on the field behind the course, in place of Haga's trees. */
@@ -466,6 +473,12 @@ export interface CourseLook {
 		/** Spires and towers rising out of the far band's roofs, behind it: a strip as wide as you like. */
 		spires?: string
 		/**
+		 * More bands, further off than the far one, behind it: each `height`
+		 * tall, its top at `top`, going by at `parallax` (the far band's is
+		 * 0.08), back to front. Peaks on peaks, fading into the distance.
+		 */
+		farther?: BackdropBand[]
+		/**
 		 * The ground from the near band on down behind the path, textured: an
 		 * image repeated over the grass's colour, going by slower than the path
 		 * does, it being further off. Cobbles, rippled sand.
@@ -474,9 +487,11 @@ export interface CourseLook {
 		/**
 		 * More bands, nearer still, each lower down and going by faster than
 		 * the last, `height` tall, and its colour on down below it: so the
-		 * view's full right down to the course.
+		 * view's full right down to the course. Its `top` where it says,
+		 * if it does: a forest stood right behind the path, high enough
+		 * for its trees to be seen over it.
 		 */
-		nearer?: { asset: string; height: number; fill: string }[]
+		nearer?: { asset: string; height: number; fill: string; top?: number }[]
 		/**
 		 * Its own sky, top to bottom, in place of the course's: deeper blue
 		 * the higher up a mountain it is. On up over the top of the screen,
@@ -1475,6 +1490,18 @@ export interface RiverLook {
 	shine: string
 	bank: string
 	wet: string
+}
+
+/**
+ * A band of the backdrop: a picture repeated along it, `height` tall from
+ * `top` down the screen, going by at `parallax` of the path's pace, the
+ * further off the slower.
+ */
+export interface BackdropBand {
+	asset: string
+	top: number
+	height: number
+	parallax: number
 }
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */

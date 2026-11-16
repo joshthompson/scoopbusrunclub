@@ -65,6 +65,31 @@ export function Medal(props: { place: 1 | 2 | 3; size?: number }) {
 	)
 }
 
+/**
+ * A medal round a runner's neck, swinging as they go: its ribbon from
+ * their neck, `x` across and `top` down their box (see `Worn`).
+ */
+export function WornMedal(props: { place: 1 | 2 | 3; x: number; top: number }) {
+	return (
+		<div
+			style={{
+				position: 'absolute',
+				left: `${Math.round(props.x)}px`,
+				top: `${Math.round(props.top)}px`,
+				'margin-left': `${-6 * MEDAL_SIZE}px`,
+				'transform-origin': 'top center',
+				animation: `medal-swing ${props.place === 1 ? 1.2 : 1.6}s ease-in-out infinite`,
+				'pointer-events': 'none',
+			}}
+		>
+			<Medal place={props.place} size={MEDAL_SIZE} />
+		</div>
+	)
+}
+
+/** How big a medal round someone's neck is drawn. */
+const MEDAL_SIZE = 2
+
 /** Points, said properly: 1 pt, 2 pts. */
 export const pts = (n: number) => `${n} pt${n === 1 ? '' : 's'}`
 
