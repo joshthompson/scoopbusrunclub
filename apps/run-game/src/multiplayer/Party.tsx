@@ -1,5 +1,7 @@
 import {
+	type JSX,
 	Match,
+	Show,
 	Switch,
 	createEffect,
 	createMemo,
@@ -13,6 +15,7 @@ import type { Racer, RacerEntry, World } from '../game/world'
 import { playMenu, playTune } from '../music/music'
 import { MenuBackdrop } from '../ui/MenuBackdrop'
 import { Stage } from '../ui/Stage'
+import { JoinBadge } from './JoinBadge'
 import { Lobby } from './Lobby'
 import { Podium } from './Podium'
 import { type Placing, Results, standingsOf } from './Results'
@@ -306,6 +309,19 @@ export default function Party(props: { onLeave: () => void }) {
 			]
 		})
 
+	/** The Starter, who starts each Round from its start screen: see `Round`. */
+	const starterNow = () => {
+		const seat = room.starter()
+		const runner = seat && seatPlayable(seat)
+		if (!seat) return undefined
+		return {
+			number: room.seats.indexOf(seat) + 1,
+			colour: seat.colour,
+			name: runner?.name ?? '',
+			controls: room.controlsFor(seat),
+		}
+	}
+
 	function roundDone(order: Racer[]) {
 		for (const racer of order)
 			if (racer.body.hat) hats.set(racer.id, racer.body.hat)
@@ -357,7 +373,10 @@ export default function Party(props: { onLeave: () => void }) {
 	/** All done: the top three on the Podium, then back to the lobby. */
 	function toPodium() {
 		stopTimer()
-		setPodium(room.everyone().map((seat) => ({ ...seat })))
+		// Each in the hat they finished the last Round in.
+		setPodium(
+			room.everyone().map((seat) => ({ ...seat, hat: hats.get(seat.id) })),
+		)
 		room.setStage('podium')
 		setLobbyIn(PODIUM_SECONDS)
 		timer = window.setInterval(() => {
@@ -445,18 +464,29 @@ export default function Party(props: { onLeave: () => void }) {
 						number={number}
 						of={roundsOf()}
 						racers={untrack(racersNow)}
+						starter={starterNow()}
+						onWaiting={(waiting) =>
+							room.setWaitingForStarter(
+								waiting ? starterNow()?.number : undefined,
+							)
+						}
 						onWorld={streamRound}
 						onTick={() => stream?.tick()}
 						onPause={room.setPaused}
 						onOver={roundDone}
 						onLobby={toLobby}
 						onEnd={end}
+						corner={<JoinBadge code={room.code} />}
 					/>
 				)}
 			</Match>
 			<Match when={room.stage() !== 'round'}>
 				<Stage>
 					<MenuBackdrop />
+					{/* The lobby shows how to join big; after it, in the corner. */}
+					<Show when={room.stage() === 'results' || room.stage() === 'podium'}>
+						<JoinBadge code={room.code} style={styles.corner} />
+					</Show>
 					<Switch>
 						<Match when={room.stage() === 'results'}>
 							<Results
@@ -505,3 +535,13 @@ export default function Party(props: { onLeave: () => void }) {
 		</Switch>
 	)
 }
+
+const styles = {
+	/** How to join, in the top left corner, over whatever's on. */
+	corner: {
+		position: 'absolute',
+		top: '10px',
+		left: '10px',
+		'z-index': 3,
+	},
+} satisfies Record<string, JSX.CSSProperties>

@@ -9,6 +9,7 @@ import tree2 from '../assets/scenery/tree2.png'
 import { PX_PER_M, START_X } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { createTerrain } from '../game/terrain'
+import { HAGA_GRASS, HAGA_TRAIL, texturedGround } from './kit/groundTextures'
 import { STEP_M, heights } from './kit/haga-profile'
 import { withHat } from './kit/hats'
 import { seeded } from './kit/seeded'
@@ -179,6 +180,12 @@ export const haga: CourseDefinition = {
 	name: 'Haga',
 	blurb: 'The home course. Rocks, branches, and geese to catch a ride on.',
 	parkrun: true,
+	// Its grass in tufts, a daisy or a buttercup in it, and grit and
+	// pebbles on its path.
+	look: {
+		ground: texturedGround('haga-grass', 'haga-trail'),
+		groundDefs: HAGA_GRASS + HAGA_TRAIL,
+	},
 	terrain,
 	runDirectors: ['claire', 'eline'],
 	cheerers: CHEERERS,

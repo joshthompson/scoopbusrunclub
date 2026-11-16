@@ -19,7 +19,7 @@ A computer-controlled runner sharing the course with the Players.
 _Avoid_: Bot, AI, NPC, the pack (in prose)
 
 **Character**:
-The runner a Player races as: a club member or a custom runner. Each Character can be used by at most one Player per Room.
+The runner a Player races as: a club member, a custom runner, or an Unlocked Bonus Runner. Each Character can be used by at most one Player per Room.
 _Avoid_: Avatar, skin, runner (for the choice itself)
 
 **Course**:
@@ -51,7 +51,7 @@ What the backend hands each Run and each Practice as it starts. A score is only 
 _Avoid_: Signature, signing (nothing's signed: whatever signed it would be in the player's browser to copy)
 
 **Unlocked**:
-Said of a Course that can be Practised on this device: the first always, and any other once the Course before it has been finished here, in a Run or in Practice. Unlocking has nothing to do with Rounds.
+Said of a Course that can be Practised on this device: the first always, and any other once the Course before it has been finished here, in a Run or in Practice. Unlocking has nothing to do with Rounds. A Bonus Runner is Unlocked, to be picked as a Character, once it's been found on this device.
 
 **Ground**:
 The lowest surface along a Course, following its hills, which runners stand on unless they're on a Platform. It can have Gaps.
@@ -64,25 +64,33 @@ The side of higher Ground, such as the next rooftop along or the far side of a G
 A Wall that only stops a runner, never throws them back: each step of the Great Wall's staircase. They jump up it.
 
 **Gap**:
-A stretch of a Course with no Ground and no Platform underneath: going down one leaves a runner Fallen.
+A stretch of a Course with no Ground and no Platform underneath: going down one leaves a runner Fallen, unless it's a Secret.
 _Avoid_: Pit, hole (potholes are Obstacles you can trip in and get out of)
+
+**Secret**:
+A Gap that is a way in rather than a fall. Whoever goes down it isn't Fallen: they drop a long way down its shaft into a cavern under the Course, at the same place along it, run along its floor, and at its far end are thrown back up onto the Course, high over it. Everest's is the Yetis' den, down the last crevasse of the Icefall, and finding it is Everest's special goal. Gamla Stan's has no Gap: its way in is an open manhole in the street, a ladder poking out of it, that runners drop down by slowing down onto it (or run over it flat out, or jump it, to stay on the street), into a tavern in an old cellar, where the Viking waits to be found; and its way out is an air duct that blows you straight back up out of a grate in the street.
+_Avoid_: Hidden level, bonus level, cave (a Cave is over the Ground; a Secret is under it)
+
+**Bonus Runner**:
+A Character that isn't a club member or anyone's own, found on a Course and Unlocked by finding it, kept on that device. The Yeti, thrown out of Everest's Secret, is the first. Some are earned by a Course's special goal instead: the Skeleton, and Ms Crocodile, for bouncing across the Nile on its Crocodiles.
+_Avoid_: Secret character, hidden character
 
 **Platform**:
 A raised surface a runner can land on above the Ground, such as a ledge, a rooftop or a crane girder. Runners jump up through one from below, and drop off it by running off the end or ducking.
 _Avoid_: Level, layer, floor
 
 **Moving Platform**:
-A Platform that moves, such as a girder swinging from a crane.
+A Platform that moves, such as a girder swinging from a crane. Most swing round and round on their own; a lift that waits stays put till a Player has stood on it a moment, then goes up and back down the once, as the girder up to Bat Person's hideout on City Rooftop does.
 
 **Cave**:
 A stretch of a Course under a hill, with rock over the Ground, or dug down under the sand, as through the Sphinx on the Pyramids. Some Platforms in a Cave are shelves of solid rock: there's no jumping up through those from below. From outside, a Cave is solid rock, only its way in and its way out showing; it opens up once someone racing goes in. On Scoop Cruises the ferry is a Cave: its plated side is the rock, its rooms open up once someone's aboard, and its sun deck is open to the sky.
 
 **Portal**:
-A machine, or a sneeze, that changes everyone's size: in Karolinska, the **Shrink Ray** in the lab and the **Sneeze** that blows everyone back out of the scientist's nose. Whoever gets to one is held in it till every Player still racing is; then it goes off for all of them at once, the camera diving in (or pulling out), and they come out the other side in the order they went in, as far apart, each as fast as they went in. The Scoop Bus comes through after them, as far behind as it was. No Pacers go through.
+A machine, or a sneeze, that changes everyone's size: in The Hospital, the **Shrink Ray** in the lab and the **Sneeze** that blows everyone back out of the scientist's nose. Whoever gets to one is held in it till every Player still racing is; then it goes off for all of them at once, the camera diving in (or pulling out), and they come out the other side in the order they went in, as far apart, each as fast as they went in. The Scoop Bus comes through after them, as far behind as it was. No Pacers go through.
 _Avoid_: Teleport, warp
 
 **Giant Mouth**:
-In Karolinska, the scientist's mouth, at the edge of the lab bench: it opens as anyone racing gets near, and its tongue rolls out over the edge, to be run up and in.
+In The Hospital, the scientist's mouth, at the edge of the lab bench: it opens as anyone racing gets near, and its tongue rolls out over the edge, to be run up and in.
 
 **Ceiling**:
 The underside of the rock over the Ground in a Cave, or of a solid rock shelf. A runner who jumps into it bumps their head and comes back down.
@@ -115,11 +123,19 @@ _Avoid_: Zombie (Zombies walk Halloween Town)
 A club member risen from the grave, now and then just a skeleton, walking the wrong way along Halloween Town: an Obstacle. One that walks into an open grave is gone, and the Scoop Bus Scoops any it reaches. (Skeletons also run the right way, as Pacers.)
 _Avoid_: Pacer (Pacers race the right way)
 
+**Crocodile**:
+One of a River's Obstacles, lying across the way in its water, only its back, eyes and nostrils out of it. Land on its back and it's a bounce off it, as off a head, and it dips under you; no springboard, though: you go on as fast as you came, steering in the air to land on the next. Never in the way: miss it and you're wading. The Pyramids' special goal is bouncing from each of the Nile's four to the next, in turn, without touching down.
+_Avoid_: Alligator
+
 **Germ**:
-A virus floating inside someone, in Karolinska, bobbing up and down: run under it or jump it, or stumble. Land on top of it and it pops, a bounce off it as off a head.
+A virus floating inside someone, in The Hospital, bobbing up and down: run under it or jump it, or stumble. Land on top of it and it pops, a bounce off it as off a head. In the Haunted House, ghosts bob about its rooms the same way.
+
+**Haunted House**:
+In Halloween Town, a house up on a hill: a Cave, dark till someone's in it, and then every floor of it at once. Bats burst out of its door at whoever's coming. Its way out is the window at the end of its upper floor, which smashes as they jump out through it. Anyone who climbs on up into its attic is caught by the **Monster** that lives there, killed, and comes back up out of a grave past the house as a **Ghost**: whiter and see-through, for the rest of the race. Becoming one is Halloween Town's special goal.
+_Avoid_: Mansion; dying (a Ghost isn't out, and runs on)
 
 **Heart Valve**:
-A flap in the floor of Karolinska's heart that opens on every beat, firing whoever's on it up into the air: the only way over the ridges between the heart's chambers.
+A flap in the floor of the heart, in The Hospital, that opens on every beat, firing whoever's on it up into the air: the only way over the ridges between the heart's chambers.
 
 **Steam Vent**:
 A grate in the Ground that puffs steam now and then, firing whoever's on it as it puffs high into the air. Not an Obstacle: nothing to stumble on. A **Giant Vent** is The Sewers' way out: it fires whoever's on it right up out of the sewer and on, back onto the street.
@@ -151,12 +167,16 @@ A parkrun barcode, floating in the run-in just before every parkrun Course's fin
 _Avoid_: Barcode (on its own: a real parkrunner's barcode is theirs, not a thing on a Course)
 
 **Ride**:
-Something that carries a runner along for a while: a corgi, in Gamla Stan, or on Machu Picchu a llama, at the Pyramids a camel (now and then, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon. One on the ground leaps when its rider jumps, with them on its back; ducking gets them off it.
+Something that carries a runner along for a while: a corgi, at Kristineberg, or in Gamla Stan a Royal Guard's horse, on Machu Picchu a llama, at the Pyramids a camel (now and then, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon. One on the ground leaps when its rider jumps, with them on its back; ducking gets them off it.
 _Avoid_: Mount, vehicle
 
 **Glider**:
 The Cliff's Ride: a hang glider, parked along the top of the cliff, more of them than a Room has Players. Run into one and you're off on it, lying along under it, out over the Sea, steering it up and down, faster or slower, for good: it only comes down once it's over the island. Down into the Sea on one, you crash, and you're Fallen. Pacers take the spare ones; those that don't get one go off the cliff.
 _Avoid_: Kite, plane
+
+**River**:
+Water across a Course, bank to bank, the Nile near the start of the Pyramids: not a Gap, but shallow, its bed a little under its surface. Miss its Crocodiles and you're in it up to your shins, wading, slowed right down, and so is the bus.
+_Avoid_: Sea (falling into that is Fallen), lake
 
 **Sea**:
 The Cliff's Gap, from the foot of its cliff out to the island. Down into it is Fallen, there and then.

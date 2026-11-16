@@ -61,8 +61,8 @@ export function SeaGround(props: { world: View; left: number; right: number }) {
 	}
 	const island = (x: number) => x >= sea.to
 	const parts = {
-		// Out from the cliff's foot, behind and in front of the line across
-		// it; in front of the island, from its shore down.
+		// Out from the cliff, behind and in front of the line across it, the
+		// crag in front of it; in front of the island, from its shore down.
 		water: columns(left, sea.from, right, (x) => [
 			x < sea.to - SHORE ? level - PATH_BACK - 4 : level + 2,
 			VIEW_HEIGHT,
@@ -82,12 +82,14 @@ export function SeaGround(props: { world: View; left: number; right: number }) {
 			groundY(x) + PATH_FRONT + 2,
 		]),
 		wet: columns(left, sea.to - SHORE, right, (x) => [level - 4, level + 2]),
-		// Surf at the cliff's foot, and along the shore.
+		// Surf at the cliff's foot, hugging its crags, and along the shore.
 		foam: [
-			columns(left, sea.from, sea.from + 12, () => [
+			cragSurf(
+				props.world,
+				left,
 				level - PATH_BACK - 6,
 				level + PATH_FRONT + 6,
-			]),
+			),
 			columns(left, sea.to - SHORE, right, (x) =>
 				Math.floor(x / STEP) % 5 ? [level + 1, level + 4] : [level, level + 5],
 			),
@@ -120,9 +122,9 @@ export function SeaGround(props: { world: View; left: number; right: number }) {
 					<stop offset="1" stop-color="#2a2118" stop-opacity="0.4" />
 				</linearGradient>
 			</defs>
-			<Crag world={props.world} left={left} />
 			<path d={parts.water} fill="url(#sea-ripples)" />
 			<path d={parts.water} fill="url(#sea-deep)" />
+			<Crag world={props.world} left={left} />
 			<path d={parts.sand} fill={look.sand} />
 			<path d={parts.path} fill={look.path} />
 			<path d={parts.edge} fill={look.wet} />
@@ -149,6 +151,43 @@ function jut(down: number, drop: number) {
 	)
 }
 
+/** How tall each crag down the cliff's face is. */
+const CRAG_ROW = 8
+
+/** How the cliff's face goes down, from its top to the sea's surface. */
+function cragDrop(world: View) {
+	const { sea } = world.course
+	const top =
+		Math.round(world.terrain.groundY((sea?.from ?? 0) - 1)) + PATH_FRONT
+	return { top, drop: (sea?.level ?? top) + PATH_FRONT - top }
+}
+
+/**
+ * How far out the cliff's face is at `y`, from its top's edge: a crag's,
+ * row by row, down to the sea's surface, and its foot's under it.
+ */
+function cragOut(world: View, y: number) {
+	const { top, drop } = cragDrop(world)
+	const down = Math.floor((y - top) / CRAG_ROW) * CRAG_ROW
+	const last = Math.floor((drop - 1) / CRAG_ROW) * CRAG_ROW
+	return jut(Math.max(0, Math.min(down, last)), drop)
+}
+
+/**
+ * The surf against the cliff, from `from` to `to` down: a few pixels of it
+ * out from each crag, wherever its face is at that height.
+ */
+function cragSurf(world: View, left: number, from: number, to: number) {
+	const sea = world.course.sea
+	if (!sea) return ''
+	let d = ''
+	for (let y = Math.round(from / 2) * 2; y < to; y += 2) {
+		const x = sea.from + cragOut(world, y) - left
+		d += ` M${x},${y} H${x + 8} V${y + 2} H${x} Z`
+	}
+	return d
+}
+
 /**
  * The cliff's edge, side on: its face jutting out unevenly further down, in
  * crags, each ledge's top catching the light, its outer edge in shadow;
@@ -158,9 +197,8 @@ function Crag(props: { world: View; left: number }) {
 	const { sea } = props.world.course
 	if (!sea) return null
 	const x0 = sea.from - props.left
-	const top = Math.round(props.world.terrain.groundY(sea.from - 1)) + PATH_FRONT
-	const drop = sea.level + PATH_FRONT - top
-	const ROW = 8
+	const { top, drop } = cragDrop(props.world)
+	const ROW = CRAG_ROW
 	let face = ''
 	let shadow = ''
 	let lit = ''
@@ -177,6 +215,10 @@ function Crag(props: { world: View; left: number }) {
 			lit += ` M${x0 + last},${y} H${x0 + out} V${y + 4} H${x0 + last} Z`
 		last = out
 	}
+	// And on down under the sea, at its foot, as far as the camera looks.
+	const under = top + Math.ceil(drop / ROW) * ROW
+	face += ` M${x0},${under} H${x0 + last} V${VIEW_HEIGHT} H${x0} Z`
+	shadow += ` M${x0 + last - 8},${under} H${x0 + last} V${VIEW_HEIGHT} H${x0 + last - 8} Z`
 	// The face behind the field's path, the field's own rock: shaded down it
 	// too, right to the bottom of it, past where the sea's in front of it.
 	const shade = `M${x0 - 4000},${top + 12} H${x0} V${VIEW_HEIGHT} H${x0 - 4000} Z ${face}`

@@ -351,7 +351,8 @@ const TOP_HAT = cells(
 		[0, 5, 7, 1, '#1d1d1f'],
 		[4, 1, 1, 1, '#2c2c30'],
 	],
-	5.5,
+	// Down over the head a cell more than its brim: it sits low.
+	4.5,
 	3.5,
 )
 
@@ -433,6 +434,119 @@ const HEAD_MIRROR = cells(
 	5.5,
 )
 
+/** How big the disco ball is across, and its hook on top, in cells. */
+const DISCO_SIZE = 12
+const DISCO_HOOK = 1
+/** How far in from its side each row of it starts, top to bottom: round. */
+const DISCO_ROWS = [4, 2, 1, 0, 0, 0, 0, 0, 0, 1, 2, 4]
+/** How many steps it turns round in, and how many ticks each one is. */
+const DISCO_TURNS = 12
+const DISCO_TICKS = 5
+const MIRROR_LIT = '#e0e7ef'
+const MIRROR = '#b7c1ce'
+const MIRROR_SHADE = '#8d98a8'
+const MIRROR_DEEP = '#5f6a7c'
+
+/** Which way each mirror tile's turned: which ones flash, and which catch the lights' colours. */
+const facing = (column: number, row: number) => {
+	const round = ((column % 6) + 6) % 6
+	return (round * 37 + row * 59 + round * row * 11) % 17
+}
+
+/**
+ * A disco ball, over the whole head, hung off its hook: mirror tiles all
+ * over it, 2 cells square, lit from above, some flashing white and some
+ * catching the lights' blue and pink. `turn` cells round: turned on a cell
+ * at a time, its tiles go by, and it spins.
+ */
+const discoBall = (turn: number) =>
+	paintedArt(DISCO_SIZE, DISCO_SIZE + DISCO_HOOK, (x, y) => {
+		if (y < DISCO_HOOK) return x > 5 && x < 7 ? '#3a3d44' : undefined
+		const inset = DISCO_ROWS[Math.floor(y - DISCO_HOOK)]
+		if (x < inset || x > DISCO_SIZE - inset) return undefined
+		const column = Math.floor((x + turn) / 2)
+		const row = Math.floor((y - DISCO_HOOK) / 2)
+		// Lit from above, and a little from in front.
+		const light =
+			-(y - DISCO_HOOK - DISCO_SIZE / 2) / 6 - (x - DISCO_SIZE / 2) / 14
+		const tile = facing(column, row)
+		if (tile === 0 && light > -0.3) return '#ffffff'
+		if (tile === 5 && light > -0.8) return '#8fb8ff'
+		if (tile === 11) return '#f2a6d6'
+		// Every other tile tipped a little more to the light.
+		const tone = light * 1.6 + ((column + row) % 2 ? 0.5 : -0.5)
+		if (tone > 1) return MIRROR_LIT
+		if (tone > -0.2) return MIRROR
+		if (tone > -1.3) return MIRROR_SHADE
+		return MIRROR_DEEP
+	})
+
+/** The disco ball, a step at a time, all the way round. */
+const DISCO_SPIN = Array.from({ length: DISCO_TURNS }, (_, turn) =>
+	discoBall(turn),
+)
+
+const DISCO_BALL: HatArt = {
+	src: DISCO_SPIN[0],
+	width: DISCO_SIZE * CELL,
+	height: (DISCO_SIZE + DISCO_HOOK) * CELL,
+	// Over the head down to the chin.
+	crown: 5 * CELL,
+	middle: (DISCO_SIZE / 2) * CELL,
+}
+
+/** How far out round the disco ball its glints go, in cells. */
+const GLINT_OUT = 3
+const GLINT = '#ffffff'
+const GLINT_RAY = '#fff1b8'
+const GLINT_FAINT = 'rgba(255,241,184,0.55)'
+/**
+ * Where the light glints off the disco ball, round its edge, in cells from
+ * `GLINT_OUT` up and left of it, and on which step of its turn each starts
+ * to twinkle.
+ */
+const GLINTS: [number, number, number][] = [
+	[4, 5, 0],
+	[15, 9, 3],
+	[13, 15, 6],
+	[1, 11, 9],
+	[14, 3, 10],
+]
+/** How big a glint is, a step at a time, as it twinkles: a dot, a cross, a star, and back. */
+const TWINKLE = [1, 2, 3, 2, 1]
+
+/** A glint, `size` big, its middle at `x`, `y`. */
+const glint = (x: number, y: number, size: number): PixelRect[] => [
+	...(size > 2
+		? ([
+				[x - 2, y, 5, 1, GLINT_FAINT],
+				[x, y - 2, 1, 5, GLINT_FAINT],
+			] satisfies PixelRect[])
+		: []),
+	...(size > 1
+		? ([
+				[x - 1, y, 3, 1, GLINT_RAY],
+				[x, y - 1, 1, 3, GLINT_RAY],
+			] satisfies PixelRect[])
+		: []),
+	[x, y, 1, 1, size > 1 ? GLINT : GLINT_RAY],
+]
+
+/**
+ * The light glinting off the disco ball as it's worn, out round it, a step
+ * of its turn at a time: each glint twinkling up to a star and away, in turn.
+ */
+const DISCO_GLINTS = Array.from({ length: DISCO_TURNS }, (_, turn) =>
+	pixelArt(
+		DISCO_SIZE + GLINT_OUT * 2,
+		DISCO_SIZE + DISCO_HOOK + GLINT_OUT * 2,
+		GLINTS.flatMap(([x, y, from]) => {
+			const size = TWINKLE[(turn - from + DISCO_TURNS) % DISCO_TURNS]
+			return size ? glint(x, y, size) : []
+		}),
+	),
+)
+
 const PUMPKINS = [
 	pumpkin1Asset,
 	pumpkin2Asset,
@@ -467,6 +581,7 @@ const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	flyingHelmet: FLYING_HELMET,
 	bobbleHat: BOBBLE_HAT,
 	headMirror: HEAD_MIRROR,
+	discoBall: DISCO_BALL,
 }
 
 /** The propeller on top of a propeller beanie, its two blades, red and yellow. */
@@ -517,12 +632,13 @@ const BEAM = paintedArt(BEAM_CELLS, BEAM_ROWS, (x, y) => {
  * How far a hat on someone's head gets out of their box, at most, for
  * their Draw Hook's `drawReach`: the miner's lamp's beam, out ahead of
  * them, and up over their head, as does any hat's crown, a propeller
- * beanie's propeller on top of it.
+ * beanie's propeller on top of it, and the glints round a disco ball.
  */
 export const WORN_HAT_REACH = {
 	left: BEAM_CELLS * CELL + MINER.middle,
 	top: Math.max(
 		BEAM_ROWS - 4 + MINER.crown,
+		DISCO_BALL.crown + GLINT_OUT * CELL,
 		...[...Object.values(ART), pumpkin()].map(
 			(art) => art.crown + (art === PROPELLER ? 3 * CELL : 0),
 		),
@@ -618,7 +734,8 @@ function propellerAcross(seconds: number, whirring: boolean) {
 
 /**
  * `HatPicture`, in a Draw Hook: `hat` with its top left at `x`, `y`, its
- * miner's lamp shining if it's `lit`, its propeller turning, `now` ticks in.
+ * miner's lamp shining if it's `lit`, its propeller turning, `now` ticks in;
+ * a disco ball spinning, and, `lit`, light glinting off it.
  */
 export function paintHat(
 	ctx: CanvasRenderingContext2D,
@@ -664,6 +781,24 @@ export function paintHat(
 			)
 			ctx.restore()
 		}
+	}
+	if (hat.kind === 'discoBall') {
+		const turn =
+			((Math.floor(options.now / DISCO_TICKS) % DISCO_TURNS) + DISCO_TURNS) %
+			DISCO_TURNS
+		paintPicture(ctx, image, DISCO_SPIN[turn], x, y, art.width, art.height)
+		if (options.lit)
+			// The light glinting off it, round it.
+			paintPicture(
+				ctx,
+				image,
+				DISCO_GLINTS[turn],
+				x - GLINT_OUT * CELL,
+				y - GLINT_OUT * CELL,
+				art.width + GLINT_OUT * 2 * CELL,
+				art.height + GLINT_OUT * 2 * CELL,
+			)
+		return
 	}
 	paintPicture(ctx, image, art.src, x, y, art.width, art.height)
 }

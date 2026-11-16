@@ -15,7 +15,9 @@ import {
  *
  * The stand pose is the custom runner template's (see `standPixels`): 23 by
  * 28, facing left, its head rows 0-6, its shirt 7-15, an arm hanging down at
- * its front, its shorts 16-19, its legs 20-25, and its shoes 26-27.
+ * its front, its shorts 16-19, its legs 20-25, and its shoes 26-27. Hair that
+ * stands up above the head (a mohawk, an afro) makes it taller, on top: the
+ * poses are as much taller, and everything's where it was beneath it.
  */
 
 /** The template's size, and where its parts are. */
@@ -67,20 +69,25 @@ export interface SkiPoses {
 export function skiPosesFor(look: CharacterSpriteProps): SkiPoses | undefined {
 	try {
 		const drawn = drawCustomSprite(look, standPixels, 2)
-		if (!drawn || drawn.totalHeight !== HEIGHT) return undefined
+		if (!drawn || drawn.totalHeight < HEIGHT) return undefined
 		const context = drawn.canvas.getContext('2d')
 		// Its first frame: stood, arms down.
-		const stand = context?.getImageData(0, 0, WIDTH, HEIGHT)
-		return stand ? skiPoses(stand) : undefined
+		const stand = context?.getImageData(0, 0, WIDTH, drawn.totalHeight)
+		return stand ? skiPoses(stand, drawn.totalHeight - HEIGHT) : undefined
 	} catch {
 		return undefined
 	}
 }
 
-function skiPoses(stand: ImageData): SkiPoses {
+/**
+ * The ski poses from a stand pose `rise` rows taller than the template, its
+ * hair standing up above its head. Drawn in the template's rows: its hair's
+ * above the top of them.
+ */
+function skiPoses(stand: ImageData, rise: number): SkiPoses {
 	const get = (x: number, y: number): Colour | undefined => {
-		if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return undefined
-		const i = (y * WIDTH + x) * 4
+		if (x < 0 || y < -rise || x >= WIDTH || y >= HEIGHT) return undefined
+		const i = ((y + rise) * WIDTH + x) * 4
 		const c = stand.data
 		return c[i + 3] > 128 ? [c[i], c[i + 1], c[i + 2], 255] : undefined
 	}
@@ -117,13 +124,13 @@ function skiPoses(stand: ImageData): SkiPoses {
 	function pose(draw: (pen: Pen) => void) {
 		const canvas = document.createElement('canvas')
 		canvas.width = OUT
-		canvas.height = HEIGHT
+		canvas.height = HEIGHT + rise
 		const context = canvas.getContext('2d')
 		if (!context) throw new Error('No canvas to draw on')
-		const image = context.createImageData(OUT, HEIGHT)
+		const image = context.createImageData(OUT, HEIGHT + rise)
 		const put = (x: number, y: number, c: Colour | undefined) => {
-			if (!c || x < 0 || y < 0 || x >= OUT || y >= HEIGHT) return
-			image.data.set(c, (y * OUT + x) * 4)
+			if (!c || x < 0 || y < -rise || x >= OUT || y >= HEIGHT) return
+			image.data.set(c, ((y + rise) * OUT + x) * 4)
 		}
 		const line = ([x0, y0]: Point, [x1, y1]: Point, c: Colour, thick = 1) => {
 			const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1)
@@ -167,7 +174,7 @@ function skiPoses(stand: ImageData): SkiPoses {
 	/** The head, stood pose's, at `dx` along, its bottom row on `bottom`. */
 	const head = (pen: Pen, dx: number, bottom: number) => {
 		const dy = bottom - HEAD.bottom
-		for (let y = HEAD.top; y <= HEAD.bottom; y++)
+		for (let y = HEAD.top - rise; y <= HEAD.bottom; y++)
 			for (let x = HEAD.left; x <= HEAD.right; x++)
 				pen.put(x + IN + dx, y + dy, get(x, y))
 	}

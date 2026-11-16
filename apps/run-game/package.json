@@ -9,7 +9,8 @@
 		"build": "pnpm prepare-web && vite build",
 		"serve": "vite preview",
 		"prepare-web": "tsx ../web/scripts/gen-custom-runner-pixels.ts",
-		"extract-profile": "tsx scripts/extract-profile.ts"
+		"extract-profile": "tsx scripts/extract-profile.ts",
+		"make-dances": "tsx scripts/make-dances.ts"
 	},
 	"dependencies": {
 		"jsqr": "^1.4.0",

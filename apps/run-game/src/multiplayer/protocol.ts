@@ -58,6 +58,13 @@ export function codeFromScan(text: string) {
 	return code.length === CODE_LENGTH ? code : ''
 }
 
+/** The longest name a Player can go by: long enough, and still fits over their head. */
+export const MAX_PLAYER_NAME = 14
+
+/** A Player's name, tidied: one line, no runs of spaces, and not too long. */
+export const cleanPlayerName = (typed: string) =>
+	typed.replace(/\s+/g, ' ').trim().slice(0, MAX_PLAYER_NAME)
+
 /**
  * How a phone plays:
  * - `controller`: a Phone Controller, the race on the big screen
@@ -92,7 +99,16 @@ export type PadMessage =
 	 * `screen`: a computer, showing the Room just as the Host does, so it's
 	 * sent the whole Room (see `RoomView`), not just its own Player.
 	 */
-	| { type: 'hello'; device: string; mode: PadMode; screen?: boolean }
+	| {
+			type: 'hello'
+			device: string
+			mode: PadMode
+			screen?: boolean
+			/** What they go by, if they've said (see `cleanPlayerName`). */
+			name?: string
+	  }
+	/** What they go by, whoever they run as: blank, their runner's name. */
+	| { type: 'name'; name: string }
 	/** Switching between playing on the big screen and on the phone. */
 	| { type: 'mode'; mode: PadMode }
 	/** Who they'll run as. A custom runner comes with its look, which only the phone has. */
@@ -151,6 +167,8 @@ export interface PadView {
 	number: number
 	colour: string
 	character?: string
+	/** What they go by, as the Host has it: none, their runner's name. */
+	name?: string
 	ready: boolean
 	/** Who's been picked by someone else. */
 	taken: string[]
@@ -162,6 +180,11 @@ export interface PadView {
 	/** Their Standings. */
 	points: number
 	paused: boolean
+	/**
+	 * A Round on its start screen, held till its Starter presses jump: the
+	 * Starter's Player number. Not, once it's under way.
+	 */
+	waitingForStarter?: number
 	course: string
 	/** How the Room's set to go, and how its Rounds are raced, for everyone to see. */
 	roomMode: RoomMode
@@ -221,6 +244,8 @@ export interface RacerIntro {
 	/** A `Playable`'s id, and a custom runner's look, which the phone may not have. */
 	character: string
 	custom?: CustomRunner
+	/** What they go by, if not their runner's name. */
+	name?: string
 	colour: string
 	number: number
 }
@@ -281,10 +306,16 @@ export const RACER_FLAGS = {
 	gliding: 128,
 	/** In a mine cart. */
 	cart: 256,
+	/** Killed by a haunted house's monster, and come back as a ghost. */
+	ghost: 512,
 }
 /** The hat a racer's wearing, as its `hatCode`, is the flags over this. */
-export const HAT_FLAG = 512
-/** [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding, 8 ducking), dazed, spin], and on skis, their ski state and trick's turn */
+export const HAT_FLAG = 1024
+/**
+ * [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding, 8 ducking,
+ * 16 being shrunk), dazed, spin (or being shrunk, how far into it: never
+ * both)], and on skis, their ski state and trick's turn
+ */
 export type PacerState = [
 	number,
 	number,
@@ -384,6 +415,11 @@ export interface RaceFrame {
 	corgis: CorgiStateFrame[]
 	/** The Caves' mine carts, if there are any: [x, rail y, state, spin], its state by `CART_STATES`. */
 	carts?: [number, number, number, number][]
+	/**
+	 * When each Platform that waits was set off, in order, if the course has
+	 * any: -1, still waiting (see `setOffPlatforms`).
+	 */
+	lifts?: number[]
 	/** Haga's football, if there is one: [x, y, spin, out: 0 no, 1 home, 2 scooped]. */
 	ball?: [number, number, number, number]
 	/** Geese flying over. */

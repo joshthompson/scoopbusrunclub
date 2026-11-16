@@ -1,5 +1,6 @@
 import type { CartState } from '../game/carts'
 import { hatCode } from '../game/hats'
+import { waitingLifts } from '../game/platforms'
 import {
 	type CorgiState,
 	type FlyerState,
@@ -55,7 +56,8 @@ export const pacerIntro = (p: Pacer): PacerIntro => ({
 	name: p.name,
 	member: p.member,
 	guest: p.guest,
-	look: p.guest || p.member || p.skeleton ? undefined : p.look,
+	// Anyone with a look of their own, a member too, in a race's T-shirt.
+	look: p.skeleton ? undefined : p.look,
 	skeleton: p.skeleton || undefined,
 })
 
@@ -69,6 +71,8 @@ export function raceStart(world: World, round: number): RaceStart {
 			id: r.id,
 			character: r.runner.id,
 			custom: r.runner.custom,
+			// What they go by, which may not be who they run as.
+			name: r.runner.name,
 			colour: r.colour ?? 'white',
 			number: r.number ?? 0,
 		})),
@@ -131,10 +135,11 @@ export function createRaceStream(
 						(b.mount > 0 ? RACER_FLAGS.mounted : 0) |
 						(b.facing === -1 ? RACER_FLAGS.left : 0) |
 						(b.carried > 0 ? RACER_FLAGS.carried : 0) |
-						(b.on !== undefined ? RACER_FLAGS.platform : 0) |
+						(b.on !== undefined || b.bed ? RACER_FLAGS.platform : 0) |
 						(b.squashed > 0 ? RACER_FLAGS.squashed : 0) |
 						(b.gliding ? RACER_FLAGS.gliding : 0) |
 						(b.cart !== undefined ? RACER_FLAGS.cart : 0) |
+						(b.ghost ? RACER_FLAGS.ghost : 0) |
 						(hatCode(b.hat) * HAT_FLAG),
 					b.stumble,
 					b.spin,
@@ -160,9 +165,12 @@ export function createRaceStream(
 				(p.grounded ? 1 : 0) |
 					(p.scooped ? 2 : 0) |
 					(p.gliding ? 4 : 0) |
-					(p.ducking ? 8 : 0),
+					(p.ducking ? 8 : 0) |
+					(p.shrink !== undefined ? 16 : 0),
 				p.dazed,
-				p.spin,
+				// Being shrunk, how far into it, in place of the spin: they're
+				// never both being shrunk and flying out of the scoop.
+				p.shrink ?? p.spin,
 				...(p.board
 					? ([skiState(p, TRICK_KINDS), Math.round(p.turn ?? 0)] as const)
 					: ([] as const)),
@@ -195,6 +203,9 @@ export function createRaceStream(
 							c.spin,
 						]),
 					}
+				: {}),
+			...(waitingLifts(world).length
+				? { lifts: waitingLifts(world).map((p) => p.move?.since ?? -1) }
 				: {}),
 			...(world.ball
 				? {

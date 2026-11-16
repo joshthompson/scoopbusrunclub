@@ -1357,7 +1357,10 @@ export const IV_STAND = {
 	height: 60,
 }
 
-/** A yellow wet floor sign, a figure slipping on it: jumped as a rock. World pixels. */
+/**
+ * A yellow wet floor sign, a figure slipping on it: in place of a traffic
+ * cone, knocked over by whoever runs into it first. World pixels.
+ */
 export const WET_FLOOR = {
 	asset: pixelArt(14, 20, [
 		[5, 0, 4, 2, '#f2c200'],
@@ -1379,6 +1382,7 @@ export const WET_FLOOR = {
 	]),
 	width: 28,
 	height: 40,
+	name: 'Wet floor signs',
 }
 
 /**
@@ -1441,5 +1445,8 @@ export const GURNEY = (() => {
 		frames: [frame(0), frame(1)] as [string, string],
 		width: W * 2,
 		height: H * 2,
+		// Up on the patient's blanket, from the pillow to the foot rail: jump
+		// on, and get wheeled along, back the way you came, maybe.
+		deck: { from: 2, to: 54, top: 14 },
 	}
 })()

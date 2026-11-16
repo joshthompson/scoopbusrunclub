@@ -5,7 +5,7 @@ import {
 	START_X,
 	VIEW_HEIGHT,
 } from '../game/constants'
-import { platformAt } from '../game/platforms'
+import { platformOut } from '../game/platforms'
 import { CAMERA_FOOTROOM, CAMERA_HEADROOM, MAX_ZOOM } from '../game/step'
 import { caves } from './caves'
 import { cityRooftop } from './cityRooftop'
@@ -20,6 +20,7 @@ import { huddinge } from './huddinge'
 import { karolinska } from './karolinska'
 import { kristineberg } from './kristineberg'
 import { machuPicchu } from './machuPicchu'
+import { midnattsloppet } from './midnattsloppet'
 import { pyramids } from './pyramids'
 import { scoopLine } from './scoopLine'
 import { sewers } from './sewers'
@@ -58,9 +59,9 @@ export function climbOf(course: CourseDefinition) {
 		highs.push(y ?? Number.POSITIVE_INFINITY)
 	}
 	for (const platform of course.platforms ?? []) {
-		const swing = platform.move?.ticks ?? 1
-		for (let t = 0; t < swing; t += Math.max(1, swing / 16)) {
-			const at = platformAt(terrain, platform, t)
+		// Through its swing: from where it is, out to its furthest.
+		for (let k = 0; k <= (platform.move ? 16 : 0); k++) {
+			const at = platformOut(terrain, platform, k / 16)
 			const i = Math.round((at.left - START_X) / SAMPLE)
 			const j = Math.round((at.right - START_X) / SAMPLE)
 			for (let k = Math.max(0, i); k <= Math.min(highs.length - 1, j); k++)
@@ -104,6 +105,7 @@ export const COURSES: Course[] = [
 	everest,
 	slopes,
 	karolinska,
+	midnattsloppet,
 ].map((course, i) => {
 	const climb = climbOf(course)
 	// So a Round can always get everyone on the screen.

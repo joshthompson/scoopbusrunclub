@@ -2,6 +2,7 @@ import type { RunnerName } from '@/data/runners'
 import { PATH_FRONT, PX_PER_M, STAND_HEIGHT, START_X } from '../game/constants'
 import { FURBY_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
+import { candyForest, candyRidge, crystalPeaks } from './kit/backdrops'
 import {
 	FIELD,
 	GIANT_FUR,
@@ -23,6 +24,12 @@ import {
 	toadstool,
 	wires,
 } from './kit/furbyScenery'
+import {
+	FURBY_FIELD,
+	FURBY_FIELD_FAR,
+	FURBY_SUGAR,
+	texturedGround,
+} from './kit/groundTextures'
 import { withHat } from './kit/hats'
 import { seeded } from './kit/seeded'
 import type {
@@ -453,7 +460,23 @@ export const furbyFields: CourseDefinition = {
 			'--dirt-dark-brown': '#e08cc4',
 			'--dirt-darker-brown': '#7a3f78',
 		},
-		horizon: { far: candyMountains, near: sweetHills, fill: MOUNTAIN_FILL },
+		// Crystal peaks far off in the haze, a ridge of iced candy mountains
+		// nearer, the candy mountains, the sweet hills, and a forest of candy
+		// trees nearer still; sprinkles all over the field.
+		horizon: {
+			farther: [
+				{ asset: crystalPeaks, top: 66, height: 170, parallax: 0.03 },
+				{ asset: candyRidge, top: 104, height: 150, parallax: 0.05 },
+			],
+			far: candyMountains,
+			near: sweetHills,
+			fill: MOUNTAIN_FILL,
+			field: FURBY_FIELD_FAR,
+			nearer: [{ asset: candyForest, top: 150, height: 180, fill: FIELD }],
+		},
+		// Sprinkles on the field either side of the path, and sugar on it.
+		ground: texturedGround('furby-sprinkles', 'furby-sugar'),
+		groundDefs: FURBY_FIELD + FURBY_SUGAR,
 		horizonTrees: false,
 		sun: 'hue-rotate(280deg) saturate(1.6)',
 		// Candy trees' low branches: trunk and leaves alike, candy pink.

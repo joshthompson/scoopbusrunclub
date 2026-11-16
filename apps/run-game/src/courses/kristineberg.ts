@@ -10,8 +10,9 @@ import type { Boost, Course, CourseDefinition, Obstacle } from './types'
 /**
  * Kristineberg: round and round the running track at Kristinebergs IP, dead
  * flat, past the grandstand once a lap. No trees, no mud: hurdles to clear, tall ones to slide under,
- * potholes in the track, and children playing football on it. And at the
- * end, the long jump: off the board into the sand, for points the further.
+ * potholes in the track, and children playing football on it, and corgis
+ * sat on it, out with their owners, to ride. And at the end, the long
+ * jump: off the board into the sand, for points the further.
  */
 
 const CHEERERS: RunnerName[] = [
@@ -42,8 +43,10 @@ const HURDLE_GAP = 300
  * the plain ones come first, and from then on, every other flight.
  */
 const TALL_FROM = 0.4
+/** How much room a corgi waits in, clear of anything else either side. */
+const CORGI_ROOM = 160
 
-function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
+function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	const random = seeded(400)
 	const obstacles: Obstacle[] = []
 	const boosts: Boost[] = []
@@ -85,15 +88,26 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		const progress = (x - START_X) / terrain.length
 		x += 380 + random() * (520 - progress * 260)
 	}
+	// Corgis, out with their owners, sat on the track waiting to be ridden:
+	// in a clear bit of it, each, well before the long jump's run-up.
+	const corgis: number[] = []
+	for (const share of [0.2, 0.48, 0.76]) {
+		let at = START_X + (BOARD - RUN_UP - START_X) * share
+		while (
+			[...obstacles, ...boosts].some((o) => Math.abs(o.x - at) < CORGI_ROOM)
+		)
+			at += 20
+		corgis.push(Math.round(at))
+	}
 	// Nothing at the side of a track: the stadium's behind it.
-	return { obstacles, boosts, scenery: [] }
+	return { obstacles, boosts, scenery: [], corgis }
 }
 
 export const kristineberg: CourseDefinition = {
 	id: 'kristineberg',
 	name: 'Kristineberg',
 	blurb:
-		'Round and round the track, dead flat: hurdles to jump, tall ones to slide under, potholes, children playing football, and the long jump at the end.',
+		'Round and round the track, dead flat: hurdles to jump, tall ones to slide under, potholes, children playing football, corgis to ride, and the long jump at the end.',
 	terrain,
 	runDirectors: ['keith', 'claire'],
 	longJump: { board: BOARD },

@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js'
-import { Logo, Menu, OUTLINED, Panel } from '../ui/Menu'
+import { Logo, Menu, OUTLINED_FLAT, Panel } from '../ui/Menu'
 
 export function TitleScreen(props: {
 	onSinglePlayer: () => void
@@ -65,13 +65,13 @@ const styles = {
 		'padding-top': '22px',
 	},
 	tagline: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		'margin-top': '10px',
 		'font-size': '20px',
 		'white-space': 'nowrap',
 	},
 	credits: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		position: 'absolute',
 		left: '16px',
 		bottom: '10px',
@@ -82,7 +82,7 @@ const styles = {
 		cursor: 'pointer',
 	},
 	footer: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		position: 'absolute',
 		right: '16px',
 		bottom: '10px',

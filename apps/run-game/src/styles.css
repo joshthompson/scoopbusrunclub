@@ -70,6 +70,26 @@ textarea {
  * Run strips are drawn right to left (see `generateFrames(…, reverse)` in the
  * web app), so they play by stepping the image to the right.
  */
+/* A new runner unlocked, on the finish screen: popping in, then glowing. */
+@keyframes new-runner-pop {
+	from {
+		transform: scale(0.4);
+		opacity: 0;
+	}
+	70% {
+		transform: scale(1.08);
+		opacity: 1;
+	}
+	to {
+		transform: scale(1);
+	}
+}
+@keyframes new-runner-glow {
+	50% {
+		box-shadow: 0 0 18px 4px rgba(255, 210, 63, 0.65);
+	}
+}
+
 @keyframes run-strip {
 	from {
 		background-position-x: var(--strip);
@@ -137,13 +157,14 @@ textarea {
 }
 
 /* The menus (ui/Menu.tsx) */
+/* Over `LOGO_CYCLE` (2.6s): up and down in 0.4s, then still till the next. */
 @keyframes logo-bounce {
 	0%,
-	60%,
+	15.4%,
 	100% {
 		transform: translateY(0) rotate(0);
 	}
-	30% {
+	7.7% {
 		transform: translateY(-10px) rotate(-3deg);
 	}
 }
@@ -161,12 +182,7 @@ textarea {
 	}
 }
 
-/* The multiplayer Podium (multiplayer/Podium.tsx): its steps rising, and confetti. */
-@keyframes podium-rise {
-	from {
-		transform: scaleY(0);
-	}
-}
+/* The multiplayer Podium (multiplayer/Podium.tsx): its confetti. */
 
 @keyframes confetti-fall {
 	from {
@@ -323,4 +339,9 @@ button {
 }
 .propeller {
 	animation: propeller 0.6s steps(6) infinite;
+}
+
+/* A Player's name, on their phone: blank, it shows their runner's, faintly. */
+.pad-name::placeholder {
+	color: rgba(15, 31, 41, 0.3);
 }

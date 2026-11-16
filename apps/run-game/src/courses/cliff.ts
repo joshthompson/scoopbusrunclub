@@ -19,6 +19,7 @@ import { FIKA_ITEMS } from '../game/fika'
 import { RING_ROOM } from '../game/sky'
 import { withGaps } from '../game/terrain'
 import {
+	SANDCASTLE,
 	SEA_FAR,
 	SEA_NEAR,
 	deckchair,
@@ -256,7 +257,8 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		// Along the beach: rocks, and gulls on the sand.
 		{ kind: 'rock', x: ISLAND + 520 },
 		{ kind: 'geese', x: ISLAND + 900, count: 3 },
-		{ kind: 'rock', x: ISLAND + 1300 },
+		// A sandcastle, on the beach in the way: flattened, run into.
+		{ kind: 'cone', x: ISLAND + 1300 },
 		{ kind: 'rock', x: ISLAND + 1650 },
 	]
 	const boosts: Boost[] = [
@@ -356,6 +358,8 @@ export const cliff: CourseDefinition = {
 		},
 		horizon: { far: seaFar, near: seaNear, fill: SEA_FAR },
 		horizonTrees: false,
+		// Sandcastles, not traffic cones: flattened, run into.
+		cone: SANDCASTLE,
 		// The field on the cliff top, its path, and the cliff's chalky face
 		// on down under it (see `SeaGround`).
 		ground: [
@@ -382,4 +386,9 @@ export const cliff: CourseDefinition = {
 		rock: 'sepia(0.4) brightness(1.1)',
 	},
 	...laidOut,
+	// Through every Ring.
+	special: {
+		goal: 'Get all the Rings',
+		done: (run) => (run.counts.rings ?? 0) >= rings,
+	},
 }

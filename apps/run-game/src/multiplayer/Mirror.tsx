@@ -3,6 +3,7 @@ import { COURSES } from '../courses'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { hatCode, hatFromCode } from '../game/hats'
+import { waitingLifts } from '../game/platforms'
 import {
 	type Flyer,
 	type Out,
@@ -13,6 +14,7 @@ import {
 	createWorld,
 } from '../game/world'
 import { NOTHING_HELD } from '../input'
+import { bonusRunner } from '../runners/bonus'
 import { guests } from '../runners/guests'
 import { DEFAULT_AVATAR } from '../runners/looks'
 import {
@@ -53,10 +55,17 @@ const JUMP_TICKS = 40
 const CATCH_UP = 0.05
 
 function playableFor(intro: RacerIntro): Playable {
+	const runner = runnerFor(intro)
+	return intro.name ? { ...runner, name: intro.name } : runner
+}
+
+function runnerFor(intro: RacerIntro): Playable {
 	if (intro.custom)
 		return { ...customPlayable(intro.custom), id: intro.character }
 	return (
 		MEMBERS.find((m) => m.id === intro.character) ??
+		// A bonus runner, unlocked on whoever's phone, if not this one.
+		bonusRunner(intro.character) ??
 		// Nobody it knows: anyone at all, rather than nothing.
 		MEMBERS[0]
 	)
@@ -70,9 +79,12 @@ function pacerFrom(intro: PacerIntro): Pacer {
 		id: intro.id,
 		name: intro.name,
 		skeleton: intro.skeleton,
+		// A member's own, unless they've a look on: a race's T-shirt.
 		sprite: intro.skeleton
 			? SKELETON_SPRITE
-			: (known?.sprite ?? lookSprite(intro.look ?? DEFAULT_AVATAR)),
+			: intro.look
+				? lookSprite(intro.look)
+				: (known?.sprite ?? lookSprite(DEFAULT_AVATAR)),
 		x: -10_000,
 		feetY: 0,
 		vx: 0,
@@ -199,6 +211,8 @@ export default function Mirror(props: {
 			// Knocked off since the last frame: flying.
 			// In a mine cart: which doesn't matter here, only that they are.
 			body.cart = flags & 256 ? 0 : undefined
+			// A ghost, killed in a haunted house.
+			body.ghost = !!(flags & 512)
 			// Knocked off since the last frame, or swapped: flying.
 			const hat = Math.floor(flags / HAT_FLAG)
 			if (body.hat && hatCode(body.hat) !== hat)
@@ -237,7 +251,10 @@ export default function Mirror(props: {
 			pacer.gliding = !!(from[4] & 4)
 			pacer.ducking = !!(from[4] & 8)
 			pacer.dazed = from[5]
-			pacer.spin = mix(from[6], to[6])
+			// Being shrunk, how far into it, sent in place of the spin.
+			const shrinking = !!(from[4] & 16)
+			pacer.shrink = shrinking ? mix(from[6], to[6]) : undefined
+			pacer.spin = shrinking ? 0 : mix(from[6], to[6])
 			const ski = fromSkiState(from[7] ?? 0, TRICK_KINDS)
 			pacer.board = ski.board || undefined
 			pacer.grind = ski.grinding ? 0 : undefined
@@ -266,6 +283,11 @@ export default function Mirror(props: {
 			world.ball.out =
 				a.ball[3] === 1 ? 'home' : a.ball[3] === 2 ? 'scooped' : undefined
 		}
+		// A lift that waits, on its way, or waiting.
+		waitingLifts(world).forEach((lift, i) => {
+			const since = a.lifts?.[i] ?? -1
+			if (lift.move) lift.move.since = since < 0 ? undefined : since
+		})
 		world.carts.forEach((cart, i) => {
 			const from = a.carts?.[i]
 			if (!from) return

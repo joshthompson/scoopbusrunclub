@@ -24,6 +24,12 @@ export type Voice =
 	| 'sub'
 	/** Struck, and ringing on: a bell, or a drip. */
 	| 'bell'
+	/** Five saws, detuned against each other, wide and bright: a dance track's lead and chords. */
+	| 'supersaw'
+	/** An electric guitar through a distortion pedal: a power chord, its fifth over it. */
+	| 'guitar'
+	/** Voices singing "aah": detuned saws through a vowel's formants, swelling in, with vibrato. */
+	| 'choir'
 	| 'kick'
 	| 'snare'
 	| 'hat'
@@ -89,6 +95,20 @@ export function parse(track: Track, steps: number): Parsed {
 
 export const isDrum = (voice: Voice) =>
 	voice === 'kick' || voice === 'snare' || voice === 'hat'
+
+/** A distortion pedal's curve: soft clipping, driven hard. */
+let driveCurve: Float32Array<ArrayBuffer> | undefined
+function drive() {
+	if (!driveCurve) {
+		const n = 1024
+		driveCurve = new Float32Array(n)
+		for (let i = 0; i < n; i++) {
+			const x = (i / (n - 1)) * 2 - 1
+			driveCurve[i] = Math.tanh(x * 6)
+		}
+	}
+	return driveCurve
+}
 
 let noiseBuffer: AudioBuffer | undefined
 function noise(ctx: AudioContext) {
@@ -246,6 +266,121 @@ export function playVoice(
 				osc.start(time)
 				osc.stop(time + ring + 0.05)
 			}
+			return
+		}
+		case 'supersaw': {
+			const frequency = noteToFrequency(note)
+			const filter = ctx.createBiquadFilter()
+			filter.type = 'lowpass'
+			filter.frequency.value = Math.min(9000, frequency * 6 + 1400)
+			filter.Q.value = 0.6
+			// Each saw a fifth as loud: together, about as loud as one square.
+			const each = gain / 2.2
+			env.gain.setValueAtTime(0.0001, time)
+			env.gain.exponentialRampToValueAtTime(each, time + 0.012)
+			env.gain.setValueAtTime(each, time + Math.max(0.02, duration - 0.03))
+			env.gain.exponentialRampToValueAtTime(0.001, time + duration + 0.06)
+			for (const detune of [-21, -11, 0, 11, 21]) {
+				const osc = ctx.createOscillator()
+				osc.type = 'sawtooth'
+				osc.frequency.value = frequency
+				osc.detune.value = detune
+				osc.connect(filter)
+				osc.start(time)
+				osc.stop(time + duration + 0.08)
+			}
+			filter.connect(env)
+			return
+		}
+		case 'guitar': {
+			// The note and its fifth, two strings, slightly out with each
+			// other, through the pedal and a speaker cabinet's dull top end.
+			const frequency = noteToFrequency(note)
+			const pedal = ctx.createWaveShaper()
+			pedal.curve = drive()
+			const pre = ctx.createGain()
+			pre.gain.value = 0.7
+			const cabinet = ctx.createBiquadFilter()
+			cabinet.type = 'lowpass'
+			cabinet.frequency.value = 3200
+			cabinet.Q.value = 0.9
+			const body = ctx.createBiquadFilter()
+			body.type = 'highpass'
+			body.frequency.value = 90
+			env.gain.setValueAtTime(0.0001, time)
+			env.gain.exponentialRampToValueAtTime(gain, time + 0.006)
+			env.gain.setValueAtTime(
+				gain * 0.8,
+				time + Math.max(0.02, duration - 0.03),
+			)
+			env.gain.exponentialRampToValueAtTime(0.001, time + duration + 0.05)
+			for (const [ratio, detune] of [
+				[1, -4],
+				[1.5, 4],
+				[2, 0],
+			]) {
+				const osc = ctx.createOscillator()
+				osc.type = 'sawtooth'
+				osc.frequency.value = frequency * ratio
+				osc.detune.value = detune
+				osc.connect(pre)
+				osc.start(time)
+				osc.stop(time + duration + 0.07)
+			}
+			pre.connect(pedal).connect(cabinet).connect(body).connect(env)
+			return
+		}
+		case 'choir': {
+			// Three voices on the note, a touch apart, wavering together,
+			// through the formants of an "aah", swelling in and dying away.
+			const frequency = noteToFrequency(note)
+			const lfo = ctx.createOscillator()
+			lfo.frequency.value = 5
+			const depth = ctx.createGain()
+			depth.gain.value = frequency * 0.007
+			lfo.connect(depth)
+			const voices = ctx.createGain()
+			voices.gain.value = 1
+			for (const detune of [-9, 0, 9]) {
+				const osc = ctx.createOscillator()
+				osc.type = 'sawtooth'
+				osc.frequency.value = frequency
+				osc.detune.value = detune
+				depth.connect(osc.frequency)
+				osc.connect(voices)
+				osc.start(time)
+				osc.stop(time + duration + 0.45)
+			}
+			lfo.start(time)
+			lfo.stop(time + duration + 0.45)
+			const out = ctx.createGain()
+			out.gain.value = 1.6
+			for (const [at, q, level] of [
+				[750, 5, 1],
+				[1150, 7, 0.6],
+				[2600, 9, 0.25],
+			]) {
+				const formant = ctx.createBiquadFilter()
+				formant.type = 'bandpass'
+				formant.frequency.value = at
+				formant.Q.value = q
+				const amount = ctx.createGain()
+				amount.gain.value = level
+				voices.connect(formant).connect(amount).connect(out)
+			}
+			// And a little of them unfiltered, low down, for body.
+			const warmth = ctx.createBiquadFilter()
+			warmth.type = 'lowpass'
+			warmth.frequency.value = 600
+			const warm = ctx.createGain()
+			warm.gain.value = 0.15
+			voices.connect(warmth).connect(warm).connect(out)
+			const swell = Math.min(0.18, duration * 0.4)
+			env.gain.setValueAtTime(0.0001, time)
+			env.gain.exponentialRampToValueAtTime(gain, time + swell)
+			env.gain.setValueAtTime(gain, time + Math.max(swell, duration - 0.05))
+			env.gain.exponentialRampToValueAtTime(0.001, time + duration + 0.4)
+			out.connect(env)
 			return
 		}
 		default: {

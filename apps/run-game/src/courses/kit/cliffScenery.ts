@@ -115,6 +115,36 @@ export const sandcastle = pixelArt(24, 20, [
 	[0, 18, 24, 2, '#c49d52'],
 ])
 
+/**
+ * The sandcastle, flattened: a heap of sand, its flag lying across it. As
+ * big as the castle, so it's drawn in the same box, its heap along the
+ * bottom.
+ */
+const flattened = pixelArt(24, 20, [
+	[7, 13, 9, 1, '#d9b46a'],
+	[3, 14, 17, 2, '#d9b46a'],
+	[1, 16, 22, 2, '#d9b46a'],
+	[0, 18, 24, 2, '#c49d52'],
+	[9, 16, 5, 2, '#a8823e'],
+	// Its flag, fallen.
+	[13, 12, 7, 1, '#5a5a5a'],
+	[19, 10, 4, 2, '#e8473c'],
+])
+
+/**
+ * A sandcastle, out on the island's beach in the way, as The Cliff's in
+ * place of a traffic cone: run into it and it's flattened, slowing you a
+ * little. The beach's own, at the same size. World pixels.
+ */
+export const SANDCASTLE = {
+	asset: sandcastle,
+	width: 48,
+	height: 40,
+	name: 'Sandcastles',
+	crumbled: flattened,
+	word: 'Crumble!',
+}
+
 /** A deckchair, striped canvas on a wooden frame: 20 by 18. */
 export const deckchair = pixelArt(20, 18, [
 	[2, 16, 2, 2, '#7a5a35'],

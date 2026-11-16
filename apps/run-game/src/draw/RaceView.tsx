@@ -2,6 +2,7 @@ import { CanvasRenderer, Scene } from 'scoopjs'
 import { type JSX, Show, createMemo } from 'solid-js'
 import { HEARTBEAT_DUB, beatAt } from '../game/body'
 import {
+	CAMERA_LEAD,
 	HITBOX_HALF_WIDTH,
 	START_X,
 	TICK_MS,
@@ -11,6 +12,7 @@ import {
 import { portalView } from '../game/portals'
 import { onScreen } from '../game/step'
 import type { World } from '../game/world'
+import { playVersion, tuneAlong } from '../music/music'
 import { FrameMeter, showFrameMeter } from './FrameMeter'
 import { createLongJump } from './LongJump'
 import {
@@ -22,8 +24,12 @@ import {
 import { createFootballSprite } from './football'
 import { createCaveCover, createSeaFront } from './frontControllers'
 import { createGiantMouth } from './giantMouth'
+import { createHauntedHouse } from './hauntedHouse'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
+import { createPyro, createSearchlights, createSmoke } from './nightRace'
 import { createPortalFx } from './portalFx'
+import { createRiver, createRiverFront } from './river'
+import { createSecret } from './secret'
 import {
 	createBanner,
 	createBoost,
@@ -33,6 +39,7 @@ import {
 	createCorgis,
 	createFlyers,
 	createForeground,
+	createFound,
 	createFurbies,
 	createGameController,
 	createGiantFurby,
@@ -73,16 +80,22 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 		frameRate: TICK_MS,
 		// Front to back.
 		assetOrder: [
+			// A haunted house's bats, bursting out of it at you, over its cover.
+			'bats',
 			// Snow and fog over everything.
 			...OVER_TYPES,
 			// Counting everyone down, at the front, always in sight.
 			'run-director',
+			// A night race's smoke, rolling over everyone on the road.
+			'smoke',
 			// Guard towers over a wall's walkway, and its parapet along the
 			// near edge of the path.
 			'tower',
 			'foreground',
 			// The near poles of the start and finish banners, which you run past.
 			'banner-front',
+			// Fireballs fired up on "Go!", off the start line's near end.
+			'pyro',
 			// Hurdles in the lanes nearer than the runner's.
 			'hazard-front',
 			// Over whoever they're carrying.
@@ -123,11 +136,21 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			'boost',
 			'hazard',
 			'cheerer',
+			// And off its far end, behind everyone on the road.
+			'pyro-back',
+			// Searchlights at the road's far edge, their beams sweeping the
+			// sky, over the scenery.
+			'searchlight',
 			'banner',
 			'sign',
 			'mud',
+			// A River's water behind the path, under its crocodiles.
+			'river',
 			// The Caves' mine: its rails, trestles and secret gallery.
 			'mine',
+			// A Secret's cavern under the course: what's in it, then its hollow.
+			'secret-prop',
+			'secret',
 			// The ways moles have dug through the rock, its shelves too.
 			'mole-trail',
 			// The hole the bus bores through a Cave's rock, its shelves too.
@@ -143,6 +166,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createScenery(world),
 				// A giant's mouth, opening, over its face: after the scenery, over it.
 				...createGiantMouth(world),
+				// A haunted house's bats, window, monster and grave.
+				...createHauntedHouse(world),
 				// Just ahead of the runner, so they toe the line rather than stand on it.
 				...createBanner(world, START_X + HITBOX_HALF_WIDTH + 4, 'START'),
 				createParkrunSign(world, START_X - 190),
@@ -154,12 +179,16 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createLongJump(world),
 				...createBanner(world, world.terrain.finishX, 'FINISH'),
 				createRunDirector(world),
+				// Whoever's hiding on the course, waiting to be found.
+				...createFound(world),
 				...createPlatforms(world),
 				...createRails(world),
 				...createHut(world),
 				...createBusBore(world),
 				...createMine(world),
+				...createSecret(world),
 				...createMoleTrails(world),
+				...createRiver(world),
 				...createMineCarts(world),
 				...createFootballSprite(world),
 				...world.obstacles.flatMap((state, i) =>
@@ -189,7 +218,12 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createBackdrop(world, scene),
 				...createCaveCover(world, scene),
 				...createSeaFront(world, scene),
+				...createRiverFront(world),
 				...createWeather(world, scene),
+				// A night race's show: fire, searchlights and smoke.
+				...createPyro(world),
+				...createSearchlights(world),
+				...createSmoke(world),
 			)
 		},
 	})
@@ -197,17 +231,31 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 	// backdrop scroll: moved by a fraction of one, the sprites would be drawn
 	// a pixel out from the ground under them. It goes up and down too, and
 	// takes in more zoomed out: the canvas only paints what it sees.
-	const scroll = () => {
-		const camera = scene.canvas.get()
-		camera.setX(Math.round(world.camera()))
-		camera.setWidth(VIEW_WIDTH * world.zoom())
-		camera.setHeight(VIEW_HEIGHT * world.zoom())
-		camera.setY(cameraTop(world))
-	}
+	const scroll = () => syncCamera(world, scene)
 	scroll()
 	scene.tickers.add(scroll)
+	// A course's tune in other versions along it (see `tunes`): whichever's
+	// where the runner is, in the camera's view, in the menus, nothing.
+	if (world.course.tunes)
+		scene.tickers.add(() =>
+			playVersion(
+				tuneAlong(
+					world.course,
+					world.camera() + VIEW_WIDTH * world.zoom() * CAMERA_LEAD,
+				),
+			),
+		)
 	window.raceScene = scene
 	return scene
+}
+
+/** The scene's camera put where the world's is: see `createRaceScene`. */
+export function syncCamera(world: World, scene: Scene) {
+	const camera = scene.canvas.get()
+	camera.setX(Math.round(world.camera()))
+	camera.setWidth(VIEW_WIDTH * world.zoom())
+	camera.setHeight(VIEW_HEIGHT * world.zoom())
+	camera.setY(cameraTop(world))
 }
 
 /**

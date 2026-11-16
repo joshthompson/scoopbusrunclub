@@ -4,7 +4,9 @@ import { TOURISTS_HEIGHT, touristsWidth } from '../draw/art/tourists'
 import { TALL_HURDLE_CLEAR, TALL_HURDLE_HEIGHT } from '../draw/art/track'
 import { flyerLook } from '../draw/flyerLook'
 import { rideLook } from '../draw/rideLook'
+import { bonusRunner } from '../runners/bonus'
 import { collect } from '../saved/collected'
+import { unlockRunner } from '../saved/unlocked'
 import { play } from '../sfx'
 import {
 	GERM_GIVE,
@@ -16,9 +18,12 @@ import {
 } from './body'
 import { boardCarts, rideCart, stepCarts } from './carts'
 import { ceilingAt, inTunnel, rockOver } from './cave'
+import { cheats } from './cheats'
 import { PICKUP_WORD } from './collectables'
 import {
-	AIR_PUSH,
+	AIR_STEER,
+	AIR_STEER_BACK,
+	AIR_STEER_ON,
 	BARCODE_BOOST,
 	BARCODE_POINTS,
 	BARCODE_TALL,
@@ -89,7 +94,7 @@ import {
 } from './constants'
 import { MUMMY_HEIGHT } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
-import { cyclistAt } from './cyclists'
+import { cyclistAt, deckAt, deckUnder } from './cyclists'
 import { FIKA_SIZE } from './fika'
 import {
 	CONDOR_SPEED,
@@ -102,13 +107,40 @@ import {
 import { stepFootball } from './football'
 import { scoopFurbies, stepFurbies } from './furbies'
 import { atSea, glidingBox, stepGliding } from './gliders'
+import { DRAWN_FROM } from './groundColumns'
 import { HAT_RULES, type Hat, WORN_FIKA, sameHat } from './hats'
+import { hearHouse, stepHaunt } from './haunted'
 import { callOut, landLongJump, longJumpTakeOff, sandDrag } from './longJump'
 import { MOLE_HOP, burrowing, onMole } from './moles'
 import { mummyAt } from './mummies'
 import { bounceOff, scoopPack, stepPack } from './pack'
-import { landingOn, platformAt, platformMove } from './platforms'
+import {
+	landingOn,
+	platformAt,
+	platformMove,
+	setOffPlatforms,
+} from './platforms'
 import { busHeld, isHeld, portalCamera, stepPortals } from './portals'
+import {
+	RIVER_BUS_PACE,
+	WADE_TOP_SPEED,
+	bounceOnCrocodile,
+	inRiver,
+	touchedDown,
+	wading,
+} from './river'
+import { brokenHalf, sagOf, stepRopeBridges } from './ropeBridge'
+import {
+	atLaunch,
+	dropsIn,
+	fling,
+	flyOut,
+	goingIn,
+	keepIn,
+	secretCeiling,
+	secretRoof,
+	underground,
+} from './secret'
 import {
 	HANDS_HOLD,
 	HANDS_REACH,
@@ -135,6 +167,7 @@ import {
 import { steamFires } from './steam'
 import { TOWER_DOOR, TOWER_HEIGHT, towerSpan } from './towers'
 import {
+	BABY_BUS_PARKED,
 	type Body,
 	type BoostState,
 	type ObstacleState,
@@ -143,7 +176,7 @@ import {
 	bodyHeight,
 	isCaught,
 } from './world'
-import { zombieAt } from './zombies'
+import { wakeZombies, zombieAt } from './zombies'
 
 /** How long a popup stays up. */
 export const POPUP_TICKS = 45
@@ -157,6 +190,20 @@ export const OVERSPEED_GRIP = 0.008
 const RUN_OFF_SPEED = 6
 /** How far past the right of the screen they get before the summary comes up. */
 const RUN_OFF_PAST = 60
+/**
+ * Over the line, how far past it the first one in slows to a stop, to dance:
+ * in front of the bus, parked behind them, and in view. Everyone in after
+ * them stops `DANCE_APART` further back, down to `DANCE_NEAREST`.
+ */
+const DANCE_PAST = 340
+const DANCE_APART = 40
+const DANCE_NEAREST = 120
+/** How hard they slow down to stop there, a tick: they ease off from about 250px out. */
+const DANCE_BRAKE = 0.07
+/** How long they dance before the summary comes up. */
+const DANCE_TICKS = 100
+/** However they've got on over the line, how long before the summary comes up anyway. */
+const FINISHED_MOST_TICKS = 420
 /** How long the runner flies after being scooped before the result shows. */
 const SCOOPED_TICKS = 70
 /** How far down a Gap, below the Ground's line, a runner's Fallen. */
@@ -187,8 +234,15 @@ export function stepWorld(world: World) {
 	const frozen = stepPortals(world)
 	stepPhase(world, frozen)
 	if (!frozen) {
+		// A lift waiting for someone, set off by whoever's stood on it.
+		setOffPlatforms(world)
 		for (const racer of world.racers)
-			if (!isHeld(world, racer)) stepRunner(world, racer)
+			if (!isHeld(world, racer)) {
+				const wasX = racer.body.x
+				stepRunner(world, racer)
+				hearHouse(world, racer, wasX)
+			}
+		for (const racer of world.racers) noteDancing(world, racer)
 		stepPack(world)
 		stepFurbies(world)
 		stepCorgis(world)
@@ -196,12 +250,30 @@ export function stepWorld(world: World) {
 		stepCarts(world)
 		stepFootball(world)
 		stepFlyers(world)
+		wakeZombies(world)
 		for (const racer of world.racers)
 			if (!isHeld(world, racer)) collide(world, racer)
 		startleGeese(world)
 		if (!busHeld(world)) stepBus(world)
 	}
+	// Everyone else out running isn't stopped, though: on into the shrink
+	// ray after the Players, and shrunk away themselves, as it goes off.
+	else stepPack(world, true)
 	stepHeart(world)
+	// Rope bridges, giving under whoever's on them, Pacers too.
+	if (world.ropeBridges.length)
+		stepRopeBridges(
+			world.ropeBridges,
+			world.platforms,
+			world.terrain,
+			world.ticks(),
+			[
+				...world.racers
+					.filter((r) => !r.out)
+					.map((r) => ({ x: r.body.x, y: r.body.feetY })),
+				...world.pack.map((p) => ({ x: p.x, y: p.feetY })),
+			],
+		)
 	if (world.round) decideRound(world)
 	// The camera on the Portal going off, if one is; or as usual.
 	if (!portalCamera(world)) {
@@ -238,8 +310,12 @@ function stepPhase(world: World, frozen = false) {
 		if (!frozen) world.setRaceTicks(world.raceTicks() + 1)
 		for (const racer of world.racers) {
 			if (racer.out || racer.body.x < world.terrain.finishX) continue
+			const ahead = world.racers.filter((r) => r.out === 'finished').length
 			racer.out = 'finished'
 			racer.outAt = world.ticks()
+			racer.danceX =
+				world.terrain.finishX +
+				Math.max(DANCE_NEAREST, DANCE_PAST - ahead * DANCE_APART)
 			play('finished')
 			if (racer === world.racers[0] && !world.round) {
 				world.setPhase('finished')
@@ -250,11 +326,17 @@ function stepPhase(world: World, frozen = false) {
 		return
 	}
 	if (world.round) return
-	// Over the line: the summary once they've run off the screen.
+	// Over the line: the summary once they've stopped and danced a while
+	// (or, if they've somehow not, run off the screen, or long enough).
+	const player = world.racers[0]
 	if (
 		phase === 'finished' &&
 		!world.result() &&
-		world.body.x > world.camera() + VIEW_WIDTH + RUN_OFF_PAST
+		((player.dancingSince !== undefined &&
+			world.ticks() - player.dancingSince > DANCE_TICKS) ||
+			world.body.x > world.camera() + VIEW_WIDTH + RUN_OFF_PAST ||
+			(player.out === 'finished' &&
+				world.ticks() - player.outAt > FINISHED_MOST_TICKS))
 	)
 		world.setResult({
 			kind: 'finished',
@@ -405,6 +487,36 @@ function decideRound(world: World) {
 	}
 }
 
+/**
+ * Over the line, slowing down to stop where they're to dance (`danceX`):
+ * `vx` kept down to what stops them there, braking evenly, and never
+ * backwards, down a hill or not.
+ */
+export function slowToDance(racer: Racer, vx: number) {
+	if (racer.out !== 'finished' || racer.danceX === undefined) return vx
+	const left = Math.max(0, racer.danceX - racer.body.x)
+	return Math.max(0, Math.min(vx, Math.sqrt(2 * DANCE_BRAKE * left)))
+}
+
+/**
+ * Over the line and stood still, on their feet: dancing, from the tick they
+ * stopped (`dancingSince`). Not up in the air, on a glider, or on anything.
+ */
+function noteDancing(world: World, racer: Racer) {
+	const b = racer.body
+	const dancing =
+		racer.out === 'finished' &&
+		b.grounded &&
+		!b.gliding &&
+		b.mount === 0 &&
+		b.carried === 0 &&
+		Math.abs(b.vx) < DANCING_STILL
+	if (!dancing) racer.dancingSince = undefined
+	else racer.dancingSince ??= world.ticks()
+}
+/** How slow someone has to be going to be stood still, dancing. */
+export const DANCING_STILL = 0.3
+
 /** Whether a decided Round's done with: the winner's run on, and the last scooped landed. */
 export function roundOver(world: World) {
 	return !!world.order() && world.ticks() - world.decidedAt > WINNER_RUN_TICKS
@@ -496,6 +608,26 @@ function stepRunner(world: World, racer: Racer) {
 		b.wasUp = up
 		return
 	}
+	if (racing && stepHaunt(world, racer)) {
+		// In a haunted house's monster's clutches, or coming back up out of
+		// a grave as a ghost: nothing to do but wait.
+		b.wasUp = up
+		return
+	}
+	if (b.secret === 'flung') {
+		// Thrown up out of a Secret: nothing to do but fly, till they're up
+		// over the course again.
+		if (flyOut(world, b)) cameOut(world, racer)
+		b.wasUp = up
+		return
+	}
+	if (b.hanging) {
+		// Hanging on to the end of a rope bridge they've broken, swinging
+		// down with it: nothing to do but hold on, till they jump up out.
+		hang(world, racer, up)
+		b.wasUp = up
+		return
+	}
 	if (b.carried > 0 && up && !b.wasUp) {
 		// Jumping off a goose: up off it, as off the ground. Off a dragon's
 		// back, pushing off it, higher: high enough, just before a guard
@@ -562,8 +694,10 @@ function stepRunner(world: World, racer: Racer) {
 	}
 
 	if (b.grounded) {
-		// Platforms are flat.
-		const slope = b.on === undefined ? terrain.slope(b.x) : 0
+		b.airBase = undefined
+		// Platforms are flat, and so's a bed.
+		const slope =
+			b.on === undefined && !b.bed && !b.secret ? terrain.slope(b.x) : 0
 		// In a Tunnel: kept down in it, ducking or not, and going through it
 		// no slower than they went in.
 		const low = inTunnel(world, b.x, b.feetY)
@@ -601,9 +735,14 @@ function stepRunner(world: World, racer: Racer) {
 				b.vx = (b.vx < 0 ? -1 : 1) * Math.max(Math.abs(b.vx), b.tunnelSpeed)
 			}
 		} else {
-			const running = b.muddy
+			// Bogged down in mud, or wading a River.
+			const slowTo = b.muddy
 				? MUD_TOP_SPEED
-				: RUN_TOP_SPEED + (b.hat ? HAT_RULES[b.hat.kind].speed : 0)
+				: wading(world, b)
+					? WADE_TOP_SPEED
+					: undefined
+			const running =
+				slowTo ?? RUN_TOP_SPEED + (b.hat ? HAT_RULES[b.hat.kind].speed : 0)
 			// Squashed by a furby: slower, till they spring back up.
 			const top =
 				(b.squashed > 0 ? Math.min(running, SQUASHED_TOP_SPEED) : running) +
@@ -621,14 +760,18 @@ function stepRunner(world: World, racer: Racer) {
 				b.vx += (target - b.vx) * (boosted ? OVERSPEED_GRIP : RUN_GRIP)
 			} else b.vx *= COAST_KEEP
 			b.vx += hillPull(slope) * HILL_PULL
-			if (b.muddy && Math.abs(b.vx) > MUD_TOP_SPEED) b.vx *= 0.93
+			if (slowTo !== undefined && Math.abs(b.vx) > slowTo) b.vx *= 0.93
 			if (b.squashed > 0 && Math.abs(b.vx) > SQUASHED_TOP_SPEED) b.vx *= 0.95
+			b.vx = slowToDance(racer, b.vx)
 		}
 
 		// Through a long jump's sand: slowed down in it.
 		sandDrag(world, b)
 
 		if (up && !b.wasUp && !low) {
+			// Off a rope bridge that breaks: one more jump it's taken.
+			if (b.on !== undefined && world.platforms[b.on].rope?.breaks)
+				b.bridgeJumps = (b.bridgeJumps ?? 0) + 1
 			// On a Ride, it leaps, with them on its back; otherwise, a jump.
 			jump(b, b.mount > 0 ? RIDE_LEAP : JUMP_SPEED)
 			b.ducking = false
@@ -659,9 +802,33 @@ function stepRunner(world: World, racer: Racer) {
 			b.facing = 1
 			b.vx +=
 				((rideLook(world.course).speed ?? CORGI_GALLOP) - b.vx) * CORGI_GRIP
-		} else {
-			if (right) b.vx += AIR_PUSH
-			if (left) b.vx -= AIR_PUSH
+		} else if (b.climbing) {
+			// Up out of the gorge: straight up the bank's side till they're
+			// up over its top, then on, onto it.
+			if (b.feetY < b.climbing.top - CLIMB_OVER) {
+				b.vx = b.climbing.dir * CLIMB_ON
+				b.climbing = undefined
+			} else b.vx = 0
+		} else if (b.launchX === undefined) {
+			// Steering, a little on or a good deal back, off how fast they
+			// took off, the way they're facing. Not on a measured jump, a long
+			// jump's or off a ski jump: that's how far their run-up took them.
+			b.airBase ??= b.vx
+			const forward = b.airBase < 0 ? -1 : 1
+			const on = forward > 0 ? right && !left : left && !right
+			const back = forward > 0 ? left && !right : right && !left
+			const most = b.airBase + forward * AIR_STEER_ON
+			const least = b.airBase - forward * AIR_STEER_BACK
+			if (on)
+				b.vx =
+					forward > 0
+						? Math.max(b.vx, Math.min(most, b.vx + AIR_STEER))
+						: Math.min(b.vx, Math.max(most, b.vx - AIR_STEER))
+			if (back)
+				b.vx =
+					forward > 0
+						? Math.min(b.vx, Math.max(least, b.vx - AIR_STEER))
+						: Math.max(b.vx, Math.min(least, b.vx + AIR_STEER))
 		}
 		// A propeller beanie: holding jump on the way down, floating down.
 		b.floating =
@@ -684,11 +851,34 @@ function stepRunner(world: World, racer: Racer) {
 	const ticks = world.ticks()
 	if (b.grounded && b.on !== undefined)
 		b.x += platformMove(terrain, world.platforms[b.on], ticks).x
+	// Or a bed, wheeled along, as far as it's gone since last tick, turned
+	// round with it at the end of its way. Not if they're off it since, up
+	// in the air or put somewhere else.
+	if (b.bed && (!b.grounded || b.on !== undefined || b.feetY !== b.bed.top))
+		b.bed = undefined
+	const deck = b.bed && deckAt(world, b.bed.index)
+	if (b.bed && deck) {
+		b.x += deck.left - b.bed.left
+		b.bed.left = deck.left
+	}
 
 	// The bus is in the way long before this, but the ground runs out here.
 	const from = b.x
 	b.x = Math.max(LEFT_EDGE, b.x + b.vx)
-	if (racing) {
+	// Down a Secret's Gap, past its lip: on the way into it, not falling.
+	if (racing && goingIn(world, b)) b.secret = 'in'
+	// Or run onto an open manhole: down it, feet first.
+	else if (racing && dropsIn(world, b)) {
+		b.secret = 'in'
+		b.grounded = false
+		b.jumping = false
+		b.vy = Math.max(0, b.vy)
+		play('whoosh')
+		world.popup('Down the manhole!', b.x, b.feetY - 80)
+	}
+	// And in it, kept in it: nothing on the course over it in the way.
+	if (b.secret) keepIn(world, b, bodyHeight(b))
+	else if (racing) {
 		callOut(world, b, from)
 		hitWall(world, racer, from)
 		hitTower(world, racer, from)
@@ -696,8 +886,10 @@ function stepRunner(world: World, racer: Racer) {
 		if (!mole) hitRockFace(world, racer, from)
 	}
 
-	const ground = terrain.groundY(b.x)
-	const overGap = terrain.inGap(b.x)
+	// Down in a Secret, its floor's their Ground, with no Gap in it.
+	const secret = b.secret ? world.course.secret : undefined
+	const ground = secret ? secret.floor : terrain.groundY(b.x)
+	const overGap = !secret && terrain.inGap(b.x)
 	if (b.grounded) {
 		if (b.on !== undefined) {
 			const platform = world.platforms[b.on]
@@ -705,8 +897,13 @@ function stepRunner(world: World, racer: Racer) {
 			// Run off the end of it: off a solid shelf's corner once they're
 			// all off it (see `landingOn`).
 			const edge = platform.solid ? HITBOX_HALF_WIDTH : 0
-			if (b.x < at.left - edge || b.x > at.right + edge) leaveFooting(b)
-			else b.feetY = at.top
+			if (platform.broken || b.x < at.left - edge || b.x > at.right + edge)
+				leaveFooting(b)
+			else b.feetY = at.top + sagOf(world.ropeBridges, b.on, b.x)
+		} else if (b.bed) {
+			// Off the end of the bed, or the bus has scooped it out from under them.
+			if (!deck || b.x < deck.left || b.x > deck.right) leaveFooting(b)
+			else b.feetY = b.bed.top = deck.top
 		} else if (overGap || stepsDown(world, from, b.x, ground - b.feetY))
 			leaveFooting(b)
 		else b.feetY = ground
@@ -718,13 +915,15 @@ function stepRunner(world: World, racer: Racer) {
 		// mole: up into the rock it digs.
 		if (b.vy < 0 && !mole) {
 			const height = bodyHeight(b)
-			const over = ceilingAt(world, b.x, wasFeetY - height)
+			const over = secret
+				? secretCeiling(world, b.x)
+				: ceilingAt(world, b.x, wasFeetY - height)
 			// And the Cave's Ceiling over their front: under a roof sloping
 			// down ahead, a Tunnel's mouth, it's their front that bumps it,
 			// rather than rising on into the rock.
-			const ahead = world.course.cave?.ceiling(
-				b.x + b.facing * HITBOX_HALF_WIDTH,
-			)
+			const ahead = secret
+				? undefined
+				: world.course.cave?.ceiling(b.x + b.facing * HITBOX_HALF_WIDTH)
 			const ceiling =
 				ahead !== undefined && ahead <= wasFeetY - height + 1
 					? Math.max(ahead, over ?? ahead)
@@ -746,25 +945,46 @@ function stepRunner(world: World, racer: Racer) {
 						b.feetY,
 						b.dropping > 0 ? b.droppingFrom : undefined,
 						HITBOX_HALF_WIDTH,
+						(index, x) => sagOf(world.ropeBridges, index, x),
 					)
+				: undefined
+		// Or onto a bed, wheeled along.
+		const bed =
+			!platform && b.vy >= 0
+				? deckUnder(world, b.x, wasFeetY, b.feetY)
 				: undefined
 		if (platform && (overGap || platform.top <= ground)) {
 			b.feetY = platform.top
 			b.on = platform.index
 			land(b)
 			if (world.platforms[platform.index].tower) b.toppedTower = true
+			if (racing) bounceOnBridge(world, racer, platform.index)
+		} else if (bed && (overGap || bed.top <= ground)) {
+			b.feetY = bed.top
+			b.on = undefined
+			land(b)
+			b.bed = { index: bed.index, left: bed.left, top: bed.top }
 		} else if (!overGap && b.feetY >= ground && b.vy >= 0) {
 			b.feetY = ground
 			b.on = undefined
+			b.bridgeJumps = 0
 			land(b)
 		} else if (
 			racing &&
+			!b.climbing &&
 			b.feetY > ground + (atSea(world, b.x) ? 0 : FALL_DEPTH)
 		)
 			// Down a Gap, out of sight; into the sea, as they hit it.
 			fall(world, racer)
 	}
-	if (b.grounded) b.floor = b.feetY
+	if (b.grounded) {
+		b.floor = b.feetY
+		b.climbing = undefined
+	}
+	// At a Secret's far end: thrown back up out of it.
+	if (racing && atLaunch(world, b)) thrownOut(world, racer)
+	// Up to whoever's hiding on the course.
+	if (racing) meetFound(world, racer)
 	// Down from the long jump: how far.
 	if (b.grounded && b.launchX !== undefined) landLongJump(world, racer)
 }
@@ -809,6 +1029,7 @@ function jump(b: Body, speed = JUMP_SPEED) {
 /** Off whatever they were stood on, and falling. */
 function leaveFooting(b: Body) {
 	b.on = undefined
+	b.bed = undefined
 	b.grounded = false
 	b.vy = 0
 }
@@ -1022,7 +1243,7 @@ function sideOfShelf(
 	const height = bodyHeight(b)
 	let shelf: { index: number; top: number; under: number } | undefined
 	world.platforms.forEach((platform, index) => {
-		if (!platform.solid) return
+		if (!platform.solid || platform.broken) return
 		const at = platformAt(world.terrain, platform, ticks)
 		if (face < at.left - 1 || face > at.right + 1) return
 		const under = at.top + platform.solid
@@ -1059,6 +1280,96 @@ function sideOfShelf(
 	return true
 }
 
+/** From the last jump a rope bridge that breaks takes, how many it creaks for, first. */
+const CREAKS = 2
+/** How far in from either bank a rope bridge snaps, at the nearest. */
+const SNAP_IN = 40
+
+/**
+ * Down on a Platform from a jump. On a rope bridge that `breaks`, from yet
+ * another jump off it: creaking, near the end; and at the end, snapping
+ * under them. Not in a Round, where it'd leave everyone behind nothing to
+ * cross by.
+ */
+function bounceOnBridge(world: World, racer: Racer, index: number) {
+	const b = racer.body
+	const breaks = world.platforms[index].rope?.breaks
+	if (!breaks || world.round) {
+		b.bridgeJumps = 0
+		return
+	}
+	const jumps = b.bridgeJumps ?? 0
+	if (jumps >= breaks) breakBridge(world, racer, index)
+	else if (jumps >= breaks - CREAKS)
+		world.popup('Creak!', b.x, b.feetY - STAND_HEIGHT - 10)
+}
+
+/**
+ * A rope bridge snapping under someone, where they are: its two halves
+ * swing down to hang from the banks, and they hang on to the end of the
+ * one ahead of them, swinging down with it (see `hang`).
+ */
+function breakBridge(world: World, racer: Racer, index: number) {
+	const b = racer.body
+	const platform = world.platforms[index]
+	const x = Math.max(
+		platform.x + SNAP_IN,
+		Math.min(platform.x + platform.width - SNAP_IN, b.x),
+	)
+	platform.broken = { x, at: world.ticks() }
+	b.hanging = { index, side: b.facing < 0 ? 'near' : 'far' }
+	b.brokeBridge = true
+	b.bridgeJumps = 0
+	b.on = undefined
+	b.grounded = false
+	b.vx = 0
+	b.vy = 0
+	play('stomp')
+	world.popup('Snap!', x, b.feetY - STAND_HEIGHT - 10)
+}
+
+/** How far out from the end of a hanging half of a bridge whoever's on it is: off the bank's side. */
+const HANG_OUT = 18
+/** How high over the bank's top they jump, out of the gorge, to come down on it. */
+const CLIMB_CLEAR = 30
+/** Up over the bank's top by this much, they're on, onto it, this fast. */
+const CLIMB_OVER = 8
+const CLIMB_ON = 4
+
+/**
+ * Hanging on to the end of half a broken bridge, by their hands, under it:
+ * swinging down with it, then hanging from it, against the bank. Up, once
+ * it's still, and they jump up out of the gorge, high enough to be up over
+ * the bank's top (see `climbing`).
+ */
+function hang(world: World, racer: Racer, up: boolean) {
+	const b = racer.body
+	if (!b.hanging) return
+	const { index, side } = b.hanging
+	const half = brokenHalf(
+		world.terrain,
+		world.platforms[index],
+		side,
+		world.ticks(),
+	)
+	const dir = side === 'far' ? 1 : -1
+	b.x = half.end.x - dir * HANG_OUT * Math.abs(Math.sin(half.angle))
+	b.feetY = half.end.y + bodyHeight(b)
+	b.vx = 0
+	b.vy = 0
+	b.grounded = false
+	b.jumping = false
+	b.ducking = false
+	b.on = undefined
+	b.facing = dir
+	if (!half.settled || !up || b.wasUp) return
+	const top = world.terrain.groundY(half.pivot + dir * 20)
+	b.hanging = undefined
+	b.climbing = { dir, top }
+	b.vy = -Math.sqrt(2 * GRAVITY * (b.feetY - top + CLIMB_CLEAR))
+	play('whoosh')
+}
+
 /** Down a Gap, and out: or in Baby Mode, back on their feet past it. */
 function fall(world: World, racer: Racer) {
 	if (world.baby) return respawn(world, racer)
@@ -1084,6 +1395,69 @@ function fall(world: World, racer: Racer) {
 		b.x,
 		world.terrain.groundY(b.x) - 80,
 	)
+}
+
+/**
+ * At a Secret's far end: thrown back up out of it, high over the course,
+ * by whoever's waiting there. The first time, whoever that is is theirs to
+ * run as, if they're a bonus runner.
+ */
+function thrownOut(world: World, racer: Racer) {
+	const b = racer.body
+	fling(world, b)
+	b.foundSecret = true
+	play('whoosh')
+	world.popup(
+		world.course.secret?.duct ? 'Whoosh!' : 'Wheee!',
+		b.x,
+		b.feetY - 90,
+	)
+}
+
+/**
+ * Out of a Secret, thrown, at the top of their flight over the course: the
+ * first time, whoever threw them is theirs to run as, if they're a bonus
+ * runner. Said here, where they can see it, rather than down in the rock.
+ */
+function cameOut(world: World, racer: Racer) {
+	const b = racer.body
+	const unlocks = world.course.secret?.unlocks
+	const bonus = unlocks && bonusRunner(unlocks)
+	if (bonus && unlockRunner(bonus.id)) {
+		b.unlocked = bonus.id
+		play('cheer')
+		world.popup(`${bonus.name} unlocked!`, b.x, b.feetY - 90)
+	}
+}
+
+/** How near someone has to get to a hidden bonus runner, along and up or down, to have found them. */
+const FOUND_REACH = 24
+const FOUND_HEIGHT = 40
+
+/**
+ * Got to the course's hidden bonus runner (see `Course['found']`): hello,
+ * and the first time, they're theirs to run as.
+ */
+function meetFound(world: World, racer: Racer) {
+	const { found } = world.course
+	const b = racer.body
+	if (!found || b.metFound) return
+	if (
+		Math.abs(b.x - found.x) > FOUND_REACH ||
+		b.feetY > found.y + FOUND_HEIGHT ||
+		b.feetY < found.y - (found.over ?? FOUND_HEIGHT)
+	)
+		return
+	const bonus = bonusRunner(found.runner)
+	if (!bonus) return
+	b.metFound = true
+	// Waiting, they've said it already, stood up as they came.
+	if (found.says) world.popup(found.says, found.x, found.y - 80)
+	if (unlockRunner(bonus.id)) {
+		b.unlocked = bonus.id
+		play('cheer')
+		world.popup(`${bonus.name} unlocked!`, b.x, b.feetY - 110)
+	} else play('scan')
 }
 
 /** How far past a Gap, or the sea, someone's put back on their feet in Baby Mode. */
@@ -1163,11 +1537,26 @@ export function boost(world: World, vx: number, facing: 1 | -1, speed: number) {
 export const scored = (world: World, words: string, points: string) =>
 	world.round ? words : words ? `${words} ${points}` : points
 
+/**
+ * Of all the course's cones, or its Rings, how many they've had so far, for
+ * its popup to show, on a line of its own under the rest: "3/20". With its
+ * points, so not in a Round, where the counts are everyone's.
+ */
+function tally(world: World, kind: 'cones' | 'rings') {
+	const total =
+		kind === 'cones'
+			? world.obstacles.filter((s) => s.obstacle.kind === 'cone').length
+			: world.boosts.filter((s) => s.boost.kind === 'ring').length
+	return `${world.bonuses[kind].count}/${total}`
+}
+
 /** What a racer's run into this tick, and what it does to them. */
 function collide(world: World, racer: Racer) {
 	const { terrain } = world
 	const b = racer.body
 	if (world.phase() !== 'running' || racer.out) return
+	// Held by a monster, or coming up out of a grave: nor then.
+	if (b.haunt) return
 
 	// On a glider: lying along under its wing, it over them.
 	const box = b.gliding
@@ -1199,6 +1588,15 @@ function collide(world: World, racer: Racer) {
 	}
 
 	b.muddy = false
+	// Into a River, off its bank or down off a crocodile: a splash, once,
+	// on the way in.
+	touchedDown(b)
+	const wet = wading(world, b)
+	if (wet && !b.wading) {
+		play('squelch')
+		world.popup('Splash!', b.x, top)
+	}
+	b.wading = wet
 	/** On a corgi, over rocks, under branches and through the mud. Or carried over them, or in a cart. */
 	const riding = b.mount > 0 || b.carried > 0 || b.cart !== undefined
 	/**
@@ -1210,7 +1608,8 @@ function collide(world: World, racer: Racer) {
 	const freshFor = (state: ObstacleState) =>
 		!state.used && !state.hit.has(racer.id)
 	const hits = (state: ObstacleState | BoostState) => state.hit.add(racer.id)
-	for (const state of riding ? [] : world.obstacles) {
+	// Down in a Secret, under it all: nothing on the course to run into.
+	for (const state of riding || b.secret ? [] : world.obstacles) {
 		const o = state.obstacle
 		// Only what's near enough to touch: where it is now, for a cyclist,
 		// a Zombie or a Mummy on the move.
@@ -1266,18 +1665,31 @@ function collide(world: World, racer: Racer) {
 			case 'cone': {
 				// Into it: knocked over, flat, and on its way, costing a few
 				// points and a little speed. Not a stumble: no hat comes off.
+				// As big as the course's own, if it has one in its place.
 				const base = ground - (o.height ?? 0)
+				const own = world.course.look?.cone
+				const half = own ? own.width / 2 : CONE_HALF
+				const tall = own?.height ?? CONE_TALL
 				if (
 					!state.used &&
-					overlaps(o.x - CONE_HALF, o.x + CONE_HALF, base - CONE_TALL, base)
+					overlaps(o.x - half, o.x + half, base - tall, base)
 				) {
 					hits(state)
 					state.used = true
 					state.flown = world.ticks()
 					b.vx *= CONE_KEEP
 					world.addBonus('cones', -CONE_POINTS)
-					world.popup(scored(world, 'Bonk!', `-${CONE_POINTS}`), b.x, top)
-					play('stomp')
+					world.popup(
+						scored(
+							world,
+							own?.word ?? 'Bonk!',
+							`-${CONE_POINTS}\n${tally(world, 'cones')}`,
+						),
+						b.x,
+						top,
+					)
+					// A sandcastle's a soft thing to run into.
+					play(own?.crumbled ? 'squelch' : 'stomp')
 				}
 				break
 			}
@@ -1421,11 +1833,20 @@ function collide(world: World, racer: Racer) {
 					state.hit.clear()
 				}
 				const at = terrain.groundY(cyclist.x)
+				// One with a deck, a bed: only into its side, below that. On
+				// top of it, they're wheeled along on it.
+				const deck = deckAt(world, world.obstacles.indexOf(state))
 				if (
 					freshFor(state) &&
 					!state.scooped &&
 					b.stumble === 0 &&
-					overlaps(cyclist.x - 20, cyclist.x + 20, at - 40, at)
+					!(deck && b.bed?.index === deck.index) &&
+					overlaps(
+						cyclist.x - 20,
+						cyclist.x + 20,
+						deck ? deck.top + 6 : at - 40,
+						at,
+					)
 				) {
 					hits(state)
 					play('honk')
@@ -1439,7 +1860,6 @@ function collide(world: World, racer: Racer) {
 				if (
 					freshFor(state) &&
 					!state.scooped &&
-					zombie.sunk === 0 &&
 					b.stumble === 0 &&
 					overlaps(
 						zombie.x - 12,
@@ -1613,11 +2033,16 @@ function collide(world: World, racer: Racer) {
 				if (b.hat && HAT_RULES[b.hat.kind].germProof) {
 					play('stomp')
 					world.popup('Reflected!', b.x, top)
-				} else stumble('Atishoo!')
+				} else stumble(world.course.look?.germ?.word ?? 'Atishoo!')
 				break
 			}
 			case 'valve':
 				if (onValve(world, b, o.x)) state.flown = world.ticks()
+				break
+			case 'crocodile':
+				// Down onto its back: a bounce. Missed, there's nothing to run
+				// into: it's under the water, and they wade on past it.
+				bounceOnCrocodile(world, racer, state)
 				break
 			case 'mud':
 				// Bogging everyone down, and costing each of them once.
@@ -1649,6 +2074,9 @@ function collide(world: World, racer: Racer) {
 	for (const state of world.boosts) {
 		const o = state.boost
 		if (Math.abs(o.x - b.x) > 200) continue
+		// Down in a Secret, only what's down there with them: fika, under
+		// the Ground (a tavern's ale).
+		if (b.secret && (o.kind !== 'fika' || o.height >= 0)) continue
 		const ground = terrain.groundY(o.x)
 		switch (o.kind) {
 			case 'fika': {
@@ -1760,7 +2188,11 @@ function collide(world: World, racer: Racer) {
 					state.setCheering(RING_GLOW_TICKS)
 					b.vx = boost(world, b.vx, b.facing, RING_BOOST)
 					world.addBonus('rings', RING_POINTS)
-					world.popup(scored(world, 'Ring!', `+${RING_POINTS}`), b.x, top)
+					world.popup(
+						scored(world, 'Ring!', `+${RING_POINTS}\n${tally(world, 'rings')}`),
+						b.x,
+						top,
+					)
 					play('scan')
 				}
 				break
@@ -1778,7 +2210,15 @@ function collide(world: World, racer: Racer) {
 					state.setCheering(GATE_FLAP_TICKS)
 					b.vx = boost(world, b.vx, b.facing, GATE_BOOST)
 					world.addBonus('gates', GATE_POINTS)
-					world.popup(scored(world, 'Gate!', `+${GATE_POINTS}`), b.x, top)
+					world.popup(
+						scored(
+							world,
+							world.course.look?.gate?.word ?? 'Gate!',
+							`+${GATE_POINTS}`,
+						),
+						b.x,
+						top,
+					)
 					play('scan')
 				}
 				break
@@ -1858,6 +2298,17 @@ function stepBus(world: World) {
 
 	// Baby Mode: no bus, parked well out of the way.
 	if (phase === 'countdown' || world.baby) return
+	// Or switched off from the console, to test a course slowly; and back on,
+	// a leash's length behind whoever's furthest back.
+	if (cheats.busOff) {
+		bus.frontX = BABY_BUS_PARKED
+		bus.speed = 0
+		return
+	}
+	if (bus.frontX === BABY_BUS_PARKED) {
+		const back = Math.min(...world.racers.map((r) => r.body.x))
+		bus.frontX = back - BUS_LEASH_FULL
+	}
 
 	// Parked until a moment after "Go!", but run back into it and it'll still scoop.
 	const driving = world.raceTicks() - BUS_HOLD_TICKS
@@ -1882,8 +2333,12 @@ function stepBus(world: World) {
 			)
 		}
 		// Slowed going uphill, as everyone is: its wheels' slope. Down a ski
-		// slope, faster, but never faster than anyone can go.
-		const pace = bus.speed * busHill(world, bus.frontX)
+		// slope, faster, but never faster than anyone can go. Through a
+		// River, slowed down as much as anyone wading it.
+		const pace =
+			bus.speed *
+			busHill(world, bus.frontX) *
+			(inRiver(world, bus.frontX) ? RIVER_BUS_PACE : 1)
 		// Off a Leap, in a giant condor's talons: no faster than the condors
 		// carrying everyone down ahead of it, so it can't catch them while
 		// there's nothing they can do about it.
@@ -2021,7 +2476,7 @@ function knockOver(world: World) {
 		if (o.kind === 'zombie') {
 			if (state.scooped) continue
 			const zombie = zombieAt(world, { ...state, obstacle: o })
-			if (zombie.sunk > 0 || bus.frontX < zombie.x - 12) continue
+			if (bus.frontX < zombie.x - 12) continue
 			state.used = true
 			state.scooped = {
 				at: world.ticks(),
@@ -2208,10 +2663,10 @@ function downAhead(world: World, b: Body, low: number) {
  * `zoom`: no further down than where it starts, which is the course's
  * lowest.
  */
-function cameraYFor(high: number, low: number, zoom = 1) {
+function cameraYFor(high: number, low: number, zoom = 1, deep = false) {
 	const up = high - CAMERA_HEADROOM - VIEW_HEIGHT * (1 - zoom)
 	const down = low + CAMERA_FOOTROOM - VIEW_HEIGHT
-	return Math.min(0, Math.max(up, down))
+	return deep ? Math.max(up, down) : Math.min(0, Math.max(up, down))
 }
 
 /**
@@ -2227,6 +2682,19 @@ function leapView(world: World, b: Body) {
 		return undefined
 	const under = b.condorFrom ? 300 : b.feetY < catchLine(world) ? 160 : 240
 	return { high: b.feetY - 40, low: b.feetY + under }
+}
+
+/**
+ * Down a Secret: on the way down its shaft, the camera goes down with them,
+ * keeping what's under them in view; and once down in its cavern, the
+ * cavern, from over its roof to under its floor.
+ */
+function secretView(world: World, b: Body) {
+	const secret = world.course.secret
+	if (!secret || !underground(world, b)) return undefined
+	if (b.feetY < secretRoof(world))
+		return { high: b.feetY - 40, low: b.feetY + 220 }
+	return { high: secret.floor - 150, low: secret.floor }
 }
 
 /** How much sky over a glider's highest, and sea under the surface, the camera shows gliding. */
@@ -2262,13 +2730,23 @@ function stepCamera(world: World) {
 	const wantZoom = gliding?.zoom ?? 1
 	if (Math.abs(wantZoom - zoom) > 0.001)
 		world.setZoom(zoom + (wantZoom - zoom) * ZOOM_EASE)
-	const leaping = gliding ? undefined : leapView(world, b)
+	const leaping = gliding
+		? undefined
+		: (leapView(world, b) ?? secretView(world, b))
 	const view = gliding ?? leaping ?? lookAt(b)
+	// Down a Secret, the camera goes down under the Ground after them, as
+	// far as it takes: under Gamla Stan's street, that's under where it
+	// ever looks otherwise.
+	const deep = !gliding && !!secretView(world, b)
 	// Up a mountain, up the climb ahead too; down one, down the slope ahead.
 	if (!gliding && !leaping && !flyingHigh(b))
 		view.high = upAhead(world, b.x, b.facing, view.high)
+	// Somewhere tall, looking up at it.
+	const up = world.course.lookUp?.find((u) => b.x >= u.from && b.x < u.to)
+	if (up && !gliding && !leaping)
+		view.high = Math.min(view.high, up.top + CAMERA_HEADROOM)
 	if (!gliding && !leaping) view.low = downAhead(world, b, view.low)
-	const targetY = cameraYFor(view.high, view.low, world.zoom())
+	const targetY = cameraYFor(view.high, view.low, world.zoom(), deep)
 	const cameraY = world.cameraY()
 	// Quick after them, flying high, or dropping a long way.
 	const dropping = b.feetY > b.floor + CAMERA_DROP_ROOM
@@ -2278,7 +2756,10 @@ function stepCamera(world: World) {
 		const eased = cameraY + (targetY - cameraY) * lift
 		// And never so slow their feet go off the bottom of the screen.
 		const keepFeet = b.feetY + CAMERA_FOOTROOM - VIEW_HEIGHT
-		world.setCameraY(Math.min(0, Math.max(eased, keepFeet)))
+		const y = Math.max(eased, keepFeet)
+		// Never lower than the street but down a Secret; back up out of one,
+		// easing back up to it, rather than jumping.
+		world.setCameraY(deep ? y : Math.min(Math.max(0, cameraY), y))
 	}
 	// More of the screen ahead, whichever way they're running. Through the
 	// countdown, the bus parked behind everyone is in view too.
@@ -2290,7 +2771,7 @@ function stepCamera(world: World) {
 				: 1 - CAMERA_LEAD
 	world.view.lead += (lead - world.view.lead) * CAMERA_TURN
 	const target = Math.max(
-		LEFT_EDGE - VIEW_WIDTH * CAMERA_LEAD,
+		CAMERA_LEFTMOST,
 		Math.min(
 			world.terrain.finishX + CAMERA_PAST_FINISH - VIEW_WIDTH,
 			world.body.x - VIEW_WIDTH * world.view.lead,
@@ -2300,6 +2781,16 @@ function stepCamera(world: World) {
 	world.setCamera(camera + (target - camera) * 0.25)
 }
 
+/**
+ * The furthest left the camera goes: back past the roadblock at the left
+ * edge, but no further than the Ground's drawn from, so nobody ever sees
+ * past the start of the path.
+ */
+const CAMERA_LEFTMOST = Math.max(
+	DRAWN_FROM,
+	LEFT_EDGE - VIEW_WIDTH * CAMERA_LEAD,
+)
+
 /** Room the camera keeps behind the last Player in a Round, for the bus coming, and ahead of the first. */
 const ROUND_BEHIND = 220
 const ROUND_AHEAD = 420
@@ -2307,12 +2798,17 @@ const ROUND_AHEAD = 420
 const BUS_IN_VIEW = 520
 /** How far the camera zooms out to keep everyone in, at most. */
 export const MAX_ZOOM = 3
+/**
+ * And further, to keep in anyone down a Secret, deep under everyone else,
+ * as well as them: Everest's Yetis' den is deeper than `MAX_ZOOM` looks.
+ */
+const SECRET_MAX_ZOOM = 4.5
 /** How quickly it zooms, a share a tick. */
 const ZOOM_EASE = 0.04
 
 /**
  * A Round's camera: everyone still running in view, zoomed out up to
- * `MAX_ZOOM` to fit them all, the leader with room ahead. Anyone further
+ * `MAX_ZOOM` to fit them all (`SECRET_MAX_ZOOM`, with someone down a Secret), the leader with room ahead. Anyone further
  * back than that, the bus has got (see `ROUND_BUS_LEASH_MAX`). Through the
  * countdown, the bus parked behind is in too.
  */
@@ -2342,7 +2838,7 @@ function frameEveryone(world: World) {
 		glide?.high ?? Number.POSITIVE_INFINITY,
 		...running.map(
 			(r) =>
-				leapView(world, r.body)?.high ??
+				(leapView(world, r.body) ?? secretView(world, r.body))?.high ??
 				(flyingHigh(r.body)
 					? lookAt(r.body).high
 					: upAhead(world, r.body.x, r.body.facing, lookAt(r.body).high)),
@@ -2352,7 +2848,7 @@ function frameEveryone(world: World) {
 		glide?.low ?? Number.NEGATIVE_INFINITY,
 		...running.map(
 			(r) =>
-				leapView(world, r.body)?.low ??
+				(leapView(world, r.body) ?? secretView(world, r.body))?.low ??
 				downAhead(
 					world,
 					r.body,
@@ -2361,19 +2857,22 @@ function frameEveryone(world: World) {
 		),
 	)
 	const tall = (low + CAMERA_FOOTROOM - (high - CAMERA_HEADROOM)) / VIEW_HEIGHT
+	// Out further to fit someone down a Secret in too, but no wider for it.
+	const deep = running.some((r) => secretView(world, r.body))
 	const want = Math.max(
 		1,
-		Math.min(MAX_ZOOM, Math.max((front - back) / VIEW_WIDTH, tall)),
+		Math.min(MAX_ZOOM, (front - back) / VIEW_WIDTH),
+		Math.min(deep ? SECRET_MAX_ZOOM : MAX_ZOOM, tall),
 	)
 	const zoom = world.zoom() + (want - world.zoom()) * ZOOM_EASE
 	world.setZoom(zoom)
-	const targetY = cameraYFor(high, low, zoom)
+	const targetY = cameraYFor(high, low, zoom, deep)
 	world.setCameraY(world.cameraY() + (targetY - world.cameraY()) * CAMERA_LIFT)
 	const width = VIEW_WIDTH * zoom
 	// Room to spare goes behind the leader, evenly either side of everyone.
 	const spare = Math.max(0, width - (front - back))
 	const target = Math.max(
-		LEFT_EDGE - VIEW_WIDTH * CAMERA_LEAD,
+		CAMERA_LEFTMOST,
 		Math.min(
 			world.terrain.finishX + CAMERA_PAST_FINISH - width,
 			front > back + width ? front - width : back - spare / 2,

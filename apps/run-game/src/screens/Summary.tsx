@@ -1,4 +1,4 @@
-import { For, type JSX, Show } from 'solid-js'
+import { For, type JSX, Show, createEffect, on } from 'solid-js'
 import { SpecialGoalArt } from '../draw/art/goals'
 import { MedalArt } from '../draw/art/medal'
 import { flyerLook } from '../draw/flyerLook'
@@ -7,6 +7,7 @@ import { PX_PER_M } from '../game/constants'
 import { type Medal, medalScores } from '../game/medals'
 import type { BonusKind, Result, World } from '../game/world'
 import { ONLINE, type Tally } from '../online/runScores'
+import type { Playable } from '../runners/playable'
 import { identity } from '../saved/identity'
 import { ScoreFace } from '../ui/ScoreFace'
 import { onHover } from '../ui/hover'
@@ -22,6 +23,13 @@ export interface Placing {
 	endlessPlace?: number
 	/** A course just unlocked for practice, by finishing the one before it. */
 	unlocked?: string
+	/**
+	 * Bonus runners just unlocked, for the first time: found on the way
+	 * round, or for finishing every course. Most often none, now and then
+	 * one, and two at once can happen. Shown off before this, one at a time
+	 * (see `UnlockReveal`), not on it.
+	 */
+	newRunners: Playable[]
 	/** The medal this go got, if any, and whether it's the course's best yet. */
 	medal?: Medal
 	newMedal?: boolean
@@ -125,7 +133,11 @@ export function Summary(props: {
 										? flyerLook(world.course).rides
 										: bonus.kind === 'jumps' && world.course.longJump
 											? 'Long jump'
-											: BONUS_LABELS[bonus.kind]
+											: bonus.kind === 'gates' && world.course.look?.gate
+												? world.course.look.gate.name
+												: bonus.kind === 'cones' && world.course.look?.cone
+													? `${world.course.look.cone.name} ${world.course.look.cone.crumbled ? 'flattened' : 'knocked over'}`
+													: BONUS_LABELS[bonus.kind]
 							} ×${bonus.count}`,
 				points: bonus.points,
 			})),
@@ -145,14 +157,29 @@ export function Summary(props: {
 	const indexed = () => props.actions.map((action, i) => ({ action, i }))
 	const sendAction = () => indexed().find((a) => a.action.send)
 	const rest = () => indexed().filter((a) => !a.action.send)
+	/** The buttons, by index, to scroll to: see below. */
+	const buttons: HTMLButtonElement[] = []
+	// The panel scrolls, with a lot on it: a button picked with the arrows
+	// is scrolled to, if it's out of sight. Not to begin with, though: the
+	// top, how it went, is what's to see first.
+	createEffect(
+		on(
+			() => props.picked,
+			(i) => buttons[i]?.scrollIntoView({ block: 'nearest' }),
+			{ defer: true },
+		),
+	)
 	const button = (
 		{ action, i }: { action: SummaryAction; i: number },
 		style: JSX.CSSProperties,
-		on: JSX.CSSProperties,
+		picked: JSX.CSSProperties,
 	) => (
 		<button
+			ref={(el) => {
+				buttons[i] = el
+			}}
 			type="button"
-			style={{ ...style, ...(i === props.picked ? on : {}) }}
+			style={{ ...style, ...(i === props.picked ? picked : {}) }}
 			onMouseEnter={onHover(() => props.onPick(i))}
 			onClick={action.choose}
 		>
@@ -221,9 +248,10 @@ export function Summary(props: {
 								>
 									{special().goal}
 									{props.placing?.special
-										? props.placing.newSpecial
-											? ': done! First time!'
-											: ': done!'
+										? `${
+												// After a goal that's said with a "!" already, a new sentence.
+												/[!?.]$/.test(special().goal) ? ' Done!' : ': done!'
+											}${props.placing.newSpecial ? ' First time!' : ''}`
 										: ''}
 								</span>
 							</div>
@@ -242,7 +270,12 @@ export function Summary(props: {
 						{(line) => (
 							<div style={styles.line}>
 								<span style={styles.lineLabel}>{line.label}</span>
-								<span style={line.points < 0 ? styles.lost : undefined}>
+								<span
+									style={{
+										...styles.linePoints,
+										...(line.points < 0 ? styles.lost : {}),
+									}}
+								>
 									{line.label === 'Distance'
 										? number(line.points)
 										: `${line.points < 0 ? '-' : '+'}${number(Math.abs(line.points))}`}
@@ -366,6 +399,11 @@ const styles = {
 		gap: '10px',
 		width: '500px',
 		'max-height': 'calc(100% - 40px)',
+		// Scrolled, with more on it than fits: a special goal and a great
+		// many bonuses at once. New runners aren't on it (see `UnlockReveal`).
+		'overflow-y': 'auto',
+		'scrollbar-width': 'thin',
+		'scrollbar-color': 'rgba(255, 255, 255, 0.5) transparent',
 		'box-sizing': 'border-box',
 		padding: '18px 24px',
 		background: 'var(--ink)',
@@ -393,17 +431,21 @@ const styles = {
 	/** The points, in two columns. */
 	points: {
 		display: 'grid',
-		'grid-template-columns': '1fr 1fr',
+		// Each half the width, whatever's in it: a long label wraps, rather
+		// than pushing its column wider, off the panel.
+		'grid-template-columns': 'repeat(2, minmax(0, 1fr))',
 		gap: '4px 20px',
 		'font-size': '14px',
 	},
 	line: {
 		display: 'flex',
 		'justify-content': 'space-between',
+		'align-items': 'baseline',
 		gap: '8px',
-		'white-space': 'nowrap',
 	},
-	lineLabel: { opacity: 0.75, overflow: 'hidden', 'text-overflow': 'ellipsis' },
+	lineLabel: { opacity: 0.75, 'min-width': 0 },
+	/** The points: on one line, however long its label. */
+	linePoints: { 'white-space': 'nowrap' },
 	/** Points taken off, for hazards. */
 	lost: { color: '#ff8a80' },
 	totals: {

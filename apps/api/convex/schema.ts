@@ -14,6 +14,9 @@ export const hairValidator = v.union(
 	v.literal('ponytail'),
 	v.literal('bun'),
 	v.literal('curly'),
+	v.literal('mohawk'),
+	v.literal('afro'),
+	v.literal('mullet'),
 )
 export const facialHairValidator = v.union(
 	v.literal('beard'),

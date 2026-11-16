@@ -24,8 +24,15 @@ function cobbleHints(options: {
 	clusters: number
 	shade: string
 	glint: string
+	/** How wide and tall its stones are, in cells: the least, and how much more at most. */
+	stoneWidth?: [number, number]
+	stoneHeight?: [number, number]
+	/** How many stones together, at most. */
+	most?: number
 }) {
 	const { width, height, clusters, shade, glint } = options
+	const [wide, wider] = options.stoneWidth ?? [4, 3]
+	const [tall, taller] = options.stoneHeight ?? [3, 2]
 	const random = seeded(options.seed)
 	const art = tile(width * CELL, height * CELL)
 	const cell = (x: number, y: number, w: number, fill: string) =>
@@ -47,10 +54,10 @@ function cobbleHints(options: {
 		// Spread along the tile evenly, give or take, so no stretch is bare.
 		let x = Math.round(((i + random() * 0.8) * width) / clusters)
 		const y = Math.floor(random() * height)
-		const count = 1 + Math.floor(random() * 3)
+		const count = 1 + Math.floor(random() * (options.most ?? 3))
 		for (let n = 0; n < count; n++) {
-			const w = 4 + Math.floor(random() * 3)
-			const h = 3 + Math.floor(random() * 2)
+			const w = wide + Math.floor(random() * wider)
+			const h = tall + Math.floor(random() * taller)
 			// The next one along, or tucked in under and between them.
 			const under = n > 0 && random() < 0.35
 			stone(under ? x - w + 1 : x, under ? y + h + 1 : y, w, h)
@@ -79,3 +86,19 @@ export const GAMLA_STAN_SIDE_COBBLES = cobbleHints({
 	shade: 'rgba(60, 52, 44, 0.24)',
 	glint: 'rgba(255, 250, 240, 0.18)',
 }).pattern('gamla-stan-side-cobbles')
+
+/**
+ * Drottninggatan's, and Riksgatan's over on Helgeandsholmen: not cobbles
+ * but big granite slabs, a joint here and there.
+ */
+export const GRANITE_SLABS = cobbleHints({
+	seed: 1257,
+	width: 320,
+	height: 18,
+	clusters: 6,
+	shade: 'rgba(47, 42, 37, 0.3)',
+	glint: 'rgba(255, 250, 240, 0.2)',
+	stoneWidth: [16, 8],
+	stoneHeight: [6, 2],
+	most: 2,
+}).pattern('granite-slabs')

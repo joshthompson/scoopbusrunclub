@@ -2,9 +2,17 @@ import type { RunnerName } from '@/data/runners'
 import busAsset from '../assets/bus/bus.png'
 import scoopAsset from '../assets/bus/scoop.png'
 import windowAsset from '../assets/bus/windows.png'
-import { PATH_BACK, PATH_FRONT, START_X, VERGE } from '../game/constants'
+import {
+	PATH_BACK,
+	PATH_FRONT,
+	START_X,
+	VERGE,
+	VIEW_HEIGHT,
+} from '../game/constants'
 import { EVEREST_FIKA } from '../game/fika'
+import { CAMERA_HEADROOM, MAX_ZOOM } from '../game/step'
 import { type Gap, type Terrain, withGaps } from '../game/terrain'
+import { YETI } from '../runners/bonus'
 import {
 	EVEREST_FACE,
 	EVEREST_HORIZONS,
@@ -21,10 +29,25 @@ import {
 	tent,
 	yak,
 } from './kit/everestScenery'
+import {
+	DEN_SIGN,
+	LAMP,
+	LAUNCHER,
+	PORTRAIT,
+	TELLY,
+	YETI_SOFAS,
+} from './kit/everestSecret'
 import { withHat } from './kit/hats'
 import { nearGap, scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
-import type { Course, CourseDefinition, Obstacle, Scenery } from './types'
+import type {
+	Course,
+	CourseDefinition,
+	Obstacle,
+	Scenery,
+	Secret,
+	SecretProp,
+} from './types'
 
 /**
  * Everest: up, and up, and up, to the top of the world. The first course
@@ -245,6 +268,70 @@ const terrain: Terrain = withGaps(
 	ledges,
 )
 
+/**
+ * The Yetis' den: down the last crevasse of the Icefall, not a fall but a
+ * way in, a long way down, into a cavern under the course, sofas and a
+ * telly in it. The Yeti waits at its far end, under Camp 2, to throw you
+ * back up out of it, high over the camp, and down on the mountain past it.
+ * Finding him is the special goal.
+ */
+/**
+ * How far under the crevasse's lip the den's roof is: deeper than a Round's
+ * camera, zoomed right out, ever looks under the course, so it's never seen
+ * from up there. Zoomed out, it keeps the highest anyone's stood its
+ * headroom under the top of the screen, and the rest of the screen's under
+ * them; and more, for the mountain being lower behind the crevasse, where a
+ * leader can be with the den just in view ahead.
+ */
+const DEN_ROOF_UNDER = VIEW_HEIGHT * MAX_ZOOM - CAMERA_HEADROOM + 280
+
+const DEN = (() => {
+	const [along, width] = CREVASSES[CREVASSES.length - 1]
+	const gap = { from: START_X + along, to: START_X + along + width }
+	const launch = START_X + 12380
+	return {
+		gap,
+		from: gap.from - 140,
+		to: launch + 120,
+		// Way down under the crevasse's lip: see `DEN_ROOF_UNDER`.
+		floor: Math.round(groundY(gap.from)) + DEN_ROOF_UNDER + 230,
+		room: 230,
+		launch,
+		peak: 360,
+		land: START_X + 13050,
+		// And there he is: the Yeti, to run as.
+		unlocks: YETI.id,
+	} satisfies Secret
+})()
+
+/**
+ * The Yetis' den's furniture, against its back wall: lamps, their warm
+ * light; tellies, their screens flickering, their blue light; sofas, each
+ * on a rug; and the family portrait, hung up over it all.
+ */
+const LAMP_PROP: SecretProp = {
+	frames: [LAMP.asset],
+	width: LAMP.width,
+	height: LAMP.height,
+	glow: { x: 0, y: LAMP.height - 8, reach: 60, colour: '#ffd76a' },
+}
+const TELLY_PROP: SecretProp = {
+	...TELLY,
+	glow: { x: 6, y: TELLY.height - 12, reach: 46, colour: '#9ad7ff' },
+}
+const SOFA_PROPS: SecretProp[] = YETI_SOFAS.map((sofa) => ({
+	frames: [sofa.asset],
+	width: sofa.width,
+	height: sofa.height,
+	rug: true,
+}))
+const PORTRAIT_PROP: SecretProp = {
+	frames: [PORTRAIT.asset],
+	width: PORTRAIT.width,
+	height: PORTRAIT.height,
+	hung: 120,
+}
+
 /** Whether `along` is in a camp, or just either side of one. */
 const inCamp = (along: number, room = 0) =>
 	CAMPS.some((c) => along > c.from - room && along < c.to + room)
@@ -408,6 +495,13 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 		if (piece) out.push({ ...piece, x: Math.round(x) })
 	}
 
+	// At the lip of the crevasse down to the Yetis' den, a hint: an old
+	// signpost, pointing down. Nothing else stood too near it.
+	const sign = DEN.gap.from - 24
+	for (let i = out.length - 1; i >= 0; i--)
+		if (Math.abs(out[i].x - sign) < 50) out.splice(i, 1)
+	out.push({ x: sign, asset: DEN_SIGN, scale: 2, setBack: 2 })
+
 	// The summit: prayer flags, all over it.
 	for (const along of [LENGTH - 120, LENGTH + 60, LENGTH + 220])
 		out.push({
@@ -513,6 +607,28 @@ export const everest: CourseDefinition = {
 				foot: '#2b2b2b',
 			},
 		},
+		// The Yetis' den: a lamp as you land, two sofas, each with its telly
+		// to its left, turned to it, another lamp, the family portrait on
+		// the wall, and the run up to the Yeti.
+		secret: {
+			walls: 'ice',
+			launcher: LAUNCHER,
+			furnishings: [
+				{ x: START_X + 11320, prop: LAMP_PROP },
+				{ x: START_X + 11440, prop: TELLY_PROP },
+				{ x: START_X + 11540, prop: SOFA_PROPS[0] },
+				{ x: START_X + 11760, prop: TELLY_PROP },
+				{ x: START_X + 11860, prop: SOFA_PROPS[1] },
+				{ x: START_X + 12000, prop: LAMP_PROP },
+				// The family, on the wall at the far end, by the Yeti.
+				{ x: START_X + 12200, prop: PORTRAIT_PROP },
+			],
+		},
+	},
+	secret: DEN,
+	special: {
+		goal: 'Find the yeti',
+		done: (run) => !!run.foundSecret,
 	},
 	// A bobble hat, high over a flat stretch up the mountain: too high to
 	// jump for, only got by bouncing up off someone's head.

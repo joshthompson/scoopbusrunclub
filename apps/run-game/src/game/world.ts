@@ -21,7 +21,9 @@ import {
 import { createFootball } from './football'
 import type { Hat } from './hats'
 import { lineUp } from './pack'
+import { racePlatforms } from './platforms'
 import type { PortalRun } from './portals'
+import { createRopeBridges } from './ropeBridge'
 import type { Terrain } from './terrain'
 
 /**
@@ -60,6 +62,10 @@ export interface Racer {
 	/** Plain state, like the body: why they stopped, and the tick they did. */
 	out?: Out
 	outAt: number
+	/** Over the line: where they slow to a stop, to dance. */
+	danceX?: number
+	/** The tick they started dancing, stopped there; undefined till they have. */
+	dancingSince?: number
 }
 
 /**
@@ -128,10 +134,22 @@ export interface Body {
 	 * it, along its way down to the valley floor (see `rideCondor`).
 	 */
 	condorFrom?: { x: number; y: number }
+	/**
+	 * Down a Secret's Gap (see `Secret`): `in` its cavern, its floor their
+	 * Ground, or on down its shaft to it; or `flung`, thrown back up out of
+	 * it, flying, till they're up over the course again (see `secret.ts`).
+	 */
+	secret?: 'in' | 'flung'
 	/** Ticks before another Player can bounce on their head again. */
 	stomped: number
 	/** The Platform they're stood on, by its index: on the Ground if none. */
 	on?: number
+	/**
+	 * Or the deck of the cyclist they're stood on, being wheeled along: by
+	 * its index in the world's obstacles, where its left end was last tick,
+	 * and how high, to tell they're still on it (see `deckAt`).
+	 */
+	bed?: { index: number; left: number; top: number }
 	/** Ticks left of dropping through `on`'s Platform, ducked off it. */
 	dropping: number
 	/** Which one that is. */
@@ -170,6 +188,50 @@ export interface Body {
 	toppedTower?: boolean
 	/** Germs popped, landing on them: Karolinska's special goal. */
 	germsPopped?: number
+	/**
+	 * How many of a River's crocodiles they're on, bouncing in turn from the
+	 * first, without touching down; and the most they've managed, every one
+	 * of them the Pyramids' special goal.
+	 */
+	crocChain?: number
+	crocBest?: number
+	/**
+	 * How fast they were going as they left the ground, or last bounced off
+	 * something: steering in the air goes no further off it than
+	 * `AIR_STEER_ON` and `AIR_STEER_BACK`. None, on the ground.
+	 */
+	airBase?: number
+	/** In a River, wading, last tick: to splash in only on the way in. */
+	wading?: boolean
+	/** Been down a Secret, and thrown back up out of it: Everest's special goal. */
+	foundSecret?: boolean
+	/** The bonus runner they unlocked on this course, by runner id, if they did: for the finish screen. */
+	unlocked?: string
+	/** Got to the course's hidden bonus runner, this go (see `Course['found']`). */
+	metFound?: boolean
+	/** How many times running they've jumped off a rope bridge that `breaks`: on the ground, back to none. */
+	bridgeJumps?: number
+	/**
+	 * Hanging on to the end of one half of a rope bridge they've broken,
+	 * Platform `index`'s, `near` or `far`, swinging down with it, and then
+	 * hanging there, till they jump up out (see `breakBridge`).
+	 */
+	hanging?: { index: number; side: 'near' | 'far' }
+	/**
+	 * Jumped up out of the gorge off it, `dir` the bank's way: straight up
+	 * the bank's side till they're up over its top, at `top`, then on onto it.
+	 */
+	climbing?: { dir: number; top: number }
+	/** Broke a rope bridge, jumping on it: Machu Picchu's special goal. */
+	brokeBridge?: boolean
+	/**
+	 * In a haunted house's monster's clutches, since tick `at`: `caught`, up
+	 * in its attic, held there; then `rising`, up out of a grave past the
+	 * house (see `haunted.ts`).
+	 */
+	haunt?: { stage: 'caught' | 'rising'; at: number }
+	/** Killed by its monster, and come back a ghost: Halloween Town's special goal. */
+	ghost?: boolean
 }
 
 /**
@@ -215,8 +277,12 @@ export interface Pacer {
 	on?: number
 	/** How fast they went into the Tunnel they're in: they go through it no slower. */
 	tunnelSpeed?: number
-	/** Ducked under a low branch or a tall hurdle, as anyone: see `duckUnder`. */
+	/** Down, sliding, under a low branch or a tall hurdle, or down a hill, as anyone: see `duckUnder`. */
 	ducking?: boolean
+	/** Ticks left of sliding down the hill they're on, for the fun of it: see `slideDownhill`. */
+	hillSlide?: number
+	/** Ticks since they got into a shrink ray, being shrunk away on its plate: see `PACER_SHRINK`. */
+	shrink?: number
 	/** On a glider, out over the sea, as anyone: see `flyPacer`. */
 	gliding?: boolean
 	/** On skis or a snowboard, down The Slopes, as anyone: see `skiPacer`. */
@@ -293,6 +359,8 @@ export interface Corgi {
 	rare?: boolean
 	/** A glider's, flying off with no one on it: how long it's been going. */
 	adrift?: number
+	/** Up off the ground under its rider, last tick: for a trick, as it leaves it. */
+	aloft?: boolean
 }
 
 /**
@@ -353,7 +421,8 @@ export interface ObstacleState {
 	scooped?: { at: number; vx: number; x?: number }
 	/**
 	 * Geese, disturbed: when they took off (see `gooseTakeoff`). A Steam
-	 * Vent: when it last puffed.
+	 * Vent: when it last puffed. A Zombie: when it woke, by the race's
+	 * clock (see `wakeZombies`).
 	 */
 	flown?: number
 	/** A cyclist riding round a loop: how many times round it's been. */
@@ -616,7 +685,7 @@ export function createWorld(
 	const popup = (text: string, x: number, y: number) =>
 		setPopups((all) => [...all, { id: popupId++, text, x, y, born: ticks() }])
 
-	/** How much of the course the camera shows: 1, or up to `MAX_ZOOM` zoomed out to frame a Round. */
+	/** How much of the course the camera shows: 1, or up to `MAX_ZOOM` zoomed out to frame a Round (more, with someone down a Secret). */
 	const [zoom, setZoom] = createSignal(1)
 	/** Who's won a Round, and in what order everyone came, once it's decided. */
 	const [order, setOrder] = createSignal<Racer[]>()
@@ -710,11 +779,22 @@ export function createWorld(
 		/** Its football, if it has one: see `Football`. Plain state, like the body. */
 		ball: createFootball({ football: course.football, terrain }),
 		/** The course's Platforms, which move with the tick: see `platformAt`. */
-		platforms: course.platforms ?? [],
+		platforms: racePlatforms(course.platforms ?? []),
+		/** Its rope bridges, sagging under whoever's on them: see `ropeBridge`. Plain state. */
+		ropeBridges: createRopeBridges(course.platforms ?? []),
 		/** A Portal at work, if one is: see `portals`. Plain state, like the body. */
 		portal: undefined as PortalRun | undefined,
 		/** The course's Portals that have gone off, and let everyone through, by index. */
 		portalsDone: new Set<number>(),
+		/**
+		 * A haunted house's bats, when they burst out of its door, and its
+		 * window, when it was smashed, if they have been (see `haunted.ts`).
+		 * Plain state: the sounds only. What's drawn goes by where everyone is.
+		 */
+		house: {
+			batsAt: undefined as number | undefined,
+			smashedAt: undefined as number | undefined,
+		},
 		corgis: (course.corgis ?? []).map(
 			(x, id): Corgi => ({
 				id,

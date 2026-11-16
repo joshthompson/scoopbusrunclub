@@ -981,18 +981,20 @@ export const scoopLine: CourseDefinition = {
 		],
 		// The water between the quays and the ferry, under it, and all
 		// round it: open water, out at sea.
-		bridge: {
-			from: QUAY_END,
-			to: TURKU,
-			underside: '#6a7178',
-			highlight: '#9aa1a8',
-			underbelly: '#3a4047',
-			water: SEA,
-			rail: '#e8ecef',
-			quay: quayWall,
-			open: true,
-			stoneBefore: true,
-		},
+		bridges: [
+			{
+				from: QUAY_END,
+				to: TURKU,
+				underside: '#6a7178',
+				highlight: '#9aa1a8',
+				underbelly: '#3a4047',
+				water: SEA,
+				rail: '#e8ecef',
+				quay: quayWall,
+				open: true,
+				stoneBefore: true,
+			},
+		],
 		cave: {
 			rock: FERRY_WHITE,
 			seam: '#c9ced0',

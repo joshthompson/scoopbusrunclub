@@ -7,6 +7,12 @@ import tree2 from '../assets/scenery/tree2.png'
 import { PATH_BACK, START_X } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { createTerrain } from '../game/terrain'
+import { pinesFar, pinesNear } from './kit/backdrops'
+import {
+	HUDDINGE_FLOOR,
+	HUDDINGE_TRAIL,
+	texturedGround,
+} from './kit/groundTextures'
 import { withHat } from './kit/hats'
 import { huddingeLedgeArt } from './kit/huddinge-ledge'
 import { STEP_M, heights } from './kit/huddinge-profile'
@@ -151,6 +157,22 @@ export const huddinge: CourseDefinition = {
 			'brightness(0.66) saturate(1.3) hue-rotate(-6deg)',
 		],
 		foliage: SHADE,
+		// Ridges of pines, one behind another: far off and blue in the haze
+		// over the far hills, then a dark wall of them over the middle ones.
+		hillBands: [
+			{ asset: pinesFar, top: 118, height: 100, parallax: 0.15, over: 'far' },
+			{
+				asset: pinesNear,
+				top: 140,
+				height: 120,
+				parallax: 0.25,
+				over: 'middle',
+			},
+		],
+		// Its forest floor, moss and needles and fallen leaves, and needles
+		// and roots across its trail.
+		ground: texturedGround('huddinge-floor', 'huddinge-trail'),
+		groundDefs: HUDDINGE_FLOOR + HUDDINGE_TRAIL,
 		// A wall of pines over the hills.
 		far: [
 			piece(tree2, 110, 'brightness(0.7)'),

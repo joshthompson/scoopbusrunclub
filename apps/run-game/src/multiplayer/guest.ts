@@ -57,6 +57,66 @@ export function rememberMode(key: string, mode: PadMode) {
 	}
 }
 
+/** How long a Room's remembered for, for joining it again without asking how. */
+const LAST_ROOM_MS = 6 * 60 * 60 * 1000
+
+/**
+ * The Room this device was last in, under `key`, and how it played there,
+ * if it was in the last few hours: scanning its QR code again, or
+ * reloading, goes straight back in, the same way.
+ */
+export function lastRoom(
+	key: string,
+): { code: string; mode: PadMode } | undefined {
+	try {
+		const saved = JSON.parse(
+			localStorage.getItem(`${STORAGE_PREFIX}${key}`) ?? 'null',
+		)
+		if (
+			typeof saved?.code === 'string' &&
+			(saved.mode === 'remote' || saved.mode === 'controller') &&
+			typeof saved.at === 'number' &&
+			Date.now() - saved.at < LAST_ROOM_MS
+		)
+			return { code: saved.code, mode: saved.mode }
+	} catch {
+		// Nothing remembered.
+	}
+	return undefined
+}
+export function rememberRoom(
+	key: string,
+	room?: { code: string; mode: PadMode },
+) {
+	try {
+		if (room)
+			localStorage.setItem(
+				`${STORAGE_PREFIX}${key}`,
+				JSON.stringify({ ...room, at: Date.now() }),
+			)
+		else localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
+	} catch {
+		// Asked again next time, that's all.
+	}
+}
+
+/** What this device's Player goes by in Rooms, if they've said. */
+export function savedPlayerName(): string {
+	try {
+		return localStorage.getItem(`${STORAGE_PREFIX}player-name`) ?? ''
+	} catch {
+		return ''
+	}
+}
+export function savePlayerName(name: string) {
+	try {
+		if (name) localStorage.setItem(`${STORAGE_PREFIX}player-name`, name)
+		else localStorage.removeItem(`${STORAGE_PREFIX}player-name`)
+	} catch {
+		// Kept till the page closes: the Host has it anyway.
+	}
+}
+
 /**
  * Whether `runner` is who the Host says this device picked: a custom
  * runner's id there has the device's in it too.
@@ -92,6 +152,8 @@ export function joinAsGuest(props: {
 	mode: () => PadMode
 	/** A computer, showing the Room as the Host does. */
 	screen?: boolean
+	/** What its Player goes by, as it says when it says hello. */
+	name?: () => string
 	/** What its Player's holding. */
 	held: () => Controls
 }) {
@@ -124,6 +186,7 @@ export function joinAsGuest(props: {
 		device,
 		mode: props.mode(),
 		...(props.screen ? { screen: true } : {}),
+		...(props.name ? { name: props.name() } : {}),
 	})
 
 	/**
@@ -250,6 +313,10 @@ export function joinAsGuest(props: {
 		/** Watching the big screen, or the race here. */
 		switchMode(mode: PadMode) {
 			send({ type: 'mode', mode })
+		},
+		/** Going by `name`, or, blank, their runner's. */
+		rename(name: string) {
+			send({ type: 'name', name })
 		},
 		/** Giving its seat up. */
 		leave() {

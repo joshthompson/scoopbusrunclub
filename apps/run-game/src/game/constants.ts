@@ -33,6 +33,11 @@ export const DEPTH_SLANT = 56
  * high stretches, the scenery behind would otherwise be distant hills.
  */
 export const VERGE = 24
+/**
+ * How far back from the path the scenery stands, so the grass at a tree's foot
+ * stays off it: they're only for looking at, nothing to run into.
+ */
+export const SCENERY_SET_BACK = 10
 /** Where the runner starts, and where the start line is. */
 export const START_X = 200
 /**
@@ -97,8 +102,19 @@ export const JUMP_SPEED = 9.5
  */
 export const JUMP_CUT = 2
 export const GRAVITY = 0.45
-/** Air control, a little either way. */
+/** Air control on skis, a little either way. */
 export const AIR_PUSH = 0.04
+/**
+ * Air control running: holding left or right in the air steers a jump,
+ * this much a tick, up to `AIR_STEER_ON` faster than they took off (or
+ * last bounced off something), or `AIR_STEER_BACK` slower: enough to land
+ * where they meant to, not enough to fly. Less on than back, since
+ * everyone's holding on as they run: a jump's only a little longer for
+ * it, but held back, it's a good deal shorter.
+ */
+export const AIR_STEER = 0.2
+export const AIR_STEER_ON = 1.5
+export const AIR_STEER_BACK = 3
 /** How tall the runner's hitbox is, standing and ducking. */
 export const STAND_HEIGHT = 52
 export const DUCK_HEIGHT = 28
@@ -344,13 +360,14 @@ export const BUS_RAMP_TICKS = 2400
  * little, but never with too big a lead.
  */
 export const BUS_LEASH_FULL = 900
-export const BUS_LEASH_MAX = 1200
+/** 400 m. */
+export const BUS_LEASH_MAX = 1600
 /**
- * In a multiplayer Round, longer: 450 m. It's the leader that pulls the
+ * In a multiplayer Round, longer: 550 m. It's the leader that pulls the
  * bus along, so this is how far behind them anyone can be before it's got
  * them.
  */
-export const ROUND_BUS_LEASH_MAX = 1800
+export const ROUND_BUS_LEASH_MAX = 2200
 /** How much the leash lengthens a tick at the end of it, up to `BUS_LEASH_FULL`, and just past it. */
 export const BUS_LEASH_GROWTH = 3
 export const BUS_LEASH_LATE_GROWTH = 0.6

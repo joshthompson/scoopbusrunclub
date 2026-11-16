@@ -408,18 +408,39 @@ export function portalCamera(world: World) {
 }
 
 /**
- * Whether `x` is where everyone's shrunk: from a shrink ray's way in on to
- * where the next sneeze lets them out. Nobody else out running is in
- * there: the Pacers go into the ray and are gone, and nobody joins.
+ * The shrink ray whose shrunk stretch `x` is in, if it's in one: from its
+ * way in on to where the next sneeze lets everyone out.
  */
-export function shrunkAt(course: { portals?: Portal[] }, x: number) {
+export function shrinkRayOver(course: { portals?: Portal[] }, x: number) {
 	const portals = course.portals ?? []
-	return portals.some((portal, i) => {
+	return portals.find((portal, i) => {
 		if (portal.kind !== 'shrink') return false
 		const back = portals.slice(i + 1).find((p) => p.kind === 'grow')
 		return x >= portal.in && x < (back?.out ?? Number.POSITIVE_INFINITY)
 	})
 }
+
+/**
+ * Whether `x` is where everyone's shrunk: from a shrink ray's way in on to
+ * where the next sneeze lets them out. Nobody else out running is in
+ * there: the Pacers go into the ray, are shrunk away to nothing on its
+ * plate (see `PACER_SHRINK`), and nobody joins.
+ */
+export const shrunkAt = (course: { portals?: Portal[] }, x: number) =>
+	!!shrinkRayOver(course, x)
+
+/**
+ * A Pacer into a shrink ray, on their own: stood on its plate, it charges
+ * up for `charge` ticks, shrinks them down, as small as anyone gets, by
+ * `shrunk`, and at `gone` they're gone. Quicker than for Players, with
+ * nobody else to wait for, and no camera to dive in after them.
+ */
+export const PACER_SHRINK = { charge: 30, shrunk: 84, gone: 90 }
+
+/** How small a Pacer being shrunk is, `t` ticks into it: as a Player shrinks, `shrunk`. */
+export const pacerShrunk = (t: number) =>
+	SMALLEST **
+	ease((t - PACER_SHRINK.charge) / (PACER_SHRINK.shrunk - PACER_SHRINK.charge))
 
 /**
  * How far a Portal going off has got, for drawing it: `t` ticks since it

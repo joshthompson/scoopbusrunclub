@@ -36,11 +36,8 @@ const ZOMBIES: Playable['sprite'][] = (Object.keys(runners) as RunnerName[])
  */
 export const ZOMBIE_FILTER = ZOMBIE_TINT
 
-/** Who a Zombie was: a club member, `who` picking which, or a skeleton. */
-export function zombieSprite(zombie: { who: number; skeleton?: boolean }) {
-	if (zombie.skeleton)
-		// As it is: white bones, no glow.
-		return { sprite: SKELETON_SPRITE, filter: undefined }
+/** Who a Zombie was: a club member, `who` picking which. */
+export function zombieSprite(zombie: { who: number }) {
 	return {
 		sprite: ZOMBIES[zombie.who % ZOMBIES.length],
 		filter: ZOMBIE_FILTER,

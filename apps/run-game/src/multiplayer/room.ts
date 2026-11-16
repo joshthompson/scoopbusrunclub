@@ -1,5 +1,6 @@
 import { createSignal, onCleanup } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
+import type { Hat } from '../game/hats'
 import {
 	type Controls,
 	NOTHING_HELD,
@@ -8,20 +9,27 @@ import {
 	touchControls,
 	unpackControls,
 } from '../input'
+import { bonusRunner, unlockedRunners } from '../runners/bonus'
 import { type CustomRunner, customRunners } from '../runners/customRunners'
-import { MEMBERS, type Playable, customPlayable } from '../runners/playable'
+import {
+	CLUB,
+	MEMBERS,
+	type Playable,
+	customPlayable,
+} from '../runners/playable'
 import { openRoom } from './connection'
-import type {
-	GameMode,
-	PadMessage,
-	PadMode,
-	PadView,
-	PlayerStatus,
-	RaceFrame,
-	RaceStart,
-	RoomMode,
-	RoomStage,
-	RoomView,
+import {
+	type GameMode,
+	type PadMessage,
+	type PadMode,
+	type PadView,
+	type PlayerStatus,
+	type RaceFrame,
+	type RaceStart,
+	type RoomMode,
+	type RoomStage,
+	type RoomView,
+	cleanPlayerName,
 } from './protocol'
 
 /** At most this many Players in a Room. */
@@ -63,6 +71,8 @@ export interface Seat {
 	character?: string
 	/** A phone's custom runner, which only it had until it picked it. */
 	custom?: CustomRunner
+	/** What they go by, if they've said: their runner's name otherwise. */
+	name?: string
 	ready: boolean
 	/** A phone that's dropped out, and when. Its seat's kept a while (see `LOST_SEAT_MS`). */
 	lostAt?: number
@@ -70,6 +80,8 @@ export interface Seat {
 	points: number
 	/** Joined while a Round was on: in from the next. */
 	waiting: boolean
+	/** On the Podium: the hat they finished the last Round in, still on. */
+	hat?: Hat
 }
 
 /** How long a phone that drops out keeps its seat, for coming back. */
@@ -77,22 +89,33 @@ export const LOST_SEAT_MS = 60_000
 /** How often phones are told what to show, even when nothing's changed. */
 const VIEW_EVERY_MS = 250
 
-/** Every member, then the Host's own custom runners: who a Local Player can be. */
+/**
+ * The Host's own custom runners, then anyone unlocked here, then the club:
+ * who a Local Player can be.
+ */
 export const localCharacters = (): Playable[] => [
 	...customRunners().map(customPlayable).reverse(),
-	...MEMBERS_BY_NAME,
+	...unlockedRunners(),
+	...CLUB,
 ]
 
-export const MEMBERS_BY_NAME = [...MEMBERS].sort((a, b) =>
-	a.name.localeCompare(b.name),
-)
-
-/** Who a seat's Player runs as, if they've picked. */
+/**
+ * Who a seat's Player runs as, if they've picked: called what they go by,
+ * if they've said, wherever they're named (over their head, in the lobby,
+ * the Results, on the Podium).
+ */
 export function seatPlayable(seat: Seat): Playable | undefined {
+	const runner = seatRunner(seat)
+	return runner && seat.name ? { ...runner, name: seat.name } : runner
+}
+
+function seatRunner(seat: Seat): Playable | undefined {
 	if (!seat.character) return undefined
 	if (seat.custom) return { ...customPlayable(seat.custom), id: seat.character }
 	return (
 		MEMBERS.find((m) => m.id === seat.character) ??
+		// Unlocked on their phone, if not here.
+		bonusRunner(seat.character) ??
 		localCharacters().find((c) => c.id === seat.character)
 	)
 }
@@ -121,6 +144,8 @@ export function createRoom(code: string) {
 	const [seats, setSeats] = createStore<Seat[]>([])
 	const [stage, setStage] = createSignal<RoomStage>('lobby')
 	const [paused, setPaused] = createSignal(false)
+	/** A Round on its start screen: its Starter's Player number (see `PadView`). */
+	const [waitingForStarter, setWaitingForStarter] = createSignal<number>()
 	const [course, setCourse] = createSignal('')
 	/** How each seat's doing in the Round, for their phone: the Party says. */
 	let statusOf: (
@@ -239,6 +264,7 @@ export function createRoom(code: string) {
 					? was.colour
 					: freeColour(),
 			points: was?.points ?? 0,
+			name: seat.name ?? was?.name,
 			ready: false,
 			waiting: stage() !== 'lobby' && stage() !== 'starting',
 			...(character ? { character, custom: was?.custom } : {}),
@@ -359,6 +385,10 @@ export function createRoom(code: string) {
 				: message.character
 			pick(seat.id, character, message.custom)
 		}
+		if (message.type === 'name')
+			update(seat.id, (s) => {
+				s.name = cleanPlayerName(message.name) || undefined
+			})
 		if (message.type === 'mode') {
 			update(seat.id, (s) => {
 				s.mode = message.mode
@@ -433,6 +463,7 @@ export function createRoom(code: string) {
 			number: seats.indexOf(seat) + 1,
 			colour: seat.colour,
 			character: seat.character,
+			name: seat.name,
 			ready: seat.ready,
 			taken: taken(seat),
 			stage: stage(),
@@ -449,6 +480,7 @@ export function createRoom(code: string) {
 			of: round?.of,
 			points: seat.points,
 			paused: paused(),
+			waitingForStarter: waitingForStarter(),
 			course: course(),
 			roomMode: lobby().roomMode,
 			gameMode: lobby().gameMode,
@@ -510,6 +542,10 @@ export function createRoom(code: string) {
 		paused,
 		setPaused(next: boolean) {
 			setPaused(next)
+			tellPhones()
+		},
+		setWaitingForStarter(number: number | undefined) {
+			setWaitingForStarter(number)
 			tellPhones()
 		},
 		course,

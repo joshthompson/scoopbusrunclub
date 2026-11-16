@@ -9,6 +9,7 @@ import {
 } from 'solid-js'
 import { COURSES } from './courses'
 import type { Course } from './courses/types'
+import { podiumTests } from './debug'
 import type { Hat } from './game/hats'
 import { playMenu, playTune, unlockMusic } from './music/music'
 import type { CustomRunner } from './runners/customRunners'
@@ -47,10 +48,19 @@ type Screen =
 	| { kind: MenuScreen }
 	| { kind: 'edit'; runner?: CustomRunner }
 	| { kind: 'courses'; runner: Playable }
-	| { kind: 'play'; runner: Playable; course: Course; mode: Mode }
+	| {
+			kind: 'play'
+			runner: Playable
+			course: Course
+			mode: Mode
+			/** Another go at it: no start screen this time. */
+			restart?: boolean
+	  }
 	| { kind: 'party' }
 	/** Joined to someone else's Room, from this computer: `code`, if it came with one. */
 	| { kind: 'join'; code?: string }
+	/** A Podium to try out, from the console: the `test`th (see `testPodium()`). */
+	| { kind: 'testPodium'; test: number }
 
 type Play = Extract<Screen, { kind: 'play' }>
 
@@ -58,6 +68,8 @@ type Play = Extract<Screen, { kind: 'play' }>
 const Party = lazy(() => import('./multiplayer/Party'))
 /** And joining someone else's, from a computer. */
 const Joined = lazy(() => import('./multiplayer/Joined'))
+/** A Podium to try out, from the console: with Multi Player's chunk. */
+const TestPodium = lazy(() => import('./multiplayer/TestPodium'))
 
 export function App(props: {
 	/** Opened from a Room's link on a computer: joining it, with its code. */
@@ -79,6 +91,11 @@ export function App(props: {
 	/** Where the title menu was left, so coming back to it starts there. */
 	const [titleItem, setTitleItem] = createSignal(0)
 	const go = (kind: MenuScreen) => () => setScreen({ kind })
+	// `testPodium()` in the console: straight to one.
+	createEffect(() => {
+		const test = podiumTests()
+		if (test) setScreen({ kind: 'testPodium', test })
+	})
 
 	// The music: a course's tune while it's run, and in the menus, the menus'
 	// own till a course has been run, then whatever was last on. Multi
@@ -112,7 +129,8 @@ export function App(props: {
 		},
 	})
 	/** Endless's next course, round to the first again after the last. */
-	const next = (play: Play, score: number, hat?: Hat): Play => {
+	const next = (was: Play, score: number, hat?: Hat): Play => {
+		const play = { ...was, restart: false }
 		// Practising: the next course along, to practise.
 		if (play.mode.kind !== 'endless') {
 			const index = COURSES.findIndex((course) => course.id === play.course.id)
@@ -129,8 +147,10 @@ export function App(props: {
 		}
 	}
 	/** The same again, as a new object so the game's rebuilt: Endless from the start. */
-	const retry = (play: Play): Play =>
-		play.mode.kind === 'endless' ? endless(play.runner) : { ...play }
+	const retry = (play: Play): Play => ({
+		...(play.mode.kind === 'endless' ? endless(play.runner) : play),
+		restart: true,
+	})
 
 	return (
 		<Switch>
@@ -140,6 +160,14 @@ export function App(props: {
 			 */}
 			<Match when={screen().kind === 'party'}>
 				<Party onLeave={go('title')} />
+			</Match>
+			<Match
+				when={screen().kind === 'testPodium' && (screen() as { test: number })}
+				keyed
+			>
+				<Stage>
+					<TestPodium onLeave={go('title')} />
+				</Stage>
 			</Match>
 			<Match when={screen().kind === 'join' && screen()}>
 				{(join) => (
@@ -258,6 +286,7 @@ export function App(props: {
 							setScreen({ kind: 'courses', runner: play.runner })
 						}
 						onMenu={go('title')}
+						restart={play.restart}
 					/>
 				)}
 			</Match>

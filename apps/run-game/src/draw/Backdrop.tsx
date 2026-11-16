@@ -14,6 +14,7 @@ import { svgUrl } from '../courses/kit/pixelArt'
 import { seeded } from '../courses/kit/seeded'
 import type {
 	BackdropPiece,
+	BridgeLook,
 	CourseLook,
 	PitLook,
 	SkyFlyer,
@@ -350,6 +351,13 @@ export function Backdrop(props: { world: View }) {
 		/>
 	)
 
+	/** The course's own bands among the hills, after `over`. */
+	const hillBands = (over: 'far' | 'middle') => (
+		<For each={(look.hillBands ?? []).filter((b) => b.over === over)}>
+			{(b) => band(b.asset, b.top, b.height, b.parallax, undefined)}
+		</For>
+	)
+
 	/** A horizon's bands, far to near, each its colour on down below it. */
 	const horizonBands = (horizon: NonNullable<typeof look.horizon>) => (
 		<>
@@ -367,6 +375,10 @@ export function Backdrop(props: { world: View }) {
 					/>
 				)}
 			</Show>
+			{/* Further off still, back to front. */}
+			<For each={horizon.farther ?? []}>
+				{(b) => band(b.asset, b.top, b.height, b.parallax, undefined)}
+			</For>
 			{/* Spires and towers rising out of the far roofs, behind them. */}
 			<Show when={horizon.spires}>
 				{(spires) =>
@@ -403,7 +415,7 @@ export function Backdrop(props: { world: View }) {
 			/>
 			<For each={horizon.nearer ?? []}>
 				{(nearer, i) => {
-					const top = HORIZON + NEARER_TOP + i() * NEARER_STEP
+					const top = nearer.top ?? HORIZON + NEARER_TOP + i() * NEARER_STEP
 					return (
 						<>
 							{band(
@@ -519,15 +531,15 @@ export function Backdrop(props: { world: View }) {
 						{/* Over a bridge, the water, from it right back to the
 						    buildings' feet across it, on their quay: where the
 						    bridge is, going by as the course does. */}
-						<Show when={look.bridge}>
+						<For each={look.bridges ?? []}>
 							{(bridge) => (
 								<BridgeWater
 									world={props.world}
-									bridge={bridge()}
+									bridge={bridge}
 									top={HORIZON - 40 + SKYLINE_HEIGHT - 1}
 								/>
 							)}
-						</Show>
+						</For>
 					</>
 				)}
 			</Show>
@@ -541,7 +553,9 @@ export function Backdrop(props: { world: View }) {
 			>
 				{band(bg3Asset, 196, 43, 0.12, look.hills?.[0])}
 				<Scattered world={props.world} scattering={far} />
+				{hillBands('far')}
 				{band(bg2Asset, 216, 46, 0.22, look.hills?.[1])}
+				{hillBands('middle')}
 				{/* Level with the middle hills, as in the header: any lower and the
 				    sky shows through between them. */}
 				{band(bg1Asset, HORIZON, 150, FIELD_PARALLAX, look.hills?.[2])}
@@ -563,6 +577,27 @@ export function Backdrop(props: { world: View }) {
 export const QUAY_EDGE = 6
 export const QUAY_STONE = '#8a8278'
 export const QUAY_LIT = '#b3ab9f'
+/**
+ * The land's edges either side of a bridge's water, going back from the
+ * path, in perspective: slanting away from the bridge's ends, out under
+ * whatever's standing either side, `QUAY_SPREAD` further out at the far
+ * quay than at the path, over the top `QUAY_SLANT` of the water.
+ */
+export const QUAY_SPREAD = 96
+export const QUAY_SLANT = 48
+/**
+ * How far in from its far ends a bridge's water's edge is, `down` from its
+ * top: none at the far quay, out under the land; all of `spread` a slant
+ * down, at the bridge's ends. In 2 px steps.
+ */
+export const quayInset = (down: number, spread: number) =>
+	Math.round((spread * Math.min(1, Math.max(0, down) / QUAY_SLANT)) / 2) * 2
+/** Its rows, 2 px each, down its slant: each's `y` from its top, and its inset. */
+export const quaySlantRows = (spread: number) =>
+	Array.from({ length: QUAY_SLANT / 2 }, (_, i) => ({
+		y: i * 2,
+		inset: quayInset(i * 2, spread),
+	}))
 
 /** Ripples on water, light and dark: a tile, as an image's URL. */
 export const rippleTile = (water: string) =>
@@ -587,19 +622,43 @@ export const rippleTile = (water: string) =>
  */
 function BridgeWater(props: {
 	world: View
-	bridge: NonNullable<NonNullable<World['course']['look']>['bridge']>
+	bridge: BridgeLook
 	top: number
 }) {
 	const { bridge } = props
+	/** How far out under the land either side it goes at the far quay: none, out on open water. */
+	const spread = bridge.open ? 0 : QUAY_SPREAD
 	/** Out on open water, all along the course; or across under the bridge. */
-	const from = bridge.open ? DRAWN_FROM : bridge.from
-	const to = bridge.open ? props.world.terrain.finishX + 1600 : bridge.to
+	const from = (bridge.open ? DRAWN_FROM : bridge.from) - spread
+	const to =
+		(bridge.open ? props.world.terrain.finishX + 1600 : bridge.to) + spread
 	const width = to - from
 	const ripples = rippleTile(bridge.water)
 	/** Lined up with the Ground's ripples, from its own left edge, along and down. */
 	const along = (((DRAWN_FROM - from) % 64) + 64) % 64
 	const down = ((-(props.top + QUAY_EDGE) % 18) + 18) % 18
 	const left = () => Math.round(from - props.world.camera())
+	const rows = quaySlantRows(spread)
+	/** Its shape: its edges stepping in, down the slant, then straight down. */
+	const shape = (() => {
+		const last = spread
+		const leftEdge = rows.flatMap(({ y, inset }) => [
+			`${inset}px ${y}px`,
+			`${inset}px ${y + 2}px`,
+		])
+		const rightEdge = rows
+			.toReversed()
+			.flatMap(({ y, inset }) => [
+				`${width - inset}px ${y + 2}px`,
+				`${width - inset}px ${y}px`,
+			])
+		return `polygon(${[
+			...leftEdge,
+			`${last}px 100%`,
+			`${width - last}px 100%`,
+			...rightEdge,
+		].join(', ')})`
+	})()
 	return (
 		<div
 			style={{
@@ -614,34 +673,69 @@ function BridgeWater(props: {
 				style={{
 					position: 'absolute',
 					inset: 0,
-					top: bridge.open ? 0 : `${QUAY_EDGE}px`,
-					'background-color': bridge.water,
-					'background-image': `url("${ripples}")`,
-					'background-position': `${along}px ${down}px`,
+					'clip-path': bridge.open ? undefined : shape,
 				}}
-			/>
-			{/* The quay along the buildings' feet, lit along its top: none
-			    out on open water. */}
-			<div
-				hidden={bridge.open}
-				style={{
-					position: 'absolute',
-					left: 0,
-					right: 0,
-					top: 0,
-					height: `${QUAY_EDGE}px`,
-					background: QUAY_STONE,
-					'border-top': `2px solid ${QUAY_LIT}`,
-					'box-sizing': 'border-box',
-				}}
-			/>
-			{/* The land's stone edges, either end, down into the water. */}
+			>
+				<div
+					style={{
+						position: 'absolute',
+						inset: 0,
+						top: bridge.open ? 0 : `${QUAY_EDGE}px`,
+						'background-color': bridge.water,
+						'background-image': `url("${ripples}")`,
+						'background-position': `${along}px ${down}px`,
+					}}
+				/>
+				{/* The quay along the buildings' feet, lit along its top: none
+				    out on open water. */}
+				<div
+					hidden={bridge.open}
+					style={{
+						position: 'absolute',
+						left: 0,
+						right: 0,
+						top: 0,
+						height: `${QUAY_EDGE}px`,
+						background: QUAY_STONE,
+						'border-top': `2px solid ${QUAY_LIT}`,
+						'box-sizing': 'border-box',
+					}}
+				/>
+			</div>
+			{/* The land's stone edges, either end, slanting away from the
+			    bridge, then down into the water. */}
 			<Show when={!bridge.open}>
-				<div style={{ ...quayEnd, left: 0 }} />
-				<div style={{ ...quayEnd, right: 0 }} />
+				<For each={rows}>
+					{({ y, inset }) => (
+						<>
+							<div style={{ ...quayStep, top: `${y}px`, left: `${inset}px` }} />
+							<div
+								style={{
+									...quayStep,
+									top: `${y}px`,
+									left: `${width - inset - 4}px`,
+								}}
+							/>
+						</>
+					)}
+				</For>
+				<div
+					style={{ ...quayEnd, top: `${QUAY_SLANT}px`, left: `${spread}px` }}
+				/>
+				<div
+					style={{ ...quayEnd, top: `${QUAY_SLANT}px`, right: `${spread}px` }}
+				/>
 			</Show>
 		</div>
 	)
+}
+
+/** A step of the land's stone edge, down its slant. */
+const quayStep: JSX.CSSProperties = {
+	position: 'absolute',
+	width: '4px',
+	height: '2px',
+	background: QUAY_STONE,
 }
 
 const quayEnd: JSX.CSSProperties = {
@@ -1125,78 +1219,86 @@ export function Ground(props: { world: View }) {
 	}
 
 	/**
-	 * A bridge the course ends on: the water behind the path, its far rail,
-	 * its underside under the path, and the water on down in front.
+	 * Each bridge: the water behind the path, its far rail, its underside
+	 * under the path, and the water on down in front.
 	 */
-	const bridge = props.world.course.look?.bridge
-	/**
-	 * How deep the bridge is, `x` along it: deep at its ends, where it sits
-	 * on the land, and slim in the middle, as Guldbron is.
-	 */
-	const bridgeDepth = (x: number) => {
-		if (!bridge) return 0
-		const t = (x - bridge.from) / (bridge.to - bridge.from)
-		const fromMiddle = (2 * t - 1) ** 2
-		return Math.round(BRIDGE_SLIM + (BRIDGE_DEEP - BRIDGE_SLIM) * fromMiddle)
+	const bridgeParts = (bridge: BridgeLook) => {
+		/**
+		 * How deep the bridge is, `x` along it: deep at its ends, where it sits
+		 * on the land, and slim in the middle, as Guldbron is.
+		 */
+		const bridgeDepth = (x: number) => {
+			const t = (x - bridge.from) / (bridge.to - bridge.from)
+			const fromMiddle = (2 * t - 1) ** 2
+			return Math.round(BRIDGE_SLIM + (BRIDGE_DEEP - BRIDGE_SLIM) * fromMiddle)
+		}
+		/** Off the bridge, at `x`: before it, or on land again past it. */
+		const offBridge = (x: number) => x < bridge.from || x >= bridge.to
+		return {
+			/**
+			 * The water behind the path along the bridge: right back to the
+			 * water behind, in the backdrop (see `BridgeWater`), all the way to
+			 * its ends, where the land's quay is.
+			 */
+			behind: columns((x, ground) =>
+				offBridge(x) || bridge.open
+					? undefined
+					: [ground - PATH_BACK - BRIDGE_BEHIND, ground - PATH_BACK],
+			),
+			rail: columns((x, ground) =>
+				offBridge(x)
+					? undefined
+					: [ground - PATH_BACK - 4, ground - PATH_BACK + 2],
+			),
+			posts: columns((x, ground) =>
+				offBridge(x) || Math.floor(x / STEP) % 6
+					? undefined
+					: [ground - PATH_BACK - 18, ground - PATH_BACK],
+			),
+			/** The top of its side, catching the light. */
+			highlight: columns((x, ground) =>
+				offBridge(x)
+					? undefined
+					: [ground + PATH_FRONT, ground + PATH_FRONT + 4],
+			),
+			side: columns((x, ground) =>
+				offBridge(x)
+					? undefined
+					: [ground + PATH_FRONT + 4, ground + PATH_FRONT + bridgeDepth(x) - 5],
+			),
+			/** Its underbelly, in its own shadow. */
+			underbelly: columns((x, ground) =>
+				offBridge(x)
+					? undefined
+					: [
+							ground + PATH_FRONT + bridgeDepth(x) - 5,
+							ground + PATH_FRONT + bridgeDepth(x),
+						],
+			),
+			water: columns((x, ground) =>
+				offBridge(x)
+					? undefined
+					: [ground + PATH_FRONT + bridgeDepth(x), VIEW_HEIGHT],
+			),
+			/**
+			 * The land past the bridge, Slussen past Guldbron: its stone, from
+			 * the path's front edge down, as far as it goes.
+			 */
+			stone: columns(
+				(x, ground) =>
+					(x >= bridge.to + QUAY_WIDTH - QUAY_OVER &&
+						x < (bridge.stoneUntil ?? Number.POSITIVE_INFINITY)) ||
+					(bridge.stoneBefore && x < bridge.from - QUAY_WIDTH + QUAY_OVER)
+						? [ground + PATH_FRONT, VIEW_HEIGHT]
+						: undefined,
+				// Not down a Gap: a river, past it, is the river.
+				false,
+			),
+		}
 	}
-	/**
-	 * How much water shows behind the path along the bridge: right back to
-	 * the water behind, in the backdrop (see `BridgeWater`), all the way to
-	 * its ends, where the land's quay is.
-	 */
-	const waterBehind = () => (bridge ? BRIDGE_BEHIND : 0)
-	/** Off the bridge, at `x`: before it, or on land again past it. */
-	const offBridge = (x: number) => !bridge || x < bridge.from || x >= bridge.to
-	const bridgeParts = bridge && {
-		behind: columns((x, ground) =>
-			offBridge(x) || bridge.open
-				? undefined
-				: [ground - PATH_BACK - waterBehind(), ground - PATH_BACK],
-		),
-		rail: columns((x, ground) =>
-			offBridge(x)
-				? undefined
-				: [ground - PATH_BACK - 4, ground - PATH_BACK + 2],
-		),
-		posts: columns((x, ground) =>
-			offBridge(x) || Math.floor(x / STEP) % 6
-				? undefined
-				: [ground - PATH_BACK - 18, ground - PATH_BACK],
-		),
-		/** The top of its side, catching the light. */
-		highlight: columns((x, ground) =>
-			offBridge(x) ? undefined : [ground + PATH_FRONT, ground + PATH_FRONT + 4],
-		),
-		side: columns((x, ground) =>
-			offBridge(x)
-				? undefined
-				: [ground + PATH_FRONT + 4, ground + PATH_FRONT + bridgeDepth(x) - 5],
-		),
-		/** Its underbelly, in its own shadow. */
-		underbelly: columns((x, ground) =>
-			offBridge(x)
-				? undefined
-				: [
-						ground + PATH_FRONT + bridgeDepth(x) - 5,
-						ground + PATH_FRONT + bridgeDepth(x),
-					],
-		),
-		water: columns((x, ground) =>
-			offBridge(x)
-				? undefined
-				: [ground + PATH_FRONT + bridgeDepth(x), VIEW_HEIGHT],
-		),
-		/** Slussen, past the bridge: its stone, from the path's front edge down. */
-		slussen: columns(
-			(x, ground) =>
-				x >= bridge.to + QUAY_WIDTH - QUAY_OVER ||
-				(bridge.stoneBefore && x < bridge.from - QUAY_WIDTH + QUAY_OVER)
-					? [ground + PATH_FRONT, VIEW_HEIGHT]
-					: undefined,
-			// Not down a Gap: a river, past it, is the river.
-			false,
-		),
-	}
+	const bridges = (props.world.course.look?.bridges ?? []).map(
+		(look, index) => ({ look, index, parts: bridgeParts(look) }),
+	)
 
 	// The path, with the line everyone runs along down its middle, and the
 	// grass on down to the bottom of the screen in front of it.
@@ -1409,124 +1511,129 @@ export function Ground(props: { world: View }) {
 						</>
 					)}
 				</Show>
-				{/* A bridge, over the water. */}
-				<Show when={bridgeParts && bridge}>
-					{(look) => (
-						<>
-							<defs>
-								{/* Ripples on the water, light and dark, deeper down darker. */}
-								<pattern
-									id="water-ripples"
-									patternUnits="userSpaceOnUse"
-									width={64}
-									height={18}
-								>
-									<rect width={64} height={18} fill={look().water} />
-									<rect
-										x={4}
-										y={3}
-										width={14}
-										height={2}
-										fill="rgba(255,255,255,0.28)"
-									/>
-									<rect
-										x={34}
-										y={9}
-										width={10}
-										height={2}
-										fill="rgba(255,255,255,0.2)"
-									/>
-									<rect
-										x={22}
-										y={14}
-										width={18}
-										height={2}
-										fill="rgba(0,20,40,0.25)"
-									/>
-									<rect
-										x={50}
-										y={5}
-										width={8}
-										height={2}
-										fill="rgba(0,20,40,0.2)"
-									/>
-								</pattern>
-								<linearGradient id="water-deep" x1="0" y1="0" x2="0" y2="1">
-									<stop offset="0" stop-color="rgba(0,20,40,0)" />
-									<stop offset="1" stop-color="rgba(0,20,40,0.45)" />
-								</linearGradient>
-							</defs>
-							<path d={bridgeParts?.behind} fill="url(#water-ripples)" />
-							<path d={bridgeParts?.posts} fill={look().rail} />
-							<path d={bridgeParts?.rail} fill={look().rail} />
-							<path d={bridgeParts?.water} fill="url(#water-ripples)" />
-							<path d={bridgeParts?.water} fill="url(#water-deep)" />
-							<path d={bridgeParts?.side} fill={look().underside} />
-							<path d={bridgeParts?.highlight} fill={look().highlight} />
-							<path d={bridgeParts?.underbelly} fill={look().underbelly} />
-							{/* Slussen's stone, on from its quay wall along all of it, past
-							    the bridge, under the path: not just the one wall. */}
-							<Show when={look().quay}>
-								{(quay) => (
-									<>
-										<defs>
-											<pattern
-												id="slussen-stone"
-												patternUnits="userSpaceOnUse"
-												x={look().to - DRAWN_FROM - QUAY_OVER}
-												y={
-													Math.round(terrain.groundY(look().to) / 2) * 2 +
-													PATH_FRONT
-												}
-												width={QUAY_WIDTH}
-												height={QUAY_HEIGHT}
-											>
-												<image
-													href={quay()}
+				{/* Each bridge, over its water. */}
+				<For each={bridges}>
+					{({ look: bridge, index, parts }) => {
+						const ripples = `water-ripples-${index}`
+						const stone = `bridge-stone-${index}`
+						const deep = `water-deep-${index}`
+						return (
+							<>
+								<defs>
+									{/* Ripples on the water, light and dark, deeper down darker. */}
+									<pattern
+										id={ripples}
+										patternUnits="userSpaceOnUse"
+										width={64}
+										height={18}
+									>
+										<rect width={64} height={18} fill={bridge.water} />
+										<rect
+											x={4}
+											y={3}
+											width={14}
+											height={2}
+											fill="rgba(255,255,255,0.28)"
+										/>
+										<rect
+											x={34}
+											y={9}
+											width={10}
+											height={2}
+											fill="rgba(255,255,255,0.2)"
+										/>
+										<rect
+											x={22}
+											y={14}
+											width={18}
+											height={2}
+											fill="rgba(0,20,40,0.25)"
+										/>
+										<rect
+											x={50}
+											y={5}
+											width={8}
+											height={2}
+											fill="rgba(0,20,40,0.2)"
+										/>
+									</pattern>
+									<linearGradient id={deep} x1="0" y1="0" x2="0" y2="1">
+										<stop offset="0" stop-color="rgba(0,20,40,0)" />
+										<stop offset="1" stop-color="rgba(0,20,40,0.45)" />
+									</linearGradient>
+								</defs>
+								<path d={parts.behind} fill={`url(#${ripples})`} />
+								<path d={parts.posts} fill={bridge.rail} />
+								<path d={parts.rail} fill={bridge.rail} />
+								<path d={parts.water} fill={`url(#${ripples})`} />
+								<path d={parts.water} fill={`url(#${deep})`} />
+								<path d={parts.side} fill={bridge.underside} />
+								<path d={parts.highlight} fill={bridge.highlight} />
+								<path d={parts.underbelly} fill={bridge.underbelly} />
+								{/* The land's stone, on from its quay wall past the bridge,
+								    under the path: Slussen's, not just the one wall. */}
+								<Show when={bridge.quay}>
+									{(quay) => (
+										<>
+											<defs>
+												<pattern
+													id={stone}
+													patternUnits="userSpaceOnUse"
+													x={bridge.to - DRAWN_FROM - QUAY_OVER}
+													y={
+														Math.round(terrain.groundY(bridge.to) / 2) * 2 +
+														PATH_FRONT
+													}
 													width={QUAY_WIDTH}
 													height={QUAY_HEIGHT}
-													preserveAspectRatio="none"
-													style={{ 'image-rendering': 'pixelated' }}
-												/>
-											</pattern>
-										</defs>
-										<path d={bridgeParts?.slussen} fill="url(#slussen-stone)" />
-									</>
-								)}
-							</Show>
-							{/* The quay walls at its ends, facing the water: at Slussen's
-							    end, and turned round, at Gamla Stan's. */}
-							<Show when={look().quay}>
-								{(quay) => (
-									<For each={[look().to, look().from]}>
-										{(end, i) => {
-											const ground = Math.round(terrain.groundY(end) / 2) * 2
-											const x = end - DRAWN_FROM
-											// Facing left at Slussen, right at the near end.
-											const turn =
-												i() === 1
-													? `translate(${2 * x} 0) scale(-1 1)`
-													: undefined
-											return (
-												<g transform={turn}>
+												>
 													<image
 														href={quay()}
-														x={x - QUAY_OVER}
-														y={ground + PATH_FRONT}
 														width={QUAY_WIDTH}
 														height={QUAY_HEIGHT}
 														preserveAspectRatio="none"
 														style={{ 'image-rendering': 'pixelated' }}
 													/>
-												</g>
-											)
-										}}
-									</For>
-								)}
-							</Show>
-						</>
-					)}
-				</Show>
+												</pattern>
+											</defs>
+											<path d={parts.stone} fill={`url(#${stone})`} />
+										</>
+									)}
+								</Show>
+								{/* The quay walls at its ends, facing the water: at Slussen's
+							    end, and turned round, at Gamla Stan's. */}
+								<Show when={bridge.quay}>
+									{(quay) => (
+										<For each={[bridge.to, bridge.from]}>
+											{(end, i) => {
+												const ground = Math.round(terrain.groundY(end) / 2) * 2
+												const x = end - DRAWN_FROM
+												// Facing left at Slussen, right at the near end.
+												const turn =
+													i() === 1
+														? `translate(${2 * x} 0) scale(-1 1)`
+														: undefined
+												return (
+													<g transform={turn}>
+														<image
+															href={quay()}
+															x={x - QUAY_OVER}
+															y={ground + PATH_FRONT}
+															width={QUAY_WIDTH}
+															height={QUAY_HEIGHT}
+															preserveAspectRatio="none"
+															style={{ 'image-rendering': 'pixelated' }}
+														/>
+													</g>
+												)
+											}}
+										</For>
+									)}
+								</Show>
+							</>
+						)
+					}}
+				</For>
 				{/* A Cave, under its hill. */}
 				<Show when={caveParts && props.world.course.look?.cave}>
 					{(look) => (
@@ -1861,14 +1968,16 @@ export const COVER_FADE_MS = 350
 
 /**
  * A Cave's cover's parts, each `from` to `to`: the first with the Cave's
- * own way in showing, if it says how much.
+ * own way in showing, if it says how much, and the last its way out. In
+ * between, one part's cover runs right up to the next's, no gap between.
  */
 export function caveCoverParts(cave: NonNullable<World['course']['cave']>) {
 	const parts = cave.parts ?? [{ from: cave.from, to: cave.to }]
 	return parts.map((part, i) => ({
 		from: part.from,
 		to: part.to,
-		mouth: i === 0 ? cave.mouth : undefined,
+		mouth: i === 0 ? cave.mouth : 0,
+		end: i === parts.length - 1 ? MOUTH_SHOWN : 0,
 		id: `cave-cover-${i}`,
 	}))
 }
@@ -1880,6 +1989,8 @@ type CavePartProps = {
 	from: number
 	to: number
 	mouth?: number
+	/** How much of its far end the cover leaves showing: its way out. */
+	end?: number
 	id: string
 }
 
@@ -1935,7 +2046,8 @@ export function CaveCoverArt(props: CavePartProps) {
 			? ` M${x - DRAWN_FROM},${Math.round(top / 2) * 2} H${x - DRAWN_FROM + STEP} V${Math.round(bottom / 2) * 2} H${x - DRAWN_FROM} Z`
 			: ''
 	const mouth = props.mouth ?? MOUTH_SHOWN
-	for (let x = props.from + mouth; x < props.to - MOUTH_SHOWN; x += STEP) {
+	const end = props.end ?? MOUTH_SHOWN
+	for (let x = props.from + mouth; x < props.to - end; x += STEP) {
 		const middle = x + STEP / 2
 		const ceiling = cave.ceiling(middle)
 		const foot = cave.foot(middle)

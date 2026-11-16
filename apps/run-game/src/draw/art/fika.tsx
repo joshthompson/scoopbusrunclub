@@ -23,7 +23,13 @@ import {
 	pickAndMix,
 	salmiakki,
 } from '../../courses/kit/ferryFika'
+import { ale } from '../../courses/kit/gamlaStanFika'
 import { grapes, oxygen, vitamin } from '../../courses/kit/karolinskaFika'
+import {
+	blueberrySoup,
+	pizzaSlice,
+	waterCup,
+} from '../../courses/kit/midnattsloppetFika'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
 import {
 	goldRing,
@@ -181,6 +187,10 @@ const ART: Record<FikaItem, string> = {
 	grapes,
 	oxygen,
 	vitamin,
+	waterCup,
+	blueberrySoup,
+	pizzaSlice,
+	ale,
 }
 
 /** A fika item's picture, for a Draw Hook to draw at its size (see `FIKA_SIZE`). */

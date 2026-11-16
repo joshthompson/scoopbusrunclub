@@ -31,13 +31,23 @@ import lowBranchLimbAsset from '../assets/obstacles/low-branch-limb.png'
 import lowBranchTreeAsset from '../assets/obstacles/low-branch-tree.png'
 import mummyAsset from '../assets/obstacles/mummy.png'
 import steamVentAsset from '../assets/obstacles/steam-vent.png'
-import ventAsset from '../assets/rooftop/vent.png'
 import purpleSignAsset from '../assets/signs/purple-sign.png'
 import { GERM_FRAMES, GERM_POPPED, VALVE } from '../courses/kit/bodyScenery'
 import { bouncyToadstool } from '../courses/kit/furbyScenery'
+import {
+	ROOFTOP_VENT_FRONT,
+	ROOFTOP_VENT_HEIGHT,
+	ROOFTOP_VENT_WIDTH,
+	rooftopVent,
+} from '../courses/kit/rooftopVent'
 import { seeded } from '../courses/kit/seeded'
 import { cone } from '../courses/kit/sewerScenery'
-import type { CourseLook, Obstacle, PlatformDefinition } from '../courses/types'
+import type {
+	Boost,
+	CourseLook,
+	Obstacle,
+	PlatformDefinition,
+} from '../courses/types'
 import { boardOf } from '../game/boards'
 import { GERM_SIZE, germHeight } from '../game/body'
 import { inTunnel } from '../game/cave'
@@ -51,20 +61,24 @@ import {
 	PATH_FRONT,
 	PX_PER_M,
 	RUNNER_SCALE,
+	SCENERY_SET_BACK,
 	SQUASHED,
 	START_X,
 	TICK_MS,
 	VERGE,
 	VIEW_HEIGHT,
 } from '../game/constants'
-import { cyclistAt } from '../game/cyclists'
+import { CYCLIST_SINK, cyclistAt } from '../game/cyclists'
 import { FIKA_SIZE } from '../game/fika'
 import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from '../game/furbies'
 import { DRAWN_FROM } from '../game/groundColumns'
 import type { Hat } from '../game/hats'
+import { CAUGHT_TICKS, inClutches, risingFromGrave } from '../game/haunted'
 import { mummyAt } from '../game/mummies'
-import { type PlatformAt, platformAt } from '../game/platforms'
-import { heldLook } from '../game/portals'
+import { type PlatformAt, platformAt, platformOut } from '../game/platforms'
+import { heldLook, pacerShrunk } from '../game/portals'
+import { inRiver } from '../game/river'
+import { brokenHalf, sagOf } from '../game/ropeBridge'
 import {
 	BALLOON_HEIGHT,
 	BALLOON_WIDTH,
@@ -82,6 +96,7 @@ import {
 	whaleAt,
 } from '../game/sky'
 import {
+	DANCING_STILL,
 	GATE_FLAP_TICKS,
 	countdownWord,
 	scoopFlight,
@@ -108,7 +123,8 @@ import type {
 	TrickKind,
 	World,
 } from '../game/world'
-import { ZOMBIE_SINK_GONE, zombieAt } from '../game/zombies'
+import { zombieAt } from '../game/zombies'
+import { bonusRunner } from '../runners/bonus'
 import { customRunners } from '../runners/customRunners'
 import { guests } from '../runners/guests'
 import type { Playable } from '../runners/playable'
@@ -121,12 +137,7 @@ import { LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH, paintBusLegs } from './art/busLegs'
 import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
 import { DRILL_AT, DRILL_HEIGHT, DRILL_POINT, DRILL_WIDTH } from './art/drill'
-import {
-	DUCK_NOTE_HEIGHT,
-	DUCK_NOTE_TAPED,
-	DUCK_NOTE_WIDTH,
-	duckNote,
-} from './art/duckNote'
+import { DUCK_NOTE_HEIGHT, DUCK_NOTE_WIDTH, duckNote } from './art/duckNote'
 import { fikaPicture } from './art/fika'
 import { GEESE_HEIGHT, geeseReach, geeseWidth, paintGeese } from './art/geese'
 import {
@@ -236,6 +247,7 @@ import {
 } from './paint/vents'
 import { platformLook, platformPainter } from './platformArt'
 import { rideLook } from './rideLook'
+import { createCrocodile } from './river'
 import { createScoopable } from './scoopable'
 
 /**
@@ -290,8 +302,10 @@ export function volunteerFrame(
 }
 
 export function createPlayer(world: World, racer: Racer = world.racers[0]) {
-	/** Up on a corgi's back, or a llama's, riding one. */
-	const { saddle } = rideLook(world.course)
+	/** Up on a corgi's back, or a llama's, riding one: or stood up on a skateboard. */
+	const { saddle, stood } = rideLook(world.course)
+	/** Riding, sat down on it, rather than stood on it. */
+	const sat = (b: Body) => b.mount > 0 && !stood
 	/** Sat on a dragon's back, riding it, rather than hanging under a goose. */
 	const seated = flyerLook(world.course).seat !== undefined
 	const { sprite } = racer.runner
@@ -300,12 +314,29 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const stand = sprite.stand
 	const skiTuck = sprite.skiTuck
 	const skiStance = sprite.ski
+	const dance = sprite.dance
 	const runSize = {
 		width: sprite.width * RUNNER_SCALE,
 		height: sprite.height * RUNNER_SCALE,
 	}
 
 	const { body } = racer
+	/**
+	 * Over the line and stopped, on their feet: dancing, if they've a dance.
+	 * `body` isn't a signal: reading the tick keeps this up to date.
+	 */
+	const dancing = () =>
+		world.ticks() >= 0 &&
+		!!dance &&
+		racer.out === 'finished' &&
+		body.grounded &&
+		!body.gliding &&
+		body.mount === 0 &&
+		body.carried === 0 &&
+		Math.abs(body.vx) < DANCING_STILL
+	/** Where in their dance they start: anywhere, so nobody's in step. */
+	const danceStart = Math.floor(Math.random() * (dance?.frames.length ?? 1))
+	let wasDancing = false
 	/** On skis or a snowboard: which, if so. `body` isn't a signal: reading the tick keeps this up to date. */
 	const board = createMemo(() => (world.ticks() >= 0 ? body.board : 0))
 	/** Crouched on them: curled up in a trick, or in a heap, wiped out. */
@@ -315,7 +346,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const ducking = () =>
 		world.ticks() >= 0 &&
 		(body.ducking ||
-			body.mount > 0 ||
+			sat(body) ||
 			(seated && body.carried > 0) ||
 			(body.board > 0 && crouched(body))) &&
 		!!sit
@@ -347,7 +378,9 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		Math.abs(body.vx) < STILL_SPEED
 	// On a glider, lying along under its wing, head first, legs together:
 	// the stand frame, turned over. On skis, stood up on them.
-	const lying = () => world.ticks() >= 0 && (body.gliding || body.board > 0)
+	const lying = () =>
+		world.ticks() >= 0 &&
+		(body.gliding || body.board > 0 || (!!stood && body.mount > 0))
 	/** How they're tipped, lying on a glider: nose up climbing, down diving. */
 	let was = body.feetY
 	let tilt = 0
@@ -362,6 +395,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	/** How long snow's been spraying off their board, and sparks flying, as it's painted. */
 	const sprayFor = goingFor()
 	const sparksFor = goingFor()
+	const now = () => world.ticks()
 	/** The hat they've on, if any. `body` isn't a signal: reading the tick keeps this up to date. */
 	const hat = createMemo(
 		() => (world.ticks() >= 0 ? body.hat : undefined),
@@ -379,18 +413,24 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			...(skiTuck ? [skiTuck] : []),
 			...(skiStance ? [skiStance] : []),
 			...(sprite.snowboard ? [sprite.snowboard] : []),
+			...(dance?.frames ?? []),
 		],
 		init() {
 			const size = () =>
 				// Stood, as tall and wide as a run frame: a custom runner's stand
 				// is one frame of a strip, not a picture of its own.
-				tucked()
-					? poseSize(skiTuck, sprite)
-					: ducking()
-						? poseSize(sit, sprite)
-						: onSkis()
-							? poseSize(stanceOf(sprite, body.board), sprite)
-							: runSize
+				dancing() && dance
+					? {
+							width: dance.width * RUNNER_SCALE,
+							height: dance.height * RUNNER_SCALE,
+						}
+					: tucked()
+						? poseSize(skiTuck, sprite)
+						: ducking()
+							? poseSize(sit, sprite)
+							: onSkis()
+								? poseSize(stanceOf(sprite, body.board), sprite)
+								: runSize
 			return {
 				id: `player-${racer.id}`,
 				type: 'player',
@@ -399,15 +439,17 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				width: () => size().width,
 				height: () => size().height,
 				frames: () =>
-					tucked() && skiTuck
-						? [skiTuck]
-						: ducking() && sit
-							? [sit]
-							: onSkis()
-								? [stanceOf(sprite, body.board) ?? stand ?? run[0]]
-								: (standing() || lying()) && stand
-									? [stand]
-									: run,
+					dancing() && dance
+						? dance.frames
+						: tucked() && skiTuck
+							? [skiTuck]
+							: ducking() && sit
+								? [sit]
+								: onSkis()
+									? [stanceOf(sprite, body.board) ?? stand ?? run[0]]
+									: (standing() || lying()) && stand
+										? [stand]
+										: run,
 				...createObjectSignal(undefined as number | undefined, 'frame'),
 				// Run sprites face left, the way the header's runners run.
 				...createObjectSignal(-1, 'xScale'),
@@ -486,31 +528,52 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			} else {
 				$.setXScale(xScale)
 				$.setRotation(
-					body.gliding ? GLIDING_LEAN + tilt : runnerLean(world, body),
+					body.gliding
+						? (sprite.glideLean ?? GLIDING_LEAN) + tilt
+						: runnerLean(world, body),
 				)
 			}
 			// Sat down, the one sit frame: switching to it from a run frame
 			// would otherwise leave the engine on a frame it doesn't have. In
 			// the air, legs out in one stride.
 			const sitting =
-				(body.ducking || body.mount > 0 || (seated && body.carried > 0)) &&
-				!!sit
-			// Stood still: the one stand frame.
-			$.setFrame(
-				sitting || standing() || (lying() && stand)
-					? 0
-					: body.grounded && !body.board
-						? undefined
-						: 1,
-			)
-			const speed = Math.abs(body.vx)
-			$.setState(body.grounded && !body.board && speed > 0.3 ? 'play' : 'pause')
-			$.setFrameInterval(
-				strideFrameInterval(Math.max(45, 190 - speed * 22), run.length),
-			)
+				(body.ducking || sat(body) || (seated && body.carried > 0)) && !!sit
+			const isDancing = dancing()
+			if (isDancing && dance) {
+				// Dancing: upright, facing the way they were, from wherever in
+				// it they start, and on through it from there.
+				$.setXScale(xScale)
+				$.setRotation(0)
+				$.setFrame(wasDancing ? undefined : danceStart)
+				$.setState('play')
+				$.setFrameInterval(dance.interval)
+			} else {
+				// Stood still: the one stand frame.
+				$.setFrame(
+					sitting || standing() || (lying() && stand)
+						? 0
+						: body.grounded && !body.board
+							? undefined
+							: 1,
+				)
+				const speed = Math.abs(body.vx)
+				$.setState(
+					body.grounded && !body.board && speed > 0.3 ? 'play' : 'pause',
+				)
+				$.setFrameInterval(
+					strideFrameInterval(Math.max(45, 190 - speed * 22), run.length),
+				)
+			}
+			wasDancing = isDancing
 			const { sea } = world.course
+			const haunted = hauntLook(world, racer, now())
+			if (haunted.shake) $.setX($.x() + haunted.shake)
 			$.setStyle({
-				opacity: body.stumble > 0 && body.stumble % 8 < 4 ? '0.4' : '1',
+				opacity: String(
+					(body.stumble > 0 && body.stumble % 8 < 4 ? 0.4 : 1) *
+						haunted.opacity,
+				),
+				filter: haunted.filter,
 				// Fallen into the sea: gone under.
 				visibility:
 					racer.out === 'fallen' && sea && body.feetY > sea.level + 30
@@ -564,7 +627,44 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 /** Where each racer's head was last drawn, in the world: see `createPlayer`. */
 const headAt = new WeakMap<Body, { x: number; y: number }>()
 
-/** How far over a glider's rider is turned, lying along under it, head first. */
+/** When each racer was first seen in a haunted house's monster's clutches, on this screen. */
+const caughtSince = new WeakMap<Body, number>()
+/** A ghost, as drawn: as white as they'll go, and see-through. */
+const GHOST_FILTER = 'grayscale(1) brightness(2.6)'
+const GHOST_OPACITY = 0.6
+/** How long before they're gone that someone in the monster's clutches starts fading away. */
+const CAUGHT_FADE = 30
+
+/**
+ * How someone looks, by what a haunted house has done to them (see
+ * `haunted.ts`), going by where they are, so a Remote Player's screen
+ * draws the same: in its monster's clutches, shaking, and fading away as
+ * it finishes them; a ghost, whiter and see-through, and fading in as
+ * they come up out of the grave.
+ */
+function hauntLook(world: World, racer: Racer, now: number) {
+	const { body } = racer
+	if (!racer.out && inClutches(world, body)) {
+		const since = now - (caughtSince.get(body) ?? now)
+		if (!caughtSince.has(body)) caughtSince.set(body, now)
+		const left = CAUGHT_TICKS - since
+		return {
+			shake: since % 6 < 3 ? -2 : 2,
+			opacity: Math.max(0, Math.min(1, left / CAUGHT_FADE)),
+			filter: undefined,
+		}
+	}
+	caughtSince.delete(body)
+	if (!body.ghost) return { shake: 0, opacity: 1, filter: undefined }
+	const rising = risingFromGrave(world, body)
+	return {
+		shake: 0,
+		opacity: GHOST_OPACITY * (rising ?? 1),
+		filter: GHOST_FILTER,
+	}
+}
+
+/** How far over a glider's rider is turned, lying along under it, head first: unless their sprite says otherwise. */
 const GLIDING_LEAN = 80
 
 /** Tucked, faster than this, snow sprays off the back of them. */
@@ -661,6 +761,7 @@ const STILL_SPEED = 0.3
 function runnerLean(world: World, body: Body) {
 	return body.grounded &&
 		body.on === undefined &&
+		!body.bed &&
 		Math.abs(body.vx) >= STILL_SPEED
 		? leanOn(world, body.x)
 		: 0
@@ -832,6 +933,19 @@ function createPacer(world: World, p: Pacer) {
 				return
 			}
 			$.setXScale(-1)
+			// On a shrink ray's plate: stood still, shrinking down to
+			// nothing from their feet, as a Player does.
+			if (p.shrink !== undefined) {
+				const s = pacerShrunk(p.shrink)
+				$.setRotation(0)
+				$.setFrame(stand ? 0 : undefined)
+				$.setState('pause')
+				$.setStyle({
+					transform: `scale(${-s}, ${s})`,
+					'transform-origin': '50% 100%',
+				})
+				return
+			}
 			// Leaning with the hill, running; upright, stood still; lying
 			// along under a glider, tipped as it climbs and dives.
 			const dy = p.feetY - was
@@ -839,7 +953,7 @@ function createPacer(world: World, p: Pacer) {
 			tilt += (Math.max(-12, Math.min(12, dy * 3)) - tilt) * 0.2
 			$.setRotation(
 				p.gliding
-					? GLIDING_LEAN + tilt
+					? (sprite.glideLean ?? GLIDING_LEAN) + tilt
 					: p.grounded && !standing()
 						? leanOn(world, p.x)
 						: 0,
@@ -974,13 +1088,19 @@ const SPLASH_DEPTH = 14
 
 /**
  * Splashes, as anyone goes into the sea: off the cliff with no glider, or
- * crashed into it on one. Seen from where they are, so the same on every
+ * crashed into it on one; or into a River, missing its crocodiles. Seen from where they are, so the same on every
  * screen; each added as it happens, and gone once it's over.
  */
 export function createSplashes(world: World) {
-	const { sea } = world.course
-	if (!sea) return []
-	const line = sea.level + SPLASH_DEPTH
+	const { sea, river } = world.course
+	if (!sea && !river) return []
+	/** The water's surface at `x`, if it's out at sea or in a River. */
+	const surface = (x: number) =>
+		sea && atSea(world, x)
+			? sea.level
+			: river && inRiver(world, x)
+				? river.level
+				: undefined
 	/** Where everyone's feet were last tick. */
 	const was = new Map<string, number>()
 	const live: { id: string; at: number }[] = []
@@ -1006,11 +1126,13 @@ export function createSplashes(world: World) {
 				) => {
 					const before = was.get(key)
 					was.set(key, feetY)
-					if (flying || before === undefined || !atSea(world, x)) return
+					const level = surface(x)
+					if (flying || before === undefined || level === undefined) return
+					const line = level + SPLASH_DEPTH
 					if (before >= line || feetY < line) return
 					const id = `splash-${next++}`
 					live.push({ id, at: now })
-					$scene.addController(createSplash(world, id, x, now))
+					$scene.addController(createSplash(world, id, x, now, level))
 				}
 				for (const r of world.racers)
 					into(
@@ -1030,8 +1152,13 @@ export function createSplashes(world: World) {
 	]
 }
 
-function createSplash(world: World, id: string, x: number, at: number) {
-	const surface = world.course.sea?.level ?? world.terrain.groundY(x)
+function createSplash(
+	world: World,
+	id: string,
+	x: number,
+	at: number,
+	surface: number,
+) {
 	return createController({
 		init: () => ({
 			id,
@@ -1215,6 +1342,10 @@ function createCorgi(world: World, c: Corgi) {
 	const [barking, setBarking] = createSignal(false)
 	/** The rarer one: on a Remote Player's screen, known once the Host says. */
 	const [rare, setRare] = createSignal(!!c.rare)
+	/** Its trick, in the air under its rider, if it does one: how far through it it is. */
+	const [trickFrame, setTrickFrame] = createSignal<string>()
+	/** When it left the ground under them, if it's off it. */
+	let leftAt: number | undefined
 	return createController({
 		init: () => ({
 			id: `corgi-${c.id}`,
@@ -1234,7 +1365,7 @@ function createCorgi(world: World, c: Corgi) {
 			paintPicture(
 				ctx,
 				image,
-				look.picture(pose()),
+				trickFrame() ?? look.picture(pose()),
 				0,
 				0,
 				CORGI_WIDTH,
@@ -1259,6 +1390,17 @@ function createCorgi(world: World, c: Corgi) {
 			const floor =
 				world.terrain.groundY(c.x) - (c.state === 'waiting' ? (c.up ?? 0) : 0)
 			const airborne = c.feetY < floor - 2
+			// Jumped on, ridden: its trick, from leaving the ground, the last
+			// frame held till it's down.
+			const { trick } = ride
+			if (trick && c.state === 'ridden' && airborne) {
+				leftAt ??= world.ticks()
+				const step = Math.floor((world.ticks() - leftAt) / trick.ticks)
+				setTrickFrame(trick.frames[Math.min(step, trick.frames.length - 1)])
+			} else {
+				leftAt = undefined
+				setTrickFrame(undefined)
+			}
 			setPose(
 				c.state === 'scooped' || airborne
 					? 'leap'
@@ -2053,6 +2195,8 @@ export function createPlatforms(world: World) {
 	 * a Cave, up to its rock.
 	 */
 	const cableTo = (platform: PlatformDefinition, at: PlatformAt) => {
+		if (platform.hook !== undefined)
+			return Math.max(0, at.top - SLING_HEIGHT - platform.hook)
 		const ceiling = cave?.ceiling(at.left + platform.width / 2)
 		return ceiling === undefined
 			? 1400
@@ -2077,34 +2221,135 @@ export function createPlatforms(world: World) {
 			move && cableColour
 				? Math.max(
 						...Array.from({ length: 65 }, (_, k) =>
-							cableTo(
-								platform,
-								platformAt(world.terrain, platform, (k / 64) * move.ticks),
-							),
+							cableTo(platform, platformOut(world.terrain, platform, k / 64)),
 						),
 					)
 				: 0
 		/** Its own picture, if it's wider or deeper, and its cable, up out of sight. */
 		const overhang = art ? Math.max(0, (art.width - width) / 2) : 0
+		/** A rope bridge's, as far down as it sags. */
+		const sags = platform.rope ? Math.ceil(platform.rope.give * 2) : 0
+		/** One that breaks, its halves hanging down from the banks, as long as it is, and turned. */
+		const hangs = platform.rope?.breaks ? platform.width : 0
+		const turned = hangs && art ? art.height : 0
 		const drawReach = {
-			left: overhang,
-			right: overhang,
+			left: overhang + turned,
+			right: overhang + turned,
 			top: Math.max(art?.top ?? 0, cableColour ? SLING_HEIGHT + longest : 0),
-			bottom: art ? Math.max(0, art.height - art.top - depth) : 0,
+			bottom: art
+				? Math.max(0, art.height - art.top - depth) + sags + hangs
+				: 0,
 		}
-		return createController({
+		/** How far down it's sagged `dx` across its picture: a rope bridge's, bent under whoever's on it. */
+		const sagUnder = (dx: number) =>
+			platform.rope
+				? Math.round(
+						sagOf(
+							world.ropeBridges,
+							i,
+							platform.x + (width - (art?.width ?? width)) / 2 + dx,
+						) / 2,
+					) * 2
+				: 0
+		/** Its picture, or its near side's: bent, a rope bridge's, under whoever's on it. */
+		const paintPicture = (
+			ctx: CanvasRenderingContext2D,
+			picture: { image: CanvasImageSource; width: number },
+		) => {
+			if (!art) return
+			const x0 = (width - art.width) / 2
+			if (platform.broken) {
+				paintBroken(ctx, picture, x0)
+				return
+			}
+			if (!platform.rope) {
+				ctx.drawImage(picture.image, x0, -art.top, art.width, art.height)
+				return
+			}
+			// In strips, each down as far as it's sagged in its middle.
+			const scale = picture.width / art.width
+			for (let dx = 0; dx < art.width; dx += BRIDGE_STRIP) {
+				const w = Math.min(BRIDGE_STRIP, art.width - dx)
+				ctx.drawImage(
+					picture.image,
+					dx * scale,
+					0,
+					w * scale,
+					art.height * scale,
+					x0 + dx,
+					-art.top + sagUnder(dx + w / 2),
+					w,
+					art.height,
+				)
+			}
+		}
+		/**
+		 * A broken rope bridge's picture: its posts still standing on the
+		 * banks, and either half of it, from its bank to where it broke,
+		 * swung down from there (see `brokenHalf`).
+		 */
+		const paintBroken = (
+			ctx: CanvasRenderingContext2D,
+			picture: { image: CanvasImageSource; width: number },
+			x0: number,
+		) => {
+			if (!art) return
+			const scale = picture.width / art.width
+			/** Its picture from `from` to `to`, across, at `dx` along, as it is. */
+			const strip = (from: number, to: number, dx: number) =>
+				ctx.drawImage(
+					picture.image,
+					from * scale,
+					0,
+					(to - from) * scale,
+					art.height * scale,
+					dx,
+					-art.top,
+					to - from,
+					art.height,
+				)
+			const bank = -x0
+			const cut = (platform.broken?.x ?? platform.x) - platform.x + bank
+			strip(0, bank, x0)
+			strip(width + bank, art.width, width + x0 + bank)
+			for (const side of ['near', 'far'] as const) {
+				const half = brokenHalf(world.terrain, platform, side, world.ticks())
+				const pivot = side === 'near' ? 0 : width
+				ctx.save()
+				ctx.translate(pivot, 0)
+				ctx.rotate(half.angle)
+				if (side === 'near') strip(bank, cut, 0)
+				else strip(cut, width + bank, cut - bank - width)
+				ctx.restore()
+			}
+		}
+		// A rope bridge's near side, its handrail, in front of whoever's on it.
+		const front = art?.front
+		const nearSide = front
+			? [
+					createController({
+						drawReach,
+						draw: ({ ctx, image }) => {
+							const picture = image(front)
+							if (picture) paintPicture(ctx, picture)
+						},
+						init: () => ({
+							id: `platform-front-${i}`,
+							type: 'foreground',
+							...createObjectSignal(start.left, 'x'),
+							...createObjectSignal(start.top, 'y'),
+							width: () => platform.width,
+							height: () => platform.depth ?? look.depth,
+						}),
+					}),
+				]
+			: []
+		const slab = createController({
 			drawReach,
 			draw: ({ ctx, image }) => {
 				if (art) {
 					const picture = image(art.asset)
-					if (picture)
-						ctx.drawImage(
-							picture.image,
-							(width - art.width) / 2,
-							-art.top,
-							art.width,
-							art.height,
-						)
+					if (picture) paintPicture(ctx, picture)
 				} else paintArt?.(ctx, image)
 				if (!cableColour) return
 				// The crane's cable, down to its hook, 34 px over it; from the
@@ -2139,8 +2384,12 @@ export function createPlatforms(world: World) {
 					}
 				: undefined,
 		})
+		return [slab, ...nearSide]
 	})
 }
+
+/** How wide each strip of a rope bridge's picture is, bent to it: two of its cells. */
+const BRIDGE_STRIP = 4
 
 /** Something that stays put, drawn standing on the ground at `x`. */
 function createFixture(options: {
@@ -2185,11 +2434,52 @@ function createFixture(options: {
 	})
 }
 
+/** A course's own slalom gate (see `CourseLook['gate']`): its back, and its front over whoever's in it. */
+function createOwnGate(
+	world: World,
+	o: Extract<Boost, { kind: 'gate' }>,
+	id: string,
+	own: NonNullable<CourseLook['gate']>,
+) {
+	const part = (frames: string[], front: boolean) =>
+		createFixture({
+			id: `${id}-${front ? 'front' : 'back'}`,
+			type: front ? 'banner-front' : 'banner',
+			x: o.x,
+			sink: front ? PATH_FRONT - 4 : 4 - PATH_BACK,
+			width: own.width,
+			height: own.height,
+			world,
+			frames: [frames[0]],
+			draw: paintFrames(world, frames, own.frameTicks, own),
+		})
+	return own.front
+		? [part(own.asset, false), part(own.front, true)]
+		: [part(own.asset, false)]
+}
+
 /**
- * How far back from the path the scenery stands, so the grass at a tree's foot
- * stays off it: they're only for looking at, nothing to run into.
+ * A Draw Hook painting `frames` in turn, each for `ticks` of the race's
+ * tick, at `size`: so the same frame's on every screen. Reading the tick
+ * keeps it painting.
  */
-const SCENERY_SET_BACK = 10
+function paintFrames(
+	world: World,
+	frames: string[],
+	ticks: number | undefined,
+	size:
+		| { width: number; height: number }
+		| (() => { width: number; height: number }),
+) {
+	return ({ ctx, image }: DrawPainting) => {
+		const frame =
+			frames[Math.floor(world.ticks() / (ticks ?? 12)) % frames.length]
+		const loaded = image(frame)
+		if (!loaded) return
+		const { width, height } = typeof size === 'function' ? size() : size
+		ctx.drawImage(loaded.image, 0, 0, width, height)
+	}
+}
 
 /** A cyclist, riding towards you, or scooped and flying. */
 function createCyclist(
@@ -2230,7 +2520,7 @@ function createCyclist(
 				return
 			}
 			$.setX(cyclist.x - WIDTH / 2)
-			$.setY(ground - HEIGHT + 2)
+			$.setY(ground - HEIGHT + CYCLIST_SINK)
 			$.setState(cyclist.riding ? 'play' : 'pause')
 		},
 	})
@@ -2290,29 +2580,34 @@ export function createScenery(world: World) {
 		 * A tombstone with its name, recoloured, name and all, by its filter;
 		 * and a footing's grass, down past its box.
 		 */
-		const draw: ((painting: DrawPainting) => void) | undefined = carved
-			? ({ ctx, image }) => {
-					const loaded = image(asset)
-					if (loaded)
-						paintTombstone(ctx, loaded, {
-							key: `${world.course.id}:${i}`,
-							name: name ?? '',
-							panel: carved,
-							scale,
-							filter,
-						})
-				}
-			: footing
-				? (() => {
-						const paint = footingPainter(groundY, x, () =>
-							paletteOf(world.course.look?.palette)('var(--grass-green)'),
-						)
-						return ({ ctx, drawDefault }) => {
-							drawDefault()
-							paint(ctx, width(), height(), pathTop() - setBack)
-						}
-					})()
-				: undefined
+		const draw: ((painting: DrawPainting) => void) | undefined = piece.frames
+			? paintFrames(world, piece.frames, piece.frameTicks, () => ({
+					width: width(),
+					height: height(),
+				}))
+			: carved
+				? ({ ctx, image }) => {
+						const loaded = image(asset)
+						if (loaded)
+							paintTombstone(ctx, loaded, {
+								key: `${world.course.id}:${i}`,
+								name: name ?? '',
+								panel: carved,
+								scale,
+								filter,
+							})
+					}
+				: footing
+					? (() => {
+							const paint = footingPainter(groundY, x, () =>
+								paletteOf(world.course.look?.palette)('var(--grass-green)'),
+							)
+							return ({ ctx, drawDefault }) => {
+								drawDefault()
+								paint(ctx, width(), height(), pathTop() - setBack)
+							}
+						})()
+					: undefined
 		return createController({
 			frames: [asset],
 			draw,
@@ -2362,6 +2657,121 @@ const VOLUNTEER_SINK = 4 - PATH_BACK
  */
 const RUN_DIRECTOR_PAST = 90
 const RUN_DIRECTOR_SINK = PATH_FRONT - 2
+
+/**
+ * The course's hidden bonus runner, if it has one (see `Course['found']`),
+ * stood waiting where they are, facing whoever's coming: Bat Person, up on
+ * the girders over City Rooftop.
+ */
+export function createFound(world: World) {
+	const { found } = world.course
+	const runner = found && bonusRunner(found.runner)
+	if (!found || !runner) return []
+	const { sprite } = runner
+	if (found.waiting) return [createFoundWaiting(world)]
+	const frame = sprite.stand ?? sprite.run[0]
+	const size = poseSize(frame, sprite)
+	return [
+		createController({
+			frames: [frame],
+			init: () => ({
+				id: 'found',
+				type: 'cheerer',
+				x: () => Math.round(found.x - size.width / 2),
+				y: () => found.y - size.height,
+				width: () => size.width,
+				height: () => size.height,
+			}),
+		}),
+	]
+}
+
+/** How long a bonus runner who's waiting stays up after everyone's gone by, in ticks, before sitting back down. */
+const FOUND_SIT_AFTER = 90
+/** How big their bubble's words are. */
+const FOUND_SAYS_SIZE = 20
+
+/**
+ * The course's hidden bonus runner, sat waiting (see `FoundWaiting`): the
+ * Viking on his keg at the bar, up on his feet as anyone comes near,
+ * raising his ale, and saying so. Who's near goes by where everyone is,
+ * so it's the same on every screen; and so does which of their words
+ * they say, by the tick they got up.
+ */
+function createFoundWaiting(world: World) {
+	const found = world.course.found
+	const runner = found && bonusRunner(found.runner)
+	const waiting = found?.waiting
+	if (!found || !runner || !waiting) throw new Error('Nobody waiting')
+	const { sprite } = runner
+	const { seat } = waiting
+	const width = sprite.width * RUNNER_SCALE
+	const height = sprite.height * RUNNER_SCALE
+	/** Anyone still running near enough, along, and on their level. */
+	const near = () =>
+		world.racers.some(
+			({ body, out }) =>
+				!out &&
+				Math.abs(body.x - found.x) < waiting.near &&
+				body.feetY <= found.y + 40 &&
+				body.feetY >= found.y - (found.over ?? 40),
+		)
+	/** Up till this tick, if they're up: what they're saying, if so. */
+	const [upUntil, setUpUntil] = createSignal(0)
+	const [says, setSays] = createSignal(waiting.says[0])
+	const up = () => world.ticks() < upUntil()
+	const longest = Math.max(...waiting.says.map((s) => s.length))
+	return createController({
+		frames: [sprite.sit ?? waiting.up],
+		init: () => ({
+			id: 'found',
+			type: 'cheerer',
+			x: () => Math.round(found.x - width / 2),
+			y: () => found.y - height,
+			width: () => width,
+			height: () => height,
+		}),
+		drawReach: bubbleReach(width, FOUND_SAYS_SIZE, longest),
+		onEnterFrame: () => {
+			if (!near()) return
+			const tick = world.ticks()
+			// Just up: something to say.
+			if (!up())
+				setSays(waiting.says[Math.floor(tick / 7) % waiting.says.length])
+			setUpUntil(tick + FOUND_SIT_AFTER)
+		},
+		draw: ({ ctx, image }) => {
+			// The seat, under them, sat or stood in front of it.
+			const seatTop = height - seat.height
+			paintPicture(
+				ctx,
+				image,
+				seat.asset,
+				Math.round((width - seat.width) / 2),
+				seatTop,
+				seat.width,
+				seat.height,
+			)
+			if (up()) {
+				paintPicture(ctx, image, waiting.up, 0, 0, width, height)
+				paintBubble(ctx, says(), { width, size: FOUND_SAYS_SIZE })
+				return
+			}
+			const sit = sprite.sit && image(sprite.sit)
+			if (!sprite.sit || !sit) return
+			const sitHeight = sit.height * RUNNER_SCALE
+			paintPicture(
+				ctx,
+				image,
+				sprite.sit,
+				0,
+				seatTop + waiting.sink - sitHeight,
+				sit.width * RUNNER_SCALE,
+				sitHeight,
+			)
+		},
+	})
+}
 
 export function createRunDirector(world: World) {
 	const member = world.runDirector
@@ -2629,6 +3039,12 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			})
 		}
 		case 'cone': {
+			// Or the course's own in its place, knocked over all the same: a
+			// wet floor sign.
+			const own = world.course.look?.cone
+			const width = own?.width ?? CONE_WIDTH
+			const height = own?.height ?? CONE_HEIGHT
+			const picture = own?.asset ?? cone
 			// Knocked over: tipped forward onto its side, and skidding on a
 			// little way. `flown` isn't a signal: reading the tick keeps it
 			// up to date.
@@ -2648,26 +3064,38 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				x: o.x,
 				// Up on a platform, if it's on one.
 				sink: 1 - (o.height ?? 0),
-				width: CONE_WIDTH,
-				height: CONE_HEIGHT,
+				width,
+				height,
 				world,
 				state,
 				draw: ({ ctx, image }) => {
 					const since = knocked()
+					const crumbled = own?.crumbled
+					if (since !== undefined && crumbled) {
+						// Squashed down, from its top, into a heap of itself.
+						if (since >= CONE_CRUMBLES) {
+							paintPicture(ctx, image, crumbled, 0, 0, width, height)
+							return
+						}
+						const squash = 1 - since / CONE_CRUMBLES
+						const tall = Math.max(1, Math.round(height * squash))
+						paintPicture(ctx, image, picture, 0, height - tall, width, tall)
+						return
+					}
 					if (since !== undefined) {
 						// Over its bottom right corner.
 						const { slid, turn } = tipped(since)
-						ctx.translate(CONE_WIDTH + slid, CONE_HEIGHT)
+						ctx.translate(width + slid, height)
 						ctx.rotate((turn * Math.PI) / 180)
-						ctx.translate(-CONE_WIDTH, -CONE_HEIGHT)
+						ctx.translate(-width, -height)
 					}
-					paintPicture(ctx, image, cone, 0, 0, CONE_WIDTH, CONE_HEIGHT)
+					paintPicture(ctx, image, picture, 0, 0, width, height)
 				},
 				// Knocked over, it tips over its corner, up past its top on the
 				// way, and lies on its side, slid on past its box.
 				drawReach: {
-					top: Math.ceil(Math.hypot(CONE_WIDTH, CONE_HEIGHT) - CONE_HEIGHT),
-					right: CONE_SKID + CONE_HEIGHT,
+					top: Math.ceil(Math.hypot(width, height) - height),
+					right: CONE_SKID + height,
 				},
 			})
 		}
@@ -2740,12 +3168,15 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			const back = { left: BRANCH_CROSS, right: BRANCH_TREE_WIDTH }
 			const near = { left: 0, right: BRANCH_CROSS }
 			return [
-				// The tree, behind the path: behind everyone, the bus too.
+				// The tree, behind the path: behind everyone, the bus too. A
+				// note pinned to its trunk, over where its limb comes off it,
+				// an arrow drawn on it, down; left there once the bus has
+				// knocked the limb off.
 				createFixture({
 					id: `${id}-tree`,
 					type: 'hazard',
 					...where,
-					draw: ({ ctx, image }) =>
+					draw: ({ ctx, image }) => {
 						paintPixelArt(
 							ctx,
 							image,
@@ -2753,7 +3184,16 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							BRANCH_TREE_WIDTH,
 							BRANCH_TREE_HEIGHT,
 							foliage,
-						),
+						)
+						ctx.translate(BRANCH_NOTE.left, BRANCH_NOTE.top)
+						paintPixelArt(
+							ctx,
+							image,
+							duckNote,
+							DUCK_NOTE_WIDTH,
+							DUCK_NOTE_HEIGHT,
+						)
+					},
 					style: () => ({
 						transform: lie,
 						'transform-origin': `${lieOrigin.x}px ${lieOrigin.y}px`,
@@ -2790,28 +3230,6 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 					draw: ({ ctx, image }) => paintLimb(ctx, image),
 					style: () => ({
 						visibility: knocked() ? 'visible' : 'hidden',
-					}),
-				}),
-				// A note taped on top of its limb, over the path: an arrow,
-				// down. Gone with the limb, once the bus has knocked it off.
-				createFixture({
-					id: `${id}-note`,
-					type: 'hazard',
-					x: o.x,
-					width: DUCK_NOTE_WIDTH,
-					height: DUCK_NOTE_HEIGHT,
-					sink: DUCK_NOTE_TAPED - BRANCH_LIMB_TOP,
-					world,
-					draw: ({ ctx, image }) =>
-						paintPixelArt(
-							ctx,
-							image,
-							duckNote,
-							DUCK_NOTE_WIDTH,
-							DUCK_NOTE_HEIGHT,
-						),
-					style: () => ({
-						visibility: knocked() ? 'hidden' : 'visible',
 					}),
 				}),
 			]
@@ -2864,16 +3282,19 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			})
 		}
 		case 'vent':
+			// Right across the path, its foot just in from its near edge: at its
+			// middle, where everyone runs, it's where it's run into, and as high.
 			return createFixture({
 				id,
 				type: 'hazard',
 				x: o.x,
-				sink: 2,
+				// A pixel of its own higher, a cell: up off the roof's front edge.
+				sink: ROOFTOP_VENT_FRONT - 2,
 				width: VENT_WIDTH,
 				height: VENT_HEIGHT,
 				world,
 				draw: ({ ctx, image }) => {
-					const vent = image(ventAsset)
+					const vent = image(rooftopVent)
 					if (vent) ctx.drawImage(vent.image, 0, 0, VENT_WIDTH, VENT_HEIGHT)
 				},
 			})
@@ -2936,6 +3357,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						steamVentAsset,
 						world.ticks(),
 						state.flown,
+						Math.round(o.x) % 60,
 					),
 				drawReach: STEAM_VENT_REACH,
 			})
@@ -3102,10 +3524,14 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			return createSkyThing(world, state, o, id)
 		case 'germ':
 			return createGerm(world, state, o, id)
+		case 'crocodile':
+			return createCrocodile(world, state, o, id)
 		case 'valve':
-			// Raised a little off the floor, flapping open on the beat, its
-			// chevrons over it lighting up and leaping: stand here. The
-			// tick's a signal: reading it keeps it beating.
+			// Raised a little off the floor, flapping open on the beat, and
+			// as it fires someone up, its chevrons over it lighting up and
+			// leaping: run onto it. The tick's a signal: reading it keeps it
+			// beating; when it last fired someone isn't, and reading the tick
+			// keeps that up to date.
 			return createFixture({
 				id,
 				type: 'hazard',
@@ -3115,7 +3541,12 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				height: VALVE.height,
 				world,
 				draw: ({ ctx, image }) =>
-					paintValve(ctx, image, Math.max(0, world.ticks())),
+					paintValve(
+						ctx,
+						image,
+						Math.max(0, world.ticks()),
+						world.ticks() >= 0 ? state.flown : undefined,
+					),
 				drawReach: VALVE_REACH,
 			})
 		case 'snowman': {
@@ -3160,16 +3591,22 @@ function createGerm(
 	id: string,
 ) {
 	const ground = world.terrain.groundY(o.x)
+	// A course's own, in its place: a ghost, in a haunted house.
+	const own = world.course.look?.germ
+	const frames = own?.frames ?? GERM_FRAMES
+	const burstArt = own?.popped ?? GERM_POPPED
+	const width = own?.width ?? GERM_SIZE
+	const height = own?.height ?? GERM_SIZE
 	return createController({
-		frames: [...GERM_FRAMES, GERM_POPPED],
+		frames: [...frames, burstArt],
 		init: () => ({
 			id,
 			type: 'zombie',
-			...createObjectSignal(o.x - GERM_SIZE / 2, 'x'),
-			...createObjectSignal(ground - o.low - GERM_SIZE, 'y'),
-			width: () => GERM_SIZE,
-			height: () => GERM_SIZE,
-			frames: () => GERM_FRAMES,
+			...createObjectSignal(o.x - width / 2, 'x'),
+			...createObjectSignal(ground - o.low - height, 'y'),
+			width: () => width,
+			height: () => height,
+			frames: () => frames,
 			...createObjectSignal(0, 'rotation'),
 			...createObjectSignal(220, 'frameInterval'),
 			...createObjectSignal('play' as 'play' | 'pause', 'state'),
@@ -3179,25 +3616,25 @@ function createGerm(
 		draw({ ctx, drawDefault, image }) {
 			if (!gone()) drawDefault()
 			const since = popped()
-			const burst = since === undefined ? undefined : image(GERM_POPPED)
+			const burst = since === undefined ? undefined : image(burstArt)
 			if (since === undefined || !burst) return
 			const size = GERM_SIZE * (1 + since / GERM_BURST)
-			const at = (GERM_SIZE - size) / 2
+			const at = (width - size) / 2
 			ctx.globalAlpha *= 1 - since / GERM_BURST
-			ctx.drawImage(burst.image, at, at, size, size)
+			ctx.drawImage(burst.image, at, height - GERM_SIZE + at, size, size)
 		},
 		onEnterFrame({ $ }) {
 			const now = world.ticks()
 			const bottom = ground - germHeight(o, Math.max(0, now))
 			if (state.scooped) {
 				const flight = scoopFlight(state.scooped, now)
-				$.setX(o.x - GERM_SIZE / 2 + flight.x)
-				$.setY(bottom - GERM_SIZE + flight.y)
+				$.setX(o.x - width / 2 + flight.x)
+				$.setY(bottom - height + flight.y)
 				$.setRotation(flight.spin)
 				return
 			}
-			$.setX(o.x - GERM_SIZE / 2)
-			$.setY(bottom - GERM_SIZE)
+			$.setX(o.x - width / 2)
+			$.setY(bottom - height)
 		},
 	})
 	/** Popped, its body gone. */
@@ -3465,7 +3902,11 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				},
 			})
 		}
-		case 'gate':
+		case 'gate': {
+			// Or the course's own in its place: a shower over the road, its
+			// back behind whoever goes through, its front over them.
+			const own = world.course.look?.gate
+			if (own) return createOwnGate(world, o, id, own)
 			// At the edge of the piste, red at its back, behind whoever goes
 			// past it, blue at its front, in front of them: in turn, so the
 			// course weaves past them. Flapping, gone past.
@@ -3487,6 +3928,7 @@ export function createBoost(world: World, state: BoostState, i: number) {
 							: undefined,
 					),
 			})
+		}
 		case 'ring': {
 			// Its far half behind whoever's going through it, its near half in
 			// front of them; lit up, as someone does.
@@ -3529,6 +3971,8 @@ const CONE_HEIGHT = 22
 const CONE_TIPS = 6
 const CONE_SKID = 40
 const CONE_SKIDS = 18
+/** A sandcastle, run into: how long it takes to squash down flat. */
+const CONE_CRUMBLES = 6
 /** How long a knocked-off hat's seen flying. */
 const HAT_FLIES = 50
 
@@ -3590,9 +4034,9 @@ export function createHats(world: World) {
 }
 
 /**
- * A Zombie: a club member, gone green and glowing, or now and then a
- * skeleton, coming the wrong way, slowly. Into an open grave, it sinks out of
- * sight; scooped, it flies off like anyone else.
+ * A Zombie: a club member, gone green and glowing, coming the wrong way,
+ * slowly, and turning round and back short of a grave; scooped, it flies
+ * off like anyone else.
  */
 function createZombie(
 	world: World,
@@ -3603,25 +4047,9 @@ function createZombie(
 	const { sprite, filter } = zombieSprite(o)
 	const ZOMBIE_WIDTH = sprite.width * RUNNER_SCALE
 	const ZOMBIE_HEIGHT = sprite.height * RUNNER_SCALE
-	/** How far down into its grave it's sunk, out of sight below the ground. */
-	let sunk = 0
 	return createController({
 		frames: sprite.run,
 		randomStartFrame: true,
-		// Its frame, cut off at the ground as it sinks into the grave.
-		draw({ ctx, drawDefault }) {
-			if (sunk > 0) {
-				ctx.beginPath()
-				ctx.rect(
-					0,
-					0,
-					ZOMBIE_WIDTH,
-					ZOMBIE_HEIGHT - Math.min(ZOMBIE_HEIGHT, sunk),
-				)
-				ctx.clip()
-			}
-			drawDefault()
-		},
 		init: () => ({
 			id,
 			type: 'zombie',
@@ -3630,9 +4058,11 @@ function createZombie(
 			width: () => ZOMBIE_WIDTH,
 			height: () => ZOMBIE_HEIGHT,
 			...createObjectSignal(0, 'rotation'),
+			// Run sprites face left: the way it walks, till it turns round.
+			...createObjectSignal(1, 'xScale'),
 			// A shamble: a run, slowed right down.
 			...createObjectSignal(
-				strideFrameInterval(o.skeleton ? 220 : 300, sprite.run.length),
+				strideFrameInterval(300, sprite.run.length),
 				'frameInterval',
 			),
 			...createObjectSignal('play' as 'play' | 'pause', 'state'),
@@ -3650,14 +4080,11 @@ function createZombie(
 				return
 			}
 			$.setX(zombie.x - ZOMBIE_WIDTH / 2)
-			$.setY(ground - ZOMBIE_HEIGHT + zombie.sunk)
-			// Not walking until it's woken, nor once in the grave.
-			$.setState(zombie.walking && !zombie.sunk ? 'play' : 'pause')
-			sunk = zombie.sunk
-			$.setStyle({
-				filter,
-				visibility: zombie.sunk >= ZOMBIE_SINK_GONE ? 'hidden' : 'visible',
-			})
+			$.setY(ground - ZOMBIE_HEIGHT)
+			$.setXScale(zombie.facing === 1 ? -1 : 1)
+			// Not walking until it's woken.
+			$.setState(zombie.walking ? 'play' : 'pause')
+			$.setStyle({ filter })
 		},
 	})
 }
@@ -3730,8 +4157,9 @@ const CELL_SINK = 4
 /** How far down from the top of a street over a Cave a Sewage Drain's grate is: in the road. */
 const STREET_GRATE = 26
 
-const VENT_WIDTH = 40
-const VENT_HEIGHT = 30
+/** City Rooftop's air vent, drawn a pixel a cell, at twice that. */
+const VENT_WIDTH = ROOFTOP_VENT_WIDTH * 2
+const VENT_HEIGHT = ROOFTOP_VENT_HEIGHT * 2
 
 /**
  * Everyone whose name could be on a tombstone: the club's members and
@@ -3776,8 +4204,12 @@ const BRANCH_CROSS = 70
 const BRANCH_LINE_ROW = 249
 const BRANCH_TREE_ALONG = BRANCH_TREE_WIDTH / 2 - BRANCH_CROSS
 const BRANCH_LIMB_HEIGHT = 50
-/** How high the top of its limb is, where it crosses the line. */
-const BRANCH_LIMB_TOP = 56
+/**
+ * Where its duck note's pinned in its art: on its trunk (columns 118 to
+ * 136), its pin in the bottom of its leaves, down to just over its limb's
+ * end (its top, row 148).
+ */
+const BRANCH_NOTE = { left: 116, top: 126 }
 const BRANCH_OVER_REACH = 80
 
 /** How far down into the sea a km sign's buoy floats. */

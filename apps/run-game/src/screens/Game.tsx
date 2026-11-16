@@ -14,7 +14,7 @@ import { PX_PER_M, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import type { Hat } from '../game/hats'
 import { longJumpMetres } from '../game/longJump'
 import { medalFor } from '../game/medals'
-import { POPUP_TICKS, onScreen } from '../game/step'
+import { POPUP_TICKS, onScreen, stepWorld } from '../game/step'
 import { type World, createWorld } from '../game/world'
 import { type Action, anyControls, setTouch, touchScreen } from '../input'
 import {
@@ -28,15 +28,23 @@ import {
 	submitScore,
 	wouldPlace,
 } from '../online/runScores'
+import { DERI, unlockable } from '../runners/bonus'
 import type { Playable } from '../runners/playable'
+import { courseFinished, markFinished } from '../saved/finished'
 import { markSpecialDone } from '../saved/goals'
 import { record, today, topScore } from '../saved/highScores'
 import { named } from '../saved/identity'
 import { award } from '../saved/medals'
 import { reach } from '../saved/progress'
+import { unlockRunner } from '../saved/unlocked'
 import { play } from '../sfx'
 import { ArrowPad } from '../ui/ArrowPad'
-import { ControlsCard } from '../ui/ControlsCard'
+import {
+	ControlKeys,
+	RaceStartOverlay,
+	createRaceStart,
+	startPrompt,
+} from '../ui/RaceStart'
 import { Stage } from '../ui/Stage'
 import { IdentityEditor } from './IdentityEditor'
 import { PauseMenu, SOUND_ITEMS } from './PauseMenu'
@@ -46,6 +54,7 @@ import {
 	Summary,
 	type SummaryAction,
 } from './Summary'
+import { UnlockReveal } from './UnlockReveal'
 
 /**
  * - `practice`: one course, on its own
@@ -85,6 +94,11 @@ export function Game(props: {
 	onCourses: () => void
 	/** Back to the title screen. */
 	onMenu: () => void
+	/**
+	 * A restart: straight into the countdown once it's ready, rather than
+	 * its start screen first.
+	 */
+	restart?: boolean
 }) {
 	const { mode } = props
 	const world = createWorld(
@@ -209,6 +223,23 @@ export function Game(props: {
 	// run so far goes in Endless's. Finished, in Endless or practising, the
 	// course after it is unlocked for practice.
 	const [placing, setPlacing] = createSignal<Placing>()
+	/**
+	 * The new runners already shown off, at the end: each, one at a time, on
+	 * its own screen before the summary (see `UnlockReveal`).
+	 */
+	const [revealed, setRevealed] = createSignal(0)
+	/** The new runner being shown off, if there's one still to show. */
+	const unlock = () => {
+		const runners = world.result() ? (placing()?.newRunners ?? []) : []
+		const runner = runners[revealed()]
+		return runner
+			? { runner, number: revealed() + 1, count: runners.length }
+			: undefined
+	}
+	const nextUnlock = () => {
+		play('select')
+		setRevealed((n) => n + 1)
+	}
 	createEffect(() => {
 		const result = world.result()
 		if (!result) return
@@ -217,7 +248,19 @@ export function Game(props: {
 			const finished = result.kind === 'finished'
 			const entry = { runner: props.runner.name, date: today() }
 			const courseBestBefore = topScore(props.course.id)
-			const placing: Placing = { courseBestBefore }
+			const placing: Placing = { courseBestBefore, newRunners: [] }
+			// A bonus runner unlocked, finding them on the way: shown off.
+			const found = world.body.unlocked && unlockable(world.body.unlocked)
+			if (found) placing.newRunners.push(found)
+			// Finished: and with that, every course finished, Deri's theirs.
+			if (finished) {
+				markFinished(props.course.id)
+				if (
+					COURSES.every((course) => courseFinished(course.id)) &&
+					unlockRunner(DERI.id)
+				)
+					placing.newRunners.push(DERI)
+			}
 			if (world.courseScore() > 0)
 				placing.coursePlace = record(props.course.id, {
 					...entry,
@@ -254,10 +297,18 @@ export function Game(props: {
 					rodeWearing: world.body.rodeWearing,
 					toppedTower: world.body.toppedTower,
 					germsPopped: world.body.germsPopped,
+					foundSecret: world.body.foundSecret,
+					metFound: world.body.metFound,
+					brokeBridge: world.body.brokeBridge,
+					ghost: world.body.ghost,
+					crocodiles: world.body.crocBest,
 				})
 			) {
 				placing.special = true
 				placing.newSpecial = markSpecialDone(props.course.id)
+				// And a bonus runner, if it unlocks one: the first time, shown off.
+				const earned = special.unlocks && unlockable(special.unlocks)
+				if (earned && unlockRunner(earned.id)) placing.newRunners.push(earned)
 			}
 			setPlacing(placing)
 		})
@@ -303,11 +354,31 @@ export function Game(props: {
 		]
 	}
 
-	const scene = createRaceScene(world)
+	// Held, the world not moving on, while it's got ready and on its start
+	// screen; the Scene ticking all the same, so everything on it is placed.
+	const scene = createRaceScene(world, (w) => {
+		if (!start.holding()) stepWorld(w)
+	})
+	// Covered while it's got ready, then its start screen, the first time:
+	// held till they press any key but the pause menu's. Their jump doesn't
+	// jump at the start.
+	const start = createRaceStart({
+		world,
+		scene,
+		intro: !props.restart,
+		starter: anyControls,
+		startsOn: (event) => !paused() && !PAUSE_KEYS.includes(event.key),
+		onGo: () => {
+			world.body.wasUp = true
+		},
+	})
 
 	const [paused, setPaused] = createSignal(false)
-	/** Over once the result's up: there's nothing left to pause. */
-	const canPause = () => !world.result()
+	/**
+	 * On its start screen, or under way; not while it's got ready, and over
+	 * once the result's up: there's nothing to pause.
+	 */
+	const canPause = () => !world.result() && start.stage() !== 'loading'
 	const resume = () => {
 		// Jumping with Space to pick "Resume" shouldn't jump on the way back in.
 		world.body.wasUp = true
@@ -320,7 +391,7 @@ export function Game(props: {
 		scene.modal.set(paused() ? document.createElement('span') : undefined),
 	)
 	// Pause on switching away from the game, so the bus doesn't catch up meanwhile.
-	const pauseOnLeave = () => canPause() && setPaused(true)
+	const pauseOnLeave = () => canPause() && !start.holding() && setPaused(true)
 	window.addEventListener('blur', pauseOnLeave)
 	onCleanup(() => window.removeEventListener('blur', pauseOnLeave))
 
@@ -329,6 +400,17 @@ export function Game(props: {
 	const onKey = (event: KeyboardEvent) => {
 		// Typing a name: the editor's keys, not the summary's.
 		if (naming()) return
+		// A new runner shown off: Enter (or Space, or Esc) for the next, or the summary.
+		if (unlock()) {
+			if (
+				!event.repeat &&
+				(event.key === 'Enter' || event.key === ' ' || event.key === 'Escape')
+			) {
+				event.preventDefault()
+				nextUnlock()
+			}
+			return
+		}
 		if (world.result()) {
 			const count = actions().length
 			const move = SUMMARY_MOVES[event.key]
@@ -351,9 +433,9 @@ export function Game(props: {
 			}
 			return
 		}
-		if (event.key === 'Escape' || event.key === 'p' || event.key === 'P') {
+		if (PAUSE_KEYS.includes(event.key)) {
 			if (paused()) resume()
-			else setPaused(true)
+			else if (canPause()) setPaused(true)
 		}
 	}
 	window.addEventListener('keydown', onKey)
@@ -384,6 +466,8 @@ export function Game(props: {
 								picked={picked()}
 								onPick={setPicked}
 								placing={placing()}
+								unlock={unlock()}
+								onContinue={nextUnlock}
 								online={offer()}
 								checkingOnline={checkingOnline()}
 								onPause={() => canPause() && setPaused(true)}
@@ -403,6 +487,18 @@ export function Game(props: {
 									/>
 								</div>
 							</Show>
+							<RaceStartOverlay
+								start={start}
+								title={
+									props.course.parkrun
+										? `${props.course.name} parkrun`
+										: props.course.name
+								}
+								kicker={mode.kind === 'endless' ? 'Endless' : undefined}
+								prompt={startPrompt()}
+							>
+								<ControlKeys />
+							</RaceStartOverlay>
 							<Show when={paused()}>
 								<PauseMenu
 									groups={[
@@ -433,6 +529,9 @@ export function Game(props: {
 }
 
 const ACTIONS: Action[] = ['left', 'right', 'up', 'down']
+
+/** The keys for the pause menu: not for starting the race, on its start screen. */
+const PAUSE_KEYS = ['Escape', 'p', 'P']
 
 /**
  * Room under the race for the buttons, at least, on a phone held upright:
@@ -474,6 +573,10 @@ function Hud(props: {
 	picked: number
 	onPick: (i: number) => void
 	placing: Placing | undefined
+	/** A new runner to show off before the summary, if there's one still to show. */
+	unlock?: { runner: Playable; number: number; count: number }
+	/** On from it: to the next, or the summary. */
+	onContinue: () => void
 	online: OnlineOffer | undefined
 	/** Still finding out whether there's anything to send online. */
 	checkingOnline?: boolean
@@ -538,27 +641,44 @@ function Hud(props: {
 								opacity: 1 - (world.ticks() - popup.born) / POPUP_TICKS,
 							}}
 						>
-							{popup.text}
+							{/* Its first line; any under it, smaller: how far along a count is. */}
+							{popup.text.split('\n')[0]}
+							<For each={popup.text.split('\n').slice(1)}>
+								{(line) => <div style={styles.popupUnder}>{line}</div>}
+							</For>
 						</div>
 					)
 				}}
 			</For>
 
-			<ControlsCard world={world} />
-
 			<Show when={world.result()}>
 				{(result) => (
-					<Summary
-						world={world}
-						mode={props.mode}
-						result={result()}
-						placing={props.placing}
-						online={props.online}
-						checkingOnline={props.checkingOnline}
-						actions={props.actions}
-						picked={props.picked}
-						onPick={props.onPick}
-					/>
+					<Show
+						when={props.unlock}
+						keyed
+						fallback={
+							<Summary
+								world={world}
+								mode={props.mode}
+								result={result()}
+								placing={props.placing}
+								online={props.online}
+								checkingOnline={props.checkingOnline}
+								actions={props.actions}
+								picked={props.picked}
+								onPick={props.onPick}
+							/>
+						}
+					>
+						{(unlock) => (
+							<UnlockReveal
+								runner={unlock.runner}
+								number={unlock.number}
+								count={unlock.count}
+								onContinue={props.onContinue}
+							/>
+						)}
+					</Show>
 				)}
 			</Show>
 
@@ -689,6 +809,12 @@ const styles = {
 		'text-shadow':
 			'2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink)',
 		'white-space': 'nowrap',
+	},
+	/** A popup's line under its first: how far along a count is, "3/20". */
+	popupUnder: {
+		'font-size': '14px',
+		'text-align': 'center',
+		'margin-top': '-2px',
 	},
 	touchButton: {
 		position: 'absolute',

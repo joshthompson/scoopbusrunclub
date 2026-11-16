@@ -1,6 +1,6 @@
 import { type Collectable, courseCollectables } from '../game/collectables'
 import { COURSES } from './index'
-import type { Course } from './types'
+import type { Course, CourseId } from './types'
 
 /**
  * The collectables each course counts as its own: whatever's on it that's
@@ -22,3 +22,39 @@ const OWN = (() => {
 /** A course's own collectables: see `OWN`. */
 export const levelCollectables = (course: Course): Collectable[] =>
 	OWN.get(course.id) ?? []
+
+/** The course `id` is first found on, if it's on one: see `OWN`. */
+export function collectableCourse(id: Collectable): Course | undefined {
+	for (const course of COURSES)
+		if (OWN.get(course.id)?.includes(id)) return course
+	return undefined
+}
+
+/**
+ * How each course is said, where something's found on it: in Haga, on The
+ * Slopes, at the Pyramids. A `Record`, so a new course won't build till
+ * it's said.
+ */
+const WHERE: Record<CourseId, string> = {
+	haga: 'in',
+	kristineberg: 'at',
+	'gamla-stan': 'in',
+	huddinge: 'in',
+	pyramids: 'at the',
+	'halloween-town': 'in',
+	'scoop-line': 'on',
+	caves: 'in',
+	'great-wall': 'on the',
+	'furby-fields': 'in',
+	'machu-picchu': 'on',
+	sewers: 'in',
+	'city-rooftop': 'on',
+	cliff: 'on',
+	everest: 'on',
+	slopes: 'on',
+	karolinska: 'in',
+	midnattsloppet: 'at',
+}
+
+/** Where on `course` something is: "in Haga", "on The Slopes". */
+export const onCourse = (course: Course) => `${WHERE[course.id]} ${course.name}`

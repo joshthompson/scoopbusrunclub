@@ -1,10 +1,7 @@
-import pumpkinAsset from '@/assets/halloween/pumpkin1.png'
 import { Show } from 'solid-js'
-import spiderCupcakeAsset from '../../assets/boosts/spider-cupcake.png'
 import { paintedArt } from '../../courses/kit/pixelArt'
 import { cone } from '../../courses/kit/sewerScenery'
 import type { CourseId } from '../../courses/types'
-import { FIKA_SIZE } from '../../game/fika'
 import { PixelArt } from '../PixelArt'
 import { BALL } from '../football'
 import { TrophyArt } from './trophy'
@@ -42,8 +39,26 @@ function rowsArt(rows: string[], colours: Record<string, string>): GoalIcon {
 /** Score a goal: the football. */
 const FOOTBALL: GoalIcon = { src: BALL, width: 11 * CELL, height: 11 * CELL }
 
-/** Finish wearing a pumpkin: one, carved. */
-const PUMPKIN: GoalIcon = { src: pumpkinAsset, width: 29, height: 23 }
+/** Become a ghost: one, a sheet with eyes, its hem wavy, see-through at its edge. */
+const GHOST = rowsArt(
+	[
+		'....WWWWW....',
+		'...WWWWWWW...',
+		'..WWWWWWWWW..',
+		'.WWWWWWWWWWS.',
+		'.WWKKWWWKKWS.',
+		'.WWKKWWWKKWS.',
+		'.WWWWWWWWWWS.',
+		'.WWWWKKKWWWS.',
+		'.WWWWKKKWWWS.',
+		'.WWWWWWWWWWS.',
+		'.WWWWWWWWWWS.',
+		'.WWWWWWWWWWS.',
+		'.WSWWSWWWSWS.',
+		'.S..S.S..S.S.',
+	],
+	{ W: '#f4f2ff', S: '#b9b4d6', K: '#2b2236' },
+)
 
 /** Deer riding deer: a deer's head, its antlers up off it. */
 const DEER = rowsArt(
@@ -166,26 +181,244 @@ const GERM = rowsArt(
 	{ G: '#7ac143', L: '#c4ec86', D: '#4f8a2a', S: '#e8604a', K: '#2b2722' },
 )
 
+/**
+ * Bounce on every crocodile: a crocodile's head, side on, in the water,
+ * its eye and its grin, ripples either side of it.
+ */
+const CROCODILE = rowsArt(
+	[
+		'.......GGG...',
+		'......GYKGG..',
+		'..GGGGGGGGGG.',
+		'.GLLLLLLLGGG.',
+		'GGGGGGGGGGGG.',
+		'GTDTDTDTGGGG.',
+		'.BBBBBBBGGGD.',
+		'WWWWWWWWWWWWW',
+		'.WW..WWW..WW.',
+	],
+	{
+		G: '#5f9a3e',
+		L: '#7fb655',
+		D: '#3f6f2a',
+		B: '#d2dc8e',
+		Y: '#f2d14a',
+		K: '#1d1d1d',
+		T: '#fffaf0',
+		W: '#6fbcd8',
+	},
+)
+
+/** Find the Yeti: his face, shaggy and white, pale blue in it, grinning. */
+export const YETI = rowsArt(
+	[
+		'....L.L.L....',
+		'..LLWLWLWLL..',
+		'.LWWWWWWWWWL.',
+		'.WWWWWWWWWWWS',
+		'WWWWWWWWWWWWS',
+		'WWFFWWWWWFFWS',
+		'WWFFFFFFFFFWS',
+		'WWFKFFFFFKFWS',
+		'SWFFFFfFFFFWS',
+		'SWFMFFFFFMFWS',
+		'.SWFMTMTMFWS.',
+		'.SWWFFFFFWWS.',
+		'..SWSWSWSWS..',
+		'...S.S.S.S...',
+	],
+	{
+		L: '#ffffff',
+		W: '#eef1f7',
+		S: '#b9c0dc',
+		F: '#a6c0e0',
+		f: '#7f9cc6',
+		M: '#3b3350',
+		T: '#ffffff',
+		K: '#1d1d1d',
+	},
+)
+
+/**
+ * Find the Viking: his face, old, no helmet, his long white hair round it
+ * under a leather headband, a ginger moustache gone mostly grey, and his
+ * big white beard, its braid tied at its end.
+ */
+export const VIKING = rowsArt(
+	[
+		'...HHHHHHH...',
+		'..HHHHHHHHH..',
+		'.HBBBBBBBBBH.',
+		'.HSSSSSSSSSH.',
+		'HHSKSSSSSKSHH',
+		'HHSSSSnSSSSHH',
+		'HHsSSnnnSSsHH',
+		'HHWGGGGGGGWHH',
+		'HHWWWWmWWWWHH',
+		'hHWWWWWWWWWHh',
+		'hhWWWWWWWWWhh',
+		'.hhWWWWWWWhh.',
+		'...hWWWWWh...',
+		'.....WWW.....',
+		'......B......',
+	],
+	{
+		H: '#eeebe4',
+		h: '#aba69c',
+		B: '#47301f',
+		S: '#e5ad86',
+		s: '#bf8462',
+		n: '#bf8462',
+		K: '#1d1d1d',
+		G: '#c4834e',
+		W: '#f7f5f0',
+		m: '#8a4a3a',
+	},
+)
+
+/**
+ * Find Bat Person: his face, his black bat hood pulled down over his eyes,
+ * its ears up, the whites of his eyes through its slits, his chin under it.
+ */
+export const BAT_PERSON = rowsArt(
+	[
+		'.H.........H.',
+		'.HH.......HH.',
+		'.hHH.....HHh.',
+		'.hhHHHHHHHhh.',
+		'hhhhhhhhhhhhh',
+		'hhhhhhhhhhhhh',
+		'hheeehhheeehh',
+		'hhhhhhhhhhhhh',
+		'hhkkkkkkkkkhh',
+		'.hkkkkkkkkkh.',
+		'.hkkiiiiikkh.',
+		'..kkkkkkkkK..',
+		'...kkkkkkK...',
+		'....KKKKK....',
+	],
+	{
+		h: '#2c2c38',
+		H: '#4a4a5c',
+		e: '#f4f4f0',
+		k: '#f0c49a',
+		K: '#cf9b70',
+		i: '#3b1f1a',
+	},
+)
+
+/**
+ * Get all the Rings: one, face on, gold, the light on its top left, its
+ * inside edge in shade, the sky through it.
+ */
+export const RING = rowsArt(
+	[
+		'....LLLLL....',
+		'..LLGGGGGGG..',
+		'.LGGDDDDDGGG.',
+		'.LGD.....DGG.',
+		'LGD.......DGG',
+		'LGD.......DGG',
+		'LGD.......DGG',
+		'LGD.......DGG',
+		'GGD.......DGG',
+		'.GGD.....DGG.',
+		'.GGGDDDDDGGG.',
+		'..GGGGGGGGG..',
+		'....GGGGG....',
+	],
+	{
+		L: '#ffe680',
+		G: '#f7c531',
+		D: '#b8860b',
+	},
+)
+
+/**
+ * Break the bridge: a rope bridge snapped in the middle, its posts on the
+ * banks, its two halves of planks hanging down towards the break.
+ */
+export const BROKEN_BRIDGE_ICON = rowsArt(
+	[
+		'P...........P',
+		'Pr.........rP',
+		'PBr.......rBP',
+		'PBBr.....rBBP',
+		'P.BBr...rBB.P',
+		'P..BBr.rBB..P',
+		'P...BB.BB...P',
+		'P....B.B....P',
+		'P...........P',
+	],
+	{
+		P: '#5a3f26',
+		B: '#95693a',
+		r: '#b89b5a',
+	},
+)
+
+/**
+ * Bounce on 20 heads: a running shoe come down on a runner's head, in
+ * Midnattsloppet's blue T-shirt, and the bounce off it, flicking out.
+ */
+const HEAD_BOUNCE = rowsArt(
+	[
+		'........Ff...',
+		'.......RRRR..',
+		'.....WRRRRR..',
+		'..RRWRRRRRR..',
+		'.Rrrrrrrrrr..',
+		'.SSSSSSSSSS..',
+		'Y...........Y',
+		'.Y..HHHHH..Y.',
+		'...HHHHHHH...',
+		'...FFFFHHH...',
+		'..FKFFFFHH...',
+		'...FFFFFFH...',
+		'....FFFFf....',
+		'.....FFf.....',
+		'..BBBBBBBBB..',
+		'.BBBBBBBBBBB.',
+	],
+	{
+		R: '#e8473c',
+		r: '#b8322a',
+		W: '#ffffff',
+		S: '#eef1f4',
+		Y: '#ffd84a',
+		H: '#6a4428',
+		F: '#f0c49a',
+		f: '#cf9b70',
+		K: '#1d1d1d',
+		B: '#1f6bff',
+	},
+)
+
 /** Each special goal's picture: any without, a trophy. */
 const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	haga: FOOTBALL,
-	'halloween-town': PUMPKIN,
+	'halloween-town': GHOST,
 	huddinge: DEER,
 	kristineberg: LONG_JUMP,
 	sewers: CONE,
 	slopes: SHOE,
 	'great-wall': TOWER,
 	karolinska: GERM,
+	pyramids: CROCODILE,
+	everest: YETI,
+	'city-rooftop': BAT_PERSON,
+	'gamla-stan': VIKING,
+	cliff: RING,
+	'machu-picchu': BROKEN_BRIDGE_ICON,
+	midnattsloppet: HEAD_BOUNCE,
 }
 
 /**
  * For a collectables goal, in place of the course's own hat, where that's
- * its special goal's picture: Halloween Town's spider cupcake, its own fika,
- * its pumpkin being for finishing in one.
+ * its special goal's picture. None, now: Halloween Town's was its spider
+ * cupcake, while its special goal was finishing in a pumpkin.
  */
-export const COLLECTABLES_ICON: Partial<Record<CourseId, GoalIcon>> = {
-	'halloween-town': { src: spiderCupcakeAsset, ...FIKA_SIZE.spiderCupcake },
-}
+export const COLLECTABLES_ICON: Partial<Record<CourseId, GoalIcon>> = {}
 
 /**
  * A goal's picture, fitted into `size` px if given: a shadow of it, till

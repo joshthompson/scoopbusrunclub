@@ -148,6 +148,15 @@ export function Menu(props: {
 	)
 }
 
+/**
+ * The logo's letters bounce in a Mexican wave: each up and down quickly,
+ * 0.4s, the next just after, so two or three are up at a time; then the
+ * whole name still a while before the next wave, every 2.6s. The bounce's
+ * share of the cycle is in `logo-bounce`'s keyframes (styles.css).
+ */
+const LOGO_STAGGER = 0.08
+const LOGO_CYCLE = 2.6
+
 /** The game's name, each letter bouncing in turn. */
 export function Logo(props: { size?: number }) {
 	/** Each word's letters, and how far into the whole name each one is, for its bounce's delay. */
@@ -170,7 +179,7 @@ export function Logo(props: { size?: number }) {
 								<span
 									style={{
 										display: 'inline-block',
-										animation: `logo-bounce 2.6s ${letter.index * 0.07}s ease-in-out infinite`,
+										animation: `logo-bounce ${LOGO_CYCLE}s ${letter.index * LOGO_STAGGER}s ease-in-out infinite`,
 									}}
 								>
 									{letter.char}
@@ -184,20 +193,33 @@ export function Logo(props: { size?: number }) {
 	)
 }
 
+/** The ink outline round white text, 3 px all round. */
+const INK_OUTLINE = [
+	'3px 0 var(--ink)',
+	'-3px 0 var(--ink)',
+	'0 3px var(--ink)',
+	'0 -3px var(--ink)',
+	'3px 3px var(--ink)',
+	'-3px 3px var(--ink)',
+	'3px -3px var(--ink)',
+	'-3px -3px var(--ink)',
+]
+
 /** Text with the ink outline and drop shadow the titles use. */
 export const OUTLINED: JSX.CSSProperties = {
 	color: 'white',
-	'text-shadow': [
-		'3px 0 var(--ink)',
-		'-3px 0 var(--ink)',
-		'0 3px var(--ink)',
-		'0 -3px var(--ink)',
-		'3px 3px var(--ink)',
-		'-3px 3px var(--ink)',
-		'3px -3px var(--ink)',
-		'-3px -3px var(--ink)',
-		'5px 7px 0 rgba(15, 31, 41, 0.45)',
-	].join(', '),
+	'text-shadow': [...INK_OUTLINE, '5px 7px 0 rgba(15, 31, 41, 0.45)'].join(
+		', ',
+	),
+}
+
+/**
+ * Text with the ink outline only, no drop shadow: small text straight on
+ * the title screen's backdrop, where a shadow reads as a blurred copy.
+ */
+export const OUTLINED_FLAT: JSX.CSSProperties = {
+	color: 'white',
+	'text-shadow': INK_OUTLINE.join(', '),
 }
 
 const styles = {
@@ -245,7 +267,7 @@ const styles = {
 		background: '#ffd23f',
 		color: 'var(--ink)',
 		border: '3px solid white',
-		'box-shadow': '4px 4px 0 #b33a2a',
+		'box-shadow': '2px 2px 0 #b33a2a',
 	},
 	itemDisabled: {
 		color: 'rgba(255, 255, 255, 0.4)',

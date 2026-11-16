@@ -45,7 +45,7 @@ import {
 	WIPEOUT_TICKS,
 	topSpeed,
 } from './constants'
-import { boost, scored, shielded } from './step'
+import { boost, scored, shielded, slowToDance } from './step'
 import type { Body, Pacer, Racer, TrickKind, World } from './world'
 
 /**
@@ -448,7 +448,7 @@ export function stepSkiing(
 		b.ducking = racing && down && !grinding && b.wipeout === 0
 		if (!racing) {
 			// Over the line: gliding on, stood up, settling to an easy pace.
-			b.vx += (RUN_OFF_SPEED - b.vx) * 0.03
+			b.vx = slowToDance(racer, b.vx + (RUN_OFF_SPEED - b.vx) * 0.03)
 		} else if (b.wipeout > 0) {
 			// In a heap in the snow: sliding to a stop, then up again.
 			b.vx *= 0.95

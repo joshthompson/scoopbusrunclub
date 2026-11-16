@@ -59,3 +59,69 @@ export function cyclistAt(
 	const ridden = CYCLIST_SPEED * Math.max(0, ticks - setsOff)
 	return { x: obstacle.x - ridden, riding: ridden > 0, lap: 0, facing: -1 }
 }
+
+/** How far a cyclist's picture sinks into the Ground, drawn. */
+export const CYCLIST_SINK = 2
+
+/** A cyclist's deck, where it is on a tick (see `deckAt`). */
+export interface Deck {
+	/** Which of the world's obstacles it's on. */
+	index: number
+	/** Its left end: how far that's gone since last tick is how far it carries whoever's on it. */
+	left: number
+	right: number
+	top: number
+}
+
+/**
+ * Where the deck is on the world's obstacle `index`, if it's a cyclist with
+ * one (see `look.cyclist.deck`): a hospital bed's, to stand on. Not once
+ * the bus has scooped it.
+ */
+export function deckAt(
+	world: Pick<World, 'raceTicks' | 'course' | 'terrain' | 'obstacles'>,
+	index: number,
+): Deck | undefined {
+	const look = world.course.look?.cyclist
+	const state = world.obstacles[index]
+	const obstacle = state?.obstacle
+	if (!look?.deck || obstacle?.kind !== 'cyclist' || state.scooped) return
+	const { deck, width, height } = look
+	const cyclist = cyclistAt(world, { ...state, obstacle })
+	const left = cyclist.x - width / 2
+	// Drawn riding left: turned round, the deck's the other end of it.
+	const [from, to] =
+		cyclist.facing < 0
+			? [deck.from, deck.to]
+			: [width - deck.to, width - deck.from]
+	return {
+		index,
+		left: left + from,
+		right: left + to,
+		top: world.terrain.groundY(cyclist.x) - height + CYCLIST_SINK + deck.top,
+	}
+}
+
+/**
+ * The deck someone lands on, coming down from `wasFeetY` to `feetY` at `x`:
+ * one whose top they've come down through, if any.
+ */
+export function deckUnder(
+	world: Pick<World, 'raceTicks' | 'course' | 'terrain' | 'obstacles'>,
+	x: number,
+	wasFeetY: number,
+	feetY: number,
+) {
+	if (!world.course.look?.cyclist?.deck) return
+	for (let index = 0; index < world.obstacles.length; index++) {
+		const deck = deckAt(world, index)
+		if (
+			deck &&
+			x >= deck.left &&
+			x <= deck.right &&
+			wasFeetY <= deck.top + 1 &&
+			feetY >= deck.top
+		)
+			return deck
+	}
+}

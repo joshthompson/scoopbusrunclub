@@ -10,13 +10,34 @@ const STORAGE_KEY = `${STORAGE_PREFIX}collected`
 
 type Counts = Partial<Record<Collectable, number>>
 
+/**
+ * Collectables that have since been swapped for something else, and what
+ * for: had as the one, kept as the other. Midnattsloppet's korv med bröd,
+ * now a slice of pizza.
+ */
+const RENAMED: Record<string, Collectable> = {
+	'fika:hotDog': 'fika:pizzaSlice',
+}
+
+/** `counts`, with anything renamed counted under its new name. */
+function renamed(counts: Record<string, number>): Counts {
+	const out: Record<string, number> = {}
+	for (const [id, n] of Object.entries(counts)) {
+		const to = RENAMED[id] ?? id
+		out[to] = (out[to] ?? 0) + n
+	}
+	return out as Counts
+}
+
 function load(): Counts {
 	try {
 		const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
 		// Once just a list of what's been had: each of them, once.
 		if (Array.isArray(stored))
-			return Object.fromEntries(stored.map((id: Collectable) => [id, 1]))
-		return stored
+			return renamed(
+				Object.fromEntries(stored.map((id: Collectable) => [id, 1])),
+			)
+		return renamed(stored)
 	} catch {
 		return {}
 	}

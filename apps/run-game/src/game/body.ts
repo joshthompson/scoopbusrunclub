@@ -4,8 +4,8 @@ import type { Body, World } from './world'
 
 /**
  * Inside someone, in Karolinska: Germs floating
- * about to pop, and a heart beating, its valves firing whoever's on them
- * up into the air on every beat.
+ * about to pop, and a heart beating, its valves flapping open on every
+ * beat, and firing whoever gets onto one up into the air.
  */
 
 // --- Germs ---------------------------------------------------------------
@@ -33,7 +33,7 @@ export const GERM_GIVE = 10
 /** A heartbeat, "lub-dub", every this many ticks: the "dub" this long after the "lub". */
 export const HEARTBEAT = 80
 export const HEARTBEAT_DUB = 14
-/** How long a valve's open on the beat, firing anyone on it up; how far either side; how hard. */
+/** How long a valve's open, on the beat or firing someone up; how far either side it fires them; how hard. */
 const VALVE_OPEN = 24
 export const VALVE_REACH = 48
 const VALVE_LAUNCH = 16
@@ -44,10 +44,21 @@ export const beatAt = (ticks: number) => ticks % HEARTBEAT
 /** Whether the valves are open now, on the beat. */
 export const valveOpen = (ticks: number) => beatAt(ticks) < VALVE_OPEN
 
-/** Fired up off a valve, if they're on one as it opens: whether they were. */
-export function onValve(world: World, b: Body, x: number) {
+/**
+ * How long ago, at `ticks`, a valve that last fired someone up at `flown`
+ * flapped open to do it, if it's still open from it.
+ */
+export const valveFlapped = (flown: number | undefined, ticks: number) =>
+	flown !== undefined && ticks >= flown && ticks - flown < VALVE_OPEN
+		? ticks - flown
+		: undefined
+
+/**
+ * Fired up off a valve, the moment they're on it, beat or no beat: no
+ * stood waiting for it, with the bus coming. Whether they were.
+ */
+export function onValve(_world: World, b: Body, x: number) {
 	if (!b.grounded || Math.abs(b.x - x) > VALVE_REACH) return false
-	if (!valveOpen(world.ticks())) return false
 	b.vy = -VALVE_LAUNCH
 	b.grounded = false
 	b.jumping = false

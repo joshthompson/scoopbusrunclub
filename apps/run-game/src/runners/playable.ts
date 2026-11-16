@@ -4,17 +4,29 @@ import {
 	createRunnerFrames,
 } from '@/utils/createRunnerFrames'
 import type { CustomRunner } from './customRunners'
+import { danceForKey } from './dance'
+import { type DanceSprite, lookDance, stripDance } from './dancing'
 import { type SkiPoses, skiPosesFor } from './skiPoses'
 
 /** Anyone you can run as: a club member, or a custom runner of your own. */
 export interface Playable {
-	/** `member:<key>` or `custom:<id>`. */
+	/** `member:<key>`, `custom:<id>` or `bonus:<key>`. */
 	id: string
 	name: string
 	/** The club member they are, if they're one: nobody volunteers while they're running. */
 	member?: RunnerName
 	/** Their custom runner, if they're one. */
 	custom?: CustomRunner
+	/** A bonus runner, found on a course and unlocked (see `BONUS_RUNNERS`). */
+	bonus?: boolean
+	/**
+	 * What unlocks them, said when it does and on the select screen once it
+	 * has: where they were found ("Found in Gamla Stan"), or what it took
+	 * ("Unlocked by completing all courses").
+	 */
+	unlockedBy?: string
+	/** White all over, so lost on a light card: shown on a dark one, on the select screen. */
+	darkCard?: boolean
 	/** The look they're made from, if they're made from one: a custom runner's, or a guest's. */
 	look?: CharacterSpriteProps
 	sprite: {
@@ -39,6 +51,17 @@ export interface Playable {
 		skiTuck?: string
 		/** Their face, as the website's celebrations show it. */
 		face?: string
+		/**
+		 * Their dance: over the line, once they've stopped, and stood about
+		 * on the Podium (see `runners/dance.ts`).
+		 */
+		dance?: DanceSprite
+		/**
+		 * How far over they're turned, lying along under a glider, in degrees:
+		 * head first, as everyone is, if not said. Link, on all fours, hangs
+		 * under it as he is.
+		 */
+		glideLean?: number
 		/** One frame's size, in the sprite's own pixels. */
 		width: number
 		height: number
@@ -95,6 +118,39 @@ const MEMBER_SKI_TUCKS = byMember(
 	}),
 )
 
+/**
+ * Members' dances, made from their stand poses by `scripts/make-dances.ts`,
+ * to touch up by hand: `assets/dance/<member>.png`, a strip of frames, each
+ * as wide as their stand pose and a little taller. Which dance is theirs is
+ * `RUNNER_DANCES`'s say: a new one, or a new member's, is made with the
+ * script.
+ */
+const MEMBER_DANCES = byMember(
+	import.meta.glob<string>('../assets/dance/*.png', {
+		eager: true,
+		import: 'default',
+	}),
+)
+
+/** Members turned some other way on a glider, lying under it (see `glideLean`). */
+const MEMBER_GLIDE_LEANS: Partial<Record<RunnerName, number>> = {
+	// A dog: already lying along, on all fours.
+	link: 0,
+}
+
+/**
+ * Members locked at first, as bonus runners are, until something unlocks
+ * them: what does, said when it does. Still out on the courses with the
+ * pack, locked or not; just not yours to run as yet.
+ */
+const MEMBER_UNLOCKS: Partial<Record<RunnerName, string>> = {
+	// A dog: yours once you've ridden one.
+	link: 'Unlocked by riding a corgi at Kristineberg',
+}
+
+/** Link's runner id: unlocked by riding a corgi (see `MEMBER_UNLOCKS`). */
+export const LINK_ID = 'member:link'
+
 /** Members who can play: everyone with a run and a duck (their sit sprite). */
 export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 	.filter((member) => {
@@ -110,6 +166,7 @@ export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 			id: `member:${member}`,
 			name: runner.name,
 			member,
+			unlockedBy: MEMBER_UNLOCKS[member],
 			sprite: {
 				run: runner.frames.run ?? [],
 				sit: runner.frames.sit?.[0],
@@ -119,15 +176,34 @@ export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 				skiTuck: MEMBER_SKI_TUCKS[member] ?? poses?.skiTuck,
 				snowboard: MEMBER_SNOWBOARDS[member] ?? poses?.snowboard,
 				face: runner.frames.face?.[0],
+				// Made for them, or from their look, if they're made from one.
+				dance: MEMBER_DANCES[member]
+					? stripDance(
+							MEMBER_DANCES[member],
+							danceForKey(member),
+							runner.width,
+							runner.height,
+						)
+					: runner.look && lookDance(runner.look, member),
+				glideLean: MEMBER_GLIDE_LEANS[member],
 				width: runner.width,
 				height: runner.height,
 			},
 		}
 	})
 
+/** The club, by name: every member but those to unlock, everyone's to run as. */
+export const CLUB = MEMBERS.filter((m) => !m.unlockedBy).sort((a, b) =>
+	a.name.localeCompare(b.name),
+)
+
+/** The members to unlock (see `MEMBER_UNLOCKS`), with the bonus runners. */
+export const LOCKED_MEMBERS = MEMBERS.filter((m) => m.unlockedBy)
+
 /** Drawing a custom runner's sprites is canvas work, so each look is only drawn once. */
 const drawn = new Map<string, ReturnType<typeof createRunnerFrames>>()
 const posed = new Map<string, SkiPoses | undefined>()
+const danced = new Map<string, DanceSprite | undefined>()
 
 /** A look's sprites, the way a `Playable` has them. */
 export function lookSprite(avatar: CharacterSpriteProps): Playable['sprite'] {
@@ -140,6 +216,8 @@ export function lookSprite(avatar: CharacterSpriteProps): Playable['sprite'] {
 	// Ski poses, made from their stand pose, as the members' are: once each.
 	if (!posed.has(look)) posed.set(look, skiPosesFor(avatar))
 	const poses = posed.get(look)
+	// A dance, made from it the same way: which, picked by the look.
+	if (!danced.has(look)) danced.set(look, lookDance(avatar, look))
 	return {
 		run: frames.frames.run ?? [],
 		sit: frames.frames.sit?.[0],
@@ -148,6 +226,7 @@ export function lookSprite(avatar: CharacterSpriteProps): Playable['sprite'] {
 		skiTuck: poses?.skiTuck,
 		snowboard: poses?.snowboard,
 		face: frames.frames.face?.[0],
+		dance: danced.get(look),
 		width: frames.width,
 		height: frames.height,
 	}

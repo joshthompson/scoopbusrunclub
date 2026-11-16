@@ -4,6 +4,7 @@ import barcodeAsset from '../../assets/boosts/barcode.png'
 import type { Collectable } from '../../game/collectables'
 import type { FikaItem } from '../../game/fika'
 import type { Hat, PickupHat } from '../../game/hats'
+import { BloodCellArt } from './bloodCell'
 import { BactrianArt, CamelArt } from './camel'
 import { CondorArt } from './condor'
 import { CorgiArt } from './corgi'
@@ -14,19 +15,24 @@ import { GooseIcon } from './geese'
 import { GliderArt } from './glider'
 import { GoatArt } from './goat'
 import { HatPicture, hatArt } from './hats'
+import { HorseArt } from './horse'
 import { LlamaArt } from './llama'
 import { MineCartArt } from './mineCart'
 import { MoleArt } from './mole'
+import { SkateboardArt } from './skateboard'
 import { StoodBoardArt } from './skis'
 import { UnicornArt } from './unicorn'
+
+const isFika = (id: Collectable): id is `fika:${FikaItem}` =>
+	id.startsWith('fika:')
+const isHat = (id: Collectable): id is `hat:${PickupHat}` =>
+	id.startsWith('hat:')
 
 /** A collectable's picture, as it's seen on the course: its fika, its ride, sat waiting. */
 export function CollectableArt(props: { id: Collectable }): JSX.Element {
 	const { id } = props
-	if (id.startsWith('fika:'))
-		return <FikaArt item={id.slice('fika:'.length) as FikaItem} />
-	if (id.startsWith('hat:'))
-		return <HatIcon hat={id.slice('hat:'.length) as PickupHat} />
+	if (isFika(id)) return <FikaArt item={id.slice('fika:'.length) as FikaItem} />
+	if (isHat(id)) return <HatIcon hat={id.slice('hat:'.length) as PickupHat} />
 	switch (id) {
 		case 'ride:corgi':
 			return <CorgiArt pose="sit" />
@@ -42,6 +48,8 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <UnicornArt pose="sit" />
 		case 'ride:goat':
 			return <GoatArt pose="sit" />
+		case 'ride:horse':
+			return <HorseArt pose="sit" />
 		case 'ride:skis':
 			// The rack's first pair, stood up in the snow; and its first snowboard.
 			return <StoodBoardArt board={1} />
@@ -75,6 +83,10 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <MoleArt pose="sit" />
 		case 'ride:minecart':
 			return <MineCartArt />
+		case 'ride:bloodCell':
+			return <BloodCellArt pose="sit" />
+		case 'ride:skateboard':
+			return <SkateboardArt pose="sit" />
 		case 'barcode':
 			return (
 				<img
@@ -94,6 +106,8 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 				/>
 			)
 	}
+	// Every collectable has its picture: a new one won't build without it.
+	return id satisfies never
 }
 
 /** A hat, on its own, at its size on a head, made a little bigger. */

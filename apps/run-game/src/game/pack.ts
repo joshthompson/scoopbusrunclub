@@ -2,14 +2,20 @@ import type { Course } from '../courses/types'
 import { kidsWidth } from '../draw/art/kids'
 import { touristsWidth } from '../draw/art/tourists'
 import { guests } from '../runners/guests'
-import { DEFAULT_AVATAR, pickAny, randomAvatar } from '../runners/looks'
-import { MEMBERS, type Playable, lookSprite } from '../runners/playable'
+import {
+	type Avatar,
+	DEFAULT_AVATAR,
+	pickAny,
+	randomAvatar,
+} from '../runners/looks'
+import { CLUB, type Playable, lookSprite } from '../runners/playable'
 import { SKELETON_SPRITE } from '../runners/skeleton'
 import { play } from '../sfx'
 import { BOARDS } from './boards'
 import { ceilingAt, inTunnel, rockOver } from './cave'
 import {
 	BUS_LEASH_MAX,
+	BUS_START_X,
 	CAMERA_LEAD,
 	DAZED_SPEED,
 	DAZED_TICKS,
@@ -23,7 +29,10 @@ import {
 	PACER_EVERY_TICKS,
 	PACER_FASTEST,
 	PACER_SLOWEST,
+	PACK_SIZE,
 	RUNNER_SCALE,
+	RUN_TOP_SPEED,
+	SLIDE_KEEP,
 	STAND_HEIGHT,
 	START_X,
 	STOMP_BOOST,
@@ -40,7 +49,8 @@ import { rideCondor } from './flyers'
 import { atSea, flyPacer } from './gliders'
 import { mummyAt } from './mummies'
 import { landingOn, platformAt, platformMove } from './platforms'
-import { isHeld, shrunkAt } from './portals'
+import { PACER_SHRINK, isHeld, shrinkRayOver, shrunkAt } from './portals'
+import { sagOf } from './ropeBridge'
 import { swampManAt } from './sewer'
 import { skiPacer } from './skis'
 import { steamFires } from './steam'
@@ -108,7 +118,7 @@ export const SCOOP_HEARD = BUS_LEASH_MAX - VIEW_WIDTH * CAMERA_LEAD + 50
 
 /** What `lineUp` needs: the world's still being made when it's called. */
 interface Lineup {
-	course: Pick<Course, 'skeletons' | 'ride'>
+	course: Pick<Course, 'skeletons' | 'ride' | 'raceShirt' | 'crowd'>
 	racers: { runner: Playable }[]
 	terrain: Terrain
 	pack: Pacer[]
@@ -118,30 +128,56 @@ interface Lineup {
 
 /**
  * Someone to join: now and then someone the club knows, a member or one of
- * its guests, as long as they're not running already (or racing).
+ * its guests, as long as they're not running already (or racing). Never
+ * Link, or anyone else to unlock: one pacing you would look like they're
+ * yours to run as already.
  */
 function newcomer(
 	world: Lineup,
 ): Pick<Pacer, 'name' | 'member' | 'guest' | 'look' | 'sprite' | 'skeleton'> {
 	if (Math.random() < (world.course.skeletons ?? 0))
 		return { name: 'Skeleton', skeleton: true, sprite: SKELETON_SPRITE }
-	const members = [...MEMBERS, ...guests()].filter(
+	const shirt = world.course.raceShirt
+	const members = [...CLUB, ...guests()].filter(
 		(m) =>
+			// In the race's own T-shirt, only those made from a look.
+			(!shirt || m.look) &&
 			!world.racers.some(
 				(r) => r.runner.id === m.id || r.runner.name === m.name,
-			) && !world.pack.some((p) => p.name === m.name),
+			) &&
+			!world.pack.some((p) => p.name === m.name),
 	)
 	if (members.length && Math.random() < MEMBER_SHARE) {
-		const { id, name, member, sprite } = pickAny(members)
+		const { id, name, member, sprite, look } = pickAny(members)
+		const dressed = shirt && look ? inShirt(look, shirt) : undefined
 		return {
 			name,
 			member,
 			guest: id.startsWith('guest:') ? id : undefined,
-			sprite,
+			look: dressed,
+			sprite: dressed ? lookSprite(dressed) : sprite,
 		}
 	}
-	const look = randomAvatar(DEFAULT_AVATAR)
+	const random = randomAvatar(DEFAULT_AVATAR)
+	const look = shirt ? inShirt(random, shirt) : random
 	return { name: pickAny(NAMES), look, sprite: lookSprite(look) }
+}
+
+/** `look`, in a race's T-shirt, `colour`: see `raceShirt`. */
+const inShirt = (look: Avatar, colour: string): Avatar => ({
+	...look,
+	topType: 'tshirt',
+	topColor: colour,
+})
+
+/**
+ * How many Pacers can be out at once at `x`: the course's crowd, if it has
+ * one, less the Players in a Round, as `packSize` is.
+ */
+function packSizeAt(world: Lineup, x: number) {
+	const { crowd } = world.course
+	if (!crowd) return world.packSize
+	return Math.max(0, crowd(x) - (PACK_SIZE - world.packSize))
 }
 
 /**
@@ -172,34 +208,74 @@ function join(world: Lineup, x: number, skiing = false) {
  */
 export function lineUp(world: Lineup) {
 	const last = START_X - (world.racers.length - 1) * START_GAP
-	for (const offset of [-36, -72, -108, -150, -195].slice(0, world.packSize))
+	const size = packSizeAt(world, START_X)
+	const offsets = world.course.crowd
+		? // A crowd: packed in behind, as far back as the bus.
+			Array.from({ length: size }, (_, i) =>
+				Math.max(
+					BUS_START_X + 60 - last,
+					-30 - Math.round((i * CROWD_BACK) / Math.max(1, size - 1)),
+				),
+			)
+		: [-36, -72, -108, -150, -195].slice(0, size)
+	for (const offset of offsets)
 		join(world, last + offset + Math.round(Math.random() * 16))
 	world.packState.nextJoin = PACER_EVERY_TICKS
 }
 
-/** One tick of the pack: joining, running, being bounced on, and leaving. */
-export function stepPack(world: World) {
+/** How far back from the last Player a crowd lines up. */
+const CROWD_BACK = 380
+
+/**
+ * Ticks till the next Pacer joins: sooner the bigger the pack's meant to
+ * be at `x`, so a crowd keeps up.
+ */
+const nextJoin = (world: Lineup, x: number) =>
+	((PACER_EVERY_TICKS + Math.random() * PACER_EVERY_SPREAD) * PACK_SIZE) /
+	Math.max(PACK_SIZE, packSizeAt(world, x))
+
+/**
+ * One tick of the pack: joining, running, being bounced on, and leaving.
+ * While a Portal's going off (`frozen`), and everything else is stopped,
+ * still running, and leaving, but nobody joins.
+ */
+export function stepPack(world: World, frozen = false) {
 	const { pack, terrain, packState } = world
 	const phase = world.phase()
 	// On the start line until "Go!", like everyone.
 	if (phase === 'countdown') return
 
-	if (phase === 'running' && --packState.nextJoin <= 0) {
-		packState.nextJoin = PACER_EVERY_TICKS + Math.random() * PACER_EVERY_SPREAD
+	if (phase === 'running' && !frozen && --packState.nextJoin <= 0) {
 		// Just off the screen ahead, to be caught up with: on the Ground, not
 		// over a Gap, nor out at sea.
 		const x = world.camera() + world.viewWidth() + 80
+		packState.nextJoin = nextJoin(world, x)
 		const running = pack.filter((p) => !p.scooped).length
-		if (
-			running < world.packSize &&
-			x < terrain.finishX - 300 &&
-			!terrain.inGap(x) &&
-			!shrunkAt(world.course, x)
-		)
-			join(world, x, world.course.ride === 'skis')
+		const size = packSizeAt(world, x)
+		// A crowd joins in bunches, a few at a time, as it's caught up with.
+		const bunch = Math.max(1, Math.round(size / PACK_SIZE))
+		for (let k = 0, at = x; k < Math.min(bunch, size - running); k++) {
+			if (
+				at < terrain.finishX - 300 &&
+				!terrain.inGap(at) &&
+				!shrunkAt(world.course, at)
+			)
+				join(world, Math.round(at), world.course.ride === 'skis')
+			at += 18 + Math.random() * 30
+		}
 	}
 
-	for (const pacer of pack) movePacer(world, pacer)
+	for (const pacer of pack) {
+		// Into a shrink ray: onto its plate, to be shrunk away.
+		if (
+			pacer.shrink === undefined &&
+			!pacer.scooped &&
+			shrunkAt(world.course, pacer.x)
+		)
+			intoShrinkRay(world, pacer)
+		if (pacer.shrink !== undefined) shrinkPacer(world, pacer)
+		else movePacer(world, pacer)
+	}
 	for (const racer of world.racers) {
 		if (phase === 'running' && !racer.out && !isHeld(world, racer))
 			bounceOffHeads(world, racer)
@@ -213,11 +289,39 @@ export function stepPack(world: World) {
 		if (
 			p.feetY > VIEW_HEIGHT + 300 ||
 			p.x > terrain.finishX + 700 ||
-			// Into a shrink ray: gone, nobody else is shrunk.
-			(!p.scooped && shrunkAt(world.course, p.x))
+			// Shrunk away to nothing in a shrink ray: gone, nobody else is
+			// shrunk.
+			(p.shrink ?? 0) >= PACER_SHRINK.gone
 		)
 			pack.splice(i, 1)
 	}
+}
+
+/** How quickly a Pacer into a shrink ray steps over onto its plate. */
+const ONTO_PLATE = 0.2
+
+/** Into a shrink ray: it starts charging up for them, heard if they're in sight. */
+function intoShrinkRay(world: World, p: Pacer) {
+	p.shrink = 0
+	p.ducking = false
+	p.hillSlide = 0
+	const camera = world.camera()
+	if (p.x > camera && p.x < camera + world.viewWidth()) play('zap')
+}
+
+/**
+ * Being shrunk on a shrink ray's plate (see `PACER_SHRINK`): stepping over
+ * into its middle, stood still, while it charges and shrinks them.
+ */
+function shrinkPacer(world: World, p: Pacer) {
+	const ray = shrinkRayOver(world.course, p.x)
+	if (ray) p.x += (ray.focus.x - p.x) * ONTO_PLATE
+	p.feetY = world.terrain.groundY(p.x)
+	p.vx = 0
+	p.vy = 0
+	p.grounded = true
+	p.on = undefined
+	p.shrink = (p.shrink ?? 0) + 1
 }
 
 function movePacer(world: World, p: Pacer) {
@@ -241,13 +345,26 @@ function movePacer(world: World, p: Pacer) {
 	// On a glider, out over the sea.
 	if (p.gliding) return flyPacer(world, p)
 	// On skis, down The Slopes.
-	if (p.board) return skiPacer(world, p, (x) => hopAhead(world, x))
+	if (p.board) return skiPacer(world, p, (x) => hopAhead(world, x, p.feetY))
 	const ticks = world.ticks()
 	if (p.dazed > 0) p.dazed--
 	if (p.grounded) {
-		const pace = p.dazed > 0 ? DAZED_SPEED : p.pace
 		const slope = p.on === undefined ? terrain.slope(p.x) : 0
-		p.vx += (pace - p.vx) * PACER_GRIP + hillPull(slope) * PACER_HILL_PULL
+		// Down, sliding, as a Player does: under a low branch or a tall
+		// hurdle, and on under the next if it's close; or now and then down
+		// a hill, for the fun of it.
+		const downhill = slideDownhill(world, p, slope)
+		p.ducking = duckUnder(world, p.x) || downhill
+		if (p.ducking && p.dazed === 0) {
+			// A slide: hardly slows on the flat, and gathers speed downhill,
+			// as anyone's. Never to a stop, under something.
+			p.vx *= SLIDE_KEEP
+			p.vx += hillPull(slope) * PACER_HILL_PULL * (slope > 0 ? 2 : 1)
+			p.vx = Math.min(RUN_TOP_SPEED, Math.max(PACER_CRAWL, p.vx))
+		} else {
+			const pace = p.dazed > 0 ? DAZED_SPEED : p.pace
+			p.vx += (pace - p.vx) * PACER_GRIP + hillPull(slope) * PACER_HILL_PULL
+		}
 		// Carried along by a Moving Platform.
 		if (p.on !== undefined)
 			p.x += platformMove(terrain, world.platforms[p.on], ticks).x
@@ -274,8 +391,8 @@ function movePacer(world: World, p: Pacer) {
 			decide(world, p)
 		}
 	}
-	// Under a low branch, or a tall hurdle: ducked, sliding under it.
-	p.ducking = p.grounded && duckUnder(world, p.x)
+	// Up off the ground, jumping something or off a step: not sliding.
+	if (!p.grounded) p.ducking = false
 	const from = p.x
 	p.x += p.vx
 	// Never through a Wall: stopped at its foot, like anyone.
@@ -296,12 +413,12 @@ function movePacer(world: World, p: Pacer) {
 	if (p.grounded) {
 		if (p.on !== undefined) {
 			const at = platformAt(terrain, world.platforms[p.on], ticks)
-			if (p.x < at.left || p.x > at.right) {
-				// Off the end of it.
+			if (world.platforms[p.on].broken || p.x < at.left || p.x > at.right) {
+				// Off the end of it, or it's broken under them.
 				p.on = undefined
 				p.grounded = false
 				p.vy = 0
-			} else p.feetY = at.top
+			} else p.feetY = at.top + sagOf(world.ropeBridges, p.on, p.x)
 		} else if (
 			(ground - p.feetY > STEP_DOWN && !terrain.inGap(p.x)) ||
 			atSea(world, p.x)
@@ -326,16 +443,32 @@ function movePacer(world: World, p: Pacer) {
 		}
 		const platform =
 			p.vy >= 0
-				? landingOn(terrain, world.platforms, ticks, p.x, wasFeetY, p.feetY)
+				? landingOn(
+						terrain,
+						world.platforms,
+						ticks,
+						p.x,
+						wasFeetY,
+						p.feetY,
+						undefined,
+						0,
+						(index, x) => sagOf(world.ropeBridges, index, x),
+					)
 				: undefined
 		if (platform && platform.top <= ground) {
 			p.feetY = platform.top
 			p.on = platform.index
 			p.vy = 0
 			p.grounded = true
-		} else if (p.feetY >= ground && p.vy >= 0 && !atSea(world, p.x)) {
+		} else if (
+			p.feetY >= ground &&
+			p.vy >= 0 &&
+			!atSea(world, p.x) &&
+			!brokenUnder(world, p.x)
+		) {
 			// Over a Gap too: Pacers never fall. Into the sea, they do: down,
-			// out of sight, and gone.
+			// out of sight, and gone; and down a gorge whose bridge has
+			// broken under them.
 			p.feetY = ground
 			p.on = undefined
 			p.vy = 0
@@ -362,7 +495,7 @@ function decide(world: World, p: Pacer) {
 
 	// Something to get up onto, right here: a Platform within a jump.
 	const board = world.platforms.findIndex((platform, i) => {
-		if (i === p.on) return false
+		if (i === p.on || platform.broken) return false
 		const at = platformAt(terrain, platform, ticks)
 		return (
 			at.top < p.feetY - 3 &&
@@ -381,10 +514,14 @@ function decide(world: World, p: Pacer) {
 		// Off the end, once that's somewhere to go; till then, along for the ride.
 		const at = platformAt(terrain, world.platforms[p.on], ticks)
 		// Along to the end of it, at most: for the next plank up, or ready.
-		if (!canStepOff(world, at.right, at.top))
-			p.vx = Math.max(0, Math.min(p.vx, at.right - 12 - p.x))
+		const stepOff = canStepOff(world, at.right, at.top)
+		if (!stepOff) p.vx = Math.max(0, Math.min(p.vx, at.right - 12 - p.x))
 		// Off, at a run: enough to carry them onto what's ahead.
 		else p.vx = Math.max(p.vx, p.pace)
+		// Over a cone stood on it, as on the Ground: not off a lift, mid-air,
+		// nor off its end, with nowhere to go.
+		if (!world.platforms[p.on].move)
+			hopOnTheWay(world, p, stepOff ? undefined : at.right - 12)
 		return
 	}
 
@@ -407,6 +544,7 @@ function decide(world: World, p: Pacer) {
 		}
 		// A girder level with them, there against its edge: on, and across.
 		const level = world.platforms.findIndex((platform) => {
+			if (platform.broken) return false
 			const at = platformAt(terrain, platform, ticks)
 			return (
 				Math.abs(at.top - p.feetY) < 3 &&
@@ -438,7 +576,7 @@ function decide(world: World, p: Pacer) {
 			const over = rise + WALL_CLEAR
 			const rising = (vy - Math.sqrt(vy * vy - 2 * GRAVITY * over)) / GRAVITY
 			if (wall - 12 - p.x <= Math.max(p.vx, 2) * rising) jump(rise)
-			else if (p.dazed === 0 && hopAhead(world, p.x)) {
+			else if (p.dazed === 0 && hopAhead(world, p.x, p.feetY)) {
 				p.vy = -HOP_SPEED
 				p.grounded = false
 			}
@@ -451,7 +589,10 @@ function decide(world: World, p: Pacer) {
 				platform.x + platform.width <= wall + 4 &&
 				platform.x + platform.width > wall - 560,
 		)
-		const lift = near.find((platform) => platform.move?.y)
+		// Not one that waits for a Player to set it off: it never would.
+		const lift = near.find(
+			(platform) => platform.move?.y && !platform.move.waits,
+		)
 		const plank = near
 			.map((platform) => ({
 				platform,
@@ -464,16 +605,34 @@ function decide(world: World, p: Pacer) {
 			: plank
 				? plank.x + plank.width / 2
 				: wall - 14
-		// Under it, then: back a step, if they've gone past it.
+		// Under it, then: back a step, if they've gone past it. Hopping
+		// anything on the way there.
 		if (p.x > waitAt + 4) p.vx = -1.2
 		else if (p.x + p.vx >= waitAt) p.vx = Math.max(0, waitAt - p.x)
+		hopOnTheWay(world, p, waitAt + 4)
 		return
 	}
 
-	if (p.dazed === 0 && hopAhead(world, p.x)) {
+	if (p.dazed === 0 && hopAhead(world, p.x, p.feetY)) {
 		p.vy = -HOP_SPEED
 		p.grounded = false
 	}
+}
+
+/** How long a hop keeps a Pacer off the ground, on the flat. */
+const HOP_TICKS = Math.ceil((2 * HOP_SPEED) / GRAVITY)
+
+/**
+ * A hop over whatever's just ahead, if anything is, for a Pacer on their
+ * way somewhere, not stood waiting: as long as it doesn't carry them past
+ * `upTo`.
+ */
+function hopOnTheWay(world: World, p: Pacer, upTo = Number.POSITIVE_INFINITY) {
+	if (p.dazed > 0 || p.vx <= 1 || p.x + p.vx * HOP_TICKS > upTo) return
+	if (!hopAhead(world, p.x, p.feetY)) return
+	p.vy = -HOP_SPEED
+	p.grounded = false
+	p.on = undefined
 }
 
 /**
@@ -539,29 +698,97 @@ const STEP_DOWN = 12
 /** How far past a Gap they land. */
 const LEAP_PAST = 40
 
-/** How far before a low branch or a tall hurdle a Pacer ducks, and how far past it they get up again. */
-const DUCK_BEFORE = 30
-const DUCK_PAST = 22
+/**
+ * How far before a low branch or a tall hurdle a Pacer gets down, and how
+ * far past it they slide before getting up again: well before and well
+ * past, as a Player does, not just under it.
+ */
+const DUCK_BEFORE = 110
+const DUCK_PAST = 140
+/** The next one at most this far past the last: they stay down, under both. */
+const DUCK_CHAIN = 480
+/** The slowest a Pacer slides: on, under it, even uphill. */
+const PACER_CRAWL = 1.6
 
 /**
- * A low branch or a tall hurdle (still standing) over `x`, or just ahead:
- * something to duck under, as anyone does, rather than run through.
+ * A low branch or a tall hurdle (still standing) over `x`, just ahead or
+ * just behind; or one behind and the next one ahead close after it:
+ * something to slide under, as anyone does, rather than run through.
  */
 function duckUnder(world: World, x: number) {
-	return world.obstacles.some(({ obstacle: o, used, scooped }) => {
-		if (scooped) return false
+	let behind = Number.NEGATIVE_INFINITY
+	let ahead = Number.POSITIVE_INFINITY
+	for (const { obstacle: o, used, scooped } of world.obstacles) {
+		if (scooped) continue
 		const low = o.kind === 'branch' || (o.kind === 'hurdle' && o.tall && !used)
-		return low && x > o.x - DUCK_BEFORE && x < o.x + DUCK_PAST
-	})
+		if (!low) continue
+		if (x > o.x - DUCK_BEFORE && x < o.x + DUCK_PAST) return true
+		if (o.x <= x) behind = Math.max(behind, o.x)
+		else ahead = Math.min(ahead, o.x)
+	}
+	return ahead - behind <= DUCK_CHAIN
 }
 
 /**
- * A rock, a hurdle, a puddle or a pothole just ahead of `x`. Branches
- * and tall hurdles they duck under instead (see `duckUnder`).
+ * How steep a hill has to be, on average over the next `SLIDE_HILL_AHEAD`
+ * px, for a Pacer to slide down it, now and then; and how steep back up a
+ * hill gets them up again, short of the end of their slide.
  */
-function hopAhead(world: World, x: number) {
+const SLIDE_HILL = 0.08
+const SLIDE_HILL_AHEAD = 200
+const SLIDE_HILL_UP = -0.02
+/** The chance, each tick down one, that they start sliding. */
+const SLIDE_HILL_CHANCE = 1 / 200
+/** How long a slide down a hill lasts, at least, and at most. */
+const SLIDE_HILL_SHORTEST = 50
+const SLIDE_HILL_LONGEST = 120
+
+/**
+ * Whether a Pacer's sliding down the hill they're on: now and then, for a
+ * while, as a Player might, down one steep enough a good way ahead; up
+ * again once it's over, or it's uphill.
+ */
+function slideDownhill(world: World, p: Pacer, slope: number) {
+	const { groundY } = world.terrain
+	if (p.dazed > 0 || p.on !== undefined || slope < SLIDE_HILL_UP)
+		p.hillSlide = 0
+	else if (p.hillSlide) p.hillSlide--
+	else if (
+		slope > 0 &&
+		groundY(p.x + SLIDE_HILL_AHEAD) - p.feetY > SLIDE_HILL * SLIDE_HILL_AHEAD &&
+		Math.random() < SLIDE_HILL_CHANCE
+	)
+		p.hillSlide =
+			SLIDE_HILL_SHORTEST +
+			Math.floor(Math.random() * (SLIDE_HILL_LONGEST - SLIDE_HILL_SHORTEST))
+	return !!p.hillSlide
+}
+
+/** How far above or below their feet a standing cone can be and still be in their way: not up on a platform over them. */
+const CONE_LEVEL = 20
+/** How far short of a cone's middle they still hop it, coming down right by it. */
+const CONE_PAST = -4
+
+/**
+ * A rock, a hurdle, a puddle or a pothole just ahead of `x`, for someone
+ * whose feet are at `feetY`. Branches and tall hurdles they duck under
+ * instead (see `duckUnder`).
+ */
+function hopAhead(world: World, x: number, feetY: number) {
 	return world.obstacles.some((state) => {
 		const { obstacle: o, used } = state
+		// A cone, or a wet floor sign, still stood up, where they're running:
+		// hopped, not knocked over. That's for Players. Right up to it, too,
+		// just down off hopping the one before it in a row of them.
+		if (o.kind === 'cone') {
+			if (used || state.scooped) return false
+			const base = world.terrain.groundY(o.x) - (o.height ?? 0)
+			return (
+				Math.abs(base - feetY) < CONE_LEVEL &&
+				o.x + CONE_PAST > x &&
+				o.x - 20 - x < HOP_LOOKAHEAD
+			)
+		}
 		const edge =
 			o.kind === 'rock' ||
 			o.kind === 'tombstone' ||
@@ -606,7 +833,8 @@ function bounceOffHeads(world: World, racer: Racer) {
 	const was = b.feetY - b.vy
 
 	for (const p of world.pack) {
-		if (p.scooped || p.dazed > 0 || p.gliding) continue
+		if (p.scooped || p.dazed > 0 || p.gliding || p.shrink !== undefined)
+			continue
 		if (Math.abs(b.x - p.x) > HEAD_REACH) continue
 		const head = p.feetY - p.sprite.height * RUNNER_SCALE + HEAD_GIVE
 		// From above it, onto it.
@@ -657,6 +885,8 @@ export function bounceOff(world: World, racer: Racer, head: number, x: number) {
 	// A bounce, not a jump of their own: letting go doesn't cut it short.
 	b.jumping = false
 	b.vx = boost(world, b.vx, b.facing, STOMP_BOOST)
+	// Steering on from here, a bounce's own speed.
+	b.airBase = b.vx
 
 	const points = Math.min(STOMP_POINTS_MAX, STOMP_POINTS * 2 ** b.combo)
 	b.combo++
@@ -676,6 +906,8 @@ export function scoopPack(world: World) {
 	const camera = world.camera()
 	for (const p of world.pack) {
 		if (p.scooped || bus.frontX < p.x - HITBOX_HALF_WIDTH) continue
+		// On a shrink ray's plate, being shrunk: theirs, not the bus's.
+		if (p.shrink !== undefined) continue
 		// Off the cliff with no glider, down into the sea: nothing to scoop.
 		if (!p.gliding && atSea(world, p.x)) continue
 		p.scooped = true
@@ -690,3 +922,10 @@ export function scoopPack(world: World) {
 			play('whoosh')
 	}
 }
+
+/** Whether `x` is over a rope bridge that's broken: down the gorge it was over. */
+const brokenUnder = (world: World, x: number) =>
+	world.platforms.some(
+		(platform) =>
+			platform.broken && x > platform.x && x < platform.x + platform.width,
+	)

@@ -56,6 +56,15 @@ import {
 	goatPicture,
 } from './art/goat'
 import {
+	HORSE_BACK,
+	HORSE_HEIGHT,
+	HORSE_OUTLINE,
+	HORSE_SADDLE,
+	HORSE_WIDTH,
+	HorseArt,
+	horsePicture,
+} from './art/horse'
+import {
 	LLAMA_BACK,
 	LLAMA_HEIGHT,
 	LLAMA_OUTLINE,
@@ -73,6 +82,16 @@ import {
 	MoleArt,
 	molePicture,
 } from './art/mole'
+import {
+	SKATEBOARD_BACK,
+	SKATEBOARD_FLIP,
+	SKATEBOARD_FLIP_TICKS,
+	SKATEBOARD_HEIGHT,
+	SKATEBOARD_SADDLE,
+	SKATEBOARD_WIDTH,
+	SkateboardArt,
+	skateboardPicture,
+} from './art/skateboard'
 import {
 	STOOD_HEIGHT,
 	STOOD_WIDTH,
@@ -118,6 +137,16 @@ export interface RideLook {
 	ticks?: number
 	/** How fast it goes, if not at a corgi's gallop. */
 	speed?: number
+	/** Stepped onto at a run, rather than jumped down onto: a mole, a skateboard. */
+	runInto?: boolean
+	/** Stood on by its rider, rather than sat on: a skateboard. */
+	stood?: boolean
+	/**
+	 * A trick it does whenever its rider jumps: these pictures, each for
+	 * `ticks`, from leaving the ground, the last held till it lands. A
+	 * skateboard's kickflip; `word`, what pops up as it goes.
+	 */
+	trick?: { frames: string[]; ticks: number; word: string }
 	/**
 	 * A rarer one, now and then one of them, `share` of the time: its own
 	 * look, and its own Collectable, ridden the same.
@@ -219,6 +248,20 @@ const GOAT: RideLook = {
 	rides: 'Goat rides',
 }
 
+/** A horse of the Royal Guard's, stood waiting in the street, saddled. */
+const HORSE: RideLook = {
+	width: HORSE_WIDTH,
+	height: HORSE_HEIGHT,
+	back: HORSE_BACK,
+	saddle: HORSE_SADDLE,
+	Art: HorseArt,
+	picture: horsePicture,
+	shadow: HORSE_OUTLINE,
+	call: 'Neigh!',
+	sound: 'neigh',
+	rides: 'Horse rides',
+}
+
 /**
  * A mole: hopping along with you on its back, over and over, and on
  * through whatever rock's in the way (see `moles`), faster than running.
@@ -234,6 +277,7 @@ const MOLE: RideLook = {
 	call: 'Squeak!',
 	sound: 'furby',
 	rides: 'Mole rides',
+	runInto: true,
 	// Faster than running, and a good long ride, for the climb up to it.
 	speed: 8,
 	ticks: 320,
@@ -288,6 +332,30 @@ const BLOOD_CELL: RideLook = {
 	ticks: 360,
 }
 
+/**
+ * A skateboard, lying on the road: step on at a run and roll, stood up on
+ * it, faster than running. Jump, and it kickflips under your feet.
+ */
+const SKATEBOARD: RideLook = {
+	width: SKATEBOARD_WIDTH,
+	height: SKATEBOARD_HEIGHT,
+	back: SKATEBOARD_BACK,
+	saddle: SKATEBOARD_SADDLE,
+	Art: SkateboardArt,
+	picture: skateboardPicture,
+	call: '',
+	sound: 'grind',
+	rides: 'Skateboard rides',
+	speed: 8,
+	runInto: true,
+	stood: true,
+	trick: {
+		frames: SKATEBOARD_FLIP,
+		ticks: SKATEBOARD_FLIP_TICKS,
+		word: 'Kickflip!',
+	},
+}
+
 const RIDES = {
 	corgi: CORGI,
 	llama: LLAMA,
@@ -296,9 +364,11 @@ const RIDES = {
 	unicorn: UNICORN,
 	glider: GLIDER,
 	goat: GOAT,
+	horse: HORSE,
 	mole: MOLE,
 	skis: SKIS,
 	bloodCell: BLOOD_CELL,
+	skateboard: SKATEBOARD,
 }
 
 export const rideLook = (course: Pick<Course, 'ride'>) =>

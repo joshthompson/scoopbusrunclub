@@ -1,6 +1,6 @@
 import type { DrawPainting } from 'scoopjs'
 import { VALVE } from '../../courses/kit/bodyScenery'
-import { HEARTBEAT, beatAt, valveOpen } from '../../game/body'
+import { HEARTBEAT, beatAt, valveFlapped, valveOpen } from '../../game/body'
 import { steamPuff } from '../../game/steam'
 import { filterReach, filtered } from './css'
 import { paintPicture } from './picture'
@@ -38,17 +38,45 @@ const STEAM_BITS: SteamBit[] = STEAM_CLOUDS.map((cloud) => ({
 /** How its steam rises: in 5 steps, over half a second. */
 const STEAM_RISE = { seconds: 0.5, steps: 5 }
 
+/**
+ * The air always coming up off a Steam Vent, puffed or not: little wisps,
+ * one after another, so it reads as something blowing up, to be stood on,
+ * not something in the way.
+ */
+const AIR_WISPS = [
+	{ x: -8, size: 8, delay: 0 },
+	{ x: 6, size: 10, delay: 0.2 },
+	{ x: -2, size: 8, delay: 0.4 },
+	{ x: 9, size: 8, delay: 0.6 },
+	{ x: -10, size: 10, delay: 0.8 },
+	{ x: 2, size: 8, delay: 1 },
+]
+const AIR_BITS: SteamBit[] = AIR_WISPS.map((wisp) => ({
+	x: RISING_FROM.x + wisp.x - wisp.size / 2,
+	y: RISING_FROM.y - wisp.size,
+	width: wisp.size,
+	height: wisp.size,
+	colour: 'rgba(245, 245, 245, 0.75)',
+	delay: wisp.delay,
+}))
+/** How its air rises: each wisp in 10 steps, over 1.2 seconds, over and over. */
+const AIR_RISE = { seconds: 1.2, steps: 10 }
+/** Ticks the air's been going before the race starts: every wisp's on its way already. */
+const AIR_LEAD = 72
+
 /** How far a Steam Vent's clouds get out of its box, for its Draw Hook's `drawReach`. */
 export const STEAM_VENT_REACH = steamReach(
 	STEAM_VENT_WIDTH,
 	STEAM_VENT_HEIGHT,
 	{ bits: STEAM_BITS, steps: STEAM_RISE.steps },
+	{ bits: AIR_BITS, steps: AIR_RISE.steps },
 )
 
 /**
- * A Steam Vent: its grate, and once it's puffed, at `puffed`, steam rising
- * off it in clouds a while, from when it puffed, as they're put on the
- * page then.
+ * A Steam Vent: its grate, air always rising off it, and once it's puffed,
+ * at `puffed`, steam rising off it in clouds a while, from when it puffed,
+ * as they're put on the page then. Its air's `offset` ticks along, so
+ * vents side by side don't blow in step.
  */
 export function paintSteamVent(
 	ctx: CanvasRenderingContext2D,
@@ -56,10 +84,12 @@ export function paintSteamVent(
 	grate: string,
 	now: number,
 	puffed: number | undefined,
+	offset = 0,
 ) {
 	const loaded = image(grate)
 	if (loaded)
 		ctx.drawImage(loaded.image, 0, 0, STEAM_VENT_WIDTH, STEAM_VENT_HEIGHT)
+	paintSteam(ctx, Math.max(0, now) + AIR_LEAD + offset, AIR_BITS, AIR_RISE)
 	if (puffed === undefined || steamPuff(puffed, now) === undefined) return
 	paintSteam(ctx, now - puffed, STEAM_BITS, STEAM_RISE)
 }
@@ -110,16 +140,19 @@ export const VALVE_REACH = {
 }
 
 /**
- * A Heart Valve, flapping open on the beat at `now`, its chevrons over it
- * lighting up as the beat comes round, and leaping, glowing, as it opens.
+ * A Heart Valve, flapping open on the beat at `now`, and as it fires
+ * someone up, at `flown`, its chevrons over it lighting up as the beat comes
+ * round, and leaping, glowing, as it opens.
  */
 export function paintValve(
 	ctx: CanvasRenderingContext2D,
 	image: DrawPainting['image'],
 	now: number,
+	flown?: number,
 ) {
-	const beat = beatAt(now)
-	const open = valveOpen(now)
+	const flapped = valveFlapped(flown, now)
+	const beat = flapped ?? beatAt(now)
+	const open = flapped !== undefined || valveOpen(now)
 	paintPicture(
 		ctx,
 		image,

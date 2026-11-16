@@ -25,6 +25,7 @@ export type Sound =
 	| 'whoosh'
 	| 'woof'
 	| 'bleat'
+	| 'neigh'
 	| 'honk'
 	| 'furby'
 	| 'trick'
@@ -36,6 +37,10 @@ export type Sound =
 	| 'pop'
 	| 'heartbeat'
 	| 'heartbeatDub'
+	/** Halloween Town's haunted house: bats bursting out, its window smashing, and its monster. */
+	| 'bats'
+	| 'smash'
+	| 'roar'
 
 /** [frequency in Hz, length in seconds, wave] for each note, played one after another. */
 type Note = [number, number, OscillatorType?]
@@ -133,6 +138,19 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 			volume: 0.045,
 			slide: 0.9,
 		},
+		/** A horse, calling to be ridden: a whinny, high and shaking, falling away. */
+		neigh: {
+			notes: [
+				[880, 0.06, 'sawtooth'],
+				[980, 0.06, 'sawtooth'],
+				[860, 0.06, 'sawtooth'],
+				[940, 0.06, 'sawtooth'],
+				[760, 0.08, 'sawtooth'],
+				[520, 0.14, 'sawtooth'],
+			],
+			volume: 0.04,
+			slide: 0.85,
+		},
 		/** A trick landed: a bright run up, and a ding. */
 		trick: {
 			notes: [
@@ -188,6 +206,32 @@ const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
 		/** "Lub", and "dub": low thumps. */
 		heartbeat: { notes: [[70, 0.16, 'sine']], volume: 0.32, slide: 0.6 },
 		heartbeatDub: { notes: [[60, 0.12, 'sine']], volume: 0.24, slide: 0.6 },
+		/** Wings, flapping, a lot of them at once: a flutter, up high. */
+		bats: {
+			notes: [
+				[1400, 0.03, 'square'],
+				[1100, 0.03, 'square'],
+				[1500, 0.03, 'square'],
+				[1200, 0.03, 'square'],
+				[1600, 0.03, 'square'],
+				[1300, 0.05, 'square'],
+			],
+			volume: 0.04,
+		},
+		/** Glass, breaking: a crack, and the bits tinkling down. */
+		smash: {
+			notes: [
+				[2200, 0.04, 'sawtooth'],
+				[1800, 0.03, 'square'],
+				[2600, 0.03, 'square'],
+				[2000, 0.03, 'square'],
+				[2900, 0.05, 'triangle'],
+				[2400, 0.08, 'triangle'],
+			],
+			volume: 0.06,
+		},
+		/** The monster: a long, low roar, falling. */
+		roar: { notes: [[110, 0.7, 'sawtooth']], volume: 0.1, slide: 0.5 },
 	}
 
 /** Told of every sound played, sound on or off: a Room's Host passes them on. */
