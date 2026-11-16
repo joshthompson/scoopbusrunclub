@@ -25,7 +25,14 @@ import { LobbyView, SIDE_PANEL, nextGameMode, nextMode } from './Lobby'
 import Mirror from './Mirror'
 import { Podium } from './Podium'
 import { Results } from './Results'
-import { isPicked, joinAsGuest, lastMode, rememberMode } from './guest'
+import {
+	isPicked,
+	joinAfresh,
+	joinAsGuest,
+	joiningMessage,
+	lastMode,
+	rememberMode,
+} from './guest'
 import { CODE_LENGTH, type PadMode, type PadView, cleanCode } from './protocol'
 import { type Seat, localCharacters } from './room'
 import { roomModeInfo } from './roomModes'
@@ -58,11 +65,9 @@ export default function Joined(props: {
 	createEffect(() => {
 		if (!code()) playMenu()
 	})
-	/** Joining again, from scratch: the same seat, by this computer. */
-	const [attempt, setAttempt] = createSignal(0)
 	return (
 		<Show
-			when={code() && `${code()}#${attempt()}`}
+			when={code()}
 			keyed
 			fallback={
 				<Stage>
@@ -73,10 +78,11 @@ export default function Joined(props: {
 		>
 			{(joined) => (
 				<InRoom
-					code={joined.split('#')[0]}
+					code={joined}
 					onLeave={props.onLeave}
 					onAnother={() => setCode('')}
-					onRejoin={() => setAttempt(attempt() + 1)}
+					// From scratch, as a new page: the same seat, by this computer.
+					onRejoin={() => joinAfresh(joined)}
 				/>
 			)}
 		</Show>
@@ -165,7 +171,12 @@ function InRoom(props: {
 		screen: true,
 		held: () => (menu() ? NOTHING_HELD : anyControls()),
 	})
-	const { view, gone, lost, reconnecting, start, feed, send } = link
+	const { view, gone, reconnecting, start, feed, send } = link
+	const joining = () => joiningMessage(props.code, link)
+	const tryAgain = () => {
+		play('select')
+		props.onRejoin()
+	}
 	const room = () => view()?.room
 	/**
 	 * Everyone in the Room, the same objects from one view to the next, so
@@ -267,6 +278,10 @@ function InRoom(props: {
 		const v = view()
 		if (!v || gone() || v.full) {
 			if (event.key === 'Escape') leave()
+			// Not joined: Enter tries again (a button that's focused says itself).
+			const onButton = document.activeElement instanceof HTMLButtonElement
+			if (event.key === 'Enter' && !v && joining().failed && !onButton)
+				tryAgain()
 			return
 		}
 		if (v.stage === 'round') {
@@ -430,20 +445,18 @@ function InRoom(props: {
 							</Message>
 						</Match>
 						<Match when={!view() || !room()}>
-							<Message
-								title={
-									lost() ? `Can't find ${props.code}` : `Joining ${props.code}…`
-								}
-								text={
-									lost()
-										? 'Check the code, and that the game’s open on the big screen.'
-										: 'Finding the big screen.'
-								}
-							>
-								<Show when={lost()}>
+							<Message title={joining().title} text={joining().text}>
+								<Show when={joining().failed}>
 									<button
 										type="button"
 										style={{ ...styles.button, ...styles.on }}
+										onClick={tryAgain}
+									>
+										Try again
+									</button>
+									<button
+										type="button"
+										style={styles.button}
 										onClick={props.onAnother}
 									>
 										Try another code

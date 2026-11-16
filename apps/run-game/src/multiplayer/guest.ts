@@ -100,6 +100,49 @@ export function rememberRoom(
 	}
 }
 
+/**
+ * Into Room `code` again from scratch, as a new page: what Try Again and
+ * Rejoin do. Joining again within the page doesn't do it: trystero knows a
+ * page by one id for as long as it's open, and a Host still holding on to
+ * a failed try from that id ignores it for up to half a minute. A new page
+ * is a new id, new relay connections, and fresh TURN servers. Its link
+ * (see `index.tsx`) comes back in, on a phone or a computer, and the same
+ * seat's kept, by the device.
+ */
+export function joinAfresh(code: string) {
+	const url = new URL(import.meta.env.BASE_URL, location.href)
+	url.searchParams.set('pad', code)
+	location.replace(url)
+}
+
+/**
+ * What a device that's not in Room `code` yet says: still joining, not
+ * found it, or found it but not got through. `failed` once it's worth
+ * trying again.
+ */
+export function joiningMessage(
+	code: string,
+	link: { lost: () => boolean; blocked: () => boolean },
+) {
+	if (link.blocked())
+		return {
+			failed: true,
+			title: `Can't connect to ${code}`,
+			text: 'Found it, but couldn’t get through: your networks are keeping you apart. Try again, or join the same Wi-Fi as the big screen.',
+		}
+	if (link.lost())
+		return {
+			failed: true,
+			title: `Can't find ${code}`,
+			text: 'Check the code, and that the game’s open on the big screen.',
+		}
+	return {
+		failed: false,
+		title: `Joining ${code}…`,
+		text: 'Finding the big screen.',
+	}
+}
+
 /** What this device's Player goes by in Rooms, if they've said. */
 export function savedPlayerName(): string {
 	try {
@@ -165,6 +208,11 @@ export function joinAsGuest(props: {
 	const [gone, setGone] = createSignal(false)
 	/** It's been looked for a while, and not found. */
 	const [lost, setLost] = createSignal(false)
+	/**
+	 * Found, but not reached: their networks keep this device and the Room
+	 * apart. Still tried again (see `REFIND_MS`), but not worth waiting on.
+	 */
+	const [blocked, setBlocked] = createSignal(false)
 	/** Heard from before, but not for a moment: getting back in touch. */
 	const [reconnecting, setReconnecting] = createSignal(false)
 
@@ -209,6 +257,7 @@ export function joinAsGuest(props: {
 			setReconnecting(false)
 			setGone(false)
 			setLost(false)
+			setBlocked(false)
 			setHost(peer)
 			setView(next)
 			// Between Rounds: the last one's done with.
@@ -238,6 +287,9 @@ export function joinAsGuest(props: {
 		// locked. Back in touch once it's there again (see the watchdog).
 		room.onPeerLeave((peer) => {
 			if (peer === host()) setReconnecting(true)
+		})
+		room.onBlocked(() => {
+			if (!heardAt) setBlocked(true)
 		})
 		return { room, pad, input }
 	}
@@ -305,6 +357,7 @@ export function joinAsGuest(props: {
 		view,
 		gone,
 		lost,
+		blocked,
 		reconnecting,
 		/** The Round on now, playing remotely, and its frames as they come. */
 		start,

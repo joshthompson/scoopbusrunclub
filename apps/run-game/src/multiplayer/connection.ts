@@ -99,8 +99,24 @@ export interface GameRoom {
 	action: <T>(name: string) => RoomAction<T>
 	onPeerJoin: (handle: (peer: string) => void) => void
 	onPeerLeave: (handle: (peer: string) => void) => void
+	/**
+	 * Another device in the Room was found, and a connection to it started,
+	 * but it couldn't get through: their networks keep them apart, most
+	 * likely, with no TURN server to go between them.
+	 */
+	onBlocked: (handle: () => void) => void
 	leave: () => Promise<void>
 }
+
+/**
+ * How long a connection that's found the device at the other end gets to
+ * get through before it's taken as blocked. One that will is through in a
+ * second or two, over a TURN server too: one that won't is never told it's
+ * failed, and checks for as long as it's left to.
+ */
+const BLOCKED_MS = 8000
+
+let warnedNoTurn = false
 
 /**
  * Room `code`, joined once the TURN servers are in (or it's waited long
@@ -114,6 +130,48 @@ export interface GameRoom {
 export function openRoom(code: string): GameRoom {
 	let room: Room | undefined
 	let left = false
+	let blocked: (() => void) | undefined
+	/**
+	 * Every connection the Room's made, watched: trystero never says when
+	 * one's found the other device but can't reach it (its own report of
+	 * that comes long after a guest's started looking again). Closed with
+	 * the Room, too, or trystero keeps them for the page, and joining again
+	 * can come back on one that's gone quietly dead.
+	 */
+	const connections = new Set<RTCPeerConnection>()
+	class Watched extends RTCPeerConnection {
+		constructor(config?: RTCConfiguration) {
+			super(config)
+			// Only the open ones kept: a long party's Host makes many.
+			for (const old of connections)
+				if (old.connectionState === 'closed') connections.delete(old)
+			connections.add(this)
+			let timer: number | undefined
+			/** Got through once: whatever happens to it later, it wasn't blocked. */
+			let through = false
+			const check = () => {
+				const ice = this.iceConnectionState
+				if (through) return
+				if (ice === 'connected' || ice === 'completed' || ice === 'closed') {
+					through = ice !== 'closed'
+					window.clearTimeout(timer)
+					return
+				}
+				if (ice === 'failed') {
+					window.clearTimeout(timer)
+					if (!left) blocked?.()
+					return
+				}
+				// Checking: the other device answered, and they're trying to reach each other.
+				if (ice === 'checking' && timer === undefined)
+					timer = window.setTimeout(() => {
+						if (!left && !through && this.iceConnectionState === 'checking')
+							blocked?.()
+					}, BLOCKED_MS)
+			}
+			this.addEventListener('iceconnectionstatechange', check)
+		}
+	}
 	const actions = new Map<
 		string,
 		{ action?: MessageAction; handle?: (data: never, peer: string) => void }
@@ -133,11 +191,18 @@ export function openRoom(code: string): GameRoom {
 
 	const joined = iceServersWithin(ICE_WAIT_MS).then((turnConfig) => {
 		if (left) return
+		if (!turnConfig.length && !warnedNoTurn) {
+			warnedNoTurn = true
+			console.warn(
+				'Multi Player: no TURN servers (see /api/run/ice-servers), so devices on different networks may never connect.',
+			)
+		}
 		room = joinRoom(
 			{
 				appId: APP_ID,
 				relayConfig: { urls: RELAYS },
 				turnConfig,
+				rtcPolyfill: Watched,
 			},
 			trysteroRoom(code),
 		)
@@ -170,10 +235,15 @@ export function openRoom(code: string): GameRoom {
 		onPeerLeave(handle) {
 			peerLeave = handle
 		},
+		onBlocked(handle) {
+			blocked = handle
+		},
 		async leave() {
 			left = true
 			await joined
 			await room?.leave()
+			for (const connection of connections) connection.close()
+			connections.clear()
 		},
 	}
 }

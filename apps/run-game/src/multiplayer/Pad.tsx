@@ -23,7 +23,9 @@ import { PadRunnerEditor } from './PadRunnerEditor'
 import { Scanner } from './Scanner'
 import {
 	isPicked,
+	joinAfresh,
 	joinAsGuest,
+	joiningMessage,
 	lastMode,
 	lastRoom,
 	rememberMode,
@@ -83,8 +85,11 @@ export default function Pad() {
 		setCode('')
 		setMode(undefined)
 	}
-	/** Joining again, from scratch: the same seat, by this device. */
-	const [attempt, setAttempt] = createSignal(0)
+	/** Joining again, from scratch, as a new page: the same seat, by this device, and played the same way. */
+	const again = () => {
+		rememberRoom(ROOM_KEY, { code: code(), mode: mode() ?? 'controller' })
+		joinAfresh(code())
+	}
 	const screens = () => (
 		<Switch>
 			<Match when={!code()}>
@@ -99,10 +104,10 @@ export default function Pad() {
 			<Match when={!mode()}>
 				<ModePicker code={code()} onPick={choose} onBack={leave} />
 			</Match>
-			<Match when={code() && `${code()}#${attempt()}`} keyed>
+			<Match when={code()} keyed>
 				{(joined) => (
 					<Controller
-						code={joined.split('#')[0]}
+						code={joined}
 						mode={mode() ?? 'controller'}
 						onMode={choose}
 						onJoined={() =>
@@ -112,7 +117,7 @@ export default function Pad() {
 							})
 						}
 						onLeave={leave}
-						onRejoin={() => setAttempt(attempt() + 1)}
+						onRejoin={again}
 					/>
 				)}
 			</Match>
@@ -296,7 +301,8 @@ function Controller(props: {
 		name,
 		held,
 	})
-	const { view, gone, lost, reconnecting, start, feed, send } = link
+	const { view, gone, reconnecting, start, feed, send } = link
+	const joining = () => joiningMessage(props.code, link)
 	const rename = (next: string) => {
 		const clean = cleanPlayerName(next)
 		if (clean === name()) return
@@ -431,16 +437,9 @@ function Controller(props: {
 				</Message>
 			</Match>
 			<Match when={!view()}>
-				<Message
-					title={lost() ? `Can't find ${props.code}` : `Joining ${props.code}…`}
-					text={
-						lost()
-							? 'Check the code, and that the game’s open on the big screen.'
-							: 'Finding the big screen.'
-					}
-				>
+				<Message title={joining().title} text={joining().text}>
 					<Show
-						when={lost()}
+						when={joining().failed}
 						fallback={
 							<button
 								type="button"
@@ -453,7 +452,14 @@ function Controller(props: {
 					>
 						<button
 							type="button"
-							style={styles.bigButton}
+							style={{ ...styles.bigButton, ...styles.readyOn }}
+							onClick={props.onRejoin}
+						>
+							Try again
+						</button>
+						<button
+							type="button"
+							style={styles.smallButton}
 							onClick={props.onLeave}
 						>
 							Try another code
