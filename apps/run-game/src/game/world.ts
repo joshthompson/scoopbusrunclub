@@ -6,6 +6,7 @@ import { rideLook } from '../draw/rideLook'
 import type { Controls } from '../input'
 import type { Avatar } from '../runners/looks'
 import type { Playable } from '../runners/playable'
+import { dressed } from '../runners/raceShirts'
 import { createCarts } from './carts'
 import {
 	BUS_START_X,
@@ -209,6 +210,8 @@ export interface Body {
 	unlocked?: string
 	/** Got to the course's hidden bonus runner, this go (see `Course['found']`). */
 	metFound?: boolean
+	/** How many of the course's hunted fika they've picked up, this go (see `Course['hunt']`). */
+	hunted?: number
 	/** How many times running they've jumped off a rope bridge that `breaks`: on the ground, back to none. */
 	bridgeJumps?: number
 	/**
@@ -563,6 +566,8 @@ export function createWorld(
 	const terrain: Terrain = course.terrain
 	const racers: Racer[] = entries.map(({ hat, ...entry }, i) => ({
 		...entry,
+		// In the race's own T-shirt, if it has one (see `raceShirts.ts`).
+		runner: dressed(entry.runner, course.raceShirt),
 		body: { ...startingBody(terrain, START_X - i * START_GAP), hat },
 		outAt: 0,
 	}))

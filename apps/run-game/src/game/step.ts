@@ -95,7 +95,7 @@ import {
 import { MUMMY_HEIGHT } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
 import { cyclistAt, deckAt, deckUnder } from './cyclists'
-import { FIKA_SIZE } from './fika'
+import { FIKA_SIZE, type FikaItem } from './fika'
 import {
 	CONDOR_SPEED,
 	carryHeight,
@@ -1460,6 +1460,30 @@ function meetFound(world: World, racer: Racer) {
 	} else play('scan')
 }
 
+/**
+ * Picked up a fika: if it's the one the course has to hunt down (see
+ * `Course['hunt']`), one more of them, and how many there are to go, said;
+ * and with every one of them had, the first time, its bonus runner's
+ * theirs to run as.
+ */
+function hunted(world: World, racer: Racer, item: FikaItem) {
+	const { hunt } = world.course
+	if (hunt?.item !== item) return
+	const b = racer.body
+	const of = world.course.boosts.filter(
+		(o) => o.kind === 'fika' && o.item === item,
+	).length
+	b.hunted = (b.hunted ?? 0) + 1
+	world.popup(`${b.hunted}/${of}`, b.x, b.feetY - 110)
+	if (b.hunted < of) return
+	const bonus = bonusRunner(hunt.runner)
+	if (bonus && unlockRunner(bonus.id)) {
+		b.unlocked = bonus.id
+		play('cheer')
+		world.popup(`${bonus.name} unlocked!`, b.x, b.feetY - 130)
+	}
+}
+
 /** How far past a Gap, or the sea, someone's put back on their feet in Baby Mode. */
 const RESPAWN_PAST = 60
 /** And how long they're stumbling, getting going again. */
@@ -2104,6 +2128,7 @@ function collide(world: World, racer: Racer) {
 						top,
 					)
 					play('fika')
+					hunted(world, racer, o.item)
 				}
 				break
 			}

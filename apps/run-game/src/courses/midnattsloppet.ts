@@ -1,5 +1,6 @@
 import moon from '@/assets/background/moon8.png'
 import type { RunnerName } from '@/data/runners'
+import bananaGirlDance from '../assets/runners/banana-girl/dance.png'
 import lamp from '../assets/scenery/lamp.png'
 import tree1 from '../assets/scenery/tree1.png'
 import tree2 from '../assets/scenery/tree2.png'
@@ -12,10 +13,13 @@ import {
 	PX_PER_M,
 	SCENERY_SET_BACK,
 	START_X,
+	TICK_MS,
 	VERGE,
 } from '../game/constants'
 import { type FikaItem, MIDNATTSLOPPET_FIKA } from '../game/fika'
 import { type Terrain, withGaps } from '../game/terrain'
+import { BANANA_GIRL } from '../runners/bonus'
+import { DANCES, danceLength } from '../runners/dance'
 import {
 	SOFIA_KYRKAN_HEIGHT,
 	WOODEN_HOUSES,
@@ -51,7 +55,6 @@ import {
 	SHOWER,
 	bananaStand,
 	crowd,
-	dancingBanana,
 	drinksStation,
 	korvKiosk,
 } from './kit/midnattsloppetStations'
@@ -81,7 +84,9 @@ import type {
  * playing; up past Vita bergen's old wooden houses and through the park,
  * marschaller burning up the steep path to Sofiakyrkan, its choir singing
  * on the steps; down again into the streets, through the drinks station,
- * the showers and past the banana stand; and the sprint down Hornsgatan
+ * the showers and past the banana stand, its supporters dancing in banana
+ * suits (pick up every banana on the way, and one of them, Banana Girl, is
+ * yours to run as); and the sprint down Hornsgatan
  * between the crowds to the finish. Searchlights and smoke all the way, and
  * the music changing with it: the DJ's, the band's, the choir's.
  */
@@ -351,6 +356,23 @@ const CHEERS = [
 /** Where the skateboards lie, waiting to be stepped on: on Ringvägen, and up the old street. */
 const CORGIS = [START_X + 2300, OLD_STREET + 800]
 
+/**
+ * Bananas, dropped all along the way before the stand, seven of them, to
+ * make ten with the stand's three: had every one in one go, and Banana
+ * Girl's yours to run as (see `hunt`). Held up high on Ringvägen, on top of
+ * the band's first flight case, up the old street, in the park, halfway up
+ * the climb to the church, and over central Södermalm's streets.
+ */
+const BANANA_TRAIL: { x: number; height: number }[] = [
+	{ x: START_X + 1650, height: 95 },
+	{ x: CROSSROADS + 150, height: 26 },
+	{ x: CASES_X + MONITOR.width / 2, height: MONITOR.height + 26 },
+	{ x: OLD_STREET + 1300, height: 95 },
+	{ x: PARK + 450, height: 26 },
+	{ x: CLIMB + 300, height: 95 },
+	{ x: CENTRAL + 1100, height: 95 },
+]
+
 function layOut() {
 	const random = seeded(2026)
 	const obstacles: Obstacle[] = []
@@ -361,6 +383,7 @@ function layOut() {
 	const taken = (x: number, room: number) =>
 		[...obstacles, ...boosts].some((o) => Math.abs(o.x - x) < room) ||
 		CORGIS.some((c) => Math.abs(c - x) < 160) ||
+		BANANA_TRAIL.some((b) => Math.abs(b.x - x) < 120) ||
 		CHEERS.some((c) => Math.abs(c - x) < 120)
 
 	// Along the way, by stretch: nothing in the set pieces, laid out by hand.
@@ -392,16 +415,20 @@ function layOut() {
 	for (const x of SHOWERS) boosts.push({ kind: 'gate', x, colour: 'red' })
 	// A slice of pizza from the kiosk, held out high.
 	boosts.push({ kind: 'fika', x: KIOSK, height: 95, item: 'pizzaSlice' })
-	// Bananas, off the stand; and their skins, dropped past it.
-	for (const i of [0, 1, 2])
-		boosts.push({
-			kind: 'fika',
-			x: BANANAS + 20 + i * 60,
-			height: i === 1 ? 95 : 26,
-			item: 'banana',
-		})
+	// Bananas, off the stand: two along its front, and one held up past it,
+	// to jump for, and over the first skin with it; and their skins,
+	// dropped past it. All three in one go, for Banana Girl (see `hunt`).
+	for (const [dx, height] of [
+		[20, 26],
+		[80, 26],
+		[250, 95],
+	])
+		boosts.push({ kind: 'fika', x: BANANAS + dx, height, item: 'banana' })
 	for (const x of [BANANAS + 330, BANANAS + 640])
 		obstacles.push({ kind: 'rock', x })
+	// And the rest of the ten, along the way to it.
+	for (const { x, height } of BANANA_TRAIL)
+		boosts.push({ kind: 'fika', x, height, item: 'banana' })
 	// Cheering, at the same places every time.
 	CHEERS.forEach((x, i) =>
 		boosts.push({ kind: 'cheer', x, member: CHEERERS[i % CHEERERS.length] }),
@@ -420,6 +447,29 @@ function layOut() {
 	return { obstacles, boosts, scenery: scenery(random) }
 }
 type FikaRow = Extract<Boost, { kind: 'fika' }>['item'][]
+
+/**
+ * Banana Girl's dance (see `runners/dance.ts`), as the banana stand's
+ * supporters dance it: its strip, how many frames, and how long each, in
+ * ticks.
+ */
+const BANANA_GIRL_DANCE = bananaGirlDance
+const BANANA_DANCE_FRAMES = danceLength('banana')
+const BANANA_DANCE_TICKS = Math.round(DANCES.banana.interval / TICK_MS)
+/** Out by the roadside at midnight, not lit up as the runners are. */
+const SUPPORTERS_AT_NIGHT = 'brightness(0.88) saturate(0.9)'
+/**
+ * The banana stand's supporters, in banana suits, dancing Banana Girl's
+ * dance either side of it: each where it is from the stand's left, and
+ * how many frames into the dance it's started, two of them in step. The
+ * blocks behind are left out, round them, so they're not lost behind one.
+ */
+const SUPPORTERS: [dx: number, from: number][] = [
+	[-70, 0],
+	[-25, 4],
+	[175, 2],
+	[215, 2],
+]
 
 /** Leaves and grass in the dark, under street lights. */
 const NIGHT_TREE = 'brightness(0.42) saturate(0.7) hue-rotate(18deg)'
@@ -502,12 +552,17 @@ function scenery(random: () => number): Scenery[] {
 		DRINKS + 120,
 		KIOSK,
 		BANANAS + 60,
+		...SUPPORTERS.map(([dx]) => BANANAS + dx),
 	])
 	at(DRINKS + 140, drinksStation)
 	at(KIOSK, korvKiosk)
 	at(BANANAS + 60, bananaStand)
-	for (const dx of [-80, 190, 250])
-		at(BANANAS + dx, dancingBanana, { hops: true })
+	for (const [dx, from] of SUPPORTERS)
+		at(BANANAS + dx, BANANA_GIRL_DANCE, {
+			strip: { count: BANANA_DANCE_FRAMES, from },
+			frameTicks: BANANA_DANCE_TICKS,
+			filter: SUPPORTERS_AT_NIGHT,
+		})
 	// Hornsgatan's crowds, behind the barriers, all the way to the line.
 	for (let x = HORNSGATAN + 100; x < FINISH + 400; x += 200) at(x, crowd)
 
@@ -603,6 +658,9 @@ export const midnattsloppet: CourseDefinition = {
 	runDirectors: ['josh', 'eline'],
 	cheerers: CHEERERS,
 	corgis: CORGIS,
+	// Every banana, the stand's and the ones dropped on the way to it: for
+	// Banana Girl.
+	hunt: { item: 'banana', runner: BANANA_GIRL.id },
 	// Skateboards, left lying on the road: step on and roll; jump, and kickflip.
 	ride: 'skateboard',
 	raceShirt: RACE_BLUE,

@@ -95,6 +95,11 @@ export function CharacterSelect(props: {
 		return at >= 0 ? at : Math.min(1, entries().length - 1)
 	}
 	const selected = () => entries()[selectedIndex()]
+	/** The selected card, if it's someone not unlocked yet. */
+	const locked = () => {
+		const entry = selected()
+		return entry?.kind === 'locked' ? entry : undefined
+	}
 	const choose = (entry: Entry) => {
 		if (entry.kind === 'locked') {
 			play('back')
@@ -204,10 +209,10 @@ export function CharacterSelect(props: {
 					when={selected()?.kind === 'runner' && selected()}
 					fallback={
 						<Show
-							when={selected()?.kind === 'locked'}
+							when={locked()}
 							fallback={
 								<>
-									<RunnerStage path={false}>
+									<RunnerStage path={false} minHeight={STAGE_MIN}>
 										<div style={styles.bigPlus}>+</div>
 									</RunnerStage>
 									<div style={{ ...styles.previewName, 'font-size': '30px' }}>
@@ -217,13 +222,21 @@ export function CharacterSelect(props: {
 								</>
 							}
 						>
-							<RunnerStage path={false}>
-								<div style={styles.bigPlus}>?</div>
-							</RunnerStage>
-							<div style={{ ...styles.previewName, 'font-size': '40px' }}>
-								???
-							</div>
-							<div style={styles.previewTag}>Not unlocked yet</div>
+							{(entry) => (
+								<>
+									<RunnerStage path={false} minHeight={STAGE_MIN}>
+										<div style={styles.bigPlus}>?</div>
+									</RunnerStage>
+									<div style={{ ...styles.previewName, 'font-size': '40px' }}>
+										???
+									</div>
+									<div style={styles.previewTag}>Not unlocked yet</div>
+									{/* Still a "?": what it'll take. */}
+									<Show when={entry().runner.toUnlock}>
+										{(how) => <div style={styles.previewUnlocked}>{how()}</div>}
+									</Show>
+								</>
+							)}
 						</Show>
 					}
 				>
@@ -232,7 +245,7 @@ export function CharacterSelect(props: {
 							(entry() as Extract<Entry, { kind: 'runner' }>).runner
 						return (
 							<>
-								<RunnerStage>
+								<RunnerStage minHeight={STAGE_MIN}>
 									<RunStrip
 										frame={runner().sprite.run[0] ?? ''}
 										width={runner().sprite.width}
@@ -414,6 +427,13 @@ export function CharacterSelect(props: {
 	)
 }
 
+/**
+ * The least the preview's stage shrinks to, for a name, its tag and two
+ * lines of how they're unlocked to fit over Run: still clear of the top of
+ * anyone's head.
+ */
+const STAGE_MIN = 140
+
 const CARD_WIDTH = 66
 const CARD_HEIGHT = 72
 /** A card's padding at the sides, and its border. */
@@ -480,10 +500,11 @@ const styles = {
 		opacity: 0.8,
 		'white-space': 'nowrap',
 	},
-	/** How someone unlocked was: under their tag, a line or two. */
+	/** How someone was unlocked, or how to: under their tag, a line or two. */
 	previewUnlocked: {
 		'font-family': '"Cabin", sans-serif',
 		'font-size': '13px',
+		'flex-shrink': 0,
 		color: '#ffd23f',
 		'text-align': 'center',
 		'line-height': 1.25,
@@ -499,6 +520,7 @@ const styles = {
 		'font-family': 'var(--font-pixel)',
 		'font-size': '24px',
 		'box-shadow': '4px 4px 0 #b33a2a',
+		'flex-shrink': 0,
 		animation: 'go-pulse 1.2s ease-in-out infinite',
 	},
 	/** Someone still a "?": nothing to run as yet. */

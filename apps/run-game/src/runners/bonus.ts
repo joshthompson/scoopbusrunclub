@@ -1,6 +1,14 @@
 import skeletonFace from '@/assets/halloween/skeleton-face.png'
 import skeletonSit from '@/assets/halloween/skeleton-sit.png'
 import type { CharacterSpriteProps } from '@/utils/createRunnerFrames'
+import bananaGirlDance from '../assets/runners/banana-girl/dance.png'
+import bananaGirlFace from '../assets/runners/banana-girl/face.png'
+import bananaGirlRun from '../assets/runners/banana-girl/run.png'
+import bananaGirlSit from '../assets/runners/banana-girl/sit.png'
+import bananaGirlSkiTuck from '../assets/runners/banana-girl/ski-tuck.png'
+import bananaGirlSki from '../assets/runners/banana-girl/ski.png'
+import bananaGirlSnowboard from '../assets/runners/banana-girl/snowboard.png'
+import bananaGirlStand from '../assets/runners/banana-girl/stand.png'
 import batPersonDance from '../assets/runners/bat-person/dance.png'
 import batPersonFace from '../assets/runners/bat-person/face.png'
 import batPersonRun from '../assets/runners/bat-person/run.png'
@@ -34,6 +42,7 @@ import yetiSkiTuck from '../assets/runners/yeti/ski-tuck.png'
 import yetiSki from '../assets/runners/yeti/ski.png'
 import yetiSnowboard from '../assets/runners/yeti/snowboard.png'
 import yetiStand from '../assets/runners/yeti/stand.png'
+import { headShowsIn } from '../draw/heads'
 import { RUNNER_SCALE } from '../game/constants'
 import { runnerUnlocked } from '../saved/unlocked'
 import { danceForKey } from './dance'
@@ -87,6 +96,7 @@ export const YETI: Playable = {
 	name: 'Yeti',
 	bonus: true,
 	unlockedBy: 'Found under Everest',
+	toUnlock: 'Look under Everest',
 	sprite: {
 		run: runFrames(yetiRun, 6),
 		sit: yetiSit,
@@ -113,6 +123,7 @@ export const BAT_PERSON: Playable = {
 	name: 'Bat Person',
 	bonus: true,
 	unlockedBy: 'Found on City Rooftop',
+	toUnlock: 'Look around City Rooftop',
 	sprite: {
 		run: runFrames(batPersonRun, 6),
 		sit: batPersonSit,
@@ -139,6 +150,7 @@ export const VIKING: Playable = {
 	name: 'Viking',
 	bonus: true,
 	unlockedBy: 'Found in Gamla Stan',
+	toUnlock: 'Look around Gamla Stan',
 	sprite: {
 		run: runFrames(vikingRun, 6),
 		sit: vikingSit,
@@ -166,6 +178,7 @@ export const SKELETON: Playable = {
 	name: 'Skeleton',
 	bonus: true,
 	unlockedBy: 'Unlocked by becoming a ghost in Halloween Town',
+	toUnlock: 'Become a ghost in Halloween Town',
 	// White bones: out at night, not on a white card.
 	darkCard: true,
 	sprite: {
@@ -194,6 +207,7 @@ export const MS_CROCODILE: Playable = {
 	name: 'Ms Crocodile',
 	bonus: true,
 	unlockedBy: "Unlocked by bouncing across the Pyramids' crocodiles",
+	toUnlock: "Bounce across the Pyramids' crocodiles",
 	sprite: {
 		run: runFrames(msCrocodileRun, 6),
 		sit: msCrocodileSit,
@@ -204,6 +218,50 @@ export const MS_CROCODILE: Playable = {
 		height: HEIGHT,
 	},
 }
+
+/**
+ * Banana Girl: one of the banana stand's supporters at Midnattsloppet, in
+ * a whole-body banana suit, its stalk on top, its peel coming away down
+ * her back, a blue sticker on her front, her face out of a hole in it
+ * under an auburn fringe, bare legs and pink trainers. Her run is on
+ * the members' stride, the suit over it. Her dance, a dancing banana's, is
+ * also what the supporters by the stand are doing (see `midnattsloppet`).
+ * For picking up every banana on Midnattsloppet in one go.
+ */
+export const BANANA_GIRL: Playable = {
+	id: 'bonus:banana-girl',
+	name: 'Banana Girl',
+	bonus: true,
+	unlockedBy: 'Unlocked by collecting all 10 bananas at Midnattsloppet',
+	toUnlock: 'Collect all 10 bananas at Midnattsloppet',
+	sprite: {
+		run: runFrames(bananaGirlRun, 6),
+		sit: bananaGirlSit,
+		stand: bananaGirlStand,
+		ski: bananaGirlSki,
+		skiTuck: bananaGirlSkiTuck,
+		snowboard: bananaGirlSnowboard,
+		face: bananaGirlFace,
+		dance: dance(bananaGirlDance, 'banana-girl'),
+		width: WIDTH,
+		height: HEIGHT,
+	},
+}
+
+/** Her head's out of the banana, under her fringe: a hat goes on that, not the stalk. */
+const BANANA_GIRL_FRINGE = '#8a3f1c'
+headShowsIn(
+	[
+		bananaGirlRun,
+		bananaGirlSit,
+		bananaGirlStand,
+		bananaGirlSki,
+		bananaGirlSkiTuck,
+		bananaGirlSnowboard,
+		bananaGirlDance,
+	],
+	[BANANA_GIRL_FRINGE],
+)
 
 /**
  * Deri: the Prince of Parkrun, a guest of the club's, in his look from the
@@ -234,6 +292,7 @@ export const DERI: Playable = {
 	name: 'Deri',
 	bonus: true,
 	unlockedBy: 'Unlocked by completing all courses',
+	toUnlock: 'Complete all courses',
 	look: DERI_LOOK,
 	sprite: lookSprite(DERI_LOOK),
 }
@@ -244,6 +303,7 @@ export const BONUS_RUNNERS: Playable[] = [
 	VIKING,
 	SKELETON,
 	MS_CROCODILE,
+	BANANA_GIRL,
 	DERI,
 ]
 

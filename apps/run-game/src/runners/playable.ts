@@ -25,6 +25,11 @@ export interface Playable {
 	 * ("Unlocked by completing all courses").
 	 */
 	unlockedBy?: string
+	/**
+	 * How to unlock them, shown on the select screen while they're still a
+	 * "?": "Collect all 10 bananas at Midnattsloppet".
+	 */
+	toUnlock?: string
 	/** White all over, so lost on a light card: shown on a dark one, on the select screen. */
 	darkCard?: boolean
 	/** The look they're made from, if they're made from one: a custom runner's, or a guest's. */
@@ -143,9 +148,14 @@ const MEMBER_GLIDE_LEANS: Partial<Record<RunnerName, number>> = {
  * them: what does, said when it does. Still out on the courses with the
  * pack, locked or not; just not yours to run as yet.
  */
-const MEMBER_UNLOCKS: Partial<Record<RunnerName, string>> = {
+const MEMBER_UNLOCKS: Partial<
+	Record<RunnerName, Pick<Playable, 'unlockedBy' | 'toUnlock'>>
+> = {
 	// A dog: yours once you've ridden one.
-	link: 'Unlocked by riding a corgi at Kristineberg',
+	link: {
+		unlockedBy: 'Unlocked by riding a corgi at Kristineberg',
+		toUnlock: 'Ride a corgi at Kristineberg',
+	},
 }
 
 /** Link's runner id: unlocked by riding a corgi (see `MEMBER_UNLOCKS`). */
@@ -166,7 +176,7 @@ export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 			id: `member:${member}`,
 			name: runner.name,
 			member,
-			unlockedBy: MEMBER_UNLOCKS[member],
+			...MEMBER_UNLOCKS[member],
 			sprite: {
 				run: runner.frames.run ?? [],
 				sit: runner.frames.sit?.[0],

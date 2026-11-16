@@ -216,6 +216,20 @@ export const DANCES = {
 		interval: 160,
 		moves: [{ sway: -1, hips: 1 }, {}, { sway: 1, hips: -1 }, {}],
 	},
+	/** A dancing banana: arms up, waving one out and back, swaying and bouncing. */
+	banana: {
+		interval: 125,
+		moves: [
+			{ arms: ['up', 'up'], sway: -2, hips: 1, bend: 1 },
+			{ arms: ['up', 'out'], sway: -1, lift: 1 },
+			{ arms: ['up', 'up'], bend: 1 },
+			{ arms: ['out', 'up'], sway: 1, lift: 1 },
+			{ arms: ['up', 'up'], sway: 2, hips: -1, bend: 1 },
+			{ arms: ['out', 'up'], sway: 1, lift: 1 },
+			{ arms: ['up', 'up'], bend: 1 },
+			{ arms: ['up', 'out'], sway: -1, lift: 1 },
+		],
+	},
 	/** Round and round, hopping, chasing its tail. */
 	zoomies: {
 		interval: 110,
@@ -271,6 +285,7 @@ export const RUNNER_DANCES: Record<string, DanceName> = {
 	viking: 'bounce',
 	skeleton: 'spin',
 	'ms-crocodile': 'twist',
+	'banana-girl': 'banana',
 }
 
 /** A dance for anyone not in `RUNNER_DANCES`, from something about them that stays the same. */

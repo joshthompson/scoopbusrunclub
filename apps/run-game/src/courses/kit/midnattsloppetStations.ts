@@ -10,8 +10,9 @@ import { seeded } from './seeded'
 
 /**
  * What's laid on along Midnattsloppet's way: the drinks station, the
- * showers over the road, a korv kiosk, the banana stand and its dancing
- * bananas, what's dropped on the road past them, and Hornsgatan's crowds
+ * showers over the road, a korv kiosk, the banana stand (its dancing
+ * supporters are Banana Girl's dance: see `midnattsloppet`), what's
+ * dropped on the road past them, and Hornsgatan's crowds
  * behind the barriers. Each a cell a pixel, drawn at 2 (`scale: 2`),
  * unless it says.
  *
@@ -417,63 +418,6 @@ export const bananaStand = svgUrl(
 			'#ead25a',
 		),
 )
-
-/** Someone in a banana suit, dancing (they hop, as scenery can). 14 by 30. */
-export const dancingBanana = pixelArt(14, 30, [
-	// Arms up, waving, out of the suit's sides.
-	[1, 2, 2, 2, SKINS[3]],
-	[1, 4, 1, 4, SKINS[3]],
-	[2, 8, 1, 2, SKINS[3]],
-	[3, 10, 1, 2, SKINS[3]],
-	[11, 2, 2, 2, SKINS[3]],
-	[12, 4, 1, 4, SKINS[3]],
-	[11, 8, 1, 2, SKINS[3]],
-	[10, 10, 1, 2, SKINS[3]],
-	// The suit: a banana, standing up, curved, its stalk on top.
-	...letters(
-		[
-			'.......ee.....',
-			'.......ee.....',
-			'......LYS.....',
-			'......LYYS....',
-			'.....LYYYS....',
-			'.....LYYYYS...',
-			'....LYYYYYS...',
-			'....LffffYS...',
-			'....LfifiYS...',
-			'....LffffYS...',
-			'....LfmmfYS...',
-			'....LYYYYYS...',
-			'....LYYYYYS...',
-			'....LYYYYYS...',
-			'....LYYYYYS...',
-			'....LYYYYYS...',
-			'....LYYYYYS...',
-			'....LYYYYYS...',
-			'.....LYYYYS...',
-			'.....LYYYYS...',
-			'.....LYYYS....',
-			'......YYSS....',
-			'.......ee.....',
-		],
-		{
-			e: BANANA_END,
-			L: BANANA_LIT,
-			Y: BANANA,
-			S: BANANA_SHADE,
-			f: SKINS[3],
-			i: INK,
-			m: '#8a3a32',
-		},
-	),
-	// Legs, in black tights, and running shoes.
-	[5, 23, 2, 5, '#24242c'],
-	[8, 23, 2, 5, '#24242c'],
-	[4, 28, 3, 2, '#d6dae2'],
-	[8, 28, 3, 2, '#d6dae2'],
-	[4, 29, 3, 1, '#9aa0aa'],
-	[8, 29, 3, 1, '#9aa0aa'],
-])
 
 // --- The crowd --------------------------------------------------------------------
 

@@ -10,12 +10,20 @@ export function RunnerStage(props: {
 	path?: boolean
 	pathStyle?: JSX.CSSProperties
 	height?: number
+	/**
+	 * Shrinkable down to this, sky off its top, to leave room for what's
+	 * under it in a fixed-height panel. Not shrinkable, without it.
+	 */
+	minHeight?: number
 }) {
 	return (
 		<div
 			style={{
 				...styles.stage,
 				...(props.height ? { height: `${props.height}px` } : {}),
+				...(props.minHeight
+					? { 'flex-shrink': 1, 'min-height': `${props.minHeight}px` }
+					: {}),
 			}}
 		>
 			<Show when={props.path ?? true}>

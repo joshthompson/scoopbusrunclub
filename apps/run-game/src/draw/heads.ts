@@ -24,6 +24,20 @@ const SOLID = 100
  */
 const ACROSS = 2
 
+/**
+ * Pictures whose top isn't their head: someone in a costume over it, their
+ * head showing out of a hole in it. Their head's found from the topmost of
+ * the colours it's drawn in, by the picture's URL: Banana Girl's, out of
+ * her banana, from her fringe, not the stalk on top of it.
+ */
+const costumed = new Map<string, Set<number>>()
+
+/** `pictures` (a strip's or a picture of its own) with their head drawn in `colours`, in a costume. */
+export function headShowsIn(pictures: string[], colours: string[]) {
+	const keys = new Set(colours.map((c) => Number.parseInt(c.slice(1), 16)))
+	for (const picture of pictures) costumed.set(picture.split('#')[0], keys)
+}
+
 /** Each frame at each size it's drawn: undefined while it's being found, null if it can't be. */
 const found = new Map<string, HeadTop | null | undefined>()
 /** Bumped as each is found, for anything drawn from them to catch up. */
@@ -79,7 +93,13 @@ async function measure(frame: string, width: number, height: number) {
 		for (; x < w; x += tile) ctx.drawImage(image, x, top, tile, h)
 	} else ctx.drawImage(image, 0, 0, w, h)
 	const { data } = ctx.getImageData(0, 0, w, h)
-	const solid = (x: number, y: number) => data[(y * w + x) * 4 + 3] > SOLID
+	// In a costume, only their head counts: the colours it's drawn in.
+	const head = costumed.get(url)
+	const solid = (x: number, y: number) => {
+		const i = (y * w + x) * 4
+		if (data[i + 3] <= SOLID) return false
+		return !head || head.has((data[i] << 16) | (data[i + 1] << 8) | data[i + 2])
+	}
 	for (let y = 0; y < h; y++) {
 		let row = false
 		for (let x = 0; x < w && !row; x++) row = solid(x, y)

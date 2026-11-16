@@ -941,6 +941,12 @@ export interface Scenery {
 	frames?: string[]
 	frameTicks?: number
 	/**
+	 * Animated from a strip: `asset` is `count` frames side by side, each
+	 * shown in turn every `frameTicks`, starting `from` frames in, so a row
+	 * of them aren't all in step. A runner's dance, danced by the roadside.
+	 */
+	strip?: { count: number; from?: number }
+	/**
 	 * How far back from the path it stands, up the field behind it, if not
 	 * the usual: a crystal on a Cave's floor, with no field, stands right
 	 * on the path's back edge. Below 0, it's on the path itself, that far in
@@ -1041,10 +1047,10 @@ export interface Course {
 	/** How many of the Pacers are skeletons, out of 1: on Halloween Town. */
 	skeletons?: number
 	/**
-	 * Everyone in the pack in the race's own T-shirt, this colour, as at
-	 * Midnattsloppet, where everyone runs in the same one. Anyone made from
-	 * a look wears it; club members drawn by hand, in their own kit, stay
-	 * home.
+	 * Everyone in the race's own T-shirt, this colour, as at Midnattsloppet,
+	 * where everyone runs in the same one: the Players and the pack. Anyone
+	 * made from a look is drawn in it; the club's own, drawn by hand, have
+	 * their T-shirt's colours swapped for it (see `runners/raceShirts.ts`).
 	 */
 	raceShirt?: string
 	/**
@@ -1215,6 +1221,12 @@ export interface Course {
 		over?: number
 		waiting?: FoundWaiting
 	}
+	/**
+	 * A fika to hunt down: pick up every one of `item` on the course in one
+	 * go, and the first time, the bonus runner `runner` is yours to run as
+	 * (see `BONUS_RUNNERS`). Midnattsloppet's ten bananas, for Banana Girl.
+	 */
+	hunt?: { item: FikaItem; runner: string }
 	/** A mine, with mine carts to ride: see `Mine`. */
 	mine?: Mine
 	/**

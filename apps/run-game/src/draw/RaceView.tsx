@@ -13,6 +13,7 @@ import { portalView } from '../game/portals'
 import { onScreen } from '../game/step'
 import type { World } from '../game/world'
 import { playVersion, tuneAlong } from '../music/music'
+import { dressedIn, inRaceShirt } from '../runners/raceShirts'
 import { FrameMeter, showFrameMeter } from './FrameMeter'
 import { createLongJump } from './LongJump'
 import {
@@ -74,6 +75,10 @@ declare global {
  * moves it on a tick: the physics, or a Remote Player's frames from the Host.
  */
 export function createRaceScene(world: World, step?: (world: World) => void) {
+	const shirt = world.course.raceShirt
+	// Its T-shirt's recolouring started, if it has one: `prepareRace` waits
+	// for it, and a race shown without (a Mirror's) follows once it's done.
+	if (shirt) dressedIn(shirt)
 	const scene = new Scene('run-game', {
 		width: VIEW_WIDTH,
 		height: VIEW_HEIGHT,
@@ -160,6 +165,9 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			// The Ground and the Backdrop behind it all.
 			...BEHIND_TYPES,
 		],
+		// In a race's own T-shirt, everyone: the club's own, drawn by hand,
+		// recoloured into it (see `runners/raceShirts.ts`).
+		resolveAsset: shirt ? (url) => inRaceShirt(shirt, url) : undefined,
 		setup(scene) {
 			scene.addController(
 				createGameController(world, step),

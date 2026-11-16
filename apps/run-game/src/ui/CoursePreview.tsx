@@ -1,7 +1,8 @@
 import tombstoneAsset from '@/assets/halloween/tombstone.png'
 import rockAsset from '@/assets/misc/rock1.png'
+import { imageSize } from '@/utils/imageSize'
 import { For, type JSX, Show, createSignal, onCleanup, onMount } from 'solid-js'
-import type { Course, Obstacle } from '../courses/types'
+import type { Course, Obstacle, Scenery } from '../courses/types'
 import { Backdrop, Ground, HorizonTrees, type View } from '../draw/Backdrop'
 import { GeeseArt, geeseWidth } from '../draw/art/geese'
 import { KidsArt, kidsWidth } from '../draw/art/kids'
@@ -218,23 +219,25 @@ export function CoursePreview(props: {
 											: {}
 									}
 								>
-									<img
-										src={item.asset}
-										alt=""
-										class={item.scale ? 'pixelated' : undefined}
-										style={{
-											display: 'block',
-											// Its own size, however far along the course it's stood.
-											'max-width': 'none',
-											filter: item.filter,
-											...(item.scale
-												? {
-														transform: `scale(${item.scale})`,
-														'transform-origin': 'bottom center',
-													}
-												: {}),
-										}}
-									/>
+									<Show
+										when={item.strip}
+										fallback={
+											<img
+												src={item.asset}
+												alt=""
+												class={item.scale ? 'pixelated' : undefined}
+												style={{
+													display: 'block',
+													// Its own size, however far along the course it's stood.
+													'max-width': 'none',
+													filter: item.filter,
+													...scaled(item.scale),
+												}}
+											/>
+										}
+									>
+										{(strip) => <StripFrame item={item} strip={strip()} />}
+									</Show>
 								</div>
 							</div>
 						)}
@@ -425,6 +428,42 @@ export function CoursePreview(props: {
 				</div>
 			</div>
 		</div>
+	)
+}
+
+/** Drawn `scale` times its size, from its feet: a cell a pixel's art. */
+const scaled = (scale?: number): JSX.CSSProperties =>
+	scale
+		? { transform: `scale(${scale})`, 'transform-origin': 'bottom center' }
+		: {}
+
+/**
+ * Scenery that's a strip of frames (see `Scenery['strip']`): its first, held
+ * still, cut out of the strip once it's loaded and its size is known.
+ */
+function StripFrame(props: {
+	item: Scenery
+	strip: NonNullable<Scenery['strip']>
+}) {
+	const size = () => imageSize(props.item.asset)
+	return (
+		<Show when={size()}>
+			{(s) => {
+				const width = s().width / props.strip.count
+				return (
+					<div
+						class={props.item.scale ? 'pixelated' : undefined}
+						style={{
+							width: `${width}px`,
+							height: `${s().height}px`,
+							background: `url(${props.item.asset}) ${-width * (props.strip.from ?? 0)}px 0 / ${s().width}px ${s().height}px no-repeat`,
+							filter: props.item.filter,
+							...scaled(props.item.scale),
+						}}
+					/>
+				)
+			}}
+		</Show>
 	)
 }
 

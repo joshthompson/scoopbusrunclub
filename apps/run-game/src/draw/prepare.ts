@@ -1,6 +1,7 @@
 import type { Scene } from 'scoopjs'
 import { LEFT_EDGE, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import type { World } from '../game/world'
+import { dressedIn } from '../runners/raceShirts'
 import { syncCamera } from './RaceView'
 
 /**
@@ -20,6 +21,9 @@ export async function prepareRace(
 	scene: Scene,
 	progress?: (done: number) => void,
 ) {
+	// Everyone in the race's own T-shirt, if it has one, before they're seen.
+	const shirt = world.course.raceShirt
+	if (shirt) await dressedIn(shirt)
 	await until(() => !scene.loading.get())
 	await document.fonts?.ready
 	const was = {

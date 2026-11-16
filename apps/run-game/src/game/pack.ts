@@ -2,13 +2,9 @@ import type { Course } from '../courses/types'
 import { kidsWidth } from '../draw/art/kids'
 import { touristsWidth } from '../draw/art/tourists'
 import { guests } from '../runners/guests'
-import {
-	type Avatar,
-	DEFAULT_AVATAR,
-	pickAny,
-	randomAvatar,
-} from '../runners/looks'
+import { DEFAULT_AVATAR, pickAny, randomAvatar } from '../runners/looks'
 import { CLUB, type Playable, lookSprite } from '../runners/playable'
+import { inShirt, shirtLook } from '../runners/raceShirts'
 import { SKELETON_SPRITE } from '../runners/skeleton'
 import { play } from '../sfx'
 import { BOARDS } from './boards'
@@ -140,16 +136,15 @@ function newcomer(
 	const shirt = world.course.raceShirt
 	const members = [...CLUB, ...guests()].filter(
 		(m) =>
-			// In the race's own T-shirt, only those made from a look.
-			(!shirt || m.look) &&
 			!world.racers.some(
 				(r) => r.runner.id === m.id || r.runner.name === m.name,
-			) &&
-			!world.pack.some((p) => p.name === m.name),
+			) && !world.pack.some((p) => p.name === m.name),
 	)
 	if (members.length && Math.random() < MEMBER_SHARE) {
 		const { id, name, member, sprite, look } = pickAny(members)
-		const dressed = shirt && look ? inShirt(look, shirt) : undefined
+		// In the race's own T-shirt, if it has one: drawn again from their look,
+		// or, drawn by hand, recoloured as they're drawn (see `raceShirts.ts`).
+		const dressed = shirt ? shirtLook({ look, member }, shirt) : undefined
 		return {
 			name,
 			member,
@@ -162,13 +157,6 @@ function newcomer(
 	const look = shirt ? inShirt(random, shirt) : random
 	return { name: pickAny(NAMES), look, sprite: lookSprite(look) }
 }
-
-/** `look`, in a race's T-shirt, `colour`: see `raceShirt`. */
-const inShirt = (look: Avatar, colour: string): Avatar => ({
-	...look,
-	topType: 'tshirt',
-	topColor: colour,
-})
 
 /**
  * How many Pacers can be out at once at `x`: the course's crowd, if it has

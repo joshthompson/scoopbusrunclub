@@ -2481,6 +2481,38 @@ function paintFrames(
 	}
 }
 
+/**
+ * A Draw Hook painting a strip of `count` frames side by side, `asset`, a
+ * frame at a time, each for `ticks` of the race's tick, starting `from`
+ * frames in: the same frame on every screen, as `paintFrames`.
+ */
+function paintStrip(
+	world: World,
+	asset: string,
+	{ count, from = 0 }: { count: number; from?: number },
+	ticks: number | undefined,
+	size: () => { width: number; height: number },
+) {
+	return ({ ctx, image }: DrawPainting) => {
+		const loaded = image(asset)
+		if (!loaded) return
+		const frame = (Math.floor(world.ticks() / (ticks ?? 12)) + from) % count
+		const cell = loaded.width / count
+		const { width, height } = size()
+		ctx.drawImage(
+			loaded.image,
+			frame * cell,
+			0,
+			cell,
+			loaded.height,
+			0,
+			0,
+			width,
+			height,
+		)
+	}
+}
+
 /** A cyclist, riding towards you, or scooped and flying. */
 function createCyclist(
 	world: World,
@@ -2547,7 +2579,9 @@ export function createScenery(world: World) {
 		const { x, asset, scale = 1, filter, hops, carved, footing } = piece
 		const setBack = piece.setBack ?? (footing ? VERGE : SCENERY_SET_BACK)
 		const name = carved ? names[carvings++ % names.length] : undefined
-		const width = () => (imageSize(asset)?.width ?? 0) * scale
+		// One frame's width, if it's a strip of them.
+		const width = () =>
+			((imageSize(asset)?.width ?? 0) * scale) / (piece.strip?.count ?? 1)
 		const height = () => (imageSize(asset)?.height ?? 0) * scale
 		/**
 		 * The path's back edge at its highest under it, so a slope doesn't run
@@ -2580,34 +2614,39 @@ export function createScenery(world: World) {
 		 * A tombstone with its name, recoloured, name and all, by its filter;
 		 * and a footing's grass, down past its box.
 		 */
-		const draw: ((painting: DrawPainting) => void) | undefined = piece.frames
-			? paintFrames(world, piece.frames, piece.frameTicks, () => ({
+		const draw: ((painting: DrawPainting) => void) | undefined = piece.strip
+			? paintStrip(world, asset, piece.strip, piece.frameTicks, () => ({
 					width: width(),
 					height: height(),
 				}))
-			: carved
-				? ({ ctx, image }) => {
-						const loaded = image(asset)
-						if (loaded)
-							paintTombstone(ctx, loaded, {
-								key: `${world.course.id}:${i}`,
-								name: name ?? '',
-								panel: carved,
-								scale,
-								filter,
-							})
-					}
-				: footing
-					? (() => {
-							const paint = footingPainter(groundY, x, () =>
-								paletteOf(world.course.look?.palette)('var(--grass-green)'),
-							)
-							return ({ ctx, drawDefault }) => {
-								drawDefault()
-								paint(ctx, width(), height(), pathTop() - setBack)
-							}
-						})()
-					: undefined
+			: piece.frames
+				? paintFrames(world, piece.frames, piece.frameTicks, () => ({
+						width: width(),
+						height: height(),
+					}))
+				: carved
+					? ({ ctx, image }) => {
+							const loaded = image(asset)
+							if (loaded)
+								paintTombstone(ctx, loaded, {
+									key: `${world.course.id}:${i}`,
+									name: name ?? '',
+									panel: carved,
+									scale,
+									filter,
+								})
+						}
+					: footing
+						? (() => {
+								const paint = footingPainter(groundY, x, () =>
+									paletteOf(world.course.look?.palette)('var(--grass-green)'),
+								)
+								return ({ ctx, drawDefault }) => {
+									drawDefault()
+									paint(ctx, width(), height(), pathTop() - setBack)
+								}
+							})()
+						: undefined
 		return createController({
 			frames: [asset],
 			draw,
