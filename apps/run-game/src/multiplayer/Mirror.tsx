@@ -55,6 +55,11 @@ const JUMP_TICKS = 40
 const CATCH_UP = 0.05
 
 function playableFor(intro: RacerIntro): Playable {
+	const runner = runnerFor(intro)
+	return intro.name ? { ...runner, name: intro.name } : runner
+}
+
+function runnerFor(intro: RacerIntro): Playable {
 	if (intro.custom)
 		return { ...customPlayable(intro.custom), id: intro.character }
 	return (

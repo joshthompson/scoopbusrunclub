@@ -340,3 +340,8 @@ button {
 .propeller {
 	animation: propeller 0.6s steps(6) infinite;
 }
+
+/* A Player's name, on their phone: blank, it shows their runner's, faintly. */
+.pad-name::placeholder {
+	color: rgba(15, 31, 41, 0.3);
+}

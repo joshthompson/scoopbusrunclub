@@ -59,6 +59,13 @@ export function codeFromScan(text: string) {
 	return code.length === CODE_LENGTH ? code : ''
 }
 
+/** The longest name a Player can go by: long enough, and still fits over their head. */
+export const MAX_PLAYER_NAME = 14
+
+/** A Player's name, tidied: one line, no runs of spaces, and not too long. */
+export const cleanPlayerName = (typed: string) =>
+	typed.replace(/\s+/g, ' ').trim().slice(0, MAX_PLAYER_NAME)
+
 /**
  * How a phone plays:
  * - `controller`: a Phone Controller, the race on the big screen
@@ -93,7 +100,16 @@ export type PadMessage =
 	 * `screen`: a computer, showing the Room just as the Host does, so it's
 	 * sent the whole Room (see `RoomView`), not just its own Player.
 	 */
-	| { type: 'hello'; device: string; mode: PadMode; screen?: boolean }
+	| {
+			type: 'hello'
+			device: string
+			mode: PadMode
+			screen?: boolean
+			/** What they go by, if they've said (see `cleanPlayerName`). */
+			name?: string
+	  }
+	/** What they go by, whoever they run as: blank, their runner's name. */
+	| { type: 'name'; name: string }
 	/** Switching between playing on the big screen and on the phone. */
 	| { type: 'mode'; mode: PadMode }
 	/** Who they'll run as. A custom runner comes with its look, which only the phone has. */
@@ -152,6 +168,8 @@ export interface PadView {
 	number: number
 	colour: string
 	character?: string
+	/** What they go by, as the Host has it: none, their runner's name. */
+	name?: string
 	ready: boolean
 	/** Who's been picked by someone else. */
 	taken: string[]
@@ -240,6 +258,8 @@ export interface RacerIntro {
 	/** A `Playable`'s id, and a custom runner's look, which the phone may not have. */
 	character: string
 	custom?: CustomRunner
+	/** What they go by, if not their runner's name. */
+	name?: string
 	colour: string
 	number: number
 }

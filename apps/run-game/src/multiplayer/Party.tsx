@@ -1,5 +1,7 @@
 import {
+	type JSX,
 	Match,
+	Show,
 	Switch,
 	createEffect,
 	createMemo,
@@ -13,6 +15,7 @@ import type { Racer, RacerEntry, World } from '../game/world'
 import { playMenu, playTune } from '../music/music'
 import { MenuBackdrop } from '../ui/MenuBackdrop'
 import { Stage } from '../ui/Stage'
+import { JoinBadge } from './JoinBadge'
 import { Lobby } from './Lobby'
 import { Podium } from './Podium'
 import { type Placing, Results, standingsOf } from './Results'
@@ -473,12 +476,17 @@ export default function Party(props: { onLeave: () => void }) {
 						onOver={roundDone}
 						onLobby={toLobby}
 						onEnd={end}
+						corner={<JoinBadge code={room.code} />}
 					/>
 				)}
 			</Match>
 			<Match when={room.stage() !== 'round'}>
 				<Stage>
 					<MenuBackdrop />
+					{/* The lobby shows how to join big; after it, in the corner. */}
+					<Show when={room.stage() === 'results' || room.stage() === 'podium'}>
+						<JoinBadge code={room.code} style={styles.corner} />
+					</Show>
 					<Switch>
 						<Match when={room.stage() === 'results'}>
 							<Results
@@ -527,3 +535,13 @@ export default function Party(props: { onLeave: () => void }) {
 		</Switch>
 	)
 }
+
+const styles = {
+	/** How to join, in the top left corner, over whatever's on. */
+	corner: {
+		position: 'absolute',
+		top: '10px',
+		left: '10px',
+		'z-index': 3,
+	},
+} satisfies Record<string, JSX.CSSProperties>

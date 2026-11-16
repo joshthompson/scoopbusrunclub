@@ -436,14 +436,22 @@ export interface CourseLook {
 	 * course from `from`, as thick as it gets by `full`, and clearing again
 	 * from `clear` to `gone`. And a bank of cloud lying across the course,
 	 * `deck`: its top at `top`, `depth` deep, from `from` to `to`, drawn
-	 * over everyone falling through it.
+	 * over everyone falling through it. Over `deep`, it goes on down under
+	 * that as far as can be seen, a valley filled with it: zoomed out, no
+	 * sky (and the horizon in it) under it.
 	 */
 	fog?: {
 		from: number
 		full: number
 		clear: number
 		gone: number
-		deck?: { from: number; to: number; top: number; depth: number }
+		deck?: {
+			from: number
+			to: number
+			top: number
+			depth: number
+			deep?: { from: number; to: number }
+		}
 	}
 	/** Lightning, flashing now and then. */
 	lightning?: boolean

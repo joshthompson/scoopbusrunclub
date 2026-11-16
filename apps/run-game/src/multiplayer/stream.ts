@@ -71,6 +71,8 @@ export function raceStart(world: World, round: number): RaceStart {
 			id: r.id,
 			character: r.runner.id,
 			custom: r.runner.custom,
+			// What they go by, which may not be who they run as.
+			name: r.runner.name,
 			colour: r.colour ?? 'white',
 			number: r.number ?? 0,
 		})),

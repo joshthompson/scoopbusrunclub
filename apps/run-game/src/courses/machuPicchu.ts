@@ -911,6 +911,11 @@ export const machuPicchu: CourseDefinition = {
 				to: X(LAND + 900),
 				top: CLOUD_TOP,
 				depth: CLOUD_DEPTH,
+				// The valley under the citadel, filled with it: zoomed out,
+				// the ridge goes down into it, not out over the sky. Up to
+				// the cliff at the edge, a little over its face, and not past
+				// it, where the Leap goes down through it to the valley.
+				deep: { from: X(SUN_GATE - 100), to: X(EDGE - 470) },
 			},
 		},
 		skyFlyers: [

@@ -31,6 +31,7 @@ import {
 	type RoomStage,
 	type RoomView,
 	action,
+	cleanPlayerName,
 	trysteroRoom,
 } from './protocol'
 
@@ -73,6 +74,8 @@ export interface Seat {
 	character?: string
 	/** A phone's custom runner, which only it had until it picked it. */
 	custom?: CustomRunner
+	/** What they go by, if they've said: their runner's name otherwise. */
+	name?: string
 	ready: boolean
 	/** A phone that's dropped out, and when. Its seat's kept a while (see `LOST_SEAT_MS`). */
 	lostAt?: number
@@ -99,8 +102,17 @@ export const localCharacters = (): Playable[] => [
 	...CLUB,
 ]
 
-/** Who a seat's Player runs as, if they've picked. */
+/**
+ * Who a seat's Player runs as, if they've picked: called what they go by,
+ * if they've said, wherever they're named (over their head, in the lobby,
+ * the Results, on the Podium).
+ */
 export function seatPlayable(seat: Seat): Playable | undefined {
+	const runner = seatRunner(seat)
+	return runner && seat.name ? { ...runner, name: seat.name } : runner
+}
+
+function seatRunner(seat: Seat): Playable | undefined {
 	if (!seat.character) return undefined
 	if (seat.custom) return { ...customPlayable(seat.custom), id: seat.character }
 	return (
@@ -255,6 +267,7 @@ export function createRoom(code: string) {
 					? was.colour
 					: freeColour(),
 			points: was?.points ?? 0,
+			name: seat.name ?? was?.name,
 			ready: false,
 			waiting: stage() !== 'lobby' && stage() !== 'starting',
 			...(character ? { character, custom: was?.custom } : {}),
@@ -375,6 +388,10 @@ export function createRoom(code: string) {
 				: message.character
 			pick(seat.id, character, message.custom)
 		}
+		if (message.type === 'name')
+			update(seat.id, (s) => {
+				s.name = cleanPlayerName(message.name) || undefined
+			})
 		if (message.type === 'mode') {
 			update(seat.id, (s) => {
 				s.mode = message.mode
@@ -449,6 +466,7 @@ export function createRoom(code: string) {
 			number: seats.indexOf(seat) + 1,
 			colour: seat.colour,
 			character: seat.character,
+			name: seat.name,
 			ready: seat.ready,
 			taken: taken(seat),
 			stage: stage(),

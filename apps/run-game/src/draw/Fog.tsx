@@ -178,8 +178,62 @@ export const deckTiles = (deck: DeckLook) => [
 export const deckBox = (deck: DeckLook, zoom: number) => ({
 	top: deck.top - PUFF,
 	width: deck.to - deck.from,
-	height: deck.depth + PUFF * 2 + 20 + 10 * zoom,
+	height: Math.max(
+		deck.depth + PUFF * 2 + 20 + 10 * zoom,
+		deck.deep ? DEEP_BOTTOM - deck.top + PUFF : 0,
+	),
 })
+
+/**
+ * How far down a deep deck goes, in the world: further than any camera
+ * looks, which is never lower than the course's lowest (see `cameraYFor`).
+ */
+const DEEP_BOTTOM = VIEW_HEIGHT * 2
+/** How far a deep deck takes to thin out at its far end. */
+const DEEP_FADE = 90
+/** How much darker it gets the further down, over how far. */
+const DEEP_SHADE = '#dde5eb'
+const DEEP_SHADING = 700
+
+/**
+ * Under a deck, over its `deep` stretch: the cloud going on down, `left`
+ * to `right` of it in view, from inside its body, under its tiles, so its
+ * bottom's puffs hang in it. Thickening from nothing at its near end, as
+ * the deck does, and thinning out at its far end.
+ */
+function paintDeep(
+	ctx: CanvasRenderingContext2D,
+	deck: DeckLook,
+	left: number,
+	right: number,
+	height: number,
+) {
+	if (!deck.deep) return
+	const from = deck.deep.from - deck.from
+	const to = deck.deep.to - deck.from
+	const l = Math.max(left, from)
+	const r = Math.min(right, to)
+	if (r <= l) return
+	const top = PUFF + 40
+	const fill = (c: CanvasRenderingContext2D) => {
+		const shade = c.createLinearGradient(0, top, 0, top + DEEP_SHADING)
+		shade.addColorStop(0, CLOUD)
+		shade.addColorStop(1, DEEP_SHADE)
+		c.fillStyle = shade
+		c.fillRect(l, top, r - l, height - top)
+	}
+	if (l >= from + DECK_FADE && r <= to - DEEP_FADE) return fill(ctx)
+	inLayer(ctx, 1, fill, (c) => {
+		const fade = c.createLinearGradient(from, 0, to, 0)
+		const span = to - from
+		fade.addColorStop(0, 'rgba(0, 0, 0, 0)')
+		fade.addColorStop(Math.min(0.5, DECK_FADE / span), 'black')
+		fade.addColorStop(Math.max(0.5, 1 - DEEP_FADE / span), 'black')
+		fade.addColorStop(1, 'rgba(0, 0, 0, 0)')
+		c.fillStyle = fade
+		c.fillRect(l, top, r - l, height - top)
+	})
+}
 
 /**
  * The bank of cloud, painted onto the canvas, in the world: from its left
@@ -198,6 +252,7 @@ export function paintFogDeck(
 	const left = Math.max(0, view.left)
 	const right = Math.min(width, view.right)
 	if (right <= left) return
+	paintDeep(ctx, deck, left, right, deckBox(deck, world.zoom()).height)
 	tiles.forEach((tile, i) => {
 		const draw = (c: CanvasRenderingContext2D) =>
 			paintTiled(

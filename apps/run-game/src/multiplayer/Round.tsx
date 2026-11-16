@@ -49,6 +49,8 @@ export function Round(props: {
 	onTick?: () => void
 	onLobby: () => void
 	onEnd: () => void
+	/** In the top left corner, the race's words beside it: how to join. */
+	corner?: JSX.Element
 }) {
 	const world = createWorld(props.course, props.racers, {
 		round: true,
@@ -126,6 +128,7 @@ export function Round(props: {
 							number={props.number}
 							of={props.of}
 							onPause={() => pause(true)}
+							corner={props.corner}
 						/>
 						<RaceStartOverlay
 							start={start}
@@ -166,6 +169,8 @@ export function RoundHud(props: {
 	of?: number
 	onPause?: () => void
 	textScale?: number
+	/** In the top left corner, the words beside it. */
+	corner?: JSX.Element
 }) {
 	const { world } = props
 	const size = (px: number) => `${px * (props.textScale ?? 1)}px`
@@ -202,12 +207,17 @@ export function RoundHud(props: {
 	return (
 		<div style={styles.hud}>
 			<div style={styles.topLeft}>
-				<div style={{ 'font-size': size(18), opacity: 0.8 }}>
-					Round {props.number}
-					{props.of ? ` of ${props.of}` : ''} · {world.course.name}
-				</div>
-				<div style={{ 'font-size': size(28) }}>
-					{left()} of {world.racers.length} running
+				<Show when={props.corner}>
+					<div style={styles.corner}>{props.corner}</div>
+				</Show>
+				<div>
+					<div style={{ 'font-size': size(18), opacity: 0.8 }}>
+						Round {props.number}
+						{props.of ? ` of ${props.of}` : ''} · {world.course.name}
+					</div>
+					<div style={{ 'font-size': size(28), 'margin-top': '4px' }}>
+						{left()} of {world.racers.length} running
+					</div>
 				</div>
 			</div>
 			{/* On a touch screen: with a keyboard, it's Esc or P. */}
@@ -293,8 +303,17 @@ const styles = {
 		position: 'absolute',
 		top: '16px',
 		left: '20px',
+		display: 'flex',
+		'align-items': 'flex-start',
+		gap: '14px',
 		color: 'var(--hud-ink, var(--ink))',
 		'text-shadow': 'var(--hud-shadow, none)',
+	},
+	/** How to join, over the sky: its own colours, whatever the course's. */
+	corner: {
+		margin: '-6px 0 0 -10px',
+		color: 'white',
+		'text-shadow': 'none',
 	},
 	topRight: {
 		position: 'absolute',
