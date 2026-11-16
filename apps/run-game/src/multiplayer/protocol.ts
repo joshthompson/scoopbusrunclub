@@ -1,4 +1,3 @@
-import type { Room } from 'trystero'
 import type { Phase } from '../game/world'
 import type { CustomRunner } from '../runners/customRunners'
 import type { Avatar } from '../runners/looks'
@@ -214,19 +213,6 @@ export interface RoomView {
 	 * anyone who's left since, or left during it, still on it.
 	 */
 	podium?: Seat[]
-}
-
-/**
- * One of a Room's kinds of message, typed: trystero's own types only take
- * plain JSON, which interfaces like these don't satisfy, though they are.
- */
-export function action<T>(room: Room, name: string) {
-	const [send, receive] = room.makeAction(name)
-	return {
-		send: (data: T, to?: string | string[]) => send(data as never, to),
-		on: (handle: (data: T, peer: string) => void) =>
-			receive((data, peer) => handle(data as T, peer)),
-	}
 }
 
 /** A racer in a Round, for a remote phone to draw them. */
