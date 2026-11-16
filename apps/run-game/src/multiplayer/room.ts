@@ -1,6 +1,5 @@
 import { createSignal, onCleanup } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
-import { type Room, joinRoom } from 'trystero'
 import type { Hat } from '../game/hats'
 import {
 	type Controls,
@@ -18,8 +17,8 @@ import {
 	type Playable,
 	customPlayable,
 } from '../runners/playable'
+import { openRoom } from './connection'
 import {
-	APP_ID,
 	type GameMode,
 	type PadMessage,
 	type PadMode,
@@ -30,9 +29,7 @@ import {
 	type RoomMode,
 	type RoomStage,
 	type RoomView,
-	action,
 	cleanPlayerName,
-	trysteroRoom,
 } from './protocol'
 
 /** At most this many Players in a Room. */
@@ -212,12 +209,12 @@ export function createRoom(code: string) {
 	 */
 	const departed = new Map<string, Seat>()
 
-	const room: Room = joinRoom({ appId: APP_ID }, trysteroRoom(code))
-	const view = action<PadView>(room, 'view')
-	const pad = action<PadMessage>(room, 'pad')
-	const input = action<number>(room, 'input')
-	const race = action<RaceStart>(room, 'race')
-	const frame = action<RaceFrame>(room, 'frame')
+	const room = openRoom(code)
+	const view = room.action<PadView>('view')
+	const pad = room.action<PadMessage>('pad')
+	const input = room.action<number>('input')
+	const race = room.action<RaceStart>('race')
+	const frame = room.action<RaceFrame>('frame')
 	/** Told when a phone starts watching on its own screen, to catch it up on the race. */
 	let onWatch: (peer: string) => void = () => {}
 
@@ -373,7 +370,7 @@ export function createRoom(code: string) {
 					screen: message.screen,
 				})
 			)
-				void view.send(fullView(), peer)
+				view.send(fullView(), peer)
 			tellPhones()
 			if (message.mode === 'remote' && seatOf(peer)) onWatch(peer)
 			return
@@ -504,7 +501,7 @@ export function createRoom(code: string) {
 	function tellPhones() {
 		for (const seat of seats)
 			if (seat.kind === 'phone' && seat.peer)
-				void view.send(viewFor(seat), seat.peer)
+				view.send(viewFor(seat), seat.peer)
 	}
 	const timer = window.setInterval(() => {
 		dropLost()
@@ -570,12 +567,12 @@ export function createRoom(code: string) {
 		/** A Round's begun: told to every phone watching, or to `peer`, just started watching. */
 		sendRace(start: RaceStart, peer?: string) {
 			const to = peer ? [peer] : watchers()
-			if (to.length) void race.send(start, to)
+			if (to.length) race.send(start, to)
 		},
 		/** Where everything is in the Round, to every phone watching. */
 		sendFrame(next: RaceFrame) {
 			const to = watchers()
-			if (to.length) void frame.send(next, to)
+			if (to.length) frame.send(next, to)
 		},
 		/** What to do when a phone starts watching. */
 		setOnWatch(next: (peer: string) => void) {

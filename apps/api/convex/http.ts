@@ -2021,6 +2021,60 @@ http.route({
 	}),
 })
 
+// GET /api/run/ice-servers → { iceServers }
+// TURN servers for the run game's multiplayer Rooms, so devices that can't
+// reach each other directly (mobile data, guest Wi-Fi) still connect.
+// Cloudflare's, with credentials made fresh for each ask: the Room's devices
+// pass them to WebRTC. Set CLOUDFLARE_TURN_KEY_ID and
+// CLOUDFLARE_TURN_API_TOKEN (Cloudflare dashboard → Realtime → TURN) to
+// turn it on. Without them, or if Cloudflare doesn't answer, there are none,
+// and Rooms connect the way they always have.
+
+/** How long a Room's TURN credentials last: a long party. */
+const TURN_TTL_SECONDS = 6 * 60 * 60
+
+http.route({
+	path: '/api/run/ice-servers',
+	method: 'GET',
+	handler: httpAction(async () => {
+		const keyId = process.env.CLOUDFLARE_TURN_KEY_ID
+		const token = process.env.CLOUDFLARE_TURN_API_TOKEN
+		if (!keyId || !token) return jsonResponse({ iceServers: [] })
+		try {
+			const response = await fetch(
+				`https://rtc.live.cloudflare.com/v1/turn/keys/${keyId}/credentials/generate-ice-servers`,
+				{
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${token}`,
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({ ttl: TURN_TTL_SECONDS }),
+				},
+			)
+			if (!response.ok) throw new Error(`Cloudflare TURN: ${response.status}`)
+			const { iceServers } = (await response.json()) as {
+				iceServers?: { urls: string | string[] }[]
+			}
+			// Port 53's blocked by browsers: a URL on it only ever times out.
+			const usable = (iceServers ?? []).map((server) => ({
+				...server,
+				urls: [server.urls].flat().filter((url) => !/:53(\?|$)/.test(url)),
+			}))
+			return new Response(JSON.stringify({ iceServers: usable }), {
+				headers: {
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-store',
+					...corsHeaders,
+				},
+			})
+		} catch (error) {
+			console.error('TURN credentials failed:', error)
+			return jsonResponse({ iceServers: [] })
+		}
+	}),
+})
+
 // --- Admin: GET /api/admin/custom-racers ---
 
 http.route({
