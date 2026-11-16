@@ -108,8 +108,8 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
       scoopjs:
-        specifier: link:../../../scoopjs/packages/core
-        version: link:../../../scoopjs/packages/core
+        specifier: npm:@joshthompson/scoopjs@^0.3.0
+        version: '@joshthompson/scoopjs@0.3.0(solid-js@1.9.9)'
       solid-js:
         specifier: ^1.9.5
         version: 1.9.9
@@ -802,6 +802,11 @@ packages:
 
   '@joshthompson/scoopjs@0.2.0':
     resolution: {integrity: sha512-t5j6bymSCsLSCS7dg8+L3my6VdqcBGWoeL4JRun9hr8MY3PKJi/5M9Tk7Cam8achozM2GOnpJuk8/lnDAKWw8A==, tarball: https://npm.pkg.github.com/download/@joshthompson/scoopjs/0.2.0/1c42f4ce768daf5608e6a93cfa5a82df8e4c1bd1}
+    peerDependencies:
+      solid-js: ^1.9.0
+
+  '@joshthompson/scoopjs@0.3.0':
+    resolution: {integrity: sha512-64/NlMGfC6I3J/FDB9mK44rfwoAEUzBeXaJqjmGjshWc2jpJdFmU7BoshncD6YGT98U2IT/fOVJ47cdJdOou/A==, tarball: https://npm.pkg.github.com/download/@joshthompson/scoopjs/0.3.0/11153512f11328055ddb0e8d3e5a6a764bf6707c}
     peerDependencies:
       solid-js: ^1.9.0
 
@@ -3462,6 +3467,10 @@ snapshots:
       '@sinclair/typebox': 0.34.48
 
   '@joshthompson/scoopjs@0.2.0(solid-js@1.9.9)':
+    dependencies:
+      solid-js: 1.9.9
+
+  '@joshthompson/scoopjs@0.3.0(solid-js@1.9.9)':
     dependencies:
       solid-js: 1.9.9
 

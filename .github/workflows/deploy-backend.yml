@@ -4,6 +4,12 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  # ScoopJS, from GitHub Packages. The install covers the whole workspace,
+  # so it fetches the games' ScoopJS even though the backend doesn't use it.
+  packages: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -26,6 +32,13 @@ jobs:
           else
             echo "CONVEX_DEPLOY_KEY is set"
           fi
+
+      # GitHub Packages wants a token even to install ScoopJS (see
+      # deploy-web.yml).
+      - name: Log in to GitHub Packages
+        run: echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: pnpm install --frozen-lockfile
 
