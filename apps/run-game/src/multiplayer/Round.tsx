@@ -295,6 +295,9 @@ const styles = {
 	hud: {
 		position: 'absolute',
 		inset: 0,
+		// Its own layer: the name tags over their runners, but under the pause
+		// menu and anything else over the race.
+		isolation: 'isolate',
 		'pointer-events': 'none',
 		color: 'var(--ink)',
 		'font-family': 'var(--font-pixel)',

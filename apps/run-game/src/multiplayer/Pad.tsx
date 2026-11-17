@@ -298,6 +298,8 @@ function NameAsk(props: {
 function WatchToggle(props: {
 	mode: PadMode
 	onMode: (mode: PadMode) => void
+	/** Ready: not to be changed till they're not. */
+	disabled?: boolean
 }) {
 	const option = (mode: PadMode, label: string) => {
 		const on = () => props.mode === mode
@@ -305,9 +307,10 @@ function WatchToggle(props: {
 			<button
 				type="button"
 				aria-pressed={on()}
+				disabled={props.disabled}
 				style={{ ...styles.watchOption, ...(on() ? styles.readyOn : {}) }}
 				onClick={() => {
-					if (on()) return
+					if (on() || props.disabled) return
 					navigator.vibrate?.(8)
 					props.onMode(mode)
 				}}
@@ -322,7 +325,7 @@ function WatchToggle(props: {
 		)
 	}
 	return (
-		<div style={styles.watch}>
+		<div style={{ ...styles.watch, ...(props.disabled ? styles.locked : {}) }}>
 			<div style={styles.watchLabel}>Watch the race</div>
 			<div style={styles.watchOptions}>
 				{option('controller', 'Big screen')}
@@ -449,6 +452,11 @@ function Controller(props: {
 	}
 	/** What they're called: their own name, or their runner's. */
 	const shownName = () => name() || mine()?.name || ''
+	/** Ready in the lobby: nothing about them to change till they're not. */
+	const lockedIn = () => {
+		const v = view()
+		return v?.stage === 'lobby' && v.ready && !v.starter
+	}
 	const pick = (runner: Playable) => {
 		if (view()?.taken.includes(runner.id)) return
 		navigator.vibrate?.(15)
@@ -603,6 +611,7 @@ function Controller(props: {
 								type="button"
 								style={styles.who}
 								aria-label="Change your name"
+								disabled={lockedIn()}
 								onClick={() => setNaming(true)}
 							>
 								<span style={styles.whoTop}>
@@ -615,7 +624,9 @@ function Controller(props: {
 									}}
 								>
 									{shownName()}
-									<span style={styles.pencil}>✎</span>
+									<Show when={!lockedIn()}>
+										<span style={styles.pencil}>✎</span>
+									</Show>
 								</span>
 							</button>
 							<div style={styles.status}>{statusText(v())}</div>
@@ -769,7 +780,16 @@ function Controller(props: {
 							<div style={styles.paused}>Paused</div>
 						</Show>
 						<Show when={reconnecting()}>
-							<div style={styles.reconnecting}>Reconnecting…</div>
+							<div style={styles.reconnecting}>
+								<div style={styles.reconnectingWords}>Reconnecting…</div>
+								<button
+									type="button"
+									style={styles.smallButton}
+									onClick={leave}
+								>
+									Leave the Room
+								</button>
+							</div>
 						</Show>
 						<Show when={naming()}>
 							<NameSheet
@@ -806,15 +826,20 @@ function LobbyScreen(props: {
 	onStart: () => void
 	onLeave: () => void
 }) {
+	/** Ready: who they are and where they'll watch kept as they are, till they're not. */
+	const locked = () => props.view.ready && !props.view.starter
 	return (
 		<>
 			<div style={styles.scroll}>
 				<div style={styles.scrolled}>
-					<div style={styles.youCard}>
+					<div
+						style={{ ...styles.youCard, ...(locked() ? styles.locked : {}) }}
+					>
 						<button
 							type="button"
 							style={styles.youRunner}
 							aria-label="Change runner"
+							disabled={locked()}
 							onClick={props.onChangeRunner}
 						>
 							<Show when={props.runner}>
@@ -836,6 +861,7 @@ function LobbyScreen(props: {
 								name={props.name}
 								placeholder={props.runner?.name ?? ''}
 								onName={props.onName}
+								disabled={locked()}
 							/>
 							<div style={styles.runsAs}>
 								Running as {props.runner?.name ?? '…'}
@@ -843,6 +869,7 @@ function LobbyScreen(props: {
 							<button
 								type="button"
 								style={styles.outlineButton}
+								disabled={locked()}
 								onClick={props.onChangeRunner}
 							>
 								Change runner
@@ -850,7 +877,11 @@ function LobbyScreen(props: {
 						</div>
 					</div>
 
-					<WatchToggle mode={props.mode} onMode={props.onMode} />
+					<WatchToggle
+						mode={props.mode}
+						onMode={props.onMode}
+						disabled={locked()}
+					/>
 
 					<Show when={props.view.starter}>
 						{(starter) => (
@@ -884,8 +915,8 @@ function LobbyScreen(props: {
 							<div style={styles.footerNote}>
 								{props.view.ready
 									? props.view.starterNumber
-										? `P${props.view.starterNumber} starts the race · tap if you’re not ready`
-										: 'Tap again if you’re not ready'
+										? `P${props.view.starterNumber} starts the race · tap to change anything`
+										: 'Tap again to change anything'
 									: 'Tap when you’re ready to race'}
 							</div>
 						</>
@@ -941,7 +972,7 @@ function ReadyToggle(props: { ready: boolean; onToggle: () => void }) {
 					}}
 				/>
 			</span>
-			{props.ready ? 'Ready!' : 'Not ready'}
+			Ready
 		</button>
 	)
 }
@@ -956,6 +987,7 @@ function NameField(props: {
 	onName: (name: string) => void
 	autofocus?: boolean
 	onDone?: () => void
+	disabled?: boolean
 }) {
 	const [typed, setTyped] = createSignal(props.name)
 	// Changed elsewhere (or tidied): shown as it now is.
@@ -977,6 +1009,7 @@ function NameField(props: {
 				class="pad-name"
 				style={styles.nameInput}
 				value={typed()}
+				disabled={props.disabled}
 				maxLength={MAX_PLAYER_NAME}
 				placeholder={props.placeholder || 'Your name'}
 				autocomplete="nickname"
@@ -1645,19 +1678,32 @@ const styles = {
 		background: 'var(--ink)',
 	},
 	/** Out of touch with the big screen a moment: getting back in. */
+	/** Lost touch for a moment: saying so, and a way out if it doesn't come back. */
 	reconnecting: {
 		position: 'absolute',
 		left: '50%',
 		top: '140px',
 		transform: 'translateX(-50%)',
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'center',
+		gap: '10px',
+		'z-index': 4,
+	},
+	reconnectingWords: {
 		padding: '6px 14px 7px',
 		background: 'var(--bus-red)',
 		color: 'white',
 		border: '3px solid var(--ink)',
 		'font-size': '18px',
 		'white-space': 'nowrap',
-		'z-index': 2,
 		animation: 'blink 1.2s steps(2) infinite',
+	},
+	/** Ready: settings shown as they are, greyed, not to be changed till they're not. */
+	locked: {
+		opacity: 0.45,
+		filter: 'grayscale(0.7)',
+		cursor: 'not-allowed',
 	},
 	/** A Round on its start screen: who's to start it, over the top, leaving the buttons to press. */
 	starting: {

@@ -374,8 +374,8 @@ function InRoom(props: {
 						<Show when={view()?.paused && !menu()}>
 							<div style={styles.paused}>Paused at the big screen</div>
 						</Show>
-						<Show when={reconnecting()}>
-							<div style={styles.reconnecting}>Reconnecting…</div>
+						<Show when={reconnecting() && !menu()}>
+							<Reconnecting onLeave={leave} />
 						</Show>
 						<Show when={menu()}>
 							<PauseMenu
@@ -401,7 +401,7 @@ function InRoom(props: {
 				<Stage>
 					<MenuBackdrop />
 					<Show when={reconnecting() && !gone()}>
-						<div style={styles.reconnecting}>Reconnecting…</div>
+						<Reconnecting onLeave={leave} />
 					</Show>
 					<Switch>
 						<Match when={gone()}>
@@ -637,6 +637,21 @@ function Message(props: {
 	)
 }
 
+/**
+ * Lost touch with the Room for a moment: said, blinking, and, as it may not
+ * come back (a Room paused at the big screen says nothing new), a way out.
+ */
+function Reconnecting(props: { onLeave: () => void }) {
+	return (
+		<div style={styles.reconnecting}>
+			<div style={styles.reconnectingWords}>Reconnecting…</div>
+			<button type="button" style={styles.button} onClick={props.onLeave}>
+				Leave the Room
+			</button>
+		</div>
+	)
+}
+
 const styles = {
 	centre: {
 		position: 'absolute',
@@ -745,18 +760,25 @@ const styles = {
 		'white-space': 'nowrap',
 	},
 	/** Out of touch with the big screen a moment: getting back in. */
+	/** Lost touch for a moment: saying so, and a way out if it doesn't come back. */
 	reconnecting: {
 		position: 'absolute',
 		left: '50%',
 		top: '12px',
 		transform: 'translateX(-50%)',
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'center',
+		gap: '8px',
+		'z-index': 4,
+	},
+	reconnectingWords: {
 		padding: '6px 14px 7px',
 		background: 'var(--bus-red)',
 		color: 'white',
 		border: '3px solid var(--ink)',
 		'font-size': '18px',
 		'white-space': 'nowrap',
-		'z-index': 2,
 		animation: 'blink 1.2s steps(2) infinite',
 	},
 	/** A Round on its start screen: who's to start it, over the top, leaving the buttons to press. */
