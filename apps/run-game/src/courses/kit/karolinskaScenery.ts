@@ -335,7 +335,16 @@ export const bikeRack = (() => {
  * A Swedish ambulance, parked: yellow, a green and yellow chequered band
  * along it, AMBULANS on its side, its blue lights on top: 72 by 34.
  */
-export const ambulance = (() => {
+export const ambulance = ambulanceArt()
+/** The same, its blue lights flashing, two frames, by turns. */
+export const AMBULANCE_FLASHING: [string, string] = [
+	ambulanceArt(0),
+	ambulanceArt(1),
+]
+function ambulanceArt(flash?: 0 | 1) {
+	/** Its blue lights: one lit, the other dark, by turns, if they're flashing. */
+	const light = (which: 0 | 1) =>
+		flash === undefined ? '#2a6ae0' : flash === which ? '#8fc0ff' : '#1a3f8a'
 	const YELLOW = '#f2d32a'
 	const YELLOW_SHADE = '#d6b51c'
 	const GREEN = '#1f9a4a'
@@ -350,9 +359,11 @@ export const ambulance = (() => {
 		[56, 14, 10, 6, '#6c8ca4'],
 		[56, 14, 10, 1, '#9cbbd0'],
 		// The light bar.
-		[20, 3, 12, 3, '#2a6ae0'],
-		[24, 3, 4, 3, '#cfe0ff'],
-		[54, 9, 8, 3, '#2a6ae0'],
+		[20, 3, 6, 3, light(0)],
+		[26, 3, 6, 3, light(1)],
+		[25, 3, 2, 3, '#cfe0ff'],
+		[54, 9, 4, 3, light(1)],
+		[58, 9, 4, 3, light(0)],
 		// The chequered band.
 		...Array.from(
 			{ length: 33 },
@@ -377,7 +388,115 @@ export const ambulance = (() => {
 		34,
 		rectsMarkup(rects) + pixelText('AMBULANS', 4, 9, 1, GREEN),
 	)
-})()
+}
+
+/**
+ * The hospital's car park, across the plaza from the path: rows of cars
+ * parked nose in, between white lines, seen from the end of the row, the
+ * far row's fronts and the near row's backs; low clipped hedges round it.
+ */
+const CAR_COLOURS: [string, string, string][] = [
+	// Body, its lit top, its shade.
+	['#c8323a', '#e45a60', '#952228'],
+	['#2f5f9e', '#4f80be', '#21436f'],
+	['#e8e8e4', '#ffffff', '#b9bcb8'],
+	['#3a3f44', '#5a6066', '#25292d'],
+	['#9aa3a8', '#c3cacd', '#6c757a'],
+	['#2f8a5a', '#4cab78', '#20643f'],
+	['#e0a020', '#f2c450', '#ad7a14'],
+]
+const BAY = 30
+const LINE = '#f2f2ee'
+const TYRE = '#1d1d1d'
+
+/** A car, square on, 22 by 15 cells: its front, its lights and grille, or its back, its tail lights and plate. */
+function car(x: number, colours: [string, string, string], front: boolean) {
+	const [body, lit, shade] = colours
+	const y = 0
+	return [
+		// Its tyres, under it.
+		[x + 2, y + 12, 4, 3, TYRE],
+		[x + 16, y + 12, 4, 3, TYRE],
+		// Its roof, and glass.
+		[x + 5, y, 12, 1, lit],
+		[x + 4, y + 1, 14, 5, body],
+		[x + 5, y + 1, 12, 4, front ? '#6c8ca4' : '#56707f'],
+		[x + 5, y + 1, 12, 1, front ? '#9cbbd0' : '#6c8ca4'],
+		// Its body, wider, lit along its top, in shade along its bottom.
+		[x + 1, y + 6, 20, 7, body],
+		[x + 1, y + 6, 20, 1, lit],
+		[x + 1, y + 12, 20, 1, shade],
+		// Wing mirrors.
+		[x, y + 5, 2, 2, body],
+		[x + 20, y + 5, 2, 2, body],
+		...(front
+			? ([
+					// Headlights, and the grille between them.
+					[x + 2, y + 8, 4, 2, '#fff6c8'],
+					[x + 16, y + 8, 4, 2, '#fff6c8'],
+					[x + 8, y + 8, 6, 2, '#2b2d30'],
+					[x + 9, y + 11, 4, 1, '#f2f2ee'],
+				] as PixelRect[])
+			: ([
+					// Tail lights, and its plate.
+					[x + 2, y + 8, 4, 2, '#e02a2a'],
+					[x + 16, y + 8, 4, 2, '#e02a2a'],
+					[x + 8, y + 9, 6, 2, '#f2f2ee'],
+					[x + 9, y + 10, 4, 1, '#3a3f44'],
+				] as PixelRect[])),
+	] as PixelRect[]
+}
+
+/**
+ * A row of the car park, `bays` of them, each `BAY` cells across, a white
+ * line down between each, most with a car in, some not. Fronts or backs,
+ * as it's seen. 15 cells tall.
+ */
+export function carParkRow(bays: number, front: boolean, seed: number) {
+	const random = seeded(seed)
+	const rects: PixelRect[] = []
+	for (let i = 0; i <= bays; i++) {
+		// The line between bays, on the tarmac, coming at you.
+		rects.push([i * BAY, 13, 2, 2, LINE], [i * BAY + 1, 11, 1, 2, LINE])
+		if (i === bays || random() < 0.22) continue
+		const colours = CAR_COLOURS[Math.floor(random() * CAR_COLOURS.length)]
+		rects.push(...car(i * BAY + 4 + Math.floor(random() * 3), colours, front))
+	}
+	return pixelArt(bays * BAY + 2, 15, rects)
+}
+
+/** A clipped hedge, `width` cells long and 9 tall: square cut, its top lit, leafy all over. */
+export function hedge(width: number, seed: number) {
+	const random = seeded(seed)
+	const leaves = Array.from({ length: Math.floor((width * 9) / 6) }, () => ({
+		x: Math.floor(random() * width),
+		y: 1 + Math.floor(random() * 7),
+		lit: random() < 0.5,
+	}))
+	return paintedArt(width, 9, (x, y) => {
+		// Its ends, and its top corners, rounded off a little.
+		if ((x < 1 || x > width - 1) && y < 2) return undefined
+		const leaf = leaves.find(
+			(l) => l.x === Math.floor(x) && l.y === Math.floor(y),
+		)
+		if (y < 1.5) return '#7fb24a'
+		if (y > 7) return '#2f5a24'
+		if (leaf) return leaf.lit ? '#6fa23e' : '#365f26'
+		return '#4a7a30'
+	})
+}
+
+/** A parking sign, a white P on blue, on its post: 10 by 30. */
+export const parkingSign = svgUrl(
+	10,
+	30,
+	rectsMarkup([
+		[4, 9, 2, 21, '#6c757a'],
+		[4, 9, 1, 21, '#9aa3a8'],
+		[0, 0, 10, 10, '#1f5fb4'],
+		[0, 0, 10, 1, '#3a7fd0'],
+	]) + pixelText('P', 3, 2, 1, '#ffffff'),
+)
 
 /** A birch, its white trunk with black marks, a light green crown: 32 by 72. */
 export const birch = paintedArt(32, 72, (x, y) => {
@@ -1333,28 +1452,56 @@ export const SHRINK_RAY_FRONT = {
 // --- In the way ------------------------------------------------------------
 
 /**
- * A drip stand, on its wheels, a bag of saline hung on it: jumped as a
- * rock. World pixels.
+ * A drip stand, on its wheels, in the way: its pole dark against the pale
+ * walls, and hung off its hooks a bag of blood, bright red, its label on
+ * it, and a bag of saline, blue, their lines down to a drip chamber. Bold,
+ * so it's seen coming: jumped as a rock. World pixels.
  */
+const POLE = '#4a5258'
+const POLE_LIT = '#7c868c'
+const BLOOD_BAG = '#d8263a'
+const BLOOD_BAG_LIT = '#f25a68'
+const BLOOD_BAG_SHADE = '#a01828'
+const SALINE = '#58b4e6'
+const SALINE_LIT = '#a6dcf8'
+const SALINE_SHADE = '#3a86b8'
 export const IV_STAND = {
-	asset: pixelArt(16, 30, [
-		// The bag, and its line.
-		[9, 0, 6, 8, 'rgba(210, 236, 250, 0.9)'],
-		[9, 0, 6, 1, '#ffffff'],
-		[10, 4, 4, 3, '#bfe6ff'],
-		[11, 8, 1, 10, '#bfe6ff'],
-		// The pole, and its hook.
-		[6, 0, 2, 26, STEEL],
-		[6, 0, 9, 1, STEEL],
-		[6, 0, 1, 26, STEEL_LIT],
-		// Its wheeled feet.
-		[1, 26, 14, 2, STEEL_DARK],
-		[0, 28, 3, 2, INK],
-		[13, 28, 3, 2, INK],
-		[6, 28, 3, 2, INK],
+	asset: pixelArt(20, 34, [
+		// The pole, and its hooks across the top.
+		[9, 1, 2, 30, POLE],
+		[9, 1, 1, 30, POLE_LIT],
+		[2, 0, 16, 2, POLE],
+		[2, 0, 16, 1, POLE_LIT],
+		// The bag of blood, on the right, its label, a red cross on it.
+		[12, 2, 7, 12, BLOOD_BAG],
+		[12, 2, 7, 1, BLOOD_BAG_LIT],
+		[12, 3, 1, 10, BLOOD_BAG_LIT],
+		[18, 3, 1, 11, BLOOD_BAG_SHADE],
+		[13, 13, 5, 1, BLOOD_BAG_SHADE],
+		[13, 5, 5, 5, '#ffffff'],
+		[15, 6, 1, 3, BLOOD_BAG],
+		[14, 7, 3, 1, BLOOD_BAG],
+		// Its line, down to its drip chamber, and on down.
+		[15, 14, 1, 2, BLOOD_BAG_SHADE],
+		[14, 16, 3, 3, '#f6e6e6'],
+		[14, 18, 3, 1, BLOOD_BAG],
+		[15, 19, 1, 9, BLOOD_BAG_SHADE],
+		// The bag of saline, on the left, smaller.
+		[2, 2, 6, 9, SALINE],
+		[2, 2, 6, 1, SALINE_LIT],
+		[2, 3, 1, 7, SALINE_LIT],
+		[7, 3, 1, 8, SALINE_SHADE],
+		[3, 10, 4, 1, SALINE_SHADE],
+		[4, 11, 1, 10, SALINE_SHADE],
+		// Its wheeled feet, splayed.
+		[3, 30, 14, 2, POLE],
+		[3, 30, 14, 1, POLE_LIT],
+		[1, 32, 3, 2, INK],
+		[8, 32, 4, 2, INK],
+		[16, 32, 3, 2, INK],
 	]),
-	width: 32,
-	height: 60,
+	width: 40,
+	height: 68,
 }
 
 /**
@@ -1450,3 +1597,220 @@ export const GURNEY = (() => {
 		deck: { from: 2, to: 54, top: 14 },
 	}
 })()
+
+// --- The way out -------------------------------------------------------------
+
+/**
+ * Hospital staff, square on, clapping you out: a guard of honour down the
+ * lobby, and the ambulance crew outside. Two frames side by side, hands
+ * apart and hands together, 18 by 32 cells each, for a `strip`.
+ */
+interface Staff {
+	/** What they're in, its shade, and their trousers. */
+	top: string
+	shade: string
+	legs: string
+	skin: string
+	hair: string
+	/** A nurse's cap, a doctor's stethoscope, a paramedic's hi-vis band. */
+	cap?: string
+	stethoscope?: boolean
+	band?: string
+}
+function staffFrame(x: number, staff: Staff, together: boolean): PixelRect[] {
+	const { top, shade, legs, skin, hair } = staff
+	const skinShade = skin === SKIN ? SKIN_SHADE : '#8a5a3c'
+	return [
+		// Shoes, and legs.
+		[x + 5, 30, 3, 2, SHOE],
+		[x + 10, 30, 3, 2, SHOE],
+		[x + 6, 24, 2, 6, legs],
+		[x + 10, 24, 2, 6, legs],
+		// Their body, its far side in shade.
+		[x + 4, 13, 10, 12, top],
+		[x + 12, 13, 2, 12, shade],
+		[x + 4, 24, 10, 1, shade],
+		...(staff.band
+			? ([
+					[x + 4, 19, 10, 2, staff.band],
+					[x + 4, 22, 10, 1, '#d6dcdc'],
+				] as PixelRect[])
+			: []),
+		...(staff.stethoscope
+			? ([
+					[x + 7, 13, 1, 4, INK],
+					[x + 10, 13, 1, 4, INK],
+					[x + 8, 17, 2, 1, INK],
+					[x + 8, 18, 2, 2, STEEL],
+				] as PixelRect[])
+			: []),
+		// The neck, and the head, smiling.
+		[x + 8, 11, 2, 2, skinShade],
+		[x + 6, 4, 6, 8, skin],
+		[x + 11, 5, 1, 6, skinShade],
+		[x + 7, 7, 1, 1, INK],
+		[x + 10, 7, 1, 1, INK],
+		[x + 8, 9, 2, 1, '#9a4a3a'],
+		// Hair, and a cap over it, if they've one.
+		[x + 6, 3, 6, 2, hair],
+		[x + 5, 4, 1, 4, hair],
+		[x + 12, 4, 1, 4, hair],
+		...(staff.cap
+			? ([
+					[x + 6, 1, 6, 3, staff.cap],
+					[x + 6, 1, 6, 1, '#ffffff'],
+				] as PixelRect[])
+			: []),
+		// Their arms: up, hands apart, or clapped together in front.
+		...(together
+			? ([
+					[x + 3, 14, 2, 4, top],
+					[x + 13, 14, 2, 4, shade],
+					[x + 4, 16, 4, 2, top],
+					[x + 10, 16, 4, 2, shade],
+					[x + 8, 15, 2, 3, skin],
+				] as PixelRect[])
+			: ([
+					[x + 2, 14, 2, 4, top],
+					[x + 14, 14, 2, 4, shade],
+					[x + 2, 12, 2, 2, top],
+					[x + 14, 12, 2, 2, shade],
+					[x + 1, 10, 3, 2, skin],
+					[x + 14, 10, 3, 2, skin],
+				] as PixelRect[])),
+	]
+}
+const staffStrip = (staff: Staff) =>
+	pixelArt(36, 32, [
+		...staffFrame(0, staff, false),
+		...staffFrame(18, staff, true),
+	])
+
+const NURSE_BLUE = '#5aa0d8'
+const NURSE_BLUE_SHADE = '#3f7fb4'
+const DARK_SKIN = '#9a6a48'
+export const CLAPPING_STAFF = [
+	// A nurse, in blue, her cap on.
+	staffStrip({
+		top: NURSE_BLUE,
+		shade: NURSE_BLUE_SHADE,
+		legs: NURSE_BLUE_SHADE,
+		skin: SKIN,
+		hair: '#c8862a',
+		cap: '#f6f7f6',
+	}),
+	// A doctor, a white coat, a stethoscope.
+	staffStrip({
+		top: COAT,
+		shade: COAT_SHADE,
+		legs: SCRUBS_DARK,
+		skin: DARK_SKIN,
+		hair: HAIR,
+		stethoscope: true,
+	}),
+	// A porter, in teal scrubs.
+	staffStrip({
+		top: SCRUBS,
+		shade: SCRUBS_DARK,
+		legs: SCRUBS_DARK,
+		skin: SKIN,
+		hair: '#6a4a32',
+	}),
+	// Another doctor.
+	staffStrip({
+		top: COAT,
+		shade: COAT_SHADE,
+		legs: '#3a4f6e',
+		skin: SKIN,
+		hair: '#e0c070',
+		stethoscope: true,
+	}),
+	// A nurse.
+	staffStrip({
+		top: NURSE_BLUE,
+		shade: NURSE_BLUE_SHADE,
+		legs: NURSE_BLUE_SHADE,
+		skin: DARK_SKIN,
+		hair: INK,
+	}),
+]
+/** The ambulance crew: green, a yellow hi-vis band round them. */
+export const PARAMEDICS = [
+	staffStrip({
+		top: '#2f7a4a',
+		shade: '#20583a',
+		legs: '#20583a',
+		skin: SKIN,
+		hair: HAIR,
+		band: '#e8e23a',
+	}),
+	staffStrip({
+		top: '#2f7a4a',
+		shade: '#20583a',
+		legs: '#20583a',
+		skin: DARK_SKIN,
+		hair: '#c8862a',
+		band: '#e8e23a',
+	}),
+]
+
+/**
+ * A banner, hung up over the lobby on two strings: "KRYA PÅ DIG!", get well
+ * soon, on a white sheet, hearts either end. 96 by 46 cells, the strings
+ * the top 30 of it.
+ */
+export const GET_WELL_BANNER = (() => {
+	const w = 96
+	const text = 'KRYA PÅ DIG!'
+	const width = pixelTextWidth(text, 1)
+	const heart = (x: number, y: number): PixelRect[] => [
+		[x, y, 2, 2, '#e0304a'],
+		[x + 3, y, 2, 2, '#e0304a'],
+		[x, y + 1, 5, 2, '#e0304a'],
+		[x + 1, y + 3, 3, 1, '#e0304a'],
+		[x + 2, y + 4, 1, 1, '#e0304a'],
+		[x + 1, y, 1, 1, '#ff8a9a'],
+	]
+	return svgUrl(
+		w,
+		46,
+		rectsMarkup([
+			// Its strings, up to the ceiling.
+			[10, 0, 1, 31, STEEL_DARK],
+			[w - 11, 0, 1, 31, STEEL_DARK],
+			// The sheet, a little loose, its bottom edge in shade.
+			[2, 30, w - 4, 14, '#fbfbf8'],
+			[2, 30, w - 4, 1, '#ffffff'],
+			[2, 43, w - 4, 1, WHITE_DARK],
+			[0, 31, 2, 12, WHITE_SHADE],
+			[w - 2, 31, 2, 12, WHITE_SHADE],
+			...heart(5, 34),
+			...heart(w - 10, 34),
+		]) + pixelText(text, Math.round((w - width) / 2), 33, 1, KS_BLUE),
+	)
+})()
+
+/**
+ * Balloons, three, on their strings, tied up together: red, blue and
+ * yellow, a shine on each. 16 by 44 cells.
+ */
+export const balloons = paintedArt(16, 44, (x, y) => {
+	const list = [
+		{ cx: 5, cy: 7, fill: '#e0304a', lit: '#ff7a8a' },
+		{ cx: 11, cy: 5, fill: '#2a6ae0', lit: '#7aa8ff' },
+		{ cx: 8, cy: 12, fill: '#f2c42a', lit: '#fff08a' },
+	]
+	for (const b of list.slice().reverse()) {
+		const d = ((x - b.cx) / 4.2) ** 2 + ((y - b.cy) / 5) ** 2
+		if (d <= 1) return d < 0.2 && x < b.cx && y < b.cy ? b.lit : b.fill
+		// Its knot.
+		if (Math.abs(x - b.cx) < 1 && y > b.cy + 4.5 && y < b.cy + 6) return b.fill
+	}
+	// Their strings, down to where they're tied.
+	const strings = list.some(
+		(b) =>
+			y > b.cy + 5 &&
+			Math.abs(x - (b.cx + ((8 - b.cx) * (y - b.cy - 5)) / (40 - b.cy))) < 0.6,
+	)
+	return strings ? '#8a8f94' : undefined
+})

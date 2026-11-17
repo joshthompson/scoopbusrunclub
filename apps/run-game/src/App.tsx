@@ -24,7 +24,7 @@ import { CharacterSelect } from './screens/CharacterSelect'
 import { CollectablesScreen } from './screens/CollectablesScreen'
 import { CourseSelect, type RunChoice } from './screens/CourseSelect'
 import { CreditsScreen } from './screens/CreditsScreen'
-import { Game, type Mode } from './screens/Game'
+import { type EndlessRun, Game, type Mode } from './screens/Game'
 import { HighScoresScreen } from './screens/HighScoresScreen'
 import { InstructionsScreen } from './screens/InstructionsScreen'
 import { MultiPlayerScreen } from './screens/MultiPlayerScreen'
@@ -125,11 +125,21 @@ export function App(props: {
 			kind: 'endless',
 			cleared: 0,
 			startScore: 0,
+			run: { courses: [], unlocked: [] },
 			runId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
 		},
 	})
-	/** Endless's next course, round to the first again after the last. */
-	const next = (was: Play, score: number, hat?: Hat): Play => {
+	/**
+	 * The next course: practising, the next to practise; in Endless, the
+	 * next along, straight into its countdown, the run carried on. Never
+	 * past the last: there, the run's over.
+	 */
+	const next = (
+		was: Play,
+		score: number,
+		hat?: Hat,
+		run?: EndlessRun,
+	): Play => {
 		const play = { ...was, restart: false }
 		// Practising: the next course along, to practise.
 		if (play.mode.kind !== 'endless') {
@@ -141,9 +151,17 @@ export function App(props: {
 		const cleared = play.mode.cleared + 1
 		return {
 			...play,
-			course: COURSES[cleared % COURSES.length],
+			course: COURSES[Math.min(cleared, COURSES.length - 1)],
+			// Gone dark, and straight on into it.
+			restart: true,
 			// Whatever they've got on their head, still on it.
-			mode: { ...play.mode, cleared, startScore: score, hat },
+			mode: {
+				...play.mode,
+				cleared,
+				startScore: score,
+				hat,
+				run: run ?? play.mode.run,
+			},
 		}
 	}
 	/** The same again, as a new object so the game's rebuilt: Endless from the start. */
@@ -279,7 +297,7 @@ export function App(props: {
 						course={play.course}
 						runner={play.runner}
 						mode={play.mode}
-						onNext={(score, hat) => setScreen(next(play, score, hat))}
+						onNext={(score, hat, run) => setScreen(next(play, score, hat, run))}
 						onRetry={() => setScreen(retry(play))}
 						onQuit={go('select')}
 						onCourses={() =>

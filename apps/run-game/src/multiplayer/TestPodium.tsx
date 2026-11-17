@@ -1,14 +1,17 @@
 import { createSignal, onCleanup, onMount } from 'solid-js'
+import { podiumPlayers } from '../debug'
 import { HAT_RULES, type HatKind } from '../game/hats'
 import { type Controls, NOTHING_HELD, keyboardControls } from '../input'
-import { MEMBERS } from '../runners/playable'
+import { UNLOCKABLES } from '../runners/bonus'
+import { CLUB } from '../runners/playable'
 import { Podium } from './Podium'
 import { COLOURS, type Seat } from './room'
 
 /**
  * A Podium to try out, from the console (`testPodium()` in `debug.ts`):
- * 4 to 8 Players, made up, the club's members as them, points and all,
- * and some in a hat, as if they'd finished the last Round in one.
+ * 4 to 8 Players (or as many as it's told), made up, the club's members as them (now and then a
+ * runner or two there is to unlock, too, as if someone had), points and
+ * all, and some in a hat, as if they'd finished the last Round in one.
  * You're on the arrows, someone else can have WASD, and everyone else
  * runs about by themselves. Back to the title from either button, or
  * when its countdown runs out.
@@ -23,8 +26,16 @@ const HATS = (Object.keys(HAT_RULES) as HatKind[]).filter(
 const STAYS_UP = 90
 
 function made(): Seat[] {
-	const count = 4 + Math.floor(Math.random() * 5)
-	const who = [...MEMBERS].sort(() => Math.random() - 0.5).slice(0, count)
+	const count = podiumPlayers ?? 4 + Math.floor(Math.random() * 5)
+	const shuffled = <T,>(all: T[]) => [...all].sort(() => Math.random() - 0.5)
+	// Now and then, one to three of them a runner to unlock: unlocked or
+	// not in this browser, to see them on the Podium.
+	const unlocked =
+		Math.random() < 0.4 ? Math.min(count, 1 + Math.floor(Math.random() * 3)) : 0
+	const who = [
+		...shuffled(UNLOCKABLES).slice(0, unlocked),
+		...shuffled(CLUB).slice(0, count - unlocked),
+	]
 	// Points, each a few under the one before, now and then level.
 	let points = 14 + Math.floor(Math.random() * 20)
 	const seats = who.map(
@@ -54,12 +65,14 @@ function made(): Seat[] {
 
 /**
  * Someone running about by themselves: off one way or the other, or stood
- * still, a while each, and a jump now and then.
+ * still, a while each, a jump now and then, and now and then, running, a
+ * slide.
  */
 function wanderer(): () => Controls {
 	let doing: Controls = NOTHING_HELD
 	let until = 0
 	let jumpUntil = 0
+	let slideUntil = 0
 	return () => {
 		const now = performance.now()
 		if (now > until) {
@@ -73,7 +86,14 @@ function wanderer(): () => Controls {
 		}
 		if (now > jumpUntil + 200 && Math.random() < 0.012)
 			jumpUntil = now + 150 + Math.random() * 300
-		return { ...doing, up: now < jumpUntil }
+		const running = doing.left || doing.right
+		if (running && now > slideUntil + 600 && Math.random() < 0.006)
+			slideUntil = now + 300 + Math.random() * 600
+		return {
+			...doing,
+			up: now < jumpUntil,
+			down: running && now < slideUntil,
+		}
 	}
 }
 

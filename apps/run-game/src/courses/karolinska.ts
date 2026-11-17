@@ -1,4 +1,5 @@
 import type { RunnerName } from '@/data/runners'
+import { HEARTBEAT } from '../game/body'
 import {
 	GROUND_Y,
 	PATH_BACK,
@@ -8,9 +9,12 @@ import {
 	VERGE,
 } from '../game/constants'
 import { type Terrain, withGaps } from '../game/terrain'
+import { SPIRIT_OF_JAZZ } from '../runners/bonus'
 import {
 	ALVEOLUS,
 	ARTERY_TILES,
+	BIG_HEART,
+	BIG_LUNGS,
 	CLOT,
 	CRUMB,
 	GIANT_FACE,
@@ -20,6 +24,7 @@ import {
 	NOSE_HAIR,
 	NOSE_TILES,
 	TRACHEA_TILES,
+	airway,
 	alveoli,
 	bronchus,
 	capillaries,
@@ -27,20 +32,24 @@ import {
 	dustMite,
 	floatingCells,
 	heartPillar,
+	musclePad,
 	petriDish,
 	pipetteTip,
 	waterDroplet,
-	whiteCell,
 } from './kit/bodyScenery'
 import { JAW_DROP, LIPS_FRONT } from './kit/giantMouth'
 import { withHat } from './kit/hats'
 import {
+	AMBULANCE_FLASHING,
+	CLAPPING_STAFF,
 	ENTRANCE as ENTRANCE_ART,
 	ESCALATOR_DOWN,
 	ESCALATOR_UP,
+	GET_WELL_BANNER,
 	GURNEY,
 	HOSPITAL_TILES,
 	IV_STAND,
+	PARAMEDICS,
 	SHRINK_RAY_BACK,
 	SHRINK_RAY_FRONT,
 	SNEEZER,
@@ -49,14 +58,17 @@ import {
 	SOLNA_NEAR,
 	WET_FLOOR,
 	ambulance,
+	balloons,
 	bench,
 	bikeRack,
 	birch,
 	cafeCounter,
+	carParkRow,
 	centrifuge,
 	exitSign,
 	fireExtinguisher,
 	fumeHood,
+	hedge,
 	karolinskaSign,
 	labBench,
 	labFridge,
@@ -64,6 +76,7 @@ import {
 	noticeBoard,
 	operator,
 	parkedWheelchair,
+	parkingSign,
 	pottedPlant,
 	receptionDesk,
 	revolvingDoor,
@@ -158,8 +171,17 @@ const ARTERY = { from: 12900, to: 14700 }
 const SINUS_Y = G1
 /** Into the nose again, where the sneeze is. */
 const GROW_IN = 15200
+/**
+ * Down to it, a Slide: a steep chute of snot, everyone sat down on it
+ * sliding, faster and faster, its roof closing in over it at its bottom
+ * into a hole, dark, where the sneeze is. How far down it goes; and where,
+ * out of sight past the sneeze, the floor's back up to the lab's.
+ */
+const SLIDE = { from: ARTERY.to + 100, to: GROW_IN }
+const SLIDE_DROP = 200
+const SLIDE_UP = { from: GROW_IN + 300, to: 16100 }
 /** Where it's the lab again, full size, from: out of sight of the nose. */
-const MACRO_FROM = 16100
+const MACRO_FROM = SLIDE_UP.to
 /** Where everyone's sneezed out onto the lab's floor. */
 const GROW_OUT = 16900
 const CORRIDOR_2 = 17500
@@ -212,6 +234,18 @@ function groundY(x: number) {
 			LUNG_Y +
 			(SINUS_Y - LUNG_Y) * ease((x - ARTERY.from) / (ARTERY.to - ARTERY.from))
 		)
+	// Down the Slide into the sneeze; and, out of sight past it, back up.
+	if (x < SLIDE.from) return SINUS_Y
+	if (x < SLIDE.to)
+		return (
+			SINUS_Y + SLIDE_DROP * ease((x - SLIDE.from) / (SLIDE.to - SLIDE.from))
+		)
+	if (x < SLIDE_UP.to)
+		return (
+			SINUS_Y +
+			SLIDE_DROP -
+			SLIDE_DROP * ease((x - SLIDE_UP.from) / (SLIDE_UP.to - SLIDE_UP.from))
+		)
 	if (x < ESCALATOR_2.from) return G1
 	if (x < ESCALATOR_2.to) {
 		const t = (x - ESCALATOR_2.from) / (ESCALATOR_2.to - ESCALATOR_2.from)
@@ -253,6 +287,31 @@ const terrain: Terrain = withGaps(
 
 // --- The building, and the body: one Cave -----------------------------------
 
+/**
+ * How high a vault is over the floor at `x`, from `from` to `to`: `left`
+ * and `right` at its ends, rising to `crown` in its middle, round, its
+ * shoulders full.
+ */
+function vault(
+	x: number,
+	from: number,
+	to: number,
+	left: number,
+	right: number,
+	crown: number,
+) {
+	const t = Math.max(0, Math.min(1, (x - from) / (to - from)))
+	const u = Math.abs(2 * t - 1)
+	const round = Math.max(0, 1 - u ** 2.4) ** (1 / 2.4)
+	const ends = left + (right - left) * t
+	return ends + (crown - ends) * round
+}
+/** The higher of two vaults, where they meet rounded off, rather than to a point. */
+const softMax = (a: number, b: number, round = 24) =>
+	Math.max(a, b) + round * Math.log1p(Math.exp(-Math.abs(a - b) / round))
+/** To a whole number of 4 px cells, as the rock's drawn. */
+const fourth = (y: number) => Math.round(y / 4) * 4
+
 /** How high the rock is over the floor, inside, at `x`: none where it's open. */
 function ceiling(x: number): number | undefined {
 	if (x < ENTRANCE || x >= EXIT) return undefined
@@ -265,20 +324,42 @@ function ceiling(x: number): number | undefined {
 	if (x < LIPS_X) return undefined
 	// In the mouth, its upper lip over it; and on in, the roof of it.
 	if (x < INSIDE) return LIPS_Y
-	if (x < TRACHEA.from) return MOUTH_Y - 210
+	// Inside them, every room's roof a vault, round, not a box: rising off
+	// the tube that leads into it, and back down to the one out of it.
+	if (x < TRACHEA.from)
+		return fourth(MOUTH_Y - vault(x, INSIDE, TRACHEA.from, 170, 170, 240))
 	if (x < TRACHEA.to) return groundY(x) - 170
-	if (x < LUNGS.to) {
-		// The lungs: a cavern, rising from the windpipe's height, and back down.
-		const rise = Math.min(x - LUNGS.from, LUNGS.to - x) / 300
-		return Math.round((LUNG_Y - 170 - 390 * ease(rise)) / 4) * 4
-	}
-	if (x < HEART.to) return LUNG_Y - 440
+	if (x < LUNGS.to)
+		// The lungs: two of them, a lobe each, the left the bigger, and a
+		// cleft between them.
+		return fourth(
+			LUNG_Y -
+				softMax(
+					vault(x, LUNGS.from, LUNGS.from + 1000, 170, 170, 560),
+					vault(x, LUNGS.to - 1000, LUNGS.to, 170, 170, 540),
+				),
+		)
+	// The heart's chamber: a dome, high over the heart in its middle.
+	if (x < HEART.to)
+		return fourth(LUNG_Y - vault(x, HEART.from, HEART.to, 170, 210, 480))
 	if (x < ARTERY.to) return Math.round((groundY(x) - 210) / 2) * 2
-	if (x < MACRO_FROM) return SINUS_Y - 210
+	// Over the Slide, a vault, closing in at its bottom round the hole the
+	// sneeze is in.
+	if (x < MACRO_FROM) {
+		const closing = ease((x - (SLIDE.to - 220)) / 220)
+		return fourth(
+			groundY(x) -
+				vault(x, ARTERY.to, SLIDE.to, 210, 210, 280) * (1 - closing) -
+				SLIDE_HOLE * closing,
+		)
+	}
 	if (x < CORRIDOR_2) return G1 - 230
 	if (x < ESCALATOR_2.from) return G1 - 180
 	return G1 - 200
 }
+
+/** How high the hole at the bottom of the Slide is, the sneeze in it: room to stand, just. */
+const SLIDE_HOLE = 84
 
 /** Where a feature's top is to go, `top`, for one stood behind the path at `x`, `height` tall. */
 const behind = (x: number, height: number, top: number) =>
@@ -391,8 +472,8 @@ const plateSetBack = (art: { height: number; plate: { y: number } }) =>
 
 // --- Platforms --------------------------------------------------------------
 
-/** The lungs breathing, in and out: how long a breath takes, and how far it lifts what's in them. */
-const BREATHING = { ticks: 240, lift: 50 }
+/** The lungs breathing, in and out: how long a breath takes, and how far what's in them sinks as they breathe out. */
+const BREATHING = { ticks: 160, lift: 60 }
 const breathing = (
 	x: number,
 	width: number,
@@ -404,16 +485,40 @@ const breathing = (
 	move: { y: -BREATHING.lift, ticks: BREATHING.ticks, phase: 0 },
 })
 
+/** An airway in the lungs, to run along: soft, round-ended, air sacs hanging off it. */
+const airwayAt = (
+	platform: PlatformDefinition,
+	seed: number,
+): PlatformDefinition => ({ ...platform, art: airway(platform.width, seed) })
+
 const L = LUNGS.from
+/**
+ * The Spirit of Jazz's airway, up in the right lung's dome, just on from
+ * the top one: a jump off the end of that, at the top of its breath, gets
+ * onto it, and only then.
+ */
+const JAZZ_AIRWAY = { x: L + 1210, width: 130, height: 470 }
+/** Between the heart's ridges: a pad of its muscle, pumping up and down on the beat. */
+const PAD = { x: RIDGES[0] + RIDGE_WIDTH + 70, width: 140, height: 96 }
 const PLATFORMS: PlatformDefinition[] = [
-	// The lungs' airways, branching, one up over another; some of them
-	// rising and falling with every breath.
-	{ x: L + 250, width: 300, height: 90 },
-	breathing(L + 520, 240, 180),
-	{ x: L + 800, width: 280, height: 260 },
-	breathing(L + 1090, 200, 340),
-	{ x: L + 1320, width: 280, height: 220 },
-	breathing(L + 1560, 200, 120),
+	// The lungs' airways, branching, one up over another, up into the left
+	// lobe's dome and down out of the right's; some of them rising and
+	// falling with every breath.
+	airwayAt({ x: L + 200, width: 260, height: 100 }, 1),
+	airwayAt(breathing(L + 470, 200, 220), 2),
+	airwayAt({ x: L + 720, width: 220, height: 290 }, 3),
+	airwayAt(breathing(L + 1000, 180, 340), 4),
+	airwayAt({ x: L + 1250, width: 240, height: 230 }, 5),
+	airwayAt(breathing(L + 1520, 200, 160), 6),
+	// Up at the top of the right lung, an airway only got to off the top
+	// one, at the top of its breath: where the Spirit of Jazz lives.
+	airwayAt(JAZZ_AIRWAY, 7),
+	// The heart's: up off it, and over the next ridge without its valve.
+	{
+		...PAD,
+		art: musclePad(PAD.width),
+		move: { y: -36, ticks: HEARTBEAT, phase: 0 },
+	},
 ]
 
 /** The highest airway, breathing: the head mirror up on it. */
@@ -460,7 +565,7 @@ const OBSTACLES: Obstacle[] = [
 	// The heart: valves before each ridge, and Germs.
 	germ(HEART.from + 140),
 	{ kind: 'valve', x: RIDGES[0] - VALVE_BEFORE },
-	germ(HEART.from + 500),
+	germ(HEART.from + 420),
 	{ kind: 'valve', x: RIDGES[1] - VALVE_BEFORE },
 	germ(HEART.from + 900),
 	// The artery: clots, and Germs in the blood.
@@ -470,10 +575,9 @@ const OBSTACLES: Obstacle[] = [
 	germ(14000, 20, 130),
 	{ kind: 'rock', x: 14400 },
 	germ(14550, 20, 130),
-	// Back up the nose.
-	germ(14800),
-	{ kind: 'rock', x: 14900 },
-	{ kind: 'mud', x: 15040, width: 80 },
+	// Back up the nose, and down the Slide: a Germ over it, to jump onto.
+	germ(14750),
+	germ(SLIDE.from + 230, 50, 120),
 	// Full size again: the lab, the corridor and the beds, down to the lobby.
 	{ kind: 'rock', x: 17360 },
 	{ kind: 'cyclist', x: 17900, shuttle: [17560, 17980] },
@@ -539,6 +643,18 @@ const GERM_COUNT = OBSTACLES.filter((o) => o.kind === 'germ').length
 
 // --- Scenery ----------------------------------------------------------------
 
+/** The car parks, across the plaza from the path; their rows' middles, so many bays each; their hedges' length, in cells. */
+const CAR_PARKS = [
+	{ from: -1200, to: ENTRANCE - 40, rows: [-900, -360, 180, 720, 1260] },
+	{ from: EXIT + 40, to: FINISH + 1000, rows: [19760, 20300, 20840] },
+]
+const PARKING_BAYS = 8
+const HEDGE = 120
+
+/** The staff clapping everyone out, along the lobby; and how long a clap takes, hands apart and together. */
+const GUARD_OF_HONOUR = [18560, 18900, 19130, 19200, 19270]
+const CLAP_TICKS = 9
+
 function scenery(): Scenery[] {
 	const pieces: Scenery[] = []
 	/** Out on the plaza, behind the path. */
@@ -548,6 +664,42 @@ function scenery(): Scenery[] {
 	const inside = (x: number, asset: string) =>
 		pieces.push({ x, asset, scale: 2, setBack: -2, onFloor: true })
 
+	// Across the plaza, before the hospital and after it: its car parks,
+	// back to front, behind everything else on it. A hedge along the far
+	// side; a row of cars nose in, facing out; a row facing in, their backs
+	// to you; and a hedge along the near side, gaps in it to walk through.
+	CAR_PARKS.forEach(({ from, to, rows }, park) => {
+		for (let x = from; x < to; x += HEDGE * 2)
+			pieces.push({
+				x: x + HEDGE,
+				asset: hedge(HEDGE, x),
+				scale: 2,
+				setBack: 104,
+			})
+		rows.forEach((x, i) => {
+			pieces.push({
+				x,
+				asset: carParkRow(PARKING_BAYS, true, 300 + park * 10 + i),
+				scale: 2,
+				setBack: 64,
+			})
+			pieces.push({
+				x: x + 20,
+				asset: carParkRow(PARKING_BAYS, false, 400 + park * 10 + i),
+				scale: 2,
+				setBack: 26,
+			})
+		})
+		for (let x = from; x < to; x += HEDGE * 2 + 60)
+			pieces.push({
+				x: x + HEDGE,
+				asset: hedge(HEDGE, x + 1),
+				scale: 2,
+				setBack: 14,
+			})
+	})
+	for (const x of [-620, 1560, EXIT + 160]) out(x, parkingSign, 20)
+
 	// The plaza, before the hospital, and after.
 	for (const x of [-500, 260, 1500, 19700]) out(x, birch, 12)
 	for (const x of [-200, 640, 1240, 19480, 20400]) out(x, lampPost, 2)
@@ -555,7 +707,6 @@ function scenery(): Scenery[] {
 	out(560, bikeRack)
 	out(900, karolinskaSign, 4)
 	out(1350, ambulance, 2)
-	out(19900, bench)
 	out(20250, bikeRack)
 	inside(ENTRANCE + 50, revolvingDoor)
 	inside(EXIT - 50, revolvingDoor)
@@ -619,9 +770,8 @@ function scenery(): Scenery[] {
 	for (const x of [HEART.from + 60, HEART.from + 560, HEART.from + 960])
 		inside(x, capillaries)
 	for (const x of [13150, 13650, 14250]) inside(x, floatingCells)
-	inside(13980, whiteCell)
 	// Back in the nose.
-	for (const x of [14760, 15100]) inside(x, cilia)
+	inside(14760, cilia)
 
 	// Full size again: the lab, and the scientist sneezing.
 	inside(16300, labFridge)
@@ -644,6 +794,48 @@ function scenery(): Scenery[] {
 		[19200, wayfindingSign],
 	] as const)
 		inside(x, asset)
+
+	// The way out, made a fuss of: everyone's better. Balloons, and a banner
+	// over the lobby, "Get well soon!"; the staff lined up either side of
+	// the way out, clapping everyone out; and outside, the ambulance's
+	// lights going, its crew cheering, and balloons at the finish.
+	pieces.push({
+		x: 18940,
+		asset: GET_WELL_BANNER,
+		scale: 2,
+		setBack: 250,
+	})
+	for (const x of [18700, 18990, 19250]) inside(x, balloons)
+	GUARD_OF_HONOUR.forEach((x, i) =>
+		pieces.push({
+			x,
+			asset: CLAPPING_STAFF[i % CLAPPING_STAFF.length],
+			scale: 2,
+			setBack: -2,
+			onFloor: true,
+			strip: { count: 2, from: i % 2 },
+			frameTicks: CLAP_TICKS,
+		}),
+	)
+	pieces.push({
+		x: 19620,
+		asset: AMBULANCE_FLASHING[0],
+		frames: AMBULANCE_FLASHING,
+		frameTicks: 14,
+		scale: 2,
+		setBack: 4,
+	})
+	PARAMEDICS.forEach((asset, i) =>
+		pieces.push({
+			x: 19740 + i * 56,
+			asset,
+			scale: 2,
+			setBack: 0,
+			strip: { count: 2, from: i },
+			frameTicks: CLAP_TICKS,
+		}),
+	)
+	for (const x of [FINISH - 90, FINISH + 70]) out(x, balloons, 2)
 	return pieces
 }
 
@@ -671,6 +863,7 @@ const FLOORS: [x: number, floor: Floor][] = [
 	[HEART.from, 'heart'],
 	[ARTERY.from, 'artery'],
 	[ARTERY.to, 'nose'],
+	[SLIDE.from, 'snot'],
 	[MACRO_FROM, 'lab'],
 	[CORRIDOR_2, 'corridor'],
 	[ESCALATOR_2.from, 'steps'],
@@ -689,6 +882,7 @@ type Floor =
 	| 'lung'
 	| 'heart'
 	| 'artery'
+	| 'snot'
 /** Each floor's colours: behind the path, the path's back edge, the path, its front edge, and under it. */
 const FLOOR_COLOURS: Record<Floor, [string, string, string, string, string]> = {
 	plaza: ['#9fb07a', '#a8a39a', '#c9c4ba', '#8f8a82', '#6f6a62'],
@@ -706,6 +900,8 @@ const FLOOR_COLOURS: Record<Floor, [string, string, string, string, string]> = {
 		'transparent',
 	],
 	nose: ['#d97a86', '#c96876', '#e8909a', '#f4b0b8', '#b85560'],
+	// The Slide: snot, green, wet, shining along its edge.
+	snot: ['#b9cf6a', '#9ab450', '#cfe382', '#f2ffc4', '#7f9a3e'],
 	lung: ['#e48d9b', '#d27a89', '#efa2ae', '#f8c0c8', '#c26a76'],
 	heart: ['#9a2436', '#86192b', '#b3344a', '#cf5266', '#6a1625'],
 	artery: ['#b02c3e', '#981f31', '#c63e50', '#e05a6a', '#7a1a28'],
@@ -738,6 +934,9 @@ export const karolinska: CourseDefinition = {
 	cave: building,
 	platforms: PLATFORMS,
 	portals: PORTALS,
+	slides: [SLIDE],
+	// 2 km would be on the tongue, floating: on the bench just short of it.
+	kmSignsAt: { 2: TONGUE_TIP - 90 },
 	ride: 'bloodCell',
 	corgis: [ARTERY.from + 150, ARTERY.from + 700, ARTERY.from + 1250],
 	runDirectors: ['anna', 'keith'],
@@ -817,7 +1016,29 @@ export const karolinska: CourseDefinition = {
 		cyclist: GURNEY,
 		bouncers: true,
 		bouncer: ALVEOLUS,
-		heartbeat: { from: HEART.from - 200, to: HEART.to + 200 },
+		// Shrunk, and inside someone, the bus flies: on from just through the
+		// shrink ray, where it comes out tiny, to the sneeze, where it's
+		// back to its size. Between the two, out of sight.
+		busJets: { from: SHRINK_IN + 100, to: (GROW_IN + GROW_OUT) / 2 },
+		// The lungs themselves, hung from between their two domes, breathing
+		// in time with their airways.
+		breathing: {
+			...BIG_LUNGS,
+			x: LUNGS.from + 900,
+			y: LUNG_Y - 470,
+			ticks: BREATHING.ticks,
+		},
+		heartbeat: {
+			from: HEART.from - 200,
+			to: HEART.to + 200,
+			// The heart itself, in the middle of its chamber, between its
+			// ridges, its vessels up into the dome over it.
+			heart: {
+				...BIG_HEART,
+				x: (RIDGES[0] + RIDGES[1] + RIDGE_WIDTH) / 2,
+				y: LUNG_Y - 500,
+			},
+		},
 		// Snot, not mud.
 		mud: 'hue-rotate(40deg) saturate(1.4) brightness(1.15)',
 		mudWord: 'Slime!',
@@ -836,8 +1057,19 @@ export const karolinska: CourseDefinition = {
 	},
 	scenery: scenery(),
 	...LAID_OUT,
+	// The Spirit of Jazz, up in the lungs, at home.
+	found: {
+		runner: SPIRIT_OF_JAZZ.id,
+		x: JAZZ_AIRWAY.x + JAZZ_AIRWAY.width / 2,
+		y: LUNG_Y - JAZZ_AIRWAY.height,
+		says: 'I am the Spirit of Jazz!',
+		toSelf: 'Who dares wear my hat?',
+		// Once he's yours, his hat's there for the taking.
+		hat: 'jazzHat',
+		robbed: 'My hat!',
+	},
 	special: {
-		goal: 'Pop every germ',
+		goal: 'Cure the common cold',
 		done: (run) => (run.germsPopped ?? 0) >= GERM_COUNT,
 	},
 }

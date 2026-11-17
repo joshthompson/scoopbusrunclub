@@ -22,14 +22,19 @@ import {
 	createBackdrop,
 	createWeather,
 } from './backdropControllers'
+import { createBoars } from './boars'
+import { createCoaster } from './coaster'
 import { createFootballSprite } from './football'
 import { createCaveCover, createSeaFront } from './frontControllers'
 import { createGiantMouth } from './giantMouth'
+import { createHarvester } from './harvester'
 import { createHauntedHouse } from './hauntedHouse'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPyro, createSearchlights, createSmoke } from './nightRace'
+import { createOrgans } from './organs'
 import { createPortalFx } from './portalFx'
 import { createRiver, createRiverFront } from './river'
+import { ScreenWashes, pictureStyle } from './screenFilters'
 import { createSecret } from './secret'
 import {
 	createBanner,
@@ -172,8 +177,12 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			scene.addController(
 				createGameController(world, step),
 				...createScenery(world),
+				// A harvester at work: after the scenery, over the trees round it.
+				...createHarvester(world),
 				// A giant's mouth, opening, over its face: after the scenery, over it.
 				...createGiantMouth(world),
+				// A heart beating, lungs breathing: behind everything in their chambers.
+				...createOrgans(world),
 				// A haunted house's bats, window, monster and grave.
 				...createHauntedHouse(world),
 				// Just ahead of the runner, so they toe the line rather than stand on it.
@@ -195,6 +204,7 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createBusBore(world),
 				...createMine(world),
 				...createSecret(world),
+				...createCoaster(world),
 				...createMoleTrails(world),
 				...createRiver(world),
 				...createMineCarts(world),
@@ -214,6 +224,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createGiantFurby(world),
 				...createHats(world),
 				...createForeground(world),
+				// Wild boar, running along in front of the path.
+				...createBoars(world),
 				...createTowers(world),
 				// A Portal going off: the shrink ray's beam, the sneeze's spray.
 				...createPortalFx(world),
@@ -297,10 +309,12 @@ export function RaceCanvas(props: {
 	)
 	const portalStyle = (): JSX.CSSProperties => {
 		const view = portal()
-		if (!view) return { position: 'relative' }
+		if (!view) return { position: 'relative', ...pictureStyle(props.world) }
 		const at = onScreen(props.world, view.focus.x, view.focus.y)
 		return {
 			position: 'relative',
+			// The Screen Filters' colours, but not their swaying: the Portal's zoom.
+			...pictureStyle(props.world, true),
 			transform: `translateX(${view.shake}px) scale(${view.zoom})`,
 			'transform-origin': `${at.x}px ${at.y}px`,
 		}
@@ -333,8 +347,27 @@ export function RaceCanvas(props: {
 			</div>
 			{/* A heart beating: the screen thumping red with it. */}
 			<Heartbeat world={props.world} />
+			<ScreenWashes world={props.world} />
 			<Show when={(portal()?.flash ?? 0) > 0}>
 				<div style={{ ...styles.flash, opacity: portal()?.flash }} />
+			</Show>
+			{/* Into the dark, a Portal's words in it, shaking: the sneeze. */}
+			<Show when={(portal()?.dark ?? 0) > 0}>
+				<div style={{ ...styles.dark, opacity: portal()?.dark }} />
+			</Show>
+			<Show when={portal()?.words}>
+				{(words) => (
+					<div
+						style={{
+							...styles.words,
+							'font-size': `${words().size}px`,
+							opacity: 1 - (words().fade ?? 0),
+							transform: `translateX(${portal()?.shake ?? 0}px) scale(${1 + words().grow * 0.6}) rotate(${(portal()?.shake ?? 0) * 0.6}deg)`,
+						}}
+					>
+						{words().text}
+					</div>
+				)}
 			</Show>
 			{/* Paused, or between Rounds: the whole screen shaded, not just the
 			    canvas, which goes with the camera (see `styles.css`). */}
@@ -379,6 +412,23 @@ const styles = {
 		position: 'absolute',
 		inset: 0,
 		background: 'white',
+		'pointer-events': 'none',
+	},
+	dark: {
+		position: 'absolute',
+		inset: 0,
+		background: '#000',
+		'pointer-events': 'none',
+	},
+	words: {
+		position: 'absolute',
+		inset: 0,
+		display: 'grid',
+		'place-items': 'center',
+		color: '#fff',
+		'font-family': 'var(--font-pixel)',
+		'letter-spacing': '0.04em',
+		'text-shadow': '0 0 18px rgba(255, 120, 140, 0.8), 6px 6px 0 #6a1020',
 		'pointer-events': 'none',
 	},
 	heartbeat: {

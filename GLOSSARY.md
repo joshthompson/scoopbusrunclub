@@ -7,7 +7,7 @@ Scoop Bus Run Club's website and its games. The games turn the club's runners in
 ### Run game
 
 **Scoop Bus**:
-The bus that chases runners along a Course. It picks up (scoops) anyone it catches, at any height: its **Scoop Arm** reaches up to a Platform or down below the Ground to grab them. In a Cave it has a **Drill** on its front in place of its scoop, and bores its way through the rock, too big for the Cave. In The Sewers it puts its Drill on and **Digs** its own way down through the street after whoever's gone down the manhole, and back up again after the Giant Vent. On The Cliff it drives off the cliff after you and floats across the Sea, and up onto the island.
+The bus that chases runners along a Course. It picks up (scoops) anyone it catches, at any height: its **Scoop Arm** reaches up to a Platform or down below the Ground to grab them. In a Cave it has a **Drill** on its front in place of its scoop, and bores its way through the rock, too big for the Cave. In The Sewers it puts its Drill on and **Digs** its own way down through the street after whoever's gone down the manhole, and back up again after the Giant Vent. On The Cliff it drives off the cliff after you and floats across the Sea, and up onto the island. Shrunk inside someone, in The Hospital, it puts wings and a rocket booster on and flies, floating along over the floor.
 _Avoid_: Sweeper, chaser
 
 **Scooped**:
@@ -30,7 +30,7 @@ _Avoid_: Level, stage, map, track (Kristineberg's course is a running track)
 A Course that is a real parkrun, such as Haga or Huddinge, with that parkrun's own hills. It's raced as "_name_ parkrun". Every other Course, Kristineberg included, goes by its name alone.
 
 **Endless**:
-Single-player play that goes round every Course in order, back to the first after the last.
+Single-player play through every Course in order, the score carried on, until the bus gets you or the last Course is done: then the run's over, and there's another go to have. No summary between Courses: it goes dark, and on into the next; one at the end, for the whole run, every Bonus Runner Unlocked on the way shown off before it. It has three goals of its own, a medal each, for how many Courses one run gets through: bronze for five, silver for halfway, gold for every one, which Unlocks a Bonus Runner too.
 
 **Run**:
 One go at Endless, from the first Course until the runner is Scooped, with the score carried from Course to Course.
@@ -68,12 +68,20 @@ A stretch of a Course with no Ground and no Platform underneath: going down one 
 _Avoid_: Pit, hole (potholes are Obstacles you can trip in and get out of)
 
 **Secret**:
-A Gap that is a way in rather than a fall. Whoever goes down it isn't Fallen: they drop a long way down its shaft into a cavern under the Course, at the same place along it, run along its floor, and at its far end are thrown back up onto the Course, high over it. Everest's is the Yetis' den, down the last crevasse of the Icefall, and finding it is Everest's special goal. Gamla Stan's has no Gap: its way in is an open manhole in the street, a ladder poking out of it, that runners drop down by slowing down onto it (or run over it flat out, or jump it, to stay on the street), into a tavern in an old cellar, where the Viking waits to be found; and its way out is an air duct that blows you straight back up out of a grate in the street.
+A Gap that is a way in rather than a fall. Whoever goes down it isn't Fallen: they drop a long way down its shaft into a cavern under the Course, at the same place along it, run along its floor, and at its far end are thrown back up onto the Course, high over it. Everest's is the Yetis' den, down the last crevasse of the Icefall, and finding it is Everest's special goal. Gamla Stan's has no Gap: its way in is an open manhole in the street, a ladder poking out of it, that runners drop down by slowing down onto it (or run over it flat out, or jump it, to stay on the street), into a tavern in an old cellar, where the Viking waits to be found; and its way out is an air duct that blows you straight back up out of a grate in the street. The Caves' Gap has a rope bridge over it, crossed like any other: ducking on it drops you through, into an old mine with a Coaster through it, the mine people and The Miner at its far end, and a lift that shoots you back up out of a hatch in the floor of the cave above.
+
+**Coaster**:
+A mine cart ride through a Secret, The Caves': carts waiting at the start of its track, ridden by running into one, then along it on their own, up, down and round a loop, faster the lower they are, to its end, where you're thrown out. Jump in it on the level and it hops; anywhere steeper and you're thrown out. Its gap has to be jumped: miss it, and the cart runs off the end of the rail, down the pit under it, and you with it.
+_Avoid_: Roller coaster ride, rail (a Rail is a ski slope's, to grind)
 _Avoid_: Hidden level, bonus level, cave (a Cave is over the Ground; a Secret is under it)
 
 **Bonus Runner**:
-A Character that isn't a club member or anyone's own, found on a Course and Unlocked by finding it, kept on that device. The Yeti, thrown out of Everest's Secret, is the first. Some are earned by a Course's special goal instead: the Skeleton, and Ms Crocodile, for bouncing across the Nile on its Crocodiles.
+A Character that isn't a club member or anyone's own, found on a Course and Unlocked by finding it, kept on that device. The Yeti, thrown out of Everest's Secret, is the first. Some are earned by a Course's special goal instead: the Skeleton, and Ms Crocodile, for bouncing across the Nile on its Crocodiles. One can have an **Own Hat**, part of how they look, worn whenever they've no other hat on and gone under any they put on: the Spirit of Jazz's white top hat, on fire (find him again once he's Unlocked and you steal it off his head, to wear), or Det. Munch's deerstalker.
 _Avoid_: Secret character, hidden character
+
+**Screen Filter**:
+An effect over the whole screen of a race, on while something calls for it: a bad mushroom's trip, colours cycling and the picture swaying.
+_Avoid_: Shader
 
 **Platform**:
 A raised surface a runner can land on above the Ground, such as a ledge, a rooftop or a crane girder. Runners jump up through one from below, and drop off it by running off the end or ducking.
@@ -86,8 +94,12 @@ A Platform that moves, such as a girder swinging from a crane. Most swing round 
 A stretch of a Course under a hill, with rock over the Ground, or dug down under the sand, as through the Sphinx on the Pyramids. Some Platforms in a Cave are shelves of solid rock: there's no jumping up through those from below. From outside, a Cave is solid rock, only its way in and its way out showing; it opens up once someone racing goes in. On Scoop Cruises the ferry is a Cave: its plated side is the rock, its rooms open up once someone's aboard, and its sun deck is open to the sky.
 
 **Portal**:
-A machine, or a sneeze, that changes everyone's size: in The Hospital, the **Shrink Ray** in the lab and the **Sneeze** that blows everyone back out of the scientist's nose. Whoever gets to one is held in it till every Player still racing is; then it goes off for all of them at once, the camera diving in (or pulling out), and they come out the other side in the order they went in, as far apart, each as fast as they went in. The Scoop Bus comes through after them, as far behind as it was. No Pacers go through.
+A machine, or a sneeze, that changes everyone's size: in The Hospital, the **Shrink Ray** in the lab and the **Sneeze** that blows everyone back out of the scientist's nose. Whoever gets to one is held in it till every Player still racing is; then it goes off for all of them at once, the camera diving in (or pulling out), and they come out the other side in the order they went in, as far apart, each as fast as they went in. The Scoop Bus comes through after them, as far behind as it was, not a step nearer. The Sneeze is at the bottom of a Slide, and goes off in the dark: "Ah... Ah... AAH...", and out of the dark, "CHOO!". No Pacers go through.
 _Avoid_: Teleport, warp
+
+**Slide**:
+A stretch of Ground everyone on it is sat down sliding along, whatever they hold, gathering speed downhill and still able to jump: in The Hospital, the chute of snot down into the Sneeze.
+_Avoid_: Chute (that's what this one is made of, not what it is)
 
 **Giant Mouth**:
 In The Hospital, the scientist's mouth, at the edge of the lab bench: it opens as anyone racing gets near, and its tongue rolls out over the edge, to be run up and in.
@@ -135,7 +147,7 @@ In Halloween Town, a house up on a hill: a Cave, dark till someone's in it, and 
 _Avoid_: Mansion; dying (a Ghost isn't out, and runs on)
 
 **Heart Valve**:
-A flap in the floor of the heart, in The Hospital, that opens on every beat, firing whoever's on it up into the air: the only way over the ridges between the heart's chambers.
+A flap in the floor of the heart, in The Hospital, that opens on every beat, spurting blood, and fires whoever's on it up into the air: the way over the ridges between the heart's chambers. Between the two ridges, a pad of heart muscle pumping up and down on the beat is a way over the second without its valve.
 
 **Steam Vent**:
 A grate in the Ground that puffs steam now and then, firing whoever's on it as it puffs high into the air. Not an Obstacle: nothing to stumble on. A **Giant Vent** is The Sewers' way out: it fires whoever's on it right up out of the sewer and on, back onto the street.
@@ -167,7 +179,7 @@ A parkrun barcode, floating in the run-in just before every parkrun Course's fin
 _Avoid_: Barcode (on its own: a real parkrunner's barcode is theirs, not a thing on a Course)
 
 **Ride**:
-Something that carries a runner along for a while: a corgi, at Kristineberg, or in Gamla Stan a Royal Guard's horse, on Machu Picchu a llama, at the Pyramids a camel (now and then, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon. One on the ground leaps when its rider jumps, with them on its back; ducking gets them off it.
+Something that carries a runner along for a while: a corgi, at Kristineberg, or in Gamla Stan a Royal Guard's horse, on Machu Picchu a llama, at the Pyramids a camel (now and then, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon. One on the ground leaps when its rider jumps, with them on its back, and of its own accord over whatever's low in its way; a Steam Vent or a Heart Valve fires it up, rider and all; ducking gets them off it.
 _Avoid_: Mount, vehicle
 
 **Glider**:

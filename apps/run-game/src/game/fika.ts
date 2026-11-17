@@ -81,6 +81,26 @@ export type FikaItem =
 	| 'pizzaSlice'
 	/** Gamla Stan's, down in the tavern under it: a tankard of ale. */
 	| 'ale'
+	/**
+	 * Huddinge's, a picnic in the forest: a cake in a can, wild berries and
+	 * chanterelles; and one bad mushroom, that turns the screen funny.
+	 */
+	| 'cakeInACan'
+	| 'berries'
+	| 'mushroom'
+	| 'badMushroom'
+	/** The Caves': a miner's sandwich, a cool rock, and a jar of cave pickles. */
+	| 'sandwich'
+	| 'coolRock'
+	| 'cavePickles'
+	/** City Rooftop's, up on a roof at sunset: popcorn, a mojito, a Dobry Cola. */
+	| 'popcorn'
+	| 'mojito'
+	| 'dobryCola'
+	/** The Cliff's: a flying strawberry and bubble gum, up in the sky, and cloudberries. */
+	| 'flyingStrawberry'
+	| 'bubbleGum'
+	| 'cloudberries'
 
 export const FIKA_ITEMS: FikaItem[] = [
 	'coffee',
@@ -205,6 +225,25 @@ export const MIDNATTSLOPPET_FIKA: FikaItem[] = [
 	'waterCup',
 ]
 
+/**
+ * Huddinge's, picked and packed for a day in the forest. Its one bad
+ * mushroom isn't among them: it's placed on its own (see `huddinge`).
+ */
+export const HUDDINGE_FIKA: FikaItem[] = ['berries', 'cakeInACan', 'mushroom']
+
+/** The Caves': a sandwich, a cool rock, cave pickles. */
+export const CAVES_FIKA: FikaItem[] = ['sandwich', 'coolRock', 'cavePickles']
+
+/** City Rooftop's: popcorn, a mojito, a Dobry Cola. */
+export const ROOFTOP_FIKA: FikaItem[] = ['popcorn', 'mojito', 'dobryCola']
+
+/** The Cliff's, up in the sky: a flying strawberry, bubble gum, cloudberries. */
+export const CLIFF_FIKA: FikaItem[] = [
+	'flyingStrawberry',
+	'bubbleGum',
+	'cloudberries',
+]
+
 /** In Turku: a Karelian pie, a coffee, salmiakki. */
 export const TURKU_FIKA: FikaItem[] = ['karelianPie', 'coffee', 'salmiakki']
 
@@ -261,4 +300,17 @@ export const FIKA_SIZE: Record<FikaItem, { width: number; height: number }> = {
 	blueberrySoup: { width: 8 * CELL, height: 10 * CELL },
 	pizzaSlice: { width: 12 * CELL, height: 12 * CELL },
 	ale: { width: 11 * CELL, height: 12 * CELL },
+	cakeInACan: { width: 10 * CELL, height: 12 * CELL },
+	berries: { width: 12 * CELL, height: 10 * CELL },
+	mushroom: { width: 10 * CELL, height: 9 * CELL },
+	badMushroom: { width: 10 * CELL, height: 11 * CELL },
+	sandwich: { width: 12 * CELL, height: 9 * CELL },
+	coolRock: { width: 10 * CELL, height: 9 * CELL },
+	cavePickles: { width: 9 * CELL, height: 12 * CELL },
+	popcorn: { width: 10 * CELL, height: 12 * CELL },
+	mojito: { width: 9 * CELL, height: 13 * CELL },
+	dobryCola: { width: 7 * CELL, height: 14 * CELL },
+	flyingStrawberry: { width: 12 * CELL, height: 8 * CELL },
+	bubbleGum: { width: 12 * CELL, height: 6 * CELL },
+	cloudberries: { width: 9 * CELL, height: 9 * CELL },
 }

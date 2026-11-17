@@ -5,7 +5,14 @@ const CREDITS: { role: string; names: string[] }[] = [
 	{ role: 'Made by', names: ['Josh Thompson'] },
 	{
 		role: 'Play Testing',
-		names: ['Alisa Vasileva', 'Olesia Vasileva', 'Jack Thompson'],
+		names: [
+			'Alisa Vasileva',
+			'Olesia Vasileva',
+			'Jack Thompson',
+			'Owen Pickering',
+			'Olga Drochkova',
+			'Melvin Valster',
+		],
 	},
 ]
 
@@ -14,19 +21,28 @@ export function CreditsScreen(props: { onBack: () => void }) {
 		<div style={styles.screen}>
 			<Panel
 				title="Credits"
-				style={{ width: '440px', 'align-items': 'center' }}
+				style={{ 'max-width': 'calc(100vw - 32px)', 'align-items': 'center' }}
 			>
 				<For each={CREDITS}>
 					{(credit) => (
 						<div style={styles.credit}>
 							<div style={styles.role}>{credit.role}</div>
-							<For each={credit.names}>
-								{(name) => <div style={styles.name}>{name}</div>}
-							</For>
+							<div
+								style={{
+									...styles.names,
+									// A long list goes in two columns, to fit the screen's height.
+									'grid-template-columns':
+										credit.names.length > 2 ? 'repeat(2, auto)' : 'auto',
+								}}
+							>
+								<For each={credit.names}>
+									{(name) => <div style={styles.name}>{name}</div>}
+								</For>
+							</div>
 						</div>
 					)}
 				</For>
-				<div style={{ width: '200px', 'margin-top': '14px' }}>
+				<div style={{ width: '200px', 'margin-top': '6px' }}>
 					<Menu
 						items={[{ label: 'Back', choose: props.onBack }]}
 						onBack={props.onBack}
@@ -48,15 +64,23 @@ const styles = {
 		display: 'flex',
 		'flex-direction': 'column',
 		'align-items': 'center',
-		'margin-bottom': '10px',
+		gap: '2px',
+		'margin-bottom': '8px',
 	},
 	role: {
 		'font-size': '16px',
 		opacity: 0.75,
 		'letter-spacing': '0.1em',
 	},
+	names: {
+		display: 'grid',
+		'column-gap': '36px',
+		'row-gap': '2px',
+		'justify-items': 'center',
+	},
 	name: {
-		'font-size': '32px',
+		'font-size': '28px',
+		'white-space': 'nowrap',
 		color: 'white',
 		'text-shadow': '3px 3px 0 var(--bus-red)',
 	},

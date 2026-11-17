@@ -103,9 +103,9 @@ const PACER_GRIP = 0.05
 /** Hills slow them down and speed them up, a bit: they're used to Haga. */
 const PACER_HILL_PULL = HILL_PULL * 0.5
 /** Landing this far into someone's head still counts as on top of it. */
-const HEAD_GIVE = 6
+export const HEAD_GIVE = 6
 /** And this far either side of the middle of them. */
-const HEAD_REACH = HITBOX_HALF_WIDTH + 10
+export const HEAD_REACH = HITBOX_HALF_WIDTH + 10
 /**
  * How far off the left of the screen someone being scooped is still heard:
  * as far back as the bus ever gets (`BUS_LEASH_MAX`, less the runner's lead).
@@ -809,9 +809,9 @@ function hopAhead(world: World, x: number, feetY: number) {
 }
 
 /** How long a Player stumbles after another bounces on their head: a little. */
-const STOMPED_TICKS = 18
+export const STOMPED_TICKS = 18
 /** And how long before anyone can bounce on them again. */
-const STOMPED_GUARD = 60
+export const STOMPED_GUARD = 60
 
 /** Coming down on someone's head: bounce off it, faster, and score. */
 function bounceOffHeads(world: World, racer: Racer) {

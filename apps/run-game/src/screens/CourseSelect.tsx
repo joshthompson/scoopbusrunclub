@@ -9,6 +9,7 @@ import {
 } from 'solid-js'
 import { COURSES } from '../courses'
 import { levelCollectables } from '../courses/collectables'
+import { ENDLESS, ENDLESS_GOALS } from '../courses/endless'
 import type { Course } from '../courses/types'
 import {
 	COLLECTABLES_ICON,
@@ -20,7 +21,7 @@ import { HatPicture, hatArt } from '../draw/art/hats'
 import { MedalArt } from '../draw/art/medal'
 import { StarArt } from '../draw/art/star'
 import { courseHat } from '../game/collectables'
-import { type Medal, medalScores, nextMedal } from '../game/medals'
+import { MEDALS, type Medal, medalScores, nextMedal } from '../game/medals'
 import { touchScreen } from '../input'
 import type { Playable } from '../runners/playable'
 import { hasCollected } from '../saved/collected'
@@ -197,7 +198,7 @@ export function CourseSelect(props: {
 				<div style={styles.title}>Choose your run</div>
 			</div>
 
-			<div style={styles.list}>
+			<div class="flush-scrollbar" style={styles.list}>
 				{row(
 					'endless',
 					0,
@@ -217,6 +218,10 @@ export function CourseSelect(props: {
 									? `Best ${topScore('endless').toLocaleString('en')} pts`
 									: 'Every course in turn'}
 							</span>
+						</span>
+						{/* Its best medal, as a course's is. */}
+						<span style={styles.rowMedal}>
+							<MedalArt medal={bestMedal(ENDLESS)} scale={1.5} />
 						</span>
 					</>,
 				)}
@@ -305,7 +310,7 @@ export function CourseSelect(props: {
 					<span style={styles.headingDetail}>
 						<Show
 							when={picked()}
-							fallback={`${COURSES.length} courses, round and round`}
+							fallback={`All ${COURSES.length} courses, in one go`}
 						>
 							{(course) => <>Course {course().number}</>}
 						</Show>
@@ -321,7 +326,31 @@ export function CourseSelect(props: {
 				    once got, and how many of its collectables have been found;
 				    down the other, the top scores on it. */}
 				<div style={styles.lower}>
-					<Show when={picked()}>
+					<Show
+						when={picked()}
+						fallback={
+							// Endless's three goals, each its medal's: in colour once
+							// it's got.
+							<div style={styles.stats}>
+								<div style={styles.scoresLabel}>Your goals</div>
+								<For each={ENDLESS_GOALS}>
+									{({ medal, goal }) => (
+										<div style={styles.goalLine}>
+											<span style={styles.goalText}>{goal}</span>
+											<span style={styles.goalIcon}>
+												<MedalArt
+													medal={
+														got(bestMedal(ENDLESS), medal) ? medal : undefined
+													}
+													scale={1}
+												/>
+											</span>
+										</div>
+									)}
+								</For>
+							</div>
+						}
+					>
 						{(course) => (
 							<div style={styles.stats}>
 								<div style={styles.scoresLabel}>Your goals</div>
@@ -433,6 +462,13 @@ function TopScores(props: { id: TableId }) {
  */
 const rowNameSize = (name: string) => (name.length > 13 ? 16 : 20)
 
+/** Whether `best`, a medal got, is `medal` or better. */
+const got = (best: Medal | undefined, medal: Medal) =>
+	!!best && MEDALS.indexOf(best) >= MEDALS.indexOf(medal)
+
+/** How big a course's number square is, in the list: Endless's bus as wide. */
+const NUMBER_SIZE = 28
+
 /** How big each goal's picture is, at most, beside it. */
 const GOAL_ICON = 16
 
@@ -454,7 +490,7 @@ const styles = {
 	back: {
 		position: 'absolute',
 		left: 0,
-		padding: '8px 12px 4px',
+		padding: '6px 12px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '3px solid white',
@@ -483,7 +519,6 @@ const styles = {
 		background: 'rgba(15, 31, 41, 0.55)',
 		border: '4px solid white',
 		'box-shadow': '0 0 0 4px var(--ink)',
-		'scrollbar-width': 'thin',
 		animation: 'panel-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both',
 	},
 	row: {
@@ -502,7 +537,6 @@ const styles = {
 	},
 	endlessRow: {
 		height: '64px',
-		background: 'rgba(255, 210, 63, 0.8)',
 	},
 	rowSelected: {
 		background: 'white',
@@ -514,14 +548,19 @@ const styles = {
 		color: 'rgba(15, 31, 41, 0.6)',
 	},
 	/** Pixel art, 24 by 16: twice its size exactly, or it blurs. */
+	/**
+	 * As wide as a course's number square under it (see `number`), so the
+	 * names line up; as tall as that makes it, its 24 by 16 kept.
+	 */
 	busIcon: {
-		width: '48px',
-		height: '32px',
+		width: `${NUMBER_SIZE}px`,
+		height: `${(NUMBER_SIZE * 16) / 24}px`,
+		'flex-shrink': 0,
 		transform: 'scaleX(-1)',
 	},
 	number: {
-		width: '28px',
-		height: '28px',
+		width: `${NUMBER_SIZE}px`,
+		height: `${NUMBER_SIZE}px`,
 		display: 'grid',
 		'place-items': 'center',
 		// Its digits are drawn 2 px down their 16 px line, and none under
@@ -682,7 +721,6 @@ const styles = {
 		flex: 1,
 		'min-height': 0,
 		'overflow-y': 'auto',
-		'scrollbar-width': 'thin',
 	},
 	scoresLabel: {
 		'font-size': '12px',
@@ -716,7 +754,7 @@ const styles = {
 		position: 'absolute',
 		right: '10px',
 		bottom: '10px',
-		padding: '12px 22px 8px',
+		padding: '10px 22px',
 		background: '#ffd23f',
 		color: 'var(--ink)',
 		border: '3px solid var(--ink)',

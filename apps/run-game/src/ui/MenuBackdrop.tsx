@@ -364,7 +364,7 @@ export function MenuBackdrop() {
 						}}
 					>
 						<RunStrip
-							frame={runner.sprite.run[0] ?? ''}
+							run={runner.sprite.run}
 							width={runner.sprite.width}
 							height={runner.sprite.height}
 							stride={0.36 + (i() % 2) * 0.06}

@@ -564,6 +564,136 @@ const pumpkin = (carving = 1): HatArt => ({
 	middle: 14.5,
 })
 
+/**
+ * A runner's own hat, part of how they look (see `Playable['sprite']`'s
+ * `ownHat`): on their head whenever they've no other on, and gone under
+ * any they put on. Not a Hat: nothing to pick up, lose or count. Frames in
+ * turn, `frameTicks` each, by the race's tick.
+ */
+export interface OwnHat extends Omit<HatArt, 'src'> {
+	frames: string[]
+	frameTicks: number
+}
+
+const JAZZ_WHITE = '#f4f1e8'
+const JAZZ_LIT = '#ffffff'
+const JAZZ_SHADE = '#d6d0c0'
+const JAZZ_BAND = '#bdb6a4'
+/**
+ * The Spirit of Jazz's: a white top hat, on fire, drawn for his head: its
+ * brim as wide as his skull and his dreadlocks behind it, curled up at
+ * either end, sat just over his brow; its crown narrower, lit down its
+ * left, in shade down its right, a band round it, scorched round its top;
+ * and flames up off it, white-hot at their roots, yellow, orange and red
+ * at their tips, flickering, three frames. 8 by 12 cells, the hat its
+ * bottom 7.
+ */
+const JAZZ_FLAMES = [
+	[2, 4, 5, 3, 4, 2],
+	[3, 3, 4, 5, 3, 2],
+	[2, 5, 3, 4, 5, 3],
+]
+function jazzHat(frame: number) {
+	const flames: PixelRect[] = JAZZ_FLAMES[frame].flatMap((tall, i) =>
+		Array.from({ length: tall }, (_, up): PixelRect => {
+			const tip = tall - 1 - up
+			const fill =
+				tip === 0
+					? '#e0402a'
+					: tip === 1
+						? '#ff8a1e'
+						: up === 0 && (i === 2 || i === 3)
+							? '#fffbe8'
+							: '#ffd84a'
+			return [1 + i, 4 - up, 1, 1, fill]
+		}),
+	)
+	return pixelArt(8, 12, [
+		...flames,
+		// Its crown.
+		[1, 5, 6, 5, JAZZ_WHITE],
+		[1, 5, 1, 5, JAZZ_LIT],
+		[5, 5, 2, 5, JAZZ_SHADE],
+		// Scorched round its top, and its band.
+		[1, 5, 6, 1, '#8a7a66'],
+		[1, 8, 6, 1, JAZZ_BAND],
+		// Its brim, curled up at either end, in shade under.
+		[0, 10, 1, 1, JAZZ_LIT],
+		[7, 10, 1, 1, JAZZ_SHADE],
+		[1, 10, 6, 1, JAZZ_WHITE],
+		[1, 11, 6, 1, JAZZ_SHADE],
+		[1, 10, 2, 1, JAZZ_LIT],
+	])
+}
+export const JAZZ_HAT: OwnHat = {
+	frames: [jazzHat(0), jazzHat(1), jazzHat(2)],
+	frameTicks: 5,
+	width: 8 * CELL,
+	height: 12 * CELL,
+	// Its brim's bottom a row under the top of his head, just over his brow.
+	crown: 10 * CELL,
+	// Over the middle of his skull, his dreadlocks under the back of its brim.
+	middle: 3 * CELL,
+}
+
+const TWEED = '#a8895a'
+const TWEED_LIT = '#c7aa78'
+const TWEED_CHECK = '#7a6038'
+const TWEED_SHADE = '#8d7148'
+/**
+ * Det. Munch's: a deerstalker, as Sherlock Holmes wore, in a brown tweed
+ * check, its ear flaps tied up over its crown in a bow, and a peak out
+ * front and back, over his eye and down the back of his neck. Sat on the
+ * back of a hippo's head, over his skull. 14 by 6 cells, still.
+ */
+export const DEERSTALKER: OwnHat = {
+	frames: [
+		pixelArt(14, 6, [
+			// Its crown, a check across it.
+			[4, 1, 6, 1, TWEED],
+			[3, 2, 8, 1, TWEED],
+			[4, 1, 1, 1, TWEED_LIT],
+			[3, 2, 1, 1, TWEED_LIT],
+			[10, 2, 1, 1, TWEED_SHADE],
+			[6, 1, 1, 2, TWEED_CHECK],
+			[9, 1, 1, 2, TWEED_CHECK],
+			[3, 3, 9, 1, TWEED_CHECK],
+			// The ear flaps' ties, in a bow on top.
+			[6, 0, 2, 1, '#5e4a2c'],
+			// Its peaks, front and back, round its band.
+			[0, 4, 11, 1, TWEED],
+			[0, 4, 1, 1, TWEED_LIT],
+			[3, 4, 1, 1, TWEED_LIT],
+			[6, 4, 1, 1, TWEED_CHECK],
+			[9, 4, 1, 1, TWEED_CHECK],
+			[11, 4, 3, 1, TWEED_SHADE],
+			[1, 5, 12, 1, TWEED_SHADE],
+		]),
+	],
+	frameTicks: 1,
+	width: 14 * CELL,
+	height: 6 * CELL,
+	// Down over the top of his skull: its band a row under the top of his head.
+	crown: 6 * CELL,
+	middle: 6.5 * CELL,
+}
+
+/** A runner's own hat, in a Draw Hook: its top left at `x`, `y`, `now` ticks in. */
+export function paintOwnHat(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	own: OwnHat,
+	x: number,
+	y: number,
+	now: number,
+) {
+	const frame =
+		own.frames[
+			Math.floor(Math.max(0, now) / own.frameTicks) % own.frames.length
+		]
+	paintPicture(ctx, image, frame, x, y, own.width, own.height)
+}
+
 const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	miner: MINER,
 	captain: CAPTAIN,
@@ -582,6 +712,14 @@ const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	bobbleHat: BOBBLE_HAT,
 	headMirror: HEAD_MIRROR,
 	discoBall: DISCO_BALL,
+	// Its flames still, as a picture: on a head, they flicker (see `paintHat`).
+	jazzHat: {
+		src: JAZZ_HAT.frames[0],
+		width: JAZZ_HAT.width,
+		height: JAZZ_HAT.height,
+		crown: JAZZ_HAT.crown,
+		middle: JAZZ_HAT.middle,
+	},
 }
 
 /** The propeller on top of a propeller beanie, its two blades, red and yellow. */
@@ -639,6 +777,8 @@ export const WORN_HAT_REACH = {
 	top: Math.max(
 		BEAM_ROWS - 4 + MINER.crown,
 		DISCO_BALL.crown + GLINT_OUT * CELL,
+		JAZZ_HAT.crown,
+		DEERSTALKER.crown,
 		...[...Object.values(ART), pumpkin()].map(
 			(art) => art.crown + (art === PROPELLER ? 3 * CELL : 0),
 		),
@@ -781,6 +921,10 @@ export function paintHat(
 			)
 			ctx.restore()
 		}
+	}
+	if (hat.kind === 'jazzHat') {
+		paintOwnHat(ctx, image, JAZZ_HAT, x, y, options.now)
+		return
 	}
 	if (hat.kind === 'discoBall') {
 		const turn =

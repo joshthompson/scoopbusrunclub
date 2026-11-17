@@ -471,6 +471,8 @@ export function createRoom(code: string) {
 			name: seat.name,
 			ready: seat.ready,
 			taken: taken(seat),
+			unlocked: unlockedRunners().map((runner) => runner.id),
+			hostRunners: customRunners(),
 			stage: stage(),
 			status:
 				round?.status ??

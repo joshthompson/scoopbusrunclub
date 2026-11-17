@@ -15,7 +15,7 @@ import chimney4 from '../assets/rooftop/chimney-4.png'
 import dish from '../assets/rooftop/dish.png'
 import waterTower from '../assets/rooftop/water-tower.png'
 import { GROUND_Y, PATH_BACK, START_X } from '../game/constants'
-import { FIKA_ITEMS } from '../game/fika'
+import { ROOFTOP_FIKA } from '../game/fika'
 import { type Block, createRooftops } from '../game/terrain'
 import { BAT_PERSON } from '../runners/bonus'
 import { JIB, JIB_LEFT, JIB_TOP, towerCrane } from './kit/craneArt'
@@ -249,6 +249,7 @@ const HIDEOUT = (() => {
 			x: end - 50,
 			y: terrain.groundY(last.x) - last.height,
 			says: 'Na na na na na!',
+			toSelf: 'Greetings bat brother',
 		},
 		// Cranes on the roofs behind, each wholly on one roof, its jib out
 		// over the walkway, just over a girder, and reaching over its cable,
@@ -320,7 +321,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 					kind: 'fika',
 					x,
 					height: random() < 0.5 ? 26 : 95,
-					item: FIKA_ITEMS[fika++ % FIKA_ITEMS.length],
+					item: ROOFTOP_FIKA[fika++ % ROOFTOP_FIKA.length],
 				})
 			else
 				boosts.push({

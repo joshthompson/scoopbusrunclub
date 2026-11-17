@@ -637,9 +637,15 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	const random = seeded(1959)
 	let fika = 0
 	let cheers = 0
+	// Each side round its own list, so Turku's starts at its first, the
+	// Karelian pie: counted along with the ferry's, it never came round.
+	let ferry = 0
+	let turku = 0
 	const nextFika = (x: number): FikaItem => {
-		const items = x >= TURKU ? TURKU_FIKA : FERRY_FIKA
-		return items[fika++ % items.length]
+		fika++
+		return x >= TURKU
+			? TURKU_FIKA[turku++ % TURKU_FIKA.length]
+			: FERRY_FIKA[ferry++ % FERRY_FIKA.length]
 	}
 	const extra: Boost[] = []
 	const { obstacles, boosts } = scatter({

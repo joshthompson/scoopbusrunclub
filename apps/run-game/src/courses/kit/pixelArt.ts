@@ -16,6 +16,22 @@ export function pixelArt(width: number, height: number, rects: PixelRect[]) {
 	return svgUrl(width, height, body)
 }
 
+/**
+ * Pixel art from rows of letters, each a colour in `colours`, `.` left
+ * clear: as wide as its rows, as tall as there are of them. Every row has
+ * to be the same length.
+ */
+export function letterArt(rows: string[], colours: Record<string, string>) {
+	const rects: PixelRect[] = []
+	rows.forEach((row, y) => {
+		if (row.length !== rows[0].length)
+			throw new Error(`Row ${y} is ${row.length} long, not ${rows[0].length}`)
+		for (let x = 0; x < row.length; x++)
+			if (row[x] !== '.') rects.push([x, y, 1, 1, colours[row[x]]])
+	})
+	return pixelArt(rows[0].length, rows.length, rects)
+}
+
 /** An SVG's markup, `width` by `height`, as an image's URL. */
 export function svgUrl(width: number, height: number, body: string) {
 	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" shape-rendering="crispEdges">${body}</svg>`

@@ -106,6 +106,10 @@ export function createRaceStream(
 			camera: tenth(world.camera()),
 			cameraY: tenth(world.cameraY()),
 			zoom: Math.round(world.zoom() * 1000) / 1000,
+			...(world.trippedAt !== undefined ? { trippedAt: world.trippedAt } : {}),
+			...(world.harvesterAt !== undefined
+				? { harvesterAt: world.harvesterAt }
+				: {}),
 			...(world.portal
 				? {
 						portal: [

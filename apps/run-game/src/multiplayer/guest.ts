@@ -1,6 +1,8 @@
 import { createEffect, createSignal, onCleanup } from 'solid-js'
 import { type Controls, packControls } from '../input'
-import type { Playable } from '../runners/playable'
+import { unlockedRunners } from '../runners/bonus'
+import { type CustomRunner, customRunners } from '../runners/customRunners'
+import { CLUB, type Playable, customPlayable } from '../runners/playable'
 import { STORAGE_PREFIX } from '../saved/settings'
 import type { Feed } from './Mirror'
 import { openRoom } from './connection'
@@ -168,6 +170,27 @@ export const isPicked = (runner: Playable, character: string | undefined) =>
 	!!character &&
 	(runner.id === character ||
 		(!!runner.custom && character.endsWith(`:${runner.custom.id}`)))
+
+/**
+ * One of the big screen's own runners, for a device that's joined to pick:
+ * by its id there, with nothing of it sent back, so the Host runs them as
+ * its own (see `pick` in `room`). Not this device's to change.
+ */
+export const hostPlayable = (runner: CustomRunner): Playable => ({
+	...customPlayable(runner),
+	custom: undefined,
+})
+
+/**
+ * Who a device that's joined a Room can be: its own runners, newest first,
+ * then the big screen's, then the club, then anyone unlocked here or there.
+ */
+export const joinedCharacters = (view: PadView | undefined): Playable[] => [
+	...customRunners().map(customPlayable).reverse(),
+	...(view?.hostRunners ?? []).map(hostPlayable),
+	...CLUB,
+	...unlockedRunners(view?.unlocked),
+]
 
 /** Not heard from the Host for this long (it says something four times a second): reconnecting. */
 const QUIET_MS = 2500

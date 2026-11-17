@@ -3,7 +3,8 @@ import {
 	type CharacterSpriteProps,
 	createRunnerFrames,
 } from '@/utils/createRunnerFrames'
-import type { CustomRunner } from './customRunners'
+import type { OwnHat } from '../draw/art/hats'
+import { type CustomRunner, runnerName } from './customRunners'
 import { danceForKey } from './dance'
 import { type DanceSprite, lookDance, stripDance } from './dancing'
 import { type SkiPoses, skiPosesFor } from './skiPoses'
@@ -20,18 +21,17 @@ export interface Playable {
 	/** A bonus runner, found on a course and unlocked (see `BONUS_RUNNERS`). */
 	bonus?: boolean
 	/**
-	 * What unlocks them, said when it does and on the select screen once it
-	 * has: where they were found ("Found in Gamla Stan"), or what it took
-	 * ("Unlocked by completing all courses").
+	 * Where they're found, if they're to unlock: "Found in Gamla Stan". On
+	 * one line, and only roughly, as it's a hint while they're still a "?"
+	 * on the select screen, then said when they're unlocked and under them
+	 * from then on.
 	 */
-	unlockedBy?: string
+	unlock?: string
 	/**
-	 * How to unlock them, shown on the select screen while they're still a
-	 * "?": "Collect all 10 bananas at Midnattsloppet".
+	 * A line about them, under their name once they're unlocked, on the
+	 * select screen and when they're unlocked: "The best dog".
 	 */
-	toUnlock?: string
-	/** White all over, so lost on a light card: shown on a dark one, on the select screen. */
-	darkCard?: boolean
+	tagline?: string
 	/** The look they're made from, if they're made from one: a custom runner's, or a guest's. */
 	look?: CharacterSpriteProps
 	sprite: {
@@ -67,6 +67,20 @@ export interface Playable {
 		 * under it as he is.
 		 */
 		glideLean?: number
+		/**
+		 * Where their neck is, for a medal to hang round on the Podium: in
+		 * their first run frame, in their own pixels, `x` across its middle
+		 * and `y` its row, the last above their collar. In any other frame,
+		 * it's as far from the top of their head as it is in that one. Hung
+		 * a little way under the top of their head, if not said.
+		 */
+		neck?: Neck
+		/**
+		 * A hat of their own, part of how they look: on their head whenever
+		 * they've no other on (see `OwnHat`). The Spirit of Jazz's top hat,
+		 * on fire.
+		 */
+		ownHat?: OwnHat
 		/** One frame's size, in the sprite's own pixels. */
 		width: number
 		height: number
@@ -137,6 +151,37 @@ const MEMBER_DANCES = byMember(
 	}),
 )
 
+/** Where a runner's neck is, in their first run frame (see `Playable['sprite']['neck']`). */
+export interface Neck {
+	x: number
+	y: number
+}
+
+/**
+ * Where each member's neck is, in their first run frame (see `neck`):
+ * checked by eye, each of them. Most of the club's are at row 7; with a
+ * collar a row higher, or a row shorter, at 6; Lyra's, shorter, further
+ * down; and Link's, a corgi's, under his chin.
+ */
+const MEMBER_NECKS: Partial<Record<RunnerName, Neck>> = {
+	josh: { x: 10.5, y: 7 },
+	keith: { x: 10, y: 7 },
+	claire: { x: 10, y: 7 },
+	lyra: { x: 10, y: 15 },
+	adam: { x: 10, y: 7 },
+	anna: { x: 10, y: 7 },
+	eline: { x: 11, y: 6 },
+	rick: { x: 11, y: 7 },
+	sophie: { x: 11, y: 6 },
+	august: { x: 34.5, y: 7 },
+	alisa: { x: 11, y: 6 },
+	link: { x: 5, y: 23 },
+	otherJosh: { x: 10, y: 7 },
+	mikael: { x: 11, y: 7 },
+	mia: { x: 11, y: 6 },
+	david: { x: 11, y: 6 },
+}
+
 /** Members turned some other way on a glider, lying under it (see `glideLean`). */
 const MEMBER_GLIDE_LEANS: Partial<Record<RunnerName, number>> = {
 	// A dog: already lying along, on all fours.
@@ -149,12 +194,12 @@ const MEMBER_GLIDE_LEANS: Partial<Record<RunnerName, number>> = {
  * pack, locked or not; just not yours to run as yet.
  */
 const MEMBER_UNLOCKS: Partial<
-	Record<RunnerName, Pick<Playable, 'unlockedBy' | 'toUnlock'>>
+	Record<RunnerName, Pick<Playable, 'unlock' | 'tagline'>>
 > = {
 	// A dog: yours once you've ridden one.
 	link: {
-		unlockedBy: 'Unlocked by riding a corgi at Kristineberg',
-		toUnlock: 'Ride a corgi at Kristineberg',
+		unlock: 'Found at Kristineberg',
+		tagline: 'The best dog',
 	},
 }
 
@@ -196,6 +241,7 @@ export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 						)
 					: runner.look && lookDance(runner.look, member),
 				glideLean: MEMBER_GLIDE_LEANS[member],
+				neck: MEMBER_NECKS[member],
 				width: runner.width,
 				height: runner.height,
 			},
@@ -203,12 +249,12 @@ export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 	})
 
 /** The club, by name: every member but those to unlock, everyone's to run as. */
-export const CLUB = MEMBERS.filter((m) => !m.unlockedBy).sort((a, b) =>
+export const CLUB = MEMBERS.filter((m) => !m.unlock).sort((a, b) =>
 	a.name.localeCompare(b.name),
 )
 
 /** The members to unlock (see `MEMBER_UNLOCKS`), with the bonus runners. */
-export const LOCKED_MEMBERS = MEMBERS.filter((m) => m.unlockedBy)
+export const LOCKED_MEMBERS = MEMBERS.filter((m) => m.unlock)
 
 /** Drawing a custom runner's sprites is canvas work, so each look is only drawn once. */
 const drawn = new Map<string, ReturnType<typeof createRunnerFrames>>()
@@ -245,7 +291,8 @@ export function lookSprite(avatar: CharacterSpriteProps): Playable['sprite'] {
 export function customPlayable(runner: CustomRunner): Playable {
 	return {
 		id: `custom:${runner.id}`,
-		name: runner.name,
+		// Cut down, as one from a phone in a Room may have been named before.
+		name: runnerName(runner.name),
 		custom: runner,
 		look: runner.avatar,
 		sprite: lookSprite(runner.avatar),

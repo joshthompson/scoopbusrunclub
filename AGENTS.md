@@ -1,6 +1,16 @@
-# Testing in a Browser — Always Muted
+# Testing in a Browser — Muted, and Cleaned Up
 
 Launch every browser you test with muted: pass `--mute-audio` to Chrome (or Chrome for Testing), headless or not. The games play music and sound effects, and a multiplayer test opens a tab per player, all playing at once out of the owner's speakers.
+
+Give each headless Chrome a throwaway profile: `--user-data-dir=<your scratchpad>/chrome-<random>`. When the driver is done, kill that Chrome and delete its profile in a `finally`, so a failed run cleans up too: `chrome.kill()`, then `rmSync(dir, { recursive: true, force: true })`. Leftover profiles from earlier sessions filled the disk on 2026-11-17 (118 of them, 10 GB), and a full disk fails every shell command with ENOSPC.
+
+When you finish browser testing, sweep the profiles that no running Chrome still uses, your own and earlier sessions':
+
+```sh
+for d in /private/tmp/claude-$(id -u)/*scoopbusrunclub/*/scratchpad/chrome*; do
+  pgrep -f -- "--user-data-dir=$d" >/dev/null || rm -rf "$d"
+done
+```
 
 ---
 

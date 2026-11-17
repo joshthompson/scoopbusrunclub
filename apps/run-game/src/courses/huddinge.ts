@@ -5,7 +5,7 @@ import type { RunnerName } from '@/data/runners'
 import tree1 from '../assets/scenery/tree1.png'
 import tree2 from '../assets/scenery/tree2.png'
 import { PATH_BACK, START_X } from '../game/constants'
-import { FIKA_ITEMS } from '../game/fika'
+import { HUDDINGE_FIKA } from '../game/fika'
 import { createTerrain } from '../game/terrain'
 import { pinesFar, pinesNear } from './kit/backdrops'
 import {
@@ -50,6 +50,21 @@ const terrain = createTerrain(heights, STEP_M, 5000)
 const SHADE = 'brightness(0.78) saturate(1.15)'
 const DEEP_SHADE = 'brightness(0.62) saturate(1.2) hue-rotate(-8deg)'
 
+/**
+ * A forest harvester at work, behind the path, on the level stretch at the
+ * top of the climb out of the first big loop's dip, clear of the low
+ * branches: where the pine it fells stands. The forest's cleared round it.
+ */
+const HARVESTER_X = START_X + 7700
+const nearHarvester = (x: number) =>
+	x > HARVESTER_X - 300 && x < HARVESTER_X + 300
+
+/**
+ * Where a family of wild boar comes out and runs along with whoever's in
+ * front: past the second deer, on the way down into the second loop's dip.
+ */
+const BOARS_FROM = START_X + 12900
+
 /** A couple of deer, lying in the bracken by the path, waiting to be ridden. */
 const DEER = [START_X + 3600, START_X + 11600]
 /** How far either side of a deer the path's kept clear, to hop on and get going. */
@@ -93,7 +108,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 				kind: 'fika',
 				x,
 				height: random() < 0.5 ? 26 : 95,
-				item: FIKA_ITEMS[fika++ % FIKA_ITEMS.length],
+				item: HUDDINGE_FIKA[fika++ % HUDDINGE_FIKA.length],
 			})
 		else
 			boosts.push({
@@ -107,7 +122,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	}
 
 	// Pines, mostly, close together along the path.
-	const scenery: Course['scenery'] = []
+	let scenery: Course['scenery'] = []
 	const plants = [tree2, tree2, tree2, tree1, tree2, shrub1, shrub2, flower1]
 	for (let at = -400; at < terrain.finishX + 900; at += 50 + random() * 120) {
 		const asset = plants[Math.floor(random() * plants.length)]
@@ -118,11 +133,36 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			filter: random() < 0.4 ? DEEP_SHADE : SHADE,
 		})
 	}
-	return {
+	// A clearing round the harvester: the trees round it left out once
+	// they're all placed, so where everything else is doesn't change.
+	scenery = scenery.filter((s) => !nearHarvester(s.x))
+	const kept = {
 		obstacles: obstacles.filter((o) => !nearDeer(o.x) && !nearLedge(o.x)),
 		boosts: boosts.filter((b) => !nearDeer(b.x) && !nearLedge(b.x)),
-		scenery,
 	}
+	return { ...kept, boosts: withBadMushroom(kept), scenery }
+}
+
+/** How far a bad mushroom's kept from anything else on the path, so it's plain to see. */
+const BAD_MUSHROOM_CLEAR = 200
+
+/**
+ * The course's `boosts`, and among them, on the path about halfway round,
+ * where there's nothing else near it, a bad mushroom: run into it without
+ * thinking, and the screen goes funny for a moment (see `TRIP_TICKS`).
+ * Jump it, if you know.
+ */
+function withBadMushroom(layout: { obstacles: Obstacle[]; boosts: Boost[] }) {
+	const busy = (x: number) =>
+		nearDeer(x) ||
+		nearLedge(x) ||
+		[...layout.obstacles, ...layout.boosts].some(
+			(o) => Math.abs(o.x - x) < BAD_MUSHROOM_CLEAR,
+		)
+	let x = Math.round((START_X + terrain.finishX) / 2)
+	while (busy(x) && x < terrain.finishX - 500) x += 20
+	const bad: Boost = { kind: 'fika', x, height: 26, item: 'badMushroom' }
+	return [...layout.boosts, bad].sort((a, b) => a.x - b.x)
 }
 
 const piece = (
@@ -157,6 +197,8 @@ export const huddinge: CourseDefinition = {
 			'brightness(0.66) saturate(1.3) hue-rotate(-6deg)',
 		],
 		foliage: SHADE,
+		harvester: { x: HARVESTER_X, tree: tree2, filter: SHADE },
+		boars: { from: BOARS_FROM },
 		// Ridges of pines, one behind another: far off and blue in the haze
 		// over the far hills, then a dark wall of them over the middle ones.
 		hillBands: [

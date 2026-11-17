@@ -1,10 +1,12 @@
 import {
 	For,
+	Index,
 	type JSX,
 	Match,
 	Show,
 	Switch,
 	createEffect,
+	createMemo,
 	createSignal,
 	lazy,
 	onCleanup,
@@ -22,6 +24,7 @@ import { Medal, ordinal, pts } from './Medal'
 import { PadRunnerEditor } from './PadRunnerEditor'
 import { Scanner } from './Scanner'
 import {
+	hostPlayable,
 	isPicked,
 	joinAfresh,
 	joinAsGuest,
@@ -81,6 +84,12 @@ export default function Pad() {
 	const [mode, setMode] = createSignal<PadMode>(
 		last && last.code === code() ? last.mode : lastMode(MODE_KEY, 'controller'),
 	)
+	/**
+	 * Whether they're asked their name once they're in: joined with the QR
+	 * code (opened from the camera app, or scanned in here), not coming back
+	 * to the Room they were last in. A typed code asks it alongside.
+	 */
+	const [askName, setAskName] = createSignal(!!code() && last?.code !== code())
 	const choose = (next: PadMode) => {
 		rememberMode(MODE_KEY, next)
 		setMode(next)
@@ -99,8 +108,10 @@ export default function Pad() {
 			<Match when={!code()}>
 				<CodeEntry
 					rejoin={last?.code}
-					onCode={(next) => {
-						if (last && next === last.code) setMode(last.mode)
+					onCode={(next, named) => {
+						const back = !!last && next === last.code
+						if (last && back) setMode(last.mode)
+						setAskName(!named && !back)
 						setCode(next)
 					}}
 				/>
@@ -109,6 +120,7 @@ export default function Pad() {
 				{(joined) => (
 					<Controller
 						code={joined}
+						askName={askName()}
 						mode={mode()}
 						onMode={choose}
 						onJoined={() =>
@@ -127,15 +139,28 @@ export default function Pad() {
 function CodeEntry(props: {
 	/** The Room it was last in, lately: one tap back in. */
 	rejoin?: string
-	onCode: (code: string) => void
+	/** `named`: their name was asked with it, so it's not asked again. */
+	onCode: (code: string, named: boolean) => void
 }) {
 	const [typed, setTyped] = createSignal('')
+	/** What they'll go by, asked with the code: as they went last time, to start with. */
+	const [named, setNamed] = createSignal(cleanPlayerName(savedPlayerName()))
 	const [scanning, setScanning] = createSignal(false)
+	let codeInput: HTMLInputElement | undefined
+	const join = () => {
+		if (typed().length !== CODE_LENGTH) return
+		// Saved first: the Room's joined with whatever's saved (see `Controller`).
+		savePlayerName(cleanPlayerName(named()))
+		props.onCode(typed(), true)
+	}
 	return (
 		<Show
 			when={!scanning()}
 			fallback={
-				<Scanner onCode={props.onCode} onCancel={() => setScanning(false)} />
+				<Scanner
+					onCode={(code) => props.onCode(code, false)}
+					onCancel={() => setScanning(false)}
+				/>
 			}
 		>
 			<div style={styles.centre}>
@@ -145,7 +170,7 @@ function CodeEntry(props: {
 						<button
 							type="button"
 							style={{ ...styles.bigButton, ...styles.readyOn }}
-							onClick={() => props.onCode(code())}
+							onClick={() => props.onCode(code(), false)}
 						>
 							Back to Room {code()}
 						</button>
@@ -159,23 +184,40 @@ function CodeEntry(props: {
 					Scan the QR code
 				</button>
 				<div style={styles.text}>Or type the code on the big screen:</div>
-				<input
-					style={styles.codeInput}
-					value={typed()}
-					maxLength={CODE_LENGTH}
-					autocapitalize="characters"
-					autocomplete="off"
-					onInput={(event) => setTyped(cleanCode(event.currentTarget.value))}
-					onKeyDown={(event) => {
-						if (event.key === 'Enter' && typed().length === CODE_LENGTH)
-							props.onCode(typed())
-					}}
-				/>
+				<div style={styles.entry}>
+					<NameBox
+						value={named()}
+						onInput={setNamed}
+						enterkeyhint="next"
+						onEnter={() => {
+							if (typed().length === CODE_LENGTH) join()
+							else codeInput?.focus()
+						}}
+					/>
+					<label style={styles.nameField}>
+						<span style={styles.nameLabel}>Room code</span>
+						<input
+							ref={codeInput}
+							style={styles.codeInput}
+							value={typed()}
+							maxLength={CODE_LENGTH}
+							autocapitalize="characters"
+							autocomplete="off"
+							enterkeyhint="go"
+							onInput={(event) =>
+								setTyped(cleanCode(event.currentTarget.value))
+							}
+							onKeyDown={(event) => {
+								if (event.key === 'Enter') join()
+							}}
+						/>
+					</label>
+				</div>
 				<button
 					type="button"
 					style={styles.smallButton}
 					disabled={typed().length !== CODE_LENGTH}
-					onClick={() => props.onCode(typed())}
+					onClick={join}
 				>
 					Join
 				</button>
@@ -184,6 +226,71 @@ function CodeEntry(props: {
 				</a>
 			</div>
 		</Show>
+	)
+}
+
+/** Their name, to type in before they're in, or as they get in: kept as typed till they go on. */
+function NameBox(props: {
+	value: string
+	onInput: (name: string) => void
+	onEnter: () => void
+	enterkeyhint: 'next' | 'done'
+	autofocus?: boolean
+}) {
+	return (
+		<label style={styles.nameField}>
+			<span style={styles.nameLabel}>Your name</span>
+			<input
+				ref={(input) => {
+					if (props.autofocus) onMount(() => input.focus())
+				}}
+				type="text"
+				class="pad-name"
+				style={styles.nameInput}
+				value={props.value}
+				maxLength={MAX_PLAYER_NAME}
+				autocomplete="nickname"
+				autocapitalize="words"
+				spellcheck={false}
+				enterkeyhint={props.enterkeyhint}
+				onInput={(event) => props.onInput(event.currentTarget.value)}
+				onKeyDown={(event) => {
+					if (event.key === 'Enter') props.onEnter()
+				}}
+			/>
+		</label>
+	)
+}
+
+/** In, from the QR code: what they'll go by, as they went last time to start with. */
+function NameAsk(props: {
+	code: string
+	name: string
+	onName: (name: string) => void
+}) {
+	const [typed, setTyped] = createSignal(props.name)
+	const done = () => props.onName(cleanPlayerName(typed()))
+	return (
+		<div style={styles.centre}>
+			<div style={styles.heading}>In Room {props.code}!</div>
+			<div style={styles.text}>What’s your name?</div>
+			<div style={styles.entry}>
+				<NameBox
+					value={typed()}
+					onInput={setTyped}
+					enterkeyhint="done"
+					onEnter={done}
+					autofocus
+				/>
+			</div>
+			<button
+				type="button"
+				style={{ ...styles.bigButton, ...styles.readyOn }}
+				onClick={done}
+			>
+				Next
+			</button>
+		</div>
 	)
 }
 
@@ -227,6 +334,8 @@ function WatchToggle(props: {
 
 function Controller(props: {
 	code: string
+	/** Asked their name once they're in (see `NameAsk`). */
+	askName: boolean
 	mode: PadMode
 	onMode: (mode: PadMode) => void
 	/** In the Room: remembered, for coming straight back to. */
@@ -275,6 +384,8 @@ function Controller(props: {
 	const [editing, setEditing] = createSignal<{ runner?: CustomRunner }>()
 	/** Changing their name, from the bar along the top, whenever. */
 	const [naming, setNaming] = createSignal(false)
+	/** Still to be asked their name, now they're in. */
+	const [asking, setAsking] = createSignal(untrack(() => props.askName))
 
 	const switchMode = (mode: PadMode) => {
 		props.onMode(mode)
@@ -311,12 +422,26 @@ function Controller(props: {
 		props.onLeave()
 	}
 
-	/** Their own runners first, then anyone they've unlocked, then the club. */
-	const characters = (): Playable[] => [
-		...customRunners().map(customPlayable).reverse(),
-		...unlockedRunners(),
-		...CLUB,
-	]
+	// Who they can be, in groups. Each made again only when it changes, not
+	// every time the Host says anything (four times a second): made again,
+	// every card would be, and its runner stop running.
+	const own = createMemo(() => customRunners().map(customPlayable).reverse())
+	const hostRunners = createMemo(() => view()?.hostRunners ?? [], [], {
+		equals: sameJson,
+	})
+	const hostUnlocked = createMemo(() => view()?.unlocked ?? [], [], {
+		equals: sameJson,
+	})
+	const theirs = createMemo(() => hostRunners().map(hostPlayable))
+	const unlocked = createMemo(() => unlockedRunners(hostUnlocked()))
+	/** Their own, the big screen's, the club, then anyone unlocked here or there. */
+	const groups = createMemo((): PickerGroup[] => [
+		{ title: 'Yours', make: true, runners: own() },
+		{ title: 'From the big screen', runners: theirs() },
+		{ title: 'The club', runners: CLUB },
+		{ title: 'Unlocked', runners: unlocked() },
+	])
+	const characters = () => groups().flatMap((group) => group.runners)
 	const mine = () => {
 		const v = view()
 		if (!v?.character) return undefined
@@ -421,6 +546,17 @@ function Controller(props: {
 					</Show>
 				</Message>
 			</Match>
+			<Match when={asking()}>
+				<NameAsk
+					code={props.code}
+					name={name()}
+					onName={(next) => {
+						navigator.vibrate?.(15)
+						rename(next)
+						setAsking(false)
+					}}
+				/>
+			</Match>
 			<Match when={editing()}>
 				{(edit) => (
 					<PadRunnerEditor
@@ -438,7 +574,7 @@ function Controller(props: {
 			</Match>
 			<Match when={!view()?.character || choosing()}>
 				<Picker
-					characters={characters()}
+					groups={groups()}
 					taken={view()?.taken ?? []}
 					mine={mine()?.id}
 					colour={view()?.colour ?? 'white'}
@@ -455,7 +591,7 @@ function Controller(props: {
 							<Show when={mine()}>
 								{(runner) => (
 									<RunStrip
-										frame={runner().sprite.run[0] ?? ''}
+										run={runner().sprite.run}
 										width={runner().sprite.width}
 										height={runner().sprite.height}
 										scale={1.5}
@@ -624,7 +760,7 @@ function Controller(props: {
 							{(number) => (
 								<div style={styles.starting}>
 									{v().isStarter
-										? 'Press ↑ to start'
+										? 'Press any button to start'
 										: `Waiting for P${number()} to start`}
 								</div>
 							)}
@@ -684,7 +820,7 @@ function LobbyScreen(props: {
 							<Show when={props.runner}>
 								{(runner) => (
 									<RunStrip
-										frame={runner().sprite.run[0] ?? ''}
+										run={runner().sprite.run}
 										width={runner().sprite.width}
 										height={runner().sprite.height}
 										scale={2.5}
@@ -970,8 +1106,18 @@ function betweenText(view: PadView) {
 	return `${pts(view.points)} · ${last ? 'the Podium’s next' : done}`
 }
 
+/** Runners to pick from, under a heading: and, for their own, making one. */
+interface PickerGroup {
+	title: string
+	runners: Playable[]
+	make?: boolean
+}
+
+/** Whether two things from the Host are the same, whether or not they're the same object. */
+const sameJson = <T,>(a: T, b: T) => JSON.stringify(a) === JSON.stringify(b)
+
 function Picker(props: {
-	characters: Playable[]
+	groups: PickerGroup[]
 	taken: string[]
 	mine: string | undefined
 	colour: string
@@ -997,71 +1143,92 @@ function Picker(props: {
 				</Show>
 			</div>
 			<div style={styles.grid}>
-				<button
-					type="button"
-					style={{ ...styles.card, ...styles.makeCard }}
-					onClick={props.onMake}
-				>
-					<span style={{ 'font-size': '40px', 'line-height': 1 }}>+</span>
-					<span style={{ 'font-size': '13px' }}>Make your own</span>
-				</button>
-				<For each={props.characters}>
-					{(runner) => {
-						// Someone else's custom runners have their phone's id in theirs,
-						// so only the club's can be taken from under you.
-						const taken = () => props.taken.includes(runner.id)
-						return (
-							<div style={styles.cardWrap}>
-								<button
-									type="button"
-									style={{
-										...styles.card,
-										...(taken() ? styles.cardTaken : {}),
-										...(props.mine === runner.id
-											? { 'border-color': '#ffd23f' }
-											: {}),
-									}}
-									disabled={taken()}
-									onClick={() => props.onPick(runner)}
-								>
-									<div style={styles.cardRunner}>
-										<RunStrip
-											frame={runner.sprite.run[0] ?? ''}
-											width={runner.sprite.width}
-											height={runner.sprite.height}
-											scale={1.5}
-											stride={0.9}
-										/>
-									</div>
-									<span
-										style={{
-											'font-size': `${nameSize(runner.name, [16, 13, 11])}px`,
-											'white-space': 'nowrap',
-										}}
+				<Index each={props.groups}>
+					{(group) => (
+						<Show when={group().make || group().runners.length}>
+							<div style={styles.groupTitle}>{group().title}</div>
+							<Show when={group().make}>
+								<div style={styles.cardWrap}>
+									<button
+										type="button"
+										style={{ ...styles.card, ...styles.makeCard }}
+										onClick={props.onMake}
 									>
-										{runner.name}
-									</span>
-									<Show when={taken()}>
-										<span style={styles.takenTag}>Taken</span>
-									</Show>
-								</button>
-								<Show when={runner.custom}>
-									{(custom) => (
-										<button
-											type="button"
-											aria-label={`Change ${runner.name}`}
-											style={styles.editTag}
-											onClick={() => props.onEdit(custom())}
-										>
-											Edit
-										</button>
-									)}
-								</Show>
-							</div>
-						)
-					}}
-				</For>
+										<div style={{ ...styles.cardRunner, ...styles.makePlus }}>
+											+
+										</div>
+										<span style={styles.cardName}>Make your own</span>
+									</button>
+								</div>
+							</Show>
+							<For each={group().runners}>
+								{(runner) => (
+									<PickerCard
+										runner={runner}
+										// Someone else's custom runners have their phone's id in
+										// theirs, so only the club's, the unlocked and the big
+										// screen's can be taken from under you.
+										taken={props.taken.includes(runner.id)}
+										mine={props.mine === runner.id}
+										onPick={() => props.onPick(runner)}
+										onEdit={props.onEdit}
+									/>
+								)}
+							</For>
+						</Show>
+					)}
+				</Index>
 			</div>
+		</div>
+	)
+}
+
+/** One runner to pick, running: tapped, it's them. */
+function PickerCard(props: {
+	runner: Playable
+	taken: boolean
+	mine: boolean
+	onPick: () => void
+	onEdit: (runner: CustomRunner) => void
+}) {
+	return (
+		<div style={styles.cardWrap}>
+			<button
+				type="button"
+				style={{
+					...styles.card,
+					...(props.taken ? styles.cardTaken : {}),
+					...(props.mine ? { 'border-color': '#ffd23f' } : {}),
+				}}
+				disabled={props.taken}
+				onClick={props.onPick}
+			>
+				<div style={styles.cardRunner}>
+					<RunStrip
+						run={props.runner.sprite.run}
+						width={props.runner.sprite.width}
+						height={props.runner.sprite.height}
+						scale={1.5}
+						stride={0.9}
+					/>
+				</div>
+				<span style={styles.cardName}>{props.runner.name}</span>
+				<Show when={props.taken}>
+					<span style={styles.takenTag}>Taken</span>
+				</Show>
+			</button>
+			<Show when={props.runner.custom}>
+				{(custom) => (
+					<button
+						type="button"
+						aria-label={`Change ${props.runner.name}`}
+						style={styles.editTag}
+						onClick={() => props.onEdit(custom())}
+					>
+						Edit
+					</button>
+				)}
+			</Show>
 		</div>
 	)
 }
@@ -1105,8 +1272,20 @@ const styles = {
 	},
 	heading: { 'font-size': '30px' },
 	text: { 'font-size': '18px', opacity: 0.8, 'max-width': '320px' },
+	/** Their name and the Room Code, asked together. */
+	entry: {
+		display: 'flex',
+		'flex-direction': 'column',
+		gap: '12px',
+		width: '100%',
+		'max-width': '260px',
+		'text-align': 'left',
+	},
 	codeInput: {
-		width: '200px',
+		width: '100%',
+		'box-sizing': 'border-box',
+		background: 'white',
+		color: 'var(--ink)',
 		padding: '10px 0 6px',
 		'font-family': 'var(--font-pixel)',
 		'font-size': '40px',
@@ -1118,7 +1297,7 @@ const styles = {
 		'-webkit-user-select': 'text',
 	},
 	bigButton: {
-		padding: '14px 26px 10px',
+		padding: '12px 26px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '4px solid white',
@@ -1188,7 +1367,7 @@ const styles = {
 	runsAs: { 'font-size': '14px', opacity: 0.75 },
 	outlineButton: {
 		'min-height': '40px',
-		padding: '6px 12px 3px',
+		padding: '4px 12px 5px',
 		background: 'transparent',
 		color: 'white',
 		border: '3px solid white',
@@ -1224,7 +1403,7 @@ const styles = {
 		'margin-bottom': '-8px',
 	},
 	leaveLink: {
-		padding: '8px 12px 5px',
+		padding: '6px 12px 7px',
 		background: 'none',
 		border: 'none',
 		color: 'var(--ink)',
@@ -1250,7 +1429,7 @@ const styles = {
 		gap: '14px',
 		width: 'min(100%, 448px)',
 		'min-height': '60px',
-		padding: '10px 16px 6px',
+		padding: '8px 16px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '4px solid white',
@@ -1310,7 +1489,7 @@ const styles = {
 	sheetNote: { 'font-size': '13px', opacity: 0.75 },
 	sheetDone: {
 		'min-height': '48px',
-		padding: '8px 16px 4px',
+		padding: '6px 16px',
 		background: '#ffd23f',
 		color: 'var(--ink)',
 		border: '3px solid white',
@@ -1331,7 +1510,7 @@ const styles = {
 		'align-items': 'center',
 		gap: '12px',
 		'min-height': '60px',
-		padding: '9px 12px 6px',
+		padding: '7px 12px 8px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '3px solid white',
@@ -1382,7 +1561,7 @@ const styles = {
 		'justify-content': 'center',
 		gap: '8px',
 		'min-height': '48px',
-		padding: '8px 8px 5px',
+		padding: '6px 8px 7px',
 		background: 'transparent',
 		color: 'white',
 		border: 'none',
@@ -1395,7 +1574,7 @@ const styles = {
 		'font-size': '16px',
 	},
 	smallButton: {
-		padding: '8px 12px 5px',
+		padding: '6px 12px 7px',
 		background: 'rgba(15, 31, 41, 0.85)',
 		color: 'white',
 		border: '3px solid white',
@@ -1471,7 +1650,7 @@ const styles = {
 		left: '50%',
 		top: '140px',
 		transform: 'translateX(-50%)',
-		padding: '8px 14px 5px',
+		padding: '6px 14px 7px',
 		background: 'var(--bus-red)',
 		color: 'white',
 		border: '3px solid var(--ink)',
@@ -1487,7 +1666,7 @@ const styles = {
 		top: '84px',
 		left: '50%',
 		transform: 'translateX(-50%)',
-		padding: '8px 14px 5px',
+		padding: '6px 14px 7px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '3px solid white',
@@ -1516,7 +1695,7 @@ const styles = {
 		display: 'flex',
 		'align-items': 'center',
 		'justify-content': 'space-between',
-		padding: '10px 14px 6px',
+		padding: '8px 14px',
 		color: 'white',
 		'font-size': '22px',
 		'text-shadow': '2px 2px 0 var(--ink)',
@@ -1527,8 +1706,8 @@ const styles = {
 		'overflow-y': 'auto',
 		'touch-action': 'pan-y',
 		display: 'grid',
-		'grid-template-columns': 'repeat(auto-fill, minmax(96px, 1fr))',
-		gap: '10px',
+		'grid-template-columns': 'repeat(auto-fill, minmax(78px, 1fr))',
+		gap: '8px',
 		padding: '12px',
 		'align-content': 'start',
 	},
@@ -1549,17 +1728,41 @@ const styles = {
 	cardTaken: { opacity: 0.4 },
 	cardWrap: { position: 'relative', display: 'flex' },
 	makeCard: {
-		'justify-content': 'center',
-		'min-height': '96px',
-		padding: '6px',
 		background: 'rgba(15, 31, 41, 0.6)',
 		'border-style': 'dashed',
+	},
+	/** Where the runner would be, on Make Your Own. */
+	makePlus: {
+		'align-items': 'center',
+		background: 'none',
+		'font-size': '36px',
+		'line-height': 1,
+	},
+	/** A runner's name, under them: up to two lines, the same height on every card. */
+	cardName: {
+		display: 'flex',
+		'align-items': 'center',
+		'justify-content': 'center',
+		height: '2.3em',
+		padding: '0 4px',
+		'font-size': '11px',
+		'line-height': 1.1,
+		'text-align': 'center',
+		'overflow-wrap': 'anywhere',
+	},
+	/** Over each group of runners, the whole way across. */
+	groupTitle: {
+		'grid-column': '1 / -1',
+		'margin-top': '4px',
+		color: 'white',
+		'font-size': '15px',
+		'text-shadow': '2px 2px 0 var(--ink)',
 	},
 	editTag: {
 		position: 'absolute',
 		top: '4px',
 		left: '4px',
-		padding: '3px 5px 1px',
+		padding: '2px 5px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '2px solid white',
@@ -1571,7 +1774,7 @@ const styles = {
 		'align-items': 'flex-end',
 		'justify-content': 'center',
 		'align-self': 'stretch',
-		height: '60px',
+		height: '56px',
 		background:
 			'linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom) 75%, var(--grass-green) 75%)',
 	},

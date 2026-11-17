@@ -1,5 +1,13 @@
+import type { Obstacle } from '../courses/types'
 import { geeseWidth } from '../draw/art/geese'
 import { KIDS_REACH_UP, kidsWidth } from '../draw/art/kids'
+import {
+	SPIDER_BITE,
+	SPIDER_BODY,
+	SPIDER_HEAD,
+	SPIDER_WIDTH,
+} from '../draw/art/spider'
+import { STALACTITE_HEIGHT } from '../draw/art/stalactite'
 import { TOURISTS_HEIGHT, touristsWidth } from '../draw/art/tourists'
 import { TALL_HURDLE_CLEAR, TALL_HURDLE_HEIGHT } from '../draw/art/track'
 import { flyerLook } from '../draw/flyerLook'
@@ -19,7 +27,7 @@ import {
 import { boardCarts, rideCart, stepCarts } from './carts'
 import { ceilingAt, inTunnel, rockOver } from './cave'
 import { cheats } from './cheats'
-import { PICKUP_WORD } from './collectables'
+import { PICKUP_WORD, courseHat } from './collectables'
 import {
 	AIR_STEER,
 	AIR_STEER_BACK,
@@ -108,6 +116,7 @@ import { stepFootball } from './football'
 import { scoopFurbies, stepFurbies } from './furbies'
 import { atSea, glidingBox, stepGliding } from './gliders'
 import { DRAWN_FROM } from './groundColumns'
+import { stepHarvester } from './harvester'
 import { HAT_RULES, type Hat, WORN_FIKA, sameHat } from './hats'
 import { hearHouse, stepHaunt } from './haunted'
 import { callOut, landLongJump, longJumpTakeOff, sandDrag } from './longJump'
@@ -132,10 +141,12 @@ import {
 import { brokenHalf, sagOf, stepRopeBridges } from './ropeBridge'
 import {
 	atLaunch,
+	comingAtLaunch,
 	dropsIn,
 	fling,
 	flyOut,
 	goingIn,
+	inPit,
 	keepIn,
 	secretCeiling,
 	secretRoof,
@@ -164,6 +175,8 @@ import {
 	turbineHits,
 	whaleAt,
 } from './sky'
+import { spiderAt } from './spiders'
+import { soundStalactites, stalactiteAt, wakeStalactites } from './stalactites'
 import { steamFires } from './steam'
 import { TOWER_DOOR, TOWER_HEIGHT, towerSpan } from './towers'
 import {
@@ -178,6 +191,8 @@ import {
 } from './world'
 import { wakeZombies, zombieAt } from './zombies'
 
+/** How far into a spider's head or back someone can come down, a tick, and still bounce off it. */
+const SPIDER_GIVE = 14
 /** How long a popup stays up. */
 export const POPUP_TICKS = 45
 /** How long a cheerer's bubble stays up. */
@@ -210,8 +225,15 @@ const SCOOPED_TICKS = 70
 const FALL_DEPTH = 160
 /** How long the runner falls before the result shows. */
 const FALLEN_TICKS = 60
+/**
+ * How far into the Ground someone still going up can get, a hop up a steep
+ * slope, and be put on it, landed: any further, it's not a slope they've
+ * hopped up, it's a wall, and that's not theirs to land on.
+ */
+const SLOPE_CATCH = 24
+
 /** How long ducking drops through a Platform for, before it can be landed on again. */
-const DROP_TICKS = 14
+export const DROP_TICKS = 14
 /**
  * How far below the top of a Wall a runner's feet can be and still get up
  * onto it, rather than run into it.
@@ -230,6 +252,7 @@ const STEP_DOWN = 12
  */
 export function stepWorld(world: World) {
 	world.setTicks(world.ticks() + 1)
+	if (cheats.toFinish && world.phase() === 'running') toFinish(world)
 	// A Portal going off: everything stopped still till it's done.
 	const frozen = stepPortals(world)
 	stepPhase(world, frozen)
@@ -249,8 +272,11 @@ export function stepWorld(world: World) {
 		boardCarts(world)
 		stepCarts(world)
 		stepFootball(world)
+		stepHarvester(world)
 		stepFlyers(world)
 		wakeZombies(world)
+		wakeStalactites(world)
+		soundStalactites(world)
 		for (const racer of world.racers)
 			if (!isHeld(world, racer)) collide(world, racer)
 		startleGeese(world)
@@ -587,8 +613,8 @@ function stepRunner(world: World, racer: Racer) {
 	const mole = onMole(world, b)
 
 	if (b.cart !== undefined) {
-		// In a mine cart: down the line, nothing to do but hold on.
-		rideCart(world, racer, up)
+		// In a mine cart: down the line, holding on, or jumping it.
+		rideCart(world, racer, up && !b.wasUp, down)
 		b.wasUp = up
 		return
 	}
@@ -703,7 +729,8 @@ function stepRunner(world: World, racer: Racer) {
 		const low = inTunnel(world, b.x, b.feetY)
 		if (!low) b.tunnelSpeed = undefined
 		else b.tunnelSpeed ??= Math.abs(b.vx)
-		b.ducking = down || low
+		// On a Slide: sat down sliding, whatever's held.
+		b.ducking = down || low || onSlide(world, b.x)
 		if (b.stumble > 0) b.stumble--
 		if (b.squashed > 0) b.squashed--
 		const canDrive = b.stumble === 0
@@ -831,12 +858,15 @@ function stepRunner(world: World, racer: Racer) {
 						: Math.max(b.vx, Math.min(least, b.vx + AIR_STEER))
 		}
 		// A propeller beanie: holding jump on the way down, floating down.
+		// Only on its own course, where it's found: Furby Fields' floats
+		// are what it's for. Worn on into Endless's next, it's just a hat.
 		b.floating =
 			!mole &&
 			up &&
 			b.vy > FLOAT_FALL &&
 			!!b.hat &&
-			!!HAT_RULES[b.hat.kind].floats
+			!!HAT_RULES[b.hat.kind].floats &&
+			courseHat(world.course)?.kind === b.hat.kind
 		if (b.floating) b.vy = FLOAT_FALL
 	}
 	if (b.grounded) b.floating = false
@@ -866,7 +896,14 @@ function stepRunner(world: World, racer: Racer) {
 	const from = b.x
 	b.x = Math.max(LEFT_EDGE, b.x + b.vx)
 	// Down a Secret's Gap, past its lip: on the way into it, not falling.
-	if (racing && goingIn(world, b)) b.secret = 'in'
+	if (racing && goingIn(world, b)) {
+		b.secret = 'in'
+		// Through its bridge, ducking on it.
+		if (world.course.secret?.bridged) {
+			play('whoosh')
+			world.popup('Down you go!', b.x, b.feetY - 80)
+		}
+	}
 	// Or run onto an open manhole: down it, feet first.
 	else if (racing && dropsIn(world, b)) {
 		b.secret = 'in'
@@ -889,7 +926,8 @@ function stepRunner(world: World, racer: Racer) {
 	// Down in a Secret, its floor's their Ground, with no Gap in it.
 	const secret = b.secret ? world.course.secret : undefined
 	const ground = secret ? secret.floor : terrain.groundY(b.x)
-	const overGap = !secret && terrain.inGap(b.x)
+	// Or a pit in its floor, under a coaster's leap.
+	const overGap = secret ? inPit(world, b.x) : terrain.inGap(b.x)
 	if (b.grounded) {
 		if (b.on !== undefined) {
 			const platform = world.platforms[b.on]
@@ -964,7 +1002,15 @@ function stepRunner(world: World, racer: Racer) {
 			b.on = undefined
 			land(b)
 			b.bed = { index: bed.index, left: bed.left, top: bed.top }
-		} else if (!overGap && b.feetY >= ground && b.vy >= 0) {
+		} else if (
+			!overGap &&
+			(b.vy >= 0
+				? b.feetY >= ground
+				: // Or still going up, but slower than the ground they're over
+					// is, a hop up a steep slope (a pyramid's side): onto it,
+					// not on up inside it.
+					!mole && b.feetY > ground && b.feetY - ground < SLOPE_CATCH)
+		) {
 			b.feetY = ground
 			b.on = undefined
 			b.bridgeJumps = 0
@@ -980,6 +1026,12 @@ function stepRunner(world: World, racer: Racer) {
 	if (b.grounded) {
 		b.floor = b.feetY
 		b.climbing = undefined
+	}
+	// Coming up to whoever's at a Secret's far end: they call out.
+	if (racing && !b.greeted && comingAtLaunch(world, b)) {
+		b.greeted = true
+		const sound = world.course.secret?.greets?.sound
+		if (sound) play(sound)
 	}
 	// At a Secret's far end: thrown back up out of it.
 	if (racing && atLaunch(world, b)) thrownOut(world, racer)
@@ -1393,7 +1445,10 @@ function fall(world: World, racer: Racer) {
 				? `Splash! ${racer.runner.name} fell in!`
 				: `${racer.runner.name} fell!`,
 		b.x,
-		world.terrain.groundY(b.x) - 80,
+		// Down a Secret, down a pit in its floor: there, not up on the course.
+		(b.secret
+			? (world.course.secret?.floor ?? b.feetY)
+			: world.terrain.groundY(b.x)) - 80,
 	)
 }
 
@@ -1451,12 +1506,27 @@ function meetFound(world: World, racer: Racer) {
 	const bonus = bonusRunner(found.runner)
 	if (!bonus) return
 	b.metFound = true
-	// Waiting, they've said it already, stood up as they came.
-	if (found.says) world.popup(found.says, found.x, found.y - 80)
+	// Waiting, they've said it already, stood up as they came. To anyone
+	// running as them, something else.
+	const says = (racer.runner.id === found.runner && found.toSelf) || found.says
+	if (says && !found.waiting) world.popup(says, found.x, found.y - 80)
 	if (unlockRunner(bonus.id)) {
 		b.unlocked = bonus.id
 		play('cheer')
 		world.popup(`${bonus.name} unlocked!`, b.x, b.feetY - 110)
+	} else if (found.hat && !world.foundHatStolen) {
+		// Already theirs to run as: their own hat, then, off their head.
+		world.foundHatStolen = true
+		collect(`hat:${found.hat}`)
+		wearHat(world, b, { kind: found.hat })
+		world.addBonus('hats', HAT_POINTS)
+		play('fika')
+		world.popup(
+			scored(world, PICKUP_WORD[`hat:${found.hat}`], `+${HAT_POINTS}`),
+			b.x,
+			b.feetY - 110,
+		)
+		if (found.robbed) world.popup(found.robbed, found.x, found.y - 120)
 	} else play('scan')
 }
 
@@ -1511,6 +1581,12 @@ function respawn(world: World, racer: Racer) {
 	b.launchX = undefined
 	b.x = x
 	b.feetY = terrain.groundY(x)
+	// Down a pit in a Secret's floor: back up past it, on its floor.
+	const pit = b.secret && world.course.secret?.coaster?.leap?.pit
+	if (pit && world.course.secret) {
+		b.x = pit[1] + RESPAWN_PAST
+		b.feetY = world.course.secret.floor
+	}
 	b.floor = b.feetY
 	b.vx = 2
 	b.vy = 0
@@ -1519,7 +1595,7 @@ function respawn(world: World, racer: Racer) {
 	b.on = undefined
 	b.stumble = RESPAWN_STUMBLE
 	play('fallen')
-	world.popup(`${racer.runner.name} fell! Back up`, x, b.feetY - 80)
+	world.popup(`${racer.runner.name} fell! Back up`, b.x, b.feetY - 80)
 }
 
 /** Baby Mode: this far behind whoever's furthest along, and you're carried along faster... */
@@ -1572,6 +1648,128 @@ function tally(world: World, kind: 'cones' | 'rings') {
 			? world.obstacles.filter((s) => s.obstacle.kind === 'cone').length
 			: world.boosts.filter((s) => s.boost.kind === 'ring').length
 	return `${world.bonuses[kind].count}/${total}`
+}
+
+/** How far either side of its rider's middle a Ride bursts the Germs it touches. */
+const RIDE_GERM_REACH = 24
+
+/**
+ * Onto a Steam Vent: it puffs, and fires them up into the air, as from a
+ * jump, but much higher; on a Ride, it and them. A Giant Vent, on too, out
+ * of the sewer.
+ */
+function fireOffVent(
+	world: World,
+	b: Body,
+	state: ObstacleState,
+	o: Extract<Obstacle, { kind: 'steam' }>,
+) {
+	const fires = steamFires(o)
+	if (!b.grounded || Math.abs(b.x - o.x) >= fires.reach) return
+	state.flown = world.ticks()
+	b.vy = -fires.up
+	if (fires.on) {
+		b.vx = Math.max(b.vx, fires.on)
+		b.facing = 1
+	}
+	b.grounded = false
+	b.jumping = false
+	b.on = undefined
+	play('whoosh')
+}
+
+/** What a Ride leaps of its own accord, coming up to it on the ground: whatever's low, to be jumped. */
+const LEAPT: ReadonlySet<Obstacle['kind']> = new Set([
+	'rock',
+	'cone',
+	'hurdle',
+	'cyclist',
+	'tourists',
+	'geese',
+	'pothole',
+	'mud',
+	'snowman',
+	'tombstone',
+	'kids',
+	'zombie',
+	'mummy',
+	'hands',
+])
+/** How far ahead of it a Ride leaps something, from its middle: in time to clear it. */
+const LEAP_FROM = 70
+const LEAP_TO = 20
+
+/**
+ * On a Ride, what's in the way's nothing to them, but it's leapt all the
+ * same, of its own accord, as they come up to it, as if they'd jumped; and
+ * a vent or a valve fires them up, Ride and all, as it would anyone.
+ */
+function rideOver(world: World, racer: Racer) {
+	const b = racer.body
+	if (!b.grounded) return
+	for (const state of world.obstacles) {
+		const o = state.obstacle
+		if (o.kind === 'steam') fireOffVent(world, b, state, o)
+		else if (o.kind === 'valve') {
+			if (onValve(world, b, o.x)) state.flown = world.ticks()
+		} else if (LEAPT.has(o.kind) && !state.scooped) {
+			const at =
+				o.kind === 'cyclist'
+					? cyclistAt(world, { ...state, obstacle: o }).x
+					: o.kind === 'zombie'
+						? zombieAt(world, { ...state, obstacle: o }).x
+						: o.kind === 'mummy'
+							? mummyAt(world, { ...state, obstacle: o }).x
+							: o.x
+			const ahead = (at - b.x) * (b.facing || 1)
+			if (ahead > LEAP_TO && ahead < LEAP_FROM) {
+				jump(b, RIDE_LEAP)
+				b.on = undefined
+				return
+			}
+		}
+		if (!b.grounded) return
+	}
+}
+
+/**
+ * Germs touched by someone riding, from `top`, the top of their head up
+ * on their Ride, down to its feet: each one bursts, counted as popped.
+ */
+function burstGerms(world: World, racer: Racer, top: number) {
+	const b = racer.body
+	for (const state of world.obstacles) {
+		const o = state.obstacle
+		if (o.kind !== 'germ' || state.used || state.scooped) continue
+		if (Math.abs(o.x - b.x) > GERM_REACH + RIDE_GERM_REACH) continue
+		const bottom = world.terrain.groundY(o.x) - germHeight(o, world.ticks())
+		if (bottom - GERM_SIZE > b.feetY || bottom < top) continue
+		state.used = true
+		state.flown = world.ticks()
+		b.germsPopped = (b.germsPopped ?? 0) + 1
+		play('pop')
+		world.popup('Pop!', o.x, bottom - GERM_SIZE)
+	}
+}
+
+/** Whether `x` is on one of the course's Slides (see `Course['slides']`). */
+export const onSlide = (world: Pick<World, 'course'>, x: number) =>
+	!!world.course.slides?.some((slide) => x >= slide.from && x < slide.to)
+
+/** The `toFinish` cheat: everyone just short of the finish, running at it. */
+function toFinish(world: World) {
+	cheats.toFinish = false
+	const x = world.terrain.finishX - 20
+	for (const { body } of world.racers) {
+		body.x = x
+		body.feetY = world.terrain.groundY(x)
+		body.floor = body.feetY
+		body.grounded = true
+		body.on = undefined
+		body.vx = 6.5
+		body.vy = 0
+	}
+	world.bus.frontX = Math.min(world.bus.frontX, x - 600)
 }
 
 /** What a racer's run into this tick, and what it does to them. */
@@ -1632,6 +1830,13 @@ function collide(world: World, racer: Racer) {
 	const freshFor = (state: ObstacleState) =>
 		!state.used && !state.hit.has(racer.id)
 	const hits = (state: ObstacleState | BoostState) => state.hit.add(racer.id)
+	// Riding (a red blood cell, through an artery): any Germ it or its rider
+	// so much as touches bursts, as a Germ stomped on does, no bounce.
+	if (b.mount > 0) {
+		burstGerms(world, racer, top - rideLook(world.course).saddle)
+		// And, riding, over what's coming, and off a vent or a valve.
+		rideOver(world, racer)
+	}
 	// Down in a Secret, under it all: nothing on the course to run into.
 	for (const state of riding || b.secret ? [] : world.obstacles) {
 		const o = state.obstacle
@@ -1644,7 +1849,9 @@ function collide(world: World, racer: Racer) {
 					? zombieAt(world, { ...state, obstacle: o }).x
 					: o.kind === 'mummy'
 						? mummyAt(world, { ...state, obstacle: o }).x
-						: o.x
+						: o.kind === 'spider'
+							? spiderAt(world, { ...state, obstacle: o }).x
+							: o.x
 		if (Math.abs(at - b.x) > 200) continue
 		const ground = terrain.groundY(o.x)
 
@@ -1737,24 +1944,9 @@ function collide(world: World, racer: Racer) {
 					stumble('Clunk!')
 				}
 				break
-			case 'steam': {
-				// Onto it: it puffs, and fires them up into the air, as from a
-				// jump, but much higher. A Giant Vent, on too, out of the sewer.
-				const fires = steamFires(o)
-				if (b.grounded && Math.abs(b.x - o.x) < fires.reach) {
-					state.flown = world.ticks()
-					b.vy = -fires.up
-					if (fires.on) {
-						b.vx = Math.max(b.vx, fires.on)
-						b.facing = 1
-					}
-					b.grounded = false
-					b.jumping = false
-					b.on = undefined
-					play('whoosh')
-				}
+			case 'steam':
+				fireOffVent(world, b, state, o)
 				break
-			}
 			case 'swampman': {
 				// Up out of his sludge, he grabs whoever's in reach, once a
 				// round, and holds them still till he sinks back.
@@ -2063,6 +2255,66 @@ function collide(world: World, racer: Racer) {
 			case 'valve':
 				if (onValve(world, b, o.x)) state.flown = world.ticks()
 				break
+			case 'stalactite': {
+				// Under it, or into it, before it's smashed on the floor: a
+				// knock on the head, and a little speed lost, as running into
+				// a traffic cone. Not a stumble. Smashed, only rubble, to run over.
+				const at = stalactiteAt(world, { ...state, obstacle: o })
+				if (
+					at.phase !== 'smashed' &&
+					freshFor(state) &&
+					overlaps(o.x - 8, o.x + 8, at.tip - STALACTITE_HEIGHT + 10, at.tip)
+				) {
+					hits(state)
+					b.vx *= CONE_KEEP
+					world.popup('Bonk!', b.x, top)
+					play('stomp')
+				}
+				break
+			}
+			case 'spider': {
+				if (state.scooped) break
+				const spider = spiderAt(world, { ...state, obstacle: o })
+				const left = spider.x - SPIDER_WIDTH / 2
+				/** A part of it, from its picture's left, as it's facing: turned round going right. */
+				const span = (part: { from: number; to: number }) =>
+					spider.facing === -1
+						? [left + part.from, left + part.to]
+						: [left + SPIDER_WIDTH - part.to, left + SPIDER_WIDTH - part.from]
+				// Down onto its head or its back: a bounce off it, as off a
+				// head, and it's squashed down for a moment.
+				const landed = [SPIDER_HEAD, SPIDER_BODY].find((part) => {
+					const [from, to] = span(part)
+					const top = ground - part.top
+					return (
+						b.vy > 0 &&
+						b.x > from - 4 &&
+						b.x < to + 4 &&
+						b.feetY >= top - 2 &&
+						b.feetY - b.vy <= top + SPIDER_GIVE
+					)
+				})
+				if (landed) {
+					state.flown = world.ticks()
+					bounceOff(world, racer, ground - landed.top, b.x)
+					break
+				}
+				// Into its legs or its face: bitten.
+				if (
+					freshFor(state) &&
+					b.stumble === 0 &&
+					overlaps(
+						left + 8,
+						left + SPIDER_WIDTH - 8,
+						ground - SPIDER_BITE.top,
+						ground,
+					)
+				) {
+					hits(state)
+					stumble('Eek!')
+				}
+				break
+			}
 			case 'crocodile':
 				// Down onto its back: a bounce. Missed, there's nothing to run
 				// into: it's under the water, and they wade on past it.
@@ -2120,6 +2372,8 @@ function collide(world: World, racer: Racer) {
 					// A hat too: on their head.
 					const worn = WORN_FIKA[o.item]
 					if (worn) wearHat(world, b, { kind: worn })
+					// A bad mushroom: the screen goes funny (see `TRIP_TICKS`).
+					if (o.item === 'badMushroom') world.trippedAt = world.ticks()
 					b.vx = boost(world, b.vx, b.facing, FIKA_BOOST)
 					world.addBonus('fika', FIKA_POINTS)
 					world.popup(
@@ -2310,8 +2564,8 @@ const TUNNEL_PUSH_TO = 4
 const TUNNEL_PUSH = 0.04
 
 /** How fast someone crawls, ducking and holding a way, and how quickly they get going. */
-const CRAWL_SPEED = 1.6
-const CRAWL_GRIP = 0.2
+export const CRAWL_SPEED = 1.6
+export const CRAWL_GRIP = 0.2
 
 function stepBus(world: World) {
 	const { bus } = world
@@ -2494,6 +2748,19 @@ function knockOver(world: World) {
 				at: world.ticks(),
 				vx: Math.max(bus.speed, 2) + 2 + Math.random() * 2,
 				x: mummy.x,
+			}
+			bus.scooping = 10
+			continue
+		}
+		if (o.kind === 'spider') {
+			if (state.scooped) continue
+			const spider = spiderAt(world, { ...state, obstacle: o })
+			if (bus.frontX < spider.x - SPIDER_WIDTH / 2) continue
+			state.used = true
+			state.scooped = {
+				at: world.ticks(),
+				vx: Math.max(bus.speed, 2) + 2 + Math.random() * 2,
+				x: spider.x,
 			}
 			bus.scooping = 10
 			continue
@@ -2719,7 +2986,11 @@ function secretView(world: World, b: Body) {
 	if (!secret || !underground(world, b)) return undefined
 	if (b.feetY < secretRoof(world))
 		return { high: b.feetY - 40, low: b.feetY + 220 }
-	return { high: secret.floor - 150, low: secret.floor }
+	// Up round a coaster's loop, them and the cart over them too.
+	return {
+		high: Math.min(secret.floor - 150, b.feetY - 110),
+		low: secret.floor,
+	}
 }
 
 /** How much sky over a glider's highest, and sea under the surface, the camera shows gliding. */
@@ -2744,11 +3015,37 @@ function glideView(world: World) {
 	}
 }
 
+/** Room kept under someone's feet, finished and dropping: a little more than the least. */
+const FINISH_DROP_ROOM = 120
+
+/**
+ * Finished, up high and dropping: the camera down after them, eased,
+ * with room under them, and never so slow their feet go off its bottom.
+ * No lower than the street.
+ */
+function followDown(world: World, b: Body) {
+	const cameraY = world.cameraY()
+	const want = Math.min(
+		0,
+		b.feetY + CAMERA_FOOTROOM + FINISH_DROP_ROOM - VIEW_HEIGHT,
+	)
+	if (want <= cameraY) return
+	const keepFeet = b.feetY + CAMERA_FOOTROOM - VIEW_HEIGHT
+	const eased = cameraY + (want - cameraY) * CAMERA_FLY_LIFT
+	world.setCameraY(Math.min(0, Math.max(eased, keepFeet)))
+}
+
 function stepCamera(world: World) {
 	// Left where it is: to watch them fly off, fall, or run off.
 	const phase = world.phase()
-	if (phase === 'scooped' || phase === 'fallen' || phase === 'finished') return
+	if (phase === 'scooped' || phase === 'fallen') return
 	const b = world.body
+	// Over the line: left where it is, but over it from up high, coming
+	// down after them as they drop, never letting them off its bottom.
+	if (phase === 'finished') {
+		followDown(world, b)
+		return
+	}
 	// Zoomed out to the whole sky, gliding; back in, once down.
 	const gliding = b.gliding ? glideView(world) : undefined
 	const zoom = world.zoom()

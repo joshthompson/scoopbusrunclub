@@ -41,198 +41,321 @@ export type Sound =
 	| 'bats'
 	| 'smash'
 	| 'roar'
+	/** Everest's Yeti, calling out to whoever's coming at him in his den. */
+	| 'yeti'
+	/** The Caves' mine people, hello from all of them: "Hej hej!" */
+	| 'miners'
+	/** The Caves' stalactites: cracking off the roof and whistling down, and smashing on the floor. */
+	| 'stalactite'
+	| 'rubble'
+	/** Huddinge's harvester: its chainsaw through the trunk, through each log, and the tree hitting the ground. */
+	| 'chainsaw'
+	| 'logCut'
+	| 'timber'
 
-/** [frequency in Hz, length in seconds, wave] for each note, played one after another. */
-type Note = [number, number, OscillatorType?]
+/**
+ * [frequency in Hz, length in seconds, wave, and how loud, out of the
+ * sound's `volume`] for each note, played one after another; or, in a
+ * `chord`, all at once.
+ */
+type Note = [number, number, OscillatorType?, number?]
 
-const SOUNDS: Record<Sound, { notes: Note[]; volume: number; slide?: number }> =
-	{
-		move: { notes: [[660, 0.04, 'square']], volume: 0.05 },
-		select: {
-			notes: [
-				[660, 0.05, 'square'],
-				[990, 0.08, 'square'],
-			],
-			volume: 0.06,
-		},
-		back: {
-			notes: [
-				[660, 0.05, 'square'],
-				[440, 0.08, 'square'],
-			],
-			volume: 0.06,
-		},
-		count: { notes: [[440, 0.15, 'square']], volume: 0.08 },
-		go: { notes: [[880, 0.35, 'square']], volume: 0.08 },
-		jump: { notes: [[300, 0.12, 'square']], volume: 0.05, slide: 2.2 },
-		fika: {
-			notes: [
-				[784, 0.07, 'triangle'],
-				[1047, 0.07, 'triangle'],
-				[1319, 0.14, 'triangle'],
-			],
-			volume: 0.12,
-		},
-		/** A barcode scanned: the scanner's beep. */
-		scan: { notes: [[1760, 0.16, 'square']], volume: 0.05 },
-		cheer: {
-			notes: [
-				[523, 0.06, 'triangle'],
-				[659, 0.1, 'triangle'],
-			],
-			volume: 0.1,
-		},
-		stumble: { notes: [[140, 0.18, 'sawtooth']], volume: 0.07, slide: 0.5 },
-		squelch: { notes: [[110, 0.2, 'sine']], volume: 0.15, slide: 0.6 },
-		scooped: { notes: [[700, 0.6, 'square']], volume: 0.07, slide: 0.15 },
-		/** Down a Gap: a long whistle, falling away. */
-		fallen: { notes: [[1200, 0.9, 'triangle']], volume: 0.08, slide: 0.12 },
-		/** Into a Zombie: a low moan. */
-		groan: { notes: [[150, 0.5, 'sawtooth']], volume: 0.06, slide: 0.7 },
-		/** Bouncing off someone's head. */
-		stomp: {
-			notes: [
-				[260, 0.05, 'square'],
-				[520, 0.1, 'square'],
-			],
-			volume: 0.07,
-			slide: 1.4,
-		},
-		/** Someone else scooped: quieter and shorter than when it's you. */
-		whoosh: { notes: [[520, 0.25, 'square']], volume: 0.04, slide: 0.3 },
-		/** A furby, landing on your head. */
-		furby: {
-			notes: [
-				[1200, 0.05, 'triangle'],
-				[1600, 0.05, 'triangle'],
-				[900, 0.12, 'triangle'],
-			],
-			volume: 0.1,
-		},
-		/** A corgi, hopped on. */
-		/** Geese, run into and flying off. */
-		honk: {
-			notes: [
-				[370, 0.08, 'sawtooth'],
-				[300, 0.12, 'sawtooth'],
-			],
-			volume: 0.05,
-			slide: 0.85,
-		},
-		woof: {
-			notes: [
-				[520, 0.05, 'square'],
-				[330, 0.09, 'square'],
-			],
-			volume: 0.06,
-			slide: 0.8,
-		},
-		/** A mountain goat, calling to be ridden: a wavering bleat. */
-		bleat: {
-			notes: [
-				[620, 0.07, 'sawtooth'],
-				[560, 0.07, 'sawtooth'],
-				[640, 0.07, 'sawtooth'],
-				[540, 0.12, 'sawtooth'],
-			],
-			volume: 0.045,
-			slide: 0.9,
-		},
-		/** A horse, calling to be ridden: a whinny, high and shaking, falling away. */
-		neigh: {
-			notes: [
-				[880, 0.06, 'sawtooth'],
-				[980, 0.06, 'sawtooth'],
-				[860, 0.06, 'sawtooth'],
-				[940, 0.06, 'sawtooth'],
-				[760, 0.08, 'sawtooth'],
-				[520, 0.14, 'sawtooth'],
-			],
-			volume: 0.04,
-			slide: 0.85,
-		},
-		/** A trick landed: a bright run up, and a ding. */
-		trick: {
-			notes: [
-				[659, 0.05, 'square'],
-				[880, 0.05, 'square'],
-				[1175, 0.05, 'square'],
-				[1568, 0.16, 'triangle'],
-			],
-			volume: 0.07,
-		},
-		/** Down onto a rail: a metal scrape. */
-		grind: {
-			notes: [
-				[1900, 0.04, 'sawtooth'],
-				[1400, 0.22, 'sawtooth'],
-			],
-			volume: 0.025,
-			slide: 0.92,
-		},
-		finished: {
-			notes: [
-				[523, 0.1, 'square'],
-				[659, 0.1, 'square'],
-				[784, 0.1, 'square'],
-				[1047, 0.3, 'square'],
-			],
-			volume: 0.07,
-		},
-		/** The shrink ray going off: a rising warble, then a long falling zap. */
-		zap: {
-			notes: [
-				[220, 0.12, 'square'],
-				[330, 0.12, 'square'],
-				[440, 0.12, 'square'],
-				[1800, 0.9, 'sawtooth'],
-			],
-			volume: 0.05,
-			slide: 0.2,
-		},
-		/** A giant breathing in: "Ah...", a long rising hiss. */
-		sniff: { notes: [[180, 0.5, 'triangle']], volume: 0.1, slide: 2.4 },
-		/** "CHOO!": a burst, falling away. */
-		sneeze: {
-			notes: [
-				[900, 0.06, 'sawtooth'],
-				[300, 0.5, 'sawtooth'],
-			],
-			volume: 0.08,
-			slide: 0.3,
-		},
-		/** A Germ popped. */
-		pop: { notes: [[520, 0.08, 'square']], volume: 0.08, slide: 2.5 },
-		/** "Lub", and "dub": low thumps. */
-		heartbeat: { notes: [[70, 0.16, 'sine']], volume: 0.32, slide: 0.6 },
-		heartbeatDub: { notes: [[60, 0.12, 'sine']], volume: 0.24, slide: 0.6 },
-		/** Wings, flapping, a lot of them at once: a flutter, up high. */
-		bats: {
-			notes: [
-				[1400, 0.03, 'square'],
-				[1100, 0.03, 'square'],
-				[1500, 0.03, 'square'],
-				[1200, 0.03, 'square'],
-				[1600, 0.03, 'square'],
-				[1300, 0.05, 'square'],
-			],
-			volume: 0.04,
-		},
-		/** Glass, breaking: a crack, and the bits tinkling down. */
-		smash: {
-			notes: [
-				[2200, 0.04, 'sawtooth'],
-				[1800, 0.03, 'square'],
-				[2600, 0.03, 'square'],
-				[2000, 0.03, 'square'],
-				[2900, 0.05, 'triangle'],
-				[2400, 0.08, 'triangle'],
-			],
-			volume: 0.06,
-		},
-		/** The monster: a long, low roar, falling. */
-		roar: { notes: [[110, 0.7, 'sawtooth']], volume: 0.1, slide: 0.5 },
-	}
+const SOUNDS: Record<
+	Sound,
+	{ notes: Note[]; volume: number; slide?: number; chord?: boolean }
+> = {
+	move: { notes: [[660, 0.04, 'square']], volume: 0.05 },
+	select: {
+		notes: [
+			[660, 0.05, 'square'],
+			[990, 0.08, 'square'],
+		],
+		volume: 0.06,
+	},
+	back: {
+		notes: [
+			[660, 0.05, 'square'],
+			[440, 0.08, 'square'],
+		],
+		volume: 0.06,
+	},
+	count: { notes: [[440, 0.15, 'square']], volume: 0.08 },
+	go: { notes: [[880, 0.35, 'square']], volume: 0.08 },
+	jump: { notes: [[300, 0.12, 'square']], volume: 0.05, slide: 2.2 },
+	fika: {
+		notes: [
+			[784, 0.07, 'triangle'],
+			[1047, 0.07, 'triangle'],
+			[1319, 0.14, 'triangle'],
+		],
+		volume: 0.12,
+	},
+	/** A barcode scanned: the scanner's beep. */
+	scan: { notes: [[1760, 0.16, 'square']], volume: 0.05 },
+	cheer: {
+		notes: [
+			[523, 0.06, 'triangle'],
+			[659, 0.1, 'triangle'],
+		],
+		volume: 0.1,
+	},
+	stumble: { notes: [[140, 0.18, 'sawtooth']], volume: 0.07, slide: 0.5 },
+	squelch: { notes: [[110, 0.2, 'sine']], volume: 0.15, slide: 0.6 },
+	scooped: { notes: [[700, 0.6, 'square']], volume: 0.07, slide: 0.15 },
+	/** Down a Gap: a long whistle, falling away. */
+	fallen: { notes: [[1200, 0.9, 'triangle']], volume: 0.08, slide: 0.12 },
+	/** Into a Zombie: a low moan. */
+	groan: { notes: [[150, 0.5, 'sawtooth']], volume: 0.06, slide: 0.7 },
+	/** Bouncing off someone's head. */
+	stomp: {
+		notes: [
+			[260, 0.05, 'square'],
+			[520, 0.1, 'square'],
+		],
+		volume: 0.07,
+		slide: 1.4,
+	},
+	/** Someone else scooped: quieter and shorter than when it's you. */
+	whoosh: { notes: [[520, 0.25, 'square']], volume: 0.04, slide: 0.3 },
+	/** A furby, landing on your head. */
+	furby: {
+		notes: [
+			[1200, 0.05, 'triangle'],
+			[1600, 0.05, 'triangle'],
+			[900, 0.12, 'triangle'],
+		],
+		volume: 0.1,
+	},
+	/** A corgi, hopped on. */
+	/** Geese, run into and flying off. */
+	honk: {
+		notes: [
+			[370, 0.08, 'sawtooth'],
+			[300, 0.12, 'sawtooth'],
+		],
+		volume: 0.05,
+		slide: 0.85,
+	},
+	woof: {
+		notes: [
+			[520, 0.05, 'square'],
+			[330, 0.09, 'square'],
+		],
+		volume: 0.06,
+		slide: 0.8,
+	},
+	/** A mountain goat, calling to be ridden: a wavering bleat. */
+	bleat: {
+		notes: [
+			[620, 0.07, 'sawtooth'],
+			[560, 0.07, 'sawtooth'],
+			[640, 0.07, 'sawtooth'],
+			[540, 0.12, 'sawtooth'],
+		],
+		volume: 0.045,
+		slide: 0.9,
+	},
+	/** A horse, calling to be ridden: a whinny, high and shaking, falling away. */
+	neigh: {
+		notes: [
+			[880, 0.06, 'sawtooth'],
+			[980, 0.06, 'sawtooth'],
+			[860, 0.06, 'sawtooth'],
+			[940, 0.06, 'sawtooth'],
+			[760, 0.08, 'sawtooth'],
+			[520, 0.14, 'sawtooth'],
+		],
+		volume: 0.04,
+		slide: 0.85,
+	},
+	/** A trick landed: a bright run up, and a ding. */
+	trick: {
+		notes: [
+			[659, 0.05, 'square'],
+			[880, 0.05, 'square'],
+			[1175, 0.05, 'square'],
+			[1568, 0.16, 'triangle'],
+		],
+		volume: 0.07,
+	},
+	/** Down onto a rail: a metal scrape. */
+	grind: {
+		notes: [
+			[1900, 0.04, 'sawtooth'],
+			[1400, 0.22, 'sawtooth'],
+		],
+		volume: 0.025,
+		slide: 0.92,
+	},
+	finished: {
+		notes: [
+			[523, 0.1, 'square'],
+			[659, 0.1, 'square'],
+			[784, 0.1, 'square'],
+			[1047, 0.3, 'square'],
+		],
+		volume: 0.07,
+	},
+	/** The shrink ray going off: a rising warble, then a long falling zap. */
+	zap: {
+		notes: [
+			[220, 0.12, 'square'],
+			[330, 0.12, 'square'],
+			[440, 0.12, 'square'],
+			[1800, 0.9, 'sawtooth'],
+		],
+		volume: 0.05,
+		slide: 0.2,
+	},
+	/** A giant breathing in: "Ah...", a long rising hiss. */
+	sniff: { notes: [[180, 0.5, 'triangle']], volume: 0.1, slide: 2.4 },
+	/** "CHOO!": a burst, falling away. */
+	sneeze: {
+		notes: [
+			[900, 0.06, 'sawtooth'],
+			[300, 0.5, 'sawtooth'],
+		],
+		volume: 0.08,
+		slide: 0.3,
+	},
+	/** A Germ popped. */
+	pop: { notes: [[520, 0.08, 'square']], volume: 0.08, slide: 2.5 },
+	/**
+	 * "Lub", and "dub": big, deep thumps, a sub-bass boom under a punchier
+	 * tone an octave up, which a laptop's speakers can play, and a knock
+	 * on top to start each one off.
+	 */
+	heartbeat: {
+		notes: [
+			[52, 0.42, 'sine', 1],
+			[104, 0.26, 'triangle', 0.55],
+			[190, 0.06, 'sine', 0.35],
+		],
+		// All three at once peak at a little over 1: as loud as it gets.
+		volume: 0.6,
+		slide: 0.55,
+		chord: true,
+	},
+	heartbeatDub: {
+		notes: [
+			[44, 0.32, 'sine', 1],
+			[88, 0.2, 'triangle', 0.5],
+			[160, 0.05, 'sine', 0.3],
+		],
+		volume: 0.5,
+		slide: 0.55,
+		chord: true,
+	},
+	/** Wings, flapping, a lot of them at once: a flutter, up high. */
+	bats: {
+		notes: [
+			[1400, 0.03, 'square'],
+			[1100, 0.03, 'square'],
+			[1500, 0.03, 'square'],
+			[1200, 0.03, 'square'],
+			[1600, 0.03, 'square'],
+			[1300, 0.05, 'square'],
+		],
+		volume: 0.04,
+	},
+	/** Glass, breaking: a crack, and the bits tinkling down. */
+	smash: {
+		notes: [
+			[2200, 0.04, 'sawtooth'],
+			[1800, 0.03, 'square'],
+			[2600, 0.03, 'square'],
+			[2000, 0.03, 'square'],
+			[2900, 0.05, 'triangle'],
+			[2400, 0.08, 'triangle'],
+		],
+		volume: 0.06,
+	},
+	/** The monster: a long, low roar, falling. */
+	roar: { notes: [[110, 0.7, 'sawtooth']], volume: 0.1, slide: 0.5 },
+	/** The Yeti: a friendly growl, hrr-roo-aarr, up and then falling away. */
+	yeti: {
+		notes: [
+			[85, 0.12, 'sawtooth'],
+			[130, 0.18, 'sawtooth'],
+			[175, 0.45, 'sawtooth'],
+		],
+		volume: 0.09,
+		slide: 0.6,
+	},
+	/** The mine people: "hej hej!", cheerful, two of them at once, near enough. */
+	miners: {
+		notes: [
+			[392, 0.08, 'square'],
+			[523, 0.13, 'square'],
+			[392, 0.08, 'square'],
+			[523, 0.18, 'square'],
+		],
+		volume: 0.05,
+	},
+	/** A crack, and a whistle falling as it drops: about as long as it takes to fall. */
+	stalactite: {
+		notes: [
+			[1400, 0.03, 'square'],
+			[700, 0.03, 'square'],
+			[1900, 0.34, 'sine'],
+		],
+		volume: 0.07,
+		slide: 0.4,
+	},
+	/** It hitting the floor: a crack of rock, and a dull crunch. */
+	rubble: {
+		notes: [
+			[900, 0.03, 'square'],
+			[180, 0.05, 'square'],
+			[90, 0.3, 'sine'],
+		],
+		volume: 0.22,
+		slide: 0.5,
+	},
+	/**
+	 * A chainsaw biting into a trunk: its motor revving up, then a rough
+	 * buzz, warbling as it cuts, for as long as it takes to saw through.
+	 */
+	chainsaw: {
+		notes: [
+			[90, 0.12, 'sawtooth'],
+			[140, 0.08, 'sawtooth'],
+			[165, 0.04, 'sawtooth'],
+			[150, 0.04, 'sawtooth'],
+			[165, 0.04, 'sawtooth'],
+			[150, 0.04, 'sawtooth'],
+			[165, 0.04, 'sawtooth'],
+			[150, 0.04, 'sawtooth'],
+			[165, 0.04, 'sawtooth'],
+			[150, 0.04, 'sawtooth'],
+			[165, 0.04, 'sawtooth'],
+			[150, 0.04, 'sawtooth'],
+		],
+		volume: 0.035,
+	},
+	/** Its saw, through a log: a quick, rough buzz. */
+	logCut: {
+		notes: [
+			[170, 0.035, 'sawtooth'],
+			[155, 0.035, 'sawtooth'],
+			[170, 0.035, 'sawtooth'],
+			[155, 0.035, 'sawtooth'],
+			[170, 0.035, 'sawtooth'],
+			[155, 0.035, 'sawtooth'],
+		],
+		volume: 0.03,
+	},
+	/** A tree hitting the ground: a crack of branches, and a deep thud, dying away. */
+	timber: {
+		notes: [
+			[1100, 0.03, 'square'],
+			[600, 0.03, 'square'],
+			[85, 0.55, 'sine'],
+		],
+		volume: 0.3,
+		slide: 0.55,
+	},
+}
 
 /** Told of every sound played, sound on or off: a Room's Host passes them on. */
 let overheard: ((sound: Sound) => void) | undefined
@@ -247,9 +370,9 @@ export function play(sound: Sound) {
 	try {
 		const context = audioContext()
 		wake(context)
-		const { notes, volume, slide } = SOUNDS[sound]
+		const { notes, volume, slide, chord } = SOUNDS[sound]
 		let at = context.currentTime
-		for (const [frequency, length, wave = 'square'] of notes) {
+		for (const [frequency, length, wave = 'square', loud = 1] of notes) {
 			const oscillator = context.createOscillator()
 			const gain = context.createGain()
 			oscillator.type = wave
@@ -259,12 +382,12 @@ export function play(sound: Sound) {
 					frequency * slide,
 					at + length,
 				)
-			gain.gain.setValueAtTime(volume, at)
+			gain.gain.setValueAtTime(volume * loud, at)
 			gain.gain.exponentialRampToValueAtTime(0.0001, at + length)
 			oscillator.connect(gain).connect(context.destination)
 			oscillator.start(at)
 			oscillator.stop(at + length)
-			at += length
+			if (!chord) at += length
 		}
 	} catch {
 		// No Web Audio: the game's just quiet.

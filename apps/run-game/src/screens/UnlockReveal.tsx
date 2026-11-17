@@ -2,7 +2,7 @@ import { type JSX, Show, onMount } from 'solid-js'
 import { touchScreen } from '../input'
 import type { Playable } from '../runners/playable'
 import { play } from '../sfx'
-import { RunStrip } from '../ui/RunStrip'
+import { RunStrip, tallWithHat } from '../ui/RunStrip'
 import { RunnerStage, nameSize } from '../ui/RunnerStage'
 
 /**
@@ -30,10 +30,15 @@ export function UnlockReveal(props: {
 				</Show>
 				<RunnerStage height={180}>
 					<RunStrip
-						frame={props.runner.sprite.run[0] ?? ''}
+						run={props.runner.sprite.run}
+						hat={props.runner.sprite.ownHat}
 						width={props.runner.sprite.width}
 						height={props.runner.sprite.height}
-						scale={5}
+						// As big as fits, their own hat on too, if they've one.
+						scale={Math.min(
+							5,
+							Math.floor(152 / tallWithHat(props.runner.sprite)),
+						)}
 						stride={0.4}
 						style={{ position: 'relative', 'margin-bottom': '22px' }}
 					/>
@@ -46,8 +51,11 @@ export function UnlockReveal(props: {
 				>
 					{props.runner.name}
 				</div>
-				<Show when={props.runner.unlockedBy}>
-					<div style={styles.why}>{props.runner.unlockedBy}</div>
+				<Show when={props.runner.tagline}>
+					<div style={styles.tagline}>{props.runner.tagline}</div>
+				</Show>
+				<Show when={props.runner.unlock}>
+					<div style={styles.why}>{props.runner.unlock}</div>
 				</Show>
 				<div style={styles.hint}>Pick them on the runner screen</div>
 				<button type="button" style={styles.go} onClick={props.onContinue}>
@@ -92,8 +100,15 @@ const styles = {
 		'line-height': 1,
 		'text-shadow': '3px 3px 0 #b33a2a',
 	},
-	/** What unlocked them. */
-	why: { 'font-size': '16px', color: '#7fe08a', 'text-align': 'center' },
+	/** A line about them, under their name. */
+	tagline: {
+		'font-family': '"Cabin", sans-serif',
+		'font-size': '17px',
+		'font-style': 'italic',
+		'text-align': 'center',
+	},
+	/** Where they were found: one line. */
+	why: { 'font-size': '16px', color: '#7fe08a', 'white-space': 'nowrap' },
 	hint: {
 		'font-family': '"Cabin", sans-serif',
 		'font-size': '13px',
@@ -102,7 +117,7 @@ const styles = {
 	go: {
 		'margin-top': '6px',
 		'min-width': '220px',
-		padding: '10px 18px 6px',
+		padding: '8px 18px',
 		background: '#ffd23f',
 		color: 'var(--ink)',
 		border: '3px solid var(--ink)',

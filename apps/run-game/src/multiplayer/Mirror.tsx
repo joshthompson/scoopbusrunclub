@@ -180,11 +180,15 @@ export default function Mirror(props: {
 				held: new Map(
 					held.flatMap(([i, at, slot]) => {
 						const racer = world.racers[i]
-						return racer ? [[racer.id, { at, vx: 0, slot }] as const] : []
+						return racer
+							? [[racer.id, { at, vx: 0, over: 0, slot }] as const]
+							: []
 					}),
 				),
 			}
 		} else world.portal = undefined
+		world.trippedAt = a.trippedAt
+		world.harvesterAt = a.harvesterAt
 		world.bus.frontX = mix(a.bus[0], b.bus[0])
 		world.bus.scooping = a.bus[1]
 		world.bus.reach = mix(a.bus[2], b.bus[2])

@@ -59,7 +59,7 @@ export function codeFromScan(text: string) {
 }
 
 /** The longest name a Player can go by: long enough, and still fits over their head. */
-export const MAX_PLAYER_NAME = 14
+export const MAX_PLAYER_NAME = 12
 
 /** A Player's name, tidied: one line, no runs of spaces, and not too long. */
 export const cleanPlayerName = (typed: string) =>
@@ -172,6 +172,16 @@ export interface PadView {
 	ready: boolean
 	/** Who's been picked by someone else. */
 	taken: string[]
+	/**
+	 * Who's unlocked on the big screen, by runner id: for picking from as
+	 * well as anyone unlocked on the device that's joined.
+	 */
+	unlocked?: string[]
+	/**
+	 * The big screen's own custom runners, for picking too: by their id
+	 * there, `custom:<id>`.
+	 */
+	hostRunners?: CustomRunner[]
 	stage: RoomStage
 	status: PlayerStatus
 	/** In the last Round, out of how many; at the Podium, overall. */
@@ -181,7 +191,7 @@ export interface PadView {
 	points: number
 	paused: boolean
 	/**
-	 * A Round on its start screen, held till its Starter presses jump: the
+	 * A Round on its start screen, held till its Starter presses anything: the
 	 * Starter's Player number. Not, once it's under way.
 	 */
 	waitingForStarter?: number
@@ -443,6 +453,10 @@ export interface RaceFrame {
 		busGap: number,
 		held: [number, number, number][],
 	]
+	/** When a bad mushroom was last eaten, if one has been: see `trippedAt`. */
+	trippedAt?: number
+	/** When the course's harvester started on its tree, if it has: see `harvesterAt`. */
+	harvesterAt?: number
 	/** What was heard since the last frame. */
 	sounds: Sound[]
 }

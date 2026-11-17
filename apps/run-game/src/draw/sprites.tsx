@@ -50,7 +50,9 @@ import type {
 } from '../courses/types'
 import { boardOf } from '../game/boards'
 import { GERM_SIZE, germHeight } from '../game/body'
+import { cartOf } from '../game/carts'
 import { inTunnel } from '../game/cave'
+import { seatOf } from '../game/coaster'
 import {
 	BARCODE_TALL,
 	BARCODE_WIDTH,
@@ -95,6 +97,8 @@ import {
 	turbineAt,
 	whaleAt,
 } from '../game/sky'
+import { spiderAt } from '../game/spiders'
+import { stalactiteAt } from '../game/stalactites'
 import {
 	DANCING_STILL,
 	GATE_FLAP_TICKS,
@@ -133,6 +137,7 @@ import { zombieSprite } from '../runners/skeleton'
 import { play } from '../sfx'
 import { WallBricks } from './Backdrop'
 import { bubbleReach, paintBubble } from './Bubble'
+import { BUS_BOOSTER, BUS_FIN, BUS_FLAME, BUS_WING } from './art/busJets'
 import { LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH, paintBusLegs } from './art/busLegs'
 import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
@@ -154,6 +159,7 @@ import {
 	hatArt,
 	paintHat,
 	paintHatGlow,
+	paintOwnHat,
 } from './art/hats'
 import { KIDS_HEIGHT, KIDS_REACH, kidsPainter, kidsWidth } from './art/kids'
 import { mudReach, paintMud } from './art/mud'
@@ -200,6 +206,12 @@ import {
 	railPainter,
 } from './art/slopes'
 import {
+	SPIDER_FRAMES,
+	SPIDER_HEIGHT,
+	SPIDER_SQUASHED,
+	SPIDER_WIDTH,
+} from './art/spider'
+import {
 	SPLASH_HEIGHT,
 	SPLASH_REACH,
 	SPLASH_TICKS,
@@ -207,6 +219,18 @@ import {
 	SPLASH_WIDTH,
 	paintSplash,
 } from './art/splash'
+import {
+	DUST_FRAMES,
+	DUST_HEIGHT,
+	DUST_WIDTH,
+	RUBBLE_HEIGHT,
+	RUBBLE_WIDTH,
+	STALACTITE,
+	STALACTITE_CRACKED,
+	STALACTITE_HEIGHT,
+	STALACTITE_RUBBLE,
+	STALACTITE_WIDTH,
+} from './art/stalactite'
 import {
 	TOURISTS_DEPTH_ROOM,
 	TOURISTS_HEIGHT,
@@ -224,7 +248,7 @@ import {
 	paintPothole,
 } from './art/track'
 import { frontParapet, frontParapetCaps } from './battlements'
-import { atSea, rideBus, startRide } from './busRide'
+import { atSea, onJets, rideBus, startRide } from './busRide'
 import { cachedArt, svgArt } from './canvasArt'
 import { flyerLook } from './flyerLook'
 import { headTop } from './heads'
@@ -479,10 +503,24 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 					sparks: sparking,
 				})
 			const worn = hat()
-			if (!worn) return
+			// No hat on: their own, if they've one.
+			const own = worn ? undefined : sprite.ownHat
+			if (!worn && !own) return
 			const frames = $.frames?.() ?? []
 			const frame = frames[$currentFrame] ?? frames[0]
 			const head = frame ? headTop(frame, width, height) : undefined
+			if (own) {
+				paintOwnHat(
+					ctx,
+					image,
+					own,
+					(head?.x ?? width / 2) - own.middle,
+					(head?.y ?? 2) - own.crown,
+					now,
+				)
+				return
+			}
+			if (!worn) return
 			const art = hatArt(worn)
 			paintHat(
 				ctx,
@@ -532,6 +570,18 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 						? (sprite.glideLean ?? GLIDING_LEAN) + tilt
 						: runnerLean(world, body),
 				)
+			}
+			// In a cart: turned with it, sat in it, tipped up the secret line
+			// and round a coaster's loop. Turned about their middle, so that
+			// put where it is turned, their feet on its seat.
+			const cart = cartOf(world, body)
+			if (cart) {
+				const turned = (cart.spin * Math.PI) / 180
+				const seat = seatOf(cart.x, cart.feetY, cart.spin)
+				const half = $.height() / 2
+				$.setRotation(cart.spin)
+				$.setX(seat.x + half * Math.sin(turned) - width / 2)
+				$.setY(seat.y - half * Math.cos(turned) - half)
 			}
 			// Sat down, the one sit frame: switching to it from a run frame
 			// would otherwise leave the engine on a frame it doesn't have. In
@@ -1741,19 +1791,23 @@ export function createBus(world: World) {
 				world.course.busFloor?.(middle) !== undefined
 			// Its engine rumbling it about, a little; a sleigh glides, smooth.
 			const rumbles = ride.grounded && !look.sleigh && !hanging
+			const flying = onJets(world, middle)
 			$.setY(ride.y - WHEEL_BOTTOM + (rumbles ? Math.cos(10 + $age / 2) : 0))
 			// Nose up as it jumps, down as it drops; with the hill, on it.
 			$.setRotation(
-				hanging
-					? Math.max(
-							-8,
-							Math.min(8, (Math.atan(slope(middle)) * 180) / Math.PI / 5),
-						) +
+				// On its jets, rocking gently as it floats, nose up as it climbs.
+				flying
+					? Math.sin($age / 34) * 2 + Math.max(-8, Math.min(8, ride.vy * 2.5))
+					: hanging
+						? Math.max(
+								-8,
+								Math.min(8, (Math.atan(slope(middle)) * 180) / Math.PI / 5),
+							) +
 							Math.sin($age / 18) * 2.5
-					: ride.grounded
-						? (Math.atan(slope(middle)) * 180) / Math.PI +
-							(rumbles ? (Math.random() - 0.5) * 0.8 : 0)
-						: Math.max(-14, Math.min(14, ride.vy * 1.4)),
+						: ride.grounded
+							? (Math.atan(slope(middle)) * 180) / Math.PI +
+								(rumbles ? (Math.random() - 0.5) * 0.8 : 0)
+							: Math.max(-14, Math.min(14, ride.vy * 1.4)),
 			)
 		},
 	})
@@ -1782,6 +1836,53 @@ export function createBus(world: World) {
 		(phase: number) =>
 		(_: unknown, $age: number): number =>
 			Math.cos(10 + $age / 2 + phase) * -1
+	/** Whether it's on its jets now (see `CourseLook['busJets']`), flying. */
+	const jetting = () =>
+		world.ticks() >= 0 &&
+		onJets(world, world.bus.frontX - SCOOP_FRONT - drillOut() + BUS_WIDTH / 2)
+	/** Its wheels, tucked away on its jets. */
+	const wheelStyle = (): JSX.CSSProperties => ({
+		visibility: jetting() ? 'hidden' : 'visible',
+	})
+	/** Its wings and jets, out only on them. */
+	const jetStyle = (): JSX.CSSProperties => ({
+		'image-rendering': 'pixelated',
+		visibility: jetting() ? 'visible' : 'hidden',
+	})
+	if (world.course.look?.busJets) {
+		// Behind it, attached before its body: its fin, up off its roof, and
+		// its booster, roaring.
+		part(
+			'bus-glider',
+			BUS_FIN.asset,
+			BUS_FIN.width,
+			BUS_FIN.height,
+			BUS_FIN.at,
+			{
+				style: jetStyle,
+			},
+		)
+		part(
+			'bus-glider',
+			BUS_FLAME.frames[0],
+			BUS_FLAME.width,
+			BUS_FLAME.height,
+			BUS_FLAME.at,
+			{
+				frames: BUS_FLAME.frames,
+				frame: () => Math.floor(Math.max(0, world.ticks()) / 3) % 3,
+				style: jetStyle,
+			},
+		)
+		part(
+			'bus-glider',
+			BUS_BOOSTER.asset,
+			BUS_BOOSTER.width,
+			BUS_BOOSTER.height,
+			BUS_BOOSTER.at,
+			{ style: jetStyle },
+		)
+	}
 
 	/**
 	 * Its legs, in place of its wheels, up a mountain: the far side's behind
@@ -1811,7 +1912,7 @@ export function createBus(world: World) {
 			34,
 			38,
 			{ x: 140, y: 105 },
-			{ y: bounce(0) },
+			{ y: bounce(0), style: wheelStyle },
 		)
 		part(
 			'bus-wheel2',
@@ -1819,7 +1920,7 @@ export function createBus(world: World) {
 			34,
 			38,
 			{ x: 208, y: 103 },
-			{ y: bounce(5) },
+			{ y: bounce(5), style: wheelStyle },
 		)
 		part(
 			'bus-wheel3',
@@ -1827,7 +1928,7 @@ export function createBus(world: World) {
 			19,
 			23,
 			{ x: 68, y: 105 },
-			{ y: bounce(10) },
+			{ y: bounce(10), style: wheelStyle },
 		)
 		part(
 			'bus-wheel4',
@@ -1835,7 +1936,7 @@ export function createBus(world: World) {
 			26,
 			30,
 			{ x: 24, y: 102 },
-			{ y: bounce(15) },
+			{ y: bounce(15), style: wheelStyle },
 		)
 	}
 	if (!look.sleigh)
@@ -1858,6 +1959,17 @@ export function createBus(world: World) {
 		})
 	else part('bus-body', look.body, BUS_WIDTH, BUS_HEIGHT, { x: 0, y: 0 })
 	legs('bus-legs', false)
+	// Its near wing, over its side, on its jets: attached after its body, so
+	// drawn over it.
+	if (world.course.look?.busJets)
+		part(
+			'bus-spray',
+			BUS_WING.asset,
+			BUS_WING.width,
+			BUS_WING.height,
+			BUS_WING.at,
+			{ style: jetStyle },
+		)
 	// Snow sprayed off the back of its sleigh's runners, as it goes, from
 	// the start.
 	const sprayFor = goingFor()
@@ -2721,6 +2833,25 @@ export function createFound(world: World) {
 				width: () => size.width,
 				height: () => size.height,
 			}),
+			// Their own hat on, if they've one: flickering, by the tick.
+			...(sprite.ownHat && {
+				drawReach: WORN_HAT_REACH,
+				draw: ({ ctx, drawDefault, image }) => {
+					drawDefault()
+					const own = sprite.ownHat
+					// Stolen off his head: bare-headed for the rest of the race.
+					if (!own || world.foundHatStolen) return
+					const head = headTop(frame, size.width, size.height)
+					paintOwnHat(
+						ctx,
+						image,
+						own,
+						(head?.x ?? size.width / 2) - own.middle,
+						(head?.y ?? 2) - own.crown,
+						world.ticks(),
+					)
+				},
+			}),
 		}),
 	]
 }
@@ -2746,20 +2877,24 @@ function createFoundWaiting(world: World) {
 	const { seat } = waiting
 	const width = sprite.width * RUNNER_SCALE
 	const height = sprite.height * RUNNER_SCALE
-	/** Anyone still running near enough, along, and on their level. */
-	const near = () =>
-		world.racers.some(
-			({ body, out }) =>
-				!out &&
-				Math.abs(body.x - found.x) < waiting.near &&
-				body.feetY <= found.y + 40 &&
-				body.feetY >= found.y - (found.over ?? 40),
-		)
+	/** Whether someone's still running near enough, along, and on their level. */
+	const isNear = ({ body, out }: World['racers'][number]) =>
+		!out &&
+		Math.abs(body.x - found.x) < waiting.near &&
+		body.feetY <= found.y + 40 &&
+		body.feetY >= found.y - (found.over ?? 40)
+	const near = () => world.racers.some(isNear)
+	/** Anyone near running as them: an imposter, to be told so. */
+	const selfNear = () =>
+		!!found.toSelf &&
+		world.racers.some((r) => isNear(r) && r.runner.id === found.runner)
 	/** Up till this tick, if they're up: what they're saying, if so. */
 	const [upUntil, setUpUntil] = createSignal(0)
 	const [says, setSays] = createSignal(waiting.says[0])
 	const up = () => world.ticks() < upUntil()
-	const longest = Math.max(...waiting.says.map((s) => s.length))
+	const longest = Math.max(
+		...[...waiting.says, found.toSelf ?? ''].map((s) => s.length),
+	)
 	return createController({
 		frames: [sprite.sit ?? waiting.up],
 		init: () => ({
@@ -2774,8 +2909,9 @@ function createFoundWaiting(world: World) {
 		onEnterFrame: () => {
 			if (!near()) return
 			const tick = world.ticks()
-			// Just up: something to say.
-			if (!up())
+			// Just up: something to say; to anyone running as them, their own.
+			if (selfNear() && found.toSelf) setSays(found.toSelf)
+			else if (!up())
 				setSays(waiting.says[Math.floor(tick / 7) % waiting.says.length])
 			setUpUntil(tick + FOUND_SIT_AFTER)
 		},
@@ -3502,6 +3638,10 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			})
 		case 'zombie':
 			return createZombie(world, state, o, id)
+		case 'spider':
+			return createSpider(world, state, o, id)
+		case 'stalactite':
+			return createStalactite(world, state, o, id)
 		case 'mummy':
 			return createMummy(world, state, o, id)
 		case 'geese':
@@ -4128,6 +4268,138 @@ function createZombie(
 	})
 }
 
+/** How many ticks each of a spider's steps lasts, and how long it stays squashed, bounced on. */
+const SPIDER_STEP = 6
+const SPIDER_SQUASH = 12
+
+/**
+ * A huge spider, scuttling to and fro on a Cave's floor, squashed down a
+ * moment when someone bounces on it; or scooped, and flying.
+ */
+function createSpider(
+	world: World,
+	state: ObstacleState,
+	o: Extract<Obstacle, { kind: 'spider' }>,
+	id: string,
+) {
+	const squashed = SPIDER_FRAMES.length
+	return createController({
+		frames: [...SPIDER_FRAMES, SPIDER_SQUASHED],
+		init: () => ({
+			id,
+			type: 'zombie',
+			...createObjectSignal(o.x - SPIDER_WIDTH / 2, 'x'),
+			...createObjectSignal(world.terrain.groundY(o.x) - SPIDER_HEIGHT, 'y'),
+			width: () => SPIDER_WIDTH,
+			height: () => SPIDER_HEIGHT,
+			...createObjectSignal(0, 'rotation'),
+			// Drawn facing left: turned round, going right.
+			...createObjectSignal(1, 'xScale'),
+			...createObjectSignal(0 as number | undefined, 'frame'),
+			...createObjectSignal('pause' as 'play' | 'pause', 'state'),
+		}),
+		onEnterFrame({ $ }) {
+			const spider = spiderAt(world, { ...state, obstacle: o })
+			const ground = world.terrain.groundY(spider.x)
+			$.setX(spider.x - SPIDER_WIDTH / 2)
+			$.setY(ground - SPIDER_HEIGHT)
+			if (state.scooped) {
+				const flight = scoopFlight(state.scooped, world.ticks())
+				$.setX(spider.x - SPIDER_WIDTH / 2 + flight.x)
+				$.setY(ground - SPIDER_HEIGHT + flight.y)
+				$.setRotation(flight.spin)
+				$.setFrame(squashed)
+				return
+			}
+			$.setXScale(spider.facing === 1 ? -1 : 1)
+			const now = Math.max(0, world.ticks())
+			$.setFrame(
+				state.flown !== undefined && now - state.flown < SPIDER_SQUASH
+					? squashed
+					: Math.floor(Math.max(0, world.raceTicks()) / SPIDER_STEP) %
+							SPIDER_FRAMES.length,
+			)
+		},
+	})
+}
+
+/** How far a stalactite shakes, either way, set off; and how long its dust hangs about, smashed. */
+const STALACTITE_SHAKE = 2
+const DUST_TICKS = 24
+
+/**
+ * A stalactite that falls: hung from the Cave's roof, shaking and cracked
+ * once it's set off, falling, and smashed on the floor in a puff of dust,
+ * rubble left lying. Where it is goes by the race's clock (see
+ * `stalactiteAt`), so it's the same on every screen.
+ */
+function createStalactite(
+	world: World,
+	state: ObstacleState,
+	o: Extract<Obstacle, { kind: 'stalactite' }>,
+	id: string,
+) {
+	const at = () => stalactiteAt(world, { ...state, obstacle: o })
+	const first = at()
+	const top = first.top
+	const bottom = first.ground + 2
+	const width = Math.max(DUST_WIDTH, STALACTITE_WIDTH)
+	return createController({
+		init: () => ({
+			id,
+			type: 'hazard',
+			x: () => o.x - width / 2,
+			y: () => top,
+			width: () => width,
+			height: () => bottom - top,
+		}),
+		draw: ({ ctx, image }) => {
+			const now = at()
+			const picture = (url: string) => image(url)?.image
+			const middle = width / 2
+			if (now.phase !== 'smashed') {
+				const shake =
+					now.phase === 'shaking'
+						? (Math.floor(now.since / 2) % 2 ? 1 : -1) * STALACTITE_SHAKE
+						: 0
+				const art = picture(
+					now.phase === 'hanging' ? STALACTITE : STALACTITE_CRACKED,
+				)
+				if (art)
+					ctx.drawImage(
+						art,
+						Math.round(middle - STALACTITE_WIDTH / 2 + shake),
+						Math.round(now.top - top),
+						STALACTITE_WIDTH,
+						STALACTITE_HEIGHT,
+					)
+				return
+			}
+			const rubble = picture(STALACTITE_RUBBLE)
+			if (rubble)
+				ctx.drawImage(
+					rubble,
+					Math.round(middle - RUBBLE_WIDTH / 2),
+					Math.round(now.ground - top - RUBBLE_HEIGHT + 2),
+					RUBBLE_WIDTH,
+					RUBBLE_HEIGHT,
+				)
+			if (now.since >= DUST_TICKS) return
+			const puff =
+				DUST_FRAMES[Math.floor((now.since / DUST_TICKS) * DUST_FRAMES.length)]
+			const dust = puff && picture(puff)
+			if (dust)
+				ctx.drawImage(
+					dust,
+					Math.round(middle - DUST_WIDTH / 2),
+					Math.round(now.ground - top - DUST_HEIGHT + 2),
+					DUST_WIDTH,
+					DUST_HEIGHT,
+				)
+		},
+	})
+}
+
 /** A Mummy's frames: two, side by side, in cells twice the size of a screen pixel. */
 const MUMMY_CELLS = { width: 18, height: 29 }
 const MUMMY_WIDTH = MUMMY_CELLS.width * 2
@@ -4393,8 +4665,8 @@ export function createWarnings(world: World) {
 export function createKmSigns(world: World) {
 	const { terrain } = world
 	const { sea } = world.course
-	return [1, 2, 3, 4].map((km) => {
-		let x = START_X + km * 1000 * PX_PER_M
+	return ([1, 2, 3, 4] as const).map((km) => {
+		let x = world.course.kmSignsAt?.[km] ?? START_X + km * 1000 * PX_PER_M
 		// Out at sea, on a buoy, bobbing.
 		const afloat = !!sea && x > sea.from + 100 && x < sea.to - 200
 		const gap = terrain.gaps.find((g) => x > g.from - 30 && x < g.to + 30)

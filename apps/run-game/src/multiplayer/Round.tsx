@@ -9,13 +9,14 @@ import {
 } from 'solid-js'
 import type { Course } from '../courses/types'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
-import { PX_PER_M } from '../game/constants'
+import { PX_PER_M, RUNNER_SCALE } from '../game/constants'
 import { POPUP_TICKS, onScreen, roundOver, stepWorld } from '../game/step'
 import { type Racer, type RacerEntry, createWorld } from '../game/world'
 import { type Controls, touchScreen } from '../input'
 import { PauseMenu, SOUND_ITEMS } from '../screens/PauseMenu'
 import { RaceStartOverlay, createRaceStart } from '../ui/RaceStart'
 import { Stage } from '../ui/Stage'
+import { NameTag, hatRise } from './NameTag'
 
 /**
  * One Round: a course raced by every Player at once on the one screen,
@@ -30,7 +31,7 @@ export function Round(props: {
 	of?: number
 	racers: RacerEntry[]
 	/**
-	 * Its Starter, who starts it from its start screen by pressing jump:
+	 * Its Starter, who starts it from its start screen by pressing any of their keys or buttons:
 	 * their Player number, colour and name, and their controls.
 	 */
 	starter?: {
@@ -73,18 +74,17 @@ export function Round(props: {
 
 	const [paused, setPaused] = createSignal(false)
 	// Covered while it's got ready, then its start screen, held till its
-	// Starter presses jump: every Round's a course raced for the first time.
+	// Starter presses anything: every Round's a course raced for the first time.
 	const start = createRaceStart({
 		world,
 		scene,
 		intro: true,
-		starter: () =>
-			props.starter?.controls() ?? {
-				left: false,
-				right: false,
-				up: false,
-				down: false,
-			},
+		// Any of their buttons or keys, not just jump: held as "up", for starting it.
+		starter: () => {
+			const held = props.starter?.controls()
+			const any = !!held && (held.up || held.down || held.left || held.right)
+			return { left: false, right: false, up: any, down: false }
+		},
 		onGo: () => {
 			for (const r of world.racers) r.body.wasUp = true
 			props.onWaiting?.(false)
@@ -136,7 +136,7 @@ export function Round(props: {
 							kicker={`Round ${props.number}${props.of ? ` of ${props.of}` : ''}`}
 							prompt={
 								props.starter
-									? `P${props.starter.number}${props.starter.name ? ` ${props.starter.name}` : ''}: press jump to start`
+									? `${props.starter.name || `P${props.starter.number}`}: press any key to start`
 									: 'Press Enter to start'
 							}
 						/>
@@ -177,8 +177,10 @@ export function RoundHud(props: {
 	const tag = (racer: Racer) => {
 		// Read the tick, so this keeps up: bodies aren't signals.
 		world.ticks()
-		const height = racer.runner.sprite.height * 2
-		return onScreen(world, racer.body.x, racer.body.feetY - height - 8)
+		const height = racer.runner.sprite.height * RUNNER_SCALE
+		// Over their hat, if it stands up over their head.
+		const rise = hatRise(racer.runner, racer.body.hat, RUNNER_SCALE)
+		return onScreen(world, racer.body.x, racer.body.feetY - height - 4 - rise)
 	}
 	const left = () => {
 		world.ticks()
@@ -251,18 +253,18 @@ export function RoundHud(props: {
 			<For each={world.racers}>
 				{(racer) => (
 					<Show when={tagged(racer)}>
-						<div
+						<NameTag
+							colour={racer.colour ?? 'var(--ink)'}
+							size={13 * (props.textScale ?? 1)}
 							style={{
-								...styles.tag,
-								'font-size': size(13),
 								left: `${tag(racer).x}px`,
 								top: `${tag(racer).y}px`,
-								background: racer.colour,
+								// Its arrow's tip on the spot.
+								transform: 'translate(-50%, -100%)',
 							}}
 						>
-							<span style={{ 'margin-right': '0.7em' }}>P{racer.number}</span>
 							{racer.runner.name}
-						</div>
+						</NameTag>
 					</Show>
 				)}
 			</For>
@@ -336,18 +338,8 @@ const styles = {
 		left: '12px',
 		top: '230px',
 		color: 'white',
-		padding: '8px 10px 4px',
+		padding: '6px 10px',
 		'font-size': '20px',
-	},
-	tag: {
-		position: 'absolute',
-		transform: 'translate(-50%, -100%)',
-		padding: '3px 5px 0',
-		color: 'white',
-		'font-size': '13px',
-		'white-space': 'nowrap',
-		border: '2px solid var(--ink)',
-		'text-shadow': '1px 1px 0 var(--ink)',
 	},
 	popup: {
 		position: 'absolute',

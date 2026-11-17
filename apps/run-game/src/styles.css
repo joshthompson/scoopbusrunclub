@@ -67,6 +67,82 @@ textarea {
 }
 
 /*
+ * Scroll bars, wherever something scrolls: blocky and pixel-art, a yellow
+ * block in an ink trough, and always shown, never fading out as an overlay
+ * one does. Chrome drops these for anything with `scrollbar-width` or
+ * `scrollbar-color` set, so nothing sets them.
+ *
+ * 14 px of bar, with 4 px clear either side of it (transparent borders,
+ * the backgrounds clipped inside them), off the panel's edge and what's
+ * scrolling.
+ */
+::-webkit-scrollbar {
+	width: 22px;
+	height: 22px;
+}
+::-webkit-scrollbar-track {
+	background: var(--ink);
+	background-clip: padding-box;
+	border: solid transparent;
+	border-width: 0 4px;
+	border-radius: 0;
+	/* A lighter notch down its middle, for the block to run in. */
+	box-shadow: inset 4px 0 0 var(--ink), inset -4px 0 0 var(--ink), inset 0 0 0
+		14px rgba(255, 255, 255, 0.12);
+}
+::-webkit-scrollbar-track:horizontal {
+	border-width: 4px 0;
+	box-shadow: inset 0 4px 0 var(--ink), inset 0 -4px 0 var(--ink), inset 0 0 0
+		14px rgba(255, 255, 255, 0.12);
+}
+/*
+ * Its ink outline's an inset shadow, the border being the gap: lit top
+ * left, shaded bottom right, inside it, as a pixel button is.
+ */
+::-webkit-scrollbar-thumb {
+	background: #ffd23f;
+	background-clip: padding-box;
+	border: solid transparent;
+	border-width: 0 4px;
+	border-radius: 0;
+	box-shadow: inset 0 0 0 2px var(--ink), inset 4px 4px 0 #fff3b0, inset -4px
+		-4px 0 #b33a2a;
+}
+::-webkit-scrollbar-thumb:horizontal {
+	border-width: 4px 0;
+}
+::-webkit-scrollbar-thumb:hover {
+	background-color: #ffe27a;
+}
+::-webkit-scrollbar-thumb:active {
+	background-color: #f0b92a;
+	box-shadow: inset 0 0 0 2px var(--ink), inset 4px 4px 0 #b33a2a, inset -4px
+		-4px 0 #fff3b0;
+}
+::-webkit-scrollbar-corner {
+	background: transparent;
+}
+::-webkit-scrollbar-button {
+	display: none;
+}
+
+/* Right up against the panel's edge: no clear gap on the bar's right. */
+.flush-scrollbar::-webkit-scrollbar {
+	width: 18px;
+}
+.flush-scrollbar::-webkit-scrollbar-track,
+.flush-scrollbar::-webkit-scrollbar-thumb {
+	border-width: 0 0 0 4px;
+}
+
+/* Firefox has no `::-webkit-scrollbar`: the same colours, at least. */
+@supports not selector(::-webkit-scrollbar) {
+	* {
+		scrollbar-color: #ffd23f var(--ink);
+	}
+}
+
+/*
  * Run strips are drawn right to left (see `generateFrames(…, reverse)` in the
  * web app), so they play by stepping the image to the right.
  */

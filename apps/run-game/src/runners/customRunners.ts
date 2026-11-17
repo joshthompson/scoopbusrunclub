@@ -8,6 +8,16 @@ export interface CustomRunner {
 	avatar: CharacterSpriteProps
 }
 
+/**
+ * The longest a runner's name can be: short enough for the select screen's
+ * cards and the name over their head.
+ */
+export const MAX_RUNNER_NAME_LENGTH = 12
+
+/** A runner's name, cut down to `MAX_RUNNER_NAME_LENGTH`. */
+export const runnerName = (name: string) =>
+	name.slice(0, MAX_RUNNER_NAME_LENGTH).trimEnd()
+
 /** Kept in this browser only: they're nobody else's business. */
 const STORAGE_KEY = 'scoopbus-run:runners'
 
@@ -23,7 +33,12 @@ function isCustomRunner(value: unknown): value is CustomRunner {
 function load(): CustomRunner[] {
 	try {
 		const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
-		return Array.isArray(stored) ? stored.filter(isCustomRunner) : []
+		// Named before names were cut down to 12: cut down now.
+		return Array.isArray(stored)
+			? stored
+					.filter(isCustomRunner)
+					.map((runner) => ({ ...runner, name: runnerName(runner.name) }))
+			: []
 	} catch {
 		return []
 	}

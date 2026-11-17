@@ -83,7 +83,7 @@ export function InstructionsScreen(props: { onBack: () => void }) {
 		{
 			icon: member ? (
 				<RunStrip
-					frame={member.sprite.run[0] ?? ''}
+					run={member.sprite.run}
 					width={member.sprite.width}
 					height={member.sprite.height}
 					scale={1.4}
@@ -179,7 +179,7 @@ const styles = {
 	},
 	key: {
 		'min-width': '30px',
-		padding: '6px 7px 3px',
+		padding: '4px 7px 5px',
 		background: 'white',
 		color: 'var(--ink)',
 		'border-bottom': '4px solid #9aa3a8',

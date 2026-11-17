@@ -1,5 +1,4 @@
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
-import { MAX_RACER_NAME_LENGTH } from '@/utils/customRacers'
 import {
 	For,
 	type JSX,
@@ -12,8 +11,10 @@ import {
 } from 'solid-js'
 import {
 	type CustomRunner,
+	MAX_RUNNER_NAME_LENGTH,
 	deleteCustomRunner,
 	newRunnerId,
+	runnerName,
 	saveCustomRunner,
 } from '../runners/customRunners'
 import {
@@ -44,7 +45,7 @@ export function PadRunnerEditor(props: {
 	onDelete: () => void
 }) {
 	const [name, setName] = createSignal(
-		props.runner?.name ?? props.suggestedName ?? '',
+		runnerName(props.runner?.name ?? props.suggestedName ?? ''),
 	)
 	const [avatar, setAvatar] = createSignal<Avatar>(
 		props.runner?.avatar ?? DEFAULT_AVATAR,
@@ -153,7 +154,7 @@ export function PadRunnerEditor(props: {
 		<div style={{ ...styles.preview, ...(wide() ? styles.previewWide : {}) }}>
 			<div style={styles.stage}>
 				<RunStrip
-					frame={frames().frames.run?.[0] ?? ''}
+					run={frames().frames.run ?? []}
 					width={frames().width}
 					height={frames().height}
 					scale={wide() ? 4 : 3.5}
@@ -211,7 +212,7 @@ export function PadRunnerEditor(props: {
 										: {}),
 								}}
 								value={name()}
-								maxLength={MAX_RACER_NAME_LENGTH}
+								maxLength={MAX_RUNNER_NAME_LENGTH}
 								placeholder="Who's running?"
 								autocomplete="off"
 								autocapitalize="words"
@@ -223,7 +224,7 @@ export function PadRunnerEditor(props: {
 								}}
 							/>
 							<span style={styles.counter}>
-								{name().length}/{MAX_RACER_NAME_LENGTH}
+								{name().length}/{MAX_RUNNER_NAME_LENGTH}
 							</span>
 						</span>
 					</label>
@@ -349,7 +350,7 @@ const styles = {
 	title: { 'font-size': '20px', 'white-space': 'nowrap' },
 	topButton: {
 		'min-height': '40px',
-		padding: '6px 12px 3px',
+		padding: '4px 12px 5px',
 		background: 'transparent',
 		color: 'white',
 		border: '3px solid white',
@@ -386,7 +387,7 @@ const styles = {
 			'linear-gradient(to bottom, var(--sky-blue-top), var(--sky-blue-bottom) 82%, var(--grass-green) 82%)',
 	},
 	previewName: {
-		padding: '8px 12px 6px',
+		padding: '7px 12px',
 		color: YELLOW,
 		'white-space': 'nowrap',
 		'line-height': 1,
@@ -427,7 +428,7 @@ const styles = {
 	chips: { display: 'flex', 'flex-wrap': 'wrap', gap: '8px' },
 	chip: {
 		'min-height': '42px',
-		padding: '6px 12px 3px',
+		padding: '4px 12px 5px',
 		background: 'transparent',
 		color: 'white',
 		border: '3px solid rgba(255, 255, 255, 0.5)',
@@ -491,7 +492,7 @@ const styles = {
 	save: {
 		flex: 1,
 		'min-height': '52px',
-		padding: '8px 16px 4px',
+		padding: '6px 16px',
 		background: YELLOW,
 		color: 'var(--ink)',
 		border: '3px solid white',
@@ -500,7 +501,7 @@ const styles = {
 	},
 	delete: {
 		'min-height': '52px',
-		padding: '8px 16px 4px',
+		padding: '6px 16px',
 		background: 'transparent',
 		color: 'white',
 		border: '3px solid rgba(255, 255, 255, 0.5)',

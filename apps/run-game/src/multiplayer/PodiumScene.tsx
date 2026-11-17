@@ -9,6 +9,13 @@ import { withGaps } from '../game/terrain'
  * the screen. High enough for what's under it, along the grass in front.
  */
 export const PODIUM_GROUND = 432
+/**
+ * Its steps' feet: up the path a way from its middle, at the back of it,
+ * so the steps stand behind whoever's running along it.
+ */
+export const PODIUM_BACK = PODIUM_GROUND - 12
+/** Where everyone runs about: down the path a way from its middle, along its front. */
+export const PODIUM_FRONT = PODIUM_GROUND + 8
 
 /** Haga, dead flat where the Podium's put up, so it stands level. */
 const terrain = withGaps({

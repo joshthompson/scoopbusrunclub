@@ -5,11 +5,18 @@ import { OUTLINED } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { onHover } from '../ui/hover'
 import { Medal, ordinal, pts } from './Medal'
-import { NameTag, PodiumPlay } from './PodiumPlay'
-import { PODIUM_GROUND, PodiumScene } from './PodiumScene'
+import { NameTag, hatRise, tagOver } from './NameTag'
+import { PodiumPlay } from './PodiumPlay'
+import { PODIUM_BACK, PodiumScene } from './PodiumScene'
 import { type Placing, standingsOf } from './Results'
 import { Worn } from './Worn'
-import { PODIUM_CELL, STEP_COLUMNS, STEP_ROWS, podiumStep } from './podiumArt'
+import {
+	PODIUM_CELL,
+	STEP_COLUMNS,
+	STEP_ROWS,
+	STEP_STAND,
+	podiumStep,
+} from './podiumArt'
 import { COLOURS, type Seat, seatPlayable } from './room'
 
 /** The keys that move between the buttons, and which way. */
@@ -141,13 +148,17 @@ export function Podium(props: {
 			</div>
 
 			<div style={styles.podium} ref={podium}>
-				<For each={STEP_ORDER.filter((place) => top()[place])}>
+				{/* All three steps, always: one nobody's on, bare, but still there
+				    to jump on. */}
+				<For each={STEP_ORDER}>
 					{(place) => (
 						<Step
 							seat={top()[place]}
 							place={(place + 1) as 1 | 2 | 3}
 							loose={!!props.controlsFor}
-							onStep={(step) => steps.set(top()[place].id, step)}
+							onStep={(step) =>
+								steps.set(top()[place]?.id ?? `empty:${place + 1}`, step)
+							}
 						/>
 					)}
 				</For>
@@ -210,15 +221,18 @@ export function Podium(props: {
 	)
 }
 
-/** One Player on their step: them, their medal round their neck, and the step. */
+/**
+ * One Player on their step: them, their medal round their neck, and the
+ * step. Or, with nobody for it, the step, bare.
+ */
 function Step(props: {
-	seat: Seat
+	seat: Seat | undefined
 	place: 1 | 2 | 3
 	/** Their runner's loose, run about by them (see `PodiumPlay`): only room left for them here. */
 	loose?: boolean
 	onStep?: (step: HTMLElement) => void
 }) {
-	const runner = () => seatPlayable(props.seat)
+	const runner = () => props.seat && seatPlayable(props.seat)
 	const winner = () => props.place === 1
 	const scale = () => (winner() ? 3 : 2.5)
 	return (
@@ -230,11 +244,14 @@ function Step(props: {
 							position: 'relative',
 							width: `${r().sprite.width * scale()}px`,
 							height: `${r().sprite.height * scale()}px`,
+							// Stood on its lit top, in front of the step's back edge.
+							'margin-bottom': `${-STEP_STAND * PODIUM_CELL}px`,
+							'z-index': 1,
 						}}
 					>
 						<Show when={!props.loose}>
 							<RunStrip
-								frame={r().sprite.run[0] ?? ''}
+								run={r().sprite.run}
 								width={r().sprite.width}
 								height={r().sprite.height}
 								scale={scale()}
@@ -245,10 +262,17 @@ function Step(props: {
 								width={r().sprite.width * scale()}
 								height={r().sprite.height * scale()}
 								scale={scale()}
-								hat={props.seat.hat}
+								hat={props.seat?.hat}
 								place={props.place}
+								sprite={r().sprite}
 							/>
-							<NameTag name={r().name} colour={props.seat.colour} />
+							<NameTag
+								colour={props.seat?.colour ?? 'var(--ink)'}
+								size={11}
+								style={tagOver(hatRise(r(), props.seat?.hat, scale()))}
+							>
+								{r().name}
+							</NameTag>
 						</Show>
 					</div>
 				)}
@@ -257,7 +281,7 @@ function Step(props: {
 			    their points. */}
 			<img
 				ref={(step) => props.onStep?.(step)}
-				src={podiumStep(props.place, props.seat.points, props.seat.colour)}
+				src={podiumStep(props.place, props.seat)}
 				alt={`${props.place}`}
 				class="pixelated"
 				style={{
@@ -300,13 +324,14 @@ const styles = {
 		'font-size': '18px',
 		'margin-top': '4px',
 	},
-	// Stood on Haga's path, in the middle: its steps' feet on the path's line.
+	// Stood on Haga's path, in the middle, at the back of it: everyone runs
+	// about along its front, in front of the steps.
 	podium: {
 		position: 'absolute',
 		left: 0,
 		right: 0,
 		top: 0,
-		height: `${PODIUM_GROUND}px`,
+		height: `${PODIUM_BACK}px`,
 		width: 'fit-content',
 		margin: '0 auto',
 		display: 'flex',
@@ -318,7 +343,6 @@ const styles = {
 		'flex-direction': 'column',
 		'align-items': 'center',
 		width: '170px',
-		gap: '4px',
 	},
 	chip: {
 		display: 'inline-block',
@@ -387,7 +411,7 @@ const styles = {
 		'margin-right': '6px',
 	},
 	button: {
-		padding: '8px 14px 4px',
+		padding: '6px 14px',
 		background: 'rgba(15, 31, 41, 0.9)',
 		color: 'white',
 		border: '3px solid white',

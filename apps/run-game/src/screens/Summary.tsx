@@ -1,4 +1,6 @@
 import { For, type JSX, Show, createEffect, on } from 'solid-js'
+import { COURSES } from '../courses'
+import { ENDLESS_MEDAL_COURSES } from '../courses/endless'
 import { SpecialGoalArt } from '../draw/art/goals'
 import { MedalArt } from '../draw/art/medal'
 import { flyerLook } from '../draw/flyerLook'
@@ -11,7 +13,7 @@ import type { Playable } from '../runners/playable'
 import { identity } from '../saved/identity'
 import { ScoreFace } from '../ui/ScoreFace'
 import { onHover } from '../ui/hover'
-import type { Mode } from './Game'
+import type { EndlessCourse, Mode } from './Game'
 
 /** What the end of a course has to say about the high score tables. */
 export interface Placing {
@@ -36,6 +38,17 @@ export interface Placing {
 	/** Whether this go did the course's special goal, and whether that's for the first time. */
 	special?: boolean
 	newSpecial?: boolean
+	/**
+	 * In Endless, its own goals: how many courses the run's got through,
+	 * the medal that's worth, and whether it's its best yet.
+	 */
+	endless?: {
+		cleared: number
+		medal?: Medal
+		newMedal?: boolean
+	}
+	/** In Endless, the run, over: each course's points, for its summary. */
+	run?: { courses: EndlessCourse[] }
 }
 
 /** Scores from the end of a course that would go on the online tables, and how sending them's going. */
@@ -109,6 +122,8 @@ export function Summary(props: {
 	/** Which of them is picked. */
 	picked: number
 	onPick: (i: number) => void
+	/** At the end of an Endless run, its table of each course's points, open. */
+	breakdown?: boolean
 }) {
 	const { world } = props
 	const finished = () => props.result.kind === 'finished'
@@ -116,8 +131,15 @@ export function Summary(props: {
 	const targets = medalScores(world.course)
 	const endless = props.mode.kind === 'endless' ? props.mode : undefined
 
-	/** Each line of the points: the distance, then each bonus had. */
-	const lines = () => [
+	/**
+	 * Each line of the points: the distance, then each bonus had. Not in
+	 * Endless, the run over: its courses, in their own table (see `run`).
+	 */
+	const lines = () => (endless ? [] : courseLines())
+	/** In Endless, the run over, each of its courses. */
+	const run = () => (endless ? (props.placing?.run?.courses ?? []) : [])
+	const newBests = () => run().filter((course) => course.newBest).length
+	const courseLines = () => [
 		{ label: 'Distance', points: world.metres() },
 		...(Object.keys(BONUS_LABELS) as BonusKind[])
 			.map((kind) => ({ kind, ...world.bonuses[kind] }))
@@ -190,7 +212,14 @@ export function Summary(props: {
 
 	return (
 		<div style={styles.backdrop}>
-			<div style={styles.panel}>
+			<div
+				style={{
+					...styles.panel,
+					// The courses' table open: it scrolls, in what room's left,
+					// and nothing else does.
+					...(props.breakdown && endless ? styles.panelFixed : {}),
+				}}
+			>
 				<div style={styles.heading}>
 					<div
 						style={{
@@ -200,7 +229,7 @@ export function Summary(props: {
 					>
 						{finished()
 							? endless
-								? `${world.course.name} done!`
+								? 'Every course done!'
 								: 'Finished!'
 							: props.result.kind === 'fallen'
 								? 'Fell!'
@@ -208,29 +237,58 @@ export function Summary(props: {
 					</div>
 					<div style={styles.subtitle}>
 						<Show
-							when={finished()}
-							fallback={`${world.runner.name} made it ${km(props.result.distance)} km round ${world.course.name}`}
+							when={!endless}
+							fallback={`${world.runner.name} got through ${props.placing?.endless?.cleared ?? 0} of ${COURSES.length} courses`}
 						>
-							{world.runner.name} beat the bus by {metres(props.result.busGap)}
+							<Show
+								when={finished()}
+								fallback={`${world.runner.name} made it ${km(props.result.distance)} km round ${world.course.name}`}
+							>
+								{world.runner.name} beat the bus by{' '}
+								{metres(props.result.busGap)}
+							</Show>
 						</Show>
 					</div>
-					{/* The medal it got: or a shadow of one, and what it'd take. */}
-					<div style={styles.medal}>
-						<MedalArt medal={props.placing?.medal} scale={3} />
-						<div style={styles.medalText}>
-							<span style={styles.medalName}>
-								{props.placing?.medal
-									? `${MEDAL_NAMES[props.placing.medal]} medal!${props.placing.newMedal ? ' New best' : ''}`
-									: 'No medal'}
-							</span>
-							<span style={styles.medalTargets}>
-								Bronze {number(targets.bronze)} · Silver{' '}
-								{number(targets.silver)} · Gold {number(targets.gold)}
-							</span>
+					{/* The medal it got: or a shadow of one, and what it'd take.
+					    Not in Endless, the run over: its own, under. */}
+					<Show when={!endless}>
+						<div style={styles.medal}>
+							<MedalArt medal={props.placing?.medal} scale={3} />
+							<div style={styles.medalText}>
+								<span style={styles.medalName}>
+									{props.placing?.medal
+										? `${MEDAL_NAMES[props.placing.medal]} medal!${props.placing.newMedal ? ' New best' : ''}`
+										: 'No medal'}
+								</span>
+								<span style={styles.medalTargets}>
+									Bronze {number(targets.bronze)} · Silver{' '}
+									{number(targets.silver)} · Gold {number(targets.gold)}
+								</span>
+							</div>
 						</div>
-					</div>
-					{/* Its special goal, if it has one: done this go, or not. */}
-					<Show when={world.course.special}>
+					</Show>
+					{/* In Endless, its own medal too: for how many courses the run's
+					    got through, and what each takes. */}
+					<Show when={props.placing?.endless}>
+						{(run) => (
+							<div style={styles.medal}>
+								<MedalArt medal={run().medal} scale={3} />
+								<div style={styles.medalText}>
+									<span style={styles.medalName}>
+										{run().medal
+											? `${MEDAL_NAMES[run().medal as Medal]} medal!${run().newMedal ? ' New best' : ''}`
+											: 'No medal'}
+									</span>
+									<span style={styles.medalTargets}>
+										{`Bronze ${ENDLESS_MEDAL_COURSES.bronze} · Silver ${ENDLESS_MEDAL_COURSES.silver} · Gold ${ENDLESS_MEDAL_COURSES.gold} courses`}
+									</span>
+								</div>
+							</div>
+						)}
+					</Show>
+					{/* Its special goal, if it has one: done this go, or not. Not in
+					    Endless's summary of the whole run. */}
+					<Show when={!endless && world.course.special}>
 						{(special) => (
 							<div style={styles.medal}>
 								<SpecialGoalArt
@@ -259,39 +317,104 @@ export function Summary(props: {
 					</Show>
 				</div>
 
-				<div
-					style={{
-						...styles.points,
-						// Just the distance: across the whole width, not half of it.
-						...(lines().length === 1 ? { 'grid-template-columns': '1fr' } : {}),
-					}}
-				>
-					<For each={lines()}>
-						{(line) => (
-							<div style={styles.line}>
-								<span style={styles.lineLabel}>{line.label}</span>
-								<span
-									style={{
-										...styles.linePoints,
-										...(line.points < 0 ? styles.lost : {}),
-									}}
-								>
-									{line.label === 'Distance'
-										? number(line.points)
-										: `${line.points < 0 ? '-' : '+'}${number(Math.abs(line.points))}`}
-								</span>
-							</div>
-						)}
-					</For>
-				</div>
+				<Show when={!endless}>
+					<div
+						style={{
+							...styles.points,
+							// Just the distance: across the whole width, not half of it.
+							...(lines().length === 1
+								? { 'grid-template-columns': '1fr' }
+								: {}),
+						}}
+					>
+						<For each={lines()}>
+							{(line) => (
+								<div style={styles.line}>
+									<span style={styles.lineLabel}>{line.label}</span>
+									<span
+										style={{
+											...styles.linePoints,
+											...(line.points < 0 ? styles.lost : {}),
+										}}
+									>
+										{line.label === 'Distance'
+											? number(line.points)
+											: `${line.points < 0 ? '-' : '+'}${number(Math.abs(line.points))}`}
+									</span>
+								</div>
+							)}
+						</For>
+					</div>
+				</Show>
+				{/* In Endless, the run over: how many courses, and how many of
+				    them a best; opened, each course's points, in a table. */}
+				<Show when={endless}>
+					<div style={styles.runLine}>
+						<span>
+							{run().length} {run().length === 1 ? 'course' : 'courses'} run
+						</span>
+						<Show when={newBests()}>
+							<span style={styles.newBest}>
+								{newBests()} new {newBests() === 1 ? 'best' : 'bests'}
+							</span>
+						</Show>
+					</div>
+					<Show when={props.breakdown}>
+						<div style={styles.tableWrap}>
+							<table style={styles.table}>
+								<thead>
+									<tr>
+										<th style={styles.th}>#</th>
+										<th style={styles.thName}>Course</th>
+										<th style={styles.th} />
+										<th style={styles.th}>Points</th>
+										<th style={styles.th}>Best</th>
+									</tr>
+								</thead>
+								<tbody>
+									<For each={run()}>
+										{(course, i) => (
+											<tr>
+												<td style={styles.td}>{i() + 1}</td>
+												<td style={styles.tdName}>{course.name}</td>
+												<td style={styles.tdMedal}>
+													<Show when={course.medal}>
+														<MedalArt medal={course.medal} scale={1} />
+													</Show>
+												</td>
+												<td style={styles.td}>{number(course.score)}</td>
+												<td style={styles.td}>
+													<Show
+														when={course.newBest}
+														fallback={
+															<span style={styles.bestBefore}>
+																{course.bestBefore
+																	? number(course.bestBefore)
+																	: '-'}
+															</span>
+														}
+													>
+														<span style={styles.newBest}>New best!</span>
+													</Show>
+												</td>
+											</tr>
+										)}
+									</For>
+								</tbody>
+							</table>
+						</div>
+					</Show>
+				</Show>
 
 				<div style={styles.totals}>
-					<div style={styles.total}>
-						<span>
-							{world.course.name} {best()}
-						</span>
-						<span>{number(world.courseScore())} pts</span>
-					</div>
+					<Show when={!endless}>
+						<div style={styles.total}>
+							<span>
+								{world.course.name} {best()}
+							</span>
+							<span>{number(world.courseScore())} pts</span>
+						</div>
+					</Show>
 					<Show when={endless}>
 						<div style={styles.total}>
 							<span>Endless</span>
@@ -402,15 +525,15 @@ const styles = {
 		// Scrolled, with more on it than fits: a special goal and a great
 		// many bonuses at once. New runners aren't on it (see `UnlockReveal`).
 		'overflow-y': 'auto',
-		'scrollbar-width': 'thin',
-		'scrollbar-color': 'rgba(255, 255, 255, 0.5) transparent',
 		'box-sizing': 'border-box',
 		padding: '18px 24px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '4px solid white',
 	},
-	heading: { 'text-align': 'center' },
+	/** Not scrolled: the courses' table in it is (see `tableWrap`). */
+	panelFixed: { 'overflow-y': 'hidden' },
+	heading: { 'text-align': 'center', 'flex-shrink': 0 },
 	title: { 'font-size': '40px', 'line-height': 1 },
 	subtitle: { 'margin-top': '6px', 'font-size': '16px', opacity: 0.85 },
 	medal: {
@@ -449,6 +572,7 @@ const styles = {
 	/** Points taken off, for hazards. */
 	lost: { color: '#ff8a80' },
 	totals: {
+		'flex-shrink': 0,
 		display: 'flex',
 		'flex-direction': 'column',
 		gap: '4px',
@@ -463,7 +587,7 @@ const styles = {
 	},
 	newBest: {
 		'margin-left': '6px',
-		padding: '1px 6px 3px',
+		padding: '2px 6px',
 		background: 'var(--bus-red)',
 		'font-size': '12px',
 		'vertical-align': 'middle',
@@ -473,7 +597,77 @@ const styles = {
 		'font-size': '12px',
 		opacity: 0.6,
 	},
+	/** In Endless, the run over: how many courses, and new bests. */
+	runLine: {
+		'flex-shrink': 0,
+		display: 'flex',
+		'justify-content': 'center',
+		'align-items': 'center',
+		gap: '8px',
+		'font-size': '14px',
+	},
+	/** Each course's points, in a table: scrolled, in whatever room the panel has left. */
+	tableWrap: {
+		// As much of what's left as it needs, scrolled past that.
+		flex: '0 1 auto',
+		'min-height': '60px',
+		'overflow-y': 'auto',
+		border: '2px solid rgba(255, 255, 255, 0.25)',
+	},
+	table: {
+		width: '100%',
+		'border-collapse': 'collapse',
+		'font-size': '13px',
+	},
+	/** Its headings, kept at the top as it scrolls. */
+	th: {
+		position: 'sticky',
+		top: 0,
+		padding: '4px 8px',
+		background: 'var(--ink)',
+		'text-align': 'right',
+		'font-weight': 'normal',
+		// Its words dimmed, not it: solid, over the rows scrolling under it.
+		color: 'rgba(255, 255, 255, 0.7)',
+		'border-bottom': '2px solid rgba(255, 255, 255, 0.25)',
+	},
+	td: {
+		padding: '3px 8px',
+		'text-align': 'right',
+		'white-space': 'nowrap',
+		'border-bottom': '1px solid rgba(255, 255, 255, 0.08)',
+	},
+	/** Each course's medal: room for it, however wide its name is. */
+	tdMedal: {
+		padding: '3px 4px',
+		width: '20px',
+		'min-width': '20px',
+		'text-align': 'center',
+		'border-bottom': '1px solid rgba(255, 255, 255, 0.08)',
+	},
+	/** Each course's name, and its heading, along the left. */
+	tdName: {
+		padding: '3px 8px',
+		'text-align': 'left',
+		'white-space': 'nowrap',
+		'border-bottom': '1px solid rgba(255, 255, 255, 0.08)',
+		width: '100%',
+	},
+	thName: {
+		position: 'sticky',
+		top: 0,
+		padding: '4px 8px',
+		background: 'var(--ink)',
+		'text-align': 'left',
+		'font-weight': 'normal',
+		// Its words dimmed, not it: solid, over the rows scrolling under it.
+		color: 'rgba(255, 255, 255, 0.7)',
+		'border-bottom': '2px solid rgba(255, 255, 255, 0.25)',
+	},
+	/** A course's best, not beaten this run. */
+	bestBefore: { opacity: 0.6 },
 	notes: {
+		'flex-shrink': 0,
 		display: 'flex',
 		'flex-direction': 'column',
 		'align-items': 'center',
@@ -509,7 +703,7 @@ const styles = {
 	unlocked: { color: '#7fe08a' },
 	/** Sending, the first time: a small button by the note. */
 	send: {
-		padding: '4px 8px 2px',
+		padding: '3px 8px',
 		background: 'white',
 		color: 'var(--ink)',
 		border: '2px solid white',
@@ -517,6 +711,7 @@ const styles = {
 	},
 	sendOn: { background: '#ffd23f' },
 	actions: {
+		'flex-shrink': 0,
 		display: 'flex',
 		'flex-direction': 'column',
 		'align-items': 'center',
@@ -525,7 +720,7 @@ const styles = {
 	/** The likeliest next thing: big. */
 	primary: {
 		'min-width': '240px',
-		padding: '10px 18px 6px',
+		padding: '8px 18px',
 		background: 'white',
 		color: 'var(--ink)',
 		border: '3px solid white',
@@ -540,7 +735,7 @@ const styles = {
 		'flex-wrap': 'wrap',
 	},
 	link: {
-		padding: '4px 8px 2px',
+		padding: '3px 8px',
 		background: 'transparent',
 		color: 'white',
 		border: '2px solid rgba(255, 255, 255, 0.35)',

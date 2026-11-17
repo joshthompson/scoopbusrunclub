@@ -1,9 +1,13 @@
 import { createController, createObjectSignal } from 'scoopjs'
+import { type JSX, createSignal } from 'solid-js'
 import { seeded } from '../courses/kit/seeded'
 import type { Secret, SecretLook } from '../courses/types'
 import { VIEW_HEIGHT } from '../game/constants'
-import { secretRoof } from '../game/secret'
+import { DRAWN_FROM } from '../game/groundColumns'
+import { comingAtLaunch, secretRoof } from '../game/secret'
 import type { World } from '../game/world'
+import { bubbleReach, paintBubble } from './Bubble'
+import { cachedArt } from './canvasArt'
 import { rectFiller } from './paint/snappedRect'
 
 /**
@@ -67,10 +71,24 @@ const FLAG = '#7d766d'
 const FLAG_LIT = '#9a9288'
 const FLAG_JOINT = '#5c564f'
 
-/** A part of its drawing, from its top left: a block of colour, or a light's glow. */
+/**
+ * A part of its drawing, from its top left: a block of colour, a light's
+ * glow, or a block of one of its Cave's tiles (see `CaveTiles`), lined up
+ * with the Cave's own, so the rock round a mine is the hill's rock.
+ */
 type Part =
 	| { x: number; y: number; width: number; height: number; fill: string }
 	| { glow: [number, number]; reach: number; colour: string }
+	| {
+			x: number
+			y: number
+			width: number
+			height: number
+			tile: 'rock' | 'wall'
+	  }
+
+/** How wide a strip of it's painted at a time, and kept. */
+const STRIP = 512
 
 /** How far down under its floor it's drawn: off the bottom of the screen, looking at it. */
 const DEEP = 400
@@ -93,6 +111,13 @@ interface Painting {
 	random: () => number
 	rect: (x: number, y: number, w: number, h: number, fill: string) => void
 	glow: (x: number, y: number, reach: number, colour: string) => void
+	tiled: (
+		x: number,
+		y: number,
+		w: number,
+		h: number,
+		tile: 'rock' | 'wall',
+	) => void
 }
 
 export function createSecret(world: World) {
@@ -109,6 +134,7 @@ export function createSecret(world: World) {
 	// goes after someone down it, and on either side; its shafts are drawn
 	// as they're used.
 	const ice = art.walls === 'ice'
+	// A mine's rock goes all the way out either side, as a cellar's earth.
 	const left = ice ? secret.from - 60 : secret.from - UNDER_REACH
 	const right = ice ? secret.to + 60 : secret.to + UNDER_REACH
 	const top = ice
@@ -136,8 +162,17 @@ export function createSecret(world: World) {
 			}),
 		glow: (x, yy, reach, colour) =>
 			parts.push({ glow: [at(x), y(yy)], reach, colour }),
+		tiled: (x, yy, w, h, tile) =>
+			parts.push({
+				x: at(x),
+				y: y(yy),
+				width: Math.round(w),
+				height: Math.round(h),
+				tile,
+			}),
 	}
 	if (art.walls === 'ice') paintIce(painting)
+	else if (art.walls === 'mine') paintMine(painting)
 	else paintVaults(painting, art)
 
 	// A rug in front of whatever has one; and the lights' glow.
@@ -158,6 +193,22 @@ export function createSecret(world: World) {
 				prop.glow.colour,
 			)
 
+	// Its great sweeps (a cellar's earth, a mine's rock, far out either
+	// side), and the rest. The great ones have to be under all the rest to
+	// be painted apart from it; if not, it's all painted together.
+	const isWide = (part: Part) => 'width' in part && part.width > STRIP * 2
+	const firstNarrow = parts.findIndex((part) => !isWide(part))
+	const apart = firstNarrow < 0 || !parts.slice(firstNarrow).some(isWide)
+	const wide = apart ? parts.filter(isWide) : []
+	const narrow = apart ? parts.filter((part) => !isWide(part)) : parts
+	/** Where there's any of the rest, along: no strips kept of nothing. */
+	const reach = (part: Part) =>
+		'glow' in part
+			? [part.glow[0] - part.reach, part.glow[0] + part.reach]
+			: [part.x, part.x + part.width]
+	const narrowFrom = Math.min(...narrow.map((part) => reach(part)[0]))
+	const narrowTo = Math.max(...narrow.map((part) => reach(part)[1]))
+
 	const hollow = createController({
 		init: () => ({
 			id: 'secret',
@@ -167,11 +218,62 @@ export function createSecret(world: World) {
 			width: () => right - left,
 			height: () => bottom - top,
 		}),
-		draw: ({ ctx, $scene }) => {
+		draw: ({ ctx, $scene, image }) => {
 			const view = $scene.canvas.get()
-			paint(ctx, parts, view.x() - left, view.x() - left + view.width())
+			const from = view.x() - left
+			const to = from + view.width()
+			// Its Cave's tiles, lined up with where the Cave's are drawn from.
+			const tiles = world.course.look?.cave?.tiles
+			const pictures = [tiles?.rock, tiles?.wall].map(
+				(tile) => tile && image(tile.asset),
+			)
+			const patterns = (on: CanvasRenderingContext2D) => {
+				const [rock, wall] = pictures.map((picture) => {
+					const filled = picture && on.createPattern(picture.image, 'repeat')
+					filled?.setTransform(
+						new DOMMatrix().translate(DRAWN_FROM - left, -top),
+					)
+					return filled ?? undefined
+				})
+				return { rock, wall }
+			}
+			// Its great sweeps of earth or rock, painted as they're seen: a
+			// fill or two, however wide.
+			paint(ctx, wide, from, to, patterns(ctx))
+			// The rest, hundreds of little blocks: painted once, a strip at a
+			// time, as each comes into view, and drawn from there. Not till
+			// its tiles are in, or it'd be kept without them.
+			if (tiles && !pictures.every((picture) => picture)) {
+				paint(ctx, narrow, from, to, patterns(ctx))
+				return
+			}
+			ctx.imageSmoothingEnabled = false
+			const tall = bottom - top
+			for (
+				let strip = Math.max(0, Math.floor(Math.max(from, narrowFrom) / STRIP));
+				strip * STRIP < Math.min(to, narrowTo, right - left);
+				strip++
+			) {
+				const x = strip * STRIP
+				const art = cachedArt(
+					`secret-${world.course.id}-${strip}`,
+					STRIP,
+					tall,
+					(on) => {
+						on.translate(-x, 0)
+						paint(on, narrow, x, x + STRIP, patterns(on))
+					},
+				)
+				ctx.drawImage(art, x, 0, STRIP, tall)
+			}
 		},
 	})
+
+	/**
+	 * How far back up its floor its things stand: none in a mine, whose
+	 * floor's a line of packed earth, not a floor seen going back.
+	 */
+	const setBack = art.walls === 'mine' ? 0 : SET_BACK
 
 	const things = furnishings.map(({ x, prop }, i) =>
 		createController({
@@ -180,7 +282,7 @@ export function createSecret(world: World) {
 				id: `secret-prop-${i}`,
 				type: 'secret-prop',
 				x: () => Math.round(x - prop.width / 2),
-				y: () => floor - SET_BACK - (prop.hung ?? 0) - prop.height,
+				y: () => floor - setBack - (prop.hung ?? 0) - prop.height,
 				width: () => prop.width,
 				height: () => prop.height,
 				// A telly's screen or a candle flickering; anything else, as it is.
@@ -199,6 +301,9 @@ export function createSecret(world: World) {
 	// out of it. Or the duct: its fan still, and blowing.
 	const { launcher } = art
 	const launcherX = secret.launch - launcher.hands.x
+	/** Whoever says hello, if not whoever's at its far end: one of its furnishings. */
+	const greeter =
+		art.greeter === undefined ? undefined : furnishings[art.greeter]
 	const flying = () =>
 		world.racers.some(
 			(r) =>
@@ -232,8 +337,81 @@ export function createSecret(world: World) {
 		hollow,
 		...things,
 		thrower,
+		...createGreeting(
+			world,
+			secret,
+			greeter
+				? {
+						x: Math.round(greeter.x - greeter.prop.width / 2),
+						top: floor - setBack - greeter.prop.height,
+						width: greeter.prop.width,
+						flying,
+					}
+				: {
+						x: launcherX,
+						top: floor - launcher.kneelHeight,
+						width: launcher.width,
+						flying,
+					},
+		),
 		...createManhole(world, secret, art),
 		...createDuct(world, secret, art),
+	]
+}
+
+/** How big the words in a launcher's bubble are. */
+const GREETING_SIZE = 20
+
+/**
+ * Whoever's at a Secret's far end, calling out (see `Secret['greets']`):
+ * one of their words in a bubble over them, down on one knee, while anyone
+ * in it's coming at them, the Yeti's growl. Who's coming goes by where
+ * everyone is, and which word by the tick the first of them came, so it's
+ * the same on every screen.
+ */
+function createGreeting(
+	world: World,
+	secret: Secret,
+	at: { x: number; top: number; width: number; flying: () => boolean },
+) {
+	const { greets } = secret
+	if (!greets) return []
+	const [says, setSays] = createSignal<string>()
+	const longest = Math.max(
+		...[...greets.says, greets.toSelf ?? ''].map((s) => s.length),
+	)
+	return [
+		createController({
+			init: () => ({
+				id: 'secret-greeting',
+				type: 'secret-prop',
+				x: () => at.x,
+				y: () => at.top,
+				width: () => at.width,
+				height: () => 1,
+			}),
+			drawReach: bubbleReach(at.width, GREETING_SIZE, longest),
+			onEnterFrame: () => {
+				const coming = at.flying()
+					? []
+					: world.racers.filter((r) => !r.out && comingAtLaunch(world, r.body))
+				// To anyone running as one of them, their own word for it.
+				const self =
+					greets.toSelf !== undefined &&
+					coming.some((r) => r.runner.id === secret.unlocks)
+				if (!coming.length) setSays(undefined)
+				else if (self) setSays(greets.toSelf)
+				else if (!says())
+					setSays(
+						greets.says[Math.floor(world.ticks() / 7) % greets.says.length],
+					)
+			},
+			draw: ({ ctx }) => {
+				const text = says()
+				if (text)
+					paintBubble(ctx, text, { width: at.width, size: GREETING_SIZE })
+			},
+		}),
 	]
 }
 
@@ -426,6 +604,137 @@ function paintVaults(painting: Painting, art: SecretLook) {
 	rect(secret.from, floor + 14, secret.to - secret.from, 2, FLAG_JOINT)
 }
 
+/** A mine's timbers: lit, and in shadow; its lamps, and their light. */
+const TIMBER = '#8a5a32'
+const TIMBER_LIT = '#a8743f'
+const TIMBER_DARK = '#5e3a1e'
+const LAMP_IRON = '#2b2622'
+const LAMP_FLAME = '#ffd76a'
+/** Its floor: packed earth, worn smooth, lit along its top. */
+const EARTH_LIT = '#9a7c63'
+const EARTH_TOP = '#7a604d'
+const EARTH_UNDER = '#5c4738'
+/** Its shaft: dark, darker the further down from the bridge, till the mine's light comes up it. */
+const SHAFT_DARK = 'rgba(8, 5, 4, 0.55)'
+const SHAFT_EDGE = '#2f241e'
+/** Its rock, in shadow at the shaft's sides and its roof. */
+const ROCK_SHADE = '#413228'
+/** How far apart its timber sets are along it, and how wide a set is. */
+const SETS = 230
+const SET_WIDTH = 64
+
+/**
+ * An old mine, deep under The Caves: the hill's own rock all round, down
+ * from as deep as the course is drawn; the shaft down from the chasm's
+ * bridge, dark, a ladder down one side and old timbers across its back;
+ * and its workings, hollowed out of the rock, the Cave's dark back wall
+ * behind, its roof ragged, rounded at its ends, held up by timber sets,
+ * a lamp hung from each, warm light low down; and its floor, packed earth.
+ */
+function paintMine(painting: Painting) {
+	const { secret, roof, floor, top, bottom, random, rect, glow, tiled } =
+		painting
+	const { gap } = secret
+	const left = secret.from - UNDER_REACH
+	const right = secret.to + UNDER_REACH
+	tiled(left, top, right - left, bottom - top, 'rock')
+
+	// The shaft, from the bottom of the course down to the workings' roof:
+	// its back wall, dark, and its sides, ragged.
+	tiled(gap.from, top, gap.to - gap.from, roof - top + 8, 'wall')
+	rect(gap.from, top, gap.to - gap.from, roof - top + 8, SHAFT_DARK)
+	for (let yy = top; yy < roof + 8; yy += 4) {
+		const inLeft = 2 + Math.round(random() * 3) * 2
+		const inRight = 2 + Math.round(random() * 3) * 2
+		rect(gap.from, yy, inLeft, 4, SHAFT_EDGE)
+		rect(gap.to - inRight, yy, inRight, 4, SHAFT_EDGE)
+	}
+	// Old timbers across its back, and a ladder down its far side.
+	for (let yy = top + 60; yy < roof - 20; yy += 140) {
+		rect(gap.from + 6, yy, gap.to - gap.from - 12, 6, TIMBER_DARK)
+		rect(gap.from + 6, yy, gap.to - gap.from - 12, 2, TIMBER)
+	}
+	const ladder = gap.to - 30
+	rect(ladder, top, 4, roof - top + 8, TIMBER_DARK)
+	rect(ladder + 16, top, 4, roof - top + 8, TIMBER_DARK)
+	for (let yy = top + 6; yy < roof; yy += 14) rect(ladder, yy, 20, 2, TIMBER)
+
+	// The workings: the back wall, up to a ragged roof, rounded at its ends.
+	const end = 70
+	for (let x = secret.from; x < secret.to; x += 4) {
+		const fromEnd = Math.min(x - secret.from, secret.to - x)
+		const round = fromEnd < end ? ((end - fromEnd) / end) ** 2 * 110 : 0
+		const under = gap.from < x + 4 && x < gap.to
+		const ragged = Math.round(random() * 3) * 2
+		const ceiling = under ? roof : roof + ragged + round
+		tiled(x, ceiling, 4, floor - ceiling, 'wall')
+		if (!under) {
+			rect(x, ceiling - 2, 4, 4, ROCK_SHADE)
+			rect(x, ceiling + 2, 4, 2, SHAFT_EDGE)
+		}
+	}
+	// Warm, low down, off the lamps.
+	for (const [up, fill] of [
+		[90, 'rgba(255, 190, 110, 0.05)'],
+		[50, 'rgba(255, 190, 110, 0.06)'],
+	] as const)
+		rect(secret.from + 40, floor - up, secret.to - secret.from - 80, up, fill)
+
+	// Timber sets holding the roof up, a lamp hung from each: not under the
+	// shaft, where you come down.
+	for (let x = secret.from + 120; x < secret.to - 80; x += SETS) {
+		if (x + SET_WIDTH > gap.from - 20 && x < gap.to + 20) continue
+		// Nor over the pit under a coaster's leap: nothing to stand on.
+		const under = secret.coaster?.leap?.pit
+		if (under && x + SET_WIDTH > under[0] - 10 && x < under[1] + 10) continue
+		const cap = roof + 14
+		for (const post of [x, x + SET_WIDTH - 8]) {
+			rect(post, cap, 8, floor - cap, TIMBER)
+			rect(post, cap, 2, floor - cap, TIMBER_LIT)
+			rect(post + 6, cap, 2, floor - cap, TIMBER_DARK)
+		}
+		rect(x - 6, cap - 10, SET_WIDTH + 12, 10, TIMBER)
+		rect(x - 6, cap - 10, SET_WIDTH + 12, 2, TIMBER_LIT)
+		rect(x - 6, cap - 2, SET_WIDTH + 12, 2, TIMBER_DARK)
+		const lamp = x + SET_WIDTH / 2 - 3
+		rect(lamp + 2, cap, 2, 10, LAMP_IRON)
+		rect(lamp, cap + 10, 6, 8, LAMP_IRON)
+		rect(lamp + 2, cap + 12, 2, 4, LAMP_FLAME)
+		glow(lamp + 3, cap + 14, 70, LAMP_FLAME)
+	}
+
+	// Its floor: packed earth, lit along its top; under the shaft too, where
+	// you land.
+	rect(secret.from, floor, secret.to - secret.from, 2, EARTH_LIT)
+	rect(secret.from, floor + 2, secret.to - secret.from, 8, EARTH_TOP)
+	rect(secret.from, floor + 10, secret.to - secret.from, 4, EARTH_UNDER)
+	for (let x = secret.from + 10; x < secret.to; x += 18 + random() * 40)
+		rect(
+			Math.round(x / 2) * 2,
+			floor + 4 + Math.round(random() * 2) * 2,
+			4,
+			2,
+			EARTH_UNDER,
+		)
+
+	// The pit under its coaster's leap, if it has one: down through the
+	// floor, dark, ragged at its sides, darker the deeper.
+	const pit = secret.coaster?.leap?.pit
+	if (!pit) return
+	const [from, to] = pit
+	tiled(from, floor, to - from, DEEP, 'wall')
+	rect(from, floor, to - from, DEEP, SHAFT_DARK)
+	rect(from, floor + 50, to - from, DEEP - 50, SHAFT_DARK)
+	rect(from, floor + 140, to - from, DEEP - 140, SHAFT_DARK)
+	for (let yy = floor; yy < floor + DEEP; yy += 4) {
+		rect(from, yy, 2 + Math.round(random() * 3) * 2, 4, SHAFT_EDGE)
+		const right = 2 + Math.round(random() * 3) * 2
+		rect(to - right, yy, right, 4, SHAFT_EDGE)
+	}
+	rect(from - 2, floor, 4, 4, EARTH_LIT)
+	rect(to - 2, floor, 4, 4, EARTH_LIT)
+}
+
 /**
  * A Secret's manhole, if that's its way in: open in the street, the top of
  * its ladder poking up out of it; and, while anyone's on their way down
@@ -521,18 +830,18 @@ function createManhole(world: World, secret: Secret, art: SecretLook) {
  */
 function createDuct(world: World, secret: Secret, art: SecretLook) {
 	const duct = art.duct
+	const { launcher } = art
 	if (!secret.duct || !duct) return []
 	const { groundY } = world.terrain
 	const street = Math.round(groundY(secret.launch))
 	const roof = secretRoof(world)
 	const left = Math.round(secret.launch - duct.width / 2)
-	const blowing = () =>
-		world.racers.some(
-			({ body: b }) =>
-				Math.abs(b.x - secret.launch) < duct.width / 2 &&
-				b.feetY > groundY(b.x) + 4 &&
-				b.feetY < secret.floor - 20,
-		)
+	/** Whether someone's on their way up it, under the street still. */
+	const inShaft = (b: { x: number; feetY: number }) =>
+		Math.abs(b.x - secret.launch) < duct.width / 2 &&
+		b.feetY > groundY(b.x) + 4 &&
+		b.feetY < secret.floor - 20
+	const blowing = () => world.racers.some(({ body }) => inShaft(body))
 	const shaft = createController({
 		init: () => ({
 			id: 'duct-shaft',
@@ -540,10 +849,13 @@ function createDuct(world: World, secret: Secret, art: SecretLook) {
 			x: () => left,
 			y: () => street + 4,
 			width: () => duct.width,
-			height: () => roof - street,
+			// Down to the floor, for a lift's cable, down to its cage.
+			height: () => secret.floor - street,
 		}),
 		draw: ({ ctx }) => {
-			if (!blowing()) return
+			// A duct, only while it's blowing; a lift's shaft, always.
+			const blown = blowing()
+			if (!blown && !duct.cage) return
 			const fill = rectFiller(ctx)
 			const tall = roof - street
 			ctx.fillStyle = duct.steel
@@ -554,6 +866,20 @@ function createDuct(world: World, secret: Secret, art: SecretLook) {
 			fill(duct.width - 4, 0, 4, tall)
 			ctx.fillStyle = duct.seam
 			for (let yy = 24; yy < tall; yy += 32) fill(0, yy, duct.width, 2)
+			// A lift's cable, down from the top to its cage: on its way up
+			// with someone in it, or waiting at the bottom.
+			const cageHeight = duct.cage?.height
+			if (cageHeight !== undefined) {
+				const cage = Math.min(
+					secret.floor - launcher.kneelHeight + 2,
+					...world.racers.map(({ body: b }) =>
+						inShaft(b) ? b.feetY - cageHeight : secret.floor,
+					),
+				)
+				ctx.fillStyle = CABLE
+				fill(duct.width / 2 - 1, 0, 2, Math.max(0, cage - street - 4))
+			}
+			if (!blown) return
 			// Air, streaming up it, by the tick.
 			ctx.fillStyle = duct.air
 			const shift = (world.ticks() * 12) % 48
@@ -572,8 +898,39 @@ function createDuct(world: World, secret: Secret, art: SecretLook) {
 			height: () => duct.grate.height,
 		}),
 	})
-	return [shaft, grate]
+	// A lift's cage round each of them on their way up it: its back behind
+	// them, its bars in front.
+	const { cage } = duct
+	const cages = cage
+		? world.racers.flatMap(({ body }, i) =>
+				(['back', 'front'] as const).map((side) =>
+					createController({
+						frames: [side === 'back' ? cage.back : cage.asset],
+						init: () => ({
+							id: `lift-cage-${side}-${i}`,
+							// In front of whoever's in it, as a cart is; or behind them.
+							type: side === 'back' ? 'secret-prop' : 'cart',
+							...createObjectSignal(0, 'x'),
+							...createObjectSignal(0, 'y'),
+							width: () => cage.width,
+							height: () => cage.height,
+							...createObjectSignal({} as JSX.CSSProperties, 'style'),
+						}),
+						onEnterFrame({ $ }) {
+							$.setX(Math.round(body.x - cage.width / 2))
+							$.setY(Math.round(body.feetY - cage.height + CAGE_FLOOR))
+							$.setStyle({ visibility: inShaft(body) ? 'visible' : 'hidden' })
+						},
+					}),
+				),
+			)
+		: []
+	return [shaft, grate, ...cages]
 }
+
+/** A lift's cable, and how far up from the bottom of its cage its floor is. */
+const CABLE = '#9aa0a8'
+const CAGE_FLOOR = 4
 
 /** The Secret, painted from `left` to `right` along it. */
 function paint(
@@ -581,9 +938,21 @@ function paint(
 	parts: Part[],
 	left: number,
 	right: number,
+	tiles: Partial<Record<'rock' | 'wall', CanvasPattern>> = {},
 ) {
 	const fillRect = rectFiller(ctx)
 	for (const part of parts) {
+		if ('tile' in part) {
+			if (part.x > right || part.x + part.width < left) continue
+			const tile = tiles[part.tile]
+			if (!tile) continue
+			ctx.fillStyle = tile
+			// Only what's in view of it: a mine's rock goes on a long way.
+			const from = Math.max(part.x, Math.floor(left) - 8)
+			const to = Math.min(part.x + part.width, Math.ceil(right) + 8)
+			ctx.fillRect(from, part.y, to - from, part.height)
+			continue
+		}
 		if ('fill' in part) {
 			if (part.x > right || part.x + part.width < left) continue
 			ctx.fillStyle = part.fill

@@ -1,4 +1,8 @@
-import { type Collectable, courseCollectables } from '../game/collectables'
+import {
+	COLLECTABLES,
+	type Collectable,
+	courseCollectables,
+} from '../game/collectables'
 import { COURSES } from './index'
 import type { Course, CourseId } from './types'
 
@@ -16,6 +20,11 @@ const OWN = (() => {
 		for (const c of mine) seen.add(c)
 		own.set(course.id, mine)
 	}
+	// Anything on no course at all has no "Somewhere on..." on the
+	// Collectables screen, and can't be had: a course meant to have it
+	// doesn't.
+	for (const c of COLLECTABLES)
+		if (!seen.has(c)) console.error(`${c} isn't on any course`)
 	return own
 })()
 

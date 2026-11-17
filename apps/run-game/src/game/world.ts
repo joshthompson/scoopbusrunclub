@@ -206,6 +206,8 @@ export interface Body {
 	wading?: boolean
 	/** Been down a Secret, and thrown back up out of it: Everest's special goal. */
 	foundSecret?: boolean
+	/** Called out to, coming up to whoever's at a Secret's far end (see `Secret['greets']`). */
+	greeted?: boolean
 	/** The bonus runner they unlocked on this course, by runner id, if they did: for the finish screen. */
 	unlocked?: string
 	/** Got to the course's hidden bonus runner, this go (see `Course['found']`). */
@@ -789,6 +791,22 @@ export function createWorld(
 		ropeBridges: createRopeBridges(course.platforms ?? []),
 		/** A Portal at work, if one is: see `portals`. Plain state, like the body. */
 		portal: undefined as PortalRun | undefined,
+		/**
+		 * When a bad mushroom was last eaten, if one has been: the whole screen
+		 * goes funny for `TRIP_TICKS` after. Plain state.
+		 */
+		trippedAt: undefined as number | undefined,
+		/**
+		 * When the course's harvester started on its tree, if it has (see
+		 * `stepHarvester`). Plain state: drawn from it, by the tick.
+		 */
+		harvesterAt: undefined as number | undefined,
+		/**
+		 * The course's hidden bonus runner's own hat, stolen off their head
+		 * (see `Course['found']`'s `hat`): gone from it for the rest of the
+		 * race. Plain state.
+		 */
+		foundHatStolen: false,
 		/** The course's Portals that have gone off, and let everyone through, by index. */
 		portalsDone: new Set<number>(),
 		/**

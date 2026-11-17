@@ -1,5 +1,3 @@
-import { paintedArt } from '../../courses/kit/pixelArt'
-
 /**
  * An Andean condor, flying, facing right: the biggest wings of any bird of
  * prey, black, with the white band across them a condor has, its fingers
@@ -35,6 +33,32 @@ const TALON = '#8f8a84'
 const TALON_DARK = '#4a4744'
 
 type Point = [number, number]
+
+/**
+ * Like `paintedArt`, but a bitmap, a pixel a cell, as a PNG's URL, not an
+ * SVG of rects: an SVG's rects, a row at a time, show hairline seams
+ * between them drawn big, or tipped as it banks; a bitmap's pixels can't.
+ * Only in a browser, made the first time it's wanted (see `condorFrames`).
+ */
+function paintedBitmap(
+	width: number,
+	height: number,
+	paint: (x: number, y: number) => string | undefined,
+) {
+	const canvas = document.createElement('canvas')
+	canvas.width = width
+	canvas.height = height
+	const ctx = canvas.getContext('2d')
+	if (!ctx) return ''
+	for (let y = 0; y < height; y++)
+		for (let x = 0; x < width; x++) {
+			const colour = paint(x + 0.5, y + 0.5)
+			if (!colour) continue
+			ctx.fillStyle = colour
+			ctx.fillRect(x, y, 1, 1)
+		}
+	return canvas.toDataURL('image/png')
+}
 
 /** Whether `x`, `y` is inside the polygon through `points`. */
 function inside(points: Point[], x: number, y: number) {
@@ -128,7 +152,7 @@ function frame(beat: number, gripping: boolean) {
 		[13, BODY_Y + 3],
 		[30, BODY_Y + 4],
 	]
-	return paintedArt(COLUMNS, ROWS, (x, y) => {
+	return paintedBitmap(COLUMNS, ROWS, (x, y) => {
 		let cell: string | undefined
 		// The far wing, behind it all, in shadow, its band greyer.
 		const f = far.wing(x, y)

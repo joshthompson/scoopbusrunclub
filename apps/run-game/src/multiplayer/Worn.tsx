@@ -4,6 +4,7 @@ import { hatArt } from '../draw/art/hats'
 import { headTop } from '../draw/heads'
 import { RUNNER_SCALE } from '../game/constants'
 import type { Hat } from '../game/hats'
+import type { Playable } from '../runners/playable'
 import { WornMedal } from './Medal'
 
 /**
@@ -15,7 +16,10 @@ import { WornMedal } from './Medal'
  * with them.
  */
 
-/** How far down from the top of their head their neck is, in their own pixels. */
+/**
+ * How far down from the top of their head their neck is, in their own
+ * pixels, for anyone whose neck isn't known (see `neck`).
+ */
 const HEAD_ROWS = 7
 
 export function Worn(props: {
@@ -30,6 +34,12 @@ export function Worn(props: {
 	flipped?: boolean
 	hat?: Hat
 	place?: 1 | 2 | 3
+	/**
+	 * Their sprite, for where their neck is (see `Playable['sprite']['neck']`),
+	 * for their medal to hang from: as far from the top of their head in
+	 * this frame as it is in their first run frame.
+	 */
+	sprite?: Playable['sprite']
 }) {
 	/** How much bigger than in a Round they're drawn. */
 	const k = () => props.scale / RUNNER_SCALE
@@ -60,6 +70,27 @@ export function Worn(props: {
 			y: props.height - size.height * props.scale + found.y * k(),
 		}
 	}
+	/**
+	 * Their neck, from the top of their head, in their own pixels at
+	 * `RUNNER_SCALE`: from where it is in their first run frame.
+	 */
+	const neck = () => {
+		const sprite = props.sprite
+		const at = sprite?.neck
+		const first = sprite?.run[0]
+		if (!sprite || !at || !first) return undefined
+		const found = headTop(
+			first,
+			sprite.width * RUNNER_SCALE,
+			sprite.height * RUNNER_SCALE,
+		)
+		return (
+			found && {
+				x: at.x * RUNNER_SCALE - found.x,
+				y: at.y * RUNNER_SCALE - found.y,
+			}
+		)
+	}
 	/** Across, turned round with them. */
 	const across = (x: number) => (props.flipped ? props.width - x : x)
 	const hat = () => props.hat && hatArt(props.hat)
@@ -69,10 +100,11 @@ export function Worn(props: {
 				{(place) => (
 					<WornMedal
 						place={place()}
-						x={across(head()?.x ?? props.width / 2)}
+						x={across((head()?.x ?? props.width / 2) + (neck()?.x ?? 0) * k())}
 						top={
 							head()
-								? (head()?.y ?? 0) + HEAD_ROWS * props.scale
+								? (head()?.y ?? 0) +
+									(neck()?.y ?? HEAD_ROWS * RUNNER_SCALE) * k()
 								: props.height * 0.26
 						}
 					/>

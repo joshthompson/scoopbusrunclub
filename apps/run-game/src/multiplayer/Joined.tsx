@@ -29,12 +29,13 @@ import {
 	isPicked,
 	joinAfresh,
 	joinAsGuest,
+	joinedCharacters,
 	joiningMessage,
 	lastMode,
 	rememberMode,
 } from './guest'
 import { CODE_LENGTH, type PadMode, type PadView, cleanCode } from './protocol'
-import { type Seat, localCharacters } from './room'
+import type { Seat } from './room'
 import { roomModeInfo } from './roomModes'
 import { statusText } from './status'
 
@@ -236,14 +237,14 @@ function InRoom(props: {
 	createEffect(() => {
 		const v = view()
 		if (!v || v.full || v.character) return
-		const all = localCharacters()
+		const all = joinedCharacters(view())
 		const runner =
 			all.find((c) => c.id === lastRunner() && free(c)) ?? all.find(free)
 		if (runner && runner.id !== asked) pick(runner)
 	})
 	const cycle = (by: number) => {
 		const current = asked ?? view()?.character
-		const all = localCharacters()
+		const all = joinedCharacters(view())
 		const at = Math.max(
 			0,
 			all.findIndex((c) => isPicked(c, current)),
@@ -365,7 +366,7 @@ function InRoom(props: {
 							{(number) => (
 								<div style={styles.starting}>
 									{view()?.isStarter
-										? 'Press jump to start'
+										? 'Press any key to start'
 										: `Waiting for P${number()} to start`}
 								</div>
 							)}
@@ -482,7 +483,7 @@ function InRoom(props: {
 												? 'Paused at the big screen'
 												: v().waitingForStarter
 													? v().isStarter
-														? 'Press jump to start'
+														? 'Press any key to start'
 														: `Waiting for P${v().waitingForStarter} to start`
 													: 'Watch the race on the big screen'
 									}
@@ -672,7 +673,7 @@ const styles = {
 		'-webkit-user-select': 'text',
 	},
 	button: {
-		padding: '8px 16px 4px',
+		padding: '6px 16px',
 		background: 'rgba(15, 31, 41, 0.9)',
 		color: 'white',
 		border: '3px solid white',
@@ -701,7 +702,7 @@ const styles = {
 		display: 'flex',
 		'align-items': 'center',
 		gap: '10px',
-		padding: '8px 10px 6px',
+		padding: '7px 10px',
 		background: 'rgba(15, 31, 41, 0.9)',
 		color: 'white',
 		border: '3px solid white',
@@ -735,7 +736,7 @@ const styles = {
 		bottom: '16px',
 		left: '50%',
 		transform: 'translateX(-50%)',
-		padding: '8px 14px 4px',
+		padding: '6px 14px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '3px solid white',
@@ -749,7 +750,7 @@ const styles = {
 		left: '50%',
 		top: '12px',
 		transform: 'translateX(-50%)',
-		padding: '8px 14px 5px',
+		padding: '6px 14px 7px',
 		background: 'var(--bus-red)',
 		color: 'white',
 		border: '3px solid var(--ink)',
@@ -764,7 +765,7 @@ const styles = {
 		top: '12px',
 		left: '50%',
 		transform: 'translateX(-50%)',
-		padding: '8px 14px 5px',
+		padding: '6px 14px 7px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '3px solid white',

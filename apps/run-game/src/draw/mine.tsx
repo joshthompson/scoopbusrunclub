@@ -123,11 +123,17 @@ export function createMine(world: World) {
 	}
 	railLine(mine.from, mine.to, (x) => ground(x))
 	railLine(secret.from, secret.to, secretRail)
-	// The points: a lever beside them, and a sign before them, an arrow up
-	// it, for the line up.
-	rect(secret.from - 14, ground(secret.from) - 18, 3, 18, '#3a3a3a')
-	rect(secret.from - 16, ground(secret.from) - 22, 7, 5, '#d8342c')
-	const sign = secret.from - 60
+	// The secret line's start, up on its trestles: a leg under it, and a
+	// stop at its end, striped; and a sign before it, an arrow up it, where
+	// a cart jumped lands on it.
+	const start = Math.round(secretRail(secret.from + 1))
+	rect(secret.from, start + 4, 4, ground(secret.from) - start - 4, TIMBER_DARK)
+	rect(secret.from + 1, start + 4, 1, ground(secret.from) - start - 4, TIMBER)
+	rect(secret.from - 6, start - 14, 10, 14, TIMBER_DARK)
+	rect(secret.from - 8, start - 12, 4, 10, '#1d1d1d')
+	rect(secret.from - 8, start - 12, 4, 3, '#ffc21a')
+	rect(secret.from - 8, start - 6, 4, 3, '#ffc21a')
+	const sign = secret.from - 220
 	const signTop = ground(sign) - 58
 	rect(sign - 2, signTop + 18, 4, 40, TIMBER_DARK)
 	rect(sign - 12, signTop, 24, 22, TIMBER_DARK)
@@ -238,6 +244,13 @@ export function createMineCarts(world: World) {
 				setLoaded(cart.state === 'waiting')
 				if (cart.state === 'scooped') {
 					$.setRotation(cart.spin * 14)
+					return
+				}
+				// Ridden, tipped with its rail, as it's kept (up the secret line
+				// too, which a Remote Player's screen isn't told it's on); on a
+				// Secret's coaster, the way it's heading, round its loop too.
+				if (cart.coaster || cart.state === 'ridden') {
+					$.setRotation(cart.spin)
 					return
 				}
 				// Along the rail under it.

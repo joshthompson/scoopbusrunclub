@@ -8,12 +8,14 @@ import {
 	untrack,
 } from 'solid-js'
 import { COURSES } from '../courses'
+import { ENDLESS, endlessMedalFor } from '../courses/endless'
 import type { Course } from '../courses/types'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
+import { COLLECTABLES } from '../game/collectables'
 import { PX_PER_M, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import type { Hat } from '../game/hats'
 import { longJumpMetres } from '../game/longJump'
-import { medalFor } from '../game/medals'
+import { type Medal, medalFor } from '../game/medals'
 import { POPUP_TICKS, onScreen, stepWorld } from '../game/step'
 import { type World, createWorld } from '../game/world'
 import { type Action, anyControls, setTouch, touchScreen } from '../input'
@@ -28,8 +30,9 @@ import {
 	submitScore,
 	wouldPlace,
 } from '../online/runScores'
-import { DERI, unlockable } from '../runners/bonus'
+import { BONNIE_BOTTLE, DERI, DET_MUNCH, unlockable } from '../runners/bonus'
 import type { Playable } from '../runners/playable'
+import { hasCollected } from '../saved/collected'
 import { courseFinished, markFinished } from '../saved/finished'
 import { markSpecialDone } from '../saved/goals'
 import { record, today, topScore } from '../saved/highScores'
@@ -58,8 +61,10 @@ import { UnlockReveal } from './UnlockReveal'
 
 /**
  * - `practice`: one course, on its own
- * - `endless`: every course in turn, round and round, the score carried on
- *   from one to the next, until the bus gets you
+ * - `endless`: every course in turn, the score carried on from one to the
+ *   next, until the bus gets you, or the last of them's done: then it's
+ *   over, and there's another go to have. No summary between courses: it
+ *   goes dark, and on into the next. One, at the end, for the whole run.
  */
 export type Mode =
 	| { kind: 'practice' }
@@ -73,7 +78,32 @@ export type Mode =
 			runId: string
 			/** The hat they've still got on from the last course, if any. */
 			hat?: Hat
+			/** The run so far, for its summary at the end. */
+			run: EndlessRun
 	  }
+
+/**
+ * An Endless run so far, carried on from course to course for its one
+ * summary at the end: each course's points, and the runners unlocked on
+ * the way, by id, to be shown off then.
+ */
+export interface EndlessRun {
+	courses: EndlessCourse[]
+	unlocked: string[]
+}
+
+/**
+ * A course in an Endless run, for its breakdown at the end: its points,
+ * the medal they got, and whether they were its best yet (and its best
+ * before, if they weren't).
+ */
+export interface EndlessCourse {
+	name: string
+	score: number
+	medal?: Medal
+	newBest: boolean
+	bestBefore: number
+}
 
 const points = (score: number) => `${score.toLocaleString('en')} pts`
 const metres = (px: number) => `${Math.max(0, Math.round(px / PX_PER_M))} m`
@@ -83,10 +113,10 @@ export function Game(props: {
 	runner: Playable
 	mode: Mode
 	/**
-	 * On to the next course: in Endless, with the score so far, and the hat
-	 * they've got on; practising, the next to practise.
+	 * On to the next course: in Endless, with the score so far, the hat
+	 * they've got on, and the run so far; practising, the next to practise.
 	 */
-	onNext: (score: number, hat?: Hat) => void
+	onNext: (score: number, hat?: Hat, run?: EndlessRun) => void
 	/** The same again: in Endless, the run from the start. */
 	onRetry: () => void
 	onQuit: () => void
@@ -113,9 +143,32 @@ export function Game(props: {
 		],
 		{ startScore: mode.kind === 'endless' ? mode.startScore : 0 },
 	)
-	/** Endless's next course, round to the first again after the last. */
-	const nextIndex =
-		mode.kind === 'endless' ? (mode.cleared + 1) % COURSES.length : 0
+	/** In Endless, whether this is the last course: done, the run's over. */
+	const lastCourse =
+		mode.kind === 'endless' && mode.cleared + 1 >= COURSES.length
+	/**
+	 * In Endless, finished, and not the last course: moving on, with no
+	 * summary, the run so far to carry on with; and, after a moment to see
+	 * the finish, going dark, and then on into the next.
+	 */
+	const [passing, setPassing] = createSignal<EndlessRun>()
+	/** At the end of an Endless run, its table of each course's points, open. */
+	const [breakdown, setBreakdown] = createSignal(false)
+	const [fading, setFading] = createSignal(false)
+	const timers: ReturnType<typeof setTimeout>[] = []
+	onCleanup(() => {
+		for (const timer of timers) clearTimeout(timer)
+	})
+	const passOn = (run: EndlessRun) => {
+		setPassing(run)
+		timers.push(
+			setTimeout(() => setFading(true), FINISH_BEAT),
+			setTimeout(
+				() => props.onNext(world.score(), world.body.hat, run),
+				FINISH_BEAT + FADE_MS,
+			),
+		)
+	}
 	/** The course after this one, if there is one: unlocked by finishing this one. */
 	const index = COURSES.findIndex((course) => course.id === props.course.id)
 	const following = index + 1 < COURSES.length ? index + 1 : undefined
@@ -270,14 +323,25 @@ export function Game(props: {
 					finished,
 				})
 			if (mode.kind === 'endless') {
+				const cleared = mode.cleared + (finished ? 1 : 0)
 				if (world.score() > 0)
 					placing.endlessPlace = record('endless', {
 						...entry,
 						id: mode.runId,
 						score: world.score(),
-						courses: mode.cleared + (finished ? 1 : 0),
+						courses: cleared,
 					})
+				// Endless's own goals: a medal for how many courses this run's
+				// got through; gold, every one of them, and its bonus runner.
+				placing.endless = { cleared, medal: endlessMedalFor(cleared) }
+				const medal = placing.endless.medal
+				if (medal) placing.endless.newMedal = award(ENDLESS, medal)
+				if (medal === 'gold' && unlockRunner(BONNIE_BOTTLE.id))
+					placing.newRunners.push(BONNIE_BOTTLE)
 			}
+			// Every collectable there is, had: Det. Munch is theirs.
+			if (COLLECTABLES.every(hasCollected) && unlockRunner(DET_MUNCH.id))
+				placing.newRunners.push(DET_MUNCH)
 			if (finished && following !== undefined && reach(following))
 				placing.unlocked = COURSES[following].name
 			// A medal, for the points: its score goal.
@@ -310,6 +374,37 @@ export function Game(props: {
 				const earned = special.unlocks && unlockable(special.unlocks)
 				if (earned && unlockRunner(earned.id)) placing.newRunners.push(earned)
 			}
+			if (mode.kind === 'endless') {
+				// The run so far, this course too.
+				const run: EndlessRun = {
+					courses: [
+						...mode.run.courses,
+						{
+							name: props.course.name,
+							score: world.courseScore(),
+							medal: placing.medal,
+							newBest: placing.coursePlace === 0,
+							bestBefore: placing.courseBestBefore,
+						},
+					],
+					unlocked: [
+						...mode.run.unlocked,
+						...placing.newRunners.map((runner) => runner.id),
+					],
+				}
+				// Finished, with more to go: straight on, no summary.
+				if (finished && !lastCourse) {
+					passOn(run)
+					return
+				}
+				// Over: the whole run's summary, everyone unlocked on the way
+				// shown off first.
+				placing.run = run
+				placing.newRunners = run.unlocked.flatMap((id) => {
+					const runner = unlockable(id)
+					return runner ? [runner] : []
+				})
+			}
 			setPlacing(placing)
 		})
 	})
@@ -328,13 +423,17 @@ export function Game(props: {
 	const actions = (): SummaryAction[] => [...runActions(), ...sending()]
 	const runActions = (): SummaryAction[] => {
 		const result = world.result()
-		if (result?.kind === 'finished' && mode.kind === 'endless')
+		// In Endless, the run's over, however it ended: another go; or a
+		// look at each course's points first.
+		if (mode.kind === 'endless')
 			return [
+				{ label: 'Go again', choose: props.onRetry },
 				{
-					label: `Next: ${COURSES[nextIndex].name}`,
-					choose: () => props.onNext(world.score(), world.body.hat),
+					label: breakdown() ? 'Hide course scores' : 'Course scores',
+					choose: () => setBreakdown((open) => !open),
 				},
-				{ label: 'Stop here', choose: props.onCourses },
+				{ label: 'Change course', choose: props.onCourses },
+				{ label: 'Menu', choose: props.onMenu },
 			]
 		// Practising, finished: on to the next course, now it's unlocked.
 		const next =
@@ -411,6 +510,8 @@ export function Game(props: {
 			}
 			return
 		}
+		// Moving on to the next course: nothing to choose.
+		if (passing()) return
 		if (world.result()) {
 			const count = actions().length
 			const move = SUMMARY_MOVES[event.key]
@@ -472,6 +573,9 @@ export function Game(props: {
 								checkingOnline={checkingOnline()}
 								onPause={() => canPause() && setPaused(true)}
 								buttons={!padUnder()}
+								passing={!!passing()}
+								fading={fading()}
+								breakdown={breakdown()}
 							/>
 							<Show when={naming()}>
 								<div style={styles.naming}>
@@ -530,6 +634,14 @@ export function Game(props: {
 
 const ACTIONS: Action[] = ['left', 'right', 'up', 'down']
 
+/**
+ * In Endless, between courses: how long the finish is there to see before
+ * it goes dark, and how long going dark takes, in ms. The next course
+ * comes up out of the dark as it's ready (see `createRaceStart`).
+ */
+const FINISH_BEAT = 1400
+const FADE_MS = 700
+
 /** The keys for the pause menu: not for starting the race, on its start screen. */
 const PAUSE_KEYS = ['Escape', 'p', 'P']
 
@@ -583,6 +695,12 @@ function Hud(props: {
 	onPause: () => void
 	/** The on-screen buttons, over the race: not if they're under it. */
 	buttons: boolean
+	/** In Endless, finished, moving on to the next course: no summary. */
+	passing?: boolean
+	/** And going dark, on the way. */
+	fading?: boolean
+	/** At the end of an Endless run, its table of each course's points, open. */
+	breakdown?: boolean
 }) {
 	const { world } = props
 	const runner = () => world.runner
@@ -651,7 +769,16 @@ function Hud(props: {
 				}}
 			</For>
 
-			<Show when={world.result()}>
+			{/* In Endless, on to the next course: dark, and in. */}
+			<div
+				style={{
+					...styles.fade,
+					opacity: props.fading ? 1 : 0,
+					transition: `opacity ${FADE_MS}ms ease-in`,
+				}}
+			/>
+
+			<Show when={!props.passing && world.result()}>
 				{(result) => (
 					<Show
 						when={props.unlock}
@@ -667,6 +794,7 @@ function Hud(props: {
 								actions={props.actions}
 								picked={props.picked}
 								onPick={props.onPick}
+								breakdown={props.breakdown}
 							/>
 						}
 					>
@@ -753,6 +881,13 @@ const styles = {
 		background: 'rgba(15, 31, 41, 0.6)',
 		'pointer-events': 'auto',
 	},
+	/** Dark over everything, between Endless's courses: as dark as the next one's cover, as it's got ready. */
+	fade: {
+		position: 'absolute',
+		inset: 0,
+		background: 'var(--ink)',
+		'pointer-events': 'none',
+	},
 	hud: {
 		position: 'absolute',
 		inset: 0,
@@ -798,7 +933,7 @@ const styles = {
 		left: '12px',
 		top: '230px',
 		color: 'white',
-		padding: '8px 10px 4px',
+		padding: '6px 10px',
 		'font-size': '20px',
 	},
 	popup: {

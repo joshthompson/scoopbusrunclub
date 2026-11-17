@@ -795,28 +795,6 @@ export const floatingCells = pixelArt(40, 20, [
 ])
 
 /**
- * A white blood cell, on patrol for Germs: a white blob, its nucleus in
- * lobes, purple, and two eyes, looking. 28 by 28.
- */
-export const whiteCell = paintedArt(28, 28, (x, y) => {
-	const r = 12 + Math.sin(Math.atan2(y - 15, x - 14) * 5) * 1.4
-	const d = Math.hypot(x - 14, y - 15)
-	if (d > r) return undefined
-	if (d > r - 1.2) return y > 15 ? '#d8d0c4' : '#fbfaf6'
-	// Its eyes, looking ahead.
-	if ((Math.abs(x - 18) < 1 || Math.abs(x - 22) < 1) && Math.abs(y - 10) < 1.2)
-		return INK
-	// Its nucleus, in three lobes.
-	for (const [cx, cy] of [
-		[10, 17],
-		[15, 21],
-		[19, 16],
-	])
-		if (Math.hypot(x - cx, y - cy) < 3.4) return '#8a5ab8'
-	return '#f4f0e8'
-})
-
-/**
  * An air sac, in place of a bouncy toadstool (see `bouncers`): round,
  * plump, glistening, on its little airway, to bounce off. World pixels.
  */
@@ -876,46 +854,68 @@ export const GERM_POPPED = paintedArt(16, 16, (x, y) => {
 })
 
 /**
- * A heart valve in the floor, shut and open: a raised rim of muscle, its
- * two leaflets, pale, meeting in the middle; open, flapped up, the dark
- * under it. And chevrons over it, pointing up, lit on the beat: stand here.
- * Cells of 2, 48 by 9: world pixels, `VALVE` across and tall.
+ * A heart valve in the floor, shut and open: a round mound of muscle, wet
+ * and lit along its top, and in it the valve's two leaflets, pale,
+ * meeting in a slit; open, flapped up and out either side like petals,
+ * the dark of the vessel under them showing. And chevrons over it,
+ * pointing up, lit on the beat: stand here. Cells of 2, 48 by 16: world
+ * pixels, `VALVE` across and tall, its mound the bottom 12 cells.
  */
-const VALVE_RIM = '#e0566c'
-const VALVE_RIM_LIT = '#f58a9a'
-const VALVE_RIM_DARK = '#86192b'
+const VALVE_RIM = '#d24a62'
+const VALVE_RIM_LIT = '#f07d90'
+const VALVE_RIM_SHINE = '#ffc2cb'
+const VALVE_RIM_DARK = '#8a1c30'
 const LEAFLET = '#f6dcd4'
 const LEAFLET_LIT = '#fff3ee'
 const LEAFLET_SHADE = '#d8a8a4'
 const VALVE_DEEP = '#1e0408'
+/** The mound: inside it, and how far in from its edge, out of 1. */
+const mound = (x: number, y: number) =>
+	((x - 24) / 23.5) ** 2 + ((y - 16) / 11.5) ** 2
+function valveArt(open: boolean) {
+	return paintedArt(48, 16, (x, y) => {
+		if (open) {
+			// The leaflets, flapped up and out, either side of the hole.
+			for (const side of [-1, 1]) {
+				const px = 24 + side * 12
+				const along = (y - 1) / 9
+				const mid = px + side * (1 - along) * 4
+				if (y > 0.5 && y < 10 && Math.abs(x - mid) < 3.2 - along * 0.6) {
+					return x - mid < -0.8
+						? LEAFLET_LIT
+						: x - mid > 1
+							? LEAFLET_SHADE
+							: LEAFLET
+				}
+			}
+		}
+		const m = mound(x, y)
+		if (m > 1 || y < 4) return undefined
+		if (m > 0.86 && y > 9) return VALVE_RIM_DARK
+		if (open) {
+			// The hole, dark, down into the vessel.
+			const hole = ((x - 24) / 11) ** 2 + ((y - 7.5) / 3) ** 2
+			if (hole < 1) return hole < 0.55 ? VALVE_DEEP : '#3a0810'
+		} else {
+			// The leaflets, shut, meeting in a slit.
+			const leaflet = ((x - 24) / 13) ** 2 + ((y - 7) / 3.2) ** 2
+			if (leaflet < 1) {
+				if (Math.abs(x - 24) < 0.6) return VALVE_DEEP
+				if (leaflet > 0.8) return LEAFLET_SHADE
+				return y < 6.5 ? LEAFLET_LIT : y > 8 ? LEAFLET_SHADE : LEAFLET
+			}
+		}
+		// The muscle: a shine up on its left, lit along its top, in shade
+		// down its right and underneath.
+		if (((x - 11) / 3.5) ** 2 + ((y - 8) / 1.2) ** 2 < 1) return VALVE_RIM_SHINE
+		if (y < 7 || (x < 12 && m > 0.55)) return VALVE_RIM_LIT
+		if (y > 12 || (x > 36 && m > 0.55)) return VALVE_RIM_DARK
+		return VALVE_RIM
+	})
+}
 export const VALVE = {
-	shut: pixelArt(48, 9, [
-		// The rim, raised, lit along its top.
-		[2, 0, 44, 9, VALVE_RIM],
-		[0, 2, 48, 7, VALVE_RIM],
-		[2, 0, 44, 1, VALVE_RIM_LIT],
-		[0, 8, 48, 1, VALVE_RIM_DARK],
-		// The leaflets, meeting in the middle.
-		[3, 2, 20, 4, LEAFLET],
-		[25, 2, 20, 4, LEAFLET],
-		[3, 2, 20, 1, LEAFLET_LIT],
-		[25, 2, 20, 1, LEAFLET_LIT],
-		[3, 5, 42, 1, LEAFLET_SHADE],
-		[23, 2, 2, 5, VALVE_RIM_DARK],
-	]),
-	open: pixelArt(48, 9, [
-		[2, 0, 44, 9, VALVE_RIM],
-		[0, 2, 48, 7, VALVE_RIM],
-		[2, 0, 44, 1, VALVE_RIM_LIT],
-		[0, 8, 48, 1, VALVE_RIM_DARK],
-		// The dark under it, the leaflets flapped up either end.
-		[4, 2, 40, 6, '#3a0810'],
-		[6, 3, 36, 5, VALVE_DEEP],
-		[2, 0, 4, 3, LEAFLET],
-		[42, 0, 4, 3, LEAFLET],
-		[2, 0, 4, 1, LEAFLET_LIT],
-		[42, 0, 4, 1, LEAFLET_LIT],
-	]),
+	shut: valveArt(false),
+	open: valveArt(true),
 	/** Over it, two chevrons pointing up: 12 by 10 cells, drawn as the valve is. */
 	arrows: pixelArt(12, 10, [
 		[5, 0, 2, 1, '#ffffff'],
@@ -932,7 +932,9 @@ export const VALVE = {
 		[10, 8, 2, 1, '#ffffff'],
 	]),
 	width: 96,
-	height: 18,
+	height: 32,
+	/** Where the hole is, its middle, down from its top: where blood spurts up out of. */
+	hole: 14,
 }
 
 /**
@@ -956,12 +958,25 @@ export function heartPillar(width: number, height: number) {
 		const cy = Math.floor(y)
 		// Its cap: rounded over, lit, the top of it what's stood on.
 		if (cy < 22) {
-			const round = cy < 3 ? 3 - cy : 0
-			if (cx < round || cx >= columns - round) return undefined
-			if (cy < 3) return MUSCLE_LIT
-			if (cy < 6) return cx % 7 === 3 ? MUSCLE_LIT : '#d85a6c'
-			if (cy > 18) return MUSCLE_DARK
-			return cx < 3 ? MUSCLE_LIT : cx > columns - 4 ? MUSCLE_DARK : MUSCLE
+			// Domed over its top, not square, and tucked in round under it
+			// into the column.
+			const half = columns / 2
+			const neck = half - 5
+			const round =
+				half * Math.sqrt(Math.max(0, 1 - ((cy + 0.5 - 11) / 11.5) ** 2))
+			const reach = cy < 11 ? round : Math.max(neck, round)
+			const across = cx + 0.5 - half
+			if (Math.abs(across) > reach) return undefined
+			// Shaded round it: lit over its top and down its left, a band of
+			// its fibres under that, in shade down its right and underneath.
+			const inside = (dy: number) =>
+				Math.abs(across) <=
+				half * Math.sqrt(Math.max(0, 1 - ((cy + dy + 0.5 - 11) / 11.5) ** 2))
+			if (!inside(-2)) return MUSCLE_LIT
+			if (across < -(reach - 3)) return MUSCLE_LIT
+			if (across > reach - 3 || cy > 17) return MUSCLE_DARK
+			if (!inside(-5)) return cx % 7 === 3 ? MUSCLE_LIT : '#d85a6c'
+			return MUSCLE
 		}
 		const side = inset(cy)
 		if (cx < side || cx >= columns - side) {
@@ -988,3 +1003,342 @@ export function heartPillar(width: number, height: number) {
 		return MUSCLE
 	})
 }
+
+/**
+ * The heart itself, huge, hung in the middle of its chamber, beating (see
+ * `CourseLook['heartbeat']`): a cartoon heart, its two lobes and its point
+ * tipped down to the right, glossy, the groove between its sides and its
+ * own blood vessels over it; the great vessels out of its top, the aorta
+ * and the artery to the lungs red, the vein in blue, up into the flesh
+ * over it. In cells of 4: 96 by 112 cells, `width` by `height` world pixels.
+ */
+const HEART_RED = '#cf3048'
+const HEART_LIT = '#ee5f72'
+const HEART_SHINE = '#ffb3bd'
+const HEART_SHADE = '#97203a'
+const HEART_GROOVE = '#7c1630'
+const VEIN_BLUE = '#5868c4'
+const VEIN_BLUE_LIT = '#8494e2'
+const VEIN_BLUE_DARK = '#3a4690'
+const LUNG_ARTERY = '#b0406a'
+const LUNG_ARTERY_LIT = '#d2648c'
+const LUNG_ARTERY_DARK = '#7c2448'
+export const BIG_HEART = (() => {
+	const W = 96
+	const H = 112
+	/** Tipped down to the right, as a heart is, seen from the front. */
+	const tilt = (-14 * Math.PI) / 180
+	const unit = (x: number, y: number) => {
+		const dx = (x - 48) / 39
+		const dy = (70 - y) / 39
+		return {
+			X: dx * Math.cos(tilt) - dy * Math.sin(tilt),
+			Y: dx * Math.sin(tilt) + dy * Math.cos(tilt),
+		}
+	}
+	/** Inside the heart's body. */
+	const body = (x: number, y: number) => {
+		const { X, Y } = unit(x, y)
+		return (X * X + Y * Y - 1) ** 3 - X * X * Y ** 3 <= 0
+	}
+	/** A tube, up out of the top: its middle's x at `y`, and how wide it is. */
+	const tubes = [
+		// The vein, in from the left, behind.
+		{
+			mid: (y: number) => 30 - y * 0.06,
+			half: 6,
+			from: 0,
+			to: 50,
+			fill: [VEIN_BLUE, VEIN_BLUE_LIT, VEIN_BLUE_DARK],
+		},
+		// The artery to the lungs, off to the right.
+		{
+			mid: (y: number) => 66 + (40 - y) * 0.22,
+			half: 6,
+			from: 0,
+			to: 44,
+			fill: [LUNG_ARTERY, LUNG_ARTERY_LIT, LUNG_ARTERY_DARK],
+		},
+		// The aorta: the biggest, straight up out of the middle.
+		{
+			mid: (y: number) => 50 + Math.sin(y / 14) * 2,
+			half: 8,
+			from: 0,
+			to: 42,
+			fill: [HEART_RED, HEART_LIT, HEART_SHADE],
+		},
+	]
+	const tubeAt = (x: number, y: number) => {
+		for (let i = tubes.length - 1; i >= 0; i--) {
+			const t = tubes[i]
+			if (y < t.from || y > t.to) continue
+			const d = x - t.mid(y)
+			if (Math.abs(d) <= t.half) return { t, d }
+		}
+		return undefined
+	}
+	/** The groove down between its two sides, and the vessels branching off it. */
+	const groove = (x: number, y: number) => {
+		for (let k = 0; k <= 40; k++) {
+			const s = k / 40
+			const gx = 56 + 12 * s + 4 * Math.sin(s * Math.PI)
+			const gy = 44 + 56 * s
+			if (Math.hypot(x - gx, y - gy) < 1.3) return true
+			// Branches off it, either way, every so often.
+			if (k % 10 === 5) {
+				for (let b = 0; b < 36; b++) {
+					const bx = gx - b * 0.5
+					const by = gy + b * 0.2 + (b * b) / 200
+					if (Math.hypot(x - bx, y - by) < 0.8) return true
+				}
+			}
+		}
+		return false
+	}
+	const asset = paintedArt(W, H, (x, y) => {
+		const inside = body(x, y)
+		if (inside) {
+			// A shine, up on its left lobe.
+			const shine = ((x - 28) / 6) ** 2 + ((y - 44) / 3.5) ** 2
+			if (shine < 0.3) return '#ffffff'
+			if (shine < 1) return HEART_SHINE
+			if (groove(x, y)) return HEART_GROOVE
+			// Lit from up on the left, in shade down on the right.
+			const lit = !body(x - 4, y - 4)
+			const shade = !body(x + 5, y + 5)
+			if (shade) return HEART_SHADE
+			if (lit) return HEART_LIT
+			return HEART_RED
+		}
+		const tube = tubeAt(x, y)
+		if (!tube) return undefined
+		const { t, d } = tube
+		if (d < -t.half + 3) return t.fill[1]
+		if (d > t.half - 3) return t.fill[2]
+		return t.fill[0]
+	})
+	return { asset, width: W * 4, height: H * 4 }
+})()
+
+/**
+ * A Platform's own picture (see `PlatformDefinition['art']`), `width`
+ * across: `top` px down from its top is what's stood on.
+ */
+export interface BodyPlatformArt {
+	asset: string
+	width: number
+	height: number
+	top: number
+}
+
+/**
+ * An airway in the lungs, to run along: a soft tube, round at either end,
+ * wet and lit along its top, its rings faint down its side, cilia waving
+ * up off it; and bunches of air sacs hanging under it, like grapes. In
+ * cells of 2, `width` world pixels across.
+ */
+export function airway(width: number, seed: number): BodyPlatformArt {
+	const W = Math.round(width / 2)
+	const TOP = 3
+	const TUBE = 11
+	const HANG = 14
+	const H = TOP + TUBE + HANG
+	const random = seeded(seed)
+	/** Bunches of air sacs: where, and each sac in it, round its middle. */
+	const count = Math.max(1, Math.round(W / 55))
+	const bunches = Array.from({ length: count }, (_, i) => {
+		const cx = Math.round(((i + 0.5) / count) * W + (random() - 0.5) * 10)
+		return [
+			{ x: cx, y: TOP + TUBE + 3, r: 4.2 },
+			{ x: cx - 4, y: TOP + TUBE + 6, r: 3.6 },
+			{ x: cx + 4, y: TOP + TUBE + 6, r: 3.8 },
+			{ x: cx - 1, y: TOP + TUBE + 9.5, r: 3.4 },
+			...(random() < 0.6 ? [{ x: cx + 3, y: TOP + TUBE + 11.5, r: 2.4 }] : []),
+		]
+	}).flat()
+	/** Cilia: where each stands, and which way it's leaning. */
+	const cilia = Array.from({ length: Math.floor(W / 4) }, (_, i) => ({
+		x: i * 4 + 2 + Math.floor(random() * 2),
+		lean: random() < 0.5 ? 0 : 1,
+		tall: random() < 0.4 ? 3 : 2,
+	})).filter((c) => c.x > 4 && c.x < W - 5)
+	const R = TUBE / 2
+	const inTube = (x: number, y: number) => {
+		const cy = TOP + R
+		const cx = Math.min(Math.max(x, R), W - R)
+		return ((x - cx) / R) ** 2 + ((y - cy) / R) ** 2 <= 1
+	}
+	const asset = paintedArt(W, H, (x, y) => {
+		if (inTube(x, y)) {
+			if (!inTube(x, y + 1)) return '#b05a6e'
+			if (!inTube(x, y - 1)) return '#ffe2e7'
+			if (y < TOP + 2.5) return '#fbc4cd'
+			// Its rings, faint, down its side.
+			if (Math.floor(x) % 6 === 0 && y > TOP + 3) return '#d98494'
+			if (y > TOP + TUBE - 3) return '#c86a7e'
+			return '#efa4b1'
+		}
+		for (const c of cilia) {
+			const up = TOP - y
+			if (
+				up > 0 &&
+				up <= c.tall &&
+				Math.floor(x) === c.x + (up > 1.5 ? c.lean : 0)
+			)
+				return up > 2 ? '#fff4f6' : '#ffd6dd'
+		}
+		const sac = bunches.find((b) => (x - b.x) ** 2 + (y - b.y) ** 2 <= b.r ** 2)
+		if (sac) {
+			const d = Math.hypot(x - sac.x, y - sac.y) / sac.r
+			if (d > 0.8) return '#a84a5e'
+			if (x < sac.x - 0.5 && y < sac.y - 0.5 && d < 0.5) return '#ffe6ea'
+			return y > sac.y + 1 ? '#d8828f' : '#eba2ae'
+		}
+		return undefined
+	})
+	return { asset, width: W * 2, height: H * 2, top: TOP * 2 }
+}
+
+/**
+ * A pad of heart muscle, to stand on, pumping up and down on the beat: a
+ * fat lozenge of it, round at its ends, its fibres across it, lit along its
+ * top; and cords of tendon, pale, strung down off its underside. In cells
+ * of 2, `width` world pixels across.
+ */
+export function musclePad(width: number): BodyPlatformArt {
+	const W = Math.round(width / 2)
+	const BODY = 12
+	const CORDS = 14
+	const H = BODY + CORDS
+	const inPad = (x: number, y: number) => {
+		const t = x / W
+		// Fattest in its middle, tapering round to its ends.
+		const half = (BODY / 2) * Math.sqrt(Math.max(0, 1 - (2 * t - 1) ** 6))
+		return Math.abs(y - BODY / 2) <= half && y >= 0
+	}
+	const asset = paintedArt(W, H, (x, y) => {
+		if (inPad(x, y)) {
+			if (!inPad(x, y - 1)) return MUSCLE_LIT
+			if (!inPad(x, y + 1)) return '#6e1424'
+			if (y < 3) return '#d85a6c'
+			const fibre = Math.round(y + Math.sin(x / 4) * 1.2) % 3 === 0
+			if (fibre) return MUSCLE_DARK
+			return y > BODY - 4 ? MUSCLE_DARK : MUSCLE
+		}
+		// Cords of tendon, down off it, either way.
+		const down = y - BODY + 1
+		if (down > 0)
+			for (const [from, lean] of [
+				[W * 0.3, -0.5],
+				[W * 0.45, 0.2],
+				[W * 0.6, -0.15],
+				[W * 0.72, 0.5],
+			])
+				if (Math.abs(x - (from + down * lean)) < 0.6)
+					return down > CORDS - 2 ? undefined : '#f2d0c8'
+		return undefined
+	})
+	return { asset, width: W * 2, height: H * 2, top: 0 }
+}
+
+/**
+ * The lungs themselves, hung in the middle of their cavern (see
+ * `CourseLook['breathing']`): the windpipe down out of the flesh between
+ * its two domes, its rings of cartilage, splitting in two, into either
+ * lung; each lung round-topped, widening down to its base, spongy pink,
+ * lit up on its left, in shade down its right, a fissure across it and its
+ * airways branching through it, paler; the left one (on the right, as we
+ * look at them) notched for the heart. In cells of 4: 250 by 90 cells,
+ * `width` by `height` world pixels.
+ */
+const LUNG_PINK = '#ef9fb0'
+const LUNG_PINK_LIT = '#fcc4cf'
+const LUNG_PINK_SHADE = '#c96a80'
+const LUNG_SPONGE = '#de8698'
+const LUNG_FISSURE = '#b4566c'
+const AIRWAY_PALE = '#f8dcd8'
+const AIRWAY_SHADE = '#e0b0b4'
+export const BIG_LUNGS = (() => {
+	const W = 250
+	const H = 90
+	const MIDDLE = 125
+	/** Each lung: its middle, how wide it is either side at most, its top and bottom; the heart's notch out of the one on the right. */
+	const lobes = [
+		{ cx: 64, half: 50, top: 16, bottom: 88, inner: 1, notch: undefined },
+		{
+			cx: 186,
+			half: 46,
+			top: 18,
+			bottom: 86,
+			inner: -1,
+			notch: { x: 140, y: 78, r: 10 },
+		},
+	]
+	/** How wide a lung is either side of its middle, `v` of the way down it: round at its top, widest at its base, round under. */
+	const across = (v: number, half: number) => {
+		if (v < 0 || v > 1) return -1
+		if (v > 0.82)
+			return half * Math.sqrt(Math.max(0, 1 - ((v - 0.82) / 0.18) ** 2))
+		return half * Math.sin((Math.PI / 2) * Math.min(1, v / 0.82)) ** 0.55
+	}
+	const inLobe = (x: number, y: number) =>
+		lobes.find((l) => {
+			const v = (y - l.top) / (l.bottom - l.top)
+			// Its top nearer the windpipe, its base out: leaning in.
+			const mid = l.cx + l.inner * (1 - v) * 14
+			if (Math.abs(x - mid) > across(v, l.half)) return false
+			return !(l.notch && Math.hypot(x - l.notch.x, y - l.notch.y) < l.notch.r)
+		})
+	/** Its airways: the windpipe, the two bronchi, and the branches off them, each a line `width` thick. */
+	const airways: [number, number, number, number, number][] = [
+		[MIDDLE, 0, MIDDLE, 16, 4.5],
+		[MIDDLE, 16, 96, 36, 3],
+		[MIDDLE, 16, 156, 38, 3],
+		[96, 36, 58, 62, 2],
+		[96, 36, 82, 76, 2],
+		[58, 62, 40, 70, 1.2],
+		[58, 62, 54, 82, 1.2],
+		[96, 36, 70, 30, 1.5],
+		[156, 38, 190, 62, 2],
+		[156, 38, 176, 78, 2],
+		[190, 62, 210, 70, 1.2],
+		[190, 62, 196, 80, 1.2],
+		[156, 38, 182, 30, 1.5],
+	]
+	const onAirway = (x: number, y: number) =>
+		airways.find(([ax, ay, bx, by, w]) => {
+			const dx = bx - ax
+			const dy = by - ay
+			const t = Math.max(
+				0,
+				Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)),
+			)
+			return Math.hypot(x - (ax + dx * t), y - (ay + dy * t)) < w
+		})
+	const asset = paintedArt(W, H, (x, y) => {
+		const airway = onAirway(x, y)
+		const lobe = inLobe(x, y)
+		if (airway) {
+			// The windpipe's rings; the rest shaded down their right.
+			if (airway === airways[0])
+				return Math.floor(y) % 4 === 0 ? AIRWAY_SHADE : AIRWAY_PALE
+			if (lobe || y < 40)
+				return x > airway[0] + 0.5 && airway[4] > 2 ? AIRWAY_SHADE : AIRWAY_PALE
+		}
+		if (!lobe) return undefined
+		// Lit round its top and left, in shade round its right and under.
+		if (!inLobe(x - 3, y - 3)) return LUNG_PINK_LIT
+		if (!inLobe(x + 3, y + 3)) return LUNG_PINK_SHADE
+		// A fissure, slanting down across it.
+		const slant = lobe.cx - lobe.inner * 30 + (y - lobe.top) * lobe.inner * 0.9
+		if (Math.abs(x - slant) < 0.6 && y > lobe.top + 20) return LUNG_FISSURE
+		// Spongy: air sacs, a dot every so often.
+		if (
+			(Math.floor(x) % 6 === 0 && Math.floor(y) % 5 === 2) ||
+			(Math.floor(x) % 6 === 3 && Math.floor(y) % 5 === 0)
+		)
+			return LUNG_SPONGE
+		return LUNG_PINK
+	})
+	return { asset, width: W * 4, height: H * 4 }
+})()

@@ -230,6 +230,103 @@ export const DANCES = {
 			{ arms: ['up', 'out'], sway: -1, lift: 1 },
 		],
 	},
+	/**
+	 * A queen's: swaying side to side, her cloak swinging, waving one hand
+	 * up over her head and out, then the other, bobbing. Drawn by hand, the
+	 * Furby Queen's (her arms are under her costume's head, to be found).
+	 */
+	queen: {
+		interval: 130,
+		moves: [
+			{ arms: ['up', 'hip'] },
+			{ arms: ['up', 'hip'], sway: -1, lift: 1 },
+			{ arms: ['out', 'hip'], sway: -1 },
+			{ arms: ['hip', 'out'], lift: 1 },
+			{ arms: ['hip', 'up'] },
+			{ arms: ['hip', 'up'], sway: 1, lift: 1 },
+			{ arms: ['out', 'hip'], sway: 1 },
+			{ arms: ['up', 'hip'], lift: 1 },
+		],
+	},
+	/**
+	 * The cancan: a chorus line's high kicks, one leg and then the other,
+	 * knee up, kick, knee up, hopping on each kick. Drawn by hand, the Miner
+	 * Twins': with no arms, their cape for a skirt, flung up at its hem with
+	 * every kick, their heads thrown back at the top of it.
+	 */
+	cancan: {
+		interval: 120,
+		moves: [
+			{},
+			{ bend: 1 },
+			{ lift: 1 },
+			{ bend: 1 },
+			{},
+			{ bend: 1 },
+			{ lift: 1 },
+			{ bend: 1 },
+		],
+	},
+	/**
+	 * Jazz: jazz hands up and out, then low; pointing up one way and the
+	 * other, a hand on his hip; a spin, round past his side and his back,
+	 * arms out; a kick; and arms up, for the finish. Drawn by hand, the
+	 * Spirit of Jazz's: square on to us, his locks swinging, but turning
+	 * through the spin. These moves are only roughly it, for a start.
+	 */
+	jazz: {
+		interval: 130,
+		moves: [
+			{ arms: ['out', 'out'], bend: 1 },
+			{ arms: ['out', 'out'], lift: 1 },
+			{ arms: ['pointUp', 'hip'], bend: 1 },
+			{ arms: ['hip', 'pointUp'], bend: 1 },
+			{ lift: 1 },
+			{ arms: ['out', 'out'], narrow: true, lift: 1 },
+			{ flip: true, lift: 1 },
+			{ arms: ['out', 'out'], lift: 1 },
+			{ arms: ['up', 'out'] },
+			{ arms: ['up', 'up'], lift: 2 },
+		],
+	},
+	/**
+	 * Flexing: arms down, a double biceps, hopping in it, the drink in her
+	 * sloshing; one arm flexed and the other on her hip, then the other way;
+	 * shaking it about, the drink fizzing up her neck; and arms up. Drawn by
+	 * hand, Bonnie Bottle's, square on to us.
+	 */
+	flex: {
+		interval: 150,
+		moves: [
+			{ bend: 1 },
+			{ arms: ['up', 'up'] },
+			{ arms: ['up', 'up'], lift: 1 },
+			{ arms: ['up', 'hip'], sway: -1 },
+			{ arms: ['hip', 'up'], sway: 1 },
+			{ arms: ['out', 'out'], sway: -1, bend: 1 },
+			{ arms: ['out', 'out'], sway: 1 },
+			{ arms: ['up', 'up'], lift: 2 },
+		],
+	},
+	/**
+	 * The sleuth: peering through a magnifying glass one way, then turned
+	 * round, the other; a puff on his pipe, its smoke going up; a shimmy,
+	 * his cape swinging; and his glass held up high, for "Eureka!". Drawn by
+	 * hand, Det. Munch's.
+	 */
+	sleuth: {
+		interval: 170,
+		moves: [
+			{},
+			{ bend: 1 },
+			{ flip: true },
+			{ flip: true, lift: 1 },
+			{},
+			{ bend: 1 },
+			{ hips: 1, lift: 1 },
+			{ lift: 2 },
+		],
+	},
 	/** Round and round, hopping, chasing its tail. */
 	zoomies: {
 		interval: 110,
@@ -286,6 +383,15 @@ export const RUNNER_DANCES: Record<string, DanceName> = {
 	skeleton: 'spin',
 	'ms-crocodile': 'twist',
 	'banana-girl': 'banana',
+	'furby-queen': 'queen',
+	// No arms: high kicks, drawn by hand, the two of them a chorus line.
+	'the-miner': 'cancan',
+	// Jazz hands, and a spin: drawn by hand.
+	'spirit-of-jazz': 'jazz',
+	// Flexing her muscles, the drink in her sloshing: drawn by hand.
+	'bonnie-bottle': 'flex',
+	// A magnifying glass, a pipe, a cape: drawn by hand.
+	'det-munch': 'sleuth',
 }
 
 /** A dance for anyone not in `RUNNER_DANCES`, from something about them that stays the same. */

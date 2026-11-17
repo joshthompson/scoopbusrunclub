@@ -39,31 +39,48 @@ export function underground(world: World, b: Pick<Body, 'x' | 'feetY'>) {
 	return b.feetY > world.terrain.groundY(b.x) + LIP
 }
 
+/**
+ * How far under a bridged Gap's deck someone has to be to be on their way
+ * in: through it at all, or they'd be across it, going fast, before
+ * they'd fallen as far as its lip.
+ */
+const UNDER_BRIDGE = 4
+
 /** Gone down the Secret's Gap past its lip, this tick: on their way in. */
 export function goingIn(world: World, b: Body) {
+	const lip = world.course.secret?.bridged ? UNDER_BRIDGE : LIP
 	return (
 		!b.secret &&
 		!b.grounded &&
 		inShaft(world, b.x) &&
-		b.feetY > world.terrain.groundY(b.x) + LIP
+		b.feetY > world.terrain.groundY(b.x) + lip
 	)
 }
 
 /**
- * Kept in the Secret: down its shaft, between its sides; once under its
- * roof, between the cavern's ends.
+ * Kept in the Secret: down its shaft, between its sides, for as long as
+ * any of them's up over its roof, however fast they were going in (they
+ * were in it to go in, so they're kept in it); once under its roof,
+ * between the cavern's ends.
  */
 export function keepIn(world: World, b: Body, height: number) {
 	const secret = world.course.secret
 	if (!secret) return
 	const [left, right] =
-		b.feetY - height < secretRoof(world) && inShaft(world, b.x)
+		b.feetY - height < secretRoof(world)
 			? [secret.gap.from, secret.gap.to]
 			: [secret.from, secret.to]
-	b.x = Math.max(
-		left + HITBOX_HALF_WIDTH,
-		Math.min(right - HITBOX_HALF_WIDTH, b.x),
-	)
+	// Down a pit in its floor: between its walls.
+	const pit = secret.coaster?.leap?.pit
+	const [from, to] =
+		pit && b.feetY > secret.floor + 2 && b.x > pit[0] - 20 && b.x < pit[1] + 20
+			? [pit[0] + HITBOX_HALF_WIDTH, pit[1] - HITBOX_HALF_WIDTH]
+			: [left + HITBOX_HALF_WIDTH, right - HITBOX_HALF_WIDTH]
+	const kept = Math.max(from, Math.min(to, b.x))
+	// Into a wall: stopped by it, not still going, to fly on along under
+	// the roof the moment they're down past it.
+	if (kept !== b.x) b.vx = 0
+	b.x = kept
 }
 
 /** How far inside a manhole's rim someone's middle has to be to go down it. */
@@ -105,6 +122,17 @@ export const atLaunch = (world: World, b: Body) =>
 	b.x >= world.course.secret.launch - REACH
 
 /**
+ * Whether someone's down in the Secret, coming up to whoever's at its far
+ * end, near enough for them to call out (see `Secret['greets']`): by where
+ * they are, so a Remote Player's screen knows it too.
+ */
+export function comingAtLaunch(world: World, b: Pick<Body, 'x' | 'feetY'>) {
+	const secret = world.course.secret
+	if (!secret?.greets || !underground(world, b)) return false
+	return b.x >= secret.launch - secret.greets.near && b.x < secret.launch
+}
+
+/**
  * Thrown: straight up, far enough to clear the course over them by the
  * Secret's `peak`, and on, to come down on it about its `land` along.
  */
@@ -122,6 +150,8 @@ export function fling(world: World, b: Body) {
 	b.on = undefined
 	b.bed = undefined
 	b.vy = -up
+	// Up a duct, up the middle of it.
+	if (secret.duct) b.x = secret.launch
 	b.vx = secret.duct ? 0 : (secret.land - b.x) / (up / GRAVITY + down)
 	b.facing = 1
 }
@@ -149,4 +179,13 @@ export function flyOut(world: World, b: Body) {
 	if (b.vy <= 0 || b.feetY >= world.terrain.groundY(b.x)) return false
 	b.secret = undefined
 	return true
+}
+
+/**
+ * Whether `x` is over a pit in the Secret's floor, its coaster's (see
+ * `Coaster['leap']`): no floor under it, a Gap, down there.
+ */
+export function inPit(world: World, x: number) {
+	const pit = world.course.secret?.coaster?.leap?.pit
+	return !!pit && x > pit[0] && x < pit[1]
 }

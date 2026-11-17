@@ -14,6 +14,12 @@ import prinsesstarta from '../../assets/boosts/prinsesstarta.png'
 import semla from '../../assets/boosts/semla.png'
 import spiderCupcake from '../../assets/boosts/spider-cupcake.png'
 import toffeeApple from '../../assets/boosts/toffee-apple.png'
+import { cavePickles, coolRock, sandwich } from '../../courses/kit/caveFika'
+import {
+	bubbleGum,
+	cloudberries,
+	flyingStrawberry,
+} from '../../courses/kit/cliffFika'
 import { butterTea, mintCake } from '../../courses/kit/everestFika'
 import {
 	captainsHat,
@@ -24,6 +30,12 @@ import {
 	salmiakki,
 } from '../../courses/kit/ferryFika'
 import { ale } from '../../courses/kit/gamlaStanFika'
+import {
+	badMushroom,
+	berries,
+	cakeInACan,
+	mushroom,
+} from '../../courses/kit/huddingeFika'
 import { grapes, oxygen, vitamin } from '../../courses/kit/karolinskaFika'
 import {
 	blueberrySoup,
@@ -31,6 +43,7 @@ import {
 	waterCup,
 } from '../../courses/kit/midnattsloppetFika'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
+import { dobryCola, mojito, popcorn } from '../../courses/kit/rooftopFika'
 import {
 	goldRing,
 	lostPhone,
@@ -191,6 +204,19 @@ const ART: Record<FikaItem, string> = {
 	blueberrySoup,
 	pizzaSlice,
 	ale,
+	cakeInACan,
+	berries,
+	mushroom,
+	badMushroom,
+	sandwich,
+	coolRock,
+	cavePickles,
+	popcorn,
+	mojito,
+	dobryCola,
+	flyingStrawberry,
+	bubbleGum,
+	cloudberries,
 }
 
 /** A fika item's picture, for a Draw Hook to draw at its size (see `FIKA_SIZE`). */

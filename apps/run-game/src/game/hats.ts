@@ -21,7 +21,7 @@ import type { FikaItem } from './fika'
  *   Gamla Stan
  * - `antlers`: up on a ledge by Huddinge's second deer, worn down onto it
  * - `propeller`: a propeller beanie, over Furby Fields' highest platform:
- *   holding jump on the way down, it floats you
+ *   holding jump on the way down, it floats you, there and only there
  * - `chullo`: an Andean knitted hat, over Machu Picchu's top terrace
  * - `tentacle`: a purple tentacle, high on a shelf in the sewers: sewage
  *   slides off it, and it takes the next knock for you, coming off doing it
@@ -32,6 +32,8 @@ import type { FikaItem } from './fika'
  *   bounce right off it
  * - `discoBall`: a disco ball, over the whole head, light glinting off it,
  *   up on the rock band's speakers at Midnattsloppet
+ * - `jazzHat`: the Spirit of Jazz's white top hat, on fire, stolen off his
+ *   head up in Karolinska's lungs, once he's been found and unlocked
  */
 export type HatKind =
 	| 'pumpkin'
@@ -52,6 +54,7 @@ export type HatKind =
 	| 'bobbleHat'
 	| 'headMirror'
 	| 'discoBall'
+	| 'jazzHat'
 
 /** A hat someone's wearing: a Pumpkin by its carving, 1 to 5. */
 export interface Hat {
@@ -71,7 +74,7 @@ export interface HatRules {
 	shield: boolean
 	/** What's said as it does. */
 	saved?: string
-	/** Holding jump on the way down, floats you down slowly. */
+	/** Holding jump on the way down, floats you down slowly: on its own course only. */
 	floats?: boolean
 	/** Sewage pouring down onto it bounces off it, rather than splattering you. */
 	splatProof?: boolean
@@ -117,6 +120,7 @@ export const HAT_RULES: Record<HatKind, HatRules> = {
 	bobbleHat: PLAIN,
 	headMirror: { ...PLAIN, germProof: true },
 	discoBall: PLAIN,
+	jazzHat: PLAIN,
 }
 
 /** Fika that's a hat too, put on as it's had: the captain's hat, off the ferry's roof. */
@@ -147,6 +151,7 @@ const CODED: HatKind[] = [
 	'bobbleHat',
 	'headMirror',
 	'discoBall',
+	'jazzHat',
 ]
 /** How many carvings a Pumpkin can have: its codes. */
 const CARVINGS = 5

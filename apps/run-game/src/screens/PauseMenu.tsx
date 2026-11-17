@@ -146,7 +146,7 @@ const styles = {
 		background: 'transparent',
 		color: 'white',
 		border: '3px solid transparent',
-		padding: '5px 12px 2px',
+		padding: '3px 12px 4px',
 		'font-size': '18px',
 		'line-height': 1.1,
 		'text-align': 'left',

@@ -27,6 +27,36 @@ export function atSea(world: Pick<World, 'course'>, x: number) {
 	return !!sea && x >= sea.from && x < sea.to
 }
 
+/** Whether `x` is where it flies, on its jets (see `CourseLook['busJets']`). */
+export function onJets(world: Pick<World, 'course'>, x: number) {
+	const jets = world.course.look?.busJets
+	return !!jets && x >= jets.from && x < jets.to
+}
+
+/**
+ * On its jets: how far over the floor its wheels float, and how far it
+ * bobs up and down about that, and how often, along the way; how far
+ * back and on ahead it looks for the highest floor to float over; and
+ * how it's pulled to its height, a soft spring, slowed as it goes: floaty.
+ */
+const HOVER = 18
+const HOVER_BOB = 7
+const HOVER_BOB_EVERY = 260
+const HOVER_BEHIND = 60
+const HOVER_AHEAD = 280
+const HOVER_PULL = 0.012
+const HOVER_DAMP = 0.93
+
+/** Where its wheels float to, on its jets, its middle at `middle`. */
+function hoverHeight(world: World, middle: number) {
+	let floor = Number.POSITIVE_INFINITY
+	for (let x = middle - HOVER_BEHIND; x <= middle + HOVER_AHEAD; x += 10)
+		floor = Math.min(floor, world.terrain.groundY(x))
+	const bob =
+		Math.sin((world.bus.frontX / HOVER_BOB_EVERY) * Math.PI * 2) * HOVER_BOB
+	return floor - HOVER + bob
+}
+
 /** On its glider: how fast it climbs or dives at most, and how quickly it turns to. */
 const GLIDE_CLIMB = 4
 const GLIDE_STEER = 0.08
@@ -82,6 +112,15 @@ export function rideBus(world: World, ride: BusRide, middle: number) {
 		ride.y = dug
 		ride.vy = 0
 		ride.grounded = true
+		return
+	}
+	// On its jets: floating along, drawn up softly to its height, and over
+	// whatever's coming.
+	if (onJets(world, middle)) {
+		ride.vy += (hoverHeight(world, middle) - ride.y) * HOVER_PULL
+		ride.vy *= HOVER_DAMP
+		ride.y += ride.vy
+		ride.grounded = false
 		return
 	}
 	// Off the cliff, on its own glider, across the sea after everyone.

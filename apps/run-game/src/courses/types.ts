@@ -2,6 +2,7 @@ import type { RunnerName } from '@/data/runners'
 import type { FikaItem } from '../game/fika'
 import type { PickupHat } from '../game/hats'
 import type { Terrain } from '../game/terrain'
+import type { Sound } from '../sfx'
 
 /** Something in the way on the course, at `x` along it: jump it or duck it, or stumble. */
 export type Obstacle =
@@ -154,6 +155,23 @@ export type Obstacle =
 	 * the Pyramids' special goal.
 	 */
 	| { kind: 'crocodile'; x: number }
+	/**
+	 * A stalactite in a Cave's high roof over `x`, The Caves': as anyone
+	 * racing comes near, it shakes, cracks and falls, smashing on the floor
+	 * (see `stalactites.ts`). Going flat out, you're past it before it's
+	 * down; any slower and you're under it, a knock on the head and some
+	 * speed lost, as with a traffic cone; slower still, and it's down before
+	 * you get there, only rubble to run over.
+	 */
+	| { kind: 'stalactite'; x: number }
+	/**
+	 * A huge spider on a Cave's floor, The Caves', scuttling to and fro
+	 * along its `range`, from the start (see `spiders.ts`). Into its legs
+	 * or its face, and you stumble. Land on its head or its back, and it's
+	 * a bounce off it, as off a head: it squashes down, and is none the
+	 * worse for it.
+	 */
+	| { kind: 'spider'; x: number; range: [from: number, to: number] }
 
 /** Something on the course, at `x` along it, that speeds you up. */
 export type Boost =
@@ -352,9 +370,52 @@ export interface CourseLook {
 	}
 	/**
 	 * A heart beating, from `from` to `to` along the course: the screen
-	 * thumping red with it, in time with its valves (see `HEARTBEAT`).
+	 * thumping red with it, in time with its valves (see `HEARTBEAT`). And
+	 * the heart itself, behind everything, `x` its middle and `y` its top,
+	 * swelling on every beat.
 	 */
-	heartbeat?: { from: number; to: number }
+	heartbeat?: {
+		from: number
+		to: number
+		heart?: {
+			asset: string
+			width: number
+			height: number
+			x: number
+			y: number
+		}
+	}
+	/**
+	 * Lungs, hung behind everything, `x` their middle and `y` their top:
+	 * filling and emptying every `ticks`, `phase` of the way in at the start,
+	 * as a Moving Platform that long swings, full at the top of its swing.
+	 * In time with the airways in front of them.
+	 */
+	breathing?: {
+		asset: string
+		width: number
+		height: number
+		x: number
+		y: number
+		ticks: number
+		phase?: number
+	}
+	/**
+	 * A family of wild boar, a sow and her piglets, coming up from behind as
+	 * whoever's racing in front gets to `from`, along the grass in front of
+	 * the path, at a steady pace a touch quicker than anyone runs: slowly
+	 * catching them up, alongside a while, and slowly away ahead. Only to be
+	 * seen, not run into (see `draw/boars.ts`). Huddinge's.
+	 */
+	boars?: { from: number }
+	/**
+	 * A forest harvester at work behind the path, the tree it's felling
+	 * standing at `x`, through its head: `tree`, drawn twice its size,
+	 * through `filter`. As whoever's racing in front comes up to it, it saws
+	 * the tree down, and feeds it through its head, cutting it into logs,
+	 * onto its pile. Only to be seen (see `draw/harvester.ts`). Huddinge's.
+	 */
+	harvester?: { x: number; tree: string; filter?: string }
 	/**
 	 * Colours that change along the course, for the Ground's layers to fill
 	 * with, as `url(#id)`: each stop a colour from `x` on, till the next.
@@ -467,6 +528,13 @@ export interface CourseLook {
 	signInk?: string
 	/** The bus's own look, in place of the yellow one: see `BusLook`. */
 	bus?: BusLook
+	/**
+	 * Where the bus flies, from `from` to `to` along the course: wings out
+	 * either side, a fin up off its roof and a rocket booster under its
+	 * back, roaring, its wheels tucked away; floating along over the floor,
+	 * up over whatever's in the way, bobbing. Shrunk, inside someone.
+	 */
+	busJets?: { from: number; to: number }
 	/** How a Platform looks: see `PlatformLook`. */
 	platform?: PlatformLook
 	/**
@@ -1140,6 +1208,19 @@ export interface Course {
 	/** Its Portals, a shrink and then a grow, in order along it: see `Portal`. */
 	portals?: Portal[]
 	/**
+	 * Slides, each `from` to `to` along it: anyone on the Ground there is
+	 * sat down sliding, as if ducking, whatever's held, gathering speed
+	 * downhill; they can still jump. Down a chute of snot into the
+	 * sneeze, in Karolinska.
+	 */
+	slides?: { from: number; to: number }[]
+	/**
+	 * Where a km sign stands, by its km, if not at it: Karolinska's 2 km,
+	 * which would be up on the giant's tongue, on the bench just short of
+	 * it instead. A little out, but on the ground.
+	 */
+	kmSignsAt?: Partial<Record<1 | 2 | 3 | 4, number>>
+	/**
 	 * Rails to grind along on skis, each `from` to `to`, `height` over the
 	 * Ground all along it, following it down: a rail, a box, or a log.
 	 */
@@ -1211,7 +1292,12 @@ export interface Course {
 	 * By their runner id, at `x`, their feet at `y`; and what they say,
 	 * found: Bat Person's theme. With `over`, passing over them that high
 	 * counts too (in a room, jumping by). Or, `waiting`, sat down till
-	 * anyone comes near, and up to say hello (see `FoundWaiting`).
+	 * anyone comes near, and up to say hello (see `FoundWaiting`). And
+	 * `toSelf`, what they say instead to anyone running as them: Bat
+	 * Person's "Greetings bat brother", the Furby Queen's "Imposter!".
+	 * With a `hat`, their own, it's there to steal off their head, by
+	 * anyone getting to them once they've already been unlocked: the
+	 * Spirit of Jazz's, and `robbed`, what they say as it goes.
 	 */
 	found?: {
 		runner: string
@@ -1220,6 +1306,9 @@ export interface Course {
 		says?: string
 		over?: number
 		waiting?: FoundWaiting
+		toSelf?: string
+		hat?: PickupHat
+		robbed?: string
 	}
 	/**
 	 * A fika to hunt down: pick up every one of `item` on the course in one
@@ -1268,10 +1357,12 @@ export interface HauntedHouse {
  * A mine, in The Caves: rails along the Ground, `from` to their buffers at
  * `to`, and mine carts waiting on them at `carts`. Run into one and you're
  * in it, riding it down the line, faster than you'd run, to the buffers,
- * where you're out and on your way. Holding up at the points, you're sent
- * up a line of its own instead, `secret`: up a trestle to a gallery high
- * in the rock that there's no getting to any other way, a hat waiting in
- * it, and back down to the rest.
+ * where you're out and on your way. Jump, and the cart jumps, you in it,
+ * coming down on whatever rail's under it: up onto a line of its own,
+ * `secret`, where it starts, up on its trestles over the line along the
+ * floor, that's the way onto it; and on up it to a gallery high in the
+ * rock that there's no getting to any other way, a hat waiting in it, and
+ * back down to the rest.
  */
 /**
  * A Secret: one Gap, `gap`, that's a way in, not a fall. Whoever goes down
@@ -1289,6 +1380,14 @@ export interface HauntedHouse {
  * they don't (Gamla Stan's tavern). And with `duct`, nobody throws them:
  * it's an air duct at `launch` that blows them straight up it, out of a
  * grate in the street, and on over to `land`.
+ *
+ * With `greets`, whoever's waiting calls out to anyone coming at them,
+ * within `near` of `launch`, the first time: their `sound`, and one of
+ * `says` in a bubble over them (the Yeti's growl).
+ *
+ * With `bridged`, its Gap has a rope bridge over it (a Platform, not
+ * solid): run on over it, or duck on it, and down through it you go (The
+ * Caves' mine). With `coaster`, there's a ride through it: see `Coaster`.
  */
 export interface Secret {
 	gap: { from: number; to: number }
@@ -1302,6 +1401,41 @@ export interface Secret {
 	unlocks?: string
 	manhole?: boolean
 	duct?: boolean
+	bridged?: boolean
+	greets?: {
+		near: number
+		sound: Sound
+		says: readonly string[]
+		/** What they say instead to anyone running as who it `unlocks`: the Miner Twins' "One of us!". */
+		toSelf?: string
+	}
+	coaster?: Coaster
+}
+
+/**
+ * A mine cart ride through a Secret's cavern, under The Caves: carts
+ * waiting at the start of its `track`, `carts` of them, one for each
+ * Player there might be, all in the one spot, so there's always one there
+ * till they're all gone. Run into one and you're in it, as a mine's (see
+ * `Mine`), and off along the track: up, down and round its loop, slowed
+ * going up and sped up coming down, to its end, where you're thrown out
+ * of it, on your way (see `coaster.ts`). `track` is points along its
+ * rail, in order, `[x, y]` (a y on the screen), a few pixels apart, its
+ * start and end on the cavern's floor; and `air`, stretches of it with no
+ * rail, `[from, to]` how far along it: a jump, the cart flying over.
+ */
+export interface Coaster {
+	track: [x: number, y: number][]
+	carts: number
+	air?: [from: number, to: number][]
+	/**
+	 * Its leap, over the first of `air`: a gap in the rails over a pit in
+	 * the cavern's floor, `pit`, from and to along the course. Jump on its
+	 * run-up, from `runUp` along the track (the foot of its ramp) to the end
+	 * of the rail, and the cart's across; don't, and it runs off the end,
+	 * and down the pit, and whoever's in it with it: out, as down any Gap.
+	 */
+	leap?: { runUp: number; pit: [from: number, to: number] }
 }
 
 /**
@@ -1313,10 +1447,10 @@ export interface Secret {
  * `launcher`: facing left, the way you come, `kneel`ing, waiting, `hands`
  * where you run into, from the picture's top left; and `thrown`, while
  * you're on your way up (or a duct: still, then blowing). All in world
- * pixels.
+ * pixels. Or `mine`: an old mine's workings, deep under The Caves.
  */
 export interface SecretLook {
-	walls: 'ice' | 'vaults'
+	walls: 'ice' | 'vaults' | 'mine'
 	launcher: {
 		kneel: string
 		thrown: string
@@ -1326,6 +1460,12 @@ export interface SecretLook {
 		hands: { x: number; y: number }
 	}
 	furnishings: { x: number; prop: SecretProp }[]
+	/**
+	 * Which of its furnishings says hello to whoever's coming (see
+	 * `Secret['greets']`), by its index, if not whoever's at its far end:
+	 * The Miner, beside the mine's lift.
+	 */
+	greeter?: number
 	/**
 	 * Its manhole, if that's its way in (see `Secret`): the open `hole`,
 	 * lying flat in the street, and the top of the `ladder` down it, poking
@@ -1352,6 +1492,11 @@ export interface SecretLook {
 		shade: string
 		seam: string
 		air: string
+		/**
+		 * A lift's cage round whoever's blown up it, if it's a mine's
+		 * shaft: its `back`, behind them, and its bars, `asset`, in front.
+		 */
+		cage?: SecretPicture & { back: string }
 	}
 }
 
@@ -1400,7 +1545,7 @@ export interface Mine {
 	to: number
 	carts: number[]
 	secret: {
-		/** The points, where it leaves the line along the Ground, and where it's back on it. */
+		/** Where it starts, up on its trestles, its stop, to jump up onto; and where it's back on the line along the Ground. */
 		from: number
 		to: number
 		/** How high over the Ground its rail is, `x` along, between the two. */

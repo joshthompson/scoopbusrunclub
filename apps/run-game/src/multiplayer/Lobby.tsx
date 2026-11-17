@@ -438,7 +438,7 @@ function SeatCard(props: {
 				>
 					{(runner) => (
 						<RunStrip
-							frame={runner().sprite.run[0] ?? ''}
+							run={runner().sprite.run}
 							width={runner().sprite.width}
 							height={runner().sprite.height}
 							scale={2}
@@ -528,7 +528,7 @@ const styles = {
 		'align-items': 'center',
 		gap: '8px',
 		height: '52px',
-		padding: '6px 8px 2px',
+		padding: '4px 8px',
 		'box-sizing': 'border-box',
 		background: 'rgba(15, 31, 41, 0.92)',
 		border: '3px solid white',
@@ -543,7 +543,7 @@ const styles = {
 		display: 'flex',
 		'align-items': 'center',
 		gap: '6px',
-		padding: '1px 6px 3px',
+		padding: '2px 6px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '2px solid white',
@@ -643,7 +643,7 @@ const styles = {
 	back: {
 		position: 'absolute',
 		left: 0,
-		padding: '6px 10px 2px',
+		padding: '4px 10px',
 		background: 'rgba(15, 31, 41, 0.85)',
 		color: 'white',
 		border: '3px solid white',
@@ -676,7 +676,7 @@ const styles = {
 	},
 	touchJoin: {
 		'margin-top': '4px',
-		padding: '8px 10px 4px',
+		padding: '6px 10px',
 		background: '#ffd23f',
 		color: 'var(--ink)',
 		border: '3px solid white',
@@ -722,7 +722,7 @@ const styles = {
 		'justify-content': 'space-between',
 		'align-items': 'center',
 		'align-self': 'stretch',
-		padding: '4px 6px 1px',
+		padding: '2px 6px 3px',
 		'font-size': '16px',
 		color: 'white',
 		'text-shadow': '2px 2px 0 var(--ink)',
@@ -786,7 +786,7 @@ const styles = {
 		height: '30px',
 		'flex-shrink': 0,
 		'margin-bottom': '6px',
-		padding: '5px 8px 2px',
+		padding: '3px 8px 4px',
 		background: 'transparent',
 		color: 'white',
 		border: '2px solid white',

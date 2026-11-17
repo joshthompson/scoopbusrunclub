@@ -1,5 +1,6 @@
 import { type RunnerName, runners } from '@/data/runners'
 import { createSignal } from 'solid-js'
+import { BONUS_RUNNERS, MS_CROCODILE } from './bonus'
 import type { Avatar } from './looks'
 import { MEMBERS, type Playable, lookSprite } from './playable'
 
@@ -12,11 +13,12 @@ import { MEMBERS, type Playable, lookSprite } from './playable'
  * drawn: every picture they race in (their run, their duck, stood, on skis
  * or a board, and their dance) made again once, before the race, in its
  * colour, and shown instead through the Scene's `resolveAsset` (see
- * `dressedIn` and `inRaceShirt`). Who isn't wearing a T-shirt (Link, a dog;
- * the bonus runners, in their costumes) runs as they are.
+ * `dressedIn` and `inRaceShirt`), as are Ms Crocodile's. Who isn't
+ * wearing a T-shirt (Link, a dog; the other bonus runners, in their
+ * costumes) runs as they are.
  */
 
-/** A member's own T-shirt, as it's drawn. */
+/** Someone's own T-shirt, as it's drawn. */
 interface Shirt {
 	/**
 	 * Its colour, swapped for the race's: or, for a gradient (Other Josh's),
@@ -36,6 +38,15 @@ interface Shirt {
 	 * T-shirt's navy, and Claire's headband her T-shirt's purple.
 	 */
 	least?: number
+}
+
+/**
+ * The bonus runners in a T-shirt, by their runner id, and its colours.
+ * The rest are in costume.
+ */
+const BONUS_SHIRTS: Partial<Record<string, Shirt>> = {
+	// Her bandana's knot and her shoes' stripes are her T-shirt's orange, and stay.
+	[MS_CROCODILE.id]: { colour: '#ff8a1e', least: 12 },
 }
 
 /** Every member drawn by hand in a T-shirt, and its colours, from their pictures. */
@@ -219,19 +230,22 @@ const [made, setMade] = createSignal(new Map<string, Map<string, string>>())
 const making = new Map<string, Promise<void>>()
 
 /**
- * Every hand-drawn member's racing pictures made again in a race's
- * T-shirt, `colour`: once, whichever race asks first. Done when they all
- * are; one that can't be made is shown as it is.
+ * Every hand-drawn member's racing pictures, and every bonus runner's in a
+ * T-shirt, made again in a race's T-shirt, `colour`: once, whichever race
+ * asks first. Done when they all are; one that can't be made is shown as
+ * it is.
  */
 export function dressedIn(colour: string) {
 	let done = making.get(colour)
 	if (!done) {
 		done = Promise.all(
-			MEMBERS.flatMap((member) => {
-				const shirt = member.member && SHIRTS[member.member]
+			[...MEMBERS, ...BONUS_RUNNERS].flatMap((runner) => {
+				const shirt = runner.member
+					? SHIRTS[runner.member]
+					: BONUS_SHIRTS[runner.id]
 				if (!shirt) return []
 				const swaps = swapsFor(shirt, colour)
-				return racingPictures(member).map(async (url) => {
+				return racingPictures(runner).map(async (url) => {
 					const made = await recoloured(url, swaps, shirt.least).catch(
 						() => url,
 					)

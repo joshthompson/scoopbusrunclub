@@ -21,6 +21,13 @@ import type { Racer, World } from './world'
 export interface Held {
 	at: number
 	vx: number
+	/**
+	 * How far past its way in they'd got by the time they were held: let
+	 * out that much past its way out, so the bus, put back as far behind
+	 * its way out as it was behind its way in, is as far behind them as it
+	 * was, not a step nearer.
+	 */
+	over: number
 	/** Their place in it, in the order they got in: 0 in the middle, then either side. */
 	slot: number
 }
@@ -51,6 +58,20 @@ const SHRINK = { charge: 40, lag: 6, snap: 124 }
  * to their size as they fly, over `flight` ticks, down onto the floor.
  */
 const SNEEZE = { snap: 84, flight: 64 }
+/**
+ * The sneeze, in the dark: down the Slide into the hole it's in, the
+ * screen goes black this quick; and "CHOO!", out of it into the sneeze,
+ * this slowly. In the dark, it's said, bigger each time, "Ah...", "Ah...!",
+ * "AAH...!!", from these ticks after it went off, and at the snap, "CHOO!".
+ */
+const DARK_IN = 8
+const DARK_OUT = 30
+const AH = [
+	{ at: 8, text: 'Ah...', size: 44 },
+	{ at: 34, text: 'Ah...!', size: 60 },
+	{ at: 58, text: 'AAH...!!', size: 80 },
+]
+const CHOO = { text: 'CHOO!', size: 130, ticks: 34 }
 /** How small they get, shrunk, before the flash: and how small they start, sneezed out. */
 export const SMALLEST = 1 / 24
 /** How far apart, across, they stand in a Portal, and how far up a sneeze blows them. */
@@ -143,13 +164,6 @@ export function stepPortals(world: World) {
 			if (portal.kind === 'shrink') {
 				play('zap')
 				world.popup('Shrink ray!', portal.focus.x, portal.focus.y - 110)
-			} else {
-				play('sniff')
-				world.popup(
-					'Ah...',
-					portal.in + 70,
-					world.terrain.groundY(portal.in) - 90,
-				)
 			}
 		}
 		return false
@@ -158,14 +172,8 @@ export function stepPortals(world: World) {
 	const t = now - run.zappedAt
 	const snap = snapOf(portal)
 	if (t < snap) {
-		if (portal.kind === 'grow' && t === Math.round(snap * 0.45)) {
-			play('sniff')
-			world.popup(
-				'Ah...',
-				portal.in + 70,
-				world.terrain.groundY(portal.in) - 110,
-			)
-		}
+		// "Ah... Ah... AAH...", in the dark, a sniff each.
+		if (portal.kind === 'grow' && AH.some((ah) => ah.at === t)) play('sniff')
 		if (portal.kind === 'shrink' && t === SHRINK.charge) play('whoosh')
 		return true
 	}
@@ -201,6 +209,7 @@ function hold(world: World, run: PortalRun, portal: Portal, racer: Racer) {
 	run.held.set(racer.id, {
 		at: world.ticks(),
 		vx: Math.max(0, b.vx),
+		over: Math.max(0, b.x - portal.in),
 		slot: run.held.size,
 	})
 	if (run.held.size === 1) run.firstAt = world.ticks()
@@ -231,10 +240,7 @@ function through(world: World, run: PortalRun, portal: Portal) {
 	const { bus } = world
 	bus.frontX = portal.out - run.busGap
 	bus.reach = 0
-	if (portal.kind === 'grow') {
-		play('sneeze')
-		world.popup('CHOO!', portal.focus.x + 40, portal.focus.y - 50)
-	}
+	if (portal.kind === 'grow') play('sneeze')
 	// The camera straight there, not swept along the course.
 	const lookAt = portal.kind === 'shrink' ? portal.out : portal.focus.x + 120
 	world.setZoom(1)
@@ -278,7 +284,7 @@ export function sneezedTo(
 	// Slow away from the nose, as the camera pulls back from it: so they
 	// stay in view, growing, rather than flying off the screen.
 	const along = u * u * u
-	const landX = portal.out + slotOffset(held.slot) * 0.5
+	const landX = portal.out + slotOffset(held.slot) * 0.5 + held.over
 	const landY = world.terrain.groundY(landX)
 	return {
 		x: portal.focus.x + (landX - portal.focus.x) * along,
@@ -293,7 +299,9 @@ export function sneezedTo(
 function letOut(world: World, racer: Racer, held: Held, portal: Portal) {
 	const b = racer.body
 	const x =
-		portal.kind === 'shrink' ? portal.out : sneezedTo(world, portal, held, 1).x
+		portal.kind === 'shrink'
+			? portal.out + held.over
+			: sneezedTo(world, portal, held, 1).x
 	b.x = x
 	b.feetY = world.terrain.groundY(x)
 	b.floor = b.feetY
@@ -364,20 +372,41 @@ export function portalView(world: World) {
 			flash,
 		}
 	}
-	// Ah... Ah...: the nose shaking, more and more.
-	if (t < snap)
+	// Into the dark, quick; "Ah... Ah... AAH...", shaking, more and more.
+	if (t < snap) {
+		const ah = AH.findLast((a) => t >= a.at)
 		return {
 			zoom: 1,
 			focus: portal.focus,
 			shake: (t % 6 < 3 ? 1 : -1) * Math.round((t / snap) * 5),
-			flash,
+			flash: 0,
+			dark: Math.min(1, t / DARK_IN),
+			words: ah && {
+				text: ah.text,
+				size: ah.size,
+				// Each one bursting in, big, and settling.
+				grow: Math.max(0, 1 - (t - ah.at) / 6),
+			},
 		}
-	const u = (t - snap) / SNEEZE.flight
+	}
+	// "CHOO!": out of the dark, into the sneeze.
+	const since = t - snap
+	const u = since / SNEEZE.flight
 	return {
 		zoom: u < 1 ? 1 / grown(u) : 1,
 		focus: portal.focus,
-		shake: 0,
-		flash,
+		shake: since < 12 ? (since % 4 < 2 ? 6 : -6) * (1 - since / 12) : 0,
+		flash: 0,
+		dark: Math.max(0, 1 - since / DARK_OUT),
+		words:
+			since < CHOO.ticks
+				? {
+						text: CHOO.text,
+						size: CHOO.size,
+						grow: Math.max(0, 1 - since / 5),
+						fade: Math.max(0, (since - CHOO.ticks * 0.5) / (CHOO.ticks * 0.5)),
+					}
+				: undefined,
 	}
 }
 

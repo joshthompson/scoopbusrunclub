@@ -1,7 +1,8 @@
+import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import basicSsl from '@vitejs/plugin-basic-ssl'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import solidPlugin from 'vite-plugin-solid'
 
 /**
@@ -39,11 +40,36 @@ function networkAddress() {
 }
 const network = phones ? networkAddress() : undefined
 
+/**
+ * The website's icons, for the dev server. Built, the game sits at /run/ on the
+ * website, so index.html's root-relative icon links find the website's own
+ * files. In dev nothing's at the root, so this serves them from its `public`,
+ * under /run/ too: the dev server puts the base in front of index.html's links.
+ */
+const webPublic = path.resolve(__dirname, '../web/public')
+const ICON = /^\/(?:run\/)?(favicon[\w-]*\.(?:ico|png)|apple-touch-icon\.png)$/
+const websiteIcons: Plugin = {
+	name: 'website-icons',
+	apply: 'serve',
+	configureServer(server) {
+		server.middlewares.use((req, res, next) => {
+			const file = req.url?.split('?')[0].match(ICON)?.[1]
+			const full = file && path.join(webPublic, file)
+			if (!full || !fs.existsSync(full)) return next()
+			res.setHeader(
+				'Content-Type',
+				file.endsWith('.ico') ? 'image/x-icon' : 'image/png',
+			)
+			fs.createReadStream(full).pipe(res)
+		})
+	},
+}
+
 export default defineConfig({
 	base: '/run/',
 	// The website's env, for the same backend: the guests come from it.
 	envDir: path.resolve(__dirname, '../web'),
-	plugins: [solidPlugin(), ...(phones ? [basicSsl()] : [])],
+	plugins: [solidPlugin(), websiteIcons, ...(phones ? [basicSsl()] : [])],
 	// The Room's QR code points phones here, even with the Host on localhost.
 	define: network
 		? {

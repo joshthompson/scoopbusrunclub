@@ -15,7 +15,7 @@ import {
 	START_X,
 	VERGE,
 } from '../game/constants'
-import { FIKA_ITEMS } from '../game/fika'
+import { CLIFF_FIKA } from '../game/fika'
 import { RING_ROOM } from '../game/sky'
 import { withGaps } from '../game/terrain'
 import {
@@ -198,6 +198,9 @@ function pickLane(roll: number): Lane {
 	return 'low'
 }
 
+/** The fika up in the sky: the Cliff's own, but its cloudberries, which grow on the island. */
+const SKY_FIKA = CLIFF_FIKA.filter((item) => item !== 'cloudberries')
+
 function skyLayOut(random: () => number) {
 	const obstacles: Obstacle[] = []
 	const boosts: Boost[] = []
@@ -230,13 +233,13 @@ function skyLayOut(random: () => number) {
 		if (random() < 0.4) ring(x - 300, (last + through) / 2)
 		ring(x, through)
 		last = through
-		// Now and then, a fika, up here: a snack on the way.
+		// Now and then, a fika, up here: a flying strawberry, or bubble gum.
 		if (random() < 0.12 && fika < 4)
 			boosts.push({
 				kind: 'fika',
 				x: x + 320,
 				height: clampRing(last) - 20,
-				item: FIKA_ITEMS[fika++ % FIKA_ITEMS.length],
+				item: SKY_FIKA[fika++ % SKY_FIKA.length],
 			})
 		// Room to get from one lane to the next, more the further apart they
 		// are; and closer together further out.
@@ -265,9 +268,9 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		// Off you go, across the field.
 		{ kind: 'cheer', x: START_X + 520, member: CHEERERS[0] },
 		...sky.boosts,
-		{ kind: 'fika', x: ISLAND + 760, height: 95, item: 'kanelbulle' },
+		{ kind: 'fika', x: ISLAND + 760, height: 95, item: 'cloudberries' },
 		{ kind: 'cheer', x: ISLAND + 1100, member: CHEERERS[1] },
-		{ kind: 'fika', x: ISLAND + 1480, height: 26, item: 'coffee' },
+		{ kind: 'fika', x: ISLAND + 1480, height: 26, item: 'cloudberries' },
 		{ kind: 'cheer', x: FINISH - 300, member: CHEERERS[2] },
 	]
 	obstacles.sort((a, b) => a.x - b.x)

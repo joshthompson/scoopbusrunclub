@@ -167,7 +167,7 @@ const styles = {
 	hint: { 'font-size': '18px', 'max-width': '320px' },
 	problem: { 'font-size': '18px', 'max-width': '320px', opacity: 0.85 },
 	cancel: {
-		padding: '8px 12px 5px',
+		padding: '6px 12px 7px',
 		background: 'rgba(15, 31, 41, 0.85)',
 		color: 'white',
 		border: '3px solid white',

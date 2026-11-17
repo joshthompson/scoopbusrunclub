@@ -3,9 +3,9 @@ const INK = '#0f1f29'
 const FONT = '"Remi Pop", system-ui, sans-serif'
 /** Its border, its padding (top, sides, bottom), and how far it floats over the sprite. */
 const BORDER = 3
-const PADDING_TOP = 6
+const PADDING_TOP = 4
 const PADDING_SIDE = 10
-const PADDING_BOTTOM = 2
+const PADDING_BOTTOM = 4
 const OVER = 12
 /** Its tail: how wide, and how far down it reaches past its bottom edge's inside. */
 const TAIL_WIDTH = 12

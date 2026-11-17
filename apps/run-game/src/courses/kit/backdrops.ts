@@ -447,6 +447,323 @@ export const candyForest = (() => {
 	)
 })()
 
+/** Sprinkles, as on the field: bright, and a cell or two long. */
+const SPRINKLES = [
+	'#ff6fa8',
+	'#ffe66b',
+	'#6bc4ff',
+	'#b48bff',
+	'#ffffff',
+	'#ffb86b',
+]
+const CANE_RED = '#ff4f6f'
+const CANE_WHITE = '#fff6fb'
+const WAFFLE = '#f2c27b'
+const WAFFLE_LIT = '#ffe0a8'
+const WAFFLE_SHADE = '#c98f4a'
+const CHERRY = '#e8365a'
+
+/**
+ * A gumdrop, `r` across its dome, its foot at `base`: sugared all over,
+ * lit down its left and shaded down its right.
+ */
+function gumdrop(
+	random: () => number,
+	cx: number,
+	base: number,
+	r: number,
+	candy: Candy,
+) {
+	const [c, lit, shade] = CANDY[candy]
+	const shoulder = base - even(r * 0.6)
+	const top = shoulder - r
+	const half = (y: number) =>
+		y < shoulder
+			? even(Math.sqrt(Math.max(0, r * r - (y - shoulder) ** 2)))
+			: r + even(((y - shoulder) / (base - shoulder)) * 2)
+	let body = ''
+	for (let y = top; y < base; y += 2) {
+		const w = half(y)
+		if (w <= 0) continue
+		body += rect(cx - w, y, w * 2, 2, c)
+		body += rect(cx + w - 4, y, 4, 2, shade)
+	}
+	body += rect(cx - r - 2, base - 2, (r + 2) * 2, 2, shade)
+	body += pixelCircle(
+		cx - even(r * 0.35),
+		top + even(r * 0.45),
+		even(r * 0.22),
+		lit,
+	)
+	// Sugar: a white cell here and there, inside it.
+	for (let n = 0; n < r / 3; n++) {
+		const y = even(top + 6 + random() * (base - top - 10))
+		const w = half(y)
+		if (w > 4)
+			body += rect(
+				even(cx - w + 2 + random() * (w * 2 - 6)),
+				y,
+				2,
+				2,
+				'#ffffff',
+			)
+	}
+	return body
+}
+
+/** A bush of gumdrops: one big one, two smaller either side of it. */
+function gumdropBush(random: () => number, x: number, base: number) {
+	const kinds: Candy[] = ['pink', 'blue', 'yellow', 'lilac', 'mint', 'peach']
+	const pick = () => kinds[Math.floor(random() * kinds.length)]
+	const r = even(16 + random() * 8)
+	return (
+		gumdrop(random, x - r, base, even(r * 0.7), pick()) +
+		gumdrop(random, x + r, base, even(r * 0.65), pick()) +
+		gumdrop(random, x, base + 2, r, pick())
+	)
+}
+
+/** A great swirl lollipop: a striped stick, a bow tied on it, and a disc in rings, shining. */
+function bigLollipop(
+	x: number,
+	base: number,
+	tall: number,
+	candy: Candy,
+	other: Candy,
+) {
+	const r = even(30 + (tall - 140) * 0.2)
+	const cy = base - tall + r
+	let body = ''
+	for (let y = cy + r - 4; y < base; y += 2) {
+		const stripe = Math.floor(y / 6) % 2
+		body += rect(x - 3, y, 6, 2, stripe ? STICK : '#ff6fa8')
+		body += rect(x + 1, y, 2, 2, stripe ? STICK_SHADE : '#e04f8f')
+	}
+	// Its bow, just under the disc.
+	const bow = cy + r + 6
+	const [ribbon, , ribbonShade] = CANDY[other]
+	body += rect(x - 12, bow - 4, 8, 8, ribbon)
+	body += rect(x + 4, bow - 4, 8, 8, ribbon)
+	body += rect(x + 8, bow - 2, 4, 6, ribbonShade)
+	body += rect(x - 4, bow - 2, 8, 6, ribbonShade)
+	body += rect(x - 8, bow + 4, 4, 6, ribbon)
+	body += rect(x + 4, bow + 4, 4, 6, ribbonShade)
+	body += pixelCircle(x, cy + 2, r, CANDY[candy][2])
+	for (let ring = r; ring > 0; ring -= 6)
+		body += pixelCircle(
+			x,
+			cy,
+			ring,
+			((r - ring) / 6) % 2 ? CANDY[other][0] : CANDY[candy][0],
+		)
+	body += pixelCircle(x - even(r * 0.45), cy - even(r * 0.45), 4, '#ffffff')
+	body += rect(x - even(r * 0.7), cy - 2, 4, 6, CANDY[candy][1])
+	return body
+}
+
+/** A candy cane stuck in the hill, its crook to `side`, striped round and round. */
+function bigCane(x: number, base: number, tall: number, side: 1 | -1) {
+	const R = 14
+	const thick = 8
+	const hookY = base - tall + R
+	const stripe = (y: number, dx: number) =>
+		Math.floor((y + dx) / 6) % 2 ? CANE_WHITE : CANE_RED
+	let body = ''
+	for (let y = hookY; y < base; y += 2)
+		for (let dx = 0; dx < thick; dx += 2) {
+			const shade = dx === thick - 2
+			body += rect(
+				x + dx,
+				y,
+				2,
+				2,
+				shade && stripe(y, dx) === CANE_WHITE ? '#e6d6e0' : stripe(y, dx),
+			)
+		}
+	// Its crook: half a ring over to the other side, and down a little.
+	const cx = x + (side > 0 ? R : thick - R)
+	for (let py = hookY - R; py < hookY; py += 2)
+		for (let px = cx - R; px < cx + R; px += 2) {
+			const d = Math.hypot(px + 1 - cx, py + 1 - hookY)
+			if (d > R || d < R - thick) continue
+			const along = Math.atan2(hookY - py, px - cx) * 6
+			body += rect(px, py, 2, 2, Math.floor(along) % 2 ? CANE_WHITE : CANE_RED)
+		}
+	const end = side > 0 ? cx + R - thick : cx - R
+	for (let y = hookY; y < hookY + 12; y += 2)
+		for (let dx = 0; dx < thick; dx += 2)
+			body += rect(end + dx, y, 2, 2, stripe(y, dx))
+	body += rect(x, hookY + 6, 2, tall - R - 10, '#ffffff')
+	return body
+}
+
+/**
+ * An ice-cream tree: a waffle cone stuck point-first in the hill, two or
+ * three scoops piled on it dripping down, and a cherry on top.
+ */
+function iceCreamTree(
+	random: () => number,
+	x: number,
+	base: number,
+	tall: number,
+) {
+	const flavours: Candy[] = ['pink', 'mint', 'yellow', 'lilac', 'peach', 'blue']
+	const coneTall = even(tall * 0.42)
+	const coneTop = base - coneTall
+	let body = ''
+	for (let y = coneTop; y < base; y += 2) {
+		const w = Math.max(2, even(((base - y) / coneTall) * 20))
+		body += rect(x - w, y, w * 2, 2, WAFFLE)
+		body += rect(x - w, y, 2, 2, WAFFLE_LIT)
+		body += rect(x + w - 4, y, 4, 2, WAFFLE_SHADE)
+		// Its waffle: a crosshatch, a cell at a time.
+		for (let dx = -w + 2; dx < w - 4; dx += 2)
+			if ((y + dx * 1 + 400) % 10 === 0 || (y - dx + 400) % 10 === 0)
+				body += rect(x + dx, y, 2, 2, WAFFLE_SHADE)
+	}
+	const scoops = tall > 120 ? 3 : 2
+	let at = coneTop
+	for (let s = 0; s < scoops; s++) {
+		const flavour = flavours[Math.floor(random() * flavours.length)]
+		const [c, lit, shade] = CANDY[flavour]
+		const r = even(22 - s * 3)
+		const cy = at - r + 6
+		body += pixelCircle(x, cy + 2, r, shade)
+		body += pixelCircle(x, cy, r, c)
+		body += pixelCircle(
+			x - even(r * 0.4),
+			cy - even(r * 0.4),
+			even(r * 0.3),
+			lit,
+		)
+		// Drips, down over what's under it.
+		for (const dx of [-r + 4, -4, r - 8])
+			body += rect(x + dx, cy + r - 4, 4, 6 + even(random() * 8), c)
+		at = cy - r + 8
+	}
+	body += pixelCircle(x + 2, at - 6, 5, CHERRY)
+	body += rect(x - 2, at - 10, 2, 2, '#ffffff')
+	body += rect(x + 4, at - 18, 2, 8, '#4fbf7a')
+	return body
+}
+
+/** A wrapped sweet lying in the grass: a round body, striped, twisted ends either side. */
+function wrappedSweet(x: number, base: number, candy: Candy, other: Candy) {
+	const [c, lit, shade] = CANDY[candy]
+	const [stripe] = CANDY[other]
+	let body = ''
+	for (let y = base - 16; y < base; y += 2) {
+		const dy = y + 1 - (base - 8)
+		const w = even(14 * Math.sqrt(Math.max(0, 1 - (dy / 8) ** 2))) || 2
+		body += rect(x - w, y, w * 2, 2, y > base - 5 ? shade : c)
+		body += rect(x - 4, y, 4, 2, stripe)
+		body += rect(x + 6, y, 2, 2, stripe)
+	}
+	body += rect(x - 8, base - 14, 6, 2, lit)
+	// Its ends, twisted, fanning out.
+	for (const side of [-1, 1]) {
+		const from = x + side * 14
+		body += rect(side > 0 ? from : from - 4, base - 10, 4, 4, shade)
+		body += rect(side > 0 ? from + 4 : from - 10, base - 14, 6, 12, c)
+		body += rect(side > 0 ? from + 8 : from - 10, base - 14, 2, 12, lit)
+	}
+	return body
+}
+
+/**
+ * Nearer still, right behind the path: a grove of great sweets on two
+ * sprinkled mint hummocks, one in front of the other, bigger than the
+ * candy forest's trees so they stand out in front of it. Swirl lollipops
+ * with bows on, candy canes and ice-cream trees along the back hummock,
+ * bushes of sugared gumdrops among them; more gumdrops and wrapped sweets
+ * along the front one. 1600 by 360, the back hummock's crest about 210
+ * down, so the tallest still fit over it; the field from the front one down.
+ */
+export const candyGrove = (() => {
+	const width = 1600
+	const height = 360
+	const random = seeded(7100)
+	const field = '#9be8c8'
+	const kinds: Candy[] = ['pink', 'blue', 'yellow', 'lilac', 'mint', 'peach']
+	const pick = () => kinds[Math.floor(random() * kinds.length)]
+	/** A hummock's crest, `y` down, rolling: whole cycles across, so it wraps. */
+	const hummock = (y: number, phase: number) => (x: number) =>
+		even(
+			y +
+				Math.sin((x / width) * Math.PI * 4 + phase) * 8 +
+				Math.sin((x / width) * Math.PI * 10 + 1 + phase) * 4,
+		)
+	/** A hummock: the field from its crest down, lit along its top, sprinkled. */
+	const ground = (crest: (x: number) => number, sprinkles: number) => {
+		let out = ''
+		for (let x = 0; x < width; x += 2) {
+			const top = crest(x)
+			out += rect(x, top, 2, height - top, field)
+			out += rect(x, top, 2, 2, '#d4fbe9')
+			out += rect(x, top + 2, 2, 2, '#b8f3da')
+		}
+		for (let n = 0; n < sprinkles; n++) {
+			const x = even(random() * width)
+			const y = even(crest(x) + 8 + random() * (height - crest(x) - 10))
+			const colour = SPRINKLES[Math.floor(random() * SPRINKLES.length)]
+			out +=
+				random() < 0.5 ? rect(x, y, 4, 2, colour) : rect(x, y, 2, 4, colour)
+		}
+		return out
+	}
+
+	const back = hummock(210, 0)
+	const front = hummock(274, 2.2)
+	// The tall ones, along the back hummock, apart enough for the forest
+	// to show between; a gumdrop bush after each. Everything random is
+	// picked before it's drawn, so it's the same either side of the wrap.
+	let tall = ''
+	let bushes = ''
+	let kind = 0
+	for (let x = 30; x < width - 50; x += 110 + even(random() * 110)) {
+		const at = even(x)
+		const base = back(at) + 8 + even(random() * 10)
+		const high = even(130 + random() * 50)
+		const seed = Math.floor(random() * 1e6)
+		const a = pick()
+		// Its rings two colours, never the same twice.
+		const b = kinds[(kinds.indexOf(a) + 1 + Math.floor(random() * 5)) % 6]
+		const side = random() < 0.5 ? 1 : -1
+		const which = kind % 3
+		kind += 1 + Math.floor(random() * 2)
+		tall += tiled(width, at, (to) =>
+			which === 0
+				? bigLollipop(to, base, high, a, b)
+				: which === 1
+					? bigCane(to, base, even(high * 0.75), side)
+					: iceCreamTree(seeded(seed), to, base, high),
+		)
+		const bush = even(at + 50 + random() * 40)
+		const bushBase = back(bush) + 16 + even(random() * 14)
+		bushes += tiled(width, bush, (to) =>
+			gumdropBush(seeded(seed + 1), to, bushBase),
+		)
+	}
+	// Along the front hummock: bigger gumdrop bushes, and wrapped sweets
+	// dropped in the grass between.
+	let near = ''
+	for (let x = 60; x < width - 40; x += 120 + even(random() * 120)) {
+		const at = even(x)
+		const seed = Math.floor(random() * 1e6)
+		const base = front(at) + 18 + even(random() * 12)
+		const [a, b] = [pick(), pick()]
+		near +=
+			random() < 0.65
+				? tiled(width, at, (to) => gumdropBush(seeded(seed), to, base))
+				: tiled(width, at, (to) => wrappedSweet(to, base, a, b))
+	}
+	return svgUrl(
+		width,
+		height,
+		`${ground(back, 120)}${tall}${bushes}${ground(front, 140)}${near}`,
+	)
+})()
+
 // --- Huddinge: deep in the forest --------------------------------------------------
 
 interface PineColours {

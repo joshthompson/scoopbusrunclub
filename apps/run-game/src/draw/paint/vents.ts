@@ -124,6 +124,46 @@ export function paintBouncer(
 /** How wide a Heart Valve's chevrons are, and how tall. */
 const VALVE_ARROWS = 24
 const VALVE_ARROWS_HEIGHT = VALVE_ARROWS * (10 / 12)
+/**
+ * Blood spurting up out of a valve as it flaps open: how high, firing
+ * someone up, and on just a beat; its drops, each `x` off its middle, as
+ * big as `size`, up as far as `rise` of it, a little behind the one before.
+ */
+const SPURT_HIGH = 110
+const SPURT_LOW = 34
+const SPURT_DROPS = [
+	{ x: 0, size: 14, rise: 1, delay: 0 },
+	{ x: -8, size: 10, rise: 0.75, delay: 0.05 },
+	{ x: 9, size: 10, rise: 0.8, delay: 0.1 },
+	{ x: -3, size: 12, rise: 0.55, delay: 0.15 },
+	{ x: 5, size: 8, rise: 0.95, delay: 0.2 },
+	{ x: -12, size: 6, rise: 0.4, delay: 0.25 },
+	{ x: 13, size: 6, rise: 0.5, delay: 0.3 },
+]
+
+/**
+ * Blood spurting up out of a valve, `t` of the way through it, 0 to 1, as
+ * high as `high`: drops flung up, slowing, and falling back, shrinking.
+ */
+function paintSpurt(ctx: CanvasRenderingContext2D, t: number, high: number) {
+	const middle = VALVE.width / 2
+	for (const drop of SPURT_DROPS) {
+		const s = (t - drop.delay) / (1 - drop.delay)
+		if (s <= 0 || s >= 1) continue
+		// Up quick, slowing, and back down: a throw.
+		const up = 4 * s * (1 - s) * high * drop.rise
+		const size = Math.max(2, Math.round((drop.size * (1 - s * 0.6)) / 2) * 2)
+		const x = Math.round((middle + drop.x * (0.4 + s) - size / 2) / 2) * 2
+		const y = Math.round((VALVE.hole - up - size / 2) / 2) * 2
+		ctx.fillStyle = '#a8222f'
+		ctx.fillRect(x, y + 2, size, size - 2)
+		ctx.fillStyle = '#d8323f'
+		ctx.fillRect(x, y, size, size - 2)
+		ctx.fillStyle = '#f0606c'
+		ctx.fillRect(x + 2, y + 2, Math.max(2, size / 3), 2)
+	}
+}
+
 /** The chevrons' glow, as the valve opens. */
 const ARROWS_GLOW = 'drop-shadow(0 0 4px #fff6a8)'
 /** How far they leap as it opens, and how far over it they are. */
@@ -135,8 +175,12 @@ const ARROWS_OVER = 10
  * glowing, for the Draw Hook's `drawReach`.
  */
 export const VALVE_REACH = {
-	top:
+	top: Math.max(
 		ARROWS_OVER + ARROWS_LEAP + VALVE_ARROWS_HEIGHT + filterReach(ARROWS_GLOW),
+		SPURT_HIGH - VALVE.hole + 12,
+	),
+	left: 12,
+	right: 12,
 }
 
 /**
@@ -162,6 +206,10 @@ export function paintValve(
 		VALVE.width,
 		VALVE.height,
 	)
+	// Blood spurting up out of it: high, firing someone up; a little, on
+	// just a beat.
+	if (open)
+		paintSpurt(ctx, beat / 24, flapped !== undefined ? SPURT_HIGH : SPURT_LOW)
 	const loaded = image(VALVE.arrows)
 	if (!loaded) return
 	const arrows = filtered(

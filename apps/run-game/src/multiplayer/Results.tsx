@@ -193,7 +193,7 @@ function Row(props: { seat: Seat; lead: string; children: JSX.Element }) {
 			<Show when={runner()}>
 				{(r) => (
 					<RunStrip
-						frame={r().sprite.run[0] ?? ''}
+						run={r().sprite.run}
 						width={r().sprite.width}
 						height={r().sprite.height}
 						scale={1}
@@ -263,7 +263,7 @@ const styles = {
 	next: { ...OUTLINED, 'font-size': '22px' },
 	buttons: { display: 'flex', gap: '12px' },
 	button: {
-		padding: '8px 14px 4px',
+		padding: '6px 14px',
 		background: 'rgba(15, 31, 41, 0.9)',
 		color: 'white',
 		border: '3px solid white',

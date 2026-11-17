@@ -1,5 +1,4 @@
 import { createRunnerFrames } from '@/utils/createRunnerFrames'
-import { MAX_RACER_NAME_LENGTH } from '@/utils/customRacers'
 import {
 	For,
 	type JSX,
@@ -13,8 +12,10 @@ import {
 } from 'solid-js'
 import {
 	type CustomRunner,
+	MAX_RUNNER_NAME_LENGTH,
 	deleteCustomRunner,
 	newRunnerId,
+	runnerName,
 	saveCustomRunner,
 } from '../runners/customRunners'
 import {
@@ -57,7 +58,7 @@ export function RunnerEditor(props: {
 	onCancel: () => void
 	onDelete: () => void
 }) {
-	const [name, setName] = createSignal(props.runner?.name ?? '')
+	const [name, setName] = createSignal(runnerName(props.runner?.name ?? ''))
 	const [avatar, setAvatar] = createSignal<Avatar>(
 		props.runner?.avatar ?? DEFAULT_AVATAR,
 	)
@@ -232,7 +233,7 @@ export function RunnerEditor(props: {
 			<Panel style={styles.preview}>
 				<RunnerStage>
 					<RunStrip
-						frame={frames().frames.run?.[0] ?? ''}
+						run={frames().frames.run ?? []}
 						width={frames().width}
 						height={frames().height}
 						scale={4}
@@ -288,7 +289,7 @@ export function RunnerEditor(props: {
 															...(isSelected() ? styles.inputSelected : {}),
 														}}
 														value={name()}
-														maxLength={MAX_RACER_NAME_LENGTH}
+														maxLength={MAX_RUNNER_NAME_LENGTH}
 														placeholder="Who's running?"
 														autocomplete="off"
 														spellcheck={false}
@@ -298,7 +299,7 @@ export function RunnerEditor(props: {
 														onFocus={() => setSelection(row)}
 													/>
 													<span style={styles.counter}>
-														{name().length}/{MAX_RACER_NAME_LENGTH}
+														{name().length}/{MAX_RUNNER_NAME_LENGTH}
 													</span>
 												</span>
 											</label>
@@ -502,7 +503,7 @@ const styles = {
 	back: {
 		position: 'absolute',
 		left: 0,
-		padding: '8px 12px 4px',
+		padding: '6px 12px',
 		background: 'var(--ink)',
 		color: 'white',
 		border: '3px solid white',
@@ -540,7 +541,7 @@ const styles = {
 	},
 	go: {
 		'margin-top': 'auto',
-		padding: '8px 14px 4px',
+		padding: '6px 14px',
 		background: '#ffd23f',
 		color: 'var(--ink)',
 		'font-size': '20px',
@@ -565,7 +566,6 @@ const styles = {
 		'flex-direction': 'column',
 		gap: '4px',
 		overflow: 'hidden auto',
-		'scrollbar-width': 'thin',
 		// Room for the selected row's shadow.
 		'padding-right': '6px',
 		'padding-bottom': '4px',
@@ -693,7 +693,7 @@ const styles = {
 		'border-top': '3px solid rgba(255, 255, 255, 0.25)',
 	},
 	action: {
-		padding: '8px 16px 4px',
+		padding: '6px 16px',
 		background: 'transparent',
 		color: 'white',
 		border: '3px solid white',

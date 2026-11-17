@@ -240,6 +240,44 @@ export const YETI = rowsArt(
 )
 
 /**
+ * Find the miners: the Miner Twins, front on, two heads in orange hard
+ * hats over the one wide stiff orange cape, no arms, and their legs.
+ */
+export const MINERS = rowsArt(
+	[
+		'..HHH.....HHH..',
+		'.HhHHH...HhHHH.',
+		'BBBBBBB.BBBBBBB',
+		'.SSSSS...SSSSS.',
+		'.SKSKS...SKSKS.',
+		'.SSSSS...SSSSS.',
+		'..SmS.....SmS..',
+		'OOOOOOOOOOOOOOO',
+		'OlOOOOOOOOOOOlO',
+		'OOOOOOOcOOOOOOO',
+		'OOOOOOOOOOOOOOO',
+		'oOOOOOOcOOOOOOo',
+		'ooooooooooooooo',
+		'.D.D.......D.D.',
+		'.F.F.......F.F.',
+	],
+	{
+		H: '#ef7a33',
+		h: '#ffb070',
+		B: '#c4561f',
+		S: '#f0c49a',
+		K: '#1d1d1d',
+		m: '#c46a5a',
+		O: '#e8642c',
+		l: '#ff9460',
+		o: '#b04a1f',
+		c: '#f2d14a',
+		D: '#2b2f3a',
+		F: '#7d8fa8',
+	},
+)
+
+/**
  * Find the Viking: his face, old, no helmet, his long white hair round it
  * under a leather headband, a ginger moustache gone mostly grey, and his
  * big white beard, its braid tied at its end.
@@ -273,6 +311,41 @@ export const VIKING = rowsArt(
 		G: '#c4834e',
 		W: '#f7f5f0',
 		m: '#8a4a3a',
+	},
+)
+
+/**
+ * Find the Furby Queen: her face, a Furby's, front on, pink tinsel, its
+ * ears up either side of her gold crown, two big eyes with long lashes,
+ * and a yellow beak between them.
+ */
+const FURBY_QUEEN = rowsArt(
+	[
+		'L...Y.Y.Y...D',
+		'LL..YBYBY..DD',
+		'LEL.yYYYy.DED',
+		'.LLLLLLLLLLD.',
+		'LLPLPLPLPLPPD',
+		'PKPKPPPKPKPPD',
+		'KWWWKPKWWWKPD',
+		'WWIIWPWWIIWPD',
+		'WIKKWPWIKKWPD',
+		'WIKKWYWIKKWPD',
+		'PWWWYYYWWWPPD',
+		'PPPPyYyPPPPDD',
+		'.PDPDyDPDPDD.',
+	],
+	{
+		P: '#e2589f',
+		L: '#ff8ccb',
+		D: '#a8357a',
+		E: '#ffc6e2',
+		W: '#fbf8f2',
+		I: '#2aa6c4',
+		K: '#1d1d1d',
+		Y: '#ffd23f',
+		y: '#d0921a',
+		B: '#3a7bd5',
 	},
 )
 
@@ -406,8 +479,10 @@ const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	karolinska: GERM,
 	pyramids: CROCODILE,
 	everest: YETI,
+	caves: MINERS,
 	'city-rooftop': BAT_PERSON,
 	'gamla-stan': VIKING,
+	'furby-fields': FURBY_QUEEN,
 	cliff: RING,
 	'machu-picchu': BROKEN_BRIDGE_ICON,
 	midnattsloppet: HEAD_BOUNCE,

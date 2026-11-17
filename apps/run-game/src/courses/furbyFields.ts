@@ -1,8 +1,29 @@
 import type { RunnerName } from '@/data/runners'
-import { PATH_FRONT, PX_PER_M, STAND_HEIGHT, START_X } from '../game/constants'
+import furbyQueenWave from '../assets/runners/furby-queen/wave.png'
+import {
+	PATH_BACK,
+	PATH_FRONT,
+	PX_PER_M,
+	STAND_HEIGHT,
+	START_X,
+} from '../game/constants'
 import { FURBY_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
-import { candyForest, candyRidge, crystalPeaks } from './kit/backdrops'
+import { FURBY_QUEEN } from '../runners/bonus'
+import {
+	candyForest,
+	candyGrove,
+	candyRidge,
+	crystalPeaks,
+} from './kit/backdrops'
+import {
+	MACARONS,
+	ROYAL_MACARON,
+	THRONE,
+	THRONE_SINK,
+	macaron,
+	palace,
+} from './kit/furbyPalace'
 import {
 	FIELD,
 	GIANT_FUR,
@@ -47,7 +68,11 @@ import type {
  * runs by, and unicorns to ride. A garden of bouncy toadstools with
  * candyfloss clouds over it; a Giant Furby, its mouth opening as you come,
  * to run in through its insides and out the back; clouds to hop along; and
- * a rainbow, up and over.
+ * a rainbow, up and over. Past the rainbow, a stair of giant macarons up
+ * into the sky, each on a candy tower, and far off from the top of it,
+ * the Furby Queen's palace, floating: too far to jump, but not to float
+ * down to in a propeller beanie. She's on her throne, to be found (the
+ * special goal).
  */
 
 /** The website's furbies, every one of them, in order. */
@@ -77,7 +102,7 @@ const at = (m: number) => START_X + m * PX_PER_M
 const GARDEN = at(1000)
 const GARDEN_END = at(1450)
 /** The Giant Furby: its mouth, the way in, and how long its head is. */
-const GIANT = at(2400)
+const GIANT = at(1980)
 const GIANT_LENGTH = 1100
 const GIANT_END = GIANT + GIANT_LENGTH
 /** How high it is inside, over the floor: a hall, plenty to stand in. */
@@ -85,14 +110,57 @@ const GIANT_ROOM = 210
 /** How much of its mouth shows, from outside, in front of its face. */
 const GIANT_MOUTH = 210
 /** Clouds to hop along, before the rainbow. */
-const CLOUDS = at(3200)
-const CLOUDS_END = at(3650)
+const CLOUDS = at(2715)
+const CLOUDS_END = CLOUDS + 1800
 /** The rainbow: up and over, this high, from foot to foot. */
-const RAINBOW = at(3780)
+const RAINBOW = at(3295)
 const RAINBOW_LENGTH = 2400
 const RAINBOW_END = RAINBOW + RAINBOW_LENGTH
 /** Low and long enough to run up at a run, steepest a quarter of the way up. */
 const RAINBOW_HEIGHT = 180
+
+// --- The Furby Queen: up the macarons, and over to her palace ------------------------
+
+/** Where the macaron stair starts, just past the rainbow. */
+const STAIRS_AT = RAINBOW_END + 240
+/**
+ * The macaron stair, each one the top of a candy tower (see `macaron`):
+ * each step's left end, along from where the stair starts, how wide it is,
+ * and how high its top is over the ground. The first a jump up off the
+ * ground, and each a jump up from the last. Long, as the clouds are:
+ * hopping from one to the next, steering on in the air, you're soon going
+ * flat out, and floating across in a propeller beanie carries you further
+ * still. The top one for a run at the leap off its end.
+ */
+const STEPS: [along: number, width: number, rise: number][] = [
+	[0, 340, 85],
+	[420, 340, 170],
+	[840, 340, 255],
+	[1260, 340, 340],
+	[1680, 340, 425],
+	[2100, 340, 510],
+]
+/**
+ * The Furby Queen's palace: how far past the top step it starts, how wide
+ * it is, and how high over the ground. Lower than the top step, and further
+ * off than any jump goes: floating down to it, holding jump in a propeller
+ * beanie, is the way over. Run off the top step flat out without one, and
+ * you come down a good way short, on the ground. And high enough that
+ * there's no getting up to it off anyone's head, or a furby's.
+ */
+const PALACE_GAP = 860
+const PALACE_WIDTH = 440
+const PALACE_RISE = 330
+/** Where she sits on her throne, along the palace: well on, so landing anywhere short of her, you run by her. */
+const QUEEN_ALONG = 330
+
+/** Where the palace is, and where it ends: the ground under it's flat, so there's no jumping up to it. */
+const PALACE_X =
+	STAIRS_AT +
+	STEPS[STEPS.length - 1][0] +
+	STEPS[STEPS.length - 1][1] +
+	PALACE_GAP
+const PALACE_END = PALACE_X + PALACE_WIDTH
 
 /**
  * Made up rather than from a GPS track: sharp peaks one after another, on top
@@ -128,7 +196,7 @@ const FLAT_RAMP = 1000
 const FLATS: [from: number, to: number, ramp: number][] = [
 	[GARDEN - 200, GARDEN_END + 200, FLAT_RAMP],
 	[GIANT - 400, GIANT_END + 200, FLAT_RAMP],
-	[CLOUDS - 100, RAINBOW_END + 100, FLAT_RAMP],
+	[CLOUDS - 100, PALACE_END + 200, FLAT_RAMP],
 ]
 /** The ground, flattened where something's built on it: as high as the hills are at its middle. */
 function base(x: number) {
@@ -290,6 +358,35 @@ const PLATFORMS: PlatformDefinition[] = [
 	cloud(CLOUDS + 1460, 300, 100),
 ]
 
+// --- The macaron stair, and her palace, built ---------------------------------------
+
+/** The ground under the stair and her palace: level all along (see `FLATS`). */
+const LEVEL = base(STAIRS_AT)
+
+const STAIRS: PlatformDefinition[] = STEPS.map(([along, width, rise], i) => {
+	const x = STAIRS_AT + along
+	const top = i === STEPS.length - 1
+	// Its tower, down to the path's back edge, and a little into the field.
+	const tower = rise - PATH_BACK + 2
+	return {
+		x,
+		width,
+		height: terrain.groundY(x) - (LEVEL - rise),
+		art: top
+			? macaron(width, ROYAL_MACARON, { carpet: true, tower })
+			: macaron(width, MACARONS[i % MACARONS.length], { tower }),
+	}
+})
+const PALACE: PlatformDefinition = {
+	x: PALACE_X,
+	width: PALACE_WIDTH,
+	height: terrain.groundY(PALACE_X) - (LEVEL - PALACE_RISE),
+	// Its palace, down to the path's back edge.
+	art: palace(PALACE_WIDTH, PALACE_RISE - PATH_BACK + 2),
+}
+/** Her palace's floor, where she sits. */
+const PALACE_FLOOR = LEVEL - PALACE_RISE
+
 // --- What's along it ------------------------------------------------------------------
 
 /** Where nothing else goes: in and around what's built, and in the run-in to the finish. */
@@ -297,6 +394,9 @@ const busy = (x: number) =>
 	(x > GARDEN - 260 && x < GARDEN_END + 200) ||
 	(x > GIANT - 400 && x < GIANT_END + 200) ||
 	(x > CLOUDS - 260 && x < RAINBOW_END + 160)
+
+/** How far a unicorn waits from anything on the path. */
+const UNICORN_CLEAR = 90
 
 function layOut(): Pick<
 	Course,
@@ -373,6 +473,10 @@ function layOut(): Pick<
 	})
 	obstacles.sort((a, b) => a.x - b.x)
 	boosts.sort((a, b) => a.x - b.x)
+	// No bouncy toadstool under the Furby Queen's palace, to fire anyone up
+	// to it: it's for floating down to.
+	const underPalace = (o: Obstacle) =>
+		o.kind === 'steam' && o.x > PALACE_X - 300 && o.x < PALACE_END + 100
 
 	// Furbies, hopping about between everything else, more of them the
 	// further round: not inside the Giant Furby, nor on the rainbow.
@@ -390,14 +494,32 @@ function layOut(): Pick<
 		at += 560 + random() * (600 - progress * 300)
 	}
 
-	// A unicorn to ride every so often: not waiting in anything built.
+	// A unicorn to ride every so often: not waiting in anything built, nor
+	// on top of anything, a bouncy toadstool or a gumdrop; on past it.
 	const corgis: number[] = []
+	const onTopOf = (at: number) =>
+		obstacles.some(
+			(o) =>
+				at > o.x - UNICORN_CLEAR &&
+				at < o.x + ('width' in o ? (o.width ?? 0) : 0) + UNICORN_CLEAR,
+		)
 	for (let at = START_X + 1500; at < terrain.finishX - 900; ) {
-		if (!busy(at)) corgis.push(Math.round(at))
+		let spot = Math.round(at)
+		while (onTopOf(spot)) spot += 20
+		if (!busy(spot)) corgis.push(spot)
 		at += 1500 + random() * 1200
 	}
 
-	return { obstacles, boosts, scenery: scenery(random), furbies, corgis }
+	return {
+		obstacles: obstacles.filter((o) => !underPalace(o)),
+		boosts,
+		scenery: scenery(random),
+		// None by the Furby Queen's palace, to bounce up to it off.
+		furbies: furbies.filter(
+			(f) => f.x < PALACE_X - 700 || f.x > PALACE_END + 500,
+		),
+		corgis,
+	}
 }
 
 /** Lollipop trees, candyfloss trees, toadstools, candy canes and rainbow flowers; and furbies, hopping about. */
@@ -444,7 +566,7 @@ export const furbyFields: CourseDefinition = {
 	terrain,
 	runDirectors: ['eline', 'claire'],
 	cheerers: CHEERERS,
-	platforms: PLATFORMS,
+	platforms: [...PLATFORMS, ...STAIRS, PALACE],
 	cave: giantFurby,
 	giantFurby: { x: GIANT, to: GIANT_END },
 	ride: 'unicorn',
@@ -472,7 +594,10 @@ export const furbyFields: CourseDefinition = {
 			near: sweetHills,
 			fill: MOUNTAIN_FILL,
 			field: FURBY_FIELD_FAR,
-			nearer: [{ asset: candyForest, top: 150, height: 180, fill: FIELD }],
+			nearer: [
+				{ asset: candyForest, top: 150, height: 180, fill: FIELD },
+				{ asset: candyGrove, top: 110, height: 360, fill: FIELD },
+			],
 		},
 		// Sprinkles on the field either side of the path, and sugar on it.
 		ground: texturedGround('furby-sprinkles', 'furby-sugar'),
@@ -505,8 +630,29 @@ export const furbyFields: CourseDefinition = {
 			grass: GIANT_FUR_LIGHT,
 		},
 	},
-	// A propeller beanie, over the highest of the platforms: up the moving
-	// ones to it, and a jump.
+	// The Furby Queen, on her throne in her palace, floating off the top of
+	// the macaron stair: up off her throne to say hello as you come.
+	found: {
+		runner: FURBY_QUEEN.id,
+		x: PALACE_X + QUEEN_ALONG,
+		y: PALACE_FLOOR,
+		waiting: {
+			seat: THRONE,
+			sink: THRONE_SINK,
+			up: furbyQueenWave,
+			near: 150,
+			// Furbish, more or less: "I love you!", "Dance!", and "Yay!".
+			says: ['Kah may-may u-nye!', 'Noh-lah!', 'Wah! Wah!'],
+		},
+		toSelf: 'Imposter!',
+	},
+	special: {
+		goal: 'Find the Furby Queen',
+		done: (run) => !!run.metFound,
+	},
+	// A propeller beanie, over the highest of the clouds: up the moving
+	// ones to it, and a jump. Wear it on over the rainbow, up the macarons,
+	// and float down off the top of them to the Furby Queen.
 	...withHat(layOut(), 'propeller', () => {
 		const top = PLATFORMS.reduce((a, b) => (b.height > a.height ? b : a))
 		return { x: top.x + top.width / 2, height: top.height + 70 }

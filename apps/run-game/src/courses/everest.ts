@@ -301,6 +301,12 @@ const DEN = (() => {
 		land: START_X + 13050,
 		// And there he is: the Yeti, to run as.
 		unlocks: YETI.id,
+		// Growling hello as you come running at him.
+		greets: {
+			near: 260,
+			sound: 'yeti',
+			says: ['Hrrooaarr!', 'Hoo hoo hoo!', 'Grrrooar!'],
+		},
 	} satisfies Secret
 })()
 

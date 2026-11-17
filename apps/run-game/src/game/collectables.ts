@@ -82,6 +82,19 @@ export const COLLECTABLE_NAMES = {
 	'fika:blueberrySoup': 'Blåbärssoppa',
 	'fika:pizzaSlice': 'Pizza slice',
 	'fika:ale': 'Ale',
+	'fika:cakeInACan': 'Cake in a can',
+	'fika:berries': 'Wild berries',
+	'fika:mushroom': 'Kantareller',
+	'fika:badMushroom': 'Bad mushroom',
+	'fika:sandwich': 'Sandwich',
+	'fika:coolRock': 'Cool rock',
+	'fika:cavePickles': 'Cave pickles',
+	'fika:popcorn': 'Popcorn',
+	'fika:mojito': 'Mojito',
+	'fika:dobryCola': 'Dobry Cola',
+	'fika:flyingStrawberry': 'Flying strawberry',
+	'fika:bubbleGum': 'Bubble gum',
+	'fika:cloudberries': 'Hjortron',
 	'ride:corgi': 'Corgi',
 	'ride:llama': 'Llama',
 	'ride:camel': 'Camel',
@@ -117,6 +130,7 @@ export const COLLECTABLE_NAMES = {
 	'hat:bobbleHat': 'Bobble hat',
 	'hat:headMirror': 'Head mirror',
 	'hat:discoBall': 'Disco ball',
+	'hat:jazzHat': 'Flaming top hat',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
 
@@ -174,6 +188,19 @@ export const PICKUP_WORD = {
 	'fika:blueberrySoup': 'Blåbär!',
 	'fika:pizzaSlice': 'Pizza!',
 	'fika:ale': 'Skål!',
+	'fika:cakeInACan': 'Cake in a can!',
+	'fika:berries': 'Berries!',
+	'fika:mushroom': 'Kantareller!',
+	'fika:badMushroom': 'Bad mushroom!',
+	'fika:sandwich': 'Sandwich!',
+	'fika:coolRock': 'Cool rock!',
+	'fika:cavePickles': 'Pickles!',
+	'fika:popcorn': 'Popcorn!',
+	'fika:mojito': 'Mojito!',
+	'fika:dobryCola': 'Dobry Cola!',
+	'fika:flyingStrawberry': 'Flying strawberry!',
+	'fika:bubbleGum': 'Bubble gum!',
+	'fika:cloudberries': 'Hjortron!',
 	'ride:corgi': 'Giddy up!',
 	'ride:llama': 'Giddy up!',
 	'ride:camel': 'Giddy up!',
@@ -209,6 +236,7 @@ export const PICKUP_WORD = {
 	'hat:bobbleHat': 'Toppluva!',
 	'hat:headMirror': 'Say aah!',
 	'hat:discoBall': 'Disco!',
+	'hat:jazzHat': 'Hot hat!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>
 
@@ -278,6 +306,24 @@ export const COLLECTABLE_ABOUT = {
 		'A slice of pizza, from a kiosk on Södermalm, still open at midnight.',
 	'fika:ale':
 		'A tankard of ale, in a tavern under the old town. Mind the manholes.',
+	'fika:cakeInACan': 'A whole cake, in a tin: a picnic for deep in the forest.',
+	'fika:berries':
+		'Blueberries and a lingonberry, picked off the bushes along the path.',
+	'fika:mushroom':
+		"Chanterelles: the forest's gold, for whoever knows where to look.",
+	'fika:badMushroom': 'A fly agaric. Red with white spots means no. Too late.',
+	'fika:sandwich': "A miner's packed lunch: ham, cheese and lettuce.",
+	'fika:coolRock': 'A geode, cracked open, crystals inside. Very cool.',
+	'fika:cavePickles': 'A jar of pickles, left to pickle in the dark. Crunchy.',
+	'fika:popcorn':
+		'A striped box of popcorn, for watching the sunset from the roofs.',
+	'fika:mojito': 'Lime, mint and ice, at a rooftop bar.',
+	'fika:dobryCola': 'A bottle of Dobry Cola, ice cold.',
+	'fika:flyingStrawberry':
+		'A strawberry with wings, out over the sea. Catch it if you can.',
+	'fika:bubbleGum': 'A piece of bubble gum, blowing about in the sky.',
+	'fika:cloudberries':
+		'Cloudberries: golden, rare, and the best berry there is.',
 	'ride:corgi': 'A corgi, sat on the track, barking for a rider.',
 	'ride:llama': 'A llama, humming for a rider.',
 	'ride:camel': 'A camel, grumbling for a rider.',
@@ -317,6 +363,8 @@ export const COLLECTABLE_ABOUT = {
 	'hat:headMirror': "A doctor's head mirror, high in the lungs.",
 	'hat:discoBall':
 		'A disco ball, over your whole head, up on the rock band’s speakers.',
+	'hat:jazzHat':
+		'The Spirit of Jazz’s own top hat, on fire. Find him again, once he’s yours, and take it.',
 	barcode: "Floating just before every parkrun's finish. Don't forget it!",
 } satisfies Record<Collectable, string>
 
@@ -359,7 +407,8 @@ function hatPowers(kind: HatKind): string[] {
 	if (rules.shield)
 		powers.push('Takes the next knock for you, coming off doing it.')
 	else if (rules.fallsOff) powers.push('Knocked off by a stumble.')
-	if (rules.floats) powers.push('Hold jump on the way down to float.')
+	if (rules.floats)
+		powers.push('Hold jump on the way down to float (only in Furby Fields)')
 	if (rules.splatProof) powers.push('Sewage slides right off it.')
 	if (rules.germProof) powers.push('Germs bounce right off it.')
 	return powers.length ? powers : ['Just for looks.']
@@ -420,6 +469,8 @@ export function courseCollectables(course: Course): Collectable[] {
 		const rare = rideLook(course).rare
 		if (rare) there.add(`ride:${rare.kind}`)
 	}
+	// A hidden bonus runner's own hat, to steal off them.
+	if (course.found?.hat) there.add(`hat:${course.found.hat}`)
 	if (course.flyovers?.length) there.add(`ride:${course.flyer ?? 'goose'}`)
 	if (course.leap) there.add('ride:condor')
 	if (course.mine) there.add('ride:minecart')

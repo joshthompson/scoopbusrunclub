@@ -12,6 +12,8 @@ export const PODIUM_CELL = 3
 /** How wide a step is, and how tall each is, 1st to 3rd, in cells. */
 export const STEP_COLUMNS = 50
 export const STEP_ROWS = [44, 34, 28] as const
+/** How far down a step's lit top whoever's on it stands, in cells: on it, not on its back edge. */
+export const STEP_STAND = 2
 
 const TOP = '#eef1f4'
 const TOP_SHADE = '#cfd5dc'
@@ -65,10 +67,14 @@ const centred = (text: string, y: number, fill: string) =>
 	)
 
 /**
- * The step for `place`, its top edge in the colour of whoever's on it, and
- * their `points` along its foot: as an image's URL.
+ * The step for `place`, its top edge in the colour of whoever's `on` it, and
+ * their points along its foot: as an image's URL. With nobody on it, bare:
+ * no place on it, nor points.
  */
-export function podiumStep(place: 1 | 2 | 3, points: number, colour: string) {
+export function podiumStep(
+	place: 1 | 2 | 3,
+	on: { points: number; colour: string } | undefined,
+) {
 	const rows = STEP_ROWS[place - 1]
 	const w = STEP_COLUMNS
 	const parts: string[] = []
@@ -85,8 +91,12 @@ export function podiumStep(place: 1 | 2 | 3, points: number, colour: string) {
 	// Its top, lit, its front edge, and a strip of their colour along it.
 	parts.push(rect(0, 0, w, 3, TOP))
 	parts.push(rect(0, 2, w, 1, TOP_SHADE))
-	parts.push(rect(0, 3, w, 1, colour))
+	parts.push(rect(0, 3, w, 1, on?.colour ?? TOP_SHADE))
 	parts.push(rect(0, 4, w, 1, EDGE))
+	// Its foot, darker.
+	parts.push(rect(0, rows - 4, w, 4, FOOT))
+	parts.push(rect(0, rows - 1, w, 1, FOOT_SHADE))
+	if (!on) return svgUrl(w, rows, parts.join(''))
 	// Its plaque, near the top: its place.
 	const label = `#${place}`
 	const plaqueWide = pixelTextWidth(label, 1) + 8
@@ -96,10 +106,8 @@ export function podiumStep(place: 1 | 2 | 3, points: number, colour: string) {
 	parts.push(centred(label, 8, place === 1 ? GOLD : LETTERS))
 	// The winner's: a trophy, under the plaque.
 	if (place === 1) parts.push(trophy(Math.floor((w - 14) / 2), 18))
-	// Its foot, darker, and the points on a plaque along it.
-	parts.push(rect(0, rows - 4, w, 4, FOOT))
-	parts.push(rect(0, rows - 1, w, 1, FOOT_SHADE))
-	const score = `${points} PTS`
+	// The points, on a plaque along its foot.
+	const score = `${on.points} PTS`
 	const scoreWide = pixelTextWidth(score, 1) + 6
 	const scoreLeft = Math.floor((w - scoreWide) / 2)
 	parts.push(rect(scoreLeft, rows - 12, scoreWide, 10, PLAQUE_RIM))
