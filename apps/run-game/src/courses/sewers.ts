@@ -28,9 +28,11 @@ import {
 	crates,
 	drumFire,
 	duckSign,
+	grimeStreak,
 	houses,
 	lanternPole,
 	manholeShaft,
+	outflowPipe,
 	pipes,
 	roadBlock,
 	roadworksSign,
@@ -610,7 +612,18 @@ function scenery(random: () => number): Course['scenery'] {
 	// (see `trafficCones`).
 	pieces.push({ x: MANHOLE - 520, asset: roadworksSign, scale: 2, setBack: -2 })
 	// Under the street.
-	const tunnelBits = [pipes, archway, crates, pipes, lanternPole, archway]
+	const tunnelBits = [
+		pipes,
+		outflowPipe,
+		archway,
+		grimeStreak,
+		crates,
+		pipes,
+		outflowPipe,
+		lanternPole,
+		archway,
+		grimeStreak,
+	]
 	const site = [
 		scaffolding,
 		crates,

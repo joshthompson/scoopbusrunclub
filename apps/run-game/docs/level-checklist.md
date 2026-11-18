@@ -20,7 +20,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | 9 | Great Wall of China | ✅ Dumplings, bubble tea, mooncake | ✅ On top of a tower | ⬜ | ✅ Bamboo hat | ✅ Dragon (flies over) | ✅ Guard towers | 2026-11-18 |
 | 10 | Furby Fields | ✅ Tiny furby, lollipop, rainbow cake | ✅ Find the Furby Queen | ✅ Furby Queen | ✅ Propeller beanie | ✅ Unicorn | ✅ Giant Furby to run through, a stair of macaron-topped candy towers past the rainbow, up to float over to the Furby Queen's palace | ⬜ |
 | 11 | Machu Picchu | ✅ Inca Kola | ✅ Break the bridge | ⬜ | ✅ Chullo | ✅ Llama, condor | ✅ The Leap, rope bridge | 2026-11-18 |
-| 12 | The Sewers | ✅ Rubber duck, gold ring, old coin, lost phone | ✅ Knock over every traffic cone | ⬜ | ✅ Tentacle hat | ⬜ | ✅ Down a manhole, out up the Giant Vent | ⬜ |
+| 12 | The Sewers | ✅ Rubber duck, gold ring, old coin, lost phone | ✅ Knock over every traffic cone | ⬜ | ✅ Tentacle hat | ⬜ | ✅ Down a manhole, out up the Giant Vent | 2026-11-18 |
 | 13 | City Rooftop | ✅ Popcorn, mojito, Dobry Cola | ✅ Find Bat Person | ✅ Bat Person | ✅ Top hat | ⬜ | ✅ Bat Person's crane hideout | ⬜ |
 | 14 | The Cliff | ✅ Flying strawberry, bubble gum, hjortron (cloudberries) | ✅ Get all the Rings | ⬜ | ✅ Flying helmet | ✅ Glider | ✅ Glide out over the sea to the island | ⬜ |
 | 15 | Everest | ✅ Kendal Mint Cake, butter tea | ✅ Find the yeti | ✅ Yuri the Yeti | ✅ Bobble hat | ✅ Mountain goat | ✅ Yeti den under the mountain | 2026-11-18 |
@@ -39,7 +39,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | Unique hat | 0 | |
 | Ride | 4 | Halloween Town, Scoop Cruises, The Sewers, City Rooftop |
 | Set piece | 1 | Huddinge |
-| Art pass | 7 | Furby Fields, The Sewers, City Rooftop, The Cliff, The Slopes, The Hospital, Midnattsloppet |
+| Art pass | 6 | Furby Fields, City Rooftop, The Cliff, The Slopes, The Hospital, Midnattsloppet |
 
 ## Also in the course standard
 

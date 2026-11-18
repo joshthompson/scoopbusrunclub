@@ -389,3 +389,55 @@ export function duckSign(opening: number) {
 		].join(''),
 	)
 }
+
+const SLIME = '#7a9a3a'
+const SLIME_LIT = '#a4c454'
+const SLIME_DARK = '#4e6a24'
+
+/**
+ * An outflow, high in the wall: a round iron pipe's mouth, a trickle of
+ * green slime pouring out of it and down the bricks, splashing into a
+ * puddle at the foot. 24 by 64.
+ */
+export const outflowPipe = pixelArt(24, 64, [
+	// Damp stain round it, darker brick.
+	[4, 4, 16, 52, 'rgba(20, 14, 10, 0.22)'],
+	// The pipe's mouth, a ring of iron, dark inside.
+	[6, 2, 12, 2, '#5a5e62'],
+	[4, 4, 16, 8, '#5a5e62'],
+	[6, 12, 12, 2, '#3e4246'],
+	[7, 4, 10, 8, '#1a1612'],
+	[5, 4, 2, 8, '#7a7e82'],
+	// Slime out of it, down the wall.
+	[9, 10, 6, 2, SLIME],
+	[10, 12, 4, 46, SLIME],
+	[10, 12, 1, 46, SLIME_LIT],
+	[13, 14, 1, 44, SLIME_DARK],
+	// Drips off to one side.
+	[8, 22, 1, 3, SLIME],
+	[15, 34, 1, 4, SLIME],
+	// The puddle, and its splash.
+	[4, 58, 16, 2, SLIME],
+	[2, 60, 20, 3, SLIME_DARK],
+	[6, 58, 6, 1, SLIME_LIT],
+	[7, 55, 1, 2, SLIME_LIT],
+	[16, 56, 1, 1, SLIME_LIT],
+	[2, 63, 20, 1, 'rgba(20, 14, 10, 0.3)'],
+])
+
+/**
+ * A damp streak down the bricks, dark and green-tinged, from a crack high
+ * up to a slick of moss at the foot. 14 by 72.
+ */
+export const grimeStreak = pixelArt(14, 72, [
+	[5, 0, 3, 2, 'rgba(20, 14, 10, 0.4)'],
+	[4, 2, 5, 20, 'rgba(30, 36, 18, 0.28)'],
+	[3, 22, 7, 24, 'rgba(30, 36, 18, 0.24)'],
+	[2, 46, 9, 20, 'rgba(30, 36, 18, 0.2)'],
+	[6, 8, 1, 30, 'rgba(20, 14, 10, 0.25)'],
+	[9, 30, 1, 22, 'rgba(20, 14, 10, 0.2)'],
+	// Moss at its foot.
+	[1, 66, 12, 4, 'rgba(78, 106, 36, 0.7)'],
+	[3, 64, 4, 2, 'rgba(122, 154, 58, 0.6)'],
+	[0, 70, 14, 2, 'rgba(78, 106, 36, 0.5)'],
+])
