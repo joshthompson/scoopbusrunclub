@@ -1,8 +1,4 @@
-import flower1 from '@/assets/misc/flower1.png'
-import shrub1 from '@/assets/misc/shrub1.png'
-import shrub2 from '@/assets/misc/shrub2.png'
 import type { RunnerName } from '@/data/runners'
-import tree1 from '../assets/scenery/tree1.png'
 import tree2 from '../assets/scenery/tree2.png'
 import { PATH_BACK, START_X } from '../game/constants'
 import { HUDDINGE_FIKA } from '../game/fika'
@@ -16,6 +12,15 @@ import {
 import { withHat } from './kit/hats'
 import { huddingeLedgeArt } from './kit/huddinge-ledge'
 import { STEP_M, heights } from './kit/huddinge-profile'
+import {
+	anthill,
+	blueberryBush,
+	fern,
+	mossyBoulder,
+	scotsPine,
+	spruceA,
+	spruceB,
+} from './kit/huddingeForest'
 import { seeded } from './kit/seeded'
 import type {
 	BackdropPiece,
@@ -89,6 +94,23 @@ const ANTLERS_BACK = 40
 const nearLedge = (x: number) =>
 	x > LEDGE.x - 160 && x < LEDGE.x + LEDGE.width + 40
 
+/**
+ * An anthill now and then, by the path: their own random numbers, so
+ * everything else is where it was.
+ */
+function anthills(): Course['scenery'] {
+	const random = seeded(4519)
+	const out: Course['scenery'] = []
+	for (
+		let at = START_X + 900;
+		at < terrain.finishX;
+		at += 1400 + random() * 1600
+	)
+		if (!nearHarvester(at))
+			out.push({ x: Math.round(at), asset: anthill, scale: 2, filter: SHADE })
+	return out
+}
+
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	const random = seeded(1410)
 	const obstacles: Obstacle[] = []
@@ -121,14 +143,26 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		x += 380 + random() * (500 - progress * 260)
 	}
 
-	// Pines, mostly, close together along the path.
+	// Spruce, mostly, close together along the path, a pine here and there,
+	// and the forest floor: as many kinds as ever, so the same random
+	// numbers place them.
 	let scenery: Course['scenery'] = []
-	const plants = [tree2, tree2, tree2, tree1, tree2, shrub1, shrub2, flower1]
+	const plants = [
+		spruceA,
+		spruceB,
+		spruceA,
+		scotsPine,
+		spruceB,
+		mossyBoulder,
+		blueberryBush,
+		fern,
+	]
 	for (let at = -400; at < terrain.finishX + 900; at += 50 + random() * 120) {
 		const asset = plants[Math.floor(random() * plants.length)]
 		scenery.push({
 			x: Math.round(at),
 			asset,
+			scale: 2,
 			// Some in deeper shade than others, so they don't all look one tree.
 			filter: random() < 0.4 ? DEEP_SHADE : SHADE,
 		})
@@ -136,6 +170,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	// A clearing round the harvester: the trees round it left out once
 	// they're all placed, so where everything else is doesn't change.
 	scenery = scenery.filter((s) => !nearHarvester(s.x))
+	scenery.push(...anthills())
 	const kept = {
 		obstacles: obstacles.filter((o) => !nearDeer(o.x) && !nearLedge(o.x)),
 		boosts: boosts.filter((b) => !nearDeer(b.x) && !nearLedge(b.x)),
@@ -217,18 +252,18 @@ export const huddinge: CourseDefinition = {
 		groundDefs: HUDDINGE_FLOOR + HUDDINGE_TRAIL,
 		// A wall of pines over the hills.
 		far: [
-			piece(tree2, 110, 'brightness(0.7)'),
-			piece(tree2, 110, 'brightness(0.6)'),
-			piece(tree2, 110, 'brightness(0.75) saturate(1.2)'),
+			piece(spruceA, 116, 'brightness(0.7)'),
+			piece(spruceB, 116, 'brightness(0.6)'),
+			piece(spruceA, 116, 'brightness(0.75) saturate(1.2)'),
 		],
 		// And thick on the field behind the path.
 		near: [
-			piece(tree2, 110, SHADE),
-			piece(tree2, 110, DEEP_SHADE),
-			piece(tree1, 120, SHADE),
-			piece(tree2, 110, SHADE),
+			piece(spruceA, 116, SHADE),
+			piece(spruceB, 116, DEEP_SHADE),
+			piece(spruceB, 116, SHADE),
+			piece(spruceA, 116, DEEP_SHADE),
 		],
-		nearGap: [24, 90],
+		nearGap: [12, 56],
 		// Granite, grey and mossy, as the forest's boulders are.
 		platform: {
 			top: '#8e8b80',
