@@ -28,8 +28,10 @@ import {
 	moose,
 	pisteSign,
 	slopesStrips,
+	snowBoulder,
 	snowCannon,
 	snowyPine,
+	spruceStand,
 	swedishFlag,
 	trickSign,
 } from './kit/slopesScenery'
@@ -675,6 +677,41 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 			else if (roll < 0.55) piece = { x, asset: birch, scale: 2 }
 		}
 		if (piece) out.push({ ...piece, x: Math.round(x) })
+	}
+
+	// A thicker forest up the hillside, and boulders in the snow: its own
+	// stream, so the rest stays as it was. Spruce stands the blue and black
+	// runs run through, boulders here and there, clear of the set pieces.
+	const thick = seeded(4417)
+	for (let x = at(300); x < FINISH; x += 60 + thick() * 110) {
+		const along = x - START_X
+		const roll = thick()
+		const pick = thick()
+		if (
+			!clearOf(x) ||
+			taken(x, 90) ||
+			(along > -40 && along < RACK_FROM + RACK.length * RACK_GAP + 60) ||
+			(along > HUT_FROM - 100 && along < HUT_TO + 100) ||
+			(along > JUMP_FROM && along < JUMP_TO) ||
+			along > LENGTH - 900
+		)
+			continue
+		const zone = zoneOf(along)
+		const stand = zone === 'forest' ? 0.7 : zone === 'black' ? 0.6 : 0.1
+		if (roll < stand)
+			out.push({
+				x: Math.round(x),
+				asset: spruceStand(Math.min(2, Math.floor(pick * 3)) as 0 | 1 | 2),
+				scale: 2,
+				setBack: 28 + Math.round(thick() * 30),
+			})
+		else if (roll < stand + 0.12)
+			out.push({
+				x: Math.round(x),
+				asset: snowBoulder(Math.min(2, Math.floor(pick * 3)) as 0 | 1 | 2),
+				scale: 2,
+				setBack: 6 + Math.round(thick() * 14),
+			})
 	}
 	return out.map(standUpright).sort((a, b) => a.x - b.x)
 }

@@ -995,3 +995,83 @@ export const afterski = (() => {
 	}
 	return svgUrl(74, 42, body)
 })()
+
+// --- A thicker forest, and boulders ---------------------------------------------------
+
+/** One spruce for a stand: tiers of boughs, snow on each, its trunk at the foot. */
+function spruceInto(
+	rects: PixelRect[],
+	cx: number,
+	foot: number,
+	tiers: number,
+	deep: boolean,
+) {
+	const dark = deep ? '#1d3a2d' : '#26493a'
+	const base = deep ? '#244636' : '#2c5444'
+	const top = foot - 3 - tiers * 4
+	rects.push([cx - 1, foot - 3, 2, 3, '#4a3020'])
+	for (let tier = 0; tier < tiers; tier++) {
+		const w = 4 + tier * 3
+		const y = top + tier * 4
+		const left = cx - Math.floor(w / 2)
+		rects.push([left, y, w, 4, tier % 2 ? base : dark])
+		rects.push([left + 1, y + 3, w - 2, 1, '#16291f'])
+		// Snow along each tier's lit side.
+		rects.push([left, y, Math.ceil(w * 0.65), 1, SNOW])
+		if (tier) rects.push([left, y + 1, 2, 1, SNOW_SHADE])
+	}
+	rects.push([cx - 1, top - 1, 2, 2, SNOW])
+}
+
+/**
+ * A stand of spruce, three or four close together, some tall and some
+ * short, the far ones darker: the forest the blue and black runs go
+ * through. Three of them, 34 cells wide, 40 to 56 tall.
+ */
+export const spruceStand = (variant: 0 | 1 | 2) => {
+	const width = 36
+	const height = [40, 48, 56][variant]
+	const rects: PixelRect[] = []
+	const trees: [cx: number, tiers: number, deep: boolean][][] = [
+		[
+			[9, 6, true],
+			[26, 7, true],
+			[17, 8, false],
+		],
+		[
+			[8, 7, true],
+			[19, 9, false],
+			[29, 6, true],
+		],
+		[
+			[7, 6, true],
+			[29, 8, true],
+			[14, 10, false],
+			[23, 8, false],
+		],
+	]
+	for (const [cx, tiers, deep] of trees[variant])
+		spruceInto(rects, cx, height - (deep ? 3 : 0), tiers, deep)
+	// Snow banked round their feet.
+	rects.push([2, height - 2, width - 4, 2, SNOW])
+	rects.push([2, height - 1, width - 4, 1, SNOW_SHADE])
+	return pixelArt(width, height, rects)
+}
+
+/**
+ * A boulder, a snow cap on it, grey rock showing on its shaded side: 3
+ * sizes, 14 to 26 cells wide.
+ */
+export const snowBoulder = (size: 0 | 1 | 2) => {
+	const w = [14, 20, 26][size]
+	const h = [8, 11, 14][size]
+	return paintedArt(w, h, (x, y) => {
+		const u = (x + 0.5 - w / 2) / (w / 2)
+		const v = (y + 0.5 - h) / h
+		if (u * u + v * v * 1.05 > 1) return undefined
+		// Its cap of snow, over the top and down the lit side.
+		if (y < h * 0.42 + (u < 0 ? 1 : 0)) return u > 0.55 ? SNOW_SHADE : SNOW
+		if (y >= h - 1) return '#6d7a8d'
+		return u > 0.15 ? '#7d8a9d' : '#9aa6b6'
+	})
+}
