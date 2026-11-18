@@ -10,6 +10,13 @@ import { PYRAMIDS_FIKA } from '../game/fika'
 import { type Terrain, createTerrain, withGaps } from '../game/terrain'
 import { MS_CROCODILE } from '../runners/bonus'
 import { nearDunes } from './kit/backdrops'
+import {
+	brokenColumn,
+	desertScrub,
+	lotusColumn,
+	obelisk,
+	tumbledBlocks,
+} from './kit/desertRuins'
 import { duckPost } from './kit/duckSigns'
 import { bush, papyrus, reeds } from './kit/nileScenery'
 import { SAND_FAR_RIPPLES, SAND_RIPPLES, SAND_TRACK } from './kit/sand'
@@ -389,6 +396,41 @@ function camels() {
 	return at
 }
 
+/** Where the desert's clear for ruins: off the pyramids, the Sphinx and the Nile. */
+const clearSand = (at: number) =>
+	!pyramidAt(at) &&
+	!(at > SPHINX - 300 && at < SPHINX_END + 100) &&
+	!(at > NILE_FROM - 80 && at < NILE_TO + 80)
+
+/**
+ * What's left lying about the desert: columns standing and broken,
+ * tumbled blocks, scrub, and now and then an obelisk. Their own random
+ * numbers, so everything else is where it was.
+ */
+function ruins(): Course['scenery'] {
+	const random = seeded(5301)
+	const pieces = [
+		desertScrub,
+		tumbledBlocks,
+		desertScrub,
+		brokenColumn,
+		lotusColumn,
+		desertScrub,
+		tumbledBlocks,
+		brokenColumn,
+	]
+	const out: Course['scenery'] = []
+	let n = 0
+	for (let at = 200; at < terrain.finishX + 600; at += 160 + random() * 340) {
+		if (!clearSand(at)) continue
+		// An obelisk every so often, a landmark to run for.
+		const asset =
+			n++ % 11 === 5 ? obelisk : pieces[Math.floor(random() * pieces.length)]
+		out.push({ x: Math.round(at), asset, scale: 2 })
+	}
+	return out
+}
+
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	const random = seeded(2560)
 	let fika = 0
@@ -444,6 +486,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 		)
 			scenery.push({ x: Math.round(at), asset: palm })
 	scenery.push(...nileBanks())
+	scenery.push(...ruins())
 	// The sarcophagus in the Sphinx's tomb, stood against the wall.
 	scenery.push({
 		x: TOMB_FROM + TOMB / 2 + 40,

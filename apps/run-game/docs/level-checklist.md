@@ -13,7 +13,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | 2 | Kristineberg | ✅ Energy drink, sports gel, banana | ✅ Long jump 10 m | ✅ Link (ride a corgi) | ✅ Sweatband | ✅ Corgi | ✅ Long jump pit | 2026-11-18 |
 | 3 | Gamla Stan | ✅ Semla, dammsugare, kardemummabulle, ale | ✅ Find the viking | ✅ Sven the Viking | ✅ Royal Guard's helmet | ✅ Royal Guard horse | ✅ Tavern under the street, down a manhole | 2026-11-18 |
 | 4 | Huddinge | ✅ Cake in a can, wild berries, kantareller, bad mushroom (one, halfway: the screen trips for 3 s) | ✅ Deer riding deer | ⬜ | ✅ Antlers | ✅ Deer | ⬜ Flavour so far: a wild boar family running alongside, a harvester felling a pine, the granite ledge onto the deer | 2026-11-18 |
-| 5 | Pyramids | ✅ Falafel, knafeh, koshary | ✅ Bounce across the crocodiles | ✅ Ms Crocodile | ✅ Pharaoh's headdress | ✅ Camel, rare bactrian camel | ✅ Tomb under the Sphinx, the Nile | ⬜ |
+| 5 | Pyramids | ✅ Falafel, knafeh, koshary | ✅ Bounce across the crocodiles | ✅ Ms Crocodile | ✅ Pharaoh's headdress | ✅ Camel, rare bactrian camel | ✅ Tomb under the Sphinx, the Nile | 2026-11-18 |
 | 6 | Halloween Town | ✅ Candyfloss, toffee apple, spider cupcake, pumpkin | ✅ Become a ghost | ✅ Skeleton | ✅ Pumpkin | ⬜ | ✅ Haunted house | ⬜ |
 | 7 | Scoop Cruises | ✅ Kladdkaka, lingondricka, lösgodis, salmiakki, karjalanpiirakka | ⬜ | ⬜ | ✅ Captain's hat | ⬜ | ✅ The ferry, roof route | ⬜ |
 | 8 | The Caves | ✅ Sandwich, cool rock, cave pickles | ✅ Find the miners | ✅ The Miner | ✅ Miner's helmet | ✅ Mole, mine cart | ✅ Mine with a secret line to the gallery; the old mine under the chasm, its coaster and loop | ⬜ |
@@ -39,7 +39,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | Unique hat | 0 | |
 | Ride | 4 | Halloween Town, Scoop Cruises, The Sewers, City Rooftop |
 | Set piece | 1 | Huddinge |
-| Art pass | 12 | Every level but Haga, Kristineberg, Gamla Stan, Huddinge, Machu Picchu, Everest and Dino Island |
+| Art pass | 11 | Every level but Haga, Kristineberg, Gamla Stan, Huddinge, Pyramids, Machu Picchu, Everest and Dino Island |
 
 ## Also in the course standard
 
