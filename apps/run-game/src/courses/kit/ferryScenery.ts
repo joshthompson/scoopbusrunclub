@@ -1099,3 +1099,31 @@ export const skylight = svgUrl(
 		rect(76, 44, 4, 4, '#ffe14d'),
 	].join(''),
 )
+
+/**
+ * A herring gull, perched, looking out to sea: white, grey wings, a
+ * yellow beak with its red spot, pink legs. 12 by 11, facing `left` or not.
+ */
+const gullRects = (
+	left: boolean,
+): [number, number, number, number, string][] => {
+	const rects: [number, number, number, number, string][] = [
+		// Head and beak.
+		[7, 0, 3, 3, '#f6f6f2'],
+		[10, 1, 2, 1, '#f2c430'],
+		[11, 2, 1, 1, '#d8443a'],
+		[8, 1, 1, 1, '#1c1c1c'],
+		// Body, breast white, wings grey, black tips.
+		[3, 3, 7, 4, '#f6f6f2'],
+		[2, 3, 6, 3, '#a9b2ba'],
+		[0, 4, 3, 2, '#2a2a2a'],
+		[3, 3, 5, 1, '#c3cad0'],
+		// Legs.
+		[5, 7, 1, 3, '#e29a8e'],
+		[7, 7, 1, 3, '#e29a8e'],
+		[4, 10, 5, 1, '#e29a8e'],
+	]
+	return left ? rects.map(([x, y, w, h, c]) => [12 - x - w, y, w, h, c]) : rects
+}
+export const gull = pixelArt(12, 11, gullRects(false))
+export const gullLeft = pixelArt(12, 11, gullRects(true))

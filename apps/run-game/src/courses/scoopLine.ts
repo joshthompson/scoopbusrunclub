@@ -57,6 +57,8 @@ import {
 	deckSign,
 	diningTable,
 	funnel,
+	gull,
+	gullLeft,
 	lifeboat,
 	lifeboatOnDavits,
 	lifebuoy,
@@ -836,7 +838,15 @@ function scenery(random: () => number): Course['scenery'] {
 	// On board: indoors, nothing in the way of the walls; out on the sun
 	// deck, loungers, vents and lifebuoys.
 	const sunDeck = room('sunDeck')
-	const deckBits = [lounger, ventilator, lounger, lifebuoy, lounger]
+	const deckBits = [
+		lounger,
+		ventilator,
+		gull,
+		lounger,
+		lifebuoy,
+		gullLeft,
+		lounger,
+	]
 	let n = 0
 	for (
 		let x = sunDeck.from + 160;
@@ -852,7 +862,16 @@ function scenery(random: () => number): Course['scenery'] {
 	// Finland's flags, flying along the quay, to welcome everyone off.
 	const flagsTo = TURKU + 640
 	for (let x = TURKU + 130; x < flagsTo; x += 150) add(x, finnishFlag)
-	const turkuBits = [linden, lamp, bench, linden, parkedBike, lamp]
+	const turkuBits = [
+		linden,
+		lamp,
+		bench,
+		gull,
+		linden,
+		parkedBike,
+		lamp,
+		gullLeft,
+	]
 	n = 0
 	for (let x = flagsTo + 60; x < FINISH + 900; x += 150 + random() * 120) {
 		if (x > AURA.from - 140 && x < AURA.to + 140) continue
