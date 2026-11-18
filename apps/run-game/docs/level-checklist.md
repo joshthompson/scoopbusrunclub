@@ -26,7 +26,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | 15 | Everest | ✅ Kendal Mint Cake, butter tea | ✅ Find the yeti | ✅ Yuri the Yeti | ✅ Bobble hat | ✅ Mountain goat | ✅ Yeti den under the mountain | 2026-11-18 |
 | 16 | The Slopes | ✅ Våffla, varm choklad, lussekatt, pepparkaka, våffeltorn, tomatsoppa | ✅ Complete the course on foot | ⬜ | ✅ Ski helmet | ✅ Skis, snowboard | ✅ Ski jump, waffle hut | ⬜ |
 | 17 | The Hospital (Karolinska) | ✅ Grapes, oxygen, vitamins | ✅ Cure the common cold (pop every germ) | ✅ Spirit of Jazz | ✅ Head mirror | ✅ Red blood cell | ✅ Shrink ray, inside the body | 2026-11-18 |
-| 18 | Midnattsloppet | ✅ Water, blåbärssoppa, pizza slice (plus the banana hunt) | ✅ Bounce on 20 heads | ✅ Banana Girl | ✅ Disco ball | ✅ Skateboard | ✅ Rock band stage, church choir, banana stand | ⬜ |
+| 18 | Midnattsloppet | ✅ Water, blåbärssoppa, pizza slice (plus the banana hunt) | ✅ Bounce on 20 heads | ✅ Banana Girl | ✅ Disco ball | ✅ Skateboard | ✅ Rock band stage, church choir, banana stand | 2026-11-18 |
 | 19 | Dino Island | ✅ Fossil pops, lava cake, coconut | ✅ Hatch the egg and bring it home | ✅ Hatchling | ✅ Snorkel mask | ✅ Pterodactyl (flies over) | ✅ Up a diplodocus onto its lifting head; a volcano that erupts as the last runner crosses its crater, then a run down it on the skyline, in silhouette; a dive and a swim in Deep Water | 2026-11-18 |
 
 ## Still to do
@@ -39,7 +39,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | Unique hat | 0 | |
 | Ride | 4 | Halloween Town, Scoop Cruises, The Sewers, City Rooftop |
 | Set piece | 1 | Huddinge |
-| Art pass | 3 | Furby Fields, The Slopes, Midnattsloppet |
+| Art pass | 2 | Furby Fields, The Slopes |
 
 ## Also in the course standard
 

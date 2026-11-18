@@ -50,6 +50,14 @@ import {
 	VITA_BERGEN_NEAR,
 } from './kit/midnattsloppetHorizons'
 import {
+	bikeRack,
+	candleTable,
+	lifebuoy,
+	onlookers,
+	quayBench,
+	sailboat,
+} from './kit/midnattsloppetLife'
+import {
 	BANANA_SKIN,
 	PAPER_CUP,
 	SHOWER,
@@ -444,7 +452,11 @@ function layOut() {
 	})
 	obstacles.sort((a, b) => a.x - b.x)
 	boosts.sort((a, b) => a.x - b.x)
-	return { obstacles, boosts, scenery: scenery(random) }
+	return {
+		obstacles,
+		boosts,
+		scenery: [...scenery(random), ...roadsideLife()].sort((a, b) => a.x - b.x),
+	}
 }
 type FikaRow = Extract<Boost, { kind: 'fika' }>['item'][]
 
@@ -578,6 +590,40 @@ function scenery(random: () => number): Scenery[] {
 		)
 			pieces.push({ x, asset: lamp, filter: 'brightness(0.8)' })
 	return pieces.sort((a, b) => a.x - b.x)
+}
+
+/**
+ * What's about by the road, in front of the blocks and along the quay:
+ * sailboats at anchor, benches and lifebuoys on the docks; bikes, café
+ * tables and onlookers along the streets. Its own random numbers, so the
+ * rest of the course is laid out the same as ever, and it keeps clear of
+ * the set pieces.
+ */
+function roadsideLife(): Scenery[] {
+	const random = seeded(2611)
+	const pieces: Scenery[] = []
+	const put = (x: number, asset: string, extra: Partial<Scenery> = {}) =>
+		pieces.push({ x: Math.round(x), asset, scale: 2, ...extra })
+	// Out on the water, anchored, between the moored boats.
+	for (let x = DOCKS + 500; x < DOCKS_END - 300; x += 650 + random() * 500)
+		if (Math.abs(x - BAND) > 700) put(x, sailboat, { setBack: 70 })
+	// Along the quay.
+	for (let x = DOCKS + 250; x < DOCKS_END - 200; x += 260 + random() * 260) {
+		if (inSetPiece(x)) continue
+		put(x, random() < 0.6 ? quayBench : lifebuoy)
+	}
+	// Along the streets, but not by the crossroads, the park or the stands.
+	const props = [bikeRack, candleTable, onlookers, quayBench, candleTable]
+	const streets = (from: number, to: number) => {
+		for (let x = from; x < to; x += 220 + random() * 260) {
+			if (inSetPiece(x) || Math.abs(x - CROSSROADS) < 180) continue
+			put(x, props[Math.floor(random() * props.length)])
+		}
+	}
+	streets(START_X + 700, RINGEN - 220)
+	streets(RINGEN + 220, DOCKS - 250)
+	streets(CENTRAL + 150, HORNSGATAN - 100)
+	return pieces
 }
 
 /** Lighting rigs, by the road, every so often. */
