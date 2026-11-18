@@ -22,8 +22,11 @@ import {
 	WALL_DARKER,
 	WALL_FOOT,
 	breach,
+	dragonBanner,
+	mingCannon,
 	wallBushes,
 	wallForest,
+	wallTuft,
 	wallWoods,
 } from './kit/greatWallScenery'
 import { nearGap, scatter } from './kit/scatter'
@@ -204,10 +207,20 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			boosts.sort((a, b) => a.x - b.x)
 			break
 		}
-	// Red lanterns along the walkway.
+	// Red lanterns along the walkway, and in between them dragon banners,
+	// now and then an old cannon at the parapet, and grass in the cracks.
 	const scenery: Course['scenery'] = []
-	for (let at = -300; at < terrain.finishX + 900; at += 260 + random() * 200)
-		if (!nearTower(at)) scenery.push({ x: Math.round(at), asset: lantern })
+	let n = 0
+	for (let at = -300; at < terrain.finishX + 900; at += 260 + random() * 200) {
+		if (nearTower(at)) continue
+		const x = Math.round(at)
+		const which = n++ % 6
+		if (which === 1 || which === 4)
+			scenery.push({ x, asset: dragonBanner, scale: 2 })
+		else if (which === 3) scenery.push({ x, asset: mingCannon, scale: 2 })
+		else scenery.push({ x, asset: lantern })
+		if (which % 2 === 0) scenery.push({ x: x + 90, asset: wallTuft, scale: 2 })
+	}
 	// Where it's crumbled away, a breach in it, the bushes grown up round the heap.
 	terrain.gaps.forEach((gap, i) => {
 		scenery.push(...breach(terrain, gap, 1600 + i))

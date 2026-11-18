@@ -11,6 +11,7 @@ import type { Gap, Terrain } from '../../game/terrain'
 import type { Scenery } from '../types'
 import {
 	type PixelRect,
+	pixelArt,
 	pixelCircle,
 	rectsMarkup,
 	svgUrl,
@@ -621,3 +622,59 @@ export function breach(
 		},
 	]
 }
+
+/**
+ * A dragon banner on a pole: a tall yellow pennant, red-bordered, a red
+ * dragon's coil on it, tied to a black pole with a gilt tip. 14 by 44.
+ */
+export const dragonBanner = pixelArt(14, 44, [
+	[1, 0, 2, 1, '#e6c24a'],
+	[1, 1, 2, 43, '#2a2420'],
+	// The pennant, tapering off the pole.
+	[3, 2, 10, 1, '#c8302a'],
+	[3, 3, 10, 14, '#f0c832'],
+	[3, 17, 8, 2, '#f0c832'],
+	[3, 19, 6, 2, '#f0c832'],
+	[3, 21, 4, 2, '#f0c832'],
+	[12, 3, 1, 14, '#c8302a'],
+	[10, 17, 1, 2, '#c8302a'],
+	[8, 19, 1, 2, '#c8302a'],
+	[6, 21, 1, 2, '#c8302a'],
+	[3, 23, 3, 1, '#c8302a'],
+	// The dragon, a red coil.
+	[5, 5, 5, 1, '#c8302a'],
+	[9, 6, 1, 3, '#c8302a'],
+	[5, 9, 5, 1, '#c8302a'],
+	[5, 10, 1, 3, '#c8302a'],
+	[5, 13, 4, 1, '#c8302a'],
+	[6, 4, 1, 1, '#c8302a'],
+])
+
+/** An old Ming cannon on a wooden carriage, pointing out over the parapet. 26 by 13. */
+export const mingCannon = pixelArt(26, 13, [
+	// The barrel, bronze gone dark, bands round it.
+	[2, 3, 20, 4, '#4a4036'],
+	[2, 3, 20, 1, '#6a5c4c'],
+	[22, 2, 3, 6, '#3a322a'],
+	[0, 4, 2, 2, '#3a322a'],
+	[7, 3, 1, 4, '#2a241e'],
+	[14, 3, 1, 4, '#2a241e'],
+	// Its carriage.
+	[4, 7, 14, 3, '#7a5432'],
+	[4, 7, 14, 1, '#9a6c42'],
+	// Its wheels.
+	[4, 8, 5, 5, '#5a3c22'],
+	[13, 8, 5, 5, '#5a3c22'],
+	[6, 10, 1, 1, '#2a1c10'],
+	[15, 10, 1, 1, '#2a1c10'],
+])
+
+/** Grass grown up between the stones of the walkway. 10 by 5. */
+export const wallTuft = pixelArt(10, 5, [
+	[1, 2, 1, 3, '#6a8a3a'],
+	[3, 0, 1, 5, '#7a9c44'],
+	[4, 1, 1, 4, '#5a7a32'],
+	[6, 1, 1, 4, '#7a9c44'],
+	[8, 3, 1, 2, '#6a8a3a'],
+	[2, 4, 7, 1, '#4e6a2c'],
+])
