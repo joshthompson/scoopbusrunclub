@@ -1098,6 +1098,11 @@ export interface Scenery {
 	 * than on the highest of it under it, clear of a slope: a crystal.
 	 */
 	onFloor?: boolean
+	/**
+	 * With `onFloor`, stood upright rather than leant with the slope, its
+	 * foot sunk in at its uphill end: coral growing up a reef.
+	 */
+	upright?: boolean
 	/** In front of whoever's on the path, rather than behind them: a gateway's near side. */
 	front?: boolean
 	/** Stood over a Gap all the same, as nothing else is: a crumbled wall's breach. */

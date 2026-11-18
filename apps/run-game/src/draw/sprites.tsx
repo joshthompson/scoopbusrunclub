@@ -2868,15 +2868,21 @@ export function createScenery(world: World) {
 		 * between them pokes up past its foot.
 		 */
 		const pathTop = () =>
-			(piece.onFloor
-				? groundY(x)
-				: footing
-					? highestUnder(groundY, x - width() / 2, x + width() / 2)
-					: Math.min(
-							groundY(x - width() / 2),
-							groundY(x),
-							groundY(x + width() / 2),
-						)) - PATH_BACK
+			(piece.onFloor && piece.upright
+				? Math.max(
+						groundY(x - width() / 2),
+						groundY(x),
+						groundY(x + width() / 2),
+					)
+				: piece.onFloor
+					? groundY(x)
+					: footing
+						? highestUnder(groundY, x - width() / 2, x + width() / 2)
+						: Math.min(
+								groundY(x - width() / 2),
+								groundY(x),
+								groundY(x + width() / 2),
+							)) - PATH_BACK
 		const top = () => pathTop() - setBack - height()
 		/** How steep the floor is under it, end to end, as an angle. */
 		const floorLean = () => {
@@ -2943,10 +2949,11 @@ export function createScenery(world: World) {
 					'image-rendering': scale > 1 ? 'pixelated' : undefined,
 					// Stood on the floor, leant with its slope, so both its feet
 					// are on it, uphill and down.
-					...(piece.onFloor && {
-						transform: `skewY(${floorLean()}rad)`,
-						'transform-origin': '50% 100%',
-					}),
+					...(piece.onFloor &&
+						!piece.upright && {
+							transform: `skewY(${floorLean()}rad)`,
+							'transform-origin': '50% 100%',
+						}),
 				}),
 			}),
 			// Only what hops needs anything doing every tick.

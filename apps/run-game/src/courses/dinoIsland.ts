@@ -47,7 +47,6 @@ import {
 	BARNACLE_ROCK,
 	BEACH,
 	CORAL,
-	FISH_SCHOOL,
 	KELP,
 	OCTOPUS,
 	REEF,
@@ -527,12 +526,19 @@ function scenery(random: () => number, clearOf: number[]): Scenery[] {
 	}
 	// The nest, on the path, its egg kicked out of it (see `egg`).
 	pieces.push({ ...art(NEST_X, NEST_EMPTY), setBack: -PATH_BACK - 3 })
-	// Under the sea: coral, kelp swaying, octopuses and fish, on the seabed.
+	// Under the sea: coral, kelp swaying and octopuses, on the seabed. No
+	// fish: stood still on the spot, they'd look stuck.
 	n = 0
 	for (let x = CLIFF + 260; x < SHORE.from; x += 90 + random() * 150) {
 		if (within(x, { from: SHELF.from - 60, to: SHELF.to + 60 })) continue
 		const which = n++ % 6
-		const at = { x: Math.round(x), scale: 2, setBack: 2, onFloor: true }
+		const at = {
+			x: Math.round(x),
+			scale: 2,
+			setBack: 2,
+			onFloor: true,
+			upright: true,
+		}
 		if (which === 1)
 			pieces.push({
 				...at,
@@ -546,13 +552,6 @@ function scenery(random: () => number, clearOf: number[]): Scenery[] {
 				asset: OCTOPUS.asset,
 				strip: { count: OCTOPUS.count },
 				frameTicks: 24,
-			})
-		else if (which === 5)
-			pieces.push({
-				...at,
-				asset: FISH_SCHOOL.asset,
-				strip: { count: FISH_SCHOOL.count, from: n % 2 },
-				frameTicks: 20,
 			})
 		else if (which === 4)
 			pieces.push(
@@ -594,6 +593,7 @@ function scenery(random: () => number, clearOf: number[]): Scenery[] {
 			scale: 2,
 			setBack: 2,
 			onFloor: true,
+			upright: true,
 		})
 	// The beach at the finish: tiki torches either side of the line, a
 	// surfboard and coconuts by it, a beach hut, and palms.
