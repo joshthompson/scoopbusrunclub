@@ -636,46 +636,51 @@ export const JAZZ_HAT: OwnHat = {
 	middle: 3 * CELL,
 }
 
-const TWEED = '#a8895a'
-const TWEED_LIT = '#c7aa78'
-const TWEED_CHECK = '#7a6038'
-const TWEED_SHADE = '#8d7148'
+const TWEED = '#8e6a44'
+const TWEED_LIT = '#ab865a'
+const TWEED_CHECK = '#5f4329'
+const TWEED_SHADE = '#735536'
+const TWEED_TIE = '#3e2b1a'
 /**
- * Det. Munch's: a deerstalker, as Sherlock Holmes wore, in a brown tweed
- * check, its ear flaps tied up over its crown in a bow, and a peak out
- * front and back, over his eye and down the back of his neck. Sat on the
- * back of a hippo's head, over his skull. 14 by 6 cells, still.
+ * Det. Munch's: a deerstalker, as Sherlock Holmes wore, made to fit her: a
+ * snug crown in a brown tweed check, darker than her khaki coat, pulled
+ * down over the dome of a hippo's skull, its ear flaps tied up over it in a
+ * bow; and a peak out front and back at her brow, their tips turned down,
+ * her eye peeping out from under the front one. The same front and back,
+ * so it fits her the other way round too, as she turns in her dance. 12 by
+ * 7 cells, still.
  */
 export const DEERSTALKER: OwnHat = {
 	frames: [
-		pixelArt(14, 6, [
-			// Its crown, a check across it.
-			[4, 1, 6, 1, TWEED],
-			[3, 2, 8, 1, TWEED],
-			[4, 1, 1, 1, TWEED_LIT],
-			[3, 2, 1, 1, TWEED_LIT],
-			[10, 2, 1, 1, TWEED_SHADE],
-			[6, 1, 1, 2, TWEED_CHECK],
-			[9, 1, 1, 2, TWEED_CHECK],
-			[3, 3, 9, 1, TWEED_CHECK],
+		pixelArt(12, 7, [
+			// Its crown, lit along its top, in shade down its back.
+			[3, 1, 6, 1, TWEED_LIT],
+			[2, 2, 8, 3, TWEED],
+			[9, 2, 1, 3, TWEED_SHADE],
+			[8, 1, 1, 1, TWEED_SHADE],
+			// Its check: seams up it, and a line round it.
+			[4, 1, 1, 4, TWEED_CHECK],
+			[7, 1, 1, 4, TWEED_CHECK],
+			[3, 3, 6, 1, TWEED_CHECK],
 			// The ear flaps' ties, in a bow on top.
-			[6, 0, 2, 1, '#5e4a2c'],
-			// Its peaks, front and back, round its band.
-			[0, 4, 11, 1, TWEED],
-			[0, 4, 1, 1, TWEED_LIT],
-			[3, 4, 1, 1, TWEED_LIT],
-			[6, 4, 1, 1, TWEED_CHECK],
-			[9, 4, 1, 1, TWEED_CHECK],
-			[11, 4, 3, 1, TWEED_SHADE],
-			[1, 5, 12, 1, TWEED_SHADE],
+			[4, 0, 4, 1, TWEED],
+			[5, 0, 2, 1, TWEED_TIE],
+			// Its peaks, front and back, either side of its band, at her
+			// brow, their tips turned down.
+			[0, 5, 12, 1, TWEED],
+			[0, 5, 2, 1, TWEED_LIT],
+			[3, 5, 6, 1, TWEED_CHECK],
+			[11, 5, 1, 1, TWEED_SHADE],
+			[0, 6, 1, 1, TWEED_SHADE],
+			[11, 6, 1, 1, TWEED_SHADE],
 		]),
 	],
 	frameTicks: 1,
-	width: 14 * CELL,
-	height: 6 * CELL,
-	// Down over the top of his skull: its band a row under the top of his head.
-	crown: 6 * CELL,
-	middle: 6.5 * CELL,
+	width: 12 * CELL,
+	height: 7 * CELL,
+	// Down over the top two rows of her skull, its band on the second.
+	crown: 4 * CELL,
+	middle: 6 * CELL,
 }
 
 /** A runner's own hat, in a Draw Hook: its top left at `x`, `y`, `now` ticks in. */

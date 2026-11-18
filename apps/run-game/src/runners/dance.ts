@@ -310,8 +310,8 @@ export const DANCES = {
 	},
 	/**
 	 * The sleuth: peering through a magnifying glass one way, then turned
-	 * round, the other; a puff on his pipe, its smoke going up; a shimmy,
-	 * his cape swinging; and his glass held up high, for "Eureka!". Drawn by
+	 * round, the other; a puff on her pipe, its smoke going up; a shimmy,
+	 * her cape swinging; and her glass held up high, for "Eureka!". Drawn by
 	 * hand, Det. Munch's.
 	 */
 	sleuth: {

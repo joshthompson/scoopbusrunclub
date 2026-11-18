@@ -532,18 +532,20 @@ headShowsIn(
 const MUNCH_WIDTH = 27
 
 /**
- * Det. Munch: a large hippo, up on his hind legs and dressed as Sherlock
- * Holmes. His head side on, a big grey-purple muzzle out front, his mouth
- * a long line along it, a tooth showing, his eye up high and a little ear
- * at the back; a curved pipe in the front of his mouth. A brown Inverness
- * coat down to his knees, round over his belly, and its cape over his
- * shoulders, lighter, flying out behind as he runs. Stubby grey legs in
- * brogues. And on his head, his own deerstalker (`DEERSTALKER`), drawn for
- * it: until he puts any other hat on, which goes on in place of it. Six
- * frames to his run, short steps. Stood, his magnifying glass up. His
- * dance is his own, drawn by hand (`sleuth`): peering through his glass one
- * way and then the other, a puff on his pipe, a shimmy, and his glass up
- * for "Eureka!". For finding every collectable there is.
+ * Det. Munch: a large hippo, up on her hind legs and dressed as Sherlock
+ * Holmes. Her head side on, a big slate-blue muzzle out front, her mouth a
+ * long line along it, a tooth showing, her eye up high and a little ear at
+ * the back; a curved pipe in the front of her mouth. A khaki Inverness coat
+ * down to her knees, round over her belly, and its cape over her shoulders,
+ * lighter, flying out behind as she runs. Stubby blue-grey legs in brogues.
+ * And on her head, her own deerstalker (`DEERSTALKER`), drawn for it: until
+ * she puts any other hat on, which goes on in place of it. Six frames to her
+ * run, short steps, her head kept level through all of them for a hat to
+ * sit still on: as she comes down, her belly does, the cape stretching to
+ * meet it. Stood, her magnifying glass up. Her dance is her own, drawn by
+ * hand (`sleuth`): peering through her glass one way and then the other, a
+ * puff on her pipe, a shimmy, and her glass up for "Eureka!". For finding
+ * every collectable there is.
  */
 export const DET_MUNCH: Playable = {
 	id: 'bonus:det-munch',
@@ -568,10 +570,10 @@ export const DET_MUNCH: Playable = {
 }
 
 /**
- * A hat goes on his skull, not on his pipe's smoke or his glass held up:
- * his head's found from a hippo's colours.
+ * A hat goes on her skull, not on her pipe's smoke or her glass held up:
+ * her head's found from a hippo's colours.
  */
-const MUNCH_HEAD = ['#8f7fa0', '#ab9cbc', '#54476a']
+const MUNCH_HEAD = ['#7f99ae', '#a3b8c8', '#475d73']
 headShowsIn(
 	[
 		detMunchRun,
