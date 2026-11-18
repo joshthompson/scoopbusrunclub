@@ -17,6 +17,15 @@ import {
 	crystalPeaks,
 } from './kit/backdrops'
 import {
+	SWEETS,
+	droppedLollipop,
+	gumdrop,
+	jellyBean,
+	rockCandy,
+	sugarGrass,
+	wrappedSweet,
+} from './kit/furbyForeground'
+import {
 	MACARONS,
 	ROYAL_MACARON,
 	THRONE,
@@ -513,7 +522,7 @@ function layOut(): Pick<
 	return {
 		obstacles: obstacles.filter((o) => !underPalace(o)),
 		boosts,
-		scenery: scenery(random),
+		scenery: [...scenery(random), ...nearField()],
 		// None by the Furby Queen's palace, to bounce up to it off.
 		furbies: furbies.filter(
 			(f) => f.x < PALACE_X - 700 || f.x > PALACE_END + 500,
@@ -554,6 +563,46 @@ function scenery(random: () => number): Course['scenery'] {
 				asset: kinds[Math.floor(random() * kinds.length)](),
 				scale: 2,
 			})
+	}
+	return pieces
+}
+
+/**
+ * Sweets lying about in the field in front of the path: gumdrops, wrapped
+ * sweets, dropped lollipops, jelly beans, rock candy and sugar grass. Its
+ * own random stream, so the rest of the course stays as it was. Bigger
+ * ones lie further down the field, clear of the lane; none by the Giant
+ * Furby, nor under the rainbow.
+ */
+function nearField(): Course['scenery'] {
+	const random = seeded(7251)
+	const pick = <T>(list: T[]) => list[Math.floor(random() * list.length)]
+	const kinds: (() => { asset: string; height: number })[] = [
+		() => ({ asset: gumdrop(pick(SWEETS)), height: 24 }),
+		() => ({ asset: gumdrop(pick(SWEETS)), height: 24 }),
+		() => ({ asset: wrappedSweet(pick(SWEETS)), height: 20 }),
+		() => ({ asset: droppedLollipop(pick(SWEETS)), height: 24 }),
+		() => ({ asset: jellyBean(pick(SWEETS)), height: 12 }),
+		() => ({ asset: jellyBean(pick(SWEETS)), height: 12 }),
+		() => ({ asset: rockCandy('#d6b4ff', '#a98bdc'), height: 28 }),
+		() => ({ asset: rockCandy('#ffc4d8', '#e08cae'), height: 28 }),
+		() => ({ asset: sugarGrass, height: 20 }),
+		() => ({ asset: sugarGrass, height: 20 }),
+	]
+	const pieces: Course['scenery'] = []
+	for (let x = 200; x < terrain.finishX + 600; x += 70 + random() * 190) {
+		const { asset, height } = pick(kinds)()
+		const down = Math.round(random() * 100)
+		if (x > GIANT - 200 && x < GIANT_END + 200) continue
+		if (x > RAINBOW - 100 && x < RAINBOW_END + 100) continue
+		pieces.push({
+			x: Math.round(x),
+			asset,
+			scale: 2,
+			front: true,
+			// Below the path's front edge, and further the taller it is.
+			setBack: -(PATH_BACK + PATH_FRONT + height / 2 + down),
+		})
 	}
 	return pieces
 }
