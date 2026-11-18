@@ -19,6 +19,14 @@ import { type Gap, createTerrain, withGaps } from '../game/terrain'
 import { SKELETON } from '../runners/bonus'
 import { fullMoon } from './kit/fullMoon'
 import {
+	celticCross,
+	graveLantern,
+	ironRailings,
+	leaningStone,
+	mausoleum,
+	sunkStone,
+} from './kit/graveyard'
+import {
 	BANISTER,
 	BOOKCASE,
 	CHANDELIER,
@@ -621,7 +629,41 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		if ((x > DOOR - 60 && x < WINDOW + 60) || Math.abs(x - GRAVE) < 60) continue
 		scenery.push({ x, ...piece })
 	}
-	return { ...laidOut, scenery: [...scenery, ...houseScenery()] }
+	return {
+		...laidOut,
+		scenery: [...scenery, ...moreGraveyard(), ...houseScenery()],
+	}
+}
+
+/**
+ * More of the graveyard, in between: crosses, old stones leaning and sunk,
+ * railings, lanterns, and now and then a mausoleum. Their own random
+ * numbers, so everything else is where it was.
+ */
+function moreGraveyard(): Course['scenery'] {
+	const random = seeded(3110)
+	const pieces = [
+		{ asset: celticCross, filter: 'brightness(0.75)' },
+		{ asset: leaningStone, filter: 'brightness(0.7)' },
+		{ asset: sunkStone, filter: 'brightness(0.65)' },
+		{ asset: ironRailings },
+		{ asset: graveLantern },
+		{ asset: leaningStone, filter: 'brightness(0.6)' },
+		{ asset: sunkStone, filter: 'brightness(0.75)' },
+	]
+	const out: Course['scenery'] = []
+	let n = 0
+	for (let at = -200; at < terrain.finishX + 900; at += 120 + random() * 260) {
+		const x = Math.round(at)
+		if ((x > DOOR - 160 && x < WINDOW + 160) || Math.abs(x - GRAVE) < 120)
+			continue
+		const piece =
+			n++ % 14 === 7
+				? { asset: mausoleum, filter: 'brightness(0.75)' }
+				: pieces[Math.floor(random() * pieces.length)]
+		out.push({ x, scale: 2, ...piece })
+	}
+	return out
 }
 
 /**
