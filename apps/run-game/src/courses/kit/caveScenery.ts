@@ -80,33 +80,64 @@ function rockTile() {
 	return t.url()
 }
 
-/** The back wall, 64 by 64: dark, a few darker cracks and paler blotches, so it's rock, not a hole. */
+/**
+ * The cave's back wall, far off in the dark, 128 by 96 to tile: faint
+ * strata, wavy, running along it; boulders set in it, just caught along
+ * their tops by the lamps and shadowed under; cracks; and once in a while
+ * a glint of crystal. All kept dim, never busier than what's in front.
+ */
 function wallTile() {
-	const width = 64
-	const height = 64
+	const width = 128
+	const height = 96
 	const t = tile(width, height)
 	const random = seeded(4242)
 	t.rect(0, 0, width, height, WALL)
-	for (let i = 0; i < 10; i++) {
-		const x = Math.floor(random() * 32) * 2
-		const y = Math.floor(random() * 32) * 2
-		t.rect(x, y, 6 + Math.floor(random() * 4) * 2, 4, '#2a201b')
+	// Strata, a band at a time, stepping up and down along it.
+	for (const [base, fill] of [
+		[10, '#261d18'],
+		[38, '#1e1713'],
+		[62, '#271e19'],
+		[84, '#1f1814'],
+	] as const) {
+		let y: number = base
+		for (let x = 0; x < width; x += 8) {
+			t.rect(x, y, 8, 6, fill)
+			y += random() < 0.5 ? 2 : -2
+			y = Math.max(base - 4, Math.min(base + 4, y))
+		}
 	}
-	for (let i = 0; i < 5; i++) {
-		let x = Math.floor(random() * 32) * 2
-		let y = Math.floor(random() * 32) * 2
-		for (let step = 0; step < 4; step++) {
-			t.rect(x, y, 4, 2, '#18120f')
+	// Boulders, lit along their tops, shadowed under.
+	for (let i = 0; i < 9; i++) {
+		const x = Math.floor(random() * 64) * 2
+		const y = Math.floor(random() * 48) * 2
+		const w = 6 + Math.floor(random() * 5) * 2
+		t.rect(x, y, w, 4, '#2a201b')
+		t.rect(x + 2, y, w - 4, 2, '#30251f')
+		t.rect(x, y + 4, w, 2, '#18120f')
+	}
+	// Cracks, wandering.
+	for (let i = 0; i < 6; i++) {
+		let x = Math.floor(random() * 64) * 2
+		let y = Math.floor(random() * 48) * 2
+		for (let step = 0; step < 5; step++) {
+			t.rect(x, y, 4, 2, '#15100d')
 			x += 4
 			y += random() < 0.5 ? 2 : -2
 		}
+	}
+	// A glint of crystal, now and then.
+	for (let i = 0; i < 2; i++) {
+		const x = Math.floor(random() * 64) * 2
+		const y = Math.floor(random() * 48) * 2
+		t.rect(x, y, 2, 2, '#3c4a5a')
+		t.rect(x + 2, y + 2, 2, 2, '#2e3a48')
 	}
 	return t.url()
 }
 
 export const CAVE_TILES: CaveTiles = {
 	rock: { asset: rockTile(), width: 96, height: 72 },
-	wall: { asset: wallTile(), width: 64, height: 64 },
+	wall: { asset: wallTile(), width: 128, height: 96 },
 }
 
 /** The same rock, as a CSS background, for its shelves' faces. */

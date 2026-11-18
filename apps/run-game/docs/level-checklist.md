@@ -16,7 +16,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | 5 | Pyramids | ✅ Falafel, knafeh, koshary | ✅ Bounce across the crocodiles | ✅ Ms Crocodile | ✅ Pharaoh's headdress | ✅ Camel, rare bactrian camel | ✅ Tomb under the Sphinx, the Nile | 2026-11-18 |
 | 6 | Halloween Town | ✅ Candyfloss, toffee apple, spider cupcake, pumpkin | ✅ Become a ghost | ✅ Skeleton | ✅ Pumpkin | ⬜ | ✅ Haunted house | 2026-11-18 |
 | 7 | Scoop Cruises | ✅ Kladdkaka, lingondricka, lösgodis, salmiakki, karjalanpiirakka | ⬜ | ⬜ | ✅ Captain's hat | ⬜ | ✅ The ferry, roof route | 2026-11-18 |
-| 8 | The Caves | ✅ Sandwich, cool rock, cave pickles | ✅ Find the miners | ✅ The Miner | ✅ Miner's helmet | ✅ Mole, mine cart | ✅ Mine with a secret line to the gallery; the old mine under the chasm, its coaster and loop | ⬜ |
+| 8 | The Caves | ✅ Sandwich, cool rock, cave pickles | ✅ Find the miners | ✅ The Miner | ✅ Miner's helmet | ✅ Mole, mine cart | ✅ Mine with a secret line to the gallery; the old mine under the chasm, its coaster and loop | 2026-11-18 |
 | 9 | Great Wall of China | ✅ Dumplings, bubble tea, mooncake | ✅ On top of a tower | ⬜ | ✅ Bamboo hat | ✅ Dragon (flies over) | ✅ Guard towers | ⬜ |
 | 10 | Furby Fields | ✅ Tiny furby, lollipop, rainbow cake | ✅ Find the Furby Queen | ✅ Furby Queen | ✅ Propeller beanie | ✅ Unicorn | ✅ Giant Furby to run through, a stair of macaron-topped candy towers past the rainbow, up to float over to the Furby Queen's palace | ⬜ |
 | 11 | Machu Picchu | ✅ Inca Kola | ✅ Break the bridge | ⬜ | ✅ Chullo | ✅ Llama, condor | ✅ The Leap, rope bridge | 2026-11-18 |
@@ -39,7 +39,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | Unique hat | 0 | |
 | Ride | 4 | Halloween Town, Scoop Cruises, The Sewers, City Rooftop |
 | Set piece | 1 | Huddinge |
-| Art pass | 9 | The Caves, Great Wall of China, Furby Fields, The Sewers, City Rooftop, The Cliff, The Slopes, The Hospital, Midnattsloppet |
+| Art pass | 8 | Great Wall of China, Furby Fields, The Sewers, City Rooftop, The Cliff, The Slopes, The Hospital, Midnattsloppet |
 
 ## Also in the course standard
 
