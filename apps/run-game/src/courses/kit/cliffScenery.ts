@@ -156,3 +156,108 @@ export const deckchair = pixelArt(20, 18, [
 	[12, 10, 2, 4, '#f6f7f8'],
 	[4, 14, 12, 2, '#7a5a35'],
 ])
+
+const GRANITE = '#9a8e88'
+const GRANITE_LIT = '#bcb0a8'
+const GRANITE_PINK = '#b8948a'
+const GRANITE_DARK = '#6e6460'
+const TUFT = '#7aa04a'
+
+/** A granite hump, `w` wide and `h` high, rounded, lit from the left, at `x0`. */
+function hump(x0: number, w: number, h: number, H: number): PixelRect[] {
+	const rects: PixelRect[] = []
+	for (let y = 0; y < h; y++) {
+		const half = Math.round((w / 2) * Math.sqrt(1 - ((h - 1 - y) / h) ** 2))
+		const cx = x0 + w / 2
+		const top = H - h + y
+		rects.push([Math.round(cx - half), top, half * 2, 1, GRANITE])
+		rects.push([
+			Math.round(cx - half),
+			top,
+			Math.round(half * 0.6),
+			1,
+			GRANITE_LIT,
+		])
+		rects.push([Math.round(cx + half - 3), top, 3, 1, GRANITE_DARK])
+		if (y % 3 === 1)
+			rects.push([Math.round(cx - half / 3), top, 2, 1, GRANITE_PINK])
+	}
+	return rects
+}
+
+/**
+ * A skerry: a low granite islet, smoothed by the ice, a red fishing hut
+ * on it with a white trim, a flagpole and tufts of grass, and the sea
+ * lapping its foot. 70 by 30.
+ */
+export const skerry = pixelArt(70, 30, [
+	...hump(0, 70, 14, 28),
+	...hump(10, 34, 18, 28),
+	// Grass in its hollows.
+	[16, 11, 6, 1, TUFT],
+	[44, 16, 8, 1, TUFT],
+	// The hut, Falu red, white corners and a black roof.
+	[20, 2, 14, 2, '#2a2420'],
+	[18, 4, 18, 1, '#2a2420'],
+	[20, 5, 14, 8, '#a8322a'],
+	[20, 5, 1, 8, '#f4f1ea'],
+	[33, 5, 1, 8, '#f4f1ea'],
+	[25, 8, 4, 5, '#5a1e18'],
+	[30, 7, 2, 2, '#f4f1ea'],
+	// A flagpole, the flag out.
+	[40, 0, 1, 12, '#f4f1ea'],
+	[41, 0, 5, 3, '#3a6fd8'],
+	[41, 1, 5, 1, '#f0c832'],
+	[43, 0, 1, 3, '#f0c832'],
+	// The sea at its foot, a line of foam.
+	[0, 28, 70, 2, 'rgba(255, 255, 255, 0.55)'],
+])
+
+/** A bare little skerry, two grey seals hauled out on it. 36 by 16. */
+export const sealRock = pixelArt(36, 16, [
+	...hump(0, 36, 8, 14),
+	// A seal, lying along it, head up.
+	[4, 3, 12, 3, '#5e6066'],
+	[4, 3, 12, 1, '#7e8086'],
+	[15, 1, 4, 3, '#5e6066'],
+	[18, 2, 1, 1, '#1c1c1c'],
+	[2, 4, 3, 1, '#4a4c52'],
+	// Another, flat out.
+	[21, 5, 11, 2, '#6a6c72'],
+	[21, 5, 11, 1, '#8a8c92'],
+	[31, 4, 3, 2, '#6a6c72'],
+	[19, 6, 2, 1, '#4a4c52'],
+	[0, 14, 36, 2, 'rgba(255, 255, 255, 0.55)'],
+])
+
+/** A channel marker buoy, red, a cone on top. 6 by 18. */
+export const buoy = pixelArt(6, 18, [
+	[2, 0, 2, 2, '#c8302a'],
+	[1, 2, 4, 2, '#c8302a'],
+	[2, 4, 2, 6, '#2a2420'],
+	[1, 10, 4, 6, '#d8443a'],
+	[1, 10, 1, 6, '#f06a5a'],
+	[0, 16, 6, 2, 'rgba(255, 255, 255, 0.6)'],
+])
+
+/** Thrift, sea pinks, a cushion of them on the cliff top. 12 by 8. */
+export const thrift = pixelArt(12, 8, [
+	[1, 4, 10, 4, '#5e8a3a'],
+	[2, 1, 2, 2, '#e88ab8'],
+	[5, 0, 2, 2, '#f0a0c8'],
+	[8, 1, 2, 2, '#e88ab8'],
+	[3, 3, 1, 1, '#4a7a2e'],
+	[6, 2, 1, 2, '#4a7a2e'],
+	[9, 3, 1, 1, '#4a7a2e'],
+])
+
+/** Lyme grass, blue-green, leaning in the wind off the sea. 12 by 12. */
+export const lymeGrass = pixelArt(12, 12, [
+	[2, 4, 1, 8, '#7aa8a0'],
+	[3, 2, 1, 3, '#7aa8a0'],
+	[5, 3, 1, 9, '#8ab8ae'],
+	[6, 1, 1, 3, '#8ab8ae'],
+	[8, 5, 1, 7, '#6a9890'],
+	[9, 3, 1, 3, '#6a9890'],
+	[1, 11, 10, 1, '#5e8a80'],
+])

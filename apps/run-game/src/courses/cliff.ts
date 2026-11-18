@@ -1,7 +1,3 @@
-import flower1 from '@/assets/misc/flower1.png'
-import flower2 from '@/assets/misc/flower2.png'
-import shrub1 from '@/assets/misc/shrub1.png'
-import shrub2 from '@/assets/misc/shrub2.png'
 import type { RunnerName } from '@/data/runners'
 import palm from '../assets/scenery/palm.png'
 import {
@@ -22,11 +18,16 @@ import {
 	SANDCASTLE,
 	SEA_FAR,
 	SEA_NEAR,
+	buoy,
 	deckchair,
 	lighthouse,
+	lymeGrass,
 	sandcastle,
 	seaFar,
 	seaNear,
+	sealRock,
+	skerry,
+	thrift,
 	umbrella,
 	windsock,
 } from './kit/cliffScenery'
@@ -282,10 +283,14 @@ function scenery(random: () => number): Course['scenery'] {
 	const pieces: Course['scenery'] = []
 	// The field: flowers and shrubs, a lighthouse behind it, and a windsock
 	// by the gliders.
-	const field = [flower1, flower2, shrub1, flower1, shrub2, flower2]
+	const field = [thrift, lymeGrass, thrift, lymeGrass, thrift, lymeGrass]
 	let n = 0
 	for (let x = -600; x < GLIDERS[0] - 80; x += 70 + random() * 140)
-		pieces.push({ x: Math.round(x), asset: field[n++ % field.length] })
+		pieces.push({
+			x: Math.round(x),
+			asset: field[n++ % field.length],
+			scale: 2,
+		})
 	pieces.push({ x: START_X - 420, asset: lighthouse, scale: 2, setBack: 22 })
 	pieces.push({ x: GLIDERS[0] - 50, asset: windsock, scale: 2 })
 	// The island: palms, and the beach's things.
@@ -299,7 +304,31 @@ function scenery(random: () => number): Course['scenery'] {
 			...(asset === palm ? { setBack: 4 } : { scale: 2, setBack: 2 }),
 		})
 	}
+	pieces.push(...outAtSea())
 	return pieces
+}
+
+/**
+ * Out at sea, under the glide: skerries, one with a fishing hut on it,
+ * seals hauled out on the rocks, and channel buoys. Their own random
+ * numbers, so everything else is where it was.
+ */
+function outAtSea(): Course['scenery'] {
+	const random = seeded(1418)
+	const out: Course['scenery'] = []
+	const sea = [buoy, sealRock, buoy, skerry, buoy, sealRock]
+	let n = 0
+	for (let x = CLIFF + 500; x < ISLAND - 400; x += 500 + random() * 700) {
+		const asset = sea[n++ % sea.length]
+		out.push({
+			x: Math.round(x),
+			asset,
+			scale: 2,
+			setBack: asset === buoy ? 6 : 20 + Math.floor(random() * 30),
+			overGap: true,
+		})
+	}
+	return out
 }
 
 // --- Its look ------------------------------------------------------------------------
