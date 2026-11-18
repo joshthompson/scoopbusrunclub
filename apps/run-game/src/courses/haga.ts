@@ -11,6 +11,16 @@ import { FIKA_ITEMS } from '../game/fika'
 import { createTerrain } from '../game/terrain'
 import { HAGA_GRASS, HAGA_TRAIL, texturedGround } from './kit/groundTextures'
 import { STEP_M, heights } from './kit/haga-profile'
+import {
+	birchLeft,
+	birchRight,
+	birchTall,
+	echoTemple,
+	hagaGate,
+	lilacBush,
+	parkBench,
+	parkLamp,
+} from './kit/hagaScenery'
 import { withHat } from './kit/hats'
 import { seeded } from './kit/seeded'
 import type { Boost, Course, CourseDefinition, Obstacle } from './types'
@@ -72,6 +82,15 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			asset: assets[Math.floor(random() * assets.length)],
 		})
 	}
+	// Haga's gate, just off the start, clear of what's around it.
+	for (let i = scenery.length - 1; i >= 0; i--)
+		if (Math.abs(scenery[i].x - GATE_X) < GATE_ROOM) scenery.splice(i, 1)
+	scenery.push({ x: GATE_X, asset: hagaGate, scale: 3 })
+	// Ekotemplet, the Echo Temple, with nothing stood in front of it.
+	for (let i = scenery.length - 1; i >= 0; i--)
+		if (Math.abs(scenery[i].x - TEMPLE_X) < TEMPLE_ROOM) scenery.splice(i, 1)
+	scenery.push({ x: TEMPLE_X, asset: echoTemple, scale: 2 })
+	scenery.push(...parkScenery())
 	// Koppartälten, the Copper Tents, at the top of the hill, levelled on it.
 	scenery.push({
 		x: TENTS_X,
@@ -80,6 +99,45 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		footing: true,
 	})
 	return { obstacles, boosts, scenery }
+}
+
+/** Where Haga's gate stands: just past the start. */
+const GATE_X = START_X + 380
+/** Half the gate's width, and a little more. */
+const GATE_ROOM = 156 + 30
+
+/** Where Ekotemplet stands: on the flat, a little under 4 km in. */
+const TEMPLE_X = START_X + 3870 * PX_PER_M
+/** Half the Echo Temple's width, and a little more: no trees in front of it. */
+const TEMPLE_ROOM = 64 + 40
+
+/**
+ * Haga's own: birches, lilacs, and the park's benches and lamps, in among
+ * the oaks and pines. Their own random numbers, so the rest of the course is
+ * laid out the same as ever.
+ */
+function parkScenery(): Course['scenery'] {
+	const random = seeded(1786)
+	const trees = [birchLeft, birchRight, birchTall, lilacBush, lilacBush]
+	const scenery: Course['scenery'] = []
+	for (let at = -200; at < terrain.finishX + 900; at += 160 + random() * 340) {
+		const x = Math.round(at)
+		if (Math.abs(x - TENTS_X) < TENTS_ROOM) continue
+		if (Math.abs(x - TEMPLE_X) < TEMPLE_ROOM) continue
+		if (Math.abs(x - GATE_X) < GATE_ROOM) continue
+		const roll = random()
+		// Now and then a bench, with a lamp beside it.
+		if (roll < 0.12) {
+			scenery.push({ x, asset: parkBench, scale: 2 })
+			scenery.push({ x: x + 34, asset: parkLamp, scale: 2 })
+		} else
+			scenery.push({
+				x,
+				asset: trees[Math.floor(random() * trees.length)],
+				scale: 2,
+			})
+	}
+	return scenery
 }
 
 /** How far short of the top the Copper Tents stand. */

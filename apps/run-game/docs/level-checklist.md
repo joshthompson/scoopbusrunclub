@@ -9,7 +9,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 
 | # | Level | Unique collectables | Custom goal | Unlockable character | Unique hat | Ride | Set piece | Last art pass |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Haga | ✅ The standard fika (kaffe, kanelbulle, chokladboll, prinsesstårta), parkrun barcode | ✅ Score a goal | ⬜ | ✅ Flower crown | ✅ Goose (flies over) | ✅ Football to kick into the goal | ⬜ |
+| 1 | Haga | ✅ The standard fika (kaffe, kanelbulle, chokladboll, prinsesstårta), parkrun barcode | ✅ Score a goal | ⬜ | ✅ Flower crown | ✅ Goose (flies over) | ✅ Football to kick into the goal | 2026-11-18 |
 | 2 | Kristineberg | ✅ Energy drink, sports gel, banana | ✅ Long jump 10 m | ✅ Link (ride a corgi) | ✅ Sweatband | ✅ Corgi | ✅ Long jump pit | ⬜ |
 | 3 | Gamla Stan | ✅ Semla, dammsugare, kardemummabulle, ale | ✅ Find the viking | ✅ Sven the Viking | ✅ Royal Guard's helmet | ✅ Royal Guard horse | ✅ Tavern under the street, down a manhole | ⬜ |
 | 4 | Huddinge | ✅ Cake in a can, wild berries, kantareller, bad mushroom (one, halfway: the screen trips for 3 s) | ✅ Deer riding deer | ⬜ | ✅ Antlers | ✅ Deer | ⬜ Flavour so far: a wild boar family running alongside, a harvester felling a pine, the granite ledge onto the deer | ⬜ |
@@ -39,7 +39,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | Unique hat | 0 | |
 | Ride | 4 | Halloween Town, Scoop Cruises, The Sewers, City Rooftop |
 | Set piece | 1 | Huddinge |
-| Art pass | 16 | Every level but Machu Picchu, Everest and Dino Island |
+| Art pass | 15 | Every level but Haga, Machu Picchu, Everest and Dino Island |
 
 ## Also in the course standard
 
