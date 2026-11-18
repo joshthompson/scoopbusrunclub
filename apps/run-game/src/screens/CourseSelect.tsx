@@ -235,10 +235,8 @@ export function CourseSelect(props: {
 								<span style={styles.number}>{course.number}</span>
 								<span style={styles.rowText}>
 									<span
-										style={{
-											...styles.rowName,
-											'font-size': `${rowNameSize(course.name)}px`,
-										}}
+										ref={(el) => fitRowName(el, rowNameSize(course.name))}
+										style={styles.rowName}
 									>
 										{course.name}
 									</span>
@@ -461,6 +459,29 @@ function TopScores(props: { id: TableId }) {
  * it all fits ("Great Wall of China"), rather than being cut off.
  */
 const rowNameSize = (name: string) => (name.length > 13 ? 16 : 20)
+
+/** The smallest a course's name goes in the list, to fit. */
+const ROW_NAME_MIN = 12
+
+/**
+ * A course's name, in the list, at `size`: and a pixel smaller at a time,
+ * if that's too wide for its row, till it fits. Fitted again whenever its
+ * row's room changes (a medal in at its end), and once the font's in, as
+ * the font's own width is what counts: one browser's draws it a little
+ * wider than another's.
+ */
+function fitRowName(el: HTMLElement, size: number) {
+	const fit = () => {
+		let px = size
+		el.style.fontSize = `${px}px`
+		while (el.scrollWidth > el.clientWidth && px > ROW_NAME_MIN)
+			el.style.fontSize = `${--px}px`
+	}
+	const watch = new ResizeObserver(fit)
+	watch.observe(el)
+	document.fonts.ready.then(fit)
+	onCleanup(() => watch.disconnect())
+}
 
 /** Whether `best`, a medal got, is `medal` or better. */
 const got = (best: Medal | undefined, medal: Medal) =>

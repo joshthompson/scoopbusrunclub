@@ -494,7 +494,7 @@ export const BONNIE_BOTTLE: Playable = {
 	name: 'Bonnie Bottle',
 	bonus: true,
 	unlock: 'For every course in one Endless run',
-	tagline: 'Electrolytes for 100 miles',
+	tagline: 'She will never dehydrate',
 	sprite: {
 		run: runFrames(bonnieBottleRun, 6),
 		sit: bonnieBottleSit,
@@ -535,17 +535,21 @@ const MUNCH_WIDTH = 27
  * Det. Munch: a large hippo, up on her hind legs and dressed as Sherlock
  * Holmes. Her head side on, a big slate-blue muzzle out front, her mouth a
  * long line along it, a tooth showing, her eye up high and a little ear at
- * the back; a curved pipe in the front of her mouth. A khaki Inverness coat
- * down to her knees, round over her belly, and its cape over her shoulders,
- * lighter, flying out behind as she runs. Stubby blue-grey legs in brogues.
- * And on her head, her own deerstalker (`DEERSTALKER`), drawn for it: until
- * she puts any other hat on, which goes on in place of it. Six frames to her
- * run, short steps, her head kept level through all of them for a hat to
- * sit still on: as she comes down, her belly does, the cape stretching to
- * meet it. Stood, her magnifying glass up. Her dance is her own, drawn by
- * hand (`sleuth`): peering through her glass one way and then the other, a
- * puff on her pipe, a shimmy, and her glass up for "Eureka!". For finding
- * every collectable there is.
+ * the back; a curved pipe in the front of her mouth. A khaki trench coat
+ * down to her knees, its collar turned up behind, lapels at her throat and
+ * buttoned down the front, its sleeves seamed down her side. Stout blue-grey
+ * legs in brogues. And on her head, her own deerstalker (`DEERSTALKER`),
+ * drawn for it: until she puts any other hat on, which goes on in place of
+ * it. Eight frames to her run, more than anyone's, for a smooth stride:
+ * each foot down in front, rolling back under her, up on its toe behind,
+ * kicked up, tucked under and reaching forward again, the far leg, darker,
+ * half a stride on; her arms swinging opposite, and her head kept level
+ * through all of them for a hat to sit still on. Stood, her
+ * magnifying glass up; ducking, crouched, hands on her knees; on a
+ * snowboard, arms out. Her dance is her own, drawn by hand (`sleuth`):
+ * peering through her glass one way and then the other, a puff on her pipe,
+ * a shimmy, and her glass up for "Eureka!". For finding every collectable
+ * there is.
  */
 export const DET_MUNCH: Playable = {
 	id: 'bonus:det-munch',
@@ -554,7 +558,7 @@ export const DET_MUNCH: Playable = {
 	unlock: 'For finding every collectable',
 	tagline: 'Elementary, my dear runner',
 	sprite: {
-		run: runFrames(detMunchRun, 6, MUNCH_WIDTH),
+		run: runFrames(detMunchRun, 8, MUNCH_WIDTH),
 		sit: detMunchSit,
 		stand: detMunchStand,
 		ski: detMunchSki,

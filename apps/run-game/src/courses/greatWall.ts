@@ -23,6 +23,7 @@ import {
 	WALL_FOOT,
 	breach,
 	wallBushes,
+	wallForest,
 	wallWoods,
 } from './kit/greatWallScenery'
 import { nearGap, scatter } from './kit/scatter'
@@ -253,6 +254,19 @@ export const greatWall: CourseDefinition = {
 					lit: '#6f9a58',
 					shade: '#40683a',
 				}),
+				// And the forest on down the slope, to the wall's foot.
+				wallForest(
+					1502,
+					{
+						leaves: '#4c7641',
+						lit: '#5a8549',
+						shade: '#406a39',
+						deep: '#35592f',
+					},
+					// 30 px higher than a second band's usual place (`NEARER_STEP`
+					// under the first), up under the woods' treetops.
+					306,
+				),
 			],
 		},
 		horizonTrees: false,

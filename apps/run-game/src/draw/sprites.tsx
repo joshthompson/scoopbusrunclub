@@ -1064,6 +1064,9 @@ export function createPack(world: World) {
 	return [keeper, ...world.pack.map((p) => createPacer(world, p))]
 }
 
+/** How many ticks of a flyer's frames are asked for up front: every one of them, a dragon's ripple and a condor's beat included. */
+const FLYER_WARM_TICKS = 200
+
 /** A goose flying over, kept on the scene for as long as it's about (see `createFlyers`). */
 function createFlyer(world: World, goose: Flyer) {
 	const {
@@ -1072,6 +1075,9 @@ function createFlyer(world: World, goose: Flyer) {
 		picture,
 		mirrored: turned,
 	} = flyerLook(world.course)
+	let warmed = false
+	/** The frame it last showed. */
+	let shown: string | undefined
 	return createController({
 		init: () => ({
 			id: `flyer-${goose.id}`,
@@ -1082,10 +1088,22 @@ function createFlyer(world: World, goose: Flyer) {
 			height: () => FLYING_GOOSE_HEIGHT,
 		}),
 		draw({ ctx, image }) {
-			const src = picture(
+			// Every frame it has, asked for at once, the first time it's seen:
+			// a picture's only drawn once it's loaded, so one at a time, the
+			// first dragon would flicker, a frame missing for each new one.
+			if (!warmed) {
+				warmed = true
+				for (let now = 0; now < FLYER_WARM_TICKS; now++)
+					for (const carrying of [false, true]) image(picture(now, carrying))
+			}
+			const wanted = picture(
 				world.ticks() + goose.id * 3,
 				goose.state === 'carrying',
 			)
+			// And any not in yet, the last one it showed held in its place.
+			const src = image(wanted) ? wanted : shown
+			if (!src) return
+			shown = src
 			const paint = () =>
 				paintPicture(
 					ctx,
@@ -3102,8 +3120,6 @@ export function createBanner(world: World, x: number, text: string) {
 		ctx.fillStyle = '#ffd23f'
 		fillLine(ctx, text, patchLeft + 8, patchTop + 4, 20)
 	}
-	let fontLoaded = false
-
 	const across = createFixture({
 		id: `banner-${text}`,
 		type: 'banner',
@@ -3120,19 +3136,12 @@ export function createBanner(world: World, x: number, text: string) {
 			ctx.fill(linePath)
 			ctx.restore()
 			paintPole(ctx, far.x - POLE_WIDTH / 2, far.foot - POLE_HEIGHT)
-			// The cloth, sloping up to the far pole's top: painted once and
-			// kept, once its font's loaded, and drawn sloping pixel for pixel.
+			// The cloth, sloping up to the far pole's top: painted every time,
+			// sloped, as a sloped picture of it painted once comes out blurred,
+			// its words above all. A few rects and a word, so cheap.
 			ctx.translate(near.x, near.foot - POLE_HEIGHT)
 			ctx.transform(1, -slope, 0, 1, 0, 0)
-			fontLoaded ||= document.fonts.check(CLOTH_FONT)
-			if (!fontLoaded) return paintCloth(ctx)
-			const art = cachedArt(
-				`banner-cloth:${text}:${clothWidth}`,
-				clothWidth,
-				CLOTH_HEIGHT,
-				paintCloth,
-			)
-			ctx.drawImage(art, 0, 0, clothWidth, CLOTH_HEIGHT)
+			paintCloth(ctx)
 		},
 	})
 

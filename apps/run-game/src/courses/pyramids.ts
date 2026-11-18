@@ -3,8 +3,6 @@ import pyramidsFar from '../assets/horizons/pyramids-far.png'
 import pyramidsNear from '../assets/horizons/pyramids-near.png'
 import palm from '../assets/scenery/palm.png'
 import sphinxEntrance from '../assets/sphinx/entrance.png'
-import sphinxHead from '../assets/sphinx/head.png'
-import sphinxPaw from '../assets/sphinx/paw.png'
 import sarcophagus from '../assets/sphinx/sarcophagus.png'
 import { START_X } from '../game/constants'
 import { PATH_BACK, PATH_FRONT, VERGE } from '../game/constants'
@@ -17,6 +15,21 @@ import { bush, papyrus, reeds } from './kit/nileScenery'
 import { SAND_FAR_RIPPLES, SAND_RIPPLES, SAND_TRACK } from './kit/sand'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
+import {
+	SPHINX_HAUNCH_HEIGHT,
+	SPHINX_HAUNCH_WIDTH,
+	SPHINX_HEAD_HEIGHT,
+	SPHINX_HEAD_WIDTH,
+	SPHINX_LEG_HEIGHT,
+	SPHINX_LEG_WIDTH,
+	SPHINX_SHOULDER_HEIGHT,
+	SPHINX_SHOULDER_WIDTH,
+	sphinxFarLeg,
+	sphinxHaunch,
+	sphinxHead,
+	sphinxLeg,
+	sphinxShoulder,
+} from './kit/sphinxArt'
 import type {
 	Cave,
 	Course,
@@ -234,20 +247,39 @@ function headroom(x: number) {
 }
 
 /**
- * How high the Sphinx's back is over the sand, `x` along: up from its
- * chest over the slot to its head, along its back, and down its haunches.
+ * How high the Sphinx's back is over the sand, `x` along: a lion's, lying
+ * down. Its chest, over the way in, tall enough for its doorway, and as
+ * tall as someone on its porch's roof can't jump; up its neck to under its
+ * head; its shoulders, down to its long back; the round of its haunch; and
+ * down its rump, over the passage out, rock over its doorway to the end.
  */
 function sphinxHeight(x: number) {
 	const t = x - SPHINX
 	const length = SPHINX_END - SPHINX
-	// Its chest, tall enough over the way in for its doorway.
 	if (t < 40) return 85
-	if (t < 100) return 85 + ((t - 40) / 60) * 35
-	if (t < 320) return 120
-	if (t < length - 260) return 110 - ((t - 320) / (length - 580)) * 15
-	// Its haunches, over the passage out: rock over its doorway to the end.
-	return EXIT_ROOM + 16 + (95 - EXIT_ROOM - 16) * ease((length - t) / 260)
+	if (t < 70) return 85 + ((t - 40) / 30) * 27
+	if (t < 170) return 112
+	if (t < 300) return 112 - ((t - 170) / 130) * 12
+	const haunch = length - 520
+	if (t < haunch) return 100 - ((t - 300) / (haunch - 300)) * 6
+	if (t < length - 220) {
+		const u = (t - haunch) / 300
+		return 94 + u + 16 * Math.sin(Math.PI * u)
+	}
+	return EXIT_ROOM + 16 + (95 - EXIT_ROOM - 16) * ease((length - t) / 220)
 }
+
+/** Where along it its head, its shoulder and its haunch are, from its chest. */
+const HEAD_AT = 70
+const SHOULDER_AT = 100
+const HAUNCH_AT = SPHINX_END - SPHINX - 360
+
+/**
+ * How far down into its body from its back a carving on its side sinks, at
+ * `t` along, for its bottom to be on the sand at its foot: as far as its
+ * side goes down, from its back to the sand.
+ */
+const onItsSide = (t: number) => sphinxHeight(SPHINX + t) - PATH_BACK
 
 /** The Sphinx, as a Cave: its body over the way through it. */
 const sphinx: Cave = {
@@ -276,8 +308,39 @@ const sphinx: Cave = {
 		return dunes.groundY(x) - dune(x) - PATH_BACK
 	},
 	features: [
-		// Its head, forward over its chest.
-		{ asset: sphinxHead, x: SPHINX + 170, width: 120, height: 130, sink: 14 },
+		// Its far foreleg, behind its porch, its paw just showing past it.
+		{
+			asset: sphinxFarLeg,
+			x: SPHINX - 46,
+			width: SPHINX_LEG_WIDTH,
+			height: SPHINX_LEG_HEIGHT,
+			sink: 4,
+			on: 'behind',
+		},
+		// Carved into its side: its shoulder, down to its elbow; its haunch,
+		// its hind leg tucked under it, and its tail.
+		{
+			asset: sphinxShoulder,
+			x: SPHINX + SHOULDER_AT,
+			width: SPHINX_SHOULDER_WIDTH,
+			height: SPHINX_SHOULDER_HEIGHT,
+			sink: onItsSide(SHOULDER_AT),
+		},
+		{
+			asset: sphinxHaunch,
+			x: SPHINX + HAUNCH_AT,
+			width: SPHINX_HAUNCH_WIDTH,
+			height: SPHINX_HAUNCH_HEIGHT,
+			sink: onItsSide(HAUNCH_AT),
+		},
+		// Its head, side on, facing whoever's coming, over its chest.
+		{
+			asset: sphinxHead,
+			x: SPHINX + HEAD_AT,
+			width: SPHINX_HEAD_WIDTH,
+			height: SPHINX_HEAD_HEIGHT,
+			sink: 42,
+		},
 		// Its way in: a porch along the path, open, dark inside, over the
 		// path itself, so it reads as a way in, however the perspective goes.
 		{
@@ -287,14 +350,14 @@ const sphinx: Cave = {
 			height: PORCH_TOP + PATH_FRONT,
 			on: 'path',
 		},
-		// Its paw, out along the near side of its porch: the far one's
-		// behind it.
+		// Its near foreleg, out along the near side of its porch, its elbow
+		// at its chest and its paw out at the front.
 		{
-			asset: sphinxPaw,
-			x: SPHINX - 90,
-			width: 180,
-			height: 18,
-			sink: 6,
+			asset: sphinxLeg,
+			x: SPHINX - 46,
+			width: SPHINX_LEG_WIDTH,
+			height: SPHINX_LEG_HEIGHT,
+			sink: 8,
 			on: 'in front',
 		},
 	],

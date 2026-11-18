@@ -230,6 +230,81 @@ export function wallWoods(
 	}
 }
 
+/**
+ * The forest on down the slope below the woods, to the wall's foot behind
+ * it: treetops all the way down, packed in, the gaps between them in deep
+ * shade, each lit on its upper left; bigger the lower, as they're nearer;
+ * now and then a pine, dark, standing up out of them.
+ * Another of the horizon's nearer bands, under `wallWoods`, its top a
+ * ragged line of treetops against the woods' green: at `top`, up close
+ * under theirs, so none of the woods' plain green shows between them.
+ */
+export function wallForest(
+	seed: number,
+	colours: { leaves: string; lit: string; shade: string; deep: string },
+	top = 0,
+	height = 230,
+) {
+	const width = 960
+	const random = seeded(seed)
+	const phases = [random(), random()].map((p) => p * Math.PI * 2)
+	/** The slope's line, along the top: where the trees start. */
+	const line = (x: number) =>
+		16 +
+		4 * Math.sin((Math.PI * 2 * 4 * x) / width + phases[0]) +
+		2 * Math.sin((Math.PI * 2 * 11 * x) / width + phases[1])
+	// Each size of treetop drawn once, used over and over.
+	const SIZES = [6, 8, 10, 12, 14]
+	let defs = ''
+	for (const r of SIZES) {
+		defs += `<g id="crown-${r}">${pixelCircle(0, 2, r, colours.shade)}${pixelCircle(0, 0, r, colours.leaves)}${pixelCircle(-2, -2, r - 4, colours.lit)}</g>`
+	}
+	defs += `<g id="pine">${[0, 4, 8, 12, 16]
+		.map(
+			(y, i) =>
+				`<rect x="${-2 - i * 2}" y="${y}" width="${4 + i * 4}" height="4" fill="${colours.deep}"/><rect x="${-2 - i * 2}" y="${y}" width="${2 + i * 2}" height="2" fill="${colours.shade}"/>`,
+		)
+		.join('')}<rect x="-2" y="20" width="4" height="4" fill="#4a3a2a"/></g>`
+	// The slope under them, in deep shade: what shows between them.
+	let body = ''
+	for (let x = 0; x < width; x += 2) {
+		const y = snap(line(x + 1)) + 6
+		body += `<rect x="${x}" y="${y}" width="2" height="${height - y}" fill="${colours.deep}"/>`
+	}
+	// Row on row of treetops down it, staggered, bigger the lower.
+	type Crown = { x: number; y: number; use: string }
+	const crowns: Crown[] = []
+	let row = 0
+	for (let y = 0; y < height + 12; y += 12, row++) {
+		const down = y / height
+		const step = 20 + down * 14
+		for (let x = (row % 2) * (step / 2); x < width; x += step) {
+			const cx = snap(x + (random() - 0.5) * step * 0.6)
+			const r = SIZES[Math.min(4, Math.floor(down * 4 + random() * 2))]
+			const cy = snap(line(cx) + 6 + y + random() * 6)
+			const roll = random()
+			crowns.push({
+				x: cx,
+				y: cy,
+				use: roll < 0.025 ? 'pine' : `crown-${r}`,
+			})
+		}
+	}
+	// Furthest up first, so the nearer ones, lower, go over them.
+	crowns.sort((a, b) => a.y - b.y)
+	for (const { x, y, use } of crowns)
+		for (const shift of [-width, 0, width]) {
+			if (x + shift + 16 < 0 || x + shift - 16 > width) continue
+			body += `<use href="#${use}" x="${x + shift}" y="${use === 'pine' ? y - 12 : y}"/>`
+		}
+	return {
+		asset: svgUrl(width, height, `<defs>${defs}</defs>${body}`),
+		height,
+		fill: colours.deep,
+		top,
+	}
+}
+
 // --- Where it's crumbled away ------------------------------------------------------
 
 /** The wall's stone: its parapets, the walkway, its face's coping. */
