@@ -32,6 +32,12 @@ import {
 	rosenbad,
 } from './kit/gamlaStanScenery'
 import {
+	cafeTable,
+	flowerTub,
+	leaningBike,
+	stortorgetWell,
+} from './kit/gamlaStanStreet'
+import {
 	DUCT,
 	DUCT_COLOURS,
 	GRATE,
@@ -257,6 +263,36 @@ const GRANITE_BRIDGE = {
 	quay: quayWall,
 } satisfies Partial<BridgeLook>
 
+/** Where Stortorgsbrunnen stands: in the old town, a third of the way to the bridge. */
+const WELL = Math.round(STALLBRON_END + (BRIDGE - STALLBRON_END) * 0.3)
+
+/**
+ * The old town's streets, lived in: Stortorgsbrunnen, café tables out on
+ * the cobbles, tubs of flowers and a bike or two, from Stallbron to the
+ * bridge. Their own random numbers, so the rest of the course is laid out
+ * the same as ever.
+ */
+function streetLife(): Course['scenery'] {
+	const random = seeded(1523)
+	const props = [cafeTable, flowerTub, flowerTub, leaningBike, cafeTable]
+	const scenery: Course['scenery'] = [
+		{ x: WELL, asset: stortorgetWell, scale: 2 },
+	]
+	for (
+		let at = STALLBRON_END + 160;
+		at < BRIDGE - 120;
+		at += 180 + random() * 260
+	) {
+		if (Math.abs(at - WELL) < 80) continue
+		scenery.push({
+			x: Math.round(at),
+			asset: props[Math.floor(random() * props.length)],
+			scale: 2,
+		})
+	}
+	return scenery
+}
+
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	const random = seeded(1252)
 	let fika = 0
@@ -331,6 +367,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 		)
 			scenery.push({ x: Math.round(at), asset: lamp })
 	scenery.push({ x: KATARINAHISSEN, asset: katarinahissen })
+	scenery.push(...streetLife())
 	// Its walkway, on past the building, so it's never left in mid-air,
 	// however far the camera's zoomed out.
 	scenery.push({
