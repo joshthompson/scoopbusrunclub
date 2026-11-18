@@ -20,6 +20,7 @@ import { type Block, createRooftops } from '../game/terrain'
 import { BAT_PERSON } from '../runners/bonus'
 import { JIB, JIB_LEFT, JIB_TOP, towerCrane } from './kit/craneArt'
 import { withHat } from './kit/hats'
+import { neonSign, roofGarden, washingLine } from './kit/rooftopLife'
 import { seeded } from './kit/seeded'
 import { swing } from './kit/swing'
 import type {
@@ -384,6 +385,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			setBack: -ON_ROOF,
 		})
 	}
+	scenery.push(...rooftopLife(blocks))
 	// The cranes over the hideout, each stood on a roof behind.
 	for (const crane of HIDEOUT?.cranes ?? [])
 		scenery.push({
@@ -394,6 +396,25 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			onFloor: true,
 		})
 	return { obstacles, boosts, scenery }
+}
+
+/**
+ * Washing lines, roof gardens, and now and then a neon sign, each wholly on
+ * one roof: their own random numbers, so everything else is where it was.
+ */
+function rooftopLife(blocks: Block[]): Course['scenery'] {
+	const random = seeded(1313)
+	const out: Course['scenery'] = []
+	let n = 0
+	for (let at = 300; at < terrain.finishX; at += 500 + random() * 600) {
+		const x = Math.round(at)
+		const asset =
+			n++ % 5 === 2 ? neonSign : random() < 0.5 ? washingLine : roofGarden
+		const half = asset === neonSign ? 70 : 42
+		if (!blocks.some((b) => x - half > b.from && x + half < b.to)) continue
+		out.push({ x, asset, scale: 2, setBack: -ON_ROOF })
+	}
+	return out
 }
 
 /** How far in from a roof's far edge what's on it stands. */
