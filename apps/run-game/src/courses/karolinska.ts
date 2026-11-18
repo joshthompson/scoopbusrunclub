@@ -47,6 +47,7 @@ import {
 	ESCALATOR_UP,
 	GET_WELL_BANNER,
 	GURNEY,
+	HOSPITAL_FLOOR,
 	HOSPITAL_TILES,
 	IV_STAND,
 	PARAMEDICS,
@@ -915,6 +916,19 @@ const strip = (id: string, layer: number) => ({
 	]),
 })
 
+/**
+ * Where the vinyl floor's laid: indoors on the level ground, not on the
+ * escalators, the bench or inside the body. Pushed off down out of sight
+ * everywhere else.
+ */
+const onHospitalFloor = (x: number) =>
+	(x >= ENTRANCE && x < ESCALATOR.from) ||
+	(x >= ESCALATOR.to && x < MICRO_FROM) ||
+	(x >= MACRO_FROM && x < ESCALATOR_2.from) ||
+	(x >= ESCALATOR_2.to && x < EXIT)
+		? 0
+		: 99999
+
 const LAID_OUT = withHat(
 	{ obstacles: OBSTACLES, boosts: BOOSTS },
 	'headMirror',
@@ -950,6 +964,7 @@ export const karolinska: CourseDefinition = {
 			'--hud-shadow':
 				'2px 0 #3a1820, -2px 0 #3a1820, 0 2px #3a1820, 0 -2px #3a1820',
 		},
+		groundDefs: HOSPITAL_FLOOR,
 		horizon: { far: SOLNA_FAR, near: SOLNA_NEAR, fill: SOLNA_FILL },
 		voyage: [
 			{ from: MICRO_FROM - 400, horizon: GIANT_LAB },
@@ -970,6 +985,8 @@ export const karolinska: CourseDefinition = {
 			[-PATH_BACK - VERGE, 'url(#k-verge)'],
 			[-PATH_BACK, 'url(#k-back)'],
 			[-PATH_BACK + 4, 'url(#k-path)'],
+			// Vinyl tiles and scuffs, on the hospital's floors only.
+			[-PATH_BACK + 4, 'url(#k-floor)', false, onHospitalFloor],
 			[PATH_FRONT, 'url(#k-edge)'],
 			[PATH_FRONT + 4, 'url(#k-under)'],
 		],

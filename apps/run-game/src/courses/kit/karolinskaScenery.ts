@@ -90,25 +90,94 @@ function facadeTile() {
 }
 
 /**
- * Its floor slab and foundations, under the path, 120 by 80: plain cast
- * concrete in big pours, a seam between them, and a pockmark now and then.
+ * Its floor slab and foundations, under the path, 240 by 160: cast concrete
+ * in big pours with a seam between them and a control joint down the
+ * middle, grit through it, a stain where it's damp, a hairline crack, and
+ * a rebar cap or two at the joints. Its own `seeded` stream, so the same
+ * for everyone.
  */
 function slabTile() {
-	const t = tile(120, 80)
-	t.rect(0, 0, 120, 80, '#8f969c')
-	t.rect(0, 78, 120, 2, '#80878d')
-	t.rect(118, 0, 2, 80, '#80878d')
-	t.rect(0, 0, 120, 2, '#9ba2a7')
+	const W = 240
+	const H = 160
+	const t = tile(W, H)
+	const random = seeded(48151)
+	const BASE = '#8f969c'
+	const SEAM = '#80878d'
+	const LIT = '#9ba2a7'
+	const GRIT = '#838a91'
+	const GLINT = '#a0a7ac'
+	const DAMP = '#868d94'
+	t.rect(0, 0, W, H, BASE)
+	// The pours' seams, and the lit edge of the one below.
+	t.rect(0, H - 2, W, 2, SEAM)
+	t.rect(W - 2, 0, 2, H, SEAM)
+	t.rect(0, 0, W, 2, LIT)
+	// A control joint down the middle, cut in dashes.
+	for (let y = 6; y < H - 6; y += 12) t.rect(W / 2 - 2, y, 2, 8, SEAM)
+	// Damp, in a couple of low patches: a shade darker, ragged.
+	for (const [x, y, w] of [
+		[30, 100, 44],
+		[150, 36, 36],
+	]) {
+		t.rect(x, y, w, 6, DAMP)
+		t.rect(x + 6, y + 6, w - 14, 6, DAMP)
+		t.rect(x + 2, y - 2, w - 8, 2, DAMP)
+	}
+	// Grit: aggregate showing, darker and lighter, a few at a time.
+	for (let n = 0; n < 34; n++) {
+		const x = Math.round((random() * (W - 8)) / 2) * 2 + 2
+		const y = Math.round((random() * (H - 8)) / 2) * 2 + 4
+		t.rect(x, y, 2, 2, random() < 0.6 ? GRIT : GLINT)
+	}
+	// A hairline crack, stepping down across a pour.
+	let cx = 170
+	let cy = 92
+	for (let n = 0; n < 9; n++) {
+		t.rect(cx, cy, 4, 2, SEAM)
+		cx += 4
+		cy += n % 3 === 2 ? 4 : 2
+	}
+	// Rebar caps where the seams cross.
 	for (const [x, y] of [
-		[14, 22],
-		[70, 12],
-		[40, 54],
-		[96, 46],
-		[26, 66],
+		[W / 2 - 2, 70],
+		[44, H - 6],
 	])
-		t.rect(x, y, 2, 2, '#828990')
-	return { asset: t.url(), width: 120, height: 80 }
+		t.rect(x, y, 4, 4, '#6e757b')
+	return { asset: t.url(), width: W, height: H }
 }
+
+/**
+ * The path's own floor, a pattern (`k-floor`) for `groundDefs`, laid over
+ * the hospital's lino and corridor: vinyl in tiles, a joint between them,
+ * scuffs where feet have been and a few flecks of grit. See-through, so
+ * each floor's own colour shows.
+ */
+export const HOSPITAL_FLOOR = (() => {
+	const W = 120
+	const H = 36
+	const t = tile(W, H)
+	const random = seeded(48153)
+	const JOINT = 'rgba(70, 92, 100, 0.16)'
+	const SCUFF = 'rgba(70, 92, 100, 0.12)'
+	const SHINE = 'rgba(255, 255, 255, 0.45)'
+	// Joints between the vinyl tiles, and a sheen along each one's edge.
+	t.rect(0, 0, 2, H, JOINT)
+	t.rect(60, 0, 2, H, JOINT)
+	t.rect(2, 0, 2, H, SHINE)
+	t.rect(62, 0, 2, H, SHINE)
+	// Scuffs, low and long, and flecks.
+	for (let n = 0; n < 6; n++) {
+		const x = Math.round((random() * (W - 16)) / 2) * 2 + 6
+		const y = Math.round((random() * (H - 4)) / 2) * 2
+		t.rect(x, y, 4 + Math.round(random() * 3) * 2, 2, SCUFF)
+	}
+	for (let n = 0; n < 8; n++) {
+		const x = Math.round((random() * (W - 8)) / 2) * 2 + 6
+		const y = Math.round((random() * (H - 2)) / 2) * 2
+		t.rect(x, y, 2, 2, random() < 0.5 ? SHINE : JOINT)
+	}
+	return t.pattern('k-floor')
+})()
 
 const WALL = '#e4ebdc'
 const WALL_PANEL = '#dbe3d2'
