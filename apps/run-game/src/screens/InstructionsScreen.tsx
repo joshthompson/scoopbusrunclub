@@ -1,8 +1,8 @@
 import busEmoji from '@/assets/emoji/bus.png'
-import rockAsset from '@/assets/misc/rock1.png'
 import { For, type JSX } from 'solid-js'
 import mudAsset from '../assets/obstacles/mud.png'
 import mummyAsset from '../assets/obstacles/mummy.png'
+import { ROCK } from '../courses/kit/rock'
 import { CollectableArt } from '../draw/art/collectable'
 import type { Collectable } from '../game/collectables'
 import { MEMBERS } from '../runners/playable'
@@ -50,7 +50,12 @@ export function InstructionsScreen(props: { onBack: () => void }) {
 		{
 			icon: (
 				<Examples>
-					<img src={rockAsset} alt="" style={{ height: '22px' }} />
+					<img
+						src={ROCK.asset}
+						alt=""
+						class="pixelated"
+						style={{ height: '22px' }}
+					/>
 					<img
 						src={mudAsset}
 						alt=""

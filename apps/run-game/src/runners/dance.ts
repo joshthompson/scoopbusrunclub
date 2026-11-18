@@ -327,6 +327,24 @@ export const DANCES = {
 			{ lift: 2 },
 		],
 	},
+	/**
+	 * The wobble: rocking from foot to foot, the egg tipping with it; a
+	 * hop; a high kick forward and one back; and a jump, legs out wide.
+	 * Drawn by hand, the Hatchling's: no arms, all legs.
+	 */
+	wobble: {
+		interval: 150,
+		moves: [
+			{},
+			{ sway: -1, bend: 1 },
+			{ bend: 1 },
+			{ sway: 1, bend: 1 },
+			{ lift: 2 },
+			{ lift: 1 },
+			{ lift: 1 },
+			{ lift: 3 },
+		],
+	},
 	/** Round and round, hopping, chasing its tail. */
 	zoomies: {
 		interval: 110,
@@ -392,6 +410,8 @@ export const RUNNER_DANCES: Record<string, DanceName> = {
 	'bonnie-bottle': 'flex',
 	// A magnifying glass, a pipe, a cape: drawn by hand.
 	'det-munch': 'sleuth',
+	// An egg on legs, rocking and kicking: drawn by hand.
+	hatchling: 'wobble',
 }
 
 /** A dance for anyone not in `RUNNER_DANCES`, from something about them that stays the same. */

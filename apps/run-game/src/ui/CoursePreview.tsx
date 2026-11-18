@@ -1,7 +1,7 @@
 import tombstoneAsset from '@/assets/halloween/tombstone.png'
-import rockAsset from '@/assets/misc/rock1.png'
 import { imageSize } from '@/utils/imageSize'
 import { For, type JSX, Show, createSignal, onCleanup, onMount } from 'solid-js'
+import { ROCK } from '../courses/kit/rock'
 import type { Course, Obstacle, Scenery } from '../courses/types'
 import { Backdrop, Ground, HorizonTrees, type View } from '../draw/Backdrop'
 import { GeeseArt, geeseWidth } from '../draw/art/geese'
@@ -246,14 +246,14 @@ export function CoursePreview(props: {
 						{(rock, i) => {
 							// Or the course's own, in its place, taken in turn.
 							const own = course.look?.rocks
-							const art = own?.length ? own[i() % own.length] : undefined
+							const art = own?.length ? own[i() % own.length] : ROCK
 							return (
 								<img
-									src={art?.asset ?? rockAsset}
+									src={art.asset}
 									alt=""
-									class={art ? 'pixelated' : undefined}
-									width={art?.width}
-									height={art?.height}
+									class="pixelated"
+									width={art.width}
+									height={art.height}
 									style={{
 										...at(rock.x, 3),
 										transform: 'translateX(-50%)',

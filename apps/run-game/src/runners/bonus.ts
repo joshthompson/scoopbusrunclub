@@ -40,6 +40,14 @@ import furbyQueenSkiTuck from '../assets/runners/furby-queen/ski-tuck.png'
 import furbyQueenSki from '../assets/runners/furby-queen/ski.png'
 import furbyQueenSnowboard from '../assets/runners/furby-queen/snowboard.png'
 import furbyQueenStand from '../assets/runners/furby-queen/stand.png'
+import hatchlingDance from '../assets/runners/hatchling/dance.png'
+import hatchlingFace from '../assets/runners/hatchling/face.png'
+import hatchlingRun from '../assets/runners/hatchling/run.png'
+import hatchlingSit from '../assets/runners/hatchling/sit.png'
+import hatchlingSkiTuck from '../assets/runners/hatchling/ski-tuck.png'
+import hatchlingSki from '../assets/runners/hatchling/ski.png'
+import hatchlingSnowboard from '../assets/runners/hatchling/snowboard.png'
+import hatchlingStand from '../assets/runners/hatchling/stand.png'
 import msCrocodileDance from '../assets/runners/ms-crocodile/dance.png'
 import msCrocodileFace from '../assets/runners/ms-crocodile/face.png'
 import msCrocodileRun from '../assets/runners/ms-crocodile/run.png'
@@ -483,33 +491,35 @@ export const DERI: Playable = {
 
 /**
  * The Hatchling: hatched out of the egg kicked all the way along Dino
- * Island, and brought home over its finish line (its special goal). A
- * placeholder for now, made from a look: a mohawk of green crest, a shell
- * of a cream top, green shorts.
+ * Island, and brought home over its finish line (its special goal). Still
+ * all in its egg, the kicked egg's speckles and its cracks zigzagging down
+ * from its top; two green legs out of its sides, low down, knees bent out,
+ * three toes and a dark claw on each foot, the far one in shadow. No arms,
+ * no face: an egg. Six frames to its run, the members' stride, leant into
+ * it, bobbing on each step. Ducking, it squats right down, the egg on the
+ * ground and its knees up either side. Its dance is its own, drawn by hand
+ * (`wobble`). The one that follows you home on Dino Island is a small one
+ * of it (`HATCHLING` in `courses/kit/dinoForest.ts`).
  */
-const HATCHLING_LOOK: CharacterSpriteProps = {
-	skin: 'light',
-	head: {
-		hair: 'mohawk',
-		hairColor: '#5f9a3a',
-		topColorForNeck: false,
-	},
-	topType: 'tshirt',
-	topColor: '#f2e2c0',
-	bottomType: 'shorts',
-	bottomColor: '#5f9a3a',
-	showColor: '#86c050',
-	shoeColor: '#e0a43a',
-}
-
 export const HATCHLING: Playable = {
 	id: 'bonus:hatchling',
 	name: 'Hatchling',
 	bonus: true,
 	unlock: 'Hatched on Dino Island',
 	tagline: 'Fresh out of the egg',
-	look: HATCHLING_LOOK,
-	sprite: lookSprite(HATCHLING_LOOK),
+	sprite: {
+		run: runFrames(hatchlingRun, 6),
+		sit: hatchlingSit,
+		stand: hatchlingStand,
+		ski: hatchlingSki,
+		skiTuck: hatchlingSkiTuck,
+		snowboard: hatchlingSnowboard,
+		face: hatchlingFace,
+		dance: dance(hatchlingDance, 'hatchling'),
+		neck: { x: 11, y: 9 },
+		width: WIDTH,
+		height: HEIGHT,
+	},
 }
 
 /**

@@ -431,26 +431,26 @@ export const BROKEN_BRIDGE_ICON = rowsArt(
 )
 
 /**
- * Hatch the egg and bring it home: the hatchling, out of its cracked egg,
- * its head up out of the top, running on its own two legs, a finish flag
- * behind it.
+ * Hatch the egg and bring it home: the Hatchling, still all in its cracked
+ * egg, running on the two green legs out of its sides, a finish flag behind
+ * it.
  */
 const HATCHLING_HOME = rowsArt(
 	[
-		'K.......gg....',
-		'KW.....gGgg...',
-		'KWK....gGgkg..',
-		'KKW....ggggggg',
-		'K.....eEegggE.',
-		'K....eEEeeeeee',
-		'K....eEeeseeed',
-		'K....eeecceeed',
-		'K....eseeeeced',
-		'K.....eeeeeed.',
-		'K......dddddd.',
-		'K......l...l..',
-		'K.....l.....l.',
-		'K....ll.....ll',
+		'K.......Ec....',
+		'KW.....EcEE...',
+		'KWK...EEEced..',
+		'KKW..EEccecd..',
+		'K....Eceescd..',
+		'K....Eeeeecd..',
+		'K....Eeseedd..',
+		'K...gEseeedd..',
+		'K..gDEeeedddG.',
+		'K..D..ddddd.GG',
+		'K..g...ddd..Gg',
+		'K..gg......Gg.',
+		'K...g......G..',
+		'K...ggD....GGD',
 	],
 	{
 		K: '#3a3f44',
@@ -460,10 +460,9 @@ const HATCHLING_HOME = rowsArt(
 		d: '#d4c49a',
 		s: '#a8885a',
 		c: '#4a3a2a',
-		g: '#5f9a3a',
-		G: '#86c050',
-		k: '#1d1d1d',
-		l: '#e0a43a',
+		g: '#3ca370',
+		G: '#5cc08a',
+		D: '#2f6658',
 	},
 )
 

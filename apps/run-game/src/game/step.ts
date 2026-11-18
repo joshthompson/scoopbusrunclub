@@ -1052,7 +1052,7 @@ function stepRunner(world: World, racer: Racer) {
 		// Down into the sea, to swim: diving in.
 		else if (underwater(world, b.x, b.feetY)) {
 			diveIn(world, b)
-			play('squelch')
+			play('splash')
 		}
 	}
 	if (b.grounded) {
@@ -1465,7 +1465,9 @@ function hang(world: World, racer: Racer, up: boolean) {
 
 /** Down a Gap, and out: or in Baby Mode, back on their feet past it. */
 function fall(world: World, racer: Racer) {
-	if (world.baby) return respawn(world, racer)
+	// Into the sea, they've hit the water: a splash, not a whistle falling away.
+	const sound = atSea(world, racer.body.x) ? 'splash' : 'fallen'
+	if (world.baby) return respawn(world, racer, sound)
 	const b = racer.body
 	const crashed = b.gliding
 	b.mount = 0
@@ -1478,7 +1480,7 @@ function fall(world: World, racer: Racer) {
 	racer.out = 'fallen'
 	racer.outAt = world.ticks()
 	if (!world.round) world.setPhase('fallen')
-	play('fallen')
+	play(sound)
 	world.popup(
 		crashed
 			? `Splash! ${racer.runner.name} crashed!`
@@ -1604,7 +1606,7 @@ const RESPAWN_STUMBLE = 24
  * Baby Mode's fall: not out, but put back on their feet just past the Gap
  * they fell down (or past the sea, fallen in), stumbling a moment.
  */
-function respawn(world: World, racer: Racer) {
+function respawn(world: World, racer: Racer, sound: 'fallen' | 'splash') {
 	const b = racer.body
 	const { terrain } = world
 	const { sea } = world.course
@@ -1635,7 +1637,7 @@ function respawn(world: World, racer: Racer) {
 	b.jumping = false
 	b.on = undefined
 	b.stumble = RESPAWN_STUMBLE
-	play('fallen')
+	play(sound)
 	world.popup(`${racer.runner.name} fell! Back up`, b.x, b.feetY - 80)
 }
 
@@ -1859,7 +1861,7 @@ function collide(world: World, racer: Racer) {
 	touchedDown(b)
 	const wet = wading(world, b)
 	if (wet && !b.wading) {
-		play('squelch')
+		play('splash')
 		world.popup('Splash!', b.x, top)
 	}
 	b.wading = wet

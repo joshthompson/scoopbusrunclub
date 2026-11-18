@@ -446,11 +446,9 @@ const EGG_COLOURS = {
 	d: '#d4c49a',
 	s: '#a8885a',
 	c: '#4a3a2a',
-	g: '#5f9a3a',
-	G: '#86c050',
-	k: '#1d1d1d',
-	l: '#e0a43a',
-	L: '#b87a24',
+	g: '#3ca370',
+	G: '#5cc08a',
+	D: '#2f6658',
 }
 /** How big the egg is, half across and half its length, in cells; and its picture, square, to turn in. */
 const EGG_HALF = { across: 5.5, along: 7.5 }
@@ -464,29 +462,41 @@ const EGG_SPECKLES: [number, number][] = [
 	[-3, 3.5],
 	[0.5, 5],
 ]
-/** Its cracks, more of them the more it's been kicked: lines of cells, `[across, along]` from its middle. */
-const EGG_CRACKS: [number, number][][] = [
+/**
+ * Its cracks, more of them the more it's been kicked: for each stage, the
+ * lines it adds, zigzagging down from its top and round it, `[across,
+ * along]` from its middle. The Hatchling's egg is cracked in all of them
+ * (`assets/runners/hatchling/`).
+ */
+const EGG_CRACKS: [number, number][][][] = [
 	[],
 	[
-		[0, -6],
-		[-0.6, -5],
-		[0.4, -4],
-		[-0.4, -3],
+		[
+			[0.2, -7.6],
+			[-0.6, -6],
+			[0.6, -4.6],
+			[-0.4, -3.2],
+		],
 	],
 	[
-		[1.2, -2.5],
-		[2, -1.5],
-		[1.4, -0.5],
-		[-1.2, -2.5],
-		[-2.2, -1.8],
+		[
+			[0.6, -4.6],
+			[1.8, -3.6],
+			[2.6, -2.2],
+			[3.8, -1.6],
+		],
 	],
 	[
-		[2.4, 0.5],
-		[3.2, 1.2],
-		[-2.6, -0.8],
-		[-3.4, 0],
-		[-2.8, 1],
-		[0.6, 0.6],
+		[
+			[-0.4, -3.2],
+			[-1.8, -2.6],
+			[-2.6, -1.2],
+			[-4, -0.6],
+		],
+		[
+			[2.6, -2.2],
+			[2.2, -0.6],
+		],
 	],
 ]
 /** How many ways round it's drawn, turning, a frame each. */
@@ -526,7 +536,20 @@ function eggPicture(stage: number, turn: number) {
 			y: Math.floor(mid + a * sin + l * cos),
 		}))
 	const speckles = marks(EGG_SPECKLES)
-	const cracks = marks(EGG_CRACKS.slice(0, stage + 1).flat())
+	// Each crack's line, a cell at a time from one of its corners to the next.
+	const cracks = EGG_CRACKS.slice(0, stage + 1)
+		.flat()
+		.flatMap((line) =>
+			marks(line).flatMap((to, i, corners) => {
+				if (i === 0) return [to]
+				const from = corners[i - 1]
+				const steps = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y))
+				return Array.from({ length: steps }, (_, s) => ({
+					x: Math.round(from.x + ((to.x - from.x) * (s + 1)) / steps),
+					y: Math.round(from.y + ((to.y - from.y) * (s + 1)) / steps),
+				}))
+			}),
+		)
 	return paintedArt(EGG_CELLS, EGG_CELLS, (x, y) => {
 		if (!inside(x, y)) return undefined
 		const cx = Math.floor(x)
@@ -563,36 +586,119 @@ export const eggBottom = (turn: number) => {
 }
 
 /**
- * What hatches out of it, a hatchling: still in its shell, its top broken
- * off, its little green head poking up out of it, an eye; and two legs out
- * of its bottom, running, a frame apart, then together. Faces right, the
- * way it runs. 12 by 16 cells, at `scale: 2`.
+ * What hatches out of it, the Hatchling: still all in its egg, cracked all
+ * over, as it was kicked; two green legs out of its sides, knees bent out,
+ * the far one in shadow. Four frames to its run, from its widest stride,
+ * leant into it and bobbing on each step. Faces right, the way it runs. A
+ * small one of the bonus runner (`assets/runners/hatchling/`), the kicked
+ * egg's own size: 18 by 22 cells, at `scale: 2`.
  */
-const HATCHLING_TOP = [
-	'.....gg.....',
-	'....gGgg....',
-	'....gGgkg...',
-	'....ggggggg.',
-	'.e.eegggeE..',
-	'eEeEEeeeeEe.',
-	'eEEeeeseeed.',
-	'eEeeseeeeed.',
-	'eeeeeeeesed.',
-	'esceeeeeeed.',
-	'eeecceeeedd.',
-	'.eeeeeeced..',
-	'..dddddddd..',
-]
-const HATCHLING_LEGS = [
-	['..l.....l...', '.L.......l..', 'LL.......ll.'],
-	['....l..l....', '....L..l....', '...LL..ll...'],
+const HATCHLING_RUN = [
+	// Its widest stride, both feet down: and in the air.
+	[
+		'..................',
+		'........EcE.......',
+		'.......EEcEE......',
+		'......EEEeced.....',
+		'.....EEEececd.....',
+		'....EEEcceeced....',
+		'....EEeceesced....',
+		'....Ecceeeeccd....',
+		'...EEeeeeeeced....',
+		'...EEeeseeeeed....',
+		'...gEeeeeeeedd....',
+		'...gEseeeeesdd....',
+		'..gDEeeeeeeddgG...',
+		'..gDDeeesedddggG..',
+		'.gDD.Edddddd.GggG.',
+		'.gDD...dddd...Ggg.',
+		'.gD............Gg.',
+		'.gD............Gg.',
+		'.gD............Gg.',
+		'.gDg...........Gg.',
+		'.gDD...........Gg.',
+		'..gDD..........GgD',
+	],
+	// Its front foot coming up.
+	[
+		'........EcE.......',
+		'.......EEcEE......',
+		'......EEEeced.....',
+		'.....EEEececd.....',
+		'....EEEcceeced....',
+		'....EEeceesced....',
+		'....Ecceeeeccd....',
+		'...EEeeeeeeced....',
+		'...EEeeseeeeed....',
+		'...gEeeeeeeedd....',
+		'..gDEseeeeesdd....',
+		'..gDEeeeeeeddg....',
+		'.gDD.eeesedddgG...',
+		'.gDD.Edddddd.Gg...',
+		'.gDD...dddd..Gg...',
+		'.gDDg........Gg...',
+		'..gDDg.......Gg...',
+		'....gD.......Gg...',
+		'.....gD.....Ggg...',
+		'............Gg....',
+		'............Gg....',
+		'.............GGD..',
+	],
+	// Passing.
+	[
+		'..................',
+		'........EcE.......',
+		'.......EEcEE......',
+		'......EEEeced.....',
+		'.....EEEececd.....',
+		'....EEEcceeced....',
+		'....EEeceesced....',
+		'....Ecceeeeccd....',
+		'...EEeeeeeeced....',
+		'...EEeeseeeeed....',
+		'...gEeeeeeeedd....',
+		'...gEseeeeesdd....',
+		'...gEeeeeeeddg....',
+		'....geeesedddg....',
+		'....gEddddddGg....',
+		'....gDgdddd.GgG...',
+		'.....gD.....Ggg...',
+		'.....gDg...Gggg...',
+		'.....gDD..Gggg....',
+		'......gDg.Ggg.....',
+		'......gDD.Gg......',
+		'.......gDDGgD.....',
+	],
+	// Its back foot coming up.
+	[
+		'........EcE.......',
+		'.......EEcEE......',
+		'......EEEeced.....',
+		'.....EEEececd.....',
+		'....EEEcceeced....',
+		'....EEeceesced....',
+		'....Ecceeeeccd....',
+		'...EEeeeeeeced....',
+		'...EEeeseeeeed....',
+		'...gEeeeeeeedd....',
+		'...gEseeeeesdd....',
+		'...gEeeeeeeddgG...',
+		'...gDeeesedddggGG.',
+		'...gDEdddddd..GggG',
+		'...gD..dddd...Gggg',
+		'...gDg.......Gggg.',
+		'...gDD......Gggg..',
+		'....gD......Gg....',
+		'....gD.......GD...',
+		'....gD............',
+		'....gD............',
+		'.....ggD..........',
+	],
 ]
 export const HATCHLING = {
-	frames: HATCHLING_LEGS.map((legs) =>
-		letterArt([...HATCHLING_TOP, ...legs], EGG_COLOURS),
-	),
-	width: 24,
-	height: 32,
+	frames: HATCHLING_RUN.map((rows) => letterArt(rows, EGG_COLOURS)),
+	width: 36,
+	height: 44,
 }
 
 // --- What grows ---------------------------------------------------------------

@@ -1,4 +1,5 @@
 import type { CourseLook } from '../types'
+import { TRAIL_SLOPE, URUBAMBA } from './machuPicchuBackdrop'
 import {
 	type PixelRect,
 	pixelArt,
@@ -310,19 +311,9 @@ const TRAIL: NonNullable<CourseLook['horizon']> = {
 			mist(132, 8, 0.4, 140),
 	),
 	fill: TRAIL_FAR_FILL,
-	nearer: [
-		{
-			asset: svgUrl(
-				W,
-				120,
-				under(wave(141, 46, 18, [2, 3, 8]), '#5d9a4c', 120) +
-					canopy(wave(141, 46, 18, [2, 3, 8]), 70, '#457f3b', 142, 6) +
-					canopy(wave(141, 46, 18, [2, 3, 8]), 30, '#6fae58', 143, 3),
-			),
-			height: 120,
-			fill: '#5d9a4c',
-		},
-	],
+	// The cloud-forest hillside the trail climbs along: tall trees, ferns,
+	// mist, an old terrace wall, a waterfall.
+	nearer: [TRAIL_SLOPE],
 	sky: ['#7fb6dc', '#e4f0ee'],
 }
 
@@ -625,18 +616,9 @@ const VALLEY: NonNullable<CourseLook['horizon']> = {
 		})()}`,
 	),
 	fill: '#4b6f52',
-	nearer: [
-		{
-			asset: svgUrl(
-				W,
-				120,
-				under(wave(168, 40, 14, [3, 5, 11]), '#4a8a3e', 120) +
-					canopy(wave(168, 40, 14, [3, 5, 11]), 80, '#3a7433', 169, 7),
-			),
-			height: 120,
-			fill: '#4a8a3e',
-		},
-	],
+	// The Urubamba, white water, along the valley floor, and the railway
+	// beside it into Aguas Calientes.
+	nearer: [URUBAMBA],
 	sky: ['#9cbfd8', '#e6eef0'],
 }
 

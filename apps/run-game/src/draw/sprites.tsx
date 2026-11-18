@@ -4,7 +4,6 @@ import pumpkin3Asset from '@/assets/halloween/pumpkin3.png'
 import pumpkin4Asset from '@/assets/halloween/pumpkin4.png'
 import pumpkin5Asset from '@/assets/halloween/pumpkin5.png'
 import tombstoneAsset from '@/assets/halloween/tombstone.png'
-import rockAsset from '@/assets/misc/rock1.png'
 import { type RunnerName, runners, strideFrameInterval } from '@/data/runners'
 import { imageSize } from '@/utils/imageSize'
 import {
@@ -34,6 +33,7 @@ import steamVentAsset from '../assets/obstacles/steam-vent.png'
 import purpleSignAsset from '../assets/signs/purple-sign.png'
 import { GERM_FRAMES, GERM_POPPED, VALVE } from '../courses/kit/bodyScenery'
 import { bouncyToadstool } from '../courses/kit/furbyScenery'
+import { ROCK, ROCK_BOX_HEIGHT } from '../courses/kit/rock'
 import {
 	ROOFTOP_VENT_FRONT,
 	ROOFTOP_VENT_HEIGHT,
@@ -3339,9 +3339,9 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 							.indexOf(state) % own.length
 					]
 				: undefined
-			const width = art?.width ?? 56
-			const height = art?.height ?? 29
-			const src = art?.asset ?? rockAsset
+			const width = art?.width ?? ROCK.width
+			const height = art?.height ?? ROCK_BOX_HEIGHT
+			const src = art?.asset ?? ROCK.asset
 			// Up on the skyline, sunk into the ridge it's on, rather than
 			// perched on it, with nothing behind it.
 			const skyline = world.course.skyline?.some(
@@ -3359,12 +3359,13 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				draw: ({ ctx, image }) => {
 					const loaded = image(src)
 					if (!loaded) return
-					// Recoloured as the course has its rocks, at its own size, unless
-					// the course's own says.
+					// Recoloured as the course has its rocks, at its own size. The
+					// game's own rock is a pixel taller than its box, its peak just
+					// over the top.
 					const rock = filtered(src, loaded, world.course.look?.rock)
-					const across = (art?.width ?? rock.width) / rock.width
-					const down = (art?.height ?? rock.height) / rock.height
-					ctx.scale(across, down)
+					const drawn = art ?? ROCK
+					if (!art) ctx.translate(0, height - ROCK.height)
+					ctx.scale(drawn.width / rock.width, drawn.height / rock.height)
 					ctx.drawImage(
 						rock.art,
 						-rock.pad,

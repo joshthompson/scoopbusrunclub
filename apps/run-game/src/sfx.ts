@@ -63,6 +63,8 @@ export type Sound =
 	| 'meteorHit'
 	| 'lavaBomb'
 	| 'blorp'
+	/** Into water: wading into a River or a pond, diving into the sea, or falling in off a cliff. */
+	| 'splash'
 
 /**
  * [frequency in Hz, length in seconds, wave, how loud, out of the sound's
@@ -427,6 +429,15 @@ const SOUNDS: Record<
 			[900, 0.18, 'noise', 0.5, 0.4],
 		],
 		volume: 0.12,
+	},
+	/** Into water: a plunk as they go in, and the spray, bright, falling back. */
+	splash: {
+		notes: [
+			[6000, 0.45, 'noise', 1, 0.12],
+			[220, 0.12, 'sine', 0.8, 2.2],
+		],
+		volume: 0.1,
+		chord: true,
 	},
 }
 

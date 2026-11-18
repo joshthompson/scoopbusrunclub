@@ -19,6 +19,11 @@ const LOOKS: Record<
 > = {
 	hatchling: HATCHLING,
 }
+/** The room one takes up: the biggest of them. */
+const BOX = {
+	width: Math.max(...Object.values(LOOKS).map((look) => look.width)),
+	height: Math.max(...Object.values(LOOKS).map((look) => look.height)),
+}
 /** How far a stride takes one, a frame each. */
 const STRIDE = 7
 /** How many there can be at once: one each, a Player. */
@@ -38,8 +43,8 @@ export function createFollowers(world: World) {
 				type: 'pacer',
 				x,
 				y,
-				width: () => 32,
-				height: () => 40,
+				width: () => BOX.width,
+				height: () => BOX.height,
 			}),
 			// Its own flyer, over it, carrying it.
 			drawReach: { top: 90, left: 70, right: 70 },

@@ -8,6 +8,16 @@ import {
 } from '../game/constants'
 import { type Gap, type Terrain, withGaps } from '../game/terrain'
 import { withHat } from './kit/hats'
+import { MACHU_CLOUD_FOREST, MACHU_TERRACES } from './kit/machuPicchuGround'
+import {
+	bamboo,
+	bromeliadRock,
+	cloudForestTree,
+	cloudForestTreeSmall,
+	ichuGrass,
+	polylepis,
+	puya,
+} from './kit/machuPicchuPlants'
 import {
 	BROKEN_BRIDGE,
 	DOORWAY,
@@ -579,6 +589,9 @@ const DOORWAYS = [15000, 15245, 16260]
 /** Where the train's in, at Aguas Calientes: its first carriage. */
 const TRAIN = 20250
 
+/** The high pass, round Runkurakay, from and to: over the cloud forest, on the puna. */
+const HIGH_PASS = [3700, 7400]
+
 /** Which bit of the course `along` is on. */
 const zoneOf = (along: number) =>
 	along < SUN_GATE ? 'trail' : along < EDGE ? 'citadel' : 'valley'
@@ -775,6 +788,11 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 		setBack: -CLIFF_DEPTH * 2 - PATH_BACK - PATH_FRONT,
 	})
 
+	// Which of a kind it is, from a stream of its own, so the rest stand
+	// where they always have.
+	const variety = seeded(1532)
+	const pick = <T>(...of: T[]) => of[Math.floor(variety() * of.length)]
+
 	// Along the way: each part of it its own. Never over what's nearer.
 	const place = (piece: Scenery) => {
 		if (!overNearer(piece)) add(piece)
@@ -788,9 +806,24 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 		const zone = zoneOf(along)
 		const roll = random()
 		if (zone === 'trail') {
-			if (roll < 0.34) place({ x, asset: mossTree })
-			else if (roll < 0.62) place({ x, asset: treeFern })
-			else if (roll < 0.84) place({ x, asset: orchids })
+			// Up on the pass, round Runkurakay: the puna, its queñua trees,
+			// ichu grass and puyas. Below it, the cloud forest.
+			const high = along > HIGH_PASS[0] && along < HIGH_PASS[1]
+			if (roll < 0.34)
+				place({
+					x,
+					asset: high
+						? pick(polylepis, polylepis, puya)
+						: pick(mossTree, cloudForestTree, cloudForestTreeSmall, bamboo),
+				})
+			else if (roll < 0.62)
+				place({
+					x,
+					asset: high
+						? pick(ichuGrass, bromeliadRock)
+						: pick(treeFern, treeFern, bromeliadRock),
+				})
+			else if (roll < 0.84) place({ x, asset: high ? ichuGrass : orchids })
 			else if (roll < 0.94)
 				place({
 					x,
@@ -826,6 +859,21 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 	for (let i = 0; i < 3; i++)
 		out.push({ x: X(TRAIN) + i * 186, asset: carriage, scale: 2, setBack: 4 })
 	return out.sort((a, b) => a.x - b.x)
+}
+
+/** A Ground layer's `edge` that lays it only `where` along the course, and off down out of sight everywhere else. */
+const only =
+	(where: (along: number) => boolean, edge?: (x: number) => number) =>
+	(x: number) =>
+		where(x - START_X) ? (edge?.(x) ?? 0) : 99999
+/**
+ * The citadel's terraces coming in under the forest as it gives out: from
+ * the bottom of the face up, over its first 500, a ragged line, so there's
+ * no edge down the face where they start.
+ */
+const terracesIn = (x: number) => {
+	const t = Math.min(1, (x - START_X - (CITADEL - 300)) / 500)
+	return (1 - t) * 420 + (t < 1 ? 12 * Math.sin(x / 13) : 0)
 }
 
 export const machuPicchu: CourseDefinition = {
@@ -880,6 +928,20 @@ export const machuPicchu: CourseDefinition = {
 			[PATH_FRONT, 'url(#machu-edge)'],
 			[PATH_FRONT + 4, 'url(#machu-face)'],
 			[PATH_FRONT + 4, 'url(#machu-face-pattern)'],
+			// The face's own, each stretch's: the cloud forest dropping away
+			// under the trail, and in the valley; the citadel's terraces.
+			[
+				PATH_FRONT + 4,
+				'url(#machu-cloud-forest)',
+				false,
+				only((along) => along < CITADEL + 200 || along >= EDGE),
+			],
+			[
+				PATH_FRONT + 4,
+				'url(#machu-terraces)',
+				false,
+				only((along) => along >= CITADEL - 300 && along < EDGE, terracesIn),
+			],
 			// Darker the further down the mountain's face, in bands, for depth.
 			[PATH_FRONT + 90, 'rgba(16, 40, 30, 0.07)', true],
 			[PATH_FRONT + 200, 'rgba(16, 40, 30, 0.08)', true],
@@ -887,7 +949,7 @@ export const machuPicchu: CourseDefinition = {
 		],
 		ridge,
 		strips: machuPicchuStrips({ citadel: X(CITADEL - 300), valley: X(EDGE) }),
-		groundDefs: MACHU_PAVING + MACHU_FACE,
+		groundDefs: MACHU_PAVING + MACHU_FACE + MACHU_CLOUD_FOREST + MACHU_TERRACES,
 		// Down into a gorge: granite, darker the deeper, the river far down.
 		gap: 'linear-gradient(to bottom, #6f6a5c, #4a463c 60px, #22261f 150px)',
 		pit: {
