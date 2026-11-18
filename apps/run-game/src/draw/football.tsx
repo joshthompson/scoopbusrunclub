@@ -1,5 +1,11 @@
 import { createController, createObjectSignal } from 'scoopjs'
 import type { JSX } from 'solid-js'
+import {
+	EGG_SIZE,
+	EGG_TUMBLE,
+	EGG_TURNS,
+	eggBottom,
+} from '../courses/kit/dinoForest'
 import { paintedArt } from '../courses/kit/pixelArt'
 import { FOOTBALL_RADIUS } from '../game/football'
 import type { World } from '../game/world'
@@ -42,27 +48,45 @@ export function createFootballSprite(world: World) {
 	const ball = world.ball
 	if (!ball) return []
 	const size = FOOTBALL_RADIUS * 2
+	// An egg, in its place: taller than it's wide, cracking as it's kicked.
+	const { width, height } = ball.egg ? EGG_SIZE : { width: size, height: size }
+	/** An egg's way round, tumbling: an eighth for each eighth of a turn it's rolled. */
+	const turn = () =>
+		((Math.round(ball.spin / (360 / EGG_TURNS)) % EGG_TURNS) + EGG_TURNS) %
+		EGG_TURNS
+	const picture = () =>
+		ball.egg
+			? EGG_TUMBLE[Math.min(EGG_TUMBLE.length - 1, ball.stage)][turn()]
+			: BALL
+	/** How far down its middle is from the top of its picture, sat on the ground. */
+	const sitsAt = () =>
+		ball.egg
+			? height / 2 - (FOOTBALL_RADIUS - eggBottom(turn()))
+			: height - FOOTBALL_RADIUS
 	return [
 		createController({
 			init: () => ({
 				id: 'football',
 				type: 'football',
-				...createObjectSignal(ball.x - FOOTBALL_RADIUS, 'x'),
-				...createObjectSignal(ball.y - FOOTBALL_RADIUS, 'y'),
+				...createObjectSignal(ball.x - width / 2, 'x'),
+				...createObjectSignal(ball.y - sitsAt(), 'y'),
 				...createObjectSignal(0, 'rotation'),
 				...createObjectSignal({} as JSX.CSSProperties, 'style'),
-				width: () => size,
-				height: () => size,
+				width: () => width,
+				height: () => height,
 			}),
 			draw({ ctx, image }) {
-				const art = image(BALL)
-				if (art) ctx.drawImage(art.image, 0, 0, size, size)
+				// Hatched: gone, on its own two legs (see `createFollowers`).
+				if (ball.out === 'hatched') return
+				const art = image(picture())
+				if (art) ctx.drawImage(art.image, 0, 0, width, height)
 			},
 			onEnterFrame({ $ }) {
-				$.setX(ball.x - FOOTBALL_RADIUS)
-				$.setY(ball.y - FOOTBALL_RADIUS)
-				// In quarter turns, to keep its pixels square and sharp.
-				$.setRotation(Math.round(ball.spin / 90) * 90)
+				$.setX(ball.x - width / 2)
+				$.setY(ball.y - sitsAt())
+				// In quarter turns, to keep its pixels square and sharp. An egg's
+				// drawn turned already, every eighth of the way round.
+				$.setRotation(ball.egg ? 0 : Math.round(ball.spin / 90) * 90)
 			},
 		}),
 	]

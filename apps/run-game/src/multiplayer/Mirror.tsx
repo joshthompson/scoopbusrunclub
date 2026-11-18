@@ -4,6 +4,7 @@ import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { hatCode, hatFromCode } from '../game/hats'
 import { waitingLifts } from '../game/platforms'
+import { stepSharks } from '../game/sharks'
 import {
 	type Flyer,
 	type Out,
@@ -164,6 +165,8 @@ export default function Mirror(props: {
 		const mix = (from: number, to: number) => from + (to - from) * share
 
 		world.setTicks(Math.round(mix(a.ticks, b.ticks)))
+		// Sharks, swimming after whoever's nearest, stepped here as there.
+		stepSharks(world)
 		world.setRaceTicks(a.raceTicks)
 		if (world.phase() !== a.phase) world.setPhase(a.phase)
 		world.setCamera(mix(a.camera, b.camera))

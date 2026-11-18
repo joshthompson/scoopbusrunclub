@@ -41,6 +41,7 @@ What every course has as of the Challenges commit (`4db1312`). A course is **up 
 4. **Fill rows 8–12.** Anything that doesn't exist yet (a new fika, hat, Ride, obstacle, look field, special-goal criterion), see [NEW-KINDS.md](NEW-KINDS.md).
 5. **Check row 14**: count its fika, cheers, Rides, flyovers, hats, Rings and gates against `MOST_PER_COURSE`. Raising a ceiling means updating that comment's "most on any course" line too.
 6. **Verify** (below).
+7. **Offer an art pass** (the `course-art-pass` skill) once it plays end to end.
 
 ### Building a big set-piece course
 

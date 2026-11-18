@@ -54,6 +54,19 @@ export interface Playable {
 		 * under their arms: their sit pose, if they've not one.
 		 */
 		skiTuck?: string
+		/**
+		 * Swimming, lying along in the water, head first, face down: two
+		 * frames, a stroke and a kick, each `width` by `height` of their own
+		 * pixels, facing left as their run does. Their run, turned over, if
+		 * they've none (see `scripts/make-swims.ts`).
+		 */
+		swim?: SwimSprite
+		/**
+		 * Diving in: stood tall, arms straight up over their head, hands
+		 * together, facing left, turned over by the game, head first and on
+		 * down (see `scripts/make-swims.ts`). Their swim, turned, if they've none.
+		 */
+		dive?: string
 		/** Their face, as the website's celebrations show it. */
 		face?: string
 		/**
@@ -151,6 +164,61 @@ const MEMBER_DANCES = byMember(
 	}),
 )
 
+/** Someone's swim frames: see `Playable['sprite']['swim']`. */
+export interface SwimSprite {
+	frames: [string, string]
+	width: number
+	height: number
+}
+
+/**
+ * Swim frames, by whose they are, from pictures `<who>-1.png` and
+ * `<who>-2.png` (or `swim-1.png` and `swim-2.png` in a folder of theirs):
+ * each picture's own size, read once it's loaded.
+ */
+export function swimsFrom(
+	pictures: Record<string, string>,
+	whose: (path: string) => string,
+	size: (who: string) => { width: number; height: number },
+) {
+	const swims: Record<string, SwimSprite> = {}
+	for (const [path, url] of Object.entries(pictures)) {
+		const who = whose(path)
+		const n = /-(\d)\.png$/.exec(path)?.[1] === '2' ? 1 : 0
+		swims[who] ??= { frames: [url, url], ...size(who) }
+		swims[who].frames[n] = url
+	}
+	return swims
+}
+
+/**
+ * Members' swim poses, made from their run strips by `scripts/make-swims.ts`,
+ * to touch up by hand: `assets/swim/<member>-1.png` and `-2.png`, their run
+ * turned over to lie along, so as tall as they're wide, and as wide as
+ * they're tall. Link's isn't turned: he's on all fours already.
+ */
+const MEMBER_SWIMS = swimsFrom(
+	import.meta.glob<string>('../assets/swim/*.png', {
+		eager: true,
+		import: 'default',
+	}),
+	(path) => path.replace(/^.*\/|-\d\.png$/g, ''),
+	(who) => {
+		const runner = runners[who as RunnerName]?.[0]()
+		const width = runner?.width ?? 23
+		const height = runner?.height ?? 29
+		return who === 'link' ? { width, height } : { width: height, height: width }
+	},
+)
+
+/** Members' dive poses, made from their stand poses by `scripts/make-swims.ts`: `assets/dive/<member>.png`. */
+const MEMBER_DIVES = byMember(
+	import.meta.glob<string>('../assets/dive/*.png', {
+		eager: true,
+		import: 'default',
+	}),
+)
+
 /** Where a runner's neck is, in their first run frame (see `Playable['sprite']['neck']`). */
 export interface Neck {
 	x: number
@@ -230,6 +298,8 @@ export const MEMBERS: Playable[] = (Object.keys(runners) as RunnerName[])
 				ski: MEMBER_SKIS[member] ?? poses?.ski,
 				skiTuck: MEMBER_SKI_TUCKS[member] ?? poses?.skiTuck,
 				snowboard: MEMBER_SNOWBOARDS[member] ?? poses?.snowboard,
+				swim: MEMBER_SWIMS[member],
+				dive: MEMBER_DIVES[member],
 				face: runner.frames.face?.[0],
 				// Made for them, or from their look, if they're made from one.
 				dance: MEMBER_DANCES[member]

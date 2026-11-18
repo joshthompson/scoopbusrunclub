@@ -20,6 +20,12 @@ import {
 	FLYING_GOOSE_WIDTH,
 	flyingGoosePicture,
 } from './art/geese'
+import {
+	PTERODACTYL_HEIGHT,
+	PTERODACTYL_TALONS,
+	PTERODACTYL_WIDTH,
+	pterodactylPicture,
+} from './art/pterodactyl'
 
 /** What flies over a course to be ridden: geese, or on the Great Wall, a dragon. */
 export interface FlyerLook {
@@ -88,9 +94,21 @@ const CONDOR: FlyerLook = {
 	},
 }
 
+const PTERODACTYL: FlyerLook = {
+	width: PTERODACTYL_WIDTH,
+	height: PTERODACTYL_HEIGHT,
+	picture: pterodactylPicture,
+	sound: 'whoosh',
+	rides: 'Pterodactyl rides',
+	// Hanging from its talons, gripping the top of their head.
+	grip: PTERODACTYL_TALONS + 2,
+}
+
 export const flyerLook = (course: Pick<Course, 'flyer'>) =>
 	course.flyer === 'dragon'
 		? DRAGON
 		: course.flyer === 'condor'
 			? CONDOR
-			: GOOSE
+			: course.flyer === 'pterodactyl'
+				? PTERODACTYL
+				: GOOSE

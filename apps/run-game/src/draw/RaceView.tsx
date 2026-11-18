@@ -24,11 +24,23 @@ import {
 } from './backdropControllers'
 import { createBoars } from './boars'
 import { createCoaster } from './coaster'
+import { createDeepWater } from './deepWater'
+import { createDiplodocus } from './diplodocus'
+import {
+	EruptionSky,
+	createEruptionBurst,
+	createSmokeWall,
+	eruptionShake,
+	silhouetteFilter,
+} from './eruption'
+import { createFollowers } from './followers'
 import { createFootballSprite } from './football'
 import { createCaveCover, createSeaFront } from './frontControllers'
 import { createGiantMouth } from './giantMouth'
 import { createHarvester } from './harvester'
 import { createHauntedHouse } from './hauntedHouse'
+import { createHerds } from './herds'
+import { createLava } from './lava'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPyro, createSearchlights, createSmoke } from './nightRace'
 import { createOrgans } from './organs'
@@ -209,6 +221,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createRiver(world),
 				...createMineCarts(world),
 				...createFootballSprite(world),
+				// Whoever's following anyone: a hatchling, out of its egg.
+				...createFollowers(world),
 				...world.obstacles.flatMap((state, i) =>
 					createObstacle(world, state, i),
 				),
@@ -216,6 +230,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createCorgis(world),
 				...createFurbies(world),
 				createBus(world),
+				// Black smoke rolling down a volcano, level with the bus.
+				...createSmokeWall(world),
 				createScoopArm(world),
 				...createBusDirt(world),
 				...createPack(world),
@@ -224,8 +240,15 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createGiantFurby(world),
 				...createHats(world),
 				...createForeground(world),
-				// Wild boar, running along in front of the path.
+				// Wild boar, running along in front of the path; and herds, dinosaurs.
 				...createBoars(world),
+				...createHerds(world),
+				// A diplodocus, the path up over it.
+				...createDiplodocus(world),
+				// Lava down a crater, churning, behind its bridge.
+				...createLava(world),
+				// A volcano blowing: lava and smoke up out of its crater.
+				...createEruptionBurst(world),
 				...createTowers(world),
 				// A Portal going off: the shrink ray's beam, the sneeze's spray.
 				...createPortalFx(world),
@@ -238,6 +261,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createBackdrop(world, scene),
 				...createCaveCover(world, scene),
 				...createSeaFront(world, scene),
+				// The sea, swum through: its water, and over everyone in it.
+				...createDeepWater(world, scene),
 				...createRiverFront(world),
 				...createWeather(world, scene),
 				// A night race's show: fire, searchlights and smoke.
@@ -325,6 +350,8 @@ export function RaceCanvas(props: {
 			{/* Over the top of the course's own sky, once zoomed out. The top
 			    of its gradient, so the join doesn't show. */}
 			<div style={styles.sky} />
+			{/* A volcano gone off: its burning sky, behind everything. */}
+			<EruptionSky world={props.world} />
 			<div style={portalStyle()}>
 				<CanvasRenderer
 					scene={props.scene}
@@ -336,9 +363,11 @@ export function RaceCanvas(props: {
 					style={{
 						// Its size is the camera's, which takes in more zoomed out
 						// (to fit a Round's Players in): shrunk back to fill the screen.
-						transform: `scale(${1 / zoom()})`,
+						transform: `translateX(${eruptionShake(props.world)}px) scale(${1 / zoom()})`,
 						'transform-origin': '0 0',
 						background: 'transparent',
+						// Black against a burning sky, in its silhouetted stretch.
+						filter: silhouetteFilter(props.world),
 					}}
 					loading={() => (
 						<div style={styles.loading}>Loading {props.world.course.name}…</div>

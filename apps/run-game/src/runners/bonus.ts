@@ -88,7 +88,12 @@ import { RUNNER_SCALE } from '../game/constants'
 import { runnerUnlocked } from '../saved/unlocked'
 import { danceForKey } from './dance'
 import { stripDance } from './dancing'
-import { LOCKED_MEMBERS, type Playable, lookSprite } from './playable'
+import {
+	LOCKED_MEMBERS,
+	type Playable,
+	lookSprite,
+	swimsFrom,
+} from './playable'
 import { SKELETON_SPRITE } from './skeleton'
 
 /**
@@ -477,6 +482,37 @@ export const DERI: Playable = {
 }
 
 /**
+ * The Hatchling: hatched out of the egg kicked all the way along Dino
+ * Island, and brought home over its finish line (its special goal). A
+ * placeholder for now, made from a look: a mohawk of green crest, a shell
+ * of a cream top, green shorts.
+ */
+const HATCHLING_LOOK: CharacterSpriteProps = {
+	skin: 'light',
+	head: {
+		hair: 'mohawk',
+		hairColor: '#5f9a3a',
+		topColorForNeck: false,
+	},
+	topType: 'tshirt',
+	topColor: '#f2e2c0',
+	bottomType: 'shorts',
+	bottomColor: '#5f9a3a',
+	showColor: '#86c050',
+	shoeColor: '#e0a43a',
+}
+
+export const HATCHLING: Playable = {
+	id: 'bonus:hatchling',
+	name: 'Hatchling',
+	bonus: true,
+	unlock: 'Hatched on Dino Island',
+	tagline: 'Fresh out of the egg',
+	look: HATCHLING_LOOK,
+	sprite: lookSprite(HATCHLING_LOOK),
+}
+
+/**
  * Bonnie Bottle: an ultra runner who's a bottle of blue sports drink, side
  * on: her head its orange cap, a pink sweatband round it, her eye and a
  * smile on it, the white pull nozzle on top; the bottle clear at its neck,
@@ -604,7 +640,46 @@ export const BONUS_RUNNERS: Playable[] = [
 	DERI,
 	BONNIE_BOTTLE,
 	DET_MUNCH,
+	HATCHLING,
 ]
+
+/**
+ * The bonus runners' swim poses, made from their run strips by
+ * `scripts/make-swims.ts`, to touch up by hand:
+ * `assets/runners/<who>/swim-1.png` and `-2.png`, their run turned over, so
+ * as tall as their run's wide, and as wide as it's tall. By the folder
+ * they're in, their id's end.
+ */
+const BONUS_SWIMS = swimsFrom(
+	import.meta.glob<string>('../assets/runners/*/swim-*.png', {
+		eager: true,
+		import: 'default',
+	}),
+	(path) => path.replace(/^.*runners\/|\/swim-\d\.png$/g, ''),
+	(who) => {
+		const runner = BONUS_RUNNERS.find((r) => r.id === `bonus:${who}`)
+		return {
+			width: runner?.sprite.height ?? HEIGHT,
+			height: runner?.sprite.width ?? WIDTH,
+		}
+	},
+)
+/** The bonus runners' dive poses, made from their stand poses: `assets/runners/<who>/dive.png`. */
+const BONUS_DIVES = Object.fromEntries(
+	Object.entries(
+		import.meta.glob<string>('../assets/runners/*/dive.png', {
+			eager: true,
+			import: 'default',
+		}),
+	).map(([path, url]) => [path.replace(/^.*runners\/|\/dive\.png$/g, ''), url]),
+)
+
+// Each one's swim and dive poses, if they've any.
+for (const runner of BONUS_RUNNERS) {
+	const folder = runner.id.replace(/^bonus:/, '')
+	runner.sprite.swim ??= BONUS_SWIMS[folder]
+	runner.sprite.dive ??= BONUS_DIVES[folder]
+}
 
 /** A bonus runner, by their runner id: unlocked here or not, to show anyone who's running as them. */
 export const bonusRunner = (id: string) =>

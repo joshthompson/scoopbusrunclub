@@ -1,4 +1,5 @@
 import { GRAVITY } from '../game/constants'
+import { inDeepWater } from '../game/swim'
 import type { World } from '../game/world'
 
 /**
@@ -55,6 +56,27 @@ function hoverHeight(world: World, middle: number) {
 	const bob =
 		Math.sin((world.bus.frontX / HOVER_BOB_EVERY) * Math.PI * 2) * HOVER_BOB
 	return floor - HOVER + bob
+}
+
+/** How far under whoever it's after its wheels swim, and how near the surface they go. */
+const SWIM_UNDER = 30
+const SWIM_SURFACE_ROOM = 70
+
+/**
+ * Where its wheels go, under the sea: level with whoever's nearest ahead
+ * of it, its scoop at them, however deep they are; never up out of the
+ * water, nor down into the seabed.
+ */
+function swimHeight(world: World, middle: number) {
+	const { deepWater } = world.course
+	const floor = hoverHeight(world, middle)
+	if (!deepWater) return floor
+	const front = world.bus.frontX
+	const ahead = world.racers
+		.filter((r) => !r.out && r.body.x > front - 20)
+		.sort((a, b) => a.body.x - b.body.x)[0]
+	const y = ahead ? ahead.body.feetY + SWIM_UNDER : floor
+	return Math.max(deepWater.surface + SWIM_SURFACE_ROOM, Math.min(floor, y))
 }
 
 /** On its glider: how fast it climbs or dives at most, and how quickly it turns to. */
@@ -115,9 +137,12 @@ export function rideBus(world: World, ride: BusRide, middle: number) {
 		return
 	}
 	// On its jets: floating along, drawn up softly to its height, and over
-	// whatever's coming.
+	// whatever's coming; under the sea, at the depth of whoever it's after.
 	if (onJets(world, middle)) {
-		ride.vy += (hoverHeight(world, middle) - ride.y) * HOVER_PULL
+		const want = inDeepWater(world, middle)
+			? swimHeight(world, middle)
+			: hoverHeight(world, middle)
+		ride.vy += (want - ride.y) * HOVER_PULL
 		ride.vy *= HOVER_DAMP
 		ride.y += ride.vy
 		ride.grounded = false

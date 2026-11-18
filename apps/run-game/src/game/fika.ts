@@ -101,6 +101,10 @@ export type FikaItem =
 	| 'flyingStrawberry'
 	| 'bubbleGum'
 	| 'cloudberries'
+	/** Dino Island's: fossil pops in the forest, a lava cake up the volcano, a coconut on the island. */
+	| 'fossilPops'
+	| 'lavaCake'
+	| 'coconut'
 
 export const FIKA_ITEMS: FikaItem[] = [
 	'coffee',
@@ -244,6 +248,9 @@ export const CLIFF_FIKA: FikaItem[] = [
 	'cloudberries',
 ]
 
+/** Dino Island's: fossil pops, a lava cake, a coconut. */
+export const DINO_FIKA: FikaItem[] = ['fossilPops', 'lavaCake', 'coconut']
+
 /** In Turku: a Karelian pie, a coffee, salmiakki. */
 export const TURKU_FIKA: FikaItem[] = ['karelianPie', 'coffee', 'salmiakki']
 
@@ -311,6 +318,9 @@ export const FIKA_SIZE: Record<FikaItem, { width: number; height: number }> = {
 	mojito: { width: 9 * CELL, height: 13 * CELL },
 	dobryCola: { width: 7 * CELL, height: 14 * CELL },
 	flyingStrawberry: { width: 12 * CELL, height: 8 * CELL },
+	fossilPops: { width: 15 * CELL, height: 13 * CELL },
+	lavaCake: { width: 12 * CELL, height: 9 * CELL },
+	coconut: { width: 11 * CELL, height: 12 * CELL },
 	bubbleGum: { width: 12 * CELL, height: 6 * CELL },
 	cloudberries: { width: 9 * CELL, height: 9 * CELL },
 }

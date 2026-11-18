@@ -1,6 +1,7 @@
 import type { Course } from '../courses/types'
 import { play } from '../sfx'
 import { GRAVITY, HITBOX_HALF_WIDTH, LEFT_EDGE, VIEW_HEIGHT } from './constants'
+import { createFollower } from './followers'
 import { scored } from './step'
 import type { Terrain } from './terrain'
 import type { World } from './world'
@@ -21,8 +22,22 @@ export interface Football {
 	vy: number
 	/** How far round it's rolled, in degrees: what it's drawn turned by. */
 	spin: number
-	/** Over the finish line, a goal; or scooped up by the bus, flying. */
-	out?: 'home' | 'scooped'
+	/**
+	 * Over the finish line, a goal; or scooped up by the bus, flying; or
+	 * an egg, hatched, and running on its own two legs.
+	 */
+	out?: 'home' | 'scooped' | 'hatched'
+	/**
+	 * An egg, rather than a football: it cracks, kicked, and hatches,
+	 * landing past `hatchFrom` (see `Course['egg']`).
+	 */
+	egg?: NonNullable<Course['egg']>
+	/** How many times it's been kicked. */
+	kicks: number
+	/** An egg's cracks, 0 to `EGG_STAGES - 1`, the further it's come (see `eggStage`). */
+	stage: number
+	/** Who last kicked it, by their racer id. */
+	kickedBy?: string
 	/** The tick each racer last kicked it, by their id: not every tick they're touching it. */
 	kicked: Record<string, number>
 }
@@ -52,10 +67,11 @@ export const GOAL_POINTS = 500
 /** A course's football, lying on the path where it says, if it has one. */
 export function createFootball(course: {
 	football?: Course['football']
+	egg?: Course['egg']
 	terrain: Terrain
 }): Football | undefined {
-	if (course.football === undefined) return undefined
-	const x = course.football
+	const x = course.football ?? course.egg?.x
+	if (x === undefined) return undefined
 	return {
 		x,
 		y: course.terrain.groundY(x) - FOOTBALL_RADIUS,
@@ -63,6 +79,9 @@ export function createFootball(course: {
 		vy: 0,
 		spin: 0,
 		kicked: {},
+		kicks: 0,
+		stage: 0,
+		egg: course.football === undefined ? course.egg : undefined,
 	}
 }
 
@@ -75,6 +94,7 @@ export function stepFootball(world: World) {
 	const ball = world.ball
 	if (!ball) return
 	const { terrain } = world
+	if (ball.out === 'hatched') return
 	if (ball.out === 'scooped') {
 		if (ball.y > VIEW_HEIGHT + 400) return
 		ball.vy += GRAVITY
@@ -104,10 +124,33 @@ export function stepFootball(world: World) {
 		ball.y = under
 		ball.vy = ball.vy > 2 ? -ball.vy * BOUNCE : 0
 	}
+	// An egg, cracking more the further it's come, and saying so.
+	if (ball.egg && !ball.out) {
+		const stage = eggStage(ball)
+		if (stage > ball.stage) {
+			ball.stage = stage
+			play('stomp')
+			world.popup(
+				stage === EGG_STAGES - 1 ? 'It’s moving!' : 'Crack!',
+				ball.x,
+				ball.y - 40,
+			)
+		}
+	}
+	// An egg, kicked on as far as where it hatches, on the ground: it does.
+	if (
+		ball.egg &&
+		!ball.out &&
+		ball.x >= ball.egg.hatchFrom &&
+		ball.y >= under - 1
+	) {
+		hatch(world, ball, ball.egg)
+		return
+	}
 	// Rolling along, turning as it goes: a radian for each radius it rolls.
 	ball.spin += (ball.vx / FOOTBALL_RADIUS) * (180 / Math.PI)
 
-	if (!ball.out && ball.x >= terrain.finishX) {
+	if (!ball.out && !ball.egg && ball.x >= terrain.finishX) {
 		ball.out = 'home'
 		play('cheer')
 		world.addBonus('football', GOAL_POINTS)
@@ -139,6 +182,8 @@ function kick(world: World, ball: Football) {
 		const last = ball.kicked[racer.id]
 		if (last !== undefined && world.ticks() - last < KICK_AGAIN) continue
 		ball.kicked[racer.id] = world.ticks()
+		ball.kicks++
+		ball.kickedBy = racer.id
 		// On ahead the way they're going, even run past its middle before
 		// they got to kick it; nudged by someone standing about, away from them.
 		const speed = Math.abs(b.vx)
@@ -149,4 +194,32 @@ function kick(world: World, ball: Football) {
 		ball.x = b.x + dir * (HITBOX_HALF_WIDTH + FOOTBALL_RADIUS + 1)
 		play('stomp')
 	}
+}
+
+/** How many stages of cracking an egg goes through, from none to all over. */
+export const EGG_STAGES = 4
+
+/**
+ * How cracked an egg is: more and more the further it's been kicked from
+ * its nest towards where it hatches.
+ */
+export function eggStage(ball: Football) {
+	if (!ball.egg) return 0
+	const { x: nest, hatchFrom } = ball.egg
+	const come = Math.max(0, Math.min(1, (ball.x - nest) / (hatchFrom - nest)))
+	return Math.min(EGG_STAGES - 1, Math.floor(come * EGG_STAGES))
+}
+
+/** An egg, hatched: legs out, and off after whoever kicked it last, following them. */
+function hatch(world: World, ball: Football, egg: NonNullable<Course['egg']>) {
+	ball.out = 'hatched'
+	ball.vx = 0
+	ball.vy = 0
+	const owner =
+		world.racers.find((r) => r.id === ball.kickedBy) ?? world.racers[0]
+	world.followers.push(
+		createFollower(egg.follower, owner, ball.x, ball.y + FOOTBALL_RADIUS),
+	)
+	play('pop')
+	world.popup('It hatched!', ball.x, ball.y - 60)
 }

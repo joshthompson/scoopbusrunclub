@@ -699,6 +699,34 @@ export function paintOwnHat(
 	paintPicture(ctx, image, frame, x, y, own.width, own.height)
 }
 
+/**
+ * A snorkel mask, off the seabed by Dino Island: its glass over the eyes,
+ * at the front, in a black rubber frame, a strap round the back of the
+ * head, and the snorkel up behind it, its mouthpiece down by the cheek and
+ * its top an orange band.
+ */
+const SNORKEL = cells(
+	12,
+	12,
+	[
+		// The snorkel: up behind the head, its orange top, and down to the mouth.
+		[10, 0, 2, 2, '#ff7a1a'],
+		[10, 2, 2, 7, '#3fa0d8'],
+		[11, 2, 1, 7, '#2a78a8'],
+		[9, 9, 2, 1, '#2a78a8'],
+		// The strap, round the back of the head.
+		[4, 6, 6, 1, '#2b2b2b'],
+		[4, 7, 6, 1, '#1d1d1d'],
+		// The mask's frame, and its glass, light glinting off it.
+		[0, 5, 5, 4, '#1d1d1d'],
+		[1, 6, 3, 2, '#9fdcf2'],
+		[1, 6, 1, 1, '#ffffff'],
+		[3, 7, 1, 1, '#6cb8d8'],
+	],
+	3,
+	6,
+)
+
 const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	miner: MINER,
 	captain: CAPTAIN,
@@ -717,6 +745,7 @@ const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	bobbleHat: BOBBLE_HAT,
 	headMirror: HEAD_MIRROR,
 	discoBall: DISCO_BALL,
+	snorkel: SNORKEL,
 	// Its flames still, as a picture: on a head, they flicker (see `paintHat`).
 	jazzHat: {
 		src: JAZZ_HAT.frames[0],

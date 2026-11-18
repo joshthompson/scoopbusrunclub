@@ -46,6 +46,105 @@ export const BEAT: Tune = {
 	],
 }
 
+/**
+ * Dino Island's tune, in E minor, the same melody over the same chords in
+ * three versions, one for each stretch of it (see `Course['tunes']`): a
+ * jungle's, plucked over a bouncing bass, through the forest; a volcano's,
+ * on a distorted guitar, from when it blows; and the sea's, whistled over
+ * a soft bass, bubbles dripping, under it. So one fades into the next
+ * mid-tune.
+ */
+const DINO_CHORDS = [
+	'Em',
+	'Em',
+	'C',
+	'D',
+	'Em',
+	'Em',
+	'C',
+	'B',
+	'Am',
+	'C',
+	'G',
+	'D',
+	'Em',
+	'Em',
+	'C',
+	'D',
+] as const
+/** Each chord's bar of bass: its root bouncing, its fifth, and up to its third. */
+const DINO_BASS: Record<(typeof DINO_CHORDS)[number], string> = {
+	Em: 'E2 - - E2 - - B1 - E2 - - E2 - - G2 -',
+	C: 'C2 - - C2 - - G1 - C2 - - C2 - - E2 -',
+	D: 'D2 - - D2 - - A1 - D2 - - D2 - - F#2 -',
+	B: 'B1 - - B1 - - F#1 - B1 - - B1 - - D#2 -',
+	Am: 'A1 - - A1 - - E2 - A1 - - A1 - - C2 -',
+	G: 'G1 - - G1 - - D2 - G1 - - G1 - - B1 -',
+}
+const DINO_BASS_LINE = bars(...DINO_CHORDS.map((chord) => DINO_BASS[chord]))
+const DINO_MELODY = bars(
+	'E5 - G5 - B5 _ _ - A5 - G5 - E5 _ _ -',
+	'D5 - E5 - G5 _ _ - E5 _ _ _ - - - -',
+	'E5 - G5 - C6 _ _ - B5 - G5 - E5 _ _ -',
+	'F#5 - A5 - D6 _ _ - C6 - A5 - F#5 _ _ -',
+	'E5 - G5 - B5 _ _ - A5 - G5 - E5 _ _ -',
+	'D5 - E5 - G5 _ _ - B5 _ _ _ - - - -',
+	'C6 - B5 - G5 _ _ - E5 - G5 - C6 _ _ -',
+	'B5 _ _ _ D#6 _ _ _ F#6 _ _ _ - - - -',
+	'A5 _ _ - C6 _ _ - E6 _ _ _ D6 - C6 -',
+	'G5 _ _ - C6 _ _ - E6 _ _ _ D6 - C6 -',
+	'B5 _ _ - D6 _ _ - G6 _ _ _ F#6 - E6 -',
+	'F#6 _ _ _ E6 _ _ _ D6 _ _ _ A5 _ _ -',
+	'E5 - G5 - B5 _ _ - A5 - G5 - E5 _ _ -',
+	'D5 - E5 - G5 _ _ - E5 _ _ _ - - - -',
+	'E5 - G5 - C6 _ _ - B5 - G5 - E5 _ _ -',
+	'F#5 - A5 - D6 _ _ - B5 _ _ _ E5 _ _ -',
+)
+/** The melody an octave down, for a guitar to chug. */
+const DINO_LOW_MELODY = DINO_MELODY.replace(
+	/([A-G]#?)(\d)/g,
+	(_, note, octave) => `${note}${Number(octave) - 1}`,
+)
+
+const DINO_JUNGLE: Tune = {
+	bars: 16,
+	tracks: [
+		{ voice: 'bass', pattern: DINO_BASS_LINE, gain: 0.12, gate: 0.5 },
+		{ voice: 'pluck', pattern: DINO_MELODY, gain: 0.05, gate: 0.6 },
+		{
+			voice: 'bell',
+			pattern: bars(
+				'- - - - - - - - - - - - - - B5 -',
+				'- - - - - - - - - - - - - - E6 -',
+			),
+			gain: 0.025,
+		},
+	],
+}
+const DINO_VOLCANO: Tune = {
+	bars: 16,
+	tracks: [
+		{ voice: 'bass', pattern: DINO_BASS_LINE, gain: 0.14, gate: 0.4 },
+		{ voice: 'guitar', pattern: DINO_LOW_MELODY, gain: 0.024, gate: 0.85 },
+	],
+}
+const DINO_SEA: Tune = {
+	bars: 16,
+	beat: 0.4,
+	tracks: [
+		{ voice: 'sub', pattern: DINO_BASS_LINE, gain: 0.12, gate: 0.7 },
+		{ voice: 'whistle', pattern: DINO_MELODY, gain: 0.035, gate: 0.9 },
+		{
+			voice: 'bell',
+			pattern: bars(
+				'- - - - - - B6 - - - - - - - E7 -',
+				'- - - - - - - - - - G6 - - - - -',
+			),
+			gain: 0.02,
+		},
+	],
+}
+
 /** The menus': bright, in C, round and round while you pick. */
 const MENU: Tune = {
 	bars: 16,
@@ -1375,6 +1474,9 @@ export const TUNES: Record<string, Tune> = {
 	midnattsloppet: MIDNATT_EDM,
 	'midnattsloppet:rock': MIDNATT_ROCK,
 	'midnattsloppet:choir': MIDNATT_CHOIR,
+	'dino-island': DINO_JUNGLE,
+	'dino-island:volcano': DINO_VOLCANO,
+	'dino-island:sea': DINO_SEA,
 }
 
 /** A course with no tune of its own yet gets Haga's. */

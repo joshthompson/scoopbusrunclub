@@ -172,6 +172,20 @@ export type Obstacle =
 	 * worse for it.
 	 */
 	| { kind: 'spider'; x: number; range: [from: number, to: number] }
+	/**
+	 * A jellyfish, in Deep Water (see `DeepWater`), drifting slowly up and down
+	 * from `low` to `high` over the seabed, its bell's bottom: swim round
+	 * it, or into it and you're stung, a stumble. Its trailing tentacles
+	 * sting too.
+	 */
+	| { kind: 'jellyfish'; x: number; low: number; high: number }
+	/**
+	 * A shark, in Deep Water, lurking `height` over the seabed at `x`: as
+	 * anyone swims near, it's after whoever's nearest, faster than they
+	 * swim. Swim clear of it, or it bites, a stumble; and it's off, done,
+	 * biting nobody else (see `sharks.ts`).
+	 */
+	| { kind: 'shark'; x: number; height: number }
 
 /** Something on the course, at `x` along it, that speeds you up. */
 export type Boost =
@@ -409,6 +423,50 @@ export interface CourseLook {
 	 */
 	boars?: { from: number }
 	/**
+	 * Herds running alongside, as the boars do (see `boars`), each coming up
+	 * from behind as whoever's racing in front gets to `from`: dinosaurs on
+	 * Dino Island, overtaking at a gallop, or one keeping pace a long way.
+	 * See `Herd`.
+	 */
+	herds?: Herd[]
+	/**
+	 * A picture in place of the huge spider, and where on it to land or not
+	 * to run into (see `SpiderLook`): a triceratops, on Dino Island.
+	 */
+	spider?: SpiderLook
+	/**
+	 * A volcano erupting once everyone racing's crossed its crater, at `at`: the
+	 * sky going red, smoke pouring up, ash falling; and from `silhouette.from`
+	 * to `silhouette.to` along, everything on the course black against it,
+	 * as in an old dinosaur game (see `draw/eruption.tsx`).
+	 */
+	eruption?: Eruption
+	/** Deep Water's colours, swum through: see `DeepWater`. */
+	deepWater?: DeepWaterLook
+	/**
+	 * A diplodocus the path runs up and over: its tail and back are the
+	 * Ground, its head a Platform, `head` (by its index), that rises as
+	 * someone's on it, its neck drawn from its shoulders, `shoulder`, up to
+	 * it. Its body's picture, its top left at `body.x`, `body.y`.
+	 */
+	diplodocus?: {
+		head: number
+		shoulder: { x: number; y: number }
+		body: { asset: string; x: number; y: number; width: number; height: number }
+		/**
+		 * The ground under it, `from` to `to`, its line at `y`: drawn as the
+		 * Ground is either side, its `layers` as `ground`'s are (offsets from
+		 * the line, each filled on down, a ragged top if it has an `edge`), as
+		 * the Ground there's up on its back.
+		 */
+		floor: {
+			from: number
+			to: number
+			y: number
+			layers: [offset: number, fill: string, edge?: (x: number) => number][]
+		}
+	}
+	/**
 	 * A forest harvester at work behind the path, the tree it's felling
 	 * standing at `x`, through its head: `tree`, drawn twice its size,
 	 * through `filter`. As whoever's racing in front comes up to it, it saws
@@ -485,6 +543,12 @@ export interface CourseLook {
 	 * drop. See `PitLook`.
 	 */
 	pit?: PitLook
+	/**
+	 * Lava down Gaps, each `from` to `to`, its surface at `level` (a y):
+	 * churning, bubbling and spurting up (see `draw/lava.ts`). A volcano's
+	 * crater, on Dino Island.
+	 */
+	lava?: { from: number; to: number; level: number }[]
 	/** Its Gaps on fire: pits down into hell, flames licking up out of them, embers rising. */
 	pitFire?: boolean
 	/** In place of the sun, `scale` times its size, through the `sun` filter: a moon. */
@@ -534,7 +598,15 @@ export interface CourseLook {
 	 * back, roaring, its wheels tucked away; floating along over the floor,
 	 * up over whatever's in the way, bobbing. Shrunk, inside someone.
 	 */
-	busJets?: { from: number; to: number }
+	busJets?: {
+		from: number
+		to: number
+		/**
+		 * Under the sea, a turbine in place of the rocket booster, its
+		 * propeller turning, bubbles streaming off it: Dino Island's.
+		 */
+		turbine?: boolean
+	}
 	/** How a Platform looks: see `PlatformLook`. */
 	platform?: PlatformLook
 	/**
@@ -1066,6 +1138,7 @@ export type CourseId =
 	| 'slopes'
 	| 'karolinska'
 	| 'midnattsloppet'
+	| 'dino-island'
 
 /**
  * A Portal: a machine that shrinks everyone down, or a sneeze that blows
@@ -1154,6 +1227,12 @@ export interface Course {
 	 * screen: something tall there, Sofiakyrkan, the whole of it in view.
 	 */
 	lookUp?: { from: number; to: number; top: number }[]
+	/**
+	 * Stretches where whoever's running is kept low on the screen, the sky
+	 * filling it over them, up on the skyline: Dino Island's run down its
+	 * volcano, blown, everyone black against the burning sky.
+	 */
+	skyline?: { from: number; to: number }[]
 	/** Platforms over the Ground, in order along the course. */
 	platforms?: PlatformDefinition[]
 	/** A Cave it runs through, under a hill. */
@@ -1259,6 +1338,8 @@ export interface Course {
 	sea?: { from: number; to: number; level: number; busSpeed: number }
 	/** A River across the course, to wade or cross on its crocodiles: see `River`. */
 	river?: River
+	/** Deep Water, to dive into and swim through, under it: see `DeepWater`. */
+	deepWater?: DeepWater
 	/** How high a glider can go, at most: a y, its rider's feet. */
 	sky?: number
 	/**
@@ -1272,8 +1353,11 @@ export interface Course {
 	 * gets to `x`. Jump into one and it carries you.
 	 */
 	flyovers?: { x: number; count: number }[]
-	/** What those are: geese, or on the Great Wall, a dragon; off Machu Picchu, condors. */
-	flyer?: 'goose' | 'dragon' | 'condor'
+	/**
+	 * What those are: geese, or on the Great Wall, a dragon; off Machu
+	 * Picchu, condors; over Dino Island, pterodactyls.
+	 */
+	flyer?: 'goose' | 'dragon' | 'condor' | 'pterodactyl'
 	/**
 	 * A Leap: the Ground drops away sheer at `edge`, a long way down to a
 	 * valley floor, and there's no way on but off it. Whoever goes over
@@ -1323,6 +1407,14 @@ export interface Course {
 	 * ahead (see `Football`).
 	 */
 	football?: number
+	/**
+	 * An egg, in its nest on the path at `x`: run into it and you kick it on
+	 * ahead, as a football, and it cracks a little more every time. Kicked
+	 * on as far as `hatchFrom`, on the Ground there, it cracks open, hatched: legs out, it's a Follower, `follower` by kind, running on
+	 * after whoever kicked it (see `followers.ts`). Bring it over the finish
+	 * line with you, and that's Dino Island's special goal. Not in a Round.
+	 */
+	egg?: { x: number; hatchFrom: number; follower: FollowerKind }
 	/** Its special goal, its own: see `SpecialGoal`. */
 	special?: SpecialGoal
 	/**
@@ -1628,6 +1720,8 @@ export interface SpecialRun {
 	ghost?: boolean
 	/** The most of a River's crocodiles they bounced on in turn, from the first, without touching down. */
 	crocodiles?: number
+	/** Brought their Follower over the finish line with them, still with them. */
+	followerHome?: boolean
 }
 
 /**
@@ -1642,6 +1736,12 @@ export interface River {
 	to: number
 	level: number
 	depth: number
+	/**
+	 * A pond, rather than a river flowing away across the field: its far
+	 * edge rounded off, a mud bank all round it, and only as deep as it is
+	 * in front (see `draw/river.tsx`). Dino Island's, under the diplodocus.
+	 */
+	pond?: boolean
 }
 
 /**
@@ -1658,6 +1758,84 @@ export interface RiverLook {
 }
 
 /**
+ * A herd running alongside the path (see `CourseLook['herds']`): each of
+ * them its `frames`, `width` by `height`, `behind` the first, `down` the
+ * grass in front of the path, a run frame every `stride` px; at `speed` px a
+ * tick. `over` the path, rather than in front of it: right on it, beside
+ * whoever's running.
+ */
+export interface Herd {
+	from: number
+	speed: number
+	over?: boolean
+	members: {
+		frames: string[]
+		width: number
+		height: number
+		behind: number
+		down: number
+		stride: number
+	}[]
+}
+
+/**
+ * A huge spider's picture, or whatever's in its place (see
+ * `CourseLook['spider']`): its walk's `frames` and its `squashed` one, all
+ * `width` by `height`, facing left; `head` and `body`, the tops to land on,
+ * from and to across it from its left, `top` up from its feet; and `bite`,
+ * what knocks you down running into it, up to `top`. `word`, said as it
+ * does.
+ */
+export interface SpiderLook {
+	frames: string[]
+	squashed: string
+	width: number
+	height: number
+	head: { from: number; to: number; top: number }
+	body: { from: number; to: number; top: number }
+	bite: { from: number; to: number; top: number }
+	word?: string
+}
+
+/**
+ * A volcano's eruption (see `CourseLook['eruption']`): its crater's middle
+ * `crater`, a y its lip; set off once everyone racing is past `at` (or,
+ * all of them caught, the bus is). And where
+ * everything's drawn as a silhouette, black against the burning sky.
+ */
+export interface Eruption {
+	at: number
+	crater: { x: number; y: number }
+	silhouette: { from: number; to: number }
+	/** Where the smoke's cleared, and the sky's its own again, by: over the sea. */
+	clear: number
+}
+
+/**
+ * Deep Water, swum through, not fallen into as the Sea (see `sea`) is:
+ * Dino Island's sea, off its cliff. From where the course goes into it, `from`, to
+ * where it comes up out of it, `to`, its surface at `surface` (a y). The
+ * Ground under it is the seabed. Into it, off the land, and you're
+ * swimming, up and down as you steer, through what's in it, and up out of
+ * it onto the shore the far side, as soon as it's shallow enough to stand.
+ * The bus goes through it at `busPace` of its own pace, at most.
+ */
+export interface DeepWater {
+	from: number
+	to: number
+	surface: number
+	busPace: number
+}
+
+/** The sea's colours, swum through: its `water` near the surface, darkening to `deep`; the `light` playing down through it, and its `surface`'s shine. */
+export interface DeepWaterLook {
+	water: string
+	deep: string
+	light: string
+	surface: string
+}
+
+/**
  * A band of the backdrop: a picture repeated along it, `height` tall from
  * `top` down the screen, going by at `parallax` of the path's pace, the
  * further off the slower.
@@ -1668,6 +1846,12 @@ export interface BackdropBand {
 	height: number
 	parallax: number
 }
+
+/**
+ * What can follow someone along (see `followers.ts`): Dino Island's
+ * hatchling, out of its egg on its own two legs.
+ */
+export type FollowerKind = 'hatchling'
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */
 export type CourseDefinition = Omit<Course, 'number'>

@@ -76,11 +76,13 @@ import { FURBY_HEIGHT, FURBY_WIDTH, furbySquash } from '../game/furbies'
 import { DRAWN_FROM } from '../game/groundColumns'
 import type { Hat } from '../game/hats'
 import { CAUGHT_TICKS, inClutches, risingFromGrave } from '../game/haunted'
+import { jellyfishHeight } from '../game/jellyfish'
 import { mummyAt } from '../game/mummies'
 import { type PlatformAt, platformAt, platformOut } from '../game/platforms'
 import { heldLook, pacerShrunk } from '../game/portals'
 import { inRiver } from '../game/river'
 import { brokenHalf, sagOf } from '../game/ropeBridge'
+import { sharkSwim } from '../game/sharks'
 import {
 	BALLOON_HEIGHT,
 	BALLOON_WIDTH,
@@ -97,7 +99,7 @@ import {
 	turbineAt,
 	whaleAt,
 } from '../game/sky'
-import { spiderAt } from '../game/spiders'
+import { spiderAt, spiderLook } from '../game/spiders'
 import { stalactiteAt } from '../game/stalactites'
 import {
 	DANCING_STILL,
@@ -106,6 +108,7 @@ import {
 	scoopFlight,
 	stepWorld,
 } from '../game/step'
+import { SWIM_TALL, inDeepWater, underwater } from '../game/swim'
 import { tiltAt } from '../game/terrain'
 import {
 	TOWER_ARCH,
@@ -137,7 +140,14 @@ import { zombieSprite } from '../runners/skeleton'
 import { play } from '../sfx'
 import { WallBricks } from './Backdrop'
 import { bubbleReach, paintBubble } from './Bubble'
-import { BUS_BOOSTER, BUS_FIN, BUS_FLAME, BUS_WING } from './art/busJets'
+import {
+	BUS_BOOSTER,
+	BUS_BUBBLES,
+	BUS_FIN,
+	BUS_FLAME,
+	BUS_PROPELLER,
+	BUS_WING,
+} from './art/busJets'
 import { LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH, paintBusLegs } from './art/busLegs'
 import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
@@ -161,6 +171,12 @@ import {
 	paintHatGlow,
 	paintOwnHat,
 } from './art/hats'
+import {
+	JELLYFISH_BELL,
+	JELLYFISH_FRAMES,
+	JELLYFISH_HEIGHT,
+	JELLYFISH_WIDTH,
+} from './art/jellyfish'
 import { KIDS_HEIGHT, KIDS_REACH, kidsPainter, kidsWidth } from './art/kids'
 import { mudReach, paintMud } from './art/mud'
 import { ROADBLOCK, ROADBLOCK_HEIGHT, ROADBLOCK_WIDTH } from './art/roadblock'
@@ -177,6 +193,7 @@ import {
 	paintSewage,
 	paintSwampMan,
 } from './art/sewer'
+import { SHARK_FRAMES, SHARK_HEIGHT, SHARK_WIDTH } from './art/shark'
 import {
 	STOOD_HEIGHT,
 	STOOD_WIDTH,
@@ -205,12 +222,6 @@ import {
 	paintSnowman,
 	railPainter,
 } from './art/slopes'
-import {
-	SPIDER_FRAMES,
-	SPIDER_HEIGHT,
-	SPIDER_SQUASHED,
-	SPIDER_WIDTH,
-} from './art/spider'
 import {
 	SPLASH_HEIGHT,
 	SPLASH_REACH,
@@ -400,6 +411,33 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		body.carried === 0 &&
 		racer.out !== 'scooped' &&
 		Math.abs(body.vx) < STILL_SPEED
+	/**
+	 * Under the sea, swimming: worked out from where they are, so a Remote
+	 * Player's screen draws it too. In their swim frames, or their run
+	 * turned over if they've none.
+	 */
+	const swimming = () =>
+		world.ticks() >= 0 &&
+		racer.out !== 'scooped' &&
+		!body.grounded &&
+		underwater(world, body.x, body.feetY)
+	const swim = sprite.swim
+	const dive = sprite.dive
+	const swimSize = swim
+		? { width: swim.width * RUNNER_SCALE, height: swim.height * RUNNER_SCALE }
+		: runSize
+	/**
+	 * Off a diving board, falling, on the way down into the sea: their swim
+	 * frame turned nose down, arms out ahead, a dive.
+	 */
+	const diving = () =>
+		world.ticks() >= 0 &&
+		racer.out !== 'scooped' &&
+		!body.grounded &&
+		body.carried === 0 &&
+		body.vy > 1 &&
+		!swimming() &&
+		inDeepWater(world, body.x)
 	// On a glider, lying along under its wing, head first, legs together:
 	// the stand frame, turned over. On skis, stood up on them.
 	const lying = () =>
@@ -438,6 +476,8 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			...(skiStance ? [skiStance] : []),
 			...(sprite.snowboard ? [sprite.snowboard] : []),
 			...(dance?.frames ?? []),
+			...(swim?.frames ?? []),
+			...(dive ? [dive] : []),
 		],
 		init() {
 			const size = () =>
@@ -448,13 +488,17 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 							width: dance.width * RUNNER_SCALE,
 							height: dance.height * RUNNER_SCALE,
 						}
-					: tucked()
-						? poseSize(skiTuck, sprite)
-						: ducking()
-							? poseSize(sit, sprite)
-							: onSkis()
-								? poseSize(stanceOf(sprite, body.board), sprite)
-								: runSize
+					: diving() && dive
+						? poseSize(dive, sprite)
+						: swimming() || diving()
+							? swimSize
+							: tucked()
+								? poseSize(skiTuck, sprite)
+								: ducking()
+									? poseSize(sit, sprite)
+									: onSkis()
+										? poseSize(stanceOf(sprite, body.board), sprite)
+										: runSize
 			return {
 				id: `player-${racer.id}`,
 				type: 'player',
@@ -465,15 +509,19 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				frames: () =>
 					dancing() && dance
 						? dance.frames
-						: tucked() && skiTuck
-							? [skiTuck]
-							: ducking() && sit
-								? [sit]
-								: onSkis()
-									? [stanceOf(sprite, body.board) ?? stand ?? run[0]]
-									: (standing() || lying()) && stand
-										? [stand]
-										: run,
+						: diving() && dive
+							? [dive]
+							: (swimming() || diving()) && swim
+								? swim.frames
+								: tucked() && skiTuck
+									? [skiTuck]
+									: ducking() && sit
+										? [sit]
+										: onSkis()
+											? [stanceOf(sprite, body.board) ?? stand ?? run[0]]
+											: (standing() || lying()) && stand
+												? [stand]
+												: run,
 				...createObjectSignal(undefined as number | undefined, 'frame'),
 				// Run sprites face left, the way the header's runners run.
 				...createObjectSignal(-1, 'xScale'),
@@ -508,27 +556,41 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			if (!worn && !own) return
 			const frames = $.frames?.() ?? []
 			const frame = frames[$currentFrame] ?? frames[0]
-			const head = frame ? headTop(frame, width, height) : undefined
+			// Swimming, or diving, in their swim frames: lying along, head
+			// first, so the hat's on the front of their head, turned a
+			// quarter round with them, its crown ahead.
+			const lying = !!swim && (swimming() || (diving() && !dive))
+			const head = frame ? headTop(frame, width, height, lying) : undefined
+			/** Paints a hat `middle` across and `crown` down, on their head. */
+			const onHead = (
+				middle: number,
+				crown: number,
+				paint: (x: number, y: number) => void,
+			) => {
+				if (!lying) {
+					paint((head?.x ?? width / 2) - middle, (head?.y ?? 2) - crown)
+					return
+				}
+				ctx.save()
+				ctx.translate(head?.x ?? 2, head?.y ?? height / 2)
+				ctx.rotate(-Math.PI / 2)
+				paint(-middle, -crown)
+				ctx.restore()
+			}
 			if (own) {
-				paintOwnHat(
-					ctx,
-					image,
-					own,
-					(head?.x ?? width / 2) - own.middle,
-					(head?.y ?? 2) - own.crown,
-					now,
+				onHead(own.middle, own.crown, (x, y) =>
+					paintOwnHat(ctx, image, own, x, y, now),
 				)
 				return
 			}
 			if (!worn) return
 			const art = hatArt(worn)
-			paintHat(
-				ctx,
-				image,
-				worn,
-				(head?.x ?? width / 2) - art.middle,
-				(head?.y ?? 2) - art.crown,
-				{ lit: true, whirring: floating(), now },
+			onHead(art.middle, art.crown, (x, y) =>
+				paintHat(ctx, image, worn, x, y, {
+					lit: true,
+					whirring: floating(),
+					now,
+				}),
 			)
 		},
 		onEnterFrame({ $, $currentFrame }) {
@@ -615,6 +677,45 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				)
 			}
 			wasDancing = isDancing
+			if (diving() && dive) {
+				// Diving in: stood tall, arms up, turned over head first, and
+				// on down head first the faster they fall.
+				$.setXScale(xScale)
+				$.setRotation(
+					(90 + Math.max(0, Math.min(80, body.vy * 9))) * body.facing,
+				)
+				$.setY(body.feetY - DIVE_MIDDLE - $.height() / 2)
+				$.setFrame(0)
+				$.setState('pause')
+			} else if (swimming() || diving()) {
+				// Lying along, head first, in the middle of the water they're in;
+				// or diving, nose down. Their run, turned over, if they've no
+				// swim of their own.
+				const lean = swim ? 0 : 90
+				// Pointing the way they're going: nose down diving, up rising.
+				const steer = Math.max(
+					-STEEPEST_SWIM,
+					Math.min(
+						STEEPEST_SWIM,
+						(Math.atan2(body.vy, Math.max(Math.abs(body.vx), 1.2)) * 180) /
+							Math.PI,
+					),
+				)
+				const dive = diving() ? Math.min(70, 20 + body.vy * 6) : 0
+				$.setXScale(xScale)
+				$.setRotation((lean + steer + dive) * body.facing)
+				$.setY(body.feetY - SWIM_TALL / 2 - $.height() / 2)
+				$.setState('pause')
+				// Stroke and kick, by the tick, quicker the faster they swim.
+				const strokes = Math.abs(body.vx) > 0.5 || diving()
+				$.setFrame(
+					diving()
+						? 0
+						: strokes
+							? Math.floor(Math.max(0, world.ticks()) / 14) % 2
+							: 0,
+				)
+			}
 			const { sea } = world.course
 			const haunted = hauntLook(world, racer, now())
 			if (haunted.shake) $.setX($.x() + haunted.shake)
@@ -658,7 +759,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			const across = ((head?.x ?? width / 2) - width / 2) * $.xScale()
 			const down = (head?.y ?? 0) - height / 2
 			const turned = ($.rotation() * Math.PI) / 180
-			headAt.set(body, {
+			const drawn = {
 				x:
 					$.x() +
 					width / 2 +
@@ -669,6 +770,11 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 					height / 2 +
 					across * Math.sin(turned) +
 					down * Math.cos(turned),
+			}
+			headAt.set(body, drawn)
+			headFromFeet.set(body, {
+				x: drawn.x - body.x,
+				y: drawn.y - body.feetY,
 			})
 		},
 	})
@@ -676,6 +782,25 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 
 /** Where each racer's head was last drawn, in the world: see `createPlayer`. */
 const headAt = new WeakMap<Body, { x: number; y: number }>()
+
+/**
+ * Where a flyer carrying someone has its feet, under it, if it's hanging
+ * on to them: on the top of their head, as it was last drawn, found from
+ * their picture, so it's on everyone's head whatever their picture's like.
+ * Kept as how far their head is from their feet, and put by where they are
+ * now, so it doesn't lag a frame behind them, flying along.
+ */
+function carriedBy(world: World, goose: Flyer) {
+	if (goose.state !== 'carrying' || goose.rider === undefined) return undefined
+	const look = flyerLook(world.course)
+	if (look.seat) return undefined
+	const body = world.racers.find((r) => r.id === goose.rider)?.body
+	const head = body && headFromFeet.get(body)
+	if (!body || !head) return undefined
+	return { x: body.x + head.x, feetY: body.feetY + head.y + look.grip }
+}
+/** How far from their feet each racer's head was last drawn. */
+const headFromFeet = new WeakMap<Body, { x: number; y: number }>()
 
 /** When each racer was first seen in a haunted house's monster's clutches, on this screen. */
 const caughtSince = new WeakMap<Body, number>()
@@ -871,14 +996,26 @@ function createPacer(world: World, p: Pacer) {
 		p.grounded &&
 		!p.scooped &&
 		Math.abs(p.vx) < STILL_SPEED
+	/** Under the sea, swimming, as a Player does: worked out from where they are. */
+	const swim = sprite.swim
+	const swimming = () =>
+		world.ticks() >= 0 &&
+		!p.scooped &&
+		!p.grounded &&
+		underwater(world, p.x, p.feetY)
 	const size = () =>
-		tucked()
-			? poseSize(skiTuck, sprite)
-			: ducked()
-				? poseSize(sit, sprite)
-				: onSkis()
-					? poseSize(stanceOf(sprite, p.board), sprite)
-					: runSize
+		swimming() && swim
+			? {
+					width: swim.width * RUNNER_SCALE,
+					height: swim.height * RUNNER_SCALE,
+				}
+			: tucked()
+				? poseSize(skiTuck, sprite)
+				: ducked()
+					? poseSize(sit, sprite)
+					: onSkis()
+						? poseSize(stanceOf(sprite, p.board), sprite)
+						: runSize
 	/** On a glider, lying along under it, as a racer does; or stood up on skis. */
 	const lying = () => world.ticks() >= 0 && (!!p.gliding || !!p.board)
 	let was = p.feetY
@@ -900,6 +1037,7 @@ function createPacer(world: World, p: Pacer) {
 			...(skiTuck ? [skiTuck] : []),
 			...(skiStance ? [skiStance] : []),
 			...(sprite.snowboard ? [sprite.snowboard] : []),
+			...(swim?.frames ?? []),
 		],
 		randomStartFrame: true,
 		init: () => ({
@@ -910,15 +1048,17 @@ function createPacer(world: World, p: Pacer) {
 			width: () => size().width,
 			height: () => size().height,
 			frames: () =>
-				tucked() && skiTuck
-					? [skiTuck]
-					: ducked() && sit
-						? [sit]
-						: onSkis()
-							? [stanceOf(sprite, p.board) ?? stand ?? sprite.run[0]]
-							: (standing() || lying()) && stand
-								? [stand]
-								: sprite.run,
+				swimming() && swim
+					? swim.frames
+					: tucked() && skiTuck
+						? [skiTuck]
+						: ducked() && sit
+							? [sit]
+							: onSkis()
+								? [stanceOf(sprite, p.board) ?? stand ?? sprite.run[0]]
+								: (standing() || lying()) && stand
+									? [stand]
+									: sprite.run,
 			...createObjectSignal(undefined as number | undefined, 'frame'),
 			// Facing right, the way they're running.
 			...createObjectSignal(0, 'rotation'),
@@ -983,6 +1123,16 @@ function createPacer(world: World, p: Pacer) {
 				return
 			}
 			$.setXScale(-1)
+			// Under the sea: lying along, head first, stroke and kick; their
+			// run turned over, if they've no swim.
+			if (swimming()) {
+				$.setRotation(swim ? 0 : 90)
+				$.setY(p.feetY - SWIM_TALL / 2 - $.height() / 2)
+				$.setFrame(Math.floor((Math.max(0, world.ticks()) + p.id * 5) / 16) % 2)
+				$.setState('pause')
+				$.setStyle({})
+				return
+			}
 			// On a shrink ray's plate: stood still, shrinking down to
 			// nothing from their feet, as a Player does.
 			if (p.shrink !== undefined) {
@@ -1118,8 +1268,9 @@ function createFlyer(world: World, goose: Flyer) {
 			else paint()
 		},
 		onEnterFrame({ $ }) {
-			$.setX(goose.x - FLYING_GOOSE_WIDTH / 2)
-			$.setY(goose.feetY - FLYING_GOOSE_HEIGHT)
+			const at = carriedBy(world, goose) ?? goose
+			$.setX(at.x - FLYING_GOOSE_WIDTH / 2)
+			$.setY(at.feetY - FLYING_GOOSE_HEIGHT)
 		},
 	})
 }
@@ -1880,18 +2031,15 @@ export function createBus(world: World) {
 				style: jetStyle,
 			},
 		)
-		part(
-			'bus-glider',
-			BUS_FLAME.frames[0],
-			BUS_FLAME.width,
-			BUS_FLAME.height,
-			BUS_FLAME.at,
-			{
-				frames: BUS_FLAME.frames,
+		// Its flame, roaring; or under the sea, its turbine's propeller,
+		// turning, and the bubbles churned out behind it.
+		const turbine = !!world.course.look.busJets.turbine
+		for (const out of turbine ? [BUS_BUBBLES, BUS_PROPELLER] : [BUS_FLAME])
+			part('bus-glider', out.frames[0], out.width, out.height, out.at, {
+				frames: out.frames,
 				frame: () => Math.floor(Math.max(0, world.ticks()) / 3) % 3,
 				style: jetStyle,
-			},
-		)
+			})
 		part(
 			'bus-glider',
 			BUS_BOOSTER.asset,
@@ -3194,11 +3342,16 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			const width = art?.width ?? 56
 			const height = art?.height ?? 29
 			const src = art?.asset ?? rockAsset
+			// Up on the skyline, sunk into the ridge it's on, rather than
+			// perched on it, with nothing behind it.
+			const skyline = world.course.skyline?.some(
+				(s) => o.x >= s.from && o.x < s.to,
+			)
 			return createScoopable({
 				id,
 				type: 'hazard',
 				x: o.x,
-				sink: 3,
+				sink: skyline ? SKYLINE_SINK : 3,
 				width,
 				height,
 				world,
@@ -3712,6 +3865,10 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			return createSkyThing(world, state, o, id)
 		case 'germ':
 			return createGerm(world, state, o, id)
+		case 'jellyfish':
+			return createJellyfish(world, o, id)
+		case 'shark':
+			return createShark(world, state, o, id)
 		case 'crocodile':
 			return createCrocodile(world, state, o, id)
 		case 'valve':
@@ -3772,6 +3929,80 @@ const GERM_BURST = 18
  * a burst, and gone; scooped, flying. Drawn where `germHeight` says it is
  * by the tick, which is a signal: reading it keeps it bobbing.
  */
+/** How long each sweep of a shark's tail lasts, cruising, and hunting. */
+const SHARK_SWEEP = 18
+const SHARK_SWEEP_FAST = 7
+
+/**
+ * A shark, swimming where its state says it is (see `sharks.ts`), facing
+ * the way it's going, its tail sweeping, quicker hunting.
+ */
+function createShark(
+	world: World,
+	state: ObstacleState,
+	o: Extract<Obstacle, { kind: 'shark' }>,
+	id: string,
+) {
+	const swim = () => sharkSwim(world, { ...state, obstacle: o })
+	return createController({
+		frames: SHARK_FRAMES,
+		init: () => ({
+			id,
+			type: 'zombie',
+			...createObjectSignal(o.x - SHARK_WIDTH / 2, 'x'),
+			...createObjectSignal(0, 'y'),
+			width: () => SHARK_WIDTH,
+			height: () => SHARK_HEIGHT,
+			// Drawn facing left: turned round, going right.
+			...createObjectSignal(1, 'xScale'),
+			...createObjectSignal(0 as number | undefined, 'frame'),
+			...createObjectSignal('pause' as 'play' | 'pause', 'state'),
+		}),
+		onEnterFrame({ $ }) {
+			// `sharkSwim` keeps it on the state, made the first time it's asked.
+			const shark = state.swim ?? swim()
+			$.setX(Math.round(shark.x - SHARK_WIDTH / 2))
+			$.setY(Math.round(shark.y - SHARK_HEIGHT / 2))
+			$.setXScale(shark.facing === 1 ? -1 : 1)
+			const sweep = shark.mode === 'lurking' ? SHARK_SWEEP : SHARK_SWEEP_FAST
+			$.setFrame(Math.floor(Math.max(0, world.ticks()) / sweep) % 2)
+		},
+	})
+}
+
+/** How long each of a jellyfish's pulses lasts. */
+const JELLYFISH_PULSE = 26
+
+/**
+ * A jellyfish, drifting up and down in the sea, pulsing as it goes: by the
+ * race's clock, so the same on every screen.
+ */
+function createJellyfish(
+	world: World,
+	o: Extract<Obstacle, { kind: 'jellyfish' }>,
+	id: string,
+) {
+	const ground = world.terrain.groundY(o.x)
+	return createController({
+		frames: JELLYFISH_FRAMES,
+		init: () => ({
+			id,
+			type: 'zombie',
+			...createObjectSignal(o.x - JELLYFISH_WIDTH / 2, 'x'),
+			...createObjectSignal(ground - o.low - JELLYFISH_BELL, 'y'),
+			width: () => JELLYFISH_WIDTH,
+			height: () => JELLYFISH_HEIGHT,
+			...createObjectSignal(0 as number | undefined, 'frame'),
+			...createObjectSignal('pause' as 'play' | 'pause', 'state'),
+		}),
+		onEnterFrame({ $ }) {
+			const now = Math.max(0, world.ticks())
+			$.setY(Math.round(ground - jellyfishHeight(o, now) - JELLYFISH_BELL))
+			$.setFrame(Math.floor((now + o.x) / JELLYFISH_PULSE) % 2)
+		},
+	})
+}
+
 function createGerm(
 	world: World,
 	state: ObstacleState,
@@ -4277,6 +4508,15 @@ function createZombie(
 	})
 }
 
+/** How far a rock's sunk into the ground up on the skyline (see `Course['skyline']`). */
+const SKYLINE_SINK = 9
+
+/** How far a swimmer's tipped, at most, pointing the way they're going: nearly straight down, diving. */
+const STEEPEST_SWIM = 70
+
+/** How far up from their feet a diver's middle is, turning over in the air. */
+const DIVE_MIDDLE = 30
+
 /** How many ticks each of a spider's steps lasts, and how long it stays squashed, bounced on. */
 const SPIDER_STEP = 6
 const SPIDER_SQUASH = 12
@@ -4291,16 +4531,17 @@ function createSpider(
 	o: Extract<Obstacle, { kind: 'spider' }>,
 	id: string,
 ) {
-	const squashed = SPIDER_FRAMES.length
+	const look = spiderLook(world.course)
+	const squashed = look.frames.length
 	return createController({
-		frames: [...SPIDER_FRAMES, SPIDER_SQUASHED],
+		frames: [...look.frames, look.squashed],
 		init: () => ({
 			id,
 			type: 'zombie',
-			...createObjectSignal(o.x - SPIDER_WIDTH / 2, 'x'),
-			...createObjectSignal(world.terrain.groundY(o.x) - SPIDER_HEIGHT, 'y'),
-			width: () => SPIDER_WIDTH,
-			height: () => SPIDER_HEIGHT,
+			...createObjectSignal(o.x - look.width / 2, 'x'),
+			...createObjectSignal(world.terrain.groundY(o.x) - look.height, 'y'),
+			width: () => look.width,
+			height: () => look.height,
 			...createObjectSignal(0, 'rotation'),
 			// Drawn facing left: turned round, going right.
 			...createObjectSignal(1, 'xScale'),
@@ -4310,12 +4551,12 @@ function createSpider(
 		onEnterFrame({ $ }) {
 			const spider = spiderAt(world, { ...state, obstacle: o })
 			const ground = world.terrain.groundY(spider.x)
-			$.setX(spider.x - SPIDER_WIDTH / 2)
-			$.setY(ground - SPIDER_HEIGHT)
+			$.setX(spider.x - look.width / 2)
+			$.setY(ground - look.height)
 			if (state.scooped) {
 				const flight = scoopFlight(state.scooped, world.ticks())
-				$.setX(spider.x - SPIDER_WIDTH / 2 + flight.x)
-				$.setY(ground - SPIDER_HEIGHT + flight.y)
+				$.setX(spider.x - look.width / 2 + flight.x)
+				$.setY(ground - look.height + flight.y)
 				$.setRotation(flight.spin)
 				$.setFrame(squashed)
 				return
@@ -4326,7 +4567,7 @@ function createSpider(
 				state.flown !== undefined && now - state.flown < SPIDER_SQUASH
 					? squashed
 					: Math.floor(Math.max(0, world.raceTicks()) / SPIDER_STEP) %
-							SPIDER_FRAMES.length,
+							look.frames.length,
 			)
 		},
 	})

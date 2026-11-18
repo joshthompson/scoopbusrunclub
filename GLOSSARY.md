@@ -7,7 +7,7 @@ Scoop Bus Run Club's website and its games. The games turn the club's runners in
 ### Run game
 
 **Scoop Bus**:
-The bus that chases runners along a Course. It picks up (scoops) anyone it catches, at any height: its **Scoop Arm** reaches up to a Platform or down below the Ground to grab them. In a Cave it has a **Drill** on its front in place of its scoop, and bores its way through the rock, too big for the Cave. In The Sewers it puts its Drill on and **Digs** its own way down through the street after whoever's gone down the manhole, and back up again after the Giant Vent. On The Cliff it drives off the cliff after you and floats across the Sea, and up onto the island. Shrunk inside someone, in The Hospital, it puts wings and a rocket booster on and flies, floating along over the floor.
+The bus that chases runners along a Course. It picks up (scoops) anyone it catches, at any height: its **Scoop Arm** reaches up to a Platform or down below the Ground to grab them. In a Cave it has a **Drill** on its front in place of its scoop, and bores its way through the rock, too big for the Cave. In The Sewers it puts its Drill on and **Digs** its own way down through the street after whoever's gone down the manhole, and back up again after the Giant Vent. On The Cliff it drives off the cliff after you and floats across the Sea, and up onto the island. Shrunk inside someone, in The Hospital, it puts wings and a rocket booster on and flies, floating along over the floor; off Dino Island's cliff, the same with a turbine on, under the water.
 _Avoid_: Sweeper, chaser
 
 **Scooped**:
@@ -179,7 +179,7 @@ A parkrun barcode, floating in the run-in just before every parkrun Course's fin
 _Avoid_: Barcode (on its own: a real parkrunner's barcode is theirs, not a thing on a Course)
 
 **Ride**:
-Something that carries a runner along for a while: a corgi, at Kristineberg, or in Gamla Stan a Royal Guard's horse, on Machu Picchu a llama, at the Pyramids a camel (now and then, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon. One on the ground leaps when its rider jumps, with them on its back, and of its own accord over whatever's low in its way; a Steam Vent or a Heart Valve fires it up, rider and all; ducking gets them off it.
+Something that carries a runner along for a while: a corgi, at Kristineberg, or in Gamla Stan a Royal Guard's horse, on Machu Picchu a llama, at the Pyramids a camel (now and then, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon, or on Dino Island a pterodactyl. One on the ground leaps when its rider jumps, with them on its back, and of its own accord over whatever's low in its way; a Steam Vent or a Heart Valve fires it up, rider and all; ducking gets them off it.
 _Avoid_: Mount, vehicle
 
 **Glider**:
@@ -193,6 +193,26 @@ _Avoid_: Sea (falling into that is Fallen), lake
 **Sea**:
 The Cliff's Gap, from the foot of its cliff out to the island. Down into it is Fallen, there and then.
 _Avoid_: Water, ocean
+
+**Deep Water**:
+Water to swim through, off Dino Island's cliff, from the foot of the cliff to the shore: not a Gap, its seabed the Ground. Dive in and you're **Swimming**, lying along in it, on as you hold right, up and down as you steer, floating up if you don't; under a shelf of rock and through, round its Jellyfish, and up onto the shore once it's shallow enough to stand. The bus follows on a turbine, slower than on land.
+_Avoid_: Sea (falling into that is Fallen), ocean
+
+**Jellyfish**:
+An Obstacle in Deep Water, drifting slowly up and down: swim into it, or its tentacles under it, and you're stung, a stumble.
+
+**Follower**:
+Something following a runner along, a moment behind them, the way they went: jumping where they jumped, swimming where they swam. Dino Island's hatchling, out of the egg kicked along its path, hatched landing off the diplodocus; bring it over the finish line with you and that's the course's special goal. Let the bus get to it and it's scooped. Not in a Round.
+_Avoid_: Pet, companion
+
+**Shark**:
+An Obstacle in Deep Water, lurking deep: as anyone swims near it's after whoever's nearest, faster than they swim. It bites once, a stumble, and swims off, biting nobody else.
+
+**Herd**:
+Animals running alongside the path for a while, only to be seen, never run into: Huddinge's wild boar, and Dino Island's dinosaurs, overtaking at a gallop, or a little yellow raptor keeping pace with you down the volcano.
+
+**Eruption**:
+Dino Island's volcano going off, as the last runner crosses its crater: lava and smoke bursting up out of it, the sky burns red, and for a stretch everything on the course is drawn black against it, a silhouette.
 
 **Ring**:
 A Boost in the sky over the Sea: glide through one for a burst of speed. There for everyone, once each.

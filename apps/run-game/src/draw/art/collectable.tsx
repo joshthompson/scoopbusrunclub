@@ -19,6 +19,7 @@ import { HorseArt } from './horse'
 import { LlamaArt } from './llama'
 import { MineCartArt } from './mineCart'
 import { MoleArt } from './mole'
+import { PterodactylArt } from './pterodactyl'
 import { SkateboardArt } from './skateboard'
 import { StoodBoardArt } from './skis'
 import { UnicornArt } from './unicorn'
@@ -77,6 +78,12 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 					<div style={{ transform: 'scale(0.4)', 'transform-origin': '0 0' }}>
 						<CondorArt now={0} />
 					</div>
+				</div>
+			)
+		case 'ride:pterodactyl':
+			return (
+				<div style={{ width: '58px', height: '36px' }}>
+					<PterodactylArt scale={0.6} />
 				</div>
 			)
 		case 'ride:mole':

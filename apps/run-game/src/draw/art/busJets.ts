@@ -142,3 +142,67 @@ export const BUS_FLAME = {
 	height: 26,
 	at: { x: BUS_BOOSTER.at.x - 58, y: BUS_BOOSTER.at.y },
 }
+
+/**
+ * Under the sea, a turbine in place of the booster's flame (see
+ * `CourseLook['busJets']`'s `turbine`): a propeller out behind its nozzle,
+ * turning, seen side on, its blades sweeping round, a frame each, in a
+ * ring of a duct; and a stream of bubbles churned out behind it.
+ */
+function propeller(frame: number) {
+	// How far up and down its blades reach this frame, as they turn.
+	const reach = [11, 6, 2][frame]
+	const other = [2, 6, 11][frame]
+	return paintedArt(12, 26, (x, y) => {
+		// The duct round it: a ring, side on, its top and bottom.
+		if (x >= 2 && x < 10 && (y < 2 || y >= 24))
+			return y < 1 || y >= 25 ? METAL_SHADE : METAL
+		// Its hub, on its shaft.
+		if (x >= 8 && Math.abs(y - 13) < 2) return NOZZLE
+		if (x >= 4 && x < 8 && Math.abs(y - 13) < 2.5) return '#1d1d1d'
+		// Its blades: one sweeping up and down, the other across.
+		const d = y - 13
+		if (x >= 5 && x < 7 && Math.abs(d) < reach)
+			return d < 0 ? YELLOW_LIT : YELLOW
+		if (x >= 4 && x < 8 && Math.abs(d) < other && Math.abs(d) > 1)
+			return d < 0 ? YELLOW : YELLOW_SHADE
+		return undefined
+	})
+}
+export const BUS_PROPELLER = {
+	frames: [propeller(0), propeller(1), propeller(2)],
+	width: 24,
+	height: 52,
+	at: { x: BUS_BOOSTER.at.x - 22, y: BUS_BOOSTER.at.y - 13 },
+}
+
+/** Bubbles, churned out behind it, streaming away: three frames, each a little further on. */
+function bubbles(frame: number) {
+	const BUBBLE = '#e6f8ff'
+	const RIM = '#9fd6ee'
+	const all: [x: number, y: number, r: number][] = [
+		[26, 6, 1.5],
+		[20, 4, 1],
+		[16, 8, 2],
+		[10, 5, 1.2],
+		[6, 9, 1.6],
+		[2, 3, 1],
+		[23, 10, 1],
+		[13, 2, 1],
+	]
+	return paintedArt(30, 13, (x, y) => {
+		for (const [bx, by, r] of all) {
+			const cx = bx - frame * 3
+			const cy = by - frame
+			const d = Math.hypot(x - cx, y - cy)
+			if (d < r + 0.6) return d > r - 0.4 ? RIM : BUBBLE
+		}
+		return undefined
+	})
+}
+export const BUS_BUBBLES = {
+	frames: [bubbles(0), bubbles(1), bubbles(2)],
+	width: 60,
+	height: 26,
+	at: { x: BUS_PROPELLER.at.x - 60, y: BUS_BOOSTER.at.y - 2 },
+}

@@ -10,6 +10,7 @@ import { CAMERA_FOOTROOM, CAMERA_HEADROOM, MAX_ZOOM } from '../game/step'
 import { caves } from './caves'
 import { cityRooftop } from './cityRooftop'
 import { cliff } from './cliff'
+import { dinoIsland } from './dinoIsland'
 import { everest } from './everest'
 import { furbyFields } from './furbyFields'
 import { gamlaStan } from './gamlaStan'
@@ -106,6 +107,7 @@ export const COURSES: Course[] = [
 	slopes,
 	karolinska,
 	midnattsloppet,
+	dinoIsland,
 ].map((course, i) => {
 	const climb = climbOf(course)
 	// So a Round can always get everyone on the screen.

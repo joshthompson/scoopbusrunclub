@@ -13,8 +13,10 @@ import {
 	PATH_BACK,
 	RUNNER_SCALE,
 	STAND_HEIGHT,
+	VIEW_HEIGHT,
 } from './constants'
 import { scored } from './step'
+import { inDeepWater } from './swim'
 import { TOWER_DOOR, TOWER_HEIGHT, TOWER_MERLON, towerSpan } from './towers'
 import type { Body, Flyer, Pacer, Racer, World } from './world'
 
@@ -30,9 +32,12 @@ const FLOCK_GAP = 52
 const ENTER_BEHIND = 70
 /** How quickly one climbs away, having let go. */
 const CLIMB = 0.06
-/** Gone, this far off the right of the screen, or this high. */
+/**
+ * Gone, this far off the right of the screen; or, climbing away, this far
+ * up over the top of it, out of sight, wherever the camera's looking.
+ */
 const GONE_AHEAD = 300
-const GONE_ABOVE = -900
+const GONE_ABOVE = 60
 
 /** How far ahead, and back for its tail, a flyer keeps above the ground: up steps before it gets to them. */
 const GROUND_AHEAD = 160
@@ -105,8 +110,15 @@ function cruiseHeight(world: World, goose: Flyer) {
 export function flightFloor(world: World, x: number, overTowers = true) {
 	const { terrain } = world
 	let floor = Number.POSITIVE_INFINITY
+	// Over Deep Water, skimming its surface, not the seabed down under it.
+	const surface = world.course.deepWater?.surface
 	for (let at = x - GROUND_BEHIND; at <= x + GROUND_AHEAD; at += 20)
-		floor = Math.min(floor, terrain.groundY(at))
+		floor = Math.min(
+			floor,
+			surface !== undefined && inDeepWater(world, at)
+				? Math.min(surface, terrain.groundY(at))
+				: terrain.groundY(at),
+		)
 	if (!overTowers) return floor
 	for (const t of world.course.towers ?? []) {
 		const { left, right } = towerSpan(t)
@@ -211,12 +223,15 @@ export function stepFlyers(world: World) {
 	}
 
 	const right = world.camera() + world.viewWidth() + GONE_AHEAD
+	// The top of the screen, zoomed out or not.
+	const top = world.cameraY() + VIEW_HEIGHT * (1 - world.zoom())
 	for (let i = flyers.length - 1; i >= 0; i--) {
 		const goose = flyers[i]
 		if (
 			goose.state !== 'carrying' &&
 			goose.state !== 'swooping' &&
-			(goose.x > right || goose.feetY < GONE_ABOVE)
+			(goose.x > right ||
+				(goose.state === 'leaving' && goose.feetY < top - GONE_ABOVE))
 		)
 			flyers.splice(i, 1)
 	}

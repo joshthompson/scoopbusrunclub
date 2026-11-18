@@ -34,6 +34,7 @@ import type { FikaItem } from './fika'
  *   up on the rock band's speakers at Midnattsloppet
  * - `jazzHat`: the Spirit of Jazz's white top hat, on fire, stolen off his
  *   head up in Karolinska's lungs, once he's been found and unlocked
+ * - `snorkel`: a snorkel mask, down on the seabed off Dino Island, dived for
  */
 export type HatKind =
 	| 'pumpkin'
@@ -55,6 +56,7 @@ export type HatKind =
 	| 'headMirror'
 	| 'discoBall'
 	| 'jazzHat'
+	| 'snorkel'
 
 /** A hat someone's wearing: a Pumpkin by its carving, 1 to 5. */
 export interface Hat {
@@ -121,6 +123,7 @@ export const HAT_RULES: Record<HatKind, HatRules> = {
 	headMirror: { ...PLAIN, germProof: true },
 	discoBall: PLAIN,
 	jazzHat: PLAIN,
+	snorkel: PLAIN,
 }
 
 /** Fika that's a hat too, put on as it's had: the captain's hat, off the ferry's roof. */
@@ -152,6 +155,7 @@ const CODED: HatKind[] = [
 	'headMirror',
 	'discoBall',
 	'jazzHat',
+	'snorkel',
 ]
 /** How many carvings a Pumpkin can have: its codes. */
 const CARVINGS = 5

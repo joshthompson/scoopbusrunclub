@@ -95,6 +95,9 @@ export const COLLECTABLE_NAMES = {
 	'fika:flyingStrawberry': 'Flying strawberry',
 	'fika:bubbleGum': 'Bubble gum',
 	'fika:cloudberries': 'Hjortron',
+	'fika:fossilPops': 'Fossil pops',
+	'fika:lavaCake': 'Lava cake',
+	'fika:coconut': 'Coconut',
 	'ride:corgi': 'Corgi',
 	'ride:llama': 'Llama',
 	'ride:camel': 'Camel',
@@ -109,6 +112,7 @@ export const COLLECTABLE_NAMES = {
 	'ride:goose': 'Goose',
 	'ride:dragon': 'Dragon',
 	'ride:condor': 'Condor',
+	'ride:pterodactyl': 'Pterodactyl',
 	'ride:mole': 'Mole',
 	'ride:minecart': 'Mine cart',
 	'ride:bloodCell': 'Red blood cell',
@@ -131,6 +135,7 @@ export const COLLECTABLE_NAMES = {
 	'hat:headMirror': 'Head mirror',
 	'hat:discoBall': 'Disco ball',
 	'hat:jazzHat': 'Flaming top hat',
+	'hat:snorkel': 'Snorkel mask',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
 
@@ -201,6 +206,9 @@ export const PICKUP_WORD = {
 	'fika:flyingStrawberry': 'Flying strawberry!',
 	'fika:bubbleGum': 'Bubble gum!',
 	'fika:cloudberries': 'Hjortron!',
+	'fika:fossilPops': 'Fossil pops!',
+	'fika:lavaCake': 'Molten!',
+	'fika:coconut': 'Coconut!',
 	'ride:corgi': 'Giddy up!',
 	'ride:llama': 'Giddy up!',
 	'ride:camel': 'Giddy up!',
@@ -212,6 +220,7 @@ export const PICKUP_WORD = {
 	'ride:goose': 'Honk honk!',
 	'ride:dragon': 'Dragon ride!',
 	'ride:condor': 'Caught by a condor!',
+	'ride:pterodactyl': 'Pterodactyl ride!',
 	'ride:mole': 'Dig dig!',
 	'ride:minecart': 'All aboard!',
 	'ride:bloodCell': 'Go with the flow!',
@@ -237,6 +246,7 @@ export const PICKUP_WORD = {
 	'hat:headMirror': 'Say aah!',
 	'hat:discoBall': 'Disco!',
 	'hat:jazzHat': 'Hot hat!',
+	'hat:snorkel': 'Snorkel!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>
 
@@ -324,6 +334,11 @@ export const COLLECTABLE_ABOUT = {
 	'fika:bubbleGum': 'A piece of bubble gum, blowing about in the sky.',
 	'fika:cloudberries':
 		'Cloudberries: golden, rare, and the best berry there is.',
+	'fika:fossilPops':
+		'Fossil pops: lollipops curled up like ammonites. Only found on Dino Island.',
+	'fika:lavaCake':
+		'A lava cake, on the way up the volcano. Molten in the middle.',
+	'fika:coconut': 'A coconut, a straw in it, on the island’s beach.',
 	'ride:corgi': 'A corgi, sat on the track, barking for a rider.',
 	'ride:llama': 'A llama, humming for a rider.',
 	'ride:camel': 'A camel, grumbling for a rider.',
@@ -340,6 +355,7 @@ export const COLLECTABLE_ABOUT = {
 	'ride:goose': 'A goose, flying over, honking.',
 	'ride:dragon': 'A dragon, rippling along the Wall.',
 	'ride:condor': 'A giant condor, patrolling the skies around Machu Picchu.',
+	'ride:pterodactyl': 'A pterodactyl, soaring over the forests of Dino Island.',
 	'ride:mole': 'A mole, squeaking for a rider.',
 	'ride:minecart': 'A mine cart, heaped with ore, waiting on the rails.',
 	'ride:bloodCell': 'A red blood cell, bobbing in the bloodstream.',
@@ -365,6 +381,8 @@ export const COLLECTABLE_ABOUT = {
 		'A disco ball, over your whole head, up on the rock band’s speakers.',
 	'hat:jazzHat':
 		'The Spirit of Jazz’s own top hat, on fire. Find him again, once he’s yours, and take it.',
+	'hat:snorkel':
+		'A snorkel mask, lost on the seabed off Dino Island. Dive deep for it.',
 	barcode: "Floating just before every parkrun's finish. Don't forget it!",
 } satisfies Record<Collectable, string>
 
@@ -391,6 +409,7 @@ const RIDE_BEHAVIOUR = {
 	goose: 'Jump into it to be carried over everything for a while.',
 	dragon: 'Jump onto its neck to fly over everything for a while.',
 	condor: 'Catches you when you fall off the Leap.',
+	pterodactyl: 'Jump into it to be carried over everything for a while.',
 	mole: 'Run into it. It hops along by itself, digging through rock.',
 	minecart: 'Run into it and hold on to the end of the line.',
 	bloodCell:

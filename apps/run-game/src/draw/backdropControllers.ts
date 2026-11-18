@@ -29,6 +29,7 @@ import { deckBox, deckTiles, paintFog, paintFogDeck } from './Fog'
 import { paintSnow } from './Snow'
 import { createBackdropPainter } from './backdropPaint'
 import { cachedArt } from './canvasArt'
+import { eruptionStrength } from './eruption'
 import { cycle, steps } from './paint/animation'
 import { type ImageOf, paintTiled } from './paint/bands'
 import {
@@ -53,7 +54,12 @@ import { TILE, tileControllers, tileDensity } from './paint/tiles'
  */
 
 /** Their types, behind every sprite, front to back, for `assetOrder`'s end. */
-export const BEHIND_TYPES = ['ground', 'backdrop']
+export const BEHIND_TYPES = [
+	'ground',
+	// The sea's water, behind its seabed and its rock (see `deepWater.ts`).
+	'deep-water-back',
+	'backdrop',
+]
 /**
  * And over every sprite, front to back, for its start: under the snow and
  * fog, the sea's waves and a River's water in front of everyone in them,
@@ -167,6 +173,11 @@ function createSky(world: World, scene: Scene, resolve: Resolve) {
 			height: () => height + HORIZON_SKY_OVER,
 		}),
 		draw: ({ ctx, image }) => {
+			// A volcano gone off: fading away, its burning sky behind (see
+			// `eruption.tsx`).
+			const left = 1 - eruptionStrength(world)
+			if (left <= 0) return
+			ctx.globalAlpha *= left
 			ctx.translate(0, HORIZON_SKY_OVER)
 			paint(ctx, image, camera().width(), height)
 		},

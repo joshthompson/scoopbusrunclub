@@ -431,6 +431,43 @@ export const BROKEN_BRIDGE_ICON = rowsArt(
 )
 
 /**
+ * Hatch the egg and bring it home: the hatchling, out of its cracked egg,
+ * its head up out of the top, running on its own two legs, a finish flag
+ * behind it.
+ */
+const HATCHLING_HOME = rowsArt(
+	[
+		'K.......gg....',
+		'KW.....gGgg...',
+		'KWK....gGgkg..',
+		'KKW....ggggggg',
+		'K.....eEegggE.',
+		'K....eEEeeeeee',
+		'K....eEeeseeed',
+		'K....eeecceeed',
+		'K....eseeeeced',
+		'K.....eeeeeed.',
+		'K......dddddd.',
+		'K......l...l..',
+		'K.....l.....l.',
+		'K....ll.....ll',
+	],
+	{
+		K: '#3a3f44',
+		W: '#ffffff',
+		e: '#f2e2c0',
+		E: '#fff6e0',
+		d: '#d4c49a',
+		s: '#a8885a',
+		c: '#4a3a2a',
+		g: '#5f9a3a',
+		G: '#86c050',
+		k: '#1d1d1d',
+		l: '#e0a43a',
+	},
+)
+
+/**
  * Bounce on 20 heads: a running shoe come down on a runner's head, in
  * Midnattsloppet's blue T-shirt, and the bounce off it, flicking out.
  */
@@ -486,6 +523,7 @@ const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	cliff: RING,
 	'machu-picchu': BROKEN_BRIDGE_ICON,
 	midnattsloppet: HEAD_BOUNCE,
+	'dino-island': HATCHLING_HOME,
 }
 
 /**

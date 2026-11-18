@@ -19,12 +19,14 @@ import {
 	START_X,
 	VIEW_WIDTH,
 } from './constants'
+import type { Follower } from './followers'
 import { createFootball } from './football'
 import type { Hat } from './hats'
 import { lineUp } from './pack'
 import { racePlatforms } from './platforms'
 import type { PortalRun } from './portals'
 import { createRopeBridges } from './ropeBridge'
+import type { SharkSwim } from './sharks'
 import type { Terrain } from './terrain'
 
 /**
@@ -128,6 +130,11 @@ export interface Body {
 	 * down on the island.
 	 */
 	gliding: boolean
+	/**
+	 * Swimming, under the sea, off the land into it, till they're up on the
+	 * shore the far side (see `swim.ts`).
+	 */
+	swimming?: boolean
 	/** Ticks left being carried by a flying goose. */
 	carried: number
 	/**
@@ -290,6 +297,8 @@ export interface Pacer {
 	shrink?: number
 	/** On a glider, out over the sea, as anyone: see `flyPacer`. */
 	gliding?: boolean
+	/** Swimming, under the sea, as anyone: see `swimPacer`. */
+	swimming?: boolean
 	/** On skis or a snowboard, down The Slopes, as anyone: see `skiPacer`. */
 	board?: number
 	/** A trick they're doing in the air, and how far round they've turned in it. */
@@ -432,6 +441,8 @@ export interface ObstacleState {
 	flown?: number
 	/** A cyclist riding round a loop: how many times round it's been. */
 	lap?: number
+	/** A shark: where it is, swimming, and what it's after (see `sharks.ts`). */
+	swim?: SharkSwim
 }
 
 /**
@@ -784,7 +795,14 @@ export function createWorld(
 		/** The course's mine carts, if it has a mine. Plain state, like the body. */
 		carts: createCarts({ course, terrain }),
 		/** Its football, if it has one: see `Football`. Plain state, like the body. */
-		ball: createFootball({ football: course.football, terrain }),
+		ball: createFootball({
+			football: course.football,
+			// An egg's as a football's kicked, but not in a Round.
+			egg: round ? undefined : course.egg,
+			terrain,
+		}),
+		/** Whoever's following anyone along: see `Follower`. Plain state. */
+		followers: [] as Follower[],
 		/** The course's Platforms, which move with the tick: see `platformAt`. */
 		platforms: racePlatforms(course.platforms ?? []),
 		/** Its rope bridges, sagging under whoever's on them: see `ropeBridge`. Plain state. */

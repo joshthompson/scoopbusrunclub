@@ -51,6 +51,7 @@ import { swampManAt } from './sewer'
 import { skiPacer } from './skis'
 import { steamFires } from './steam'
 import { boost } from './step'
+import { inDeepWater, pacerDivesIn, surfaceFloor, swimPacer } from './swim'
 import type { Terrain } from './terrain'
 import { type Pacer, type Racer, START_GAP, type World } from './world'
 import { zombieAt } from './zombies'
@@ -114,7 +115,10 @@ export const SCOOP_HEARD = BUS_LEASH_MAX - VIEW_WIDTH * CAMERA_LEAD + 50
 
 /** What `lineUp` needs: the world's still being made when it's called. */
 interface Lineup {
-	course: Pick<Course, 'skeletons' | 'ride' | 'raceShirt' | 'crowd'>
+	course: Pick<
+		Course,
+		'skeletons' | 'ride' | 'raceShirt' | 'crowd' | 'deepWater'
+	>
 	racers: { runner: Playable }[]
 	terrain: Terrain
 	pack: Pacer[]
@@ -174,15 +178,19 @@ function packSizeAt(world: Lineup, x: number) {
  * rack, as anyone.
  */
 function join(world: Lineup, x: number, skiing = false) {
+	// Out in the sea: swimming, halfway down it.
+	const swimming = inDeepWater(world, x)
+	const ground = world.terrain.groundY(x)
 	world.pack.push({
 		board: skiing ? 1 + Math.floor(Math.random() * BOARDS.length) : undefined,
 		id: world.packState.nextId++,
 		...newcomer(world),
 		x,
-		feetY: world.terrain.groundY(x),
+		feetY: swimming ? Math.round((ground + surfaceFloor(world)) / 2) : ground,
 		vx: 0,
 		vy: 0,
-		grounded: true,
+		grounded: !swimming,
+		swimming,
 		pace: PACER_SLOWEST + Math.random() * (PACER_FASTEST - PACER_SLOWEST),
 		dazed: 0,
 		scooped: false,
@@ -332,6 +340,8 @@ function movePacer(world: World, p: Pacer) {
 	}
 	// On a glider, out over the sea.
 	if (p.gliding) return flyPacer(world, p)
+	// Under the sea, swimming.
+	if (p.swimming) return swimPacer(world, p)
 	// On skis, down The Slopes.
 	if (p.board) return skiPacer(world, p, (x) => hopAhead(world, x, p.feetY))
 	const ticks = world.ticks()
@@ -443,6 +453,9 @@ function movePacer(world: World, p: Pacer) {
 						(index, x) => sagOf(world.ropeBridges, index, x),
 					)
 				: undefined
+		// Down into the sea, to swim.
+		pacerDivesIn(world, p)
+		if (p.swimming) return
 		if (platform && platform.top <= ground) {
 			p.feetY = platform.top
 			p.on = platform.index
@@ -816,12 +829,19 @@ export const STOMPED_GUARD = 60
 /** Coming down on someone's head: bounce off it, faster, and score. */
 function bounceOffHeads(world: World, racer: Racer) {
 	const b = racer.body
-	if (b.grounded || b.vy <= 0 || b.carried > 0 || b.gliding) return
+	if (b.grounded || b.vy <= 0 || b.carried > 0 || b.gliding || b.swimming)
+		return
 	/** Where their feet were last tick. */
 	const was = b.feetY - b.vy
 
 	for (const p of world.pack) {
-		if (p.scooped || p.dazed > 0 || p.gliding || p.shrink !== undefined)
+		if (
+			p.scooped ||
+			p.dazed > 0 ||
+			p.gliding ||
+			p.swimming ||
+			p.shrink !== undefined
+		)
 			continue
 		if (Math.abs(b.x - p.x) > HEAD_REACH) continue
 		const head = p.feetY - p.sprite.height * RUNNER_SCALE + HEAD_GIVE

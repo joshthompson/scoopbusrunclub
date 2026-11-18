@@ -54,12 +54,13 @@ export function headTop(
 	frame: string,
 	width: number,
 	height: number,
+	lying = false,
 ): HeadTop | undefined {
 	measured()
-	const key = `${frame}|${width}|${height}`
+	const key = `${frame}|${width}|${height}|${lying}`
 	if (!found.has(key)) {
 		found.set(key, undefined)
-		measure(frame, width, height)
+		measure(frame, width, height, lying)
 			.catch(() => null)
 			.then((head) => {
 				found.set(key, head)
@@ -69,7 +70,21 @@ export function headTop(
 	return found.get(key) ?? undefined
 }
 
-async function measure(frame: string, width: number, height: number) {
+/**
+ * The front of the head in `frame`, lying along, head first, facing left,
+ * as a swimmer is: `x` its frontmost column, `y` the middle of the head
+ * there, `width` how tall the head is there. For a hat to sit on, turned
+ * a quarter round with them.
+ */
+export const headFront = (frame: string, width: number, height: number) =>
+	headTop(frame, width, height, true)
+
+async function measure(
+	frame: string,
+	width: number,
+	height: number,
+	lying: boolean,
+) {
 	const [url, crop] = frame.split('#')
 	const image = new Image()
 	image.src = url
@@ -100,6 +115,22 @@ async function measure(frame: string, width: number, height: number) {
 		if (data[i + 3] <= SOLID) return false
 		return !head || head.has((data[i] << 16) | (data[i + 1] << 8) | data[i + 2])
 	}
+	// Lying along, head first: from its front, the left, across.
+	if (lying)
+		for (let x = 0; x < w; x++) {
+			let column = false
+			for (let y = 0; y < h && !column; y++) column = solid(x, y)
+			if (!column) continue
+			let top = h
+			let bottom = -1
+			for (let dx = 0; dx < ACROSS && x + dx < w; dx++)
+				for (let y = 0; y < h; y++)
+					if (solid(x + dx, y)) {
+						top = Math.min(top, y)
+						bottom = Math.max(bottom, y)
+					}
+			return { x, y: (top + bottom + 1) / 2, width: bottom + 1 - top }
+		}
 	for (let y = 0; y < h; y++) {
 		let row = false
 		for (let x = 0; x < w && !row; x++) row = solid(x, y)

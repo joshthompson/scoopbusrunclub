@@ -9,6 +9,7 @@ import type { Obstacle } from '../courses/types'
 import { PATH_BACK, VERGE, VIEW_HEIGHT } from '../game/constants'
 import { crocDip } from '../game/river'
 import type { ObstacleState, World } from '../game/world'
+import { cellBatch } from './paint/cellBatch'
 import { paintPicture } from './paint/picture'
 
 /**
@@ -191,11 +192,65 @@ function ripples(
 	}
 }
 
+/**
+ * How far in from either end a pond's edge is, `t` of the way from its
+ * surface (0) to its far edge (1): a rounded rectangle, square along its
+ * middle, rounding off at its corners. `width` across.
+ */
+function pondInset(t: number, width: number, round: number) {
+	const k = Math.max(0, Math.min(1, t))
+	return cell(round * (1 - (1 - k ** 3) ** (1 / 3)) + (width / 2) * k ** 12)
+}
+
+/**
+ * A pond's rim, a mud bank round it, `inset` in at each end at each row:
+ * the bank, and its wet edge just inside it, and a pebble here and there.
+ */
+function pondRim(
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	rows: number,
+	inset: (y: number) => number,
+	look: { bank: string; wet: string },
+	seed: number,
+) {
+	for (let y = 0; y < rows; y += CELL) {
+		const at = inset(y)
+		// Closed off here, no water across it: no rim either.
+		if (at * 2 >= width - CELL * 2) continue
+		const next = inset(y + CELL)
+		// How far the edge steps in or out at this row: the bank's that wide.
+		const step = Math.max(CELL, Math.abs(next - at))
+		for (const side of [0, 1]) {
+			const x = side ? width - at - step : at
+			ctx.fillStyle = look.bank
+			ctx.fillRect(x, y, step + CELL, CELL)
+			ctx.fillStyle = look.wet
+			ctx.fillRect(side ? x - CELL : x + step + CELL, y, CELL, CELL)
+			if (hash(seed + y * 3 + side) > 0.9) {
+				ctx.fillStyle = PEBBLE
+				ctx.fillRect(x, y, CELL * 2, CELL)
+			}
+		}
+	}
+}
+const PEBBLE = '#9a8a72'
+/** A colour as a hex, quite clear: to fade into, not through black. */
+const clearOf = (hex: string) => {
+	const n = Number.parseInt(hex.slice(1, 7), 16)
+	return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0)`
+}
+/** How round a pond's corners are. */
+const POND_ROUND = 70
+/** How far a pond's water goes down in front, under its surface, before its bottom. */
+const POND_FRONT = 52
+
 /** The water behind the path: from its surface back to the Ground's far edge, and on away. */
 export function createRiver(world: World) {
 	const { river } = world.course
 	const look = world.course.look?.river
 	if (!river || !look) return []
+	if (river.pond) return createPondBack(world, river, look)
 	const width = river.to - river.from
 	/** The Ground's far edge, the field behind it from there. */
 	const far = river.level - PATH_BACK - VERGE
@@ -251,11 +306,133 @@ export function createRiver(world: World) {
 	]
 }
 
+/**
+ * A pond's water behind the path: back across the field, its far edge
+ * rounded off, a mud bank all round it, reeds and lily pads in it.
+ */
+function createPondBack(
+	world: World,
+	river: NonNullable<World['course']['river']>,
+	look: NonNullable<NonNullable<World['course']['look']>['river']>,
+) {
+	const width = river.to - river.from
+	const far = river.level - PATH_BACK - VERGE
+	const top = far - AWAY
+	const rows = river.level - top
+	/** How far in its edge is at row `y`, down from its far edge. */
+	const inset = (y: number) => pondInset((rows - y) / rows, width, POND_ROUND)
+	/**
+	 * Its first row with water across it: rounding in to its far edge, the
+	 * rows above close right off, and drawn they'd come out turned back on
+	 * themselves, a stray bar over the bank behind it.
+	 */
+	let first = 0
+	while (first < rows && inset(first) * 2 >= width - CELL * 2) first += CELL
+	return [
+		createController({
+			init: () => ({
+				id: 'river',
+				type: 'river',
+				x: () => river.from,
+				y: () => top - CELL * 2,
+				width: () => width,
+				height: () => rows + CELL * 2,
+			}),
+			draw: ({ ctx }) => {
+				ctx.imageSmoothingEnabled = false
+				ctx.translate(0, CELL * 2)
+				// Its rows filled as one: no hairlines between them. Hazier
+				// towards its far edge, the sky in it.
+				const water = cellBatch(ctx)
+				water.fillStyle = look.water
+				for (let y = first; y < rows; y += CELL) {
+					const at = inset(y)
+					water.fillRect(at, y, width - at * 2, CELL)
+				}
+				water.flush()
+				const haze = cellBatch(ctx)
+				const fade = ctx.createLinearGradient(0, 0, 0, rows)
+				fade.addColorStop(0, look.shine)
+				fade.addColorStop(1, clearOf(look.shine))
+				haze.fillStyle = fade
+				for (let y = first; y < rows; y += CELL) {
+					const at = inset(y)
+					haze.fillRect(at, y, width - at * 2, CELL)
+				}
+				ctx.save()
+				ctx.globalAlpha *= 0.3
+				haze.flush()
+				ctx.restore()
+				ripples(ctx, width, rows, world.ticks(), look.shine, 6)
+				// Its mud bank, round its far edge and its ends: a bank along
+				// the top, then down each end.
+				ctx.fillStyle = look.bank
+				const topAt = inset(first)
+				ctx.fillRect(topAt, first - CELL * 2, width - topAt * 2, CELL * 2)
+				ctx.fillStyle = look.wet
+				ctx.fillRect(topAt, first, width - topAt * 2, CELL)
+				pondRim(ctx, width, rows, inset, look, 5)
+				shallows(ctx, width, [14, 26, 40, rows - 2], [18, 34], 41)
+			},
+		}),
+	]
+}
+
+/** A pond's water in front of the path, from its surface down to its bottom, rounded: over everyone in it. */
+function createPondFront(
+	world: World,
+	river: NonNullable<World['course']['river']>,
+	look: NonNullable<NonNullable<World['course']['look']>['river']>,
+) {
+	const width = river.to - river.from
+	const rows = POND_FRONT
+	/** How far in its edge is at row `y`, down from its surface. */
+	const inset = (y: number) => pondInset(y / rows, width, POND_ROUND)
+	return [
+		createController({
+			init: () => ({
+				id: 'river-front',
+				type: 'river-front',
+				x: () => river.from,
+				y: () => river.level,
+				width: () => width,
+				height: () => rows + CELL * 2,
+			}),
+			draw: ({ ctx }) => {
+				ctx.imageSmoothingEnabled = false
+				ctx.save()
+				ctx.globalAlpha *= 0.86
+				// Its rows filled as one: no hairlines between them.
+				const water = cellBatch(ctx)
+				for (let y = 0; y < rows; y += CELL) {
+					const at = inset(y)
+					water.fillStyle = y / rows > 0.55 ? look.deep : look.water
+					water.fillRect(at, y, width - at * 2, CELL)
+				}
+				water.flush()
+				ctx.restore()
+				// Its surface, lit, along the top.
+				ctx.fillStyle = look.shine
+				ctx.fillRect(inset(0), 0, width - inset(0) * 2, CELL)
+				ripples(ctx, width, 30, world.ticks(), look.shine, 5)
+				// Its mud bank, down its ends and round along its bottom.
+				pondRim(ctx, width, rows, inset, look, 9)
+				const bottom = inset(rows - CELL)
+				ctx.fillStyle = look.bank
+				ctx.fillRect(bottom, rows, width - bottom * 2, CELL * 2)
+				shallows(ctx, width, [12, 26, 40], [20, 34], 77)
+			},
+			drawReach: { left: CELL, right: CELL },
+		}),
+	]
+}
+
 /** The water in front of the path, from its surface down: over everyone in it. */
 export function createRiverFront(world: World) {
 	const { river } = world.course
 	const look = world.course.look?.river
 	if (!river || !look) return []
+	if (river.pond) return createPondFront(world, river, look)
 	const width = river.to - river.from
 	const height = VIEW_HEIGHT - river.level + BELOW
 	return [

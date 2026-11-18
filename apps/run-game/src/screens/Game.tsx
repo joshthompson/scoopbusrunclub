@@ -13,6 +13,7 @@ import type { Course } from '../courses/types'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { COLLECTABLES } from '../game/collectables'
 import { PX_PER_M, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
+import { stillFollowed } from '../game/followers'
 import type { Hat } from '../game/hats'
 import { longJumpMetres } from '../game/longJump'
 import { type Medal, medalFor } from '../game/medals'
@@ -366,6 +367,7 @@ export function Game(props: {
 					brokeBridge: world.body.brokeBridge,
 					ghost: world.body.ghost,
 					crocodiles: world.body.crocBest,
+					followerHome: finished && stillFollowed(world, world.racers[0]),
 				})
 			) {
 				placing.special = true

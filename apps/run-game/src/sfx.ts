@@ -52,13 +52,29 @@ export type Sound =
 	| 'chainsaw'
 	| 'logCut'
 	| 'timber'
+	/**
+	 * Dino Island's volcano: going off, roaring on, a meteor falling out of
+	 * the burning sky and coming down far off, a lava bomb hurled out of it,
+	 * and its crater's lava spurting up before it blows.
+	 */
+	| 'eruption'
+	| 'rumble'
+	| 'meteor'
+	| 'meteorHit'
+	| 'lavaBomb'
+	| 'blorp'
 
 /**
- * [frequency in Hz, length in seconds, wave, and how loud, out of the
- * sound's `volume`] for each note, played one after another; or, in a
- * `chord`, all at once.
+ * [frequency in Hz, length in seconds, wave, how loud, out of the sound's
+ * `volume`, and how far it slides, if not the sound's `slide`] for each
+ * note, played one after another; or, in a `chord`, all at once.
+ *
+ * A `noise` note is a hiss, the NES's noise channel's: white noise, with
+ * everything over its frequency muffled away. Sliding down, it's a boom
+ * dying away, or a rush going by; a rumble, low.
  */
-type Note = [number, number, OscillatorType?, number?]
+type Wave = OscillatorType | 'noise'
+type Note = [number, number, Wave?, number?, number?]
 
 const SOUNDS: Record<
 	Sound,
@@ -355,6 +371,123 @@ const SOUNDS: Record<
 		volume: 0.3,
 		slide: 0.55,
 	},
+	/**
+	 * The volcano blowing: a crack, a huge boom dying away a long while, and
+	 * a deep shudder under it.
+	 */
+	eruption: {
+		notes: [
+			[3200, 2.4, 'noise', 1, 0.03],
+			[64, 2, 'sine', 0.9, 0.45],
+			[1400, 0.06, 'square', 0.25, 0.4],
+		],
+		volume: 0.3,
+		chord: true,
+	},
+	/** It roaring on: a low rumble, rolling. */
+	rumble: {
+		notes: [
+			[260, 1.6, 'noise', 1, 0.5],
+			[46, 1.4, 'sine', 0.6, 0.8],
+		],
+		volume: 0.11,
+		chord: true,
+	},
+	/** A meteor falling out of the sky: a long whistle down, and a rush of air. */
+	meteor: {
+		notes: [
+			[1500, 2.2, 'sine', 0.5, 0.3],
+			[5000, 2.2, 'noise', 0.7, 0.15],
+		],
+		volume: 0.05,
+		chord: true,
+	},
+	/** It coming down, far off: a muffled boom. */
+	meteorHit: {
+		notes: [
+			[700, 1.1, 'noise', 1, 0.12],
+			[70, 0.9, 'sine', 0.8, 0.5],
+		],
+		volume: 0.16,
+		chord: true,
+	},
+	/** A lava bomb, hurled out: a fwoomp. */
+	lavaBomb: {
+		notes: [
+			[500, 0.3, 'noise', 1, 2.2],
+			[150, 0.3, 'sine', 0.7, 0.4],
+		],
+		volume: 0.08,
+		chord: true,
+	},
+	/** Lava spurting up in the crater: a thick blorp, and it spattering back. */
+	blorp: {
+		notes: [
+			[150, 0.12, 'sine', 1, 2.4],
+			[900, 0.18, 'noise', 0.5, 0.4],
+		],
+		volume: 0.12,
+	},
+}
+
+/** A second of white noise, made once, looped for a `noise` note. */
+let noiseBuffer: AudioBuffer | undefined
+function noise(context: BaseAudioContext) {
+	if (noiseBuffer?.sampleRate === context.sampleRate) return noiseBuffer
+	noiseBuffer = context.createBuffer(1, context.sampleRate, context.sampleRate)
+	const data = noiseBuffer.getChannelData(0)
+	for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+	return noiseBuffer
+}
+
+/**
+ * `sound`'s notes, played into `destination` from now: the context's own
+ * speakers, or, to listen to it offline, an `OfflineAudioContext`'s.
+ */
+export function voice(
+	context: BaseAudioContext,
+	destination: AudioNode,
+	sound: Sound,
+) {
+	const { notes, volume, slide: slides, chord } = SOUNDS[sound]
+	let at = context.currentTime
+	for (const [
+		frequency,
+		length,
+		wave = 'square',
+		loud = 1,
+		slide = slides,
+	] of notes) {
+		const gain = context.createGain()
+		// A hiss, through a filter muffling all over `frequency`; or a tone.
+		let source: AudioScheduledSourceNode
+		let pitch: AudioParam
+		if (wave === 'noise') {
+			const hiss = context.createBufferSource()
+			hiss.buffer = noise(context)
+			hiss.loop = true
+			const muffle = context.createBiquadFilter()
+			muffle.type = 'lowpass'
+			hiss.connect(muffle).connect(gain)
+			source = hiss
+			pitch = muffle.frequency
+		} else {
+			const oscillator = context.createOscillator()
+			oscillator.type = wave
+			oscillator.connect(gain)
+			source = oscillator
+			pitch = oscillator.frequency
+		}
+		pitch.setValueAtTime(frequency, at)
+		if (slide)
+			pitch.exponentialRampToValueAtTime(frequency * slide, at + length)
+		gain.gain.setValueAtTime(volume * loud, at)
+		gain.gain.exponentialRampToValueAtTime(0.0001, at + length)
+		gain.connect(destination)
+		source.start(at)
+		source.stop(at + length)
+		if (!chord) at += length
+	}
 }
 
 /** Told of every sound played, sound on or off: a Room's Host passes them on. */
@@ -370,25 +503,7 @@ export function play(sound: Sound) {
 	try {
 		const context = audioContext()
 		wake(context)
-		const { notes, volume, slide, chord } = SOUNDS[sound]
-		let at = context.currentTime
-		for (const [frequency, length, wave = 'square', loud = 1] of notes) {
-			const oscillator = context.createOscillator()
-			const gain = context.createGain()
-			oscillator.type = wave
-			oscillator.frequency.setValueAtTime(frequency, at)
-			if (slide)
-				oscillator.frequency.exponentialRampToValueAtTime(
-					frequency * slide,
-					at + length,
-				)
-			gain.gain.setValueAtTime(volume * loud, at)
-			gain.gain.exponentialRampToValueAtTime(0.0001, at + length)
-			oscillator.connect(gain).connect(context.destination)
-			oscillator.start(at)
-			oscillator.stop(at + length)
-			if (!chord) at += length
-		}
+		voice(context, context.destination, sound)
 	} catch {
 		// No Web Audio: the game's just quiet.
 	}

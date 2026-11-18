@@ -20,6 +20,7 @@ import {
 	cloudberries,
 	flyingStrawberry,
 } from '../../courses/kit/cliffFika'
+import { coconut, fossilPops, lavaCake } from '../../courses/kit/dinoIslandFika'
 import { butterTea, mintCake } from '../../courses/kit/everestFika'
 import {
 	captainsHat,
@@ -217,6 +218,9 @@ const ART: Record<FikaItem, string> = {
 	flyingStrawberry,
 	bubbleGum,
 	cloudberries,
+	fossilPops,
+	lavaCake,
+	coconut,
 }
 
 /** A fika item's picture, for a Draw Hook to draw at its size (see `FIKA_SIZE`). */

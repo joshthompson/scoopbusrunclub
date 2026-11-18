@@ -1,12 +1,6 @@
 import type { Obstacle } from '../courses/types'
 import { geeseWidth } from '../draw/art/geese'
 import { KIDS_REACH_UP, kidsWidth } from '../draw/art/kids'
-import {
-	SPIDER_BITE,
-	SPIDER_BODY,
-	SPIDER_HEAD,
-	SPIDER_WIDTH,
-} from '../draw/art/spider'
 import { STALACTITE_HEIGHT } from '../draw/art/stalactite'
 import { TOURISTS_HEIGHT, touristsWidth } from '../draw/art/tourists'
 import { TALL_HURDLE_CLEAR, TALL_HURDLE_HEIGHT } from '../draw/art/track'
@@ -103,6 +97,7 @@ import {
 import { MUMMY_HEIGHT } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
 import { cyclistAt, deckAt, deckUnder } from './cyclists'
+import { soundEruption } from './eruptionSounds'
 import { FIKA_SIZE, type FikaItem } from './fika'
 import {
 	CONDOR_SPEED,
@@ -112,6 +107,7 @@ import {
 	rideCondor,
 	stepFlyers,
 } from './flyers'
+import { stepFollowers } from './followers'
 import { stepFootball } from './football'
 import { scoopFurbies, stepFurbies } from './furbies'
 import { atSea, glidingBox, stepGliding } from './gliders'
@@ -119,6 +115,13 @@ import { DRAWN_FROM } from './groundColumns'
 import { stepHarvester } from './harvester'
 import { HAT_RULES, type Hat, WORN_FIKA, sameHat } from './hats'
 import { hearHouse, stepHaunt } from './haunted'
+import {
+	BELL_UP,
+	JELLYFISH_REACH,
+	TENTACLE_DOWN,
+	TENTACLE_REACH,
+	jellyfishHeight,
+} from './jellyfish'
 import { callOut, landLongJump, longJumpTakeOff, sandDrag } from './longJump'
 import { MOLE_HOP, burrowing, onMole } from './moles'
 import { mummyAt } from './mummies'
@@ -162,6 +165,7 @@ import {
 	sewageAt,
 	swampManAt,
 } from './sewer'
+import { sharkBites, sharkLeaves, sharkSwim, stepSharks } from './sharks'
 import { stepSkiing } from './skis'
 import {
 	GULL_HEIGHT,
@@ -175,9 +179,17 @@ import {
 	turbineHits,
 	whaleAt,
 } from './sky'
-import { spiderAt } from './spiders'
+import { spiderAt, spiderLook } from './spiders'
 import { soundStalactites, stalactiteAt, wakeStalactites } from './stalactites'
 import { steamFires } from './steam'
+import {
+	diveIn,
+	inDeepWater,
+	stepSwimming,
+	surfaceFloor,
+	swimmingBox,
+	underwater,
+} from './swim'
 import { TOWER_DOOR, TOWER_HEIGHT, towerSpan } from './towers'
 import {
 	BABY_BUS_PARKED,
@@ -272,6 +284,9 @@ export function stepWorld(world: World) {
 		boardCarts(world)
 		stepCarts(world)
 		stepFootball(world)
+		stepFollowers(world)
+		stepSharks(world)
+		soundEruption(world)
 		stepHarvester(world)
 		stepFlyers(world)
 		wakeZombies(world)
@@ -403,9 +418,13 @@ function busTicksToFinish(world: World) {
 		)
 		// Its own pace, as it goes up and down: on a ski slope, quicker down
 		// it, up to the most anyone can go.
+		// Through the sea, under it, slower.
+		const swum = inDeepWater(world, x - BUS_MIDDLE_BEHIND)
+			? (world.course.deepWater?.busPace ?? 1)
+			: 1
 		x += world.course.busDownhill
 			? Math.min(pace * busHill(world, x), topSpeed(world) - ROUND_SEA_SLACK)
-			: pace
+			: pace * swum
 		ticks++
 	}
 	return ticks
@@ -534,6 +553,7 @@ function noteDancing(world: World, racer: Racer) {
 		racer.out === 'finished' &&
 		b.grounded &&
 		!b.gliding &&
+		!b.swimming &&
 		b.mount === 0 &&
 		b.carried === 0 &&
 		Math.abs(b.vx) < DANCING_STILL
@@ -665,8 +685,9 @@ function stepRunner(world: World, racer: Racer) {
 	}
 	if (b.carried > 0) {
 		// Carried by a goose: up and on, whatever's held, until it lets go,
-		// or they do, with down.
-		b.carried = down ? 0 : b.carried - 1
+		// or they do, with down. Out over Deep Water, a pterodactyl lets go,
+		// past the diving point: down into it they drop.
+		b.carried = down || pastDivingPoint(world, b.x) ? 0 : b.carried - 1
 		b.grounded = false
 		b.ducking = false
 		b.facing = 1
@@ -691,6 +712,12 @@ function stepRunner(world: World, racer: Racer) {
 		const crashed = stepGliding(world, racer, { up, down, left, right })
 		b.wasUp = up
 		if (crashed && racing) fall(world, racer)
+		return
+	}
+	if (b.swimming) {
+		// Under the sea: swimming, till they're up on the shore.
+		stepSwimming(world, racer, { up, down, left, right }, racing)
+		b.wasUp = up
 		return
 	}
 	if (b.board) {
@@ -1022,6 +1049,11 @@ function stepRunner(world: World, racer: Racer) {
 		)
 			// Down a Gap, out of sight; into the sea, as they hit it.
 			fall(world, racer)
+		// Down into the sea, to swim: diving in.
+		else if (underwater(world, b.x, b.feetY)) {
+			diveIn(world, b)
+			play('squelch')
+		}
 	}
 	if (b.grounded) {
 		b.floor = b.feetY
@@ -1039,6 +1071,15 @@ function stepRunner(world: World, racer: Racer) {
 	if (racing) meetFound(world, racer)
 	// Down from the long jump: how far.
 	if (b.grounded && b.launchX !== undefined) landLongJump(world, racer)
+}
+
+/** How far out over Deep Water, past where it starts, a flyer lets go of whoever it's carrying. */
+const DROP_OUT = 140
+
+/** Whether `x` is out over Deep Water, far enough to be let go of into it. */
+const pastDivingPoint = (world: World, x: number) => {
+	const { deepWater } = world.course
+	return !!deepWater && x >= deepWater.from + DROP_OUT && inDeepWater(world, x)
 }
 
 /** A hat knocked off someone's head, flying. */
@@ -1780,15 +1821,18 @@ function collide(world: World, racer: Racer) {
 	// Held by a monster, or coming up out of a grave: nor then.
 	if (b.haunt) return
 
-	// On a glider: lying along under its wing, it over them.
+	// On a glider: lying along under its wing, it over them. Swimming:
+	// lying along in the water.
 	const box = b.gliding
 		? glidingBox(b)
-		: {
-				left: b.x - HITBOX_HALF_WIDTH,
-				right: b.x + HITBOX_HALF_WIDTH,
-				top: b.feetY - bodyHeight(b),
-				bottom: b.feetY,
-			}
+		: b.swimming
+			? swimmingBox(b)
+			: {
+					left: b.x - HITBOX_HALF_WIDTH,
+					right: b.x + HITBOX_HALF_WIDTH,
+					top: b.feetY - bodyHeight(b),
+					bottom: b.feetY,
+				}
 	const { top } = box
 	/** Where they were last tick. */
 	const wasAt = b.x - b.vx
@@ -1851,7 +1895,9 @@ function collide(world: World, racer: Racer) {
 						? mummyAt(world, { ...state, obstacle: o }).x
 						: o.kind === 'spider'
 							? spiderAt(world, { ...state, obstacle: o }).x
-							: o.x
+							: o.kind === 'shark'
+								? sharkSwim(world, { ...state, obstacle: o }).x
+								: o.x
 		if (Math.abs(at - b.x) > 200) continue
 		const ground = terrain.groundY(o.x)
 
@@ -2275,15 +2321,16 @@ function collide(world: World, racer: Racer) {
 			case 'spider': {
 				if (state.scooped) break
 				const spider = spiderAt(world, { ...state, obstacle: o })
-				const left = spider.x - SPIDER_WIDTH / 2
+				const look = spiderLook(world.course)
+				const left = spider.x - look.width / 2
 				/** A part of it, from its picture's left, as it's facing: turned round going right. */
 				const span = (part: { from: number; to: number }) =>
 					spider.facing === -1
 						? [left + part.from, left + part.to]
-						: [left + SPIDER_WIDTH - part.to, left + SPIDER_WIDTH - part.from]
+						: [left + look.width - part.to, left + look.width - part.from]
 				// Down onto its head or its back: a bounce off it, as off a
 				// head, and it's squashed down for a moment.
-				const landed = [SPIDER_HEAD, SPIDER_BODY].find((part) => {
+				const landed = [look.head, look.body].find((part) => {
 					const [from, to] = span(part)
 					const top = ground - part.top
 					return (
@@ -2305,13 +2352,53 @@ function collide(world: World, racer: Racer) {
 					b.stumble === 0 &&
 					overlaps(
 						left + 8,
-						left + SPIDER_WIDTH - 8,
-						ground - SPIDER_BITE.top,
+						left + look.width - 8,
+						ground - look.bite.top,
 						ground,
 					)
 				) {
 					hits(state)
-					stumble('Eek!')
+					stumble(look.word ?? 'Eek!')
+				}
+				break
+			}
+			case 'shark': {
+				// Its jaws on them, swimming: a bite, and it's off, done with.
+				if (state.used || !b.swimming) break
+				const shark = sharkSwim(
+					world,
+					state as ObstacleState & { obstacle: typeof o },
+				)
+				if (b.stumble === 0 && sharkBites(shark, b)) {
+					hits(state)
+					state.used = true
+					sharkLeaves(shark)
+					stumble('Chomp!')
+					play('stomp')
+				}
+				break
+			}
+			case 'jellyfish': {
+				// Into its bell, or its tentacles under it: stung.
+				const bottom = ground - jellyfishHeight(o, Math.max(0, world.ticks()))
+				if (
+					freshFor(state) &&
+					b.stumble === 0 &&
+					(overlaps(
+						o.x - JELLYFISH_REACH,
+						o.x + JELLYFISH_REACH,
+						bottom - BELL_UP,
+						bottom,
+					) ||
+						overlaps(
+							o.x - TENTACLE_REACH,
+							o.x + TENTACLE_REACH,
+							bottom,
+							bottom + TENTACLE_DOWN,
+						))
+				) {
+					hits(state)
+					stumble('Stung!')
 				}
 				break
 			}
@@ -2617,7 +2704,10 @@ function stepBus(world: World) {
 		const pace =
 			bus.speed *
 			busHill(world, bus.frontX) *
-			(inRiver(world, bus.frontX) ? RIVER_BUS_PACE : 1)
+			(inRiver(world, bus.frontX) ? RIVER_BUS_PACE : 1) *
+			(inDeepWater(world, bus.frontX - BUS_MIDDLE_BEHIND)
+				? (world.course.deepWater?.busPace ?? 1)
+				: 1)
 		// Off a Leap, in a giant condor's talons: no faster than the condors
 		// carrying everyone down ahead of it, so it can't catch them while
 		// there's nothing they can do about it.
@@ -2696,6 +2786,7 @@ function scoop(world: World, racer: Racer, body: Body) {
 	body.mount = 0
 	body.carried = 0
 	body.gliding = false
+	body.swimming = false
 	body.grounded = false
 	body.ducking = false
 	body.trick = undefined
@@ -2755,7 +2846,7 @@ function knockOver(world: World) {
 		if (o.kind === 'spider') {
 			if (state.scooped) continue
 			const spider = spiderAt(world, { ...state, obstacle: o })
-			if (bus.frontX < spider.x - SPIDER_WIDTH / 2) continue
+			if (bus.frontX < spider.x - spiderLook(world.course).width / 2) continue
 			state.used = true
 			state.scooped = {
 				at: world.ticks(),
@@ -3015,6 +3106,45 @@ function glideView(world: World) {
 	}
 }
 
+/** How much over the surface the camera shows, swimming. */
+const SWIM_SKY_ROOM = 70
+
+/**
+ * Under the sea, swimming: the surface over them in view, and the seabed
+ * under them, as much of the water as fits; following them down, if it's
+ * too deep for both.
+ */
+function swimView(world: World, b: Body) {
+	const { deepWater } = world.course
+	if (!deepWater || !b.swimming) return undefined
+	const bed = world.terrain.groundY(b.x)
+	return {
+		high:
+			Math.min(deepWater.surface - SWIM_SKY_ROOM, b.feetY - 120) +
+			CAMERA_HEADROOM,
+		low: Math.max(b.feetY + 40, Math.min(bed, b.feetY + 200)),
+	}
+}
+
+/**
+ * Up on the skyline (see `Course['skyline']`): how far up the screen
+ * someone's feet are kept, the sky over them, and how far under them it
+ * looks.
+ */
+const SKYLINE_FEET = 400
+const SKYLINE_UNDER = 80
+
+/** Up on the skyline: low on the screen, the sky over them. */
+function skylineView(world: World, b: Body) {
+	const skyline = world.course.skyline?.find((s) => b.x >= s.from && b.x < s.to)
+	if (!skyline || b.swimming) return undefined
+	// Where they last stood, not every jump: the sky stays put over them.
+	return {
+		high: b.floor - SKYLINE_FEET + CAMERA_HEADROOM,
+		low: Math.max(b.floor, b.feetY) + SKYLINE_UNDER,
+	}
+}
+
 /** Room kept under someone's feet, finished and dropping: a little more than the least. */
 const FINISH_DROP_ROOM = 120
 
@@ -3054,20 +3184,23 @@ function stepCamera(world: World) {
 		world.setZoom(zoom + (wantZoom - zoom) * ZOOM_EASE)
 	const leaping = gliding
 		? undefined
-		: (leapView(world, b) ?? secretView(world, b))
-	const view = gliding ?? leaping ?? lookAt(b)
+		: (leapView(world, b) ?? secretView(world, b) ?? swimView(world, b))
+	// Up on the skyline: kept low on the screen, eased into, and nothing
+	// ahead looked up or down to.
+	const skyline = gliding || leaping ? undefined : skylineView(world, b)
+	const view = gliding ?? leaping ?? skyline ?? lookAt(b)
 	// Down a Secret, the camera goes down under the Ground after them, as
 	// far as it takes: under Gamla Stan's street, that's under where it
 	// ever looks otherwise.
 	const deep = !gliding && !!secretView(world, b)
 	// Up a mountain, up the climb ahead too; down one, down the slope ahead.
-	if (!gliding && !leaping && !flyingHigh(b))
+	if (!gliding && !leaping && !skyline && !flyingHigh(b))
 		view.high = upAhead(world, b.x, b.facing, view.high)
 	// Somewhere tall, looking up at it.
 	const up = world.course.lookUp?.find((u) => b.x >= u.from && b.x < u.to)
 	if (up && !gliding && !leaping)
 		view.high = Math.min(view.high, up.top + CAMERA_HEADROOM)
-	if (!gliding && !leaping) view.low = downAhead(world, b, view.low)
+	if (!gliding && !leaping && !skyline) view.low = downAhead(world, b, view.low)
 	const targetY = cameraYFor(view.high, view.low, world.zoom(), deep)
 	const cameraY = world.cameraY()
 	// Quick after them, flying high, or dropping a long way.
@@ -3160,7 +3293,11 @@ function frameEveryone(world: World) {
 		glide?.high ?? Number.POSITIVE_INFINITY,
 		...running.map(
 			(r) =>
-				(leapView(world, r.body) ?? secretView(world, r.body))?.high ??
+				(
+					leapView(world, r.body) ??
+					secretView(world, r.body) ??
+					swimView(world, r.body)
+				)?.high ??
 				(flyingHigh(r.body)
 					? lookAt(r.body).high
 					: upAhead(world, r.body.x, r.body.facing, lookAt(r.body).high)),
@@ -3170,7 +3307,11 @@ function frameEveryone(world: World) {
 		glide?.low ?? Number.NEGATIVE_INFINITY,
 		...running.map(
 			(r) =>
-				(leapView(world, r.body) ?? secretView(world, r.body))?.low ??
+				(
+					leapView(world, r.body) ??
+					secretView(world, r.body) ??
+					swimView(world, r.body)
+				)?.low ??
 				downAhead(
 					world,
 					r.body,
