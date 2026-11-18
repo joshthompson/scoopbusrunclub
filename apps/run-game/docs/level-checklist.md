@@ -23,7 +23,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | 12 | The Sewers | ✅ Rubber duck, gold ring, old coin, lost phone | ✅ Knock over every traffic cone | ⬜ | ✅ Tentacle hat | ⬜ | ✅ Down a manhole, out up the Giant Vent | ⬜ |
 | 13 | City Rooftop | ✅ Popcorn, mojito, Dobry Cola | ✅ Find Bat Person | ✅ Bat Person | ✅ Top hat | ⬜ | ✅ Bat Person's crane hideout | ⬜ |
 | 14 | The Cliff | ✅ Flying strawberry, bubble gum, hjortron (cloudberries) | ✅ Get all the Rings | ⬜ | ✅ Flying helmet | ✅ Glider | ✅ Glide out over the sea to the island | ⬜ |
-| 15 | Everest | ✅ Kendal Mint Cake, butter tea | ✅ Find the yeti | ✅ Yuri the Yeti | ✅ Bobble hat | ✅ Mountain goat | ✅ Yeti den under the mountain | ⬜ |
+| 15 | Everest | ✅ Kendal Mint Cake, butter tea | ✅ Find the yeti | ✅ Yuri the Yeti | ✅ Bobble hat | ✅ Mountain goat | ✅ Yeti den under the mountain | 2026-11-18 |
 | 16 | The Slopes | ✅ Våffla, varm choklad, lussekatt, pepparkaka, våffeltorn, tomatsoppa | ✅ Complete the course on foot | ⬜ | ✅ Ski helmet | ✅ Skis, snowboard | ✅ Ski jump, waffle hut | ⬜ |
 | 17 | The Hospital (Karolinska) | ✅ Grapes, oxygen, vitamins | ✅ Cure the common cold (pop every germ) | ✅ Spirit of Jazz | ✅ Head mirror | ✅ Red blood cell | ✅ Shrink ray, inside the body | ⬜ |
 | 18 | Midnattsloppet | ✅ Water, blåbärssoppa, pizza slice (plus the banana hunt) | ✅ Bounce on 20 heads | ✅ Banana Girl | ✅ Disco ball | ✅ Skateboard | ✅ Rock band stage, church choir, banana stand | ⬜ |
@@ -39,7 +39,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | Unique hat | 0 | |
 | Ride | 4 | Halloween Town, Scoop Cruises, The Sewers, City Rooftop |
 | Set piece | 1 | Huddinge |
-| Art pass | 18 | Every level but Dino Island |
+| Art pass | 17 | Every level but Everest and Dino Island |
 
 ## Also in the course standard
 

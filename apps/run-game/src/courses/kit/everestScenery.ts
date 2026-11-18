@@ -1,4 +1,5 @@
 import type { CourseLook } from '../types'
+import { GLACIER, SNOWFIELD, TREK_TERRACES } from './everestBackdrop'
 import {
 	type PixelRect,
 	pixelArt,
@@ -226,18 +227,8 @@ const TREK: NonNullable<CourseLook['horizon']> = {
 			under((x) => trekNear(x) + 34, TREK_GREEN_DARK),
 	),
 	fill: TREK_FAR_FILL,
-	nearer: [
-		{
-			asset: svgUrl(
-				W,
-				120,
-				under(wave(35, 50, 16, [2, 4, 9]), '#6fa04a', 120) +
-					pines(wave(35, 50, 16, [2, 4, 9]), 40, '#4a7a3a', 36),
-			),
-			height: 120,
-			fill: '#6fa04a',
-		},
-	],
+	// The hillside right behind the path: terraced fields, stone walls, lodges.
+	nearer: [TREK_TERRACES],
 }
 
 // --- Up the moraine, onto the glacier ------------------------------------------
@@ -291,29 +282,8 @@ const MORAINE: NonNullable<CourseLook['horizon']> = {
 			),
 	),
 	fill: MORAINE_FILL,
-	nearer: [
-		{
-			// The glacier: ice, broken into seracs, crevasses across it.
-			asset: svgUrl(
-				W,
-				110,
-				under(wave(45, 34, 12, [5, 8, 13]), '#dfe9f2', 110) +
-					under(wave(46, 52, 8, [6, 11]), '#c8d8e8', 110) +
-					Array.from({ length: 18 }, (_, i) =>
-						pixelPolygon(
-							[
-								[i * 54 + 10, 60 + (i % 3) * 14],
-								[i * 54 + 34, 62 + (i % 3) * 14],
-								[i * 54 + 22, 68 + (i % 3) * 14],
-							],
-							'#7f9bb8',
-						),
-					).join(''),
-			),
-			height: 110,
-			fill: '#c8d8e8',
-		},
-	],
+	// The glacier: seracs along its far edge, crevasses, moraine down it.
+	nearer: [GLACIER],
 	sky: ['#4f9ae0', '#d4ecfa'],
 }
 
@@ -365,6 +335,8 @@ const SUMMITS: NonNullable<CourseLook['horizon']> = {
 			height: 100,
 			fill: '#d2e0ee',
 		},
+		// And nearer still, the mountain's own snow, out of the clouds.
+		SNOWFIELD,
 	],
 	sky: ['#123f8c', '#8ec6ee'],
 }

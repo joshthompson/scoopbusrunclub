@@ -10,9 +10,29 @@ import {
 	VIEW_HEIGHT,
 } from '../game/constants'
 import { EVEREST_FIKA } from '../game/fika'
+import { GROUND_STEP } from '../game/groundColumns'
 import { CAMERA_HEADROOM, MAX_ZOOM } from '../game/step'
 import { type Gap, type Terrain, withGaps } from '../game/terrain'
 import { YETI } from '../runners/bonus'
+import {
+	EVEREST_BLUE_ICE,
+	EVEREST_SNOW,
+	EVEREST_TRACK,
+	EVEREST_TRAIL,
+	EVEREST_YELLOW_BAND,
+} from './kit/everestGround'
+import {
+	bigBoulder,
+	iceAxe,
+	oxygenBottle,
+	prayerWheels,
+	slab,
+	southColTent,
+	summitMound,
+	teahouse,
+	teahouseGreen,
+	wand,
+} from './kit/everestProps'
 import {
 	EVEREST_FACE,
 	EVEREST_HORIZONS,
@@ -191,6 +211,23 @@ const SNOW_LINE = 8500
 /** Where the sky's gone deep blue, over the clouds; and where it's snowing hardest. */
 const HIGH = 12000
 const BLIZZARD = 15500
+/** Where the Icefall's seracs stand, from the snow line on. */
+const ICEFALL_END = 11600
+/** The Lhotse Face's blue ice, along the course; and the Yellow Band's rock, across it. */
+const LHOTSE_ICE: [from: number, to: number] = [12700, 14600]
+const YELLOW_BAND: [from: number, to: number] = [15350, 16450]
+
+/**
+ * Fixed ropes, from and to along the course: up the Lhotse Face, and up the
+ * ridge either side of the Hillary Step. Red, along the back of the path,
+ * sagging between stakes every `ROPE_SPAN`.
+ */
+const FIXED_ROPES: [from: number, to: number][] = [
+	[12650, 14700],
+	[17350, 18860],
+	[18940, 19820],
+]
+const ROPE_SPAN = 180
 
 /**
  * A smooth climb through `points`, never overshooting between them, so a
@@ -431,6 +468,18 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 	const clearOf = (x: number) =>
 		!obstacles.some((o) => o.kind === 'tourists' && Math.abs(o.x - x) < 60)
 
+	// Which of a kind it is, from a stream of its own, so the rest stand
+	// where they always have.
+	const variety = seeded(1975)
+	const pick = <T>(...of: T[]) => of[Math.floor(variety() * of.length)]
+	/** A camp's tents, but Namche's a village: its lodges, and prayer wheels; and the South Col's, wrecked by the wind. */
+	function campPiece(name: string, fly: string, shade: string) {
+		if (name === 'Namche')
+			return pick(teahouse, teahouseGreen, teahouse, prayerWheels)
+		if (name === 'South Col' && variety() < 0.35) return southColTent
+		return tent(fly, shade)
+	}
+
 	// The camps: their tents, prayer flags, and a sign.
 	const flies: [string, string][] = [
 		['#f2a531', '#c97f1a'],
@@ -449,7 +498,11 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 		})
 		for (let x = from + 170; x < to - 60; x += 90 + random() * 70) {
 			const [fly, shade] = flies[Math.floor(random() * flies.length)]
-			out.push({ x: Math.round(x), asset: tent(fly, shade), scale: 2 })
+			out.push({
+				x: Math.round(x),
+				asset: campPiece(camp.name, fly, shade),
+				scale: 2,
+			})
 		}
 		out.push({
 			x: Math.round((from + to) / 2),
@@ -467,6 +520,8 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 			taken(x, 70) ||
 			!clearOf(x) ||
 			inCamp(along, 60) ||
+			// Nothing in front of a step up the rock.
+			nearStep(along, 120) ||
 			sheer(x - 30) ||
 			sheer(x + 30)
 		)
@@ -478,27 +533,65 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 			if (roll < 0.34) piece = { x, asset: pine, scale: 2 }
 			else if (roll < 0.58) piece = { x, asset: rhododendron, scale: 2 }
 			else if (roll < 0.68) piece = { x, asset: chorten, scale: 2 }
-			else if (roll < 0.78) piece = { x, asset: maniWall, scale: 2 }
+			else if (roll < 0.78)
+				piece = { x, asset: pick(maniWall, maniWall, prayerWheels), scale: 2 }
 			else if (roll < 0.9)
 				piece = { x, asset: prayerFlags, scale: 2, setBack: 2, onFloor: true }
+			// A lodge now and then, set back up the hillside.
+			else if (variety() < 0.3)
+				piece = {
+					x,
+					asset: pick(teahouse, teahouseGreen),
+					scale: 2,
+					setBack: 6,
+				}
 			else piece = { x, asset: yak, scale: 2 }
 		} else if (zone === 'moraine') {
-			if (roll < 0.4) piece = { x, asset: boulder(false), scale: 2 }
+			if (roll < 0.4)
+				piece = {
+					x,
+					asset: pick(boulder(false), bigBoulder(false), slab(false)),
+					scale: 2,
+				}
 			else if (roll < 0.62) piece = { x, asset: cairn, scale: 2 }
 			else if (roll < 0.78)
 				piece = { x, asset: prayerFlags, scale: 2, setBack: 2, onFloor: true }
 			else if (roll < 0.88) piece = { x, asset: yak, scale: 2 }
 			else piece = { x, asset: maniWall, scale: 2 }
 		} else {
-			const icefall = along < 11600
+			const icefall = along < ICEFALL_END
+			// Seracs in the Icefall; above it, past where the ice breaks up,
+			// what climbers leave: marker wands, an ice axe, spent oxygen.
 			if (roll < (icefall ? 0.5 : 0.18))
-				piece = { x, asset: serac, scale: 2, onFloor: true }
-			else if (roll < 0.7) piece = { x, asset: boulder(true), scale: 2 }
+				piece = icefall
+					? { x, asset: serac, scale: 2, onFloor: true }
+					: {
+							x,
+							asset: pick(wand, wand, iceAxe, oxygenBottle),
+							scale: 2,
+							onFloor: true,
+						}
+			else if (roll < 0.7)
+				piece = {
+					x,
+					asset: pick(boulder(true), bigBoulder(true), slab(true)),
+					scale: 2,
+				}
 			else if (roll < 0.82)
 				piece = { x, asset: prayerFlags, scale: 2, setBack: 2, onFloor: true }
 			else if (roll < 0.92) piece = { x, asset: cairn, scale: 2 }
 		}
 		if (piece) out.push({ ...piece, x: Math.round(x) })
+	}
+
+	// The fixed ropes' stakes: a marker wand at each, the rope tied off to
+	// it. Clear of the crevasses and the steps.
+	for (const along of ROPE_STAKES) {
+		const x = START_X + along
+		if (nearGap(terrain, x, 40) || nearStep(along, 60)) continue
+		for (let i = out.length - 1; i >= 0; i--)
+			if (Math.abs(out[i].x - x) < 24) out.splice(i, 1)
+		out.push({ x, asset: wand, scale: 2, onFloor: true })
 	}
 
 	// At the lip of the crevasse down to the Yetis' den, a hint: an old
@@ -508,8 +601,13 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 		if (Math.abs(out[i].x - sign) < 50) out.splice(i, 1)
 	out.push({ x: sign, asset: DEN_SIGN, scale: 2, setBack: 2 })
 
-	// The summit: prayer flags, all over it.
-	for (const along of [LENGTH - 120, LENGTH + 60, LENGTH + 220])
+	// The summit: its snow dome, heaped with prayer flags, its survey pole
+	// up out of it, just past the finish; and more flags strung either side.
+	const top = START_X + LENGTH + 150
+	for (let i = out.length - 1; i >= 0; i--)
+		if (Math.abs(out[i].x - top) < 90) out.splice(i, 1)
+	out.push({ x: top, asset: summitMound, scale: 2, setBack: 4 })
+	for (const along of [LENGTH - 120, LENGTH + 320])
 		out.push({
 			x: START_X + along,
 			asset: prayerFlags,
@@ -525,6 +623,56 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 	})
 	return out.sort((a, b) => a.x - b.x)
 }
+
+/** A Ground layer's `edge` that lays it only `where`, and off down out of sight everywhere else. */
+const only =
+	(where: (along: number) => boolean, edge?: (x: number) => number) =>
+	(x: number) =>
+		where(x - START_X) ? (edge?.(x) ?? 0) : 99999
+const within =
+	([from, to]: [number, number]) =>
+	(along: number) =>
+		along >= from && along <= to
+/** Up to the snow, and from it on: halfway through its blend into white. */
+const belowSnow = (along: number) => along < SNOW_LINE
+const inSnow = (along: number) => along >= SNOW_LINE
+
+/**
+ * The Yellow Band petering out at either end: its rock cut away from the
+ * top, further and further, raggedly, so it slants off under the snow.
+ */
+const yellowBandEnds = (x: number) => {
+	const along = x - START_X
+	const [from, to] = YELLOW_BAND
+	const t = Math.min(1, Math.min(along - from, to - along) / 320)
+	return (1 - t) * 520 + (t < 1 ? 10 * Math.sin(along / 9) : 0)
+}
+
+/** Where a fixed rope runs, and the stakes it's tied off to, along the course. */
+const onRope = (along: number) =>
+	FIXED_ROPES.some(([from, to]) => along >= from && along <= to)
+const ROPE_STAKES = FIXED_ROPES.flatMap(([from, to]) =>
+	Array.from(
+		{ length: Math.floor((to - from) / ROPE_SPAN) + 1 },
+		(_, k) => from + k * ROPE_SPAN,
+	),
+)
+/** How far the rope's sagged at `x`: none at a stake, most halfway between. */
+const ropeSag = (x: number) => {
+	const along = x - START_X
+	const rope = FIXED_ROPES.find(([from, to]) => along >= from && along <= to)
+	if (!rope) return 0
+	const t = ((along - rope[0]) % ROPE_SPAN) / ROPE_SPAN
+	return 6 * Math.sin(Math.PI * t)
+}
+/** How high over the path's back edge it's tied off. */
+const ROPE_UP = 14
+/**
+ * How thick it's drawn at `x`: two pixels, and up a steep bit, as much as
+ * the ground climbs across one of its columns, so it's a line, not dashes.
+ */
+const ropeUnder = (x: number) =>
+	ropeSag(x) + Math.max(0, Math.abs(tilt(x)) * GROUND_STEP - 2)
 
 export const everest: CourseDefinition = {
 	id: 'everest',
@@ -562,11 +710,40 @@ export const everest: CourseDefinition = {
 		horizonTrees: false,
 		ground: [
 			[-PATH_BACK - VERGE, 'url(#everest-verge)'],
+			// A fixed rope along the back of the path, sagging between its
+			// stakes: a line of red, the verge again just under it.
+			[-PATH_BACK - ROPE_UP, '#d8342c', false, only(onRope, ropeSag)],
+			[
+				-PATH_BACK - ROPE_UP + 2,
+				'url(#everest-verge)',
+				false,
+				only(onRope, ropeUnder),
+			],
 			[-PATH_BACK, 'url(#everest-path-edge)'],
 			[-PATH_BACK + 5, 'url(#everest-path)'],
+			// The path's own: grit and stones up the trek and the moraine,
+			// boot prints in the snow.
+			[-PATH_BACK + 5, 'url(#everest-trail)', false, only(belowSnow)],
+			[-PATH_BACK + 5, 'url(#everest-track)', false, only(inSnow)],
 			[PATH_FRONT, 'url(#everest-edge)'],
 			[PATH_FRONT + 2, 'url(#everest-rock)'],
-			[PATH_FRONT + 14, 'url(#everest-face)'],
+			// The face: rock showing through the grass and the scree, then
+			// the snow's own, wind-blown; the Lhotse Face's blue ice, and
+			// the Yellow Band's rock across it.
+			[PATH_FRONT + 14, 'url(#everest-face)', false, only(belowSnow)],
+			[PATH_FRONT + 14, 'url(#everest-snow)', false, only(inSnow)],
+			[
+				PATH_FRONT + 14,
+				'url(#everest-blue-ice)',
+				false,
+				only(within(LHOTSE_ICE)),
+			],
+			[
+				PATH_FRONT + 14,
+				'url(#everest-yellow-band)',
+				false,
+				only(within(YELLOW_BAND), yellowBandEnds),
+			],
 			// Darker the further down the mountain's face, in bands, for depth:
 			// smoothed, so its steps and corners don't show right down it.
 			[PATH_FRONT + 80, 'rgba(20, 34, 64, 0.06)', true],
@@ -579,7 +756,13 @@ export const everest: CourseDefinition = {
 			rock: START_X + MORAINE,
 			snow: START_X + SNOW_LINE,
 		}),
-		groundDefs: EVEREST_FACE,
+		groundDefs:
+			EVEREST_FACE +
+			EVEREST_SNOW +
+			EVEREST_BLUE_ICE +
+			EVEREST_YELLOW_BAND +
+			EVEREST_TRAIL +
+			EVEREST_TRACK,
 		// Its steps up, a buttress of granite each, snow on top, and a fixed
 		// rope down it; a ladder up the Hillary Step.
 		ledgeRock: {
