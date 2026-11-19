@@ -8,6 +8,7 @@ import { type CustomRunner, runnerName } from './customRunners'
 import { danceForKey } from './dance'
 import { type DanceSprite, lookDance, stripDance } from './dancing'
 import { type SkiPoses, skiPosesFor } from './skiPoses'
+import { SWIM_AHEAD } from './swimAhead'
 
 /** Anyone you can run as: a club member, or a custom runner of your own. */
 export interface Playable {
@@ -56,15 +57,17 @@ export interface Playable {
 		skiTuck?: string
 		/**
 		 * Swimming, lying along in the water, head first, face down: two
-		 * frames, a stroke and a kick, each `width` by `height` of their own
+		 * frames of a front crawl, an arm reaching on ahead and the other
+		 * back, the legs kicking, each `width` by `height` of their own
 		 * pixels, facing left as their run does. Their run, turned over, if
 		 * they've none (see `scripts/make-swims.ts`).
 		 */
 		swim?: SwimSprite
 		/**
-		 * Diving in: stood tall, arms straight up over their head, hands
-		 * together, facing left, turned over by the game, head first and on
-		 * down (see `scripts/make-swims.ts`). Their swim, turned, if they've none.
+		 * Diving in: stood tall, arms up either side of their head, hands
+		 * together over it, facing left, turned over by the game, head first
+		 * and on down (see `scripts/make-swims.ts`). Their swim, turned, if
+		 * they've none.
 		 */
 		dive?: string
 		/** Their face, as the website's celebrations show it. */
@@ -192,10 +195,11 @@ export function swimsFrom(
 }
 
 /**
- * Members' swim poses, made from their run strips by `scripts/make-swims.ts`,
- * to touch up by hand: `assets/swim/<member>-1.png` and `-2.png`, their run
- * turned over to lie along, so as tall as they're wide, and as wide as
- * they're tall. Link's isn't turned: he's on all fours already.
+ * Members' swim poses, made by `scripts/make-swims.ts` from their stand
+ * poses with their arms taken off by hand: `assets/swim/<member>-1.png`
+ * and `-2.png`, lying along, so as tall as they're wide, and as long as
+ * they're tall and `SWIM_AHEAD` more, for an arm reaching on ahead. Link's
+ * is his run as it is: he's on all fours already, doggy-paddling.
  */
 const MEMBER_SWIMS = swimsFrom(
 	import.meta.glob<string>('../assets/swim/*.png', {
@@ -207,11 +211,14 @@ const MEMBER_SWIMS = swimsFrom(
 		const runner = runners[who as RunnerName]?.[0]()
 		const width = runner?.width ?? 23
 		const height = runner?.height ?? 29
-		return who === 'link' ? { width, height } : { width: height, height: width }
+		if (who === 'link') return { width, height }
+		// August, without his buggy: as wide as the others, his stand pose's height.
+		if (who === 'august') return { width: 30 + SWIM_AHEAD, height: 23 }
+		return { width: height + SWIM_AHEAD, height: width }
 	},
 )
 
-/** Members' dive poses, made from their stand poses by `scripts/make-swims.ts`: `assets/dive/<member>.png`. */
+/** Members' dive poses, made from their stand poses, arms off, by `scripts/make-swims.ts`: `assets/dive/<member>.png`. */
 const MEMBER_DIVES = byMember(
 	import.meta.glob<string>('../assets/dive/*.png', {
 		eager: true,

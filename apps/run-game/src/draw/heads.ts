@@ -23,6 +23,11 @@ const SOLID = 100
  * long hair down the back of it pulls the middle back off their skull.
  */
 const ACROSS = 2
+/**
+ * How many of their own pixels across a head is at least, lying along:
+ * an arm, however thick, is less (see `scripts/make-swims.ts`).
+ */
+const HEAD_ACROSS = 4
 
 /**
  * Pictures whose top isn't their head: someone in a costume over it, their
@@ -115,22 +120,39 @@ async function measure(
 		if (data[i + 3] <= SOLID) return false
 		return !head || head.has((data[i] << 16) | (data[i + 1] << 8) | data[i + 2])
 	}
-	// Lying along, head first: from its front, the left, across.
-	if (lying)
+	// Lying along, head first: from its front, the left, across. An arm
+	// reaching on ahead of it, or along under the chin, is thinner than a
+	// head: only the tallest run of them down a column counts, and only if
+	// it's as tall as a head.
+	if (lying) {
+		const tallest = (x: number) => {
+			let best = { top: 0, bottom: -1 }
+			let from = -1
+			for (let y = 0; y <= h; y++) {
+				if (y < h && solid(x, y)) {
+					if (from < 0) from = y
+					continue
+				}
+				if (from >= 0 && y - from > best.bottom + 1 - best.top)
+					best = { top: from, bottom: y - 1 }
+				from = -1
+			}
+			return best
+		}
+		const least = HEAD_ACROSS * (h / image.naturalHeight)
 		for (let x = 0; x < w; x++) {
-			let column = false
-			for (let y = 0; y < h && !column; y++) column = solid(x, y)
-			if (!column) continue
-			let top = h
-			let bottom = -1
-			for (let dx = 0; dx < ACROSS && x + dx < w; dx++)
-				for (let y = 0; y < h; y++)
-					if (solid(x + dx, y)) {
-						top = Math.min(top, y)
-						bottom = Math.max(bottom, y)
-					}
+			const run = tallest(x)
+			if (run.bottom + 1 - run.top < least) continue
+			let { top, bottom } = run
+			for (let dx = 1; dx < ACROSS && x + dx < w; dx++) {
+				const next = tallest(x + dx)
+				if (next.bottom < top || next.top > bottom) continue
+				top = Math.min(top, next.top)
+				bottom = Math.max(bottom, next.bottom)
+			}
 			return { x, y: (top + bottom + 1) / 2, width: bottom + 1 - top }
 		}
+	}
 	for (let y = 0; y < h; y++) {
 		let row = false
 		for (let x = 0; x < w && !row; x++) row = solid(x, y)

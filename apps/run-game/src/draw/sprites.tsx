@@ -92,6 +92,7 @@ import {
 	whaleAt,
 } from '../game/sky'
 import { spiderAt, spiderLook } from '../game/spiders'
+import { hasWater, otherSplashers, splashWatch } from '../game/splashes'
 import { stalactiteAt } from '../game/stalactites'
 import {
 	DANCING_STILL,
@@ -1383,32 +1384,16 @@ export function createFlyers(world: World) {
 	})
 }
 
-/** A splash's height into the sea, under its surface, that anyone's feet go in at. */
-const SPLASH_DEPTH = 14
-
 /**
- * Splashes, as anyone goes into the sea: off the cliff with no glider, or
- * crashed into it on one; or into a River, missing its crocodiles. Seen from where they are, so the same on every
- * screen; each added as it happens, and gone once it's over.
+ * Splashes, as anyone goes into the water: off the cliff with no glider,
+ * crashed into the sea on one, diving in to swim, or into a River, missing
+ * its crocodiles; the pack, the egg and the hatchling, too. Seen from
+ * where they are, so the same on every screen; each added as it happens,
+ * and gone once it's over.
  */
 export function createSplashes(world: World) {
-	const { sea, river } = world.course
-	/** Over a ship's side, out of the hole in its engine rooms: the sea under it. */
-	const overboard = world.course.secret?.lifeboat
-	if (!sea && !river && !overboard) return []
-	/** The water's surface at `x`, if it's out at sea or in a River. */
-	const surface = (x: number) =>
-		sea && atSea(world, x)
-			? sea.level
-			: river && inRiver(world, x)
-				? river.level
-				: overboard &&
-						x > overboard.hole.from - 20 &&
-						x < overboard.hole.to + 20
-					? overboard.water
-					: undefined
-	/** Where everyone's feet were last tick. */
-	const was = new Map<string, number>()
+	if (!hasWater(world)) return []
+	const watch = splashWatch(world)
 	const live: { id: string; at: number }[] = []
 	let next = 0
 	return [
@@ -1430,12 +1415,8 @@ export function createSplashes(world: World) {
 					feetY: number,
 					flying: boolean,
 				) => {
-					const before = was.get(key)
-					was.set(key, feetY)
-					const level = surface(x)
-					if (flying || before === undefined || level === undefined) return
-					const line = level + SPLASH_DEPTH
-					if (before >= line || feetY < line) return
+					const level = watch(key, x, feetY, flying)
+					if (level === undefined) return
 					const id = `splash-${next++}`
 					live.push({ id, at: now })
 					$scene.addController(createSplash(world, id, x, now, level))
@@ -1447,8 +1428,8 @@ export function createSplashes(world: World) {
 						r.body.feetY,
 						r.body.gliding || r.out === 'scooped',
 					)
-				for (const p of world.pack)
-					into(`pacer-${p.id}`, p.x, p.feetY, !!p.gliding || p.scooped)
+				for (const o of otherSplashers(world))
+					into(o.key, o.x, o.feetY, o.flying)
 				while (live.length && now - live[0].at > SPLASH_TICKS) {
 					const done = live.shift()
 					if (done) $scene.removeController(done.id)

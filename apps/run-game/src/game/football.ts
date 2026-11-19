@@ -4,7 +4,7 @@ import { GRAVITY, HITBOX_HALF_WIDTH, LEFT_EDGE, VIEW_HEIGHT } from './constants'
 import { createFollower } from './followers'
 import { scored } from './step'
 import type { Terrain } from './terrain'
-import type { World } from './world'
+import type { Racer, World } from './world'
 import { bodyHeight } from './world'
 
 /**
@@ -61,6 +61,8 @@ const KICK_LIFT_SPEED = 0.35
 const TOE_REACH = 14
 /** How long before the same racer can kick it again. */
 const KICK_AGAIN = 8
+/** How near someone has to be for an egg to hatch: right by it, so it's seen, never off ahead out of sight. */
+const HATCH_NEAR = 160
 /** What getting it over the line is worth. */
 export const GOAL_POINTS = 500
 
@@ -137,15 +139,19 @@ export function stepFootball(world: World) {
 			)
 		}
 	}
-	// An egg, kicked on as far as where it hatches, on the ground: it does.
+	// An egg, kicked on as far as where it hatches, on the ground: it does,
+	// once someone's caught up with it, there to see it.
 	if (
 		ball.egg &&
 		!ball.out &&
 		ball.x >= ball.egg.hatchFrom &&
 		ball.y >= under - 1
 	) {
-		hatch(world, ball, ball.egg)
-		return
+		const by = nearBy(world, ball)
+		if (by) {
+			hatch(world, ball, ball.egg, by)
+			return
+		}
 	}
 	// Rolling along, turning as it goes: a radian for each radius it rolls.
 	ball.spin += (ball.vx / FOOTBALL_RADIUS) * (180 / Math.PI)
@@ -210,13 +216,35 @@ export function eggStage(ball: Football) {
 	return Math.min(EGG_STAGES - 1, Math.floor(come * EGG_STAGES))
 }
 
-/** An egg, hatched: legs out, and off after whoever kicked it last, following them. */
-function hatch(world: World, ball: Football, egg: NonNullable<Course['egg']>) {
+/**
+ * Whoever's right by it, still racing: whoever kicked it last, if they
+ * are, or else the nearest.
+ */
+function nearBy(world: World, ball: Football) {
+	const near = world.racers
+		.filter((r) => !r.out)
+		.map((r) => ({
+			r,
+			d: Math.hypot(
+				r.body.x - ball.x,
+				r.body.feetY - bodyHeight(r.body) / 2 - ball.y,
+			),
+		}))
+		.filter(({ d }) => d < HATCH_NEAR)
+		.sort((a, b) => a.d - b.d)
+	return (near.find(({ r }) => r.id === ball.kickedBy) ?? near[0])?.r
+}
+
+/** An egg, hatched: legs out, and off after `owner`, there to see it, following them. */
+function hatch(
+	world: World,
+	ball: Football,
+	egg: NonNullable<Course['egg']>,
+	owner: Racer,
+) {
 	ball.out = 'hatched'
 	ball.vx = 0
 	ball.vy = 0
-	const owner =
-		world.racers.find((r) => r.id === ball.kickedBy) ?? world.racers[0]
 	world.followers.push(
 		createFollower(egg.follower, owner, ball.x, ball.y + FOOTBALL_RADIUS),
 	)

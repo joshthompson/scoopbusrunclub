@@ -1,221 +1,331 @@
 /**
- * Makes everyone's swim poses from their run strips, and their dive poses
- * from their stand poses, for diving in and swimming under the
- * sea off Dino Island (see `src/game/swim.ts`): two frames each, a stroke
- * and a kick, their run's two widest strides turned over to lie along,
- * head first, face down, as a front crawl, facing left as the run strips
- * do. The members' go in `src/assets/swim/<member>-1.png` and `-2.png`; the
- * bonus runners', in `src/assets/runners/<who>/swim-1.png` and `-2.png`.
- * To touch up by hand: one already there is left alone, unless `--force`
- * is given. Link, a dog, already lies along: he doggy-paddles, his run as
- * it is.
+ * Makes everyone's dive and swim poses, for diving in and swimming under
+ * the sea off Dino Island (see `src/game/swim.ts`), from their stand poses
+ * with their arms taken off by hand (see `swimBodies.ts`): their own body,
+ * redrawn with arms that fit it, in their own skin and sleeves.
  *
- * Usage: pnpm --filter @scoopbus/run-game make-swims [--force] [who…]
+ * Diving: stood tall, arms up from their shoulders either side of their
+ * head, hands together over it, facing left; the game turns it over, head
+ * first. Swimming: lying along, head first, face down, facing left, a
+ * front crawl in two frames: the near arm reaching on ahead past the head
+ * while the far one's back at the hip, then the other way round, the legs
+ * kicking. Anyone with no arms (an egg, the Miner Twins' shared shirt)
+ * dives as they stand, and swims kicking.
+ *
+ * Usage: pnpm --filter @scoopbus/run-game make-swims [who…]
  */
-import {
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	readdirSync,
-	writeFileSync,
-} from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PNG } from 'pngjs'
+import { SWIM_AHEAD } from '../src/runners/swimAhead'
+import { BODIES, type Body } from './swimBodies'
 
 const assets = path.resolve(import.meta.dirname, '../src/assets')
-const members = path.resolve(
-	import.meta.dirname,
-	'../../web/src/assets/runners',
-)
-const args = process.argv.slice(2)
-const force = args.includes('--force')
-const only = args.filter((a) => !a.startsWith('--'))
+const only = process.argv.slice(2).filter((a) => !a.startsWith('--'))
 
-/** How many frames someone's run strip has, if not 6. */
-const RUN_FRAMES: Record<string, number> = { 'det-munch': 8, link: 2 }
-/** Who's not turned over: already on all fours. */
-const LYING = new Set(['link'])
+type Rgba = [number, number, number, number]
+type Point = [number, number]
 
-const camel = (kebab: string) =>
-	kebab.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
-
-/** Everyone with a run strip: where it is, and where their swim frames go. */
-const everyone = [
-	...readdirSync(members)
-		// Not the custom runners' template: theirs are made from their looks.
-		.filter((who) => who !== 'custom')
-		.filter((who) => existsSync(path.join(members, who, 'run.png')))
-		.map((who) => ({
-			who,
-			run: path.join(members, who, 'run.png'),
-			out: (n: number) => path.join(assets, 'swim', `${camel(who)}-${n}.png`),
-		})),
-	...readdirSync(path.join(assets, 'runners'))
-		.filter((who) => existsSync(path.join(assets, 'runners', who, 'run.png')))
-		.map((who) => ({
-			who,
-			run: path.join(assets, 'runners', who, 'run.png'),
-			out: (n: number) => path.join(assets, 'runners', who, `swim-${n}.png`),
-		})),
-]
-
-/** Frame `i` of a strip `count` frames long, turned a quarter round anticlockwise, unless it's `lying`. */
-function frame(strip: PNG, count: number, i: number, lying: boolean) {
-	const w = strip.width / count
-	const h = strip.height
-	const out = new PNG({ width: lying ? w : h, height: lying ? h : w })
-	for (let y = 0; y < h; y++)
-		for (let x = 0; x < w; x++) {
-			const from = (y * strip.width + i * w + x) * 4
-			// Anticlockwise: its top to the left, its front (its left) down.
-			const [tx, ty] = lying ? [x, y] : [y, w - 1 - x]
-			const to = (ty * out.width + tx) * 4
-			for (let c = 0; c < 4; c++) out.data[to + c] = strip.data[from + c]
-		}
-	return out
-}
-
-mkdirSync(path.join(assets, 'swim'), { recursive: true })
-for (const { who, run, out } of everyone) {
-	if (only.length && !only.includes(who)) continue
-	if (existsSync(out(1)) && !force) {
-		console.log(`${who}: already has a swim, left as it is`)
-		continue
+/** A picture, a colour a pixel, empty where it's undefined. */
+class Canvas {
+	readonly pixels: (Rgba | undefined)[]
+	constructor(
+		readonly width: number,
+		readonly height: number,
+	) {
+		this.pixels = new Array(width * height)
 	}
-	const strip = PNG.sync.read(readFileSync(run))
-	const count = RUN_FRAMES[who] ?? 6
-	const lying = LYING.has(who)
-	// Their widest stride, arms out, and the other one, half a run on.
-	const frames = [0, Math.floor(count / 2)]
-	frames.forEach((i, n) =>
-		writeFileSync(out(n + 1), PNG.sync.write(frame(strip, count, i, lying))),
-	)
-	console.log(`${who}: ${path.relative(assets, out(1))}`)
+	get(x: number, y: number) {
+		if (x < 0 || y < 0 || x >= this.width || y >= this.height) return undefined
+		return this.pixels[y * this.width + x]
+	}
+	set(x: number, y: number, c: Rgba | undefined) {
+		if (x < 0 || y < 0 || x >= this.width || y >= this.height) return
+		this.pixels[y * this.width + x] = c
+	}
+	png() {
+		const png = new PNG({ width: this.width, height: this.height })
+		this.pixels.forEach((c, i) => {
+			if (c) for (let k = 0; k < 4; k++) png.data[i * 4 + k] = c[k]
+		})
+		return PNG.sync.write(png)
+	}
 }
 
-// --- Diving: stood tall, arms straight up over the head -----------------------------
-
-/** How much taller than their stand pose a dive is: their arms, up over their head. */
-const REACH = 8
+const LETTERS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 /**
- * A dive pose from a stand pose: the same, stood tall, their arms up
- * straight over their head, either side of it, meeting over it, hands
- * together, in their skin's colour, `REACH` rows taller. Facing left, as
- * the stand pose does; the game turns it over, head first, and on down.
+ * A stand pose, and its colours lettered as they first come, row by row
+ * (as the grids in `swimBodies.ts` are written).
  */
-function dive(stand: PNG) {
-	const { width, height } = stand
-	const out = new PNG({ width, height: height + REACH })
-	const at = (x: number, y: number) => (y * width + x) * 4
-	const solid = (x: number, y: number) =>
-		x >= 0 &&
-		x < width &&
-		y >= 0 &&
-		y < height &&
-		stand.data[at(x, y) + 3] > 128
-	for (let y = 0; y < height; y++)
-		for (let x = 0; x < width; x++) {
-			const from = at(x, y)
-			const to = ((y + REACH) * width + x) * 4
-			for (let c = 0; c < 4; c++) out.data[to + c] = stand.data[from + c]
+function readStand(file: string) {
+	const png = PNG.sync.read(readFileSync(path.join(assets, file)))
+	const canvas = new Canvas(png.width, png.height)
+	const palette = new Map<string, Rgba>()
+	const seen = new Map<string, string>()
+	for (let y = 0; y < png.height; y++)
+		for (let x = 0; x < png.width; x++) {
+			const i = (y * png.width + x) * 4
+			if (png.data[i + 3] < 128) continue
+			const c: Rgba = [png.data[i], png.data[i + 1], png.data[i + 2], 255]
+			const key = c.join(',')
+			if (!seen.has(key)) {
+				const letter = LETTERS[seen.size]
+				seen.set(key, letter)
+				palette.set(letter, c)
+			}
+			canvas.set(x, y, c)
 		}
-	// Their head: its top row, and how wide it is a little way down.
-	let top = 0
-	while (top < height && ![...Array(width).keys()].some((x) => solid(x, top)))
-		top++
-	const row = top + 3
-	const xs = [...Array(width).keys()].filter((x) => solid(x, row))
-	const left = Math.min(...xs)
-	const right = Math.max(...xs)
-	// Their skin: of the colours on their head, the one there's most of
-	// on the rest of them too, their hands and legs, not their hair.
-	const key = (x: number, y: number) => {
-		const i = at(x, y)
-		return [0, 1, 2].map((c) => stand.data[i + c]).join(',')
+	return { canvas, palette }
+}
+
+/** Their body, arms off: their stand pose, its rows redrawn as `body` says. */
+function bodyOf(body: Body) {
+	const { canvas: stand, palette } = readStand(body.stand)
+	const colour = (letter: string) => {
+		const c = palette.get(letter)
+		if (!c) throw new Error(`${body.who}: no colour ${letter}`)
+		return c
 	}
-	const onHead = new Set<string>()
-	for (let y = top + 2; y < top + 8; y++)
-		for (let x = left; x <= right; x++) if (solid(x, y)) onHead.add(key(x, y))
-	const counts = new Map<string, number>()
-	for (let y = top + 10; y < height; y++)
-		for (let x = 0; x < width; x++)
-			if (solid(x, y) && onHead.has(key(x, y)))
-				counts.set(key(x, y), (counts.get(key(x, y)) ?? 0) + 1)
-	const skin = (
-		[...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ??
-		[...onHead][0] ??
-		'242,192,154'
-	)
-		.split(',')
-		.map(Number)
-	const paint = (x: number, y: number) => {
-		if (x < 0 || x >= width || y < 0 || y >= height + REACH) return
-		const i = (y * width + x) * 4
-		out.data[i] = skin[0]
-		out.data[i + 1] = skin[1]
-		out.data[i + 2] = skin[2]
-		out.data[i + 3] = 255
+	let canvas = stand
+	if (body.grid) {
+		canvas = new Canvas(body.grid[0].length, body.grid.length)
+		body.grid.forEach((row, y) =>
+			[...row].forEach((l, x) => {
+				if (l !== '.') canvas.set(x, y, colour(l))
+			}),
+		)
 	}
-	// Up from their shoulders, either side of their head, two wide, and in
-	// over it to meet, their hands together on top.
-	const shoulders = top + REACH + 7
-	const middle = Math.round((left + right) / 2)
-	for (const [side, x0] of [
-		[-1, left - 2],
-		[1, right + 1],
-	] as const) {
-		for (let y = shoulders; y >= top + REACH; y--) {
-			paint(x0, y)
-			paint(x0 + 1, y)
+	for (const { rows, cols } of body.clear ?? [])
+		for (let y = rows[0]; y <= rows[1]; y++)
+			for (let x = cols[0]; x <= cols[1]; x++) canvas.set(x, y, undefined)
+	for (const [y, from, to, letter] of body.fill ?? [])
+		for (let x = from; x <= to; x++) canvas.set(x, y, colour(letter))
+	return { canvas, colour }
+}
+
+/** Every pixel on the way from `a` to `b`, both ends too. */
+function line([x0, y0]: Point, [x1, y1]: Point): Point[] {
+	const points: Point[] = []
+	const dx = Math.abs(x1 - x0)
+	const dy = -Math.abs(y1 - y0)
+	const sx = x0 < x1 ? 1 : -1
+	const sy = y0 < y1 ? 1 : -1
+	let err = dx + dy
+	let x = x0
+	let y = y0
+	for (;;) {
+		points.push([x, y])
+		if (x === x1 && y === y1) break
+		const e2 = 2 * err
+		if (e2 >= dy) {
+			err += dy
+			x += sx
 		}
-		for (let k = 0; k < REACH - 1; k++) {
-			const y = top + REACH - 1 - k
-			const x = Math.round(x0 + ((middle - 1 - x0) * (k + 1)) / REACH)
-			paint(x, y)
-			paint(x + 1, y)
-			paint(x - side, y)
+		if (e2 <= dx) {
+			err += dx
+			y += sy
 		}
 	}
-	for (const [dx, dy] of [
-		[-1, 0],
-		[0, 0],
-		[1, 0],
-		[-1, 1],
-		[0, 1],
-		[1, 1],
-	])
-		paint(middle + dx, top + dy)
+	return points
+}
+
+/** Joins lines end to end, each one's first point dropped where it starts on the last one's end. */
+const joined = (...lines: Point[][]) =>
+	lines.flatMap((points, i) => (i ? points.slice(1) : points))
+
+/** How to colour someone's arm. */
+interface ArmLook {
+	skin: Rgba
+	sleeve?: Rgba
+	sleeveLength: number
+	/** The colour of the pixel just above the hand: a wristband. */
+	wrist?: Rgba
+	hand: number
+	/** How thick, and the colour of each line of it after the first, `offset` from it. */
+	width: number
+	shade?: Rgba
+}
+
+/**
+ * An arm along `points`, from its shoulder: its sleeve as far as it goes,
+ * then skin, a band at the wrist, and its hand. As thick as it is, each
+ * line after the first `offset` on, in shade. The near arm's over
+ * whatever's there; the far one only where nothing is, behind them.
+ */
+function arm(
+	canvas: Canvas,
+	points: Point[],
+	look: ArmLook,
+	near: boolean,
+	offset: Point,
+) {
+	const hand = points.length - look.hand
+	const colourAt = (i: number) => {
+		if (i >= hand) return look.skin
+		if (look.wrist && i === hand - 1) return look.wrist
+		if (look.sleeve && i < look.sleeveLength) return look.sleeve
+		return look.skin
+	}
+	for (let k = look.width - 1; k >= 0; k--)
+		points.forEach(([x, y], i) => {
+			const px = x + offset[0] * k
+			const py = y + offset[1] * k
+			if (!near && canvas.get(px, py)) return
+			const c = colourAt(i)
+			canvas.set(px, py, k && look.shade && i < hand ? look.shade : c)
+		})
+}
+
+function armLook(body: Body, colour: (l: string) => Rgba): ArmLook {
+	const arms = body.arms || undefined
+	return {
+		skin: colour(arms?.skin ?? 'a'),
+		sleeve: arms?.sleeve ? colour(arms.sleeve) : undefined,
+		sleeveLength: arms?.sleeveLength ?? 0,
+		wrist: arms?.wrist ? colour(arms.wrist) : undefined,
+		hand: arms?.hand ?? 1,
+		width: arms?.width ?? 1,
+		shade: arms?.shade ? colour(arms.shade) : undefined,
+	}
+}
+
+/** The ends of their shoulders, near and far: either end of their top row of shirt, unless they're said. */
+function shoulders(body: Body, canvas: Canvas) {
+	const y = body.shoulder
+	const row = [...Array(canvas.width).keys()].filter((x) => canvas.get(x, y))
+	const arms = body.arms || undefined
+	return {
+		near: [arms?.from?.[0] ?? Math.min(...row), y] as Point,
+		far: [arms?.from?.[1] ?? Math.max(...row), y] as Point,
+	}
+}
+
+function dive(body: Body) {
+	const { canvas, colour } = bodyOf(body)
+	if (!body.arms) return canvas
+	const arms = body.arms
+	const look = armLook(body, colour)
+	const { top } = body.head
+	const near = body.head.left - 1
+	const far = body.head.right + 1
+	const from = shoulders(body, canvas)
+	// Out from each shoulder, along it, to beside the head; up to its top;
+	// then in over it to meet, hands together.
+	let y = top - 2
+	let nx = near
+	let fx = far
+	const nearIn: Point[] = []
+	const farIn: Point[] = []
+	while (fx - nx > 2) {
+		nx++
+		fx--
+		nearIn.push([nx, y])
+		farIn.push([fx, y])
+		y--
+	}
+	const upFrom = ([x, y]: Point, side: number): Point[] =>
+		joined(
+			line([x, y - 1], [side, y - 1]),
+			line([side, y - 1], [side, top - 1]),
+		)
+	const nearArm = joined(upFrom(from.near, near), nearIn)
+	const farArm = joined(upFrom(from.far, far), farIn)
+	const hands: Point[] = []
+	for (const hy of [y, y - 1])
+		for (let x = nx; x <= fx; x++) hands.push([x, hy])
+	const reach = Math.max(0, -(y - 1))
+	const out = new Canvas(canvas.width, canvas.height + reach)
+	for (let py = 0; py < canvas.height; py++)
+		for (let px = 0; px < canvas.width; px++)
+			out.set(px, py + reach, canvas.get(px, py))
+	const down = (points: Point[]) =>
+		points.map(([x, py]): Point => [x, py + reach])
+	// Thick arms thicken outwards, away from the head.
+	const handless = { ...look, hand: 0 }
+	if (arms.far !== false) arm(out, down(farArm), handless, false, [1, 0])
+	arm(out, down(nearArm), handless, true, [-1, 0])
+	for (const [x, hy] of down(hands)) out.set(x, hy, look.skin)
 	return out
 }
 
-/** Everyone with a stand pose: where it is, and where their dive goes. */
-const standing = [
-	...readdirSync(path.join(assets, 'stand'))
-		.filter((file) => file.endsWith('.png'))
-		.map((file) => ({
-			who: file.replace(/\.png$/, ''),
-			stand: path.join(assets, 'stand', file),
-			out: path.join(assets, 'dive', file),
-		})),
-	...readdirSync(path.join(assets, 'runners'))
-		.filter((who) => existsSync(path.join(assets, 'runners', who, 'stand.png')))
-		.map((who) => ({
-			who,
-			stand: path.join(assets, 'runners', who, 'stand.png'),
-			out: path.join(assets, 'runners', who, 'dive.png'),
-		})),
-]
+/**
+ * A swim frame: their body turned to lie along, head first (to the left),
+ * face down, its legs kicked; an arm reaching ahead past the head, the
+ * other back at the hip.
+ */
+function swim(body: Body, frame: 0 | 1) {
+	const { canvas: stood, colour } = bodyOf(body)
+	// Its legs, each kicked over as far as it does this frame.
+	const kicked = new Canvas(stood.width, stood.height)
+	const moving = (x: number, y: number) =>
+		body.legs.find(
+			(leg) =>
+				y >= leg.top &&
+				y <= (leg.bottom ?? stood.height) &&
+				x >= leg.cols[0] &&
+				x <= leg.cols[1],
+		)
+	for (let y = 0; y < stood.height; y++)
+		for (let x = 0; x < stood.width; x++)
+			if (!moving(x, y)) kicked.set(x, y, stood.get(x, y))
+	// A far leg, kicked: behind whatever it goes over.
+	for (let y = 0; y < stood.height; y++)
+		for (let x = 0; x < stood.width; x++) {
+			const leg = moving(x, y)
+			const c = stood.get(x, y)
+			const to = x - (leg?.by[frame] ?? 0)
+			if (leg && c && !kicked.get(to, y)) kicked.set(to, y, c)
+		}
+	// Turned a quarter round anticlockwise: its top to the left, its front
+	// down; room ahead of its head for an arm reaching on past it.
+	const w = stood.width
+	const out = new Canvas(stood.height + SWIM_AHEAD, stood.width)
+	const turn = ([x, y]: Point): Point => [y + SWIM_AHEAD, w - 1 - x]
+	for (let y = 0; y < stood.height; y++)
+		for (let x = 0; x < w; x++) {
+			const [tx, ty] = turn([x, y])
+			out.set(tx, ty, kicked.get(x, y))
+		}
+	if (!body.arms) return out
+	const arms = body.arms
+	const look = armLook(body, colour)
+	const from = shoulders(body, stood)
+	const nearShoulder = turn(from.near)
+	const farShoulder = turn(from.far)
+	const ahead = (start: Point, dy: number): Point[] =>
+		line(start, [
+			Math.max(0, start[0] - body.reach - SWIM_AHEAD),
+			start[1] + dy,
+		])
+	const back = (start: Point, dy: number): Point[] =>
+		line(start, [start[0] + body.reach - 1, start[1] + dy])
+	// Thick arms thicken down, the near one's underside in shade; the far
+	// one's up.
+	const nearFirst = frame === 0
+	if (arms.far !== false)
+		arm(
+			out,
+			nearFirst ? back(farShoulder, -1) : ahead(farShoulder, -1),
+			look,
+			false,
+			[0, -1],
+		)
+	arm(
+		out,
+		nearFirst ? ahead(nearShoulder, 2) : back(nearShoulder, 2),
+		look,
+		true,
+		[0, 1],
+	)
+	return out
+}
 
-mkdirSync(path.join(assets, 'dive'), { recursive: true })
-for (const { who, stand, out } of standing) {
-	if (only.length && !only.includes(who)) continue
-	// Link's a dog: he belly-flops, as he swims.
-	if (who === 'link') continue
-	if (existsSync(out) && !force) {
-		console.log(`${who}: already has a dive, left as it is`)
-		continue
-	}
-	writeFileSync(out, PNG.sync.write(dive(PNG.sync.read(readFileSync(stand)))))
-	console.log(`${who}: ${path.relative(assets, out)}`)
+for (const body of BODIES) {
+	if (only.length && !only.includes(body.who)) continue
+	writeFileSync(path.join(assets, body.dive), dive(body).png())
+	body.swim.forEach((file, i) =>
+		writeFileSync(path.join(assets, file), swim(body, i as 0 | 1).png()),
+	)
+	console.log(`${body.who}: ${body.dive}, ${body.swim.join(', ')}`)
 }

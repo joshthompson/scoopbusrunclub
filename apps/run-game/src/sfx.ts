@@ -65,19 +65,33 @@ export type Sound =
 	| 'blorp'
 	/** Into water: wading into a River or a pond, diving into the sea, or falling in off a cliff. */
 	| 'splash'
+	/** Someone else, or something, into water: a pacer, the egg, the hatchling. Quieter. */
+	| 'splashOther'
 
 /**
  * [frequency in Hz, length in seconds, wave, how loud, out of the sound's
- * `volume`, how far it slides, if not the sound's `slide`, and in a
- * `chord`, how long after the sound starts it does] for each note, played
- * one after another; or, in a `chord`, all at once, unless held back.
+ * `volume`, how far it slides, if not the sound's `slide`, in a `chord`,
+ * how long after the sound starts it does, and how long it takes to swell
+ * up to full, in seconds] for each note, played one after another; or, in
+ * a `chord`, all at once, unless held back.
  *
  * A `noise` note is a hiss, the NES's noise channel's: white noise, with
  * everything over its frequency muffled away. Sliding down, it's a boom
- * dying away, or a rush going by; a rumble, low.
+ * dying away, or a rush going by; a rumble, low. Full at once, it cracks
+ * like a whip: swelled up, even a few hundredths of a second, it's a whoosh.
  */
 type Wave = OscillatorType | 'noise'
-type Note = [number, number, Wave?, number?, number?, number?]
+type Note = [number, number, Wave?, number?, number?, number?, number?]
+
+/** A splash's notes: see `splash`. */
+const SPLASH: Note[] = [
+	[180, 0.18, 'sine', 0.65, 3, 0, 0.01],
+	[1800, 0.5, 'noise', 0.85, 0.4, 0, 0.035],
+	[8000, 0.8, 'noise', 0.5, 0.55, 0.03, 0.07],
+	[900, 0.06, 'sine', 0.12, 2, 0.14, 0.005],
+	[1300, 0.05, 'sine', 0.1, 1.8, 0.22, 0.005],
+	[700, 0.07, 'sine', 0.06, 2.2, 0.31, 0.005],
+]
 
 const SOUNDS: Record<
 	Sound,
@@ -432,24 +446,14 @@ const SOUNDS: Record<
 		volume: 0.12,
 	},
 	/**
-	 * Into water: a deep bloop as they go under, rising, the way water does,
-	 * with the slap of it, a crash of spray dying away, and drops pattering
-	 * back down after.
+	 * Into water: a bloop as they go under, rising, the way water does, in a
+	 * sploosh, low and swelling up, not cracking (that's a whip); the spray
+	 * over it, an airy hiss, bright and lingering, and a few bubbles coming
+	 * up in it.
 	 */
-	splash: {
-		notes: [
-			[140, 0.16, 'sine', 1, 4],
-			[2400, 0.06, 'noise', 0.9, 2.5],
-			[4200, 0.55, 'noise', 0.7, 0.3, 0.03],
-			[1500, 0.04, 'sine', 0.35, 1.8, 0.2],
-			[2100, 0.035, 'sine', 0.3, 1.6, 0.29],
-			[1200, 0.045, 'sine', 0.3, 2, 0.36],
-			[2600, 0.03, 'sine', 0.22, 1.5, 0.45],
-			[1700, 0.035, 'sine', 0.18, 1.7, 0.53],
-		],
-		volume: 0.12,
-		chord: true,
-	},
+	splash: { notes: SPLASH, volume: 0.16, chord: true },
+	/** Someone else's splash, or the egg's: the same, but quieter, as for `whoosh`. */
+	splashOther: { notes: SPLASH, volume: 0.08, chord: true },
 }
 
 /** A second of white noise, made once, looped for a `noise` note. */
@@ -480,6 +484,7 @@ export function voice(
 		loud = 1,
 		slide = slides,
 		after = 0,
+		swell = 0,
 	] of notes) {
 		const start = chord ? at + after : at
 		const gain = context.createGain()
@@ -493,22 +498,28 @@ export function voice(
 			const muffle = context.createBiquadFilter()
 			muffle.type = 'lowpass'
 			hiss.connect(muffle).connect(gain)
+			// From anywhere in the noise: two from the same place at once, a
+			// moment apart (a splash's slap and spray), ring like a comb.
+			hiss.start(start, Math.random())
 			source = hiss
 			pitch = muffle.frequency
 		} else {
 			const oscillator = context.createOscillator()
 			oscillator.type = wave
 			oscillator.connect(gain)
+			oscillator.start(start)
 			source = oscillator
 			pitch = oscillator.frequency
 		}
 		pitch.setValueAtTime(frequency, start)
 		if (slide)
 			pitch.exponentialRampToValueAtTime(frequency * slide, start + length)
-		gain.gain.setValueAtTime(volume * loud, start)
+		if (swell) {
+			gain.gain.setValueAtTime(0, start)
+			gain.gain.linearRampToValueAtTime(volume * loud, start + swell)
+		} else gain.gain.setValueAtTime(volume * loud, start)
 		gain.gain.exponentialRampToValueAtTime(0.0001, start + length)
 		gain.connect(destination)
-		source.start(start)
 		source.stop(start + length)
 		if (!chord) at += length
 	}

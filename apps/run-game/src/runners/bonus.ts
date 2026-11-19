@@ -111,6 +111,7 @@ import {
 	swimsFrom,
 } from './playable'
 import { SKELETON_SPRITE } from './skeleton'
+import { SWIM_AHEAD } from './swimAhead'
 
 /**
  * Bonus runners: not club members, and not anyone's own, but found out on
@@ -666,9 +667,9 @@ const BUSHY_DANCE_WIDTH = 31
  * cloth rippling, and a leaf shed off his crown, drifting away behind him.
  * Ducking, he squats right down, the flag held level behind; on skis, a
  * pole in his near hand and the flag up behind; tucked, curled up with it
- * trailed level; on a snowboard, arms out. His swim is his run turned over,
- * the flag up out of the water off his back; his dive, arms round his
- * crown, gloves together over it. His dance is his own, drawn by hand,
+ * trailed level; on a snowboard, arms out. Swimming, a front crawl with his
+ * near arm, the flag held along his back with the far one; diving, his near
+ * arm up over his crown, the flag still in his far hand. His dance is his own, drawn by hand,
  * square on as the poster has him (`mascot`). For finishing Haga as Deri.
  */
 export const BUSHY: Playable = {
@@ -728,11 +729,11 @@ export const BONUS_RUNNERS: Playable[] = [
 ]
 
 /**
- * The bonus runners' swim poses, made from their run strips by
- * `scripts/make-swims.ts`, to touch up by hand:
- * `assets/runners/<who>/swim-1.png` and `-2.png`, their run turned over, so
- * as tall as their run's wide, and as wide as it's tall. By the folder
- * they're in, their id's end.
+ * The bonus runners' swim poses, made by `scripts/make-swims.ts` from their
+ * stand poses with their arms taken off by hand:
+ * `assets/runners/<who>/swim-1.png` and `-2.png`, lying along, so as tall
+ * as their run's wide, and as long as it's tall and `SWIM_AHEAD` more, for
+ * an arm reaching on ahead. By the folder they're in, their id's end.
  */
 const BONUS_SWIMS = swimsFrom(
 	import.meta.glob<string>('../assets/runners/*/swim-*.png', {
@@ -743,7 +744,7 @@ const BONUS_SWIMS = swimsFrom(
 	(who) => {
 		const runner = BONUS_RUNNERS.find((r) => r.id === `bonus:${who}`)
 		return {
-			width: runner?.sprite.height ?? HEIGHT,
+			width: (runner?.sprite.height ?? HEIGHT) + SWIM_AHEAD,
 			height: runner?.sprite.width ?? WIDTH,
 		}
 	},

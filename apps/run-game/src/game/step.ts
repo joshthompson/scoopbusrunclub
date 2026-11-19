@@ -173,7 +173,7 @@ import {
 	sewageAt,
 	swampManAt,
 } from './sewer'
-import { sharkBites, sharkLeaves, sharkSwim, stepSharks } from './sharks'
+import { sharkBites, sharkDone, sharkSwim, stepSharks } from './sharks'
 import { stepSkiing } from './skis'
 import {
 	GULL_HEIGHT,
@@ -188,6 +188,7 @@ import {
 	whaleAt,
 } from './sky'
 import { spiderAt, spiderLook } from './spiders'
+import { soundSplashes } from './splashes'
 import { soundStalactites, stalactiteAt, wakeStalactites } from './stalactites'
 import { steamFires } from './steam'
 import {
@@ -296,6 +297,7 @@ export function stepWorld(world: World) {
 		stepFollowers(world)
 		stepSharks(world)
 		soundEruption(world)
+		soundSplashes(world)
 		stepHarvester(world)
 		stepFlyers(world)
 		wakeZombies(world)
@@ -2501,7 +2503,7 @@ function collide(world: World, racer: Racer) {
 				break
 			}
 			case 'shark': {
-				// Its jaws on them, swimming: a bite, and it's off, done with.
+				// Its jaws on them, swimming: a bite, and it's done with.
 				if (state.used || !b.swimming) break
 				const shark = sharkSwim(
 					world,
@@ -2510,7 +2512,7 @@ function collide(world: World, racer: Racer) {
 				if (b.stumble === 0 && sharkBites(shark, b)) {
 					hits(state)
 					state.used = true
-					sharkLeaves(shark)
+					sharkDone(shark)
 					stumble('Chomp!')
 					play('stomp')
 				}
