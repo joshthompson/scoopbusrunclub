@@ -16,6 +16,41 @@ import {
 import { FERRY_FIKA, type FikaItem, TURKU_FIKA } from '../game/fika'
 import { type Gap, type Terrain, withGaps } from '../game/terrain'
 import {
+	BULKHEAD_LAMP,
+	DECK_STENCIL,
+	FUSE_BOX,
+	HOSE_REEL,
+	LADDER,
+	NO_SMOKING,
+	OIL_DRUMS,
+	PASSAGE_POSTER,
+	PUMP,
+	STEAM_LEAK,
+	TOOL_BOARD,
+	VENT_FAN,
+	WORKBENCH,
+} from './kit/engineDeck'
+import {
+	BEACON,
+	BURNING_FIRES,
+	CRANE,
+	GAUGE_BOARD,
+	HALL_ENGINE,
+	HALL_ENGINE_BURNING,
+	SMOKE,
+	TELEGRAPH,
+	UPTAKE,
+} from './kit/engineHall'
+import {
+	CONTROL_PANEL,
+	CREW_SIGN,
+	DOOR_OPEN,
+	DOOR_SHUT,
+	EXTINGUISHER,
+	FLAMES,
+	GENERATOR,
+} from './kit/engineRoom'
+import {
 	BUFFET_HEIGHT,
 	CAR_HEIGHT,
 	CAR_WIDTH,
@@ -81,6 +116,7 @@ import {
 	ventilator,
 	wheelhouse,
 } from './kit/ferryScenery'
+import { fireProp } from './kit/fire'
 import { scatter } from './kit/scatter'
 import { seeded } from './kit/seeded'
 import { swing } from './kit/swing'
@@ -115,6 +151,9 @@ import type {
 	CourseDefinition,
 	Obstacle,
 	PlatformDefinition,
+	Secret,
+	SecretLook,
+	SecretProp,
 } from './types'
 
 /**
@@ -125,6 +164,12 @@ import type {
  * sailing out through the archipelago and over the sea to Turku. Off at
  * the bow, and the last km along the river Aura, over it on the Föri, to
  * Posankka, Turku's great pink pig-duck, at the finish.
+ *
+ * Or, ducking on the stairs up to the shop, down through them, on along
+ * the corridor under them, through a door marked CREW ONLY into the engine
+ * rooms: an engine on fire, and a hole blown in the hull, burning, out to
+ * the sea, a lifeboat on the water under it. Only the one. Ride it along
+ * the ship's side, up a trick ramp, and back up into the buffet.
  */
 
 const CHEERERS: RunnerName[] = [
@@ -514,6 +559,163 @@ const overRoof = (x: number, up = 0) => terrain.groundY(x) - DECK_C + up
 /** The Föri: how long it takes there and back, timed for whoever's coming. */
 const FORI_SWING = 180
 
+// --- Below decks --------------------------------------------------------------------
+
+/**
+ * The way below decks (see `Secret['stairs']`): duck on the stairs up to
+ * the shop, and down through them, onto the floor carrying on along under
+ * them, the cabins' corridor's, low under the shop, to the engine rooms'
+ * door; past it, the engine rooms, tall under the sun deck; and a hole
+ * blown in their floor, out through the hull to the sea, the lifeboat
+ * under it. Ride it along the ship's side, up the trick ramp at the start
+ * of the buffet, and you're thrown up into the buffet.
+ */
+const DOOR = room('shop').from + 300
+const HOLE = {
+	from: room('sunDeck').from + 700,
+	to: room('sunDeck').from + 840,
+}
+const RAMP = room('buffet').from + 140
+const BELOW: Secret = {
+	gap: { from: room('stairsUp').from, to: room('stairsUp').to },
+	from: room('stairsUp').from,
+	// Its bulkhead just past the hole: no way on but down it.
+	to: HOLE.to + 8,
+	floor: DECK_A,
+	// Up to the underside of the shop's floor, over it.
+	room: DECK_A - DECK_B - PATH_FRONT - 2,
+	launch: RAMP,
+	peak: 130,
+	land: RAMP + 520,
+	stairs: true,
+	lifeboat: { hole: HOLE, water: WATERLINE },
+}
+
+/** Where the main engines' middles are, in the tall hall under the sun deck. */
+const ENGINES = [room('sunDeck').from + 120, room('sunDeck').from + 380]
+/**
+ * How far along from an engine's middle its turbo's outlet is, for its
+ * exhaust uptake to sit over; and how high the uptake hangs, its foot
+ * behind the engine, its top up against the sun deck.
+ */
+const HALL_UPTAKE_AT = 96
+const UPTAKE_HUNG = 52
+
+/** A prop hung `hung` up off the floor, its light (if it has one) moved up with it. */
+const hang = (prop: SecretProp, hung: number): SecretProp => ({
+	...prop,
+	hung,
+	glow: prop.glow && {
+		...prop.glow,
+		y: prop.glow.y + hung - (prop.hung ?? 0),
+	},
+})
+
+/** What's down there, against its back wall: see `SecretLook['furnishings']`. */
+const BELOW_LOOK: SecretLook = {
+	walls: 'engine',
+	door: { x: DOOR, shut: DOOR_SHUT, open: DOOR_OPEN },
+	furnishings: [
+		// The passage: a lamp, a muster station poster, and by the door, a sign.
+		{ x: room('shop').from + 60, prop: PASSAGE_POSTER },
+		{ x: room('shop').from + 130, prop: BULKHEAD_LAMP },
+		{ x: DOOR - 90, prop: CREW_SIGN },
+		// Low under the shop: lamps along it; generators and their panels;
+		// a workbench, its tools on the wall over it; a pump, a steam leak,
+		// a hose reel, oil drums, and a ladder up to a hatch in the deck.
+		// And a NO SMOKING sign.
+		...[380, 900, 1420, 1950].map((at) => ({
+			x: room('shop').from + at,
+			prop: BULKHEAD_LAMP,
+		})),
+		{ x: room('shop').from + 430, prop: DECK_STENCIL },
+		{ x: room('shop').from + 640, prop: GENERATOR },
+		{ x: room('shop').from + 800, prop: CONTROL_PANEL },
+		{ x: room('shop').from + 880, prop: FUSE_BOX },
+		{ x: room('shop').from + 1000, prop: TOOL_BOARD },
+		{ x: room('shop').from + 1000, prop: WORKBENCH },
+		{ x: room('shop').from + 1140, prop: GENERATOR },
+		{ x: room('shop').from + 1280, prop: STEAM_LEAK },
+		{ x: room('shop').from + 1460, prop: PUMP },
+		{ x: room('shop').from + 1560, prop: HOSE_REEL },
+		{ x: room('shop').from + 1680, prop: GENERATOR },
+		{ x: room('shop').from + 1800, prop: NO_SMOKING },
+		{ x: room('shop').from + 1870, prop: CONTROL_PANEL },
+		{ x: room('shop').from + 2040, prop: OIL_DRUMS },
+		{ x: room('shop').from + 2130, prop: LADDER },
+		{ x: room('deckStairsUp').from + 120, prop: VENT_FAN },
+		// Up into the tall hall, under the stairs up to the sun deck: the
+		// engine telegraph, at FULL AHEAD.
+		{ x: room('deckStairsUp').from + 260, prop: TELEGRAPH },
+		// Tall under the sun deck: alarm beacons going round, high on the
+		// wall; the engines' exhaust uptakes, up into the deck; a gauge
+		// board; an overhead crane between the engines; the main engines,
+		// one of them on fire, smoke rolling up off it; and flames along the
+		// floor to the hole, and round it. A fire extinguisher, on the wall,
+		// nowhere near it.
+		...[60, 360, 640].map((at) => ({
+			x: room('sunDeck').from + at,
+			prop: BEACON,
+		})),
+		{ x: ENGINES[0] + HALL_UPTAKE_AT, prop: hang(UPTAKE, UPTAKE_HUNG) },
+		{ x: ENGINES[1] + HALL_UPTAKE_AT, prop: hang(UPTAKE, UPTAKE_HUNG) },
+		{ x: HOLE.from - 70, prop: hang(GAUGE_BOARD, 230) },
+		...[180, 560].map((at) => ({
+			x: room('sunDeck').from + at,
+			prop: hang(BULKHEAD_LAMP, 250),
+		})),
+		{ x: (ENGINES[0] + ENGINES[1]) / 2, prop: hang(CRANE, 192) },
+		{ x: (ENGINES[0] + ENGINES[1]) / 2 + 4, prop: EXTINGUISHER },
+		{ x: ENGINES[1] - 10, prop: SMOKE },
+		{ x: ENGINES[0], prop: HALL_ENGINE },
+		{ x: ENGINES[1], prop: HALL_ENGINE_BURNING },
+		...BURNING_FIRES.manifold.map((at, i) => ({
+			x: ENGINES[1] + at.x,
+			prop: fireProp(
+				{ columns: 16, rows: 22, seed: 3 + i, lean: i ? 5 : -5 },
+				{ hung: at.up - 10 },
+			),
+		})),
+		{
+			x: ENGINES[1] + BURNING_FIRES.head.x,
+			prop: fireProp(
+				{ columns: 40, rows: 64, seed: 2, foot: 0.75, embers: 8 },
+				{ hung: BURNING_FIRES.head.up - 12 },
+			),
+		},
+		{ x: ENGINES[1] + 150, prop: fireProp({ columns: 20, rows: 32, seed: 5 }) },
+		{ x: HOLE.from - 24, prop: FLAMES },
+		// Round the hole in the hull, under the floor.
+		{
+			x: HOLE.from + 6,
+			prop: fireProp(
+				{ columns: 22, rows: 28, seed: 6, lean: -3 },
+				{ hung: -46 },
+			),
+		},
+		{
+			x: HOLE.to - 8,
+			prop: fireProp(
+				{ columns: 22, rows: 30, seed: 7, lean: 3 },
+				{ hung: -30 },
+			),
+		},
+	],
+}
+
+/**
+ * Fika below decks, `[x, y]`, y its foot: in the engine rooms, one on the
+ * floor and one up to jump for; and out on the water, along the
+ * lifeboat's way, to ride through, or hop up for.
+ */
+const BELOW_FIKA: [number, number][] = [
+	[room('shop').from + 1360, DECK_A - 26],
+	[room('sunDeck').from + 250, DECK_A - 96],
+	[room('sunDeck').from + 1300, WATERLINE - 20],
+	[room('sunDeck').from + 2000, WATERLINE - 60],
+	[room('deckStairsDown').from + 260, WATERLINE - 20],
+]
+
 const PLATFORMS: PlatformDefinition[] = (() => {
 	const out: PlatformDefinition[] = []
 	// The car deck: cars, and a lorry's trailer, onto a car's roof and up.
@@ -741,6 +943,15 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 				height: p.height + 26,
 				item: nextFika(p.x),
 			})
+	// Below decks, and out on the water (see `BELOW_FIKA`): after the rest,
+	// so theirs are as they were.
+	for (const [x, y] of BELOW_FIKA)
+		extra.push({
+			kind: 'fika',
+			x,
+			height: Math.round(terrain.groundY(x)) - y,
+			item: nextFika(x),
+		})
 	// And the club out cheering: by the terminal, in a cabin's doorway, in
 	// the dance bar, and off the Föri, on the far bank.
 	for (const spot of [
@@ -916,6 +1127,12 @@ const floors = (pick: (look: [string, string]) => string) => {
 	] as [number, string][]
 }
 
+/** A room's stretch along, from and to. */
+const span = (name: Room) => ({ from: room(name).from, to: room(name).to })
+/** The stairwells' wall, behind their stairs, and boxed in under them. */
+const STAIRWELL_WALL = '#d9d2c3'
+const STAIRWELL_UNDER = '#bfb5a2'
+
 const ferry: Cave = {
 	from: STERN,
 	to: BOW,
@@ -942,6 +1159,7 @@ export const scoopLine: CourseDefinition = {
 	terrain,
 	cave: ferry,
 	platforms: PLATFORMS,
+	secret: BELOW,
 	runDirectors: ['eline', 'anna'],
 	cheerers: CHEERERS,
 	look: {
@@ -1025,7 +1243,7 @@ export const scoopLine: CourseDefinition = {
 			seam: '#c9ced0',
 			// The underside of each deck over a room: its ceiling's trim.
 			edge: '#c9ced0',
-			wall: '#d9d2c3',
+			wall: STAIRWELL_WALL,
 			// Along the top of its roof, a white rail.
 			grass: FERRY_WHITE,
 			tiles: { rock: HULL_TILE, front: HULL_TILE },
@@ -1049,6 +1267,25 @@ export const scoopLine: CourseDefinition = {
 		touristsNearer: 6,
 		// Gulls, not geese.
 		geese: 'grayscale(1) brightness(1.5)',
+		secret: BELOW_LOOK,
+		// Each flight of stairs, as stairs: carpeted indoors, a wall behind
+		// them, and the passage on along under the stairs up to the shop;
+		// teak, and a ship's rail, out on deck.
+		stairs: [
+			{
+				...span('stairsUp'),
+				style: 'carpet',
+				behind: STAIRWELL_WALL,
+			},
+			{ ...span('deckStairsUp'), style: 'deck' },
+			{ ...span('deckStairsDown'), style: 'deck' },
+			{
+				...span('stairsDown'),
+				style: 'carpet',
+				behind: STAIRWELL_WALL,
+				under: STAIRWELL_UNDER,
+			},
+		],
 	},
 	...layOut(),
 }

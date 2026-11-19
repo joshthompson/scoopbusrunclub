@@ -511,6 +511,8 @@ export interface RaceFrame {
 	corgis: CorgiStateFrame[]
 	/** The Caves' mine carts, if there are any: [x, rail y, state, spin], its state by `CART_STATES`. */
 	carts?: [number, number, number, number][]
+	/** Scoop Cruises' lifeboat, if there is one: [x, waterline y, state, tilt], its state by `LIFEBOAT_STATES`. */
+	lifeboat?: [number, number, number, number]
 	/**
 	 * When each Platform that waits was set off, in order, if the course has
 	 * any: -1, still waiting (see `setOffPlatforms`).

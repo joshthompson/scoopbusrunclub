@@ -38,7 +38,13 @@ import {
 	type ShownReaction,
 	fromSkiState,
 } from './protocol'
-import { CART_STATES, CORGI_STATES, FLYER_STATES, FURBY_STATES } from './stream'
+import {
+	CART_STATES,
+	CORGI_STATES,
+	FLYER_STATES,
+	FURBY_STATES,
+	LIFEBOAT_STATES,
+} from './stream'
 
 /**
  * A Remote Player's view of the race: the Host's, drawn from the frames it
@@ -324,6 +330,14 @@ export default function Mirror(props: {
 			cart.state = CART_STATES[from[2]] ?? 'waiting'
 			cart.spin = mix(from[3], to[3])
 		})
+		const boat = world.lifeboat
+		if (boat && a.lifeboat) {
+			const to = b.lifeboat ?? a.lifeboat
+			boat.x = mix(a.lifeboat[0], to[0])
+			boat.y = mix(a.lifeboat[1], to[1])
+			boat.state = LIFEBOAT_STATES[a.lifeboat[2]] ?? 'waiting'
+			boat.tilt = mix(a.lifeboat[3], to[3])
+		}
 		world.corgis.forEach((corgi, i) => {
 			const from = a.corgis[i]
 			if (!from) return

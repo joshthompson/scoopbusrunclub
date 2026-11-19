@@ -8,6 +8,12 @@ import { comingAtLaunch, secretRoof } from '../game/secret'
 import type { World } from '../game/world'
 import { bubbleReach, paintBubble } from './Bubble'
 import { cachedArt } from './canvasArt'
+import {
+	createEngineDoor,
+	createFirelight,
+	engineRoomTop,
+	paintEngineRoom,
+} from './engineRoom'
 import { rectFiller } from './paint/snappedRect'
 
 /**
@@ -102,7 +108,8 @@ const SPRING = 60
 const PIER = 20
 
 /** Everything a painter needs: where it is, and how to add a block of colour. */
-interface Painting {
+export interface Painting {
+	world: World
 	secret: Secret
 	roof: number
 	floor: number
@@ -134,18 +141,24 @@ export function createSecret(world: World) {
 	// goes after someone down it, and on either side; its shafts are drawn
 	// as they're used.
 	const ice = art.walls === 'ice'
+	// Below decks, only the ship's own insides, up to the highest deck over
+	// them, and down to the sea, through the hole in its side.
+	const engine = art.walls === 'engine'
 	// A mine's rock goes all the way out either side, as a cellar's earth.
-	const left = ice ? secret.from - 60 : secret.from - UNDER_REACH
-	const right = ice ? secret.to + 60 : secret.to + UNDER_REACH
+	const left = ice || engine ? secret.from - 60 : secret.from - UNDER_REACH
+	const right = ice || engine ? secret.to + 60 : secret.to + UNDER_REACH
 	const top = ice
 		? Math.round(groundY(gap.from)) + 100
-		: Math.min(VIEW_HEIGHT, roof - 60)
-	const bottom = floor + DEEP
+		: engine
+			? engineRoomTop(world)
+			: Math.min(VIEW_HEIGHT, roof - 60)
+	const bottom = engine ? (secret.lifeboat?.water ?? floor) + 24 : floor + DEEP
 	const at = (x: number) => Math.round(x - left)
 	const y = (value: number) => Math.round(value - top)
 
 	const parts: Part[] = []
 	const painting: Painting = {
+		world,
 		secret,
 		roof,
 		floor,
@@ -173,6 +186,7 @@ export function createSecret(world: World) {
 	}
 	if (art.walls === 'ice') paintIce(painting)
 	else if (art.walls === 'mine') paintMine(painting)
+	else if (art.walls === 'engine') paintEngineRoom(painting, art)
 	else paintVaults(painting, art)
 
 	// A rug in front of whatever has one; and the lights' glow.
@@ -184,8 +198,9 @@ export function createSecret(world: World) {
 		painting.rect(x - w / 2, floor + 2, w, 6, base)
 		painting.rect(x - w / 2 + 4, floor + 4, w - 8, 2, stripe)
 	}
+	// Not firelight: it flickers, drawn live (see `createFirelight`).
 	for (const { x, prop } of furnishings)
-		if (prop.glow)
+		if (prop.glow && !prop.glow.flicker)
 			painting.glow(
 				x + prop.glow.x,
 				floor - prop.glow.y,
@@ -290,7 +305,7 @@ export function createSecret(world: World) {
 					(prop.frames.length > 1 ? 'play' : 'pause') as 'play' | 'pause',
 					'state',
 				),
-				...createObjectSignal(180, 'frameInterval'),
+				...createObjectSignal(prop.frameMs ?? 180, 'frameInterval'),
 			}),
 		}),
 	)
@@ -300,7 +315,7 @@ export function createSecret(world: World) {
 	// up on his feet, arms up, while whoever he's thrown is on their way up
 	// out of it. Or the duct: its fan still, and blowing.
 	const { launcher } = art
-	const launcherX = secret.launch - launcher.hands.x
+	const launcherX = secret.launch - (launcher?.hands.x ?? 0)
 	/** Whoever says hello, if not whoever's at its far end: one of its furnishings. */
 	const greeter =
 		art.greeter === undefined ? undefined : furnishings[art.greeter]
@@ -312,50 +327,67 @@ export function createSecret(world: World) {
 				r.body.feetY < floor - 40 &&
 				r.body.feetY > groundY(r.body.x) - 900,
 		)
-	const thrower = createController({
-		frames: [launcher.kneel, launcher.thrown],
-		init: () => ({
-			id: 'secret-launcher',
-			type: 'secret-prop',
-			x: () => launcherX,
-			...createObjectSignal(floor - launcher.kneelHeight, 'y'),
-			width: () => launcher.width,
-			...createObjectSignal(launcher.kneelHeight, 'height'),
-			...createObjectSignal(0, 'frame'),
-			...createObjectSignal('pause' as 'play' | 'pause', 'state'),
-		}),
-		onEnterFrame({ $ }) {
-			const up = flying()
-			const height = up ? launcher.thrownHeight : launcher.kneelHeight
-			$.setFrame(up ? 1 : 0)
-			$.setHeight(height)
-			$.setY(floor - height)
-		},
-	})
+	const thrower =
+		launcher &&
+		createController({
+			frames: [launcher.kneel, launcher.thrown],
+			init: () => ({
+				id: 'secret-launcher',
+				type: 'secret-prop',
+				x: () => launcherX,
+				...createObjectSignal(floor - launcher.kneelHeight, 'y'),
+				width: () => launcher.width,
+				...createObjectSignal(launcher.kneelHeight, 'height'),
+				...createObjectSignal(0, 'frame'),
+				...createObjectSignal('pause' as 'play' | 'pause', 'state'),
+			}),
+			onEnterFrame({ $ }) {
+				const up = flying()
+				const height = up ? launcher.thrownHeight : launcher.kneelHeight
+				$.setFrame(up ? 1 : 0)
+				$.setHeight(height)
+				$.setY(floor - height)
+			},
+		})
+	/** Whoever calls out: a furnishing, or whoever's at its far end, if anyone is. */
+	const caller = greeter
+		? {
+				x: Math.round(greeter.x - greeter.prop.width / 2),
+				top: floor - setBack - greeter.prop.height,
+				width: greeter.prop.width,
+				flying,
+			}
+		: launcher && {
+				x: launcherX,
+				top: floor - launcher.kneelHeight,
+				width: launcher.width,
+				flying,
+			}
+
+	// Firelight, flickering, over the hollow, behind what's in it.
+	const firelight = furnishings.flatMap(({ x, prop }, i) =>
+		prop.glow?.flicker
+			? [
+					createFirelight(world, {
+						x: x + prop.glow.x,
+						y: floor - prop.glow.y,
+						reach: prop.glow.reach,
+						colour: prop.glow.colour,
+						seed: i,
+					}),
+				]
+			: [],
+	)
 
 	return [
 		hollow,
+		...firelight,
 		...things,
-		thrower,
-		...createGreeting(
-			world,
-			secret,
-			greeter
-				? {
-						x: Math.round(greeter.x - greeter.prop.width / 2),
-						top: floor - setBack - greeter.prop.height,
-						width: greeter.prop.width,
-						flying,
-					}
-				: {
-						x: launcherX,
-						top: floor - launcher.kneelHeight,
-						width: launcher.width,
-						flying,
-					},
-		),
+		...(thrower ? [thrower] : []),
+		...(caller ? createGreeting(world, secret, caller) : []),
 		...createManhole(world, secret, art),
 		...createDuct(world, secret, art),
+		...createEngineDoor(world, secret, art),
 	]
 }
 
@@ -831,7 +863,7 @@ function createManhole(world: World, secret: Secret, art: SecretLook) {
 function createDuct(world: World, secret: Secret, art: SecretLook) {
 	const duct = art.duct
 	const { launcher } = art
-	if (!secret.duct || !duct) return []
+	if (!secret.duct || !duct || !launcher) return []
 	const { groundY } = world.terrain
 	const street = Math.round(groundY(secret.launch))
 	const roof = secretRoof(world)

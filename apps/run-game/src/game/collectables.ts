@@ -21,6 +21,8 @@ export type RideKind =
 	| 'snowboard'
 	/** In The Caves, a mine cart, along its rails. */
 	| 'minecart'
+	/** On Scoop Cruises, the lifeboat, out of the engine rooms. */
+	| 'lifeboat'
 
 export type Collectable =
 	| `fika:${FikaItem}`
@@ -115,6 +117,7 @@ export const COLLECTABLE_NAMES = {
 	'ride:pterodactyl': 'Pterodactyl',
 	'ride:mole': 'Mole',
 	'ride:minecart': 'Mine cart',
+	'ride:lifeboat': 'Lifeboat',
 	'ride:bloodCell': 'Red blood cell',
 	'ride:skateboard': 'Skateboard',
 	pumpkin: 'Pumpkin',
@@ -223,6 +226,7 @@ export const PICKUP_WORD = {
 	'ride:pterodactyl': 'Pterodactyl ride!',
 	'ride:mole': 'Dig dig!',
 	'ride:minecart': 'All aboard!',
+	'ride:lifeboat': 'Abandon ship!',
 	'ride:bloodCell': 'Go with the flow!',
 	'ride:skateboard': 'Skate!',
 	'ride:goat': 'G.O.A.T.!',
@@ -358,6 +362,7 @@ export const COLLECTABLE_ABOUT = {
 	'ride:pterodactyl': 'A pterodactyl, soaring over the forests of Dino Island.',
 	'ride:mole': 'A mole, squeaking for a rider.',
 	'ride:minecart': 'A mine cart, heaped with ore, waiting on the rails.',
+	'ride:lifeboat': 'A lifeboat, bobbing under the engine rooms.',
 	'ride:bloodCell': 'A red blood cell, bobbing in the bloodstream.',
 	'ride:skateboard': 'A skateboard, left on the road on Södermalm.',
 	pumpkin: 'A carved pumpkin, worn on your head.',
@@ -412,6 +417,7 @@ const RIDE_BEHAVIOUR = {
 	pterodactyl: 'Jump into it to be carried over everything for a while.',
 	mole: 'Run into it. It hops along by itself, digging through rock.',
 	minecart: 'Run into it and hold on to the end of the line.',
+	lifeboat: 'Drop into it through the hole and hold on. Jump to hop the waves.',
 	bloodCell:
 		'Jump on and go with the flow, faster than running. Duck to get off.',
 	skateboard:
@@ -493,6 +499,7 @@ export function courseCollectables(course: Course): Collectable[] {
 	if (course.flyovers?.length) there.add(`ride:${course.flyer ?? 'goose'}`)
 	if (course.leap) there.add('ride:condor')
 	if (course.mine) there.add('ride:minecart')
+	if (course.secret?.lifeboat) there.add('ride:lifeboat')
 	return COLLECTABLES.filter((c) => there.has(c))
 }
 

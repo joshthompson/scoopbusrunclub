@@ -730,6 +730,12 @@ export interface CourseLook {
 	 * `mortar` between.
 	 */
 	pyramids?: { feet: [number, number][]; block: string; mortar: string }
+	/**
+	 * Stretches of the Ground that are a flight of stairs, drawn as one over
+	 * it (see `draw/stairs.tsx`): treads, a stringer under them, and a rail
+	 * along their near side. See `StairsLook`.
+	 */
+	stairs?: StairsLook[]
 	/** A Cave's rock: the rock itself, its underside's edge, the back wall inside, and the grass over it. */
 	cave?: {
 		rock: string
@@ -773,6 +779,25 @@ export interface CourseLook {
  * Inside a Gap: its walls, either side, lit on the far side and in shadow
  * on the near; seams across them; and what's at its rims, and down it.
  */
+/**
+ * A flight of stairs, `from` to `to` along, up or down the Ground there, as
+ * it steps (see `CourseLook['stairs']`). `carpet`: indoors, wooden treads, a
+ * carpet runner up the middle, brass nosings, and a banister, balusters and
+ * newel posts; `deck`: out on deck, teak treads, yellow non-slip nosings, a
+ * white steel stringer and a ship's rail. With `behind`, the stairs take
+ * up only the front of the path, that colour (the wall) behind them. With
+ * `under`, they're boxed in under, that colour, down to the floor at their
+ * foot; without, they're open under, whatever's there showing (a passage
+ * on along under them).
+ */
+export interface StairsLook {
+	from: number
+	to: number
+	style: 'carpet' | 'deck'
+	behind?: string
+	under?: string
+}
+
 export interface PitLook {
 	wall: string
 	shade: string
@@ -1490,6 +1515,14 @@ export interface HauntedHouse {
  * With `bridged`, its Gap has a rope bridge over it (a Platform, not
  * solid): run on over it, or duck on it, and down through it you go (The
  * Caves' mine). With `coaster`, there's a ride through it: see `Coaster`.
+ *
+ * With `stairs`, its way in's no Gap at all but a flight of stairs, over
+ * `gap`, up from a floor that carries on along under them, level, at
+ * `floor`: duck on them, and down through them you drop, as if you'd run on
+ * past them. Its roof is then the underside of whatever's over it, all
+ * along it (the stairs, a deck), not `room`: a passage under the stairs,
+ * low under a deck, tall under a higher one. Scoop Cruises' engine rooms.
+ * With `lifeboat`, its way out: see `SecretLifeboat`.
  */
 export interface Secret {
 	gap: { from: number; to: number }
@@ -1501,6 +1534,8 @@ export interface Secret {
 	peak: number
 	land: number
 	unlocks?: string
+	stairs?: boolean
+	lifeboat?: SecretLifeboat
 	manhole?: boolean
 	duct?: boolean
 	bridged?: boolean
@@ -1512,6 +1547,23 @@ export interface Secret {
 		toSelf?: string
 	}
 	coaster?: Coaster
+}
+
+/**
+ * A Secret's way out by sea, under Scoop Cruises' engine rooms: a `hole`
+ * blown in its floor, from and to along, out through the ship's side to
+ * the sea, its surface at `water` (a y), and a lifeboat waiting on it
+ * under the hole. Drop down through the hole into the lifeboat and it's
+ * yours: off along the water, faster than running, jumping the waves as you
+ * like, to a plastic trick ramp, its lip at the Secret's `launch`, that throws you up out of
+ * it, back up onto the course, over it by its `peak`, down onto it at its
+ * `land` (see `lifeboat.ts`). There's only the one: anyone down the hole
+ * after it's gone drops into the sea, and is out; in Baby Mode, floated
+ * back up onto the deck over it.
+ */
+export interface SecretLifeboat {
+	hole: { from: number; to: number }
+	water: number
 }
 
 /**
@@ -1549,11 +1601,21 @@ export interface Coaster {
  * `launcher`: facing left, the way you come, `kneel`ing, waiting, `hands`
  * where you run into, from the picture's top left; and `thrown`, while
  * you're on your way up (or a duct: still, then blowing). All in world
- * pixels. Or `mine`: an old mine's workings, deep under The Caves.
+ * pixels. Or `mine`: an old mine's workings, deep under The Caves. Or
+ * `engine`: below decks on a ship, a passage on along under its stairs, and
+ * its engine rooms, steel and pipes; with no launcher, nobody there to
+ * throw you, but a lifeboat (see `SecretLifeboat`).
  */
 export interface SecretLook {
-	walls: 'ice' | 'vaults' | 'mine'
-	launcher: {
+	walls: 'ice' | 'vaults' | 'mine' | 'engine'
+	/**
+	 * A door across it at `x`, `shut`, and what's past it hidden behind the
+	 * Cave's front, as the rest of the hull is, till anyone down there gets
+	 * to it: then it's `open`, and stays open, all that's past it in view
+	 * from then on. The door into Scoop Cruises' engine rooms.
+	 */
+	door?: { x: number; shut: SecretPicture; open: SecretPicture }
+	launcher?: {
 		kneel: string
 		thrown: string
 		width: number
@@ -1637,7 +1699,16 @@ export interface SecretProp {
 	frames: string[]
 	width: number
 	height: number
-	glow?: { x: number; y: number; reach: number; colour: string }
+	/** How long each of its frames is up, in ms, if not 180: fire, flickering fast. */
+	frameMs?: number
+	/** Its light; with `flicker`, flickering, as firelight does, drawn live rather than painted in. */
+	glow?: {
+		x: number
+		y: number
+		reach: number
+		colour: string
+		flicker?: boolean
+	}
 	rug?: boolean
 	hung?: number
 }

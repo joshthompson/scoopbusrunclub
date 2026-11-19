@@ -5,6 +5,7 @@ import {
 	createEffect,
 	createSignal,
 	onCleanup,
+	onMount,
 } from 'solid-js'
 import { collectableCourse, onCourse } from '../courses/collectables'
 import { CollectableArt } from '../draw/art/collectable'
@@ -239,11 +240,7 @@ function Details(props: { id: Collectable }) {
 			>
 				{/* Keyed: the art's drawn for one collectable, not followed as it changes. */}
 				<Show when={props.id} keyed>
-					{(id) => (
-						<div style={{ transform: 'scale(2)' }}>
-							<CollectableArt id={id} />
-						</div>
-					)}
+					{(id) => <FittedArt id={id} />}
 				</Show>
 			</div>
 			<div style={styles.detailsName}>
@@ -272,6 +269,56 @@ function Details(props: { id: Collectable }) {
 					)}
 				</Show>
 			</Show>
+		</div>
+	)
+}
+
+/** How much bigger the details' art is drawn, at most, and the room it has. */
+const BIG_ART_SCALE = 2
+const BIG_ART_WIDTH = 220
+const BIG_ART_HEIGHT = 110
+
+/**
+ * A collectable's art, as big as it'll go in the details' room for it:
+ * twice its size, or smaller, if it's big (a goat, a lifeboat), to fit,
+ * not hanging down over its name. Measured as it's first drawn, all of it,
+ * whatever's scaled inside it.
+ */
+function FittedArt(props: { id: Collectable }) {
+	let art: HTMLDivElement | undefined
+	const [scale, setScale] = createSignal<number>()
+	onMount(() => {
+		if (!art) return
+		const rects = [art, ...art.querySelectorAll('*')].map((el) =>
+			el.getBoundingClientRect(),
+		)
+		// On the screen, scaled with the whole menu to fit the window: back
+		// to the menu's own pixels.
+		const shown = art.offsetWidth > 0 ? rects[0].width / art.offsetWidth : 1
+		const width =
+			Math.max(...rects.map((r) => r.right)) -
+			Math.min(...rects.map((r) => r.left))
+		const height =
+			Math.max(...rects.map((r) => r.bottom)) -
+			Math.min(...rects.map((r) => r.top))
+		setScale(
+			Math.min(
+				BIG_ART_SCALE,
+				width > 0 ? (BIG_ART_WIDTH * shown) / width : BIG_ART_SCALE,
+				height > 0 ? (BIG_ART_HEIGHT * shown) / height : BIG_ART_SCALE,
+			),
+		)
+	})
+	return (
+		<div
+			ref={art}
+			style={{
+				transform: `scale(${scale() ?? 1})`,
+				// Hidden till it's measured, at its own size.
+				visibility: scale() === undefined ? 'hidden' : 'visible',
+			}}
+		>
+			<CollectableArt id={props.id} />
 		</div>
 	)
 }

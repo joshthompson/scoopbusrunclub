@@ -1407,14 +1407,20 @@ const SPLASH_DEPTH = 14
  */
 export function createSplashes(world: World) {
 	const { sea, river } = world.course
-	if (!sea && !river) return []
+	/** Over a ship's side, out of the hole in its engine rooms: the sea under it. */
+	const overboard = world.course.secret?.lifeboat
+	if (!sea && !river && !overboard) return []
 	/** The water's surface at `x`, if it's out at sea or in a River. */
 	const surface = (x: number) =>
 		sea && atSea(world, x)
 			? sea.level
 			: river && inRiver(world, x)
 				? river.level
-				: undefined
+				: overboard &&
+						x > overboard.hole.from - 20 &&
+						x < overboard.hole.to + 20
+					? overboard.water
+					: undefined
 	/** Where everyone's feet were last tick. */
 	const was = new Map<string, number>()
 	const live: { id: string; at: number }[] = []

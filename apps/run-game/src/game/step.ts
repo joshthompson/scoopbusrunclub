@@ -122,6 +122,13 @@ import {
 	TENTACLE_REACH,
 	jellyfishHeight,
 } from './jellyfish'
+import {
+	dropOut,
+	lifeboatView,
+	overSide,
+	rideLifeboat,
+	stepLifeboat,
+} from './lifeboat'
 import { callOut, landLongJump, longJumpTakeOff, sandDrag } from './longJump'
 import { MOLE_HOP, burrowing, onMole } from './moles'
 import { mummyAt } from './mummies'
@@ -146,6 +153,7 @@ import {
 	atLaunch,
 	comingAtLaunch,
 	dropsIn,
+	dropsThrough,
 	fling,
 	flyOut,
 	goingIn,
@@ -283,6 +291,7 @@ export function stepWorld(world: World) {
 		stepCorgis(world)
 		boardCarts(world)
 		stepCarts(world)
+		stepLifeboat(world)
 		stepFootball(world)
 		stepFollowers(world)
 		stepSharks(world)
@@ -639,6 +648,20 @@ function stepRunner(world: World, racer: Racer) {
 	/** On a mole: hopping along, and digging on through any rock in the way. */
 	const mole = onMole(world, b)
 
+	// Down out of the hole in a Secret's floor: into its lifeboat, if it's
+	// still there; if it's gone, into the sea.
+	if (racing && !b.lifeboat && dropOut(world, racer)) {
+		fall(world, racer)
+		b.wasUp = up
+		return
+	}
+	if (b.lifeboat) {
+		// In the lifeboat: along the water, holding on, or hopping a wave.
+		rideLifeboat(world, racer, up && !b.wasUp)
+		b.wasUp = up
+		return
+	}
+
 	if (b.cart !== undefined) {
 		// In a mine cart: down the line, holding on, or jumping it.
 		rideCart(world, racer, up && !b.wasUp, down)
@@ -736,6 +759,18 @@ function stepRunner(world: World, racer: Racer) {
 		b.wasDown = down
 		if (fell) fall(world, racer)
 		return
+	}
+
+	// Ducking on a Secret's stairs: down through them, to the floor that
+	// goes on along under them.
+	if (racing && dropsThrough(world, b, down)) {
+		b.secret = 'in'
+		b.grounded = false
+		b.jumping = false
+		b.ducking = false
+		b.vy = 1
+		play('whoosh')
+		world.popup('Below decks!', b.x, b.feetY - 80)
 	}
 
 	// Ducking on a Platform: down through it, unless it's solid rock.
@@ -1472,8 +1507,10 @@ function hang(world: World, racer: Racer, up: boolean) {
 
 /** Down a Gap, and out: or in Baby Mode, back on their feet past it. */
 function fall(world: World, racer: Racer) {
-	// Into the sea, they've hit the water: a splash, not a whistle falling away.
-	const sound = atSea(world, racer.body.x) ? 'splash' : 'fallen'
+	// Into the sea, they've hit the water: a splash, not a whistle falling
+	// away. Over a ship's side, too, out of a Secret's hole, its lifeboat gone.
+	const wet = atSea(world, racer.body.x) || overSide(world, racer.body)
+	const sound = wet ? 'splash' : 'fallen'
 	if (world.baby) return respawn(world, racer, sound)
 	const b = racer.body
 	const crashed = b.gliding
@@ -1491,7 +1528,7 @@ function fall(world: World, racer: Racer) {
 	world.popup(
 		crashed
 			? `Splash! ${racer.runner.name} crashed!`
-			: atSea(world, b.x)
+			: wet
 				? `Splash! ${racer.runner.name} fell in!`
 				: `${racer.runner.name} fell!`,
 		b.x,
@@ -1637,6 +1674,9 @@ function respawn(world: World, racer: Racer, sound: 'fallen' | 'splash') {
 			(sea && atSea(world, b.x) ? sea.to : (gap?.to ?? b.x)) + RESPAWN_PAST
 		while (x < terrain.finishX && (terrain.inGap(x) || atSea(world, x))) x += 20
 		to = { x, y: terrain.groundY(x) }
+		// Over a ship's side, out of a Secret's hole: up out of the sea onto
+		// the deck over it, out of the Secret.
+		if (overSide(world, b)) b.secret = undefined
 		// Down a pit in a Secret's floor: back up past it, on its floor.
 		const pit = b.secret && world.course.secret?.coaster?.leap?.pit
 		if (pit && world.course.secret)
@@ -1961,7 +2001,8 @@ function collide(world: World, racer: Racer) {
 	}
 	b.wading = wet
 	/** On a corgi, over rocks, under branches and through the mud. Or carried over them, or in a cart. */
-	const riding = b.mount > 0 || b.carried > 0 || b.cart !== undefined
+	const riding =
+		b.mount > 0 || b.carried > 0 || b.cart !== undefined || !!b.lifeboat
 	/**
 	 * Not yet had its go at them. A rock, a branch, a pothole, mud and the
 	 * children are there for everyone, once each; a hurdle only for whoever
@@ -3171,6 +3212,9 @@ function leapView(world: World, b: Body) {
  */
 function secretView(world: World, b: Body) {
 	const secret = world.course.secret
+	// Out on the water in its lifeboat: the boat, and the ship's side over it.
+	const boat = lifeboatView(world, b)
+	if (boat) return boat
 	if (!secret || !underground(world, b)) return undefined
 	if (b.feetY < secretRoof(world))
 		return { high: b.feetY - 40, low: b.feetY + 220 }

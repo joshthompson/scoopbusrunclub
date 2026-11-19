@@ -16,6 +16,7 @@ import { GliderArt } from './glider'
 import { GoatArt } from './goat'
 import { HatPicture, hatArt } from './hats'
 import { HorseArt } from './horse'
+import { LifeboatArt } from './lifeboat'
 import { LlamaArt } from './llama'
 import { MineCartArt } from './mineCart'
 import { MoleArt } from './mole'
@@ -90,6 +91,12 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <MoleArt pose="sit" />
 		case 'ride:minecart':
 			return <MineCartArt />
+		case 'ride:lifeboat':
+			return (
+				<div style={{ transform: 'scale(0.6)' }}>
+					<LifeboatArt />
+				</div>
+			)
 		case 'ride:bloodCell':
 			return <BloodCellArt pose="sit" />
 		case 'ride:skateboard':

@@ -22,6 +22,7 @@ import {
 import type { Follower } from './followers'
 import { createFootball } from './football'
 import type { Hat } from './hats'
+import { createLifeboat } from './lifeboat'
 import { lineUp } from './pack'
 import { racePlatforms } from './platforms'
 import type { PortalRun } from './portals'
@@ -134,6 +135,8 @@ export interface Body {
 	mount: number
 	/** The mine cart they're riding, by its index, in The Caves (see `carts`). */
 	cart?: number
+	/** In the lifeboat, along the water, out of a Secret's hole (see `lifeboat.ts`). */
+	lifeboat?: boolean
 	/**
 	 * On a glider, out over the sea, steering it up and down, until it comes
 	 * down on the island.
@@ -809,6 +812,8 @@ export function createWorld(
 		flyerState: { next: 0, nextId: 0 },
 		/** The course's mine carts, if it has a mine. Plain state, like the body. */
 		carts: createCarts({ course, terrain }),
+		/** Its Secret's lifeboat, if it has one: see `SecretLifeboat`. Plain state, like the body. */
+		lifeboat: createLifeboat(course),
 		/** Its football, if it has one: see `Football`. Plain state, like the body. */
 		ball: createFootball({
 			football: course.football,

@@ -1,5 +1,6 @@
 import type { CartState } from '../game/carts'
 import { hatCode } from '../game/hats'
+import type { LifeboatState } from '../game/lifeboat'
 import { waitingLifts } from '../game/platforms'
 import {
 	type CorgiState,
@@ -41,6 +42,12 @@ export const CART_STATES: CartState[] = [
 	'ridden',
 	'parked',
 	'scooped',
+]
+export const LIFEBOAT_STATES: LifeboatState[] = [
+	'waiting',
+	'ridden',
+	'thrown',
+	'adrift',
 ]
 export const CORGI_STATES: CorgiState[] = [
 	'waiting',
@@ -210,6 +217,16 @@ export function createRaceStream(
 							CART_STATES.indexOf(c.state),
 							c.spin,
 						]),
+					}
+				: {}),
+			...(world.lifeboat
+				? {
+						lifeboat: [
+							tenth(world.lifeboat.x),
+							tenth(world.lifeboat.y),
+							LIFEBOAT_STATES.indexOf(world.lifeboat.state),
+							tenth(world.lifeboat.tilt),
+						] as [number, number, number, number],
 					}
 				: {}),
 			...(waitingLifts(world).length

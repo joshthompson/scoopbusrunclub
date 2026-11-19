@@ -15,7 +15,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | 4 | Huddinge | ✅ Cake in a can, wild berries, kantareller, bad mushroom (one, halfway: the screen trips for 3 s) | ✅ Deer riding deer | ⬜ | ✅ Antlers | ✅ Deer | ⬜ Flavour so far: a wild boar family running alongside, a harvester felling a pine, the granite ledge onto the deer | 2026-11-18 |
 | 5 | Pyramids | ✅ Falafel, knafeh, koshary | ✅ Bounce across the crocodiles | ✅ Ms Crocodile | ✅ Pharaoh's headdress | ✅ Camel, rare bactrian camel | ✅ Tomb under the Sphinx, the Nile | 2026-11-18 |
 | 6 | Halloween Town | ✅ Candyfloss, toffee apple, spider cupcake, pumpkin | ✅ Become a ghost | ✅ Skeleton | ✅ Pumpkin | ⬜ | ✅ Haunted house | 2026-11-18 |
-| 7 | Scoop Cruises | ✅ Kladdkaka, lingondricka, lösgodis, salmiakki, karjalanpiirakka | ⬜ | ⬜ | ✅ Captain's hat | ⬜ | ✅ The ferry, roof route | 2026-11-18 |
+| 7 | Scoop Cruises | ✅ Kladdkaka, lingondricka, lösgodis, salmiakki, karjalanpiirakka | ⬜ | ⬜ | ✅ Captain's hat | ✅ Lifeboat (out of the engine rooms) | ✅ The ferry, roof route; below decks, down through the stairs to the engine rooms, a lifeboat ride and a trick ramp back up into the buffet | 2026-11-19 (below decks) |
 | 8 | The Caves | ✅ Sandwich, cool rock, cave pickles | ✅ Find the miners | ✅ The Miner | ✅ Miner's helmet | ✅ Mole, mine cart | ✅ Mine with a secret line to the gallery; the old mine under the chasm, its coaster and loop | 2026-11-18 |
 | 9 | Great Wall of China | ✅ Dumplings, bubble tea, mooncake | ✅ On top of a tower | ⬜ | ✅ Bamboo hat | ✅ Dragon (flies over) | ✅ Guard towers | 2026-11-18 |
 | 10 | Furby Fields | ✅ Tiny furby, lollipop, rainbow cake | ✅ Find the Furby Queen | ✅ Furby Queen | ✅ Propeller beanie | ✅ Unicorn | ✅ Giant Furby to run through, a stair of macaron-topped candy towers past the rainbow, up to float over to the Furby Queen's palace | 2026-11-18 |
@@ -37,7 +37,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | Custom goal | 1 | Scoop Cruises |
 | Unlockable character | 8 | Haga, Huddinge, Scoop Cruises, Great Wall, Machu Picchu, The Sewers, The Cliff, The Slopes |
 | Unique hat | 0 | |
-| Ride | 4 | Halloween Town, Scoop Cruises, The Sewers, City Rooftop |
+| Ride | 3 | Halloween Town, The Sewers, City Rooftop |
 | Set piece | 1 | Huddinge |
 | Art pass | 0 | |
 

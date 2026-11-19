@@ -1,4 +1,4 @@
-import { GRAVITY, HITBOX_HALF_WIDTH } from './constants'
+import { GRAVITY, HITBOX_HALF_WIDTH, PATH_FRONT } from './constants'
 import type { Body, World } from './world'
 
 /**
@@ -48,6 +48,8 @@ const UNDER_BRIDGE = 4
 
 /** Gone down the Secret's Gap past its lip, this tick: on their way in. */
 export function goingIn(world: World, b: Body) {
+	// Down stairs, there's no Gap to go down: see `dropsThrough`.
+	if (world.course.secret?.stairs) return false
 	const lip = world.course.secret?.bridged ? UNDER_BRIDGE : LIP
 	return (
 		!b.secret &&
@@ -66,12 +68,14 @@ export function goingIn(world: World, b: Body) {
 export function keepIn(world: World, b: Body, height: number) {
 	const secret = world.course.secret
 	if (!secret) return
+	// Under stairs, its "shaft" is just the room under them: along it,
+	// however high up under them.
 	const [left, right] =
-		b.feetY - height < secretRoof(world)
+		b.feetY - height < secretRoof(world) && !secret.stairs
 			? [secret.gap.from, secret.gap.to]
 			: [secret.from, secret.to]
-	// Down a pit in its floor: between its walls.
-	const pit = secret.coaster?.leap?.pit
+	// Down a pit in its floor, or out of a hole in it: between its walls.
+	const pit = pitOf(world)
 	const [from, to] =
 		pit && b.feetY > secret.floor + 2 && b.x > pit[0] - 20 && b.x < pit[1] + 20
 			? [pit[0] + HITBOX_HALF_WIDTH, pit[1] - HITBOX_HALF_WIDTH]
@@ -111,9 +115,32 @@ export function dropsIn(world: World, b: Body) {
 	)
 }
 
-/** The cavern's roof over `x`, to bump a head on, jumping: none under its shaft. */
-export const secretCeiling = (world: World, x: number) =>
-	inShaft(world, x) ? undefined : secretRoof(world)
+/**
+ * The cavern's roof over `x`, to bump a head on, jumping: none under its
+ * shaft. Under stairs, the underside of whatever's over it there, the
+ * stairs themselves or a deck (see `Secret['stairs']`).
+ */
+export const secretCeiling = (world: World, x: number) => {
+	if (world.course.secret?.stairs) return underside(world, x)
+	return inShaft(world, x) ? undefined : secretRoof(world)
+}
+
+/** The underside of the Ground over `x`: its path's front edge, where the Cave's front starts under it. */
+export const underside = (world: World, x: number) =>
+	Math.round(world.terrain.groundY(x) / 2) * 2 + PATH_FRONT + 2
+
+/**
+ * Ducking on a Secret's stairs this tick (see `Secret['stairs']`): stood on
+ * them, on their feet, not on a Ride: down through them they go, to the
+ * floor under them.
+ */
+export function dropsThrough(world: World, b: Body, down: boolean) {
+	const secret = world.course.secret
+	if (!secret?.stairs || b.secret || !down || !b.grounded) return false
+	if (b.mount > 0 || b.carried > 0 || b.cart !== undefined) return false
+	if (b.on !== undefined || b.bed) return false
+	return b.x > secret.gap.from && b.x < secret.gap.to
+}
 
 /** Whether someone in the Secret has got to whoever's waiting at its far end. */
 export const atLaunch = (world: World, b: Body) =>
@@ -182,10 +209,21 @@ export function flyOut(world: World, b: Body) {
 }
 
 /**
- * Whether `x` is over a pit in the Secret's floor, its coaster's (see
- * `Coaster['leap']`): no floor under it, a Gap, down there.
+ * A pit in the Secret's floor, if it has one, from and to along: its
+ * coaster's (see `Coaster['leap']`), or the hole out to its lifeboat (see
+ * `SecretLifeboat`).
+ */
+function pitOf(world: World): [number, number] | undefined {
+	const secret = world.course.secret
+	const hole = secret?.lifeboat?.hole
+	return secret?.coaster?.leap?.pit ?? (hole && [hole.from, hole.to])
+}
+
+/**
+ * Whether `x` is over a pit in the Secret's floor (see `pitOf`): no floor
+ * under it, a Gap, down there.
  */
 export function inPit(world: World, x: number) {
-	const pit = world.course.secret?.coaster?.leap?.pit
+	const pit = pitOf(world)
 	return !!pit && x > pit[0] && x < pit[1]
 }

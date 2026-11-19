@@ -26,6 +26,7 @@ import { createBoars } from './boars'
 import { createCoaster } from './coaster'
 import { createDeepWater } from './deepWater'
 import { createDiplodocus } from './diplodocus'
+import { createLifeboatRide } from './engineRoom'
 import {
 	EruptionSky,
 	createEruptionBurst,
@@ -78,6 +79,7 @@ import {
 	createTowers,
 	createWarnings,
 } from './sprites'
+import { createStairs } from './stairs'
 
 declare global {
 	interface Window {
@@ -153,6 +155,12 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			'bus',
 			// The back of a guard tower: behind whoever's coming out of it.
 			'tower-back',
+			// Flights of stairs over the Ground, and their rails: over a ship's
+			// hull, and whatever's down there under them.
+			'stairs',
+			// A ship's hull over its engine rooms, hiding them, and what's down
+			// there with them (see `SecretLook['door']`): over the fika there.
+			'secret-cover',
 			// Behind whoever's kicking it, in front of the rocks it rolls past.
 			'football',
 			'boost',
@@ -216,6 +224,9 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createBusBore(world),
 				...createMine(world),
 				...createSecret(world),
+				// A lifeboat to ride, out of a ship's engine rooms, and its wave.
+				...createLifeboatRide(world),
+				...createStairs(world),
 				...createCoaster(world),
 				...createMoleTrails(world),
 				...createRiver(world),
