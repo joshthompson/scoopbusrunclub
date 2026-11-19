@@ -1,6 +1,6 @@
 import type { JSX } from 'solid-js'
 import { ON_COMPUTER } from '../multiplayer/onComputer'
-import { Menu, OUTLINED, Panel } from '../ui/Menu'
+import { Menu, OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 
 /**
  * Multi Player: hosting a Room on this screen, or joining someone else's:
@@ -52,7 +52,7 @@ const styles = {
 	},
 	title: { ...OUTLINED, 'font-size': '40px' },
 	hint: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		'font-size': '18px',
 		'max-width': '520px',
 		'text-align': 'center',

@@ -360,7 +360,7 @@ export interface Furby {
 /**
  * - `waiting`: sat on the path, barking for you to hop on when you're near
  * - `ridden`: galloping along with you on its back
- * - `tired`: had enough, and sat down where you got off
+ * - `tired`: had enough, and sat down where you got off, spent (see `SpentLook`), for good: only a waiting one is ridden
  * - `scooped`: flying out of the scoop
  */
 export type CorgiState = 'waiting' | 'ridden' | 'tired' | 'scooped'

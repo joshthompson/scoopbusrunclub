@@ -15,6 +15,8 @@ import {
 } from './constants'
 import { grabGlider, grabPacerGlider, pacerRider } from './gliders'
 import { SCOOP_HEARD } from './pack'
+import { platformAt } from './platforms'
+import { sagOf } from './ropeBridge'
 import { grabBoard, grabPacerBoard } from './skis'
 import { scored } from './step'
 import type { Racer, World } from './world'
@@ -42,6 +44,29 @@ const GLIDER_BAR_DOWN = 14
 const ADRIFT_SPEED = 6
 const ADRIFT_CLIMB = 1.2
 const ADRIFT_TICKS = 400
+/** A spent Ride stays on a Platform whose top it's no more than this far under: a rope bridge springs back up past its feet. */
+const PERCH_GIVE = 40
+
+/**
+ * What a spent Ride, at `x` with its feet at `feetY`, is on or above, if
+ * it's on a Platform: the top of the highest one that's under it (its rope
+ * bridge sagged where it is), or level with it. A Platform broken, or a
+ * shelf of rock it's inside, doesn't hold it.
+ */
+function perchAt(world: World, x: number, feetY: number) {
+	const ticks = world.ticks()
+	let best: number | undefined
+	world.platforms.forEach((platform, index) => {
+		if (platform.broken) return
+		const at = platformAt(world.terrain, platform, ticks)
+		if (x < at.left || x > at.right) return
+		const top = at.top + sagOf(world.ropeBridges, index, x)
+		if (feetY > top + (platform.solid && !platform.rope ? 1 : PERCH_GIVE))
+			return
+		if (best === undefined || top < best) best = top
+	})
+	return best
+}
 
 export function stepCorgis(world: World) {
 	const { corgis, terrain } = world
@@ -106,19 +131,29 @@ export function stepCorgis(world: World) {
 			}
 			continue
 		}
+		// Got off on a Platform (a rope bridge over a Gap, a terrace): it
+		// stays there, riderless, rather than going down with the ground.
+		const perch = c.state === 'tired' ? perchAt(world, c.x, c.feetY) : undefined
 		// Got off over a Gap: down it, and gone.
-		if (c.state === 'tired' && terrain.inGap(c.x)) {
+		if (c.state === 'tired' && perch === undefined && terrain.inGap(c.x)) {
 			c.state = 'scooped'
 			c.vx = 1
 			c.vy = Math.max(0, c.vy)
 			c.spin = 0
 			continue
 		}
-		const ground = terrain.groundY(c.x)
+		// The highest of what's under it: the Platform, or the Ground, if it's not a Gap.
+		const ground = Math.min(
+			perch ?? Number.POSITIVE_INFINITY,
+			c.state === 'tired' && terrain.inGap(c.x)
+				? Number.POSITIVE_INFINITY
+				: terrain.groundY(c.x),
+		)
 		// Got off in the air: down, onto its feet.
 		if (c.state === 'tired' && c.feetY < ground) {
 			c.vy += GRAVITY
 			c.feetY = Math.min(ground, c.feetY + c.vy)
+			if (c.feetY === ground) c.vy = 0
 		} else c.feetY = ground - (c.state === 'waiting' ? (c.up ?? 0) : 0)
 		// Barking at whoever's nearest. Gliders don't.
 		let dx = Number.POSITIVE_INFINITY

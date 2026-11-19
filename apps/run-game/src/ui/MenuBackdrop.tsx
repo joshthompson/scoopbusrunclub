@@ -20,8 +20,19 @@ import wheel2Asset from '../assets/bus/wheel2.png'
 import wheel3Asset from '../assets/bus/wheel3.png'
 import wheel4Asset from '../assets/bus/wheel4.png'
 import windowAsset from '../assets/bus/windows.png'
+import gooseWingsDownAsset from '../assets/flyers/goose-wings-down.png'
+import gooseWingsUpAsset from '../assets/flyers/goose-wings-up.png'
 import tree1Asset from '../assets/scenery/tree1.png'
 import tree2Asset from '../assets/scenery/tree2.png'
+import {
+	birchLeft,
+	birchRight,
+	birchTall,
+	echoTemple,
+	lilacBush,
+	parkBench,
+	parkLamp,
+} from '../courses/kit/hagaScenery'
 import { VIEW_HEIGHT } from '../game/constants'
 import { customRunners } from '../runners/customRunners'
 import { guests } from '../runners/guests'
@@ -30,9 +41,11 @@ import { RunStrip } from './RunStrip'
 
 /**
  * The menus' scene: Haga scrolling by, the header's scenery bands, houses and
- * trees at their own depths, and a few of the club running along the
- * header's path with the Scoop Bus right behind them. All CSS animation, so
- * it costs nothing to keep running behind the menus.
+ * trees at their own depths, Haga's own birches, lilacs and benches in among
+ * them, Ekotemplet going by now and then and geese flying over, and a few of
+ * the club running along the header's path with the Scoop Bus right behind
+ * them. All CSS animation, so it costs nothing to keep running behind the
+ * menus.
  */
 
 /** Where the middle hills start: the far houses and pines peek over it. */
@@ -86,31 +99,85 @@ function Band(props: {
 /** Room for one loop of a strip: wider than the stage, so it never shows its seam. */
 const STRIP_WIDTH = 1200
 
+/** Something to stand along a strip: where its foot is, and its size if it's code art. */
+type Piece = {
+	asset: string
+	bottom: (random: () => number) => number
+	/** Drawn this size, px: code art's drawn a cell a pixel, so it's given. */
+	width?: number
+	height?: number
+	/** Another stood just to its right, at the same depth: a bench's lamp. */
+	beside?: { asset: string; dx: number; width: number; height: number }
+}
+
+/** One lot of pieces dotted along a strip, from its own random numbers. */
+type Layout = { seed: number; gap: [number, number]; pieces: Piece[] }
+
+type Placed = {
+	asset: string
+	x: number
+	bottom: number
+	width?: number
+	height?: number
+}
+
 /**
  * Things dotted along the scene, scrolling left forever: laid out across one
- * strip's width, drawn twice side by side, and moved one strip's width per loop.
+ * strip's width, drawn twice side by side, and moved one strip's width per
+ * loop. Each layout has its own random numbers, so adding one leaves the
+ * others where they were; all of them are drawn back to front, by their foot.
  */
 function Strip(props: {
 	speed: number
-	seed: number
-	gap: [number, number]
-	pieces: { asset: string; bottom: (random: () => number) => number }[]
+	layouts: Layout[]
+	/** One loop's width, if not `STRIP_WIDTH`: wider, for a landmark to come by less often. */
+	width?: number
+	/** Stood once a loop at `x`, with nothing else within `room` of it. */
+	landmark?: { x: number; room: number; piece: Piece }
 	clipBelow?: number
 }) {
-	const random = seeded(props.seed)
-	const items: { asset: string; x: number; bottom: number }[] = []
-	for (
-		let x = 0;
-		x < STRIP_WIDTH - props.gap[0];
-		x += props.gap[0] + random() * (props.gap[1] - props.gap[0])
-	) {
-		const piece = props.pieces[Math.floor(random() * props.pieces.length)]
+	const width = props.width ?? STRIP_WIDTH
+	let items: Placed[] = []
+	const place = (piece: Piece, x: number, random: () => number) => {
+		const bottom = piece.bottom(random)
 		items.push({
 			asset: piece.asset,
 			x: Math.round(x),
-			bottom: piece.bottom(random),
+			bottom,
+			width: piece.width,
+			height: piece.height,
 		})
+		if (piece.beside)
+			items.push({
+				asset: piece.beside.asset,
+				x: Math.round(x) + piece.beside.dx,
+				bottom,
+				width: piece.beside.width,
+				height: piece.beside.height,
+			})
 	}
+	for (const layout of props.layouts) {
+		const random = seeded(layout.seed)
+		for (
+			let x = 0;
+			x < width - layout.gap[0];
+			x += layout.gap[0] + random() * (layout.gap[1] - layout.gap[0])
+		)
+			place(
+				layout.pieces[Math.floor(random() * layout.pieces.length)],
+				x,
+				random,
+			)
+	}
+	const landmark = props.landmark
+	if (landmark) {
+		items = items.filter(
+			(item) => Math.abs(item.x - landmark.x) > landmark.room,
+		)
+		place(landmark.piece, landmark.x, () => 0)
+	}
+	// Further back first, so what's nearer stands in front of it.
+	items.sort((a, b) => a.bottom - b.bottom)
 	return (
 		<div
 			style={{
@@ -128,13 +195,13 @@ function Strip(props: {
 					position: 'absolute',
 					left: 0,
 					top: 0,
-					width: `${STRIP_WIDTH * 2}px`,
+					width: `${width * 2}px`,
 					height: `${VIEW_HEIGHT}px`,
-					'--strip-width': `${STRIP_WIDTH}px`,
-					animation: `strip-scroll ${STRIP_WIDTH / props.speed}s linear infinite`,
+					'--strip-width': `${width}px`,
+					animation: `strip-scroll ${width / props.speed}s linear infinite`,
 				}}
 			>
-				<For each={[0, STRIP_WIDTH]}>
+				<For each={[0, width]}>
 					{(offset) => (
 						<For each={items}>
 							{(item) => (
@@ -145,6 +212,12 @@ function Strip(props: {
 										position: 'absolute',
 										left: `${item.x + offset}px`,
 										bottom: `${VIEW_HEIGHT - item.bottom}px`,
+										...(item.width === undefined
+											? {}
+											: {
+													width: `${item.width}px`,
+													height: `${item.height}px`,
+												}),
 									}}
 								/>
 							)}
@@ -166,6 +239,83 @@ const standing = (asset: string, ground: number, jitter: number) => ({
 	asset,
 	bottom: (random: () => number) => Math.round(ground - random() * jitter),
 })
+/** Haga's code art, `columns` by `rows` cells, drawn as the course draws it: 2 px a cell. */
+const hagas = (
+	asset: string,
+	columns: number,
+	rows: number,
+	ground: number,
+	jitter: number,
+): Piece => ({
+	...standing(asset, ground, jitter),
+	width: columns * 2,
+	height: rows * 2,
+})
+
+/** Where the trees on the field stand: their feet, and how much further back some are. */
+const FIELD_GROUND = 410
+const FIELD_JITTER = 30
+/**
+ * The field's loop: twice the others', so Ekotemplet comes by about every
+ * 100 s, not every 50.
+ */
+const FIELD_WIDTH = STRIP_WIDTH * 2
+
+/** A skein of geese: each one's place in it, and when its wings beat. */
+const SKEIN = [
+	{ x: 0, y: 0, flap: 0 },
+	{ x: -34, y: -10, flap: -0.15 },
+	{ x: -66, y: -19, flap: -0.3 },
+	{ x: -36, y: 12, flap: -0.22 },
+]
+
+/**
+ * Haga's Canada geese flying over, a skein of four, now and then: across
+ * the sky the way the bus is going, their wings beating, rising and dipping
+ * a little as they go. The course's own flying-goose art, turned round.
+ */
+function Geese() {
+	return (
+		<div
+			class="pixelated"
+			style={{
+				position: 'absolute',
+				left: 0,
+				top: '226px',
+				animation: 'skein-cross 46s -8s linear infinite',
+			}}
+		>
+			<div
+				style={{
+					'--bob': '-8px',
+					animation: 'sky-bob 5s ease-in-out infinite',
+				}}
+			>
+				<For each={SKEIN}>
+					{(goose) => (
+						<div
+							style={{
+								position: 'absolute',
+								left: `${goose.x}px`,
+								top: `${goose.y}px`,
+								width: '36px',
+								height: '28px',
+								'--up': `url(${gooseWingsUpAsset})`,
+								'--down': `url(${gooseWingsDownAsset})`,
+								'background-image': 'var(--up)',
+								'background-size': '36px 28px',
+								'background-repeat': 'no-repeat',
+								// Facing left as drawn: turned round to fly right.
+								transform: 'scaleX(-1)',
+								animation: `goose-flap 0.5s ${goose.flap}s linear infinite`,
+							}}
+						/>
+					)}
+				</For>
+			</div>
+		</div>
+	)
+}
 
 /** How many are out running behind the menus. */
 const PACK_SIZE = 5
@@ -281,6 +431,7 @@ export function MenuBackdrop() {
 					/>
 				)}
 			</For>
+			<Geese />
 			<Band
 				asset={bg3Asset}
 				top={HORIZON - 20}
@@ -290,13 +441,17 @@ export function MenuBackdrop() {
 			/>
 			<Strip
 				speed={9}
-				seed={11}
-				gap={[50, 170]}
 				clipBelow={HORIZON + 30}
-				pieces={[
-					peeking(house1Asset, 60, 20, 28),
-					peeking(house2Asset, 80, 20, 28),
-					peeking(tree2Asset, 110, 30, 50),
+				layouts={[
+					{
+						seed: 11,
+						gap: [50, 170],
+						pieces: [
+							peeking(house1Asset, 60, 20, 28),
+							peeking(house2Asset, 80, 20, 28),
+							peeking(tree2Asset, 110, 30, 50),
+						],
+					},
 				]}
 			/>
 			<Band
@@ -323,16 +478,45 @@ export function MenuBackdrop() {
 					background: 'var(--grass-green)',
 				}}
 			/>
-			{/* Trees and shrubs stood on the field: going by with it, as fast. */}
+			{/*
+			 * Trees and shrubs stood on the field, going by with it, as fast: the
+			 * header's oaks and pines, and Haga's own birches, lilacs and a bench
+			 * with its lamp in among them, and Ekotemplet now and then.
+			 */}
 			<Strip
 				speed={FIELD_SPEED}
-				seed={23}
-				gap={[110, 300]}
-				pieces={[
-					standing(tree1Asset, 410, 30),
-					standing(tree2Asset, 410, 30),
-					standing(shrub1Asset, 430, 6),
+				width={FIELD_WIDTH}
+				layouts={[
+					{
+						seed: 23,
+						gap: [110, 300],
+						pieces: [
+							standing(tree1Asset, FIELD_GROUND, FIELD_JITTER),
+							standing(tree2Asset, FIELD_GROUND, FIELD_JITTER),
+							standing(shrub1Asset, 430, 6),
+						],
+					},
+					{
+						seed: 1880,
+						gap: [150, 360],
+						pieces: [
+							hagas(birchLeft, 26, 60, FIELD_GROUND + 6, FIELD_JITTER),
+							hagas(birchRight, 26, 60, FIELD_GROUND + 6, FIELD_JITTER),
+							hagas(birchTall, 26, 60, FIELD_GROUND + 6, FIELD_JITTER),
+							hagas(lilacBush, 26, 18, FIELD_GROUND + 14, FIELD_JITTER),
+							hagas(lilacBush, 26, 18, FIELD_GROUND + 14, FIELD_JITTER),
+							{
+								...hagas(parkBench, 18, 10, FIELD_GROUND + 12, 10),
+								beside: { asset: parkLamp, dx: 42, width: 14, height: 72 },
+							},
+						],
+					},
 				]}
+				landmark={{
+					x: 760,
+					room: 150,
+					piece: hagas(echoTemple, 64, 50, FIELD_GROUND - 18, 0),
+				}}
 			/>
 			<Band
 				asset={pathAsset}
@@ -343,11 +527,15 @@ export function MenuBackdrop() {
 			/>
 			<Strip
 				speed={90}
-				seed={5}
-				gap={[60, 200]}
-				pieces={[
-					standing(flower1Asset, PATH_TOP + 8, 3),
-					standing(flower2Asset, PATH_TOP + 8, 3),
+				layouts={[
+					{
+						seed: 5,
+						gap: [60, 200],
+						pieces: [
+							standing(flower1Asset, PATH_TOP + 8, 3),
+							standing(flower2Asset, PATH_TOP + 8, 3),
+						],
+					},
 				]}
 			/>
 			<Bus style={{ left: '40px', top: `${PATH_TOP + 46 - 143}px` }} />

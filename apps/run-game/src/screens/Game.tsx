@@ -31,7 +31,13 @@ import {
 	submitScore,
 	wouldPlace,
 } from '../online/runScores'
-import { BONNIE_BOTTLE, DERI, DET_MUNCH, unlockable } from '../runners/bonus'
+import {
+	BONNIE_BOTTLE,
+	BUSHY,
+	DERI,
+	DET_MUNCH,
+	unlockable,
+} from '../runners/bonus'
 import type { Playable } from '../runners/playable'
 import { hasCollected } from '../saved/collected'
 import { courseFinished, markFinished } from '../saved/finished'
@@ -314,6 +320,13 @@ export function Game(props: {
 					unlockRunner(DERI.id)
 				)
 					placing.newRunners.push(DERI)
+				// Haga finished as Deri: Bushy's theirs.
+				if (
+					props.course.id === 'haga' &&
+					props.runner.id === DERI.id &&
+					unlockRunner(BUSHY.id)
+				)
+					placing.newRunners.push(BUSHY)
 			}
 			if (world.courseScore() > 0)
 				placing.coursePlace = record(props.course.id, {

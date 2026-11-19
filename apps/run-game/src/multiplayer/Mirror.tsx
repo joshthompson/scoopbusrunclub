@@ -1,4 +1,4 @@
-import type { JSX } from 'solid-js'
+import { type JSX, createSignal } from 'solid-js'
 import { COURSES } from '../courses'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
@@ -35,6 +35,7 @@ import {
 	type RaceFrame,
 	type RaceStart,
 	type RacerIntro,
+	type ShownReaction,
 	fromSkiState,
 } from './protocol'
 import { CART_STATES, CORGI_STATES, FLYER_STATES, FURBY_STATES } from './stream'
@@ -136,6 +137,8 @@ export default function Mirror(props: {
 		})),
 		{ round: true, baby: start.baby },
 	)
+	/** Reactions on their way up the screen, as the Host last sent them. */
+	const [reactions, setReactions] = createSignal<ShownReaction[]>([])
 	// Not this phone's own pack: the Host's.
 	const intros = new Map(start.pack.map((p) => [p.id, p]))
 	const pacers = new Map<number, Pacer>()
@@ -391,6 +394,11 @@ export default function Mirror(props: {
 		)
 			world.setPopups(a.popups)
 
+		const sent = a.reactions ?? []
+		const was = reactions()
+		if (sent.length !== was.length || sent.some((r, i) => r.id !== was[i].id))
+			setReactions(sent)
+
 		if (a.order && !world.order())
 			world.setOrder(
 				a.order.flatMap((id) => world.racers.filter((r) => r.id === id)),
@@ -417,6 +425,7 @@ export default function Mirror(props: {
 						<RoundHud
 							world={world}
 							number={start.round}
+							reactions={reactions()}
 							// Small on a phone: everything on it bigger.
 							textScale={props.textScale ?? Math.min(2.2, 0.9 / scale())}
 						/>

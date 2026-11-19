@@ -281,63 +281,165 @@ function gatehouse(x0: number, chimneyRight: boolean): PixelRect[] {
 	return rects
 }
 
+/** `rects` drawn `k` times the size, each still on whole cells. */
+function enlarged(rects: PixelRect[], k: number): PixelRect[] {
+	return rects.map(([x, y, w, h, c]) => {
+		const x0 = Math.round(x * k)
+		const y0 = Math.round(y * k)
+		return [
+			x0,
+			y0,
+			Math.round((x + w) * k) - x0,
+			Math.round((y + h) * k) - y0,
+			c,
+		]
+	})
+}
+
 /**
- * Haga's gate, the way in off the road near the start: two brick-red
- * gatehouses, and between them white wrought-iron gates, swung open, under
- * an arch of scrollwork with a gold crown and Gustav III's monogram. 104 by
- * 52.
+ * One of Haga's gatehouses, either side of the way in: brick-red, a
+ * pediment, a shuttered arched window, under a slate roof. Drawn half as
+ * big again as `gatehouse`, to stand by a gate the bus fits through. 45
+ * by 51.
  */
-export const hagaGate = (() => {
-	const W = 104
-	const H = 52
-	const rects: PixelRect[] = [
-		...gatehouse(0, true).map(
-			([x, y, w, h, c]): PixelRect => [x, y + 18, w, h, c],
+export const gatehouseLeft = pixelArt(
+	45,
+	51,
+	enlarged(gatehouse(0, false), 1.5),
+)
+export const gatehouseRight = pixelArt(
+	45,
+	51,
+	enlarged(gatehouse(0, true), 1.5),
+)
+
+/**
+ * How Haga's gateway goes back across the path, in cells: its far post this
+ * far along from its near one, and this far up, as everything going back
+ * across the path is (`DEPTH_SLANT` px along for `PATH_BACK + PATH_FRONT`
+ * up).
+ */
+const GATE_SLANT = 28
+const GATE_DEPTH = 18
+/** Its posts: how tall, to where the arch springs, and how thick. Tall enough for the bus. */
+const POST_HEIGHT = 80
+const POST = 4
+/** How much higher the arch is in its middle than where it springs from the posts. */
+const ARCH_RISE = 8
+/** A gate leaf, swung open along the path's edge: how long and how tall. */
+const LEAF_LENGTH = 16
+const LEAF_HEIGHT = 20
+
+/** A white wrought-iron post, on a stone plinth, a gold ball on top: its foot at `bottom`. */
+function gatePost(bottom: number): PixelRect[] {
+	const top = bottom - POST_HEIGHT
+	return [
+		[1, top, POST, POST_HEIGHT, IRONWORK],
+		[1 + POST - 1, top, 1, POST_HEIGHT, IRONWORK_SHADE],
+		// Rings round it, every so often.
+		...[0.25, 0.5, 0.75].map(
+			(t): PixelRect => [
+				0,
+				Math.round(top + POST_HEIGHT * t),
+				POST + 2,
+				1,
+				IRONWORK_SHADE,
+			],
 		),
-		...gatehouse(74, false).map(
-			([x, y, w, h, c]): PixelRect => [x, y + 18, w, h, c],
-		),
+		// Its plinth.
+		[0, bottom - 10, POST + 2, 10, STONE],
+		[0, bottom - 10, POST + 2, 1, '#d2cec4'],
+		[POST + 1, bottom - 9, 1, 9, '#9a9588'],
+		// Its gold ball.
+		[2, top - 3, 2, 1, GOLD],
+		[1, top - 2, 4, 2, GOLD],
+		[3, top - 2, 2, 2, GOLD_DARK],
 	]
-	// The posts holding the arch.
-	rects.push([36, 14, 2, 38, IRONWORK], [66, 14, 2, 38, IRONWORK])
-	// The arch: two curves of scrollwork.
-	for (let x = 36; x <= 67; x++) {
-		const t = (x - 51.5) / 15.5
-		const y = Math.round(14 - 6 * Math.sqrt(Math.max(0, 1 - t * t)))
-		rects.push([x, y, 1, 1, IRONWORK], [x, y + 3, 1, 1, IRONWORK])
-		if (x % 3 === 0) rects.push([x, y + 1, 1, 2, IRONWORK_SHADE])
+}
+
+/** A gate leaf, swung open flat along the path's edge from a post at `x`, foot at `bottom`. */
+function gateLeaf(x: number, bottom: number): PixelRect[] {
+	const top = bottom - LEAF_HEIGHT
+	const rects: PixelRect[] = [
+		[x, top, LEAF_LENGTH, 1, IRONWORK],
+		[x, top + 5, LEAF_LENGTH, 1, IRONWORK_SHADE],
+		[x, bottom - 2, LEAF_LENGTH, 1, IRONWORK],
+		[x + LEAF_LENGTH - 1, top, 1, LEAF_HEIGHT - 1, IRONWORK],
+	]
+	for (let bx = x; bx < x + LEAF_LENGTH; bx += 2) {
+		rects.push([bx, top + 1, 1, LEAF_HEIGHT - 3, IRONWORK])
+		// Spear points along its top.
+		rects.push([bx, top - 1, 1, 1, IRONWORK_SHADE])
 	}
-	// The crown, and the monogram's medallion under it.
-	rects.push(
-		[48, 0, 8, 1, GOLD],
-		[48, 1, 1, 2, GOLD],
-		[51, 1, 2, 2, GOLD],
-		[55, 1, 1, 2, GOLD],
-		[48, 3, 8, 2, GOLD],
-		[48, 4, 8, 1, GOLD_DARK],
-		[49, 6, 6, 1, GOLD],
-		[48, 7, 8, 4, GOLD],
-		[49, 11, 6, 1, GOLD],
-		[50, 8, 4, 2, '#2c3c56'],
-	)
-	// The gates, swung open, each side: bars, a rail, scrolls along the top.
-	for (const [from, to] of [
-		[30, 36],
-		[68, 74],
-	]) {
-		rects.push(
-			[from, 28, to - from, 1, IRONWORK],
-			[from, 40, to - from, 1, IRONWORK],
+	return rects
+}
+
+/**
+ * Haga's gate, the way in off the road near the start, going back across
+ * the path, the bus and all through it: in two pictures, as a gateway is.
+ * `front`, over whoever's going through: its near post, its gate leaf
+ * swung open along the path's near edge, and the arch of white scrollwork
+ * going back from it over the path to the far post, the gold crown and
+ * Gustav III's monogram at its top. `back`, behind the path: the far post,
+ * its gate leaf swung open along the path's back edge, and a barrel of
+ * flowers. Each post's middle `POST_X` cells in from its picture's left.
+ */
+export const HAGA_GATE = (() => {
+	const fw = GATE_SLANT + POST + 2
+	const fh = POST_HEIGHT + GATE_DEPTH / 2 + ARCH_RISE + 24
+	const middle = 3
+	const front: PixelRect[] = [...gatePost(fh), ...gateLeaf(POST + 1, fh)]
+	// The arch: two curves of scrollwork going back across the path,
+	// rising as they go over it, with curls between them.
+	const steps = GATE_SLANT * 3
+	for (let i = 0; i <= steps; i++) {
+		const t = i / steps
+		const x = Math.round(middle + t * GATE_SLANT)
+		const y = Math.round(
+			fh - POST_HEIGHT - t * GATE_DEPTH - ARCH_RISE * Math.sin(Math.PI * t),
 		)
-		for (let x = from; x < to; x += 2) rects.push([x, 28, 1, 24, IRONWORK])
-		rects.push([from, 30, to - from, 1, IRONWORK_SHADE])
+		front.push([x - 1, y - 1, 2, 2, IRONWORK], [x - 1, y - 6, 2, 2, IRONWORK])
+		if (i % 6 === 0) front.push([x - 1, y - 4, 2, 3, IRONWORK_SHADE])
+		else if (i % 6 === 3) front.push([x, y - 3, 1, 1, IRONWORK_SHADE])
 	}
-	// A barrel of flowers by the gate.
-	rects.push([60, 46, 5, 6, '#7a5a3a'], [60, 48, 5, 1, '#4e3a26'])
-	rects.push(
-		[59, 42, 7, 4, LEAF_DARK],
-		[60, 41, 2, 2, LEAF],
-		[62, 42, 2, 1, '#f3f0f5'],
+	// The crown, and the monogram's medallion under it, at the arch's top.
+	const cx = middle + GATE_SLANT / 2
+	const cy = Math.round(fh - POST_HEIGHT - GATE_DEPTH / 2 - ARCH_RISE) - 7
+	const crown: PixelRect[] = [
+		[0, 0, 8, 1, GOLD],
+		[0, 1, 1, 2, GOLD],
+		[3, 1, 2, 2, GOLD],
+		[7, 1, 1, 2, GOLD],
+		[0, 3, 8, 2, GOLD],
+		[0, 4, 8, 1, GOLD_DARK],
+		[1, 6, 6, 1, GOLD],
+		[0, 7, 8, 4, GOLD],
+		[1, 11, 6, 1, GOLD],
+		[2, 8, 4, 2, '#2c3c56'],
+	]
+	for (const [x, y, w, h, c] of crown)
+		front.push([x + cx - 4, y + cy - 11, w, h, c])
+
+	const bw = POST + 2 + LEAF_LENGTH + 8
+	const bh = POST_HEIGHT + 3
+	const back: PixelRect[] = [...gatePost(bh), ...gateLeaf(POST + 1, bh)]
+	// A barrel of flowers, inside the gate.
+	const bx = POST + 2 + LEAF_LENGTH + 1
+	back.push([bx, bh - 6, 5, 6, '#7a5a3a'], [bx, bh - 4, 5, 1, '#4e3a26'])
+	back.push(
+		[bx - 1, bh - 10, 7, 4, LEAF_DARK],
+		[bx, bh - 11, 2, 2, LEAF],
+		[bx + 2, bh - 10, 2, 1, '#f3f0f5'],
+		[bx + 4, bh - 11, 1, 1, LILAC],
 	)
-	return pixelArt(W, H, rects)
+	return {
+		front: pixelArt(fw, fh, front),
+		back: pixelArt(bw, bh, back),
+		frontWidth: fw * 2,
+		backWidth: bw * 2,
+		/** How far in from each picture's left its post's middle is, in px. */
+		post: middle * 2,
+		/** How far along the far post is from the near one, in px. */
+		across: GATE_SLANT * 2,
+	}
 })()

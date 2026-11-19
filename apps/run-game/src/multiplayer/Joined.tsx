@@ -19,7 +19,7 @@ import type { Playable } from '../runners/playable'
 import { lastRunner } from '../saved/settings'
 import { PauseMenu, SOUND_ITEMS } from '../screens/PauseMenu'
 import { play } from '../sfx'
-import { OUTLINED, Panel } from '../ui/Menu'
+import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { MenuBackdrop } from '../ui/MenuBackdrop'
 import { Stage } from '../ui/Stage'
 import { CoursePick } from './CoursePick'
@@ -36,7 +36,15 @@ import {
 	lastMode,
 	rememberMode,
 } from './guest'
-import { CODE_LENGTH, type PadMode, type PadView, cleanCode } from './protocol'
+import {
+	CODE_LENGTH,
+	type PadMode,
+	type PadView,
+	REACTIONS,
+	type Reaction,
+	cleanCode,
+} from './protocol'
+import { LiveReactionsLayer, ReactionBar } from './reactions'
 import type { Seat } from './room'
 import { roomModeInfo } from './roomModes'
 import { statusText } from './status'
@@ -174,7 +182,7 @@ function InRoom(props: {
 		screen: true,
 		held: () => (menu() ? NOTHING_HELD : anyControls()),
 	})
-	const { view, gone, reconnecting, start, feed, send } = link
+	const { view, gone, ended, reconnecting, start, feed, send } = link
 	const joining = () => joiningMessage(props.code, link)
 	const tryAgain = () => {
 		play('select')
@@ -197,7 +205,14 @@ function InRoom(props: {
 	const stage = () => view()?.stage
 	/** The Round, shown here: on now, raced on this screen, and caught up with. */
 	const racingHere = () =>
-		!gone() && stage() === 'round' && mode() === 'remote' && start()
+		!gone() && !ended() && stage() === 'round' && mode() === 'remote' && start()
+
+	/**
+	 * Watching the Round and not in it: joined while it was on, or out of it
+	 * while others race on. Reactions to send up the big screen.
+	 */
+	const spectating = () => !!view()?.canReact
+	const react = (reaction: Reaction) => send({ type: 'react', reaction })
 
 	const switchMode = (next: PadMode) => {
 		if (next === mode()) return
@@ -279,7 +294,7 @@ function InRoom(props: {
 	const onKey = (event: KeyboardEvent) => {
 		if (event.repeat) return
 		const v = view()
-		if (!v || gone() || v.full) {
+		if (!v || gone() || ended() || v.full) {
 			if (event.key === 'Escape') leave()
 			// Not joined: Enter tries again (a button that's focused says itself).
 			const onButton = document.activeElement instanceof HTMLButtonElement
@@ -287,6 +302,9 @@ function InRoom(props: {
 				tryAgain()
 			return
 		}
+		// 1 to 4: a reaction, watching the Round, or between Rounds.
+		const reaction = REACTIONS[Number(event.key) - 1]
+		if (reaction && spectating()) react(reaction)
 		if (v.stage === 'round') {
 			const key = event.key
 			if (racingHere() && (key === 'Escape' || key === 'p' || key === 'P'))
@@ -364,6 +382,11 @@ function InRoom(props: {
 								Watching: you’re in from the next Round
 							</div>
 						</Show>
+						<Show when={spectating() && !menu()}>
+							<div style={styles.reactionsOver}>
+								<ReactionBar onReact={react} />
+							</div>
+						</Show>
 						<Show when={!menu() && view()?.waitingForStarter}>
 							{(number) => (
 								<div style={styles.starting}>
@@ -406,6 +429,20 @@ function InRoom(props: {
 						<Reconnecting onLeave={leave} />
 					</Show>
 					<Switch>
+						<Match when={ended()}>
+							<Message title="The Room's ended" text="Thanks for playing!">
+								<button
+									type="button"
+									style={{ ...styles.button, ...styles.on }}
+									onClick={props.onAnother}
+								>
+									Join another
+								</button>
+								<button type="button" style={styles.button} onClick={leave}>
+									← Menu
+								</button>
+							</Message>
+						</Match>
 						<Match when={gone()}>
 							<Message
 								title="Lost the big screen"
@@ -490,6 +527,14 @@ function InRoom(props: {
 													: 'Watch the race on the big screen'
 									}
 								>
+									<Show when={spectating()}>
+										<div style={styles.reactions}>
+											<ReactionBar
+												title="Cheer them on: or press 1 to 4"
+												onReact={react}
+											/>
+										</div>
+									</Show>
 									<Show when={mode() === 'controller'}>
 										<div style={styles.hint}>{KEYS_HINT}</div>
 										<button
@@ -604,6 +649,15 @@ function InRoom(props: {
 							}}
 						</Match>
 					</Switch>
+					{/* Between Rounds: everyone's reactions, and theirs to send. */}
+					<Show when={stage() === 'results' || stage() === 'choosing'}>
+						<LiveReactionsLayer reactions={room()?.reactions ?? []} />
+						<Show when={spectating()}>
+							<div style={styles.reactionsOver}>
+								<ReactionBar onReact={react} />
+							</div>
+						</Show>
+					</Show>
 				</Stage>
 			</Match>
 		</Switch>
@@ -690,7 +744,7 @@ const styles = {
 		'text-align': 'center',
 	},
 	title: { ...OUTLINED, 'font-size': '40px' },
-	hint: { ...OUTLINED, 'font-size': '18px', 'max-width': '560px' },
+	hint: { ...OUTLINED_FLAT, 'font-size': '18px', 'max-width': '560px' },
 	codePanel: {
 		width: '380px',
 		'align-items': 'center',
@@ -772,6 +826,18 @@ const styles = {
 		opacity: 0.8,
 		'line-height': 1.5,
 	},
+	/** Watching, over the race: the reaction buttons, in the bottom right. */
+	reactionsOver: {
+		position: 'absolute',
+		right: '16px',
+		bottom: '60px',
+		width: '240px',
+		'pointer-events': 'auto',
+		// Over the Standings, and the reactions going up.
+		'z-index': 5,
+	},
+	/** Watching, with the race on the big screen: the reaction buttons. */
+	reactions: { width: '320px', margin: '8px 0' },
 	banner: {
 		position: 'absolute',
 		bottom: '16px',

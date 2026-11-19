@@ -10,7 +10,7 @@ import { COURSES } from '../courses'
 import type { Controls } from '../input'
 import { play } from '../sfx'
 import { CoursePreview } from '../ui/CoursePreview'
-import { OUTLINED, Panel } from '../ui/Menu'
+import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { onHover } from '../ui/hover'
 import type { Choosing } from './protocol'
 
@@ -232,5 +232,5 @@ const styles = {
 	cardRecent: { opacity: 0.6 },
 	cardName: { 'font-size': '15px', 'line-height': 1.1 },
 	cardNote: { 'font-size': '11px' },
-	hint: { ...OUTLINED, 'font-size': '16px' },
+	hint: { ...OUTLINED_FLAT, 'font-size': '16px' },
 } satisfies Record<string, JSX.CSSProperties>

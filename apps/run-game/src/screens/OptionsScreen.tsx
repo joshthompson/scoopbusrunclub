@@ -1,10 +1,14 @@
 import { type JSX, Match, Show, Switch, createSignal } from 'solid-js'
+import { menuTunePicked, tryTune, untryTune } from '../music/music'
+import { PLAYLIST, RANDOM_TUNE, tuneName } from '../music/playlist'
 import { identity } from '../saved/identity'
 import {
 	clearLocalData,
 	effectsOn,
+	menuTune,
 	musicOn,
 	setEffectsOn,
+	setMenuTune,
 	setMusicOn,
 } from '../saved/settings'
 import { play } from '../sfx'
@@ -15,10 +19,16 @@ export function OptionsScreen(props: { onBack: () => void }) {
 	const [confirming, setConfirming] = createSignal(false)
 	const [naming, setNaming] = createSignal(false)
 	const [cleared, setCleared] = createSignal(false)
+	const [tuning, setTuning] = createSignal(false)
+	/** Where they were in the menu, for coming back to it from the tunes or a name. */
+	const [at, setAt] = createSignal(0)
 
 	return (
 		<div style={styles.screen}>
 			<Switch>
+				<Match when={tuning()}>
+					<MenuMusic onDone={() => setTuning(false)} />
+				</Match>
 				<Match when={naming()}>
 					<IdentityEditor
 						onSave={() => setNaming(false)}
@@ -28,6 +38,8 @@ export function OptionsScreen(props: { onBack: () => void }) {
 				<Match when={!confirming()}>
 					<Panel title="Options" style={{ width: '440px' }}>
 						<Menu
+							initial={at()}
+							onChange={setAt}
 							items={[
 								{
 									label: 'Sound effects',
@@ -42,6 +54,11 @@ export function OptionsScreen(props: { onBack: () => void }) {
 									label: 'Music',
 									value: musicOn() ? 'On' : 'Off',
 									choose: () => setMusicOn(!musicOn()),
+								},
+								{
+									label: 'Menu music',
+									value: tuneName(menuTune() ?? 'menu'),
+									choose: () => setTuning(true),
 								},
 								{
 									label: 'High score name',
@@ -89,7 +106,59 @@ export function OptionsScreen(props: { onBack: () => void }) {
 	)
 }
 
+/**
+ * Picking the menus' music: Random, or any tune in the game, each with
+ * where it's from. Each is tried out as it's moved on to; going back puts
+ * on what was on before.
+ */
+function MenuMusic(props: { onDone: () => void }) {
+	const options = [
+		{ id: RANDOM_TUNE, name: 'Random', from: 'A new one each time' },
+		...PLAYLIST,
+	]
+	const current = options.findIndex((t) => t.id === (menuTune() ?? 'menu'))
+	let list: HTMLDivElement | undefined
+	const back = () => {
+		untryTune()
+		props.onDone()
+	}
+	return (
+		<Panel title="Menu music" style={{ width: '860px' }}>
+			<div ref={list} style={styles.tunes}>
+				<Menu
+					initial={Math.max(0, current)}
+					onChange={(i) => {
+						// Kept in sight, and heard (Random's, whatever's on).
+						list
+							?.querySelectorAll('button')
+							[i]?.scrollIntoView({ block: 'nearest' })
+						const tune = options[i]
+						if (tune && tune.id !== RANDOM_TUNE) tryTune(tune.id)
+					}}
+					items={options.map((tune) => ({
+						label: tune.name,
+						value: tune.from,
+						choose: () => {
+							setMenuTune(tune.id)
+							menuTunePicked()
+							props.onDone()
+						},
+					}))}
+					onBack={back}
+				/>
+			</div>
+			<Menu items={[{ label: 'Back', choose: back }]} active={false} />
+		</Panel>
+	)
+}
+
 const styles = {
+	/** Every tune: more than fit, so scrolled, the one picked kept in sight. */
+	tunes: {
+		'max-height': '330px',
+		'overflow-y': 'auto',
+		'scrollbar-width': 'thin',
+	},
 	screen: {
 		position: 'absolute',
 		inset: 0,

@@ -27,7 +27,7 @@ import {
 	randomAvatar,
 } from '../runners/looks'
 import { play } from '../sfx'
-import { Menu, OUTLINED, Panel } from '../ui/Menu'
+import { Menu, OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { RunnerStage, nameSize } from '../ui/RunnerStage'
 import { onHover } from '../ui/hover'
@@ -709,7 +709,7 @@ const styles = {
 		'box-shadow': '2px 2px 0 #b33a2a',
 	},
 	hint: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		position: 'absolute',
 		left: 0,
 		right: 0,

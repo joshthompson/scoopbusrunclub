@@ -270,6 +270,7 @@ import { paintHazardStripes } from './paint/hazardStripes'
 import { FONT_PIXEL, FONT_SIGN, fillLine, wrapLines } from './paint/lettering'
 import { mirrored, paintPicture } from './paint/picture'
 import { paintPixelArt } from './paint/pixelArt'
+import { paintPanting, paintSpent } from './paint/spent'
 import { svgPainter } from './paint/svgPainter'
 import {
 	STEAM_VENT_HEIGHT,
@@ -1659,6 +1660,10 @@ function createCorgi(world: World, c: Corgi) {
 	const [trickFrame, setTrickFrame] = createSignal<string>()
 	/** When it left the ground under them, if it's off it. */
 	let leftAt: number | undefined
+	/** Worn out and left sat on the track, not still coming down off its rider. */
+	const [spent, setSpent] = createSignal(false)
+	/** Where its feet were last tick: dropping to the ground, it's not yet spent. */
+	let was = c.feetY
 	return createController({
 		init: () => ({
 			id: `corgi-${c.id}`,
@@ -1672,19 +1677,38 @@ function createCorgi(world: World, c: Corgi) {
 			...createObjectSignal(0, 'rotation'),
 		}),
 		// Barking, in a bubble over it.
-		drawReach: bubbleReach(CORGI_WIDTH, 16, call.length),
+		// Panting, when it's spent: puffs off its face, past its front.
+		drawReach: (() => {
+			const said = bubbleReach(CORGI_WIDTH, 16, call.length)
+			return { ...said, right: Math.max(said.right, 16) }
+		})(),
 		draw({ ctx, image }) {
 			const look = (rare() && rarer) || ride
-			paintPicture(
-				ctx,
-				image,
-				trickFrame() ?? look.picture(pose()),
-				0,
-				0,
-				CORGI_WIDTH,
-				CORGI_HEIGHT,
-				look.shadow,
-			)
+			const spentLook = spent() ? ride.spent : undefined
+			if (spentLook)
+				paintSpent(
+					ctx,
+					image,
+					look.picture('sit'),
+					0,
+					0,
+					CORGI_WIDTH,
+					CORGI_HEIGHT,
+					spentLook,
+					look.shadow,
+				)
+			else
+				paintPicture(
+					ctx,
+					image,
+					trickFrame() ?? look.picture(pose()),
+					0,
+					0,
+					CORGI_WIDTH,
+					CORGI_HEIGHT,
+					look.shadow,
+				)
+			if (spentLook) paintPanting(ctx, spentLook, world.ticks())
 			if (barking())
 				paintBubble(ctx, call, {
 					width: CORGI_WIDTH,
@@ -1702,7 +1726,12 @@ function createCorgi(world: World, c: Corgi) {
 			/** Up off the ground: leaping, with someone on its back, or coming down after. */
 			const floor =
 				world.terrain.groundY(c.x) - (c.state === 'waiting' ? (c.up ?? 0) : 0)
-			const airborne = c.feetY < floor - 2
+			const dropping = c.feetY - was > 2
+			was = c.feetY
+			// Spent once it's down: on the ground or a Platform, it doesn't look
+			// up off it (a bridge sags under it, so go by it moving, not where).
+			setSpent(c.state === 'tired' && !dropping)
+			const airborne = c.state === 'tired' ? dropping : c.feetY < floor - 2
 			// Jumped on, ridden: its trick, from leaving the ground, the last
 			// frame held till it's down.
 			const { trick } = ride

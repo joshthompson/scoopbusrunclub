@@ -421,3 +421,26 @@ button {
 .pad-name::placeholder {
 	color: rgba(15, 31, 41, 0.3);
 }
+
+/* The menus' geese (ui/MenuBackdrop.tsx): across, then gone a while. */
+@keyframes skein-cross {
+	from {
+		transform: translateX(-120px);
+	}
+	40%,
+	to {
+		transform: translateX(1080px);
+	}
+}
+
+/* Wings up, then down: each frame's image in `--up` and `--down`. */
+@keyframes goose-flap {
+	0%,
+	49.9% {
+		background-image: var(--up);
+	}
+	50%,
+	to {
+		background-image: var(--down);
+	}
+}

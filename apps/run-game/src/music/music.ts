@@ -1,7 +1,8 @@
 import { createEffect, createRoot, createSignal } from 'solid-js'
 import { audioContext, wake } from '../audio'
 import type { Course } from '../courses/types'
-import { musicOn } from '../saved/settings'
+import { menuTune, musicOn } from '../saved/settings'
+import { RANDOM_TUNE, randomTune } from './playlist'
 import { type Parsed, isDrum, parse, playVoice } from './synth'
 import {
 	BEAT,
@@ -78,18 +79,57 @@ export function unlockMusic() {
 
 /** Whether a course's tune has been on yet: till then, the menus have their own. */
 let courseHeard = false
+/**
+ * The tune the menus put on, while it's still on: so going from one menu
+ * to another doesn't change it, Random's included.
+ */
+let menuOn: string | undefined
 
 /**
- * The menus' tune, when the game's just opened. Once a course has been run,
- * the menus keep whatever tune was last on.
+ * The menus' tune: the one picked in Options (see `menuTune`), or a new one
+ * at random each time they're come back to. Not picked, the theme when the
+ * game's just opened, and once a course has been run, whatever was last on.
  */
 export function playMenu() {
-	if (!courseHeard) playTune('menu')
+	const picked = menuTune()
+	if (picked === undefined) {
+		if (!courseHeard) playTune('menu')
+		return
+	}
+	if (picked === RANDOM_TUNE && menuOn !== undefined) return
+	const id = picked === RANDOM_TUNE ? randomTune(wanted) : picked
+	playTune(id)
+	menuOn = id
+}
+
+/** What was on before a tune was tried out in Options, to go back to (see `tryTune`). */
+let beforeTrying: { wanted: string; menuOn?: string } | undefined
+
+/** Trying a tune out, picking the menus' music: `untryTune` puts back what was on. */
+export function tryTune(id: string) {
+	beforeTrying ??= { wanted, menuOn }
+	playTune(id)
+}
+
+/** Done trying tunes out: back to what was on before. */
+export function untryTune() {
+	if (!beforeTrying) return
+	playTune(beforeTrying.wanted)
+	menuOn = beforeTrying.menuOn
+	beforeTrying = undefined
+}
+
+/** A tune picked for the menus in Options: on now, and Random a new one. */
+export function menuTunePicked() {
+	beforeTrying = undefined
+	menuOn = undefined
+	playMenu()
 }
 
 /** The tune to play, `menu` or a course's id: faded into on the next bar. */
 export function playTune(id: string) {
 	if (id !== 'menu') courseHeard = true
+	menuOn = undefined
 	wanted = id
 	if (!playing) return
 	const current = playing.layers.find((layer) => layer.until === undefined)

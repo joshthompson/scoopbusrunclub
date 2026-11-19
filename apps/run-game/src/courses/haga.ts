@@ -6,17 +6,19 @@ import type { RunnerName } from '@/data/runners'
 import copperTents from '../assets/scenery/copper-tents.png'
 import tree1 from '../assets/scenery/tree1.png'
 import tree2 from '../assets/scenery/tree2.png'
-import { PX_PER_M, START_X } from '../game/constants'
+import { PATH_BACK, PATH_FRONT, PX_PER_M, START_X } from '../game/constants'
 import { FIKA_ITEMS } from '../game/fika'
 import { createTerrain } from '../game/terrain'
 import { HAGA_GRASS, HAGA_TRAIL, texturedGround } from './kit/groundTextures'
 import { STEP_M, heights } from './kit/haga-profile'
 import {
+	HAGA_GATE,
 	birchLeft,
 	birchRight,
 	birchTall,
 	echoTemple,
-	hagaGate,
+	gatehouseLeft,
+	gatehouseRight,
 	lilacBush,
 	parkBench,
 	parkLamp,
@@ -84,8 +86,8 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	}
 	// Haga's gate, just off the start, clear of what's around it.
 	for (let i = scenery.length - 1; i >= 0; i--)
-		if (Math.abs(scenery[i].x - GATE_X) < GATE_ROOM) scenery.splice(i, 1)
-	scenery.push({ x: GATE_X, asset: hagaGate, scale: 3 })
+		if (Math.abs(scenery[i].x - GATE_MIDDLE) < GATE_ROOM) scenery.splice(i, 1)
+	scenery.push(...hagaGate())
 	// Ekotemplet, the Echo Temple, with nothing stood in front of it.
 	for (let i = scenery.length - 1; i >= 0; i--)
 		if (Math.abs(scenery[i].x - TEMPLE_X) < TEMPLE_ROOM) scenery.splice(i, 1)
@@ -101,10 +103,54 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	return { obstacles, boosts, scenery }
 }
 
-/** Where Haga's gate stands: just past the start. */
+/** Where Haga's gate stands, its near post: just past the start. */
 const GATE_X = START_X + 380
-/** Half the gate's width, and a little more. */
-const GATE_ROOM = 156 + 30
+/** The middle of it all, gatehouses and all, and half its width and a little more. */
+const GATE_MIDDLE = GATE_X + 32
+const GATE_ROOM = 134 + 30
+
+/**
+ * Haga's gate, going back across the path, as a gateway does: its far
+ * post and gatehouse behind the path, and its near post and the arch over
+ * the path in front of whoever's going through, the bus and all. Its near
+ * gatehouse stands down in the grass in front of the path, out to the
+ * left, and its far one up behind it, inside the park.
+ */
+function hagaGate(): Course['scenery'] {
+	const gate = HAGA_GATE
+	const far = GATE_X + gate.across
+	/** A gatehouse's width, and how far back the far one stands, and forward the near one. */
+	const house = 90
+	const back = 10
+	const forward = 18
+	return [
+		{ x: far + 20 + house / 2, asset: gatehouseRight, scale: 2, setBack: back },
+		{
+			x: far - gate.post + gate.backWidth / 2,
+			asset: gate.back,
+			scale: 2,
+			setBack: 0,
+			onFloor: true,
+			upright: true,
+		},
+		{
+			x: GATE_X - gate.post + gate.frontWidth / 2,
+			asset: gate.front,
+			scale: 2,
+			setBack: -(PATH_BACK + PATH_FRONT),
+			front: true,
+			onFloor: true,
+			upright: true,
+		},
+		{
+			x: GATE_X - 12 - house / 2,
+			asset: gatehouseLeft,
+			scale: 2,
+			setBack: -(PATH_BACK + PATH_FRONT + forward),
+			front: true,
+		},
+	]
+}
 
 /** Where Ekotemplet stands: on the flat, a little under 4 km in. */
 const TEMPLE_X = START_X + 3870 * PX_PER_M
@@ -124,7 +170,7 @@ function parkScenery(): Course['scenery'] {
 		const x = Math.round(at)
 		if (Math.abs(x - TENTS_X) < TENTS_ROOM) continue
 		if (Math.abs(x - TEMPLE_X) < TEMPLE_ROOM) continue
-		if (Math.abs(x - GATE_X) < GATE_ROOM) continue
+		if (Math.abs(x - GATE_MIDDLE) < GATE_ROOM) continue
 		const roll = random()
 		// Now and then a bench, with a lamp beside it.
 		if (roll < 0.12) {

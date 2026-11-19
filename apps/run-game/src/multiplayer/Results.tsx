@@ -1,6 +1,6 @@
 import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
 import { play } from '../sfx'
-import { OUTLINED, Panel } from '../ui/Menu'
+import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { onHover } from '../ui/hover'
 import { ordinal } from './Medal'
@@ -16,17 +16,31 @@ export interface Placing {
 }
 
 /**
+ * Joined while the last Round was on, and in from the next: not in it, and
+ * nothing to their name yet, so not in the Standings.
+ */
+const joining = (seat: Seat, placings: Placing[]) =>
+	seat.waiting &&
+	seat.points === 0 &&
+	!placings.some((p) => p.seatId === seat.id)
+
+/**
  * Everyone who's picked, most points first; level on points, whoever did
- * better in the last Round. The Podium goes by this too.
+ * better in the last Round. The Podium goes by this too. Not anyone who's
+ * only just joined (see `joiningOf`).
  */
 export function standingsOf(seats: Seat[], placings: Placing[]) {
 	const place = (seat: Seat) =>
 		placings.find((p) => p.seatId === seat.id)?.place ??
 		Number.POSITIVE_INFINITY
 	return [...seats]
-		.filter((s) => s.character)
+		.filter((s) => s.character && !joining(s, placings))
 		.sort((a, b) => b.points - a.points || place(a) - place(b))
 }
+
+/** Everyone who joined while the last Round was on, in from the next, in seat order. */
+export const joiningOf = (seats: Seat[], placings: Placing[]) =>
+	seats.filter((s) => s.character && joining(s, placings))
 
 /** The keys that move between the buttons, and which way. */
 const MOVES: Record<string, number> = {
@@ -65,6 +79,7 @@ export function Results(props: {
 	const placing = (seat: Seat) =>
 		props.placings.find((p) => p.seatId === seat.id)
 	const standings = () => standingsOf(props.seats, props.placings)
+	const newcomers = () => joiningOf(props.seats, props.placings)
 
 	/** Which button's picked: going on, to begin with. */
 	const [picked, setPicked] = createSignal(0)
@@ -155,6 +170,16 @@ export function Results(props: {
 							</Row>
 						)}
 					</For>
+					<Show when={newcomers().length}>
+						<div style={styles.section}>In from the next Round</div>
+						<For each={newcomers()}>
+							{(seat) => (
+								<Row seat={seat} lead="">
+									<span style={styles.how}>Just joined</span>
+								</Row>
+							)}
+						</For>
+					</Show>
 				</div>
 			</Panel>
 			<div style={styles.next}>
@@ -258,9 +283,18 @@ const styles = {
 		'text-overflow': 'ellipsis',
 	},
 	how: { 'font-size': '13px', opacity: 0.8, 'white-space': 'nowrap' },
+	/** Over anyone who's only just joined, under the Standings. */
+	section: {
+		'margin-top': '10px',
+		'padding-top': '8px',
+		'border-top': '2px solid rgba(255, 255, 255, 0.3)',
+		'font-size': '14px',
+		color: '#ffd23f',
+		'flex-shrink': 0,
+	},
 	points: { width: '96px', 'text-align': 'right', 'white-space': 'nowrap' },
 	gained: { color: '#ffd23f', 'font-size': '15px' },
-	next: { ...OUTLINED, 'font-size': '22px' },
+	next: { ...OUTLINED_FLAT, 'font-size': '22px' },
 	buttons: { display: 'flex', gap: '12px' },
 	button: {
 		padding: '6px 14px',

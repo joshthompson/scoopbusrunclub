@@ -108,6 +108,7 @@ import {
 	unicornPicture,
 } from './art/unicorn'
 import type { PictureShadow } from './paint/picture'
+import type { SpentLook } from './paint/spent'
 
 /**
  * What a course's Rides are, waiting on the path to be ridden: corgis,
@@ -133,6 +134,11 @@ export interface RideLook {
 	sound: Sound
 	/** What its rides are called in the summary. */
 	rides: string
+	/**
+	 * How it looks left on the track once it's been ridden and let go of: see
+	 * `SpentLook`. Left out, it just lies there as it was (a pair of skis).
+	 */
+	spent?: SpentLook
 	/** How long a ride on it lasts, in ticks, if not as long as a corgi's. */
 	ticks?: number
 	/** How fast it goes, if not at a corgi's gallop. */
@@ -170,6 +176,7 @@ const CORGI: RideLook = {
 	call: 'Woof!',
 	sound: 'woof',
 	rides: 'Corgi rides',
+	spent: { kind: 'droop', from: 12, droop: 3, face: [21, 9] },
 }
 
 const LLAMA: RideLook = {
@@ -184,6 +191,7 @@ const LLAMA: RideLook = {
 	call: 'Hmmm!',
 	sound: 'cheer',
 	rides: 'Llama rides',
+	spent: { kind: 'droop', from: 18, droop: 10, face: [24, 17] },
 }
 
 const CAMEL: RideLook = {
@@ -198,6 +206,7 @@ const CAMEL: RideLook = {
 	call: 'Hrrmph!',
 	sound: 'groan',
 	rides: 'Camel rides',
+	spent: { kind: 'droop', from: 21, droop: 3, face: [29, 19] },
 	// Now and then, two humps.
 	rare: {
 		picture: bactrianPicture,
@@ -219,6 +228,7 @@ const DEER: RideLook = {
 	call: 'Bark!',
 	sound: 'honk',
 	rides: 'Deer rides',
+	spent: { kind: 'droop', from: 16, droop: 8, face: [25, 18] },
 }
 
 const UNICORN: RideLook = {
@@ -233,6 +243,7 @@ const UNICORN: RideLook = {
 	// A sparkle of a sound.
 	sound: 'scan',
 	rides: 'Unicorn rides',
+	spent: { kind: 'droop', from: 15, droop: 5, face: [27, 16] },
 }
 
 const GOAT: RideLook = {
@@ -246,6 +257,7 @@ const GOAT: RideLook = {
 	call: 'Meh-eh-eh!',
 	sound: 'bleat',
 	rides: 'Goat rides',
+	spent: { kind: 'droop', from: 18, droop: 6, face: [33, 27] },
 }
 
 /** A horse of the Royal Guard's, stood waiting in the street, saddled. */
@@ -260,6 +272,7 @@ const HORSE: RideLook = {
 	call: 'Neigh!',
 	sound: 'neigh',
 	rides: 'Horse rides',
+	spent: { kind: 'droop', from: 17, droop: 7, face: [29, 11] },
 }
 
 /**
@@ -277,6 +290,7 @@ const MOLE: RideLook = {
 	call: 'Squeak!',
 	sound: 'furby',
 	rides: 'Mole rides',
+	spent: { kind: 'droop', from: 19, droop: 2, face: [25, 9] },
 	runInto: true,
 	// Faster than running, and a good long ride, for the climb up to it.
 	speed: 8,
@@ -328,6 +342,7 @@ const BLOOD_CELL: RideLook = {
 	call: 'Blub!',
 	sound: 'pop',
 	rides: 'Blood cell rides',
+	spent: { kind: 'deflate', face: [21, 8] },
 	speed: 8.5,
 	ticks: 360,
 }
@@ -346,6 +361,8 @@ const SKATEBOARD: RideLook = {
 	call: '',
 	sound: 'grind',
 	rides: 'Skateboard rides',
+	// Kicked over, wheels up.
+	spent: { kind: 'flip' },
 	speed: 8,
 	runInto: true,
 	stood: true,

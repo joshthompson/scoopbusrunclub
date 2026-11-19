@@ -14,9 +14,9 @@ export interface RoomModeInfo {
 	repeats?: boolean
 	/**
 	 * Pick and Choose: each Round's course picked before it, rather than
-	 * shuffled, by the Starter, or someone at random, someone new each time.
+	 * shuffled, by someone at random, someone new each time.
 	 */
-	picks?: 'starter' | 'random'
+	picks?: boolean
 }
 
 /**
@@ -54,18 +54,10 @@ export const ROOM_MODES: RoomModeInfo[] = [
 	{
 		mode: 'pick',
 		label: 'Pick and Choose',
-		note: 'P1 picks each course',
-		about: 'You pick each course, as long as you like',
-		repeats: true,
-		picks: 'starter',
-	},
-	{
-		mode: 'pickAny',
-		label: 'Pick and Choose',
 		note: 'Anyone picks: turns at random',
 		about: 'Someone at random picks each course, as long as you like',
 		repeats: true,
-		picks: 'random',
+		picks: true,
 	},
 ]
 

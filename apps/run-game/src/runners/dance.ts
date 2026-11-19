@@ -345,6 +345,30 @@ export const DANCES = {
 			{ lift: 3 },
 		],
 	},
+	/**
+	 * A mascot's: waving hello, the flag up in his other hand; the flag swung
+	 * over one way, up high on a hop, and over the other; the poster's
+	 * cross-step, arms out; a spin, round past his side and his back; a star
+	 * jump, leaves flying off his crown; and down, arms out, for "ta-da!".
+	 * Drawn by hand, Bushy's, square on, wider than his run for his flag.
+	 */
+	mascot: {
+		interval: 130,
+		moves: [
+			{ arms: ['up', 'out'] },
+			{ arms: ['out', 'out'], bend: 1, sway: -1 },
+			{ arms: ['up', 'out'] },
+			{ arms: ['hip', 'up'], lift: 1, sway: -1, hips: 1 },
+			{ arms: ['up', 'up'], lift: 2 },
+			{ arms: ['hip', 'up'], lift: 1, sway: 1, hips: -1 },
+			{ arms: ['out', 'out'], bend: 1 },
+			{ arms: ['out', 'out'], narrow: true, lift: 1 },
+			{ arms: ['out', 'out'], flip: true, lift: 1 },
+			{ arms: ['out', 'out'], narrow: true, flip: true, lift: 1 },
+			{ arms: ['up', 'up'], lift: 3 },
+			{ arms: ['out', 'out'], bend: 2 },
+		],
+	},
 	/** Round and round, hopping, chasing its tail. */
 	zoomies: {
 		interval: 110,
@@ -412,6 +436,8 @@ export const RUNNER_DANCES: Record<string, DanceName> = {
 	'det-munch': 'sleuth',
 	// An egg on legs, rocking and kicking: drawn by hand.
 	hatchling: 'wobble',
+	// Waving, flag-waving, a spin and a star jump: drawn by hand.
+	bushy: 'mascot',
 }
 
 /** A dance for anyone not in `RUNNER_DANCES`, from something about them that stays the same. */

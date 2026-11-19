@@ -1,6 +1,6 @@
 import { For, type JSX, Show, onCleanup } from 'solid-js'
 import { play } from '../sfx'
-import { OUTLINED, Panel } from '../ui/Menu'
+import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { nameSize } from '../ui/RunnerStage'
 import { QrCode } from './QrCode'
@@ -798,7 +798,7 @@ const styles = {
 		color: 'var(--ink)',
 	},
 	status: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		'text-align': 'center',
 		'font-size': '22px',
 		height: '26px',

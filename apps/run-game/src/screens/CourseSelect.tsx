@@ -31,7 +31,7 @@ import { bestMedal } from '../saved/medals'
 import { isUnlocked } from '../saved/progress'
 import { play } from '../sfx'
 import { CoursePreview } from '../ui/CoursePreview'
-import { OUTLINED, Panel } from '../ui/Menu'
+import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { onHover } from '../ui/hover'
 
 /** What's picked: Endless, or a course's id, to practise it. */
@@ -661,7 +661,7 @@ const styles = {
 		opacity: 0.75,
 	},
 	section: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		'margin-top': '6px',
 		'padding-left': '4px',
 		'font-size': '16px',
@@ -790,7 +790,7 @@ const styles = {
 		opacity: 0.85,
 	},
 	hint: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		position: 'absolute',
 		left: 0,
 		right: 0,

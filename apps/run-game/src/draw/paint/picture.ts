@@ -61,6 +61,16 @@ export const inkOutline = (colour: string) =>
  */
 const named = new Map<string, number>()
 
+/** The short name a picture's kept by, for a key of another picture made from it. */
+export function pictureName(src: string) {
+	let name = named.get(src)
+	if (name === undefined) {
+		name = named.size
+		named.set(src, name)
+	}
+	return name
+}
+
 /**
  * The picture at `src`, in a Draw Hook, `width` by `height` at `x`, `y`: as
  * an `<img>` of it would be, and with its `shadow`, if it has one, as a CSS
@@ -80,11 +90,7 @@ export function paintPicture(
 ) {
 	const loaded = image(src)
 	if (!loaded) return
-	let name = named.get(src)
-	if (name === undefined) {
-		name = named.size
-		named.set(src, name)
-	}
+	const name = pictureName(src)
 	let pad = 0
 	for (const [dx, dy] of shadow?.offsets ?? [])
 		pad = Math.max(pad, Math.abs(dx), Math.abs(dy))

@@ -1,6 +1,8 @@
 import type { Course } from '../courses/types'
+import { play } from '../sfx'
+import { HAZARD_POINTS, STUMBLE_TICKS } from './constants'
 import { HAT_RULES } from './hats'
-import { OVERSPEED_GRIP } from './step'
+import { OVERSPEED_GRIP, scored, shielded } from './step'
 import type { Body, Pacer, Racer, World } from './world'
 
 /**
@@ -36,6 +38,8 @@ const SWIM_DOWN_STEER = 0.16
 /** Diving in: how much of how fast they hit the water they keep, down and on. */
 const DIVE_KEEP_DOWN = 0.45
 const DIVE_KEEP_ON = 0.8
+/** Diving into the seabed this fast or faster: a bonk, as running into a wall is. Holding down a good while gets there; a gentle swim down doesn't. */
+const SEABED_BONK = 5
 /** How shallow it has to be, the seabed under the surface, to stand up out of it. */
 const SHALLOW = 40
 
@@ -163,6 +167,23 @@ export function stepSwimming(
 	// ...nor down into the seabed.
 	const ground = world.terrain.groundY(b.x)
 	if (b.feetY > ground) {
+		// Hard enough, and it's a bonk: a stumble, as into a wall, unless a
+		// helmet takes the knock.
+		if (
+			racing &&
+			b.vy >= SEABED_BONK &&
+			b.stumble === 0 &&
+			!shielded(world, b)
+		) {
+			play('stumble')
+			b.stumble = STUMBLE_TICKS
+			world.addBonus('hazards', -HAZARD_POINTS)
+			world.popup(
+				scored(world, 'Bonk!', `-${HAZARD_POINTS}`),
+				b.x,
+				b.feetY - SWIM_TALL,
+			)
+		}
 		b.feetY = ground
 		b.vy = Math.min(0, b.vy)
 	}

@@ -9,6 +9,8 @@ import {
 } from 'solid-js'
 import type { Course } from '../courses/types'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
+import { UNDER_LIFT } from '../draw/art/skis'
+import { rideLook } from '../draw/rideLook'
 import { PX_PER_M, RUNNER_SCALE } from '../game/constants'
 import { POPUP_TICKS, onScreen, roundOver, stepWorld } from '../game/step'
 import { type Racer, type RacerEntry, createWorld } from '../game/world'
@@ -17,6 +19,8 @@ import { PauseMenu, SOUND_ITEMS } from '../screens/PauseMenu'
 import { RaceStartOverlay, createRaceStart } from '../ui/RaceStart'
 import { Stage } from '../ui/Stage'
 import { NameTag, hatRise } from './NameTag'
+import type { ShownReaction } from './protocol'
+import { ReactionsLayer } from './reactions'
 
 /**
  * One Round: a course raced by every Player at once on the one screen,
@@ -54,6 +58,8 @@ export function Round(props: {
 	onEnd: () => void
 	/** In the top left corner, the race's words beside it: how to join. */
 	corner?: JSX.Element
+	/** Reactions on their way up the screen, from whoever's watching. */
+	reactions?: ShownReaction[]
 }) {
 	const world = createWorld(props.course, props.racers, {
 		round: true,
@@ -132,6 +138,7 @@ export function Round(props: {
 							of={props.of}
 							onPause={() => pause(true)}
 							corner={props.corner}
+							reactions={props.reactions}
 						/>
 						<RaceStartOverlay
 							start={start}
@@ -174,16 +181,24 @@ export function RoundHud(props: {
 	textScale?: number
 	/** In the top left corner, the words beside it. */
 	corner?: JSX.Element
+	/** Reactions on their way up the screen, from whoever's watching. */
+	reactions?: ShownReaction[]
 }) {
 	const { world } = props
 	const size = (px: number) => `${px * (props.textScale ?? 1)}px`
+	/** How high a ride's saddle is: the camel's, the corgi's. */
+	const { saddle } = rideLook(world.course)
 	const tag = (racer: Racer) => {
 		// Read the tick, so this keeps up: bodies aren't signals.
 		world.ticks()
 		const height = racer.runner.sprite.height * RUNNER_SCALE
 		// Over their hat, if it stands up over their head.
 		const rise = hatRise(racer.runner, racer.body.hat, RUNNER_SCALE)
-		return onScreen(world, racer.body.x, racer.body.feetY - height - 4 - rise)
+		// Up on a camel's back, or a corgi's, or on skis: lifted as they are.
+		const { body } = racer
+		const lift =
+			(body.mount > 0 ? saddle : 0) + (body.board > 0 ? UNDER_LIFT : 0)
+		return onScreen(world, body.x, body.feetY - height - lift - 4 - rise)
 	}
 	const left = () => {
 		world.ticks()
@@ -271,6 +286,14 @@ export function RoundHud(props: {
 					</Show>
 				)}
 			</For>
+
+			<Show when={props.reactions?.length}>
+				<ReactionsLayer
+					reactions={props.reactions ?? []}
+					now={world.ticks()}
+					textScale={props.textScale}
+				/>
+			</Show>
 
 			<For each={world.popups()}>
 				{(popup) => {

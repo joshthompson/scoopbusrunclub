@@ -236,6 +236,8 @@ export function joinAsGuest(props: {
 	 * apart. Still tried again (see `REFIND_MS`), but not worth waiting on.
 	 */
 	const [blocked, setBlocked] = createSignal(false)
+	/** The Room's been ended, and said so: nothing to get back in touch with. */
+	const [ended, setEnded] = createSignal(false)
 	/** Heard from before, but not for a moment: getting back in touch. */
 	const [reconnecting, setReconnecting] = createSignal(false)
 
@@ -276,6 +278,8 @@ export function joinAsGuest(props: {
 
 		room.onPeerJoin((peer) => pad.send(hello(), peer))
 		fromHost.on((next, peer) => {
+			if (closed) return
+			if (next.ended) return endIt()
 			heardAt = Date.now()
 			setReconnecting(false)
 			setGone(false)
@@ -335,6 +339,7 @@ export function joinAsGuest(props: {
 	}
 
 	const send = (message: PadMessage) => {
+		if (closed) return
 		const to = host()
 		if (to) link.pad.send(message, to)
 	}
@@ -361,7 +366,18 @@ export function joinAsGuest(props: {
 	}
 	document.addEventListener('visibilitychange', onVisible)
 
+	/** The Room ended: out of it, and no more looking for it. */
+	function endIt() {
+		closed = true
+		setReconnecting(false)
+		setEnded(true)
+		window.clearInterval(watchdog)
+		window.clearInterval(resend)
+		void link.room.leave()
+	}
+
 	const sendHeld = () => {
+		if (closed) return
 		const to = host()
 		if (to) link.input.send(packControls(props.held()), to)
 	}
@@ -369,16 +385,19 @@ export function joinAsGuest(props: {
 	const resend = window.setInterval(sendHeld, RESEND_MS)
 
 	onCleanup(() => {
+		document.removeEventListener('visibilitychange', onVisible)
+		// Ended, it's left already.
+		if (closed) return
 		closed = true
 		window.clearInterval(watchdog)
 		window.clearInterval(resend)
-		document.removeEventListener('visibilitychange', onVisible)
 		void link.room.leave()
 	})
 
 	return {
 		view,
 		gone,
+		ended,
 		lost,
 		blocked,
 		reconnecting,

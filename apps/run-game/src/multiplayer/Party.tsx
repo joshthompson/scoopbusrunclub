@@ -23,7 +23,20 @@ import { Lobby } from './Lobby'
 import { Podium } from './Podium'
 import { type Placing, Results, standingsOf } from './Results'
 import { Round } from './Round'
-import { type GameMode, type RoomMode, newRoomCode } from './protocol'
+import {
+	type GameMode,
+	REACTIONS,
+	type RoomMode,
+	type ShownReaction,
+	newRoomCode,
+} from './protocol'
+import {
+	LiveReactionsLayer,
+	MOST_REACTIONS,
+	REACTION_GAP_MS,
+	REACTION_TICKS,
+	REACTION_TICK_MS,
+} from './reactions'
 import { type Seat, createRoom, seatPlayable } from './room'
 import { roomModeInfo } from './roomModes'
 import { type RaceStream, createRaceStream, raceStart } from './stream'
@@ -36,6 +49,15 @@ import { type RaceStream, createRaceStream, raceStart } from './stream'
 const START_SECONDS = 3
 const RESULTS_SECONDS = 8
 const CHOOSE_SECONDS = 20
+
+/**
+ * A countdown's last seconds said out loud, as a Round's are: a beep for
+ * each of "3", "2", "1", and a higher one for "Go!" as it runs out.
+ */
+function sayCountdown(left: number) {
+	if (left === 0) play('go')
+	else if (left > 0 && left <= 3) play('count')
+}
 
 /** At least how many other courses are raced before one comes round again, from one shuffle to the next. */
 const RESHUFFLE_GAP = 5
@@ -142,11 +164,6 @@ export default function Party(props: { onLeave: () => void }) {
 	const picks = () => info().picks
 	/** What's next, between Rounds. */
 	const nextText = () => {
-		if (picks() === 'starter') {
-			const starter = room.starter()
-			const number = starter ? room.seats.indexOf(starter) + 1 : 1
-			return `Next: P${number} picks the course`
-		}
 		if (picks()) return 'Next: someone picks the course'
 		const next = nextCourseIndex()
 		return lastCourse()
@@ -190,8 +207,9 @@ export default function Party(props: { onLeave: () => void }) {
 	/** A Round's being shown on the big screen: phones playing remotely are sent it too. */
 	function streamRound(made: World) {
 		world = made
+		setReactions([])
 		stopStream()
-		stream = createRaceStream(made, roundNumber(), room.sendFrame)
+		stream = createRaceStream(made, roundNumber(), room.sendFrame, reactions)
 		room.sendRace(raceStart(made, roundNumber()))
 	}
 	// A phone joining part way through, or switching to playing remotely,
@@ -260,6 +278,7 @@ export default function Party(props: { onLeave: () => void }) {
 		next: nextText(),
 		nextIn: nextIn(),
 		podium: podium(),
+		...(between() && reactions().length ? { reactions: reactions() } : {}),
 	}))
 	/** Pick and Choose: who's picking the next course, as everyone's shown. */
 	const choosing = () => {
@@ -277,6 +296,62 @@ export default function Party(props: { onLeave: () => void }) {
 		}
 	}
 	const seatById = (id: string) => room.seats.find((s) => s.id === id)
+
+	/** Reactions on their way up the screen, from whoever's watching the Round. */
+	const [reactions, setReactions] = createSignal<ShownReaction[]>([])
+	let reactionId = 0
+	/** When each seat last sent one, so nobody fills the screen. */
+	const reactedAt = new Map<string, number>()
+	/** Between Rounds: the Standings up, or someone picking the next course. */
+	const between = () =>
+		room.stage() === 'results' || room.stage() === 'choosing'
+	/**
+	 * Who can send a reaction up the screen. In a Round, whoever's watching it
+	 * and not in it: joined while it was on, or out of it while others race
+	 * on; not once it's decided, while it's paused, or on its start screen.
+	 * Between Rounds, anyone, but whoever's picking the next course.
+	 */
+	const watching = (seatId: string) => {
+		if (between()) return seatId !== chooser()
+		if (
+			room.stage() !== 'round' ||
+			!world ||
+			world.order() ||
+			room.paused() ||
+			room.waitingForStarter() !== undefined
+		)
+			return false
+		const racer = world.racers.find((r) => r.id === seatId)
+		return !racer || !!racer.out
+	}
+	room.setCanReact(watching)
+	room.setOnReact((seatId, reaction) => {
+		const seat = seatById(seatId)
+		if (!seat || !REACTIONS.includes(reaction)) return
+		if (!watching(seatId)) return
+		const now = Date.now()
+		if (now - (reactedAt.get(seatId) ?? 0) < REACTION_GAP_MS) return
+		reactedAt.set(seatId, now)
+		// In a Round, by its ticks, so they stop with it when it's paused;
+		// between Rounds, by the clock.
+		const ticks =
+			room.stage() === 'round' && world
+				? world.ticks()
+				: Math.floor(performance.now() / REACTION_TICK_MS)
+		setReactions((shown) =>
+			[
+				...shown.filter((r) => ticks - r.born < REACTION_TICKS),
+				{
+					id: ++reactionId,
+					reaction,
+					colour: seat.colour,
+					name: seat.name || seatPlayable(seat)?.name || '',
+					born: ticks,
+					across: Math.random(),
+				},
+			].slice(-MOST_REACTIONS),
+		)
+	})
 	room.setChoosing(() => {
 		const now = choosing()
 		return now && { choosing: now, courses: COURSES.map((c) => c.name) }
@@ -349,10 +424,12 @@ export default function Party(props: { onLeave: () => void }) {
 		untrack(() => {
 			stopTimer()
 			setStartingIn(START_SECONDS)
+			sayCountdown(START_SECONDS)
 			room.setStage('starting')
 			timer = window.setInterval(() => {
 				const left = (startingIn() ?? 1) - 1
 				setStartingIn(left)
+				sayCountdown(left)
 				if (left <= 0) picks() ? toChoosing() : startRound()
 			}, 1000)
 		})
@@ -447,6 +524,8 @@ export default function Party(props: { onLeave: () => void }) {
 				s.points += placing.points
 			})
 		setPlacings(placed)
+		// Between Rounds, by the clock: the Round's own are done with.
+		setReactions([])
 		world = undefined
 		stopStream()
 		room.setStage('results')
@@ -454,6 +533,7 @@ export default function Party(props: { onLeave: () => void }) {
 		stopTimer()
 		timer = window.setInterval(() => {
 			setNextIn(nextIn() - 1)
+			sayCountdown(nextIn())
 			if (nextIn() <= 0) nextRound()
 		}, 1000)
 	}
@@ -470,8 +550,8 @@ export default function Party(props: { onLeave: () => void }) {
 	}
 
 	/**
-	 * Pick and Choose: someone's turn to pick the next course, the Starter
-	 * or someone at random (someone new, if there's anyone else), with
+	 * Pick and Choose: someone's turn to pick the next course, someone at
+	 * random (someone new, if there's anyone else), with
 	 * `CHOOSE_SECONDS` to. Out of time, it's one at random.
 	 */
 	function toChoosing() {
@@ -481,10 +561,7 @@ export default function Party(props: { onLeave: () => void }) {
 		const everyone = picked().filter((s) => !s.lostAt)
 		const others = everyone.filter((s) => s.id !== lastChooser)
 		const from = others.length ? others : everyone
-		const seat =
-			picks() === 'starter'
-				? room.starter()
-				: from[Math.floor(Math.random() * from.length)]
+		const seat = from[Math.floor(Math.random() * from.length)]
 		if (!seat) return toLobby()
 		lastChooser = seat.id
 		setChooser(seat.id)
@@ -493,6 +570,7 @@ export default function Party(props: { onLeave: () => void }) {
 		room.setStage('choosing')
 		timer = window.setInterval(() => {
 			setChooseIn(chooseIn() - 1)
+			sayCountdown(chooseIn())
 			room.tellPhones()
 			if (chooseIn() > 0) return
 			// Out of time: one at random, not the last one raced.
@@ -553,7 +631,7 @@ export default function Party(props: { onLeave: () => void }) {
 
 	function end() {
 		stopTimer()
-		room.close()
+		room.end()
 		props.onLeave()
 	}
 
@@ -617,6 +695,7 @@ export default function Party(props: { onLeave: () => void }) {
 						}
 						onWorld={streamRound}
 						onTick={() => stream?.tick()}
+						reactions={reactions()}
 						onPause={room.setPaused}
 						pauseWith={(pause) => {
 							pauseRound = pause
@@ -688,6 +767,9 @@ export default function Party(props: { onLeave: () => void }) {
 							/>
 						</Match>
 					</Switch>
+					<Show when={between()}>
+						<LiveReactionsLayer reactions={reactions()} />
+					</Show>
 				</Stage>
 			</Match>
 		</Switch>

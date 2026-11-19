@@ -81,17 +81,10 @@ export type PadMode = 'controller' | 'remote'
  * - `backyard`: a Backyard Ultra, every course and round again, till the
  *   Starter (or the Host) calls it after a Round
  * - `pick`: Pick and Choose, as long as a Backyard Ultra, but before each
- *   Round, the Starter picks its course (see `Choosing`)
- * - `pickAny`: Pick and Choose, someone at random picking each course,
- *   someone new each time
+ *   Round, someone at random picks its course, someone new each time (see
+ *   `Choosing`)
  */
-export type RoomMode =
-	| 'parkrun'
-	| 'half'
-	| 'marathon'
-	| 'backyard'
-	| 'pick'
-	| 'pickAny'
+export type RoomMode = 'parkrun' | 'half' | 'marathon' | 'backyard' | 'pick'
 
 /**
  * How its Rounds are raced, as its Starter chooses in the lobby too:
@@ -150,6 +143,29 @@ export type PadMessage =
 	| { type: 'menu'; item: PauseItem }
 	/** Whoever's picking the next course, in Pick and Choose: this one, by its index. */
 	| { type: 'choose'; course: number }
+	/** Watching a Round, not in it (or not any more): how they feel about it (see `Reaction`). */
+	| { type: 'react'; reaction: Reaction }
+
+/**
+ * What a Player watching a Round can send up the big screen: having joined
+ * while it was on, or out of it while others race on. A laugh, a cheer, a
+ * poo, or a heart.
+ */
+export type Reaction = 'laugh' | 'cheer' | 'poop' | 'heart'
+export const REACTIONS: Reaction[] = ['laugh', 'cheer', 'poop', 'heart']
+
+/**
+ * A reaction on its way up the big screen: who sent it (their colour and
+ * name), when, by the Round's tick, and how far across it goes up, 0 to 1.
+ */
+export interface ShownReaction {
+	id: number
+	reaction: Reaction
+	colour: string
+	name: string
+	born: number
+	across: number
+}
 
 /**
  * The pause menu's items, on the Starter's phone, as on the big screen: the
@@ -210,6 +226,14 @@ export type PlayerStatus =
 export interface PadView {
 	/** The Room's full: there's no seat for them. */
 	full?: boolean
+	/** The Room's been ended at the big screen, or by its Starter: gone for good. */
+	ended?: boolean
+	/**
+	 * Reactions to send up the big screen: watching the Round and not in it
+	 * (joined while it was on, or out of it while others race on), or
+	 * anyone, between Rounds.
+	 */
+	canReact?: boolean
 	mode: PadMode
 	/** Their Player number, from 1, and colour. */
 	number: number
@@ -304,6 +328,8 @@ export interface RoomView {
 	 * anyone who's left since, or left during it, still on it.
 	 */
 	podium?: Seat[]
+	/** Between Rounds: reactions on their way up the screen, from anyone. */
+	reactions?: ShownReaction[]
 }
 
 /** A racer in a Round, for a remote phone to draw them. */
@@ -499,6 +525,8 @@ export interface RaceFrame {
 	/** Every boost that's been had or is cheering. */
 	boosts: BoostFrame[]
 	popups: { id: number; text: string; x: number; y: number; born: number }[]
+	/** Reactions on their way up the screen, from whoever's watching. */
+	reactions?: ShownReaction[]
 	/** Racers' ids in the order they came, once the Round's decided. */
 	order?: string[]
 	/**

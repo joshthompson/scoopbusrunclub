@@ -7,9 +7,10 @@ import type { ObstacleState, World } from './world'
  * slowly to and fro deep down where it's put, till anyone swims within
  * `SPOT` of it; then it's after whoever's nearest, turning towards them
  * and speeding up, faster than anyone swims. Into them, a bite, and it's
- * done: off it goes, away down into the deep, never to bite again. Its
- * swimming's stepped by the tick from where everyone is, so a Remote
- * Player's screen, stepping it the same, sees much the same.
+ * done: off it goes, turning for the open water and down into the deep,
+ * never to bite again. Its swimming's stepped by the tick from where
+ * everyone is, so a Remote Player's screen, stepping it the same, sees
+ * much the same.
  */
 
 type Shark = Extract<Obstacle, { kind: 'shark' }>
@@ -34,8 +35,14 @@ const GIVE_UP = 900
 const CRUISE = 1.2
 const HUNT = 7.6
 const TURN = 0.06
-/** How far either side of where it's put it cruises. */
+/** How far either side of its home it cruises, idling. */
 const PATROL = 180
+/** How fast it swims back home, with nobody to chase, and how hard it steers up or down to it. */
+const RETURN = 3
+const RETURN_LIFT = 0.02
+/** How fast it swims off, done, and how steeply it dives as it goes. */
+const LEAVE = 6
+const LEAVE_DIVE = 3
 /** How big it is, to bite with: half its length, and half its depth. */
 export const SHARK_HALF = { along: 44, across: 14 }
 
@@ -55,6 +62,17 @@ export function sharkSwim(
 		at: -1,
 	}
 	return state.swim
+}
+
+/**
+ * Where a shark's home is, to go back to with nobody to chase: the middle
+ * of the sea along, as deep down as it was put. Where it's put, if the
+ * course has no sea.
+ */
+export function sharkHome(world: Pick<World, 'terrain' | 'course'>, o: Shark) {
+	const { deepWater } = world.course
+	const x = deepWater ? (deepWater.from + deepWater.to) / 2 : o.x
+	return { x, y: world.terrain.groundY(x) - o.height }
 }
 
 /** Every shark on the course, a tick on: by the host, and by a Remote Player's screen. */
@@ -95,20 +113,43 @@ function stepShark(world: World, o: Shark, shark: SharkSwim) {
 		const d = Math.hypot(dx, dy) || 1
 		want = { vx: (dx / d) * HUNT, vy: (dy / d) * HUNT }
 	} else if (shark.mode === 'leaving') {
-		// Away, on ahead and down, into the deep.
-		want = { vx: HUNT * 0.8, vy: 1.5 }
+		// Away, down into the deep: towards the sea's far end, the open water,
+		// never on towards the near one, where the seabed may rise up a reef
+		// to the shore and lift it to the surface.
+		const { deepWater } = world.course
+		const away = deepWater
+			? deepWater.to - shark.x > shark.x - deepWater.from
+				? 1
+				: -1
+			: 1
+		want = { vx: away * LEAVE, vy: LEAVE_DIVE }
 	} else {
-		// To and fro, slowly, where it's put.
-		const heading =
-			shark.x < o.x - PATROL ? 1 : shark.x > o.x + PATROL ? -1 : shark.facing
-		want = { vx: heading * CRUISE, vy: 0 }
+		// Nobody to chase: back to the middle of the sea, and then to and fro,
+		// slowly, there.
+		const home = sharkHome(world, o)
+		const away = shark.x - home.x
+		const heading = Math.abs(away) > PATROL ? -Math.sign(away) : shark.facing
+		const lift = Math.max(
+			-RETURN,
+			Math.min(RETURN, (home.y - shark.y) * RETURN_LIFT),
+		)
+		want = {
+			vx: heading * (Math.abs(away) > PATROL ? RETURN : CRUISE),
+			vy: lift,
+		}
 	}
 	shark.vx += (want.vx - shark.vx) * TURN
 	shark.vy += (want.vy - shark.vy) * TURN
 	shark.x += shark.vx
 	shark.y += shark.vy
-	// In the water, never up out of it, nor down into the seabed.
+	// In the water, never up out of it, nor down into the seabed, nor off
+	// either end of it.
 	const { deepWater } = world.course
+	if (deepWater)
+		shark.x = Math.max(
+			deepWater.from + SHARK_HALF.along,
+			Math.min(deepWater.to - SHARK_HALF.along, shark.x),
+		)
 	const floor = world.terrain.groundY(shark.x) - SHARK_HALF.across
 	const top = (deepWater?.surface ?? floor) + SHARK_HALF.across + 10
 	shark.y = Math.max(top, Math.min(floor, shark.y))

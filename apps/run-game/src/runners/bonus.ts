@@ -24,6 +24,14 @@ import bonnieBottleSkiTuck from '../assets/runners/bonnie-bottle/ski-tuck.png'
 import bonnieBottleSki from '../assets/runners/bonnie-bottle/ski.png'
 import bonnieBottleSnowboard from '../assets/runners/bonnie-bottle/snowboard.png'
 import bonnieBottleStand from '../assets/runners/bonnie-bottle/stand.png'
+import bushyDance from '../assets/runners/bushy/dance.png'
+import bushyFace from '../assets/runners/bushy/face.png'
+import bushyRun from '../assets/runners/bushy/run.png'
+import bushySit from '../assets/runners/bushy/sit.png'
+import bushySkiTuck from '../assets/runners/bushy/ski-tuck.png'
+import bushySki from '../assets/runners/bushy/ski.png'
+import bushySnowboard from '../assets/runners/bushy/snowboard.png'
+import bushyStand from '../assets/runners/bushy/stand.png'
 import detMunchDance from '../assets/runners/det-munch/dance.png'
 import detMunchFace from '../assets/runners/det-munch/face.png'
 import detMunchRun from '../assets/runners/det-munch/run.png'
@@ -116,7 +124,8 @@ import { SKELETON_SPRITE } from './skeleton'
  * deep under The Caves.
  * The Spirit of Jazz lives up at the top of Karolinska's lungs.
  * Bonnie Bottle is for getting through every course in one Endless run, and
- * Det. Munch for finding every collectable there is.
+ * Det. Munch for finding every collectable there is. Bushy is for finishing
+ * Haga as Deri.
  *
  * Their pictures are PNGs in `assets/runners/<who>/`, a pixel a cell, facing
  * left, as the members' are: `run.png` a strip of frames side by side, and
@@ -637,6 +646,70 @@ headShowsIn(
 	MUNCH_HEAD,
 )
 
+/** Bushy's frames: wider than the club's template, for his flag to fly behind him. */
+const BUSHY_WIDTH = 27
+/** His dance's: wider again, square on, for his flag out to his side. */
+const BUSHY_DANCE_WIDTH = 31
+
+/**
+ * Bushy: parkrun's April Fools' mascot, a tree. A brown trunk, bark streaks
+ * up it, and a big bushy crown of teal leaves, lit along their tops; two
+ * big cartoon eyes under its fringe, a round knob of a nose and a wide grin.
+ * An apricot parkrun T-shirt, its tree on his chest, branches for arms in
+ * white cartoon gloves, and roots for legs. In his far hand, always, an
+ * apricot parkrun flag on a white pole. Side on, facing left, as everyone
+ * is; his frames wider than the members', for the flag behind him. Six
+ * frames to his run, the members' stride: each foot down in front, under
+ * him, pushing off, kicked up behind, tucked under and reaching forward,
+ * bobbing down on each step, his crown a frame behind his trunk; his near
+ * arm pumping, the flag swinging back and forth with the far one, its
+ * cloth rippling, and a leaf shed off his crown, drifting away behind him.
+ * Ducking, he squats right down, the flag held level behind; on skis, a
+ * pole in his near hand and the flag up behind; tucked, curled up with it
+ * trailed level; on a snowboard, arms out. His swim is his run turned over,
+ * the flag up out of the water off his back; his dive, arms round his
+ * crown, gloves together over it. His dance is his own, drawn by hand,
+ * square on as the poster has him (`mascot`). For finishing Haga as Deri.
+ */
+export const BUSHY: Playable = {
+	id: 'bonus:bushy',
+	name: 'Bushy',
+	bonus: true,
+	unlock: 'For finishing Haga as Deri',
+	tagline: 'No April Fool',
+	sprite: {
+		run: runFrames(bushyRun, 6, BUSHY_WIDTH),
+		sit: bushySit,
+		stand: bushyStand,
+		ski: bushySki,
+		skiTuck: bushySkiTuck,
+		snowboard: bushySnowboard,
+		face: bushyFace,
+		dance: dance(bushyDance, 'bushy', BUSHY_DANCE_WIDTH),
+		neck: { x: 9.5, y: 13 },
+		width: BUSHY_WIDTH,
+		height: HEIGHT,
+	},
+}
+
+/**
+ * A hat goes on his crown, not on his flag held up over it, nor a leaf come
+ * off it: his head's found from his leaves' colours.
+ */
+const BUSHY_CROWN = ['#7af0cf', '#2fd3a6', '#12806a', '#0b5a4c']
+headShowsIn(
+	[
+		bushyRun,
+		bushySit,
+		bushyStand,
+		bushySki,
+		bushySkiTuck,
+		bushySnowboard,
+		bushyDance,
+	],
+	BUSHY_CROWN,
+)
+
 export const BONUS_RUNNERS: Playable[] = [
 	YETI,
 	BAT_PERSON,
@@ -651,6 +724,7 @@ export const BONUS_RUNNERS: Playable[] = [
 	BONNIE_BOTTLE,
 	DET_MUNCH,
 	HATCHLING,
+	BUSHY,
 ]
 
 /**

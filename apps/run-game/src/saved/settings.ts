@@ -23,6 +23,12 @@ interface Settings {
 	lastRunner?: string
 	/** And the run last chosen: Endless, or a course's id. */
 	lastRun?: string
+	/**
+	 * The menus' music, picked in Options: a tune's id, or `random`. Not
+	 * picked, the theme till a course has been run, and then whatever was
+	 * last on.
+	 */
+	menuTune?: string
 }
 
 const DEFAULTS: Settings = { effects: true, music: true }
@@ -63,6 +69,10 @@ export const setEffectsOn = (effects: boolean) =>
 	store({ ...settings(), effects })
 export const musicOn = () => settings().music
 export const setMusicOn = (music: boolean) => store({ ...settings(), music })
+
+export const menuTune = () => settings().menuTune
+export const setMenuTune = (menuTune: string) =>
+	store({ ...settings(), menuTune })
 
 export const lastRunner = () => settings().lastRunner
 export const rememberRunner = (lastRunner: string) =>

@@ -5,7 +5,7 @@ import { type CustomRunner, customRunners } from '../runners/customRunners'
 import { CLUB, type Playable, customPlayable } from '../runners/playable'
 import { runnerUnlocked } from '../saved/unlocked'
 import { play } from '../sfx'
-import { OUTLINED, Panel } from '../ui/Menu'
+import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { RunStrip, tallWithHat } from '../ui/RunStrip'
 import { RunnerStage, nameSize } from '../ui/RunnerStage'
 import { onHover } from '../ui/hover'
@@ -763,7 +763,7 @@ const styles = {
 		transform: CARD_LIFT,
 	},
 	hint: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		position: 'absolute',
 		left: 0,
 		right: 0,

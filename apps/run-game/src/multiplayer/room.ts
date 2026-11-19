@@ -29,6 +29,7 @@ import {
 	type PlayerStatus,
 	type RaceFrame,
 	type RaceStart,
+	type Reaction,
 	type RoomMode,
 	type RoomStage,
 	type RoomView,
@@ -89,6 +90,8 @@ export interface Seat {
 
 /** How long a phone that drops out keeps its seat, for coming back. */
 export const LOST_SEAT_MS = 60_000
+/** How long an ended Room waits for every phone to hear so, before it's left. */
+const END_GRACE_MS = 800
 /** How often phones are told what to show, even when nothing's changed. */
 const VIEW_EVERY_MS = 250
 
@@ -200,6 +203,10 @@ export function createRoom(code: string) {
 		() => undefined
 	/** Whoever's picking having picked: the Party checks it's them. */
 	let onChoose: (seatId: string, course: number) => void = () => {}
+	/** Someone watching the Round sending a reaction: the Party checks they're watching. */
+	let onReact: (seatId: string, reaction: Reaction) => void = () => {}
+	/** Whether a seat's watching the Round, for reacting to it: the Party says. */
+	let canReact: (seatId: string) => boolean = () => false
 
 	/** What the Host's screens show, for computers that have joined: the Party says. */
 	let screenView: () => Omit<RoomView, 'seats' | 'starter'> = () => ({
@@ -441,6 +448,8 @@ export function createRoom(code: string) {
 		if (message.type === 'pause') pauseAs(seat.id, message.paused)
 		if (message.type === 'menu') menuAs(seat.id, message.item)
 		if (message.type === 'choose') onChoose(seat.id, message.course)
+		// Up the big screen, and nothing for phones to hear about.
+		if (message.type === 'react') return onReact(seat.id, message.reaction)
 		if (message.type === 'leave') removeSeat(seat.id)
 		tellPhones()
 	})
@@ -540,6 +549,7 @@ export function createRoom(code: string) {
 					}
 				: {}),
 			...(seat.screen ? { room: roomView() } : {}),
+			...(canReact(seat.id) ? { canReact: true } : {}),
 		}
 	}
 
@@ -562,11 +572,28 @@ export function createRoom(code: string) {
 		tellPhones()
 	}, VIEW_EVERY_MS)
 
+	/** Ended, every phone told: left already, or about to be. */
+	let ended = false
 	function close() {
+		if (ended) return
 		window.clearInterval(timer)
 		void room.leave()
 	}
 	onCleanup(close)
+	/**
+	 * Ending the Room for good: every phone told so, then a moment for that
+	 * to get to them before it's left. Left with nothing said, they'd only
+	 * see the big screen go quiet, and try to get back in touch with it.
+	 */
+	function end() {
+		if (ended) return
+		ended = true
+		window.clearInterval(timer)
+		for (const seat of seats)
+			if (seat.kind === 'phone' && seat.peer)
+				view.send({ ...viewFor(seat), ended: true }, seat.peer)
+		window.setTimeout(() => void room.leave(), END_GRACE_MS)
+	}
 
 	/** What a seat's Player is holding, however they're playing. */
 	function controlsFor(seat: Seat): () => Controls {
@@ -598,6 +625,7 @@ export function createRoom(code: string) {
 			setPaused(next)
 			tellPhones()
 		},
+		waitingForStarter,
 		setWaitingForStarter(number: number | undefined) {
 			setWaitingForStarter(number)
 			tellPhones()
@@ -664,11 +692,20 @@ export function createRoom(code: string) {
 		setOnChoose(next: typeof onChoose) {
 			onChoose = next
 		},
+		/** What to do when someone watching the Round sends a reaction. */
+		setOnReact(next: typeof onReact) {
+			onReact = next
+		},
+		/** Tells the Room who's watching the Round, for their phones to react with. */
+		setCanReact(next: typeof canReact) {
+			canReact = next
+		},
 		/** Tells the Room how seats are doing in the Round, for their phones. */
 		setStatusOf(next: typeof statusOf) {
 			statusOf = next
 		},
 		close,
+		end,
 	}
 }
 

@@ -17,6 +17,7 @@ import {
 	type RaceFrame,
 	type RaceStart,
 	type RacerState,
+	type ShownReaction,
 	skiState,
 } from './protocol'
 
@@ -88,6 +89,8 @@ export function createRaceStream(
 	world: World,
 	round: number,
 	send: (frame: RaceFrame) => void,
+	/** Reactions on their way up the screen, from whoever's watching. */
+	reactions: () => ShownReaction[] = () => [],
 ) {
 	let sounds: Sound[] = []
 	overhear((sound) => sounds.push(sound))
@@ -262,6 +265,7 @@ export function createRaceStream(
 					: [],
 			),
 			popups: world.popups(),
+			...(reactions().length ? { reactions: reactions() } : {}),
 			order: world.order()?.map((r) => r.id),
 			sounds,
 		}

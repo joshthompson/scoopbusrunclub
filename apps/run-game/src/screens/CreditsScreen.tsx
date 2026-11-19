@@ -1,4 +1,5 @@
 import { For, type JSX } from 'solid-js'
+import { CoffeeLink } from '../ui/CoffeeLink'
 import { Menu, Panel } from '../ui/Menu'
 
 const CREDITS: { role: string; names: string[] }[] = [
@@ -42,7 +43,9 @@ export function CreditsScreen(props: { onBack: () => void }) {
 						</div>
 					)}
 				</For>
-				<div style={{ width: '200px', 'margin-top': '6px' }}>
+				{/* Coffee over Back, the two as wide as each other. */}
+				<div style={styles.buttons}>
+					<CoffeeLink />
 					<Menu
 						items={[{ label: 'Back', choose: props.onBack }]}
 						onBack={props.onBack}
@@ -59,6 +62,13 @@ const styles = {
 		inset: 0,
 		display: 'grid',
 		'place-items': 'center',
+	},
+	buttons: {
+		display: 'flex',
+		'flex-direction': 'column',
+		gap: '12px',
+		'min-width': '200px',
+		'margin-top': '6px',
 	},
 	credit: {
 		display: 'flex',

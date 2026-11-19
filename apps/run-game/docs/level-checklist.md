@@ -9,7 +9,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 
 | # | Level | Unique collectables | Custom goal | Unlockable character | Unique hat | Ride | Set piece | Last art pass |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Haga | ✅ The standard fika (kaffe, kanelbulle, chokladboll, prinsesstårta), parkrun barcode | ✅ Score a goal | ⬜ | ✅ Flower crown | ✅ Goose (flies over) | ✅ Football to kick into the goal | 2026-11-18 |
+| 1 | Haga | ✅ The standard fika (kaffe, kanelbulle, chokladboll, prinsesstårta), parkrun barcode | ✅ Score a goal | ✅ Bushy (finish it as Deri) | ✅ Flower crown | ✅ Goose (flies over) | ✅ Football to kick into the goal | 2026-11-18 |
 | 2 | Kristineberg | ✅ Energy drink, sports gel, banana | ✅ Long jump 10 m | ✅ Link (ride a corgi) | ✅ Sweatband | ✅ Corgi | ✅ Long jump pit | 2026-11-18 |
 | 3 | Gamla Stan | ✅ Semla, dammsugare, kardemummabulle, ale | ✅ Find the viking | ✅ Sven the Viking | ✅ Royal Guard's helmet | ✅ Royal Guard horse | ✅ Tavern under the street, down a manhole | 2026-11-18 |
 | 4 | Huddinge | ✅ Cake in a can, wild berries, kantareller, bad mushroom (one, halfway: the screen trips for 3 s) | ✅ Deer riding deer | ⬜ | ✅ Antlers | ✅ Deer | ⬜ Flavour so far: a wild boar family running alongside, a harvester felling a pine, the granite ledge onto the deer | 2026-11-18 |

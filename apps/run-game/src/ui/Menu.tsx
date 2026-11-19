@@ -214,8 +214,9 @@ export const OUTLINED: JSX.CSSProperties = {
 }
 
 /**
- * Text with the ink outline only, no drop shadow: small text straight on
- * the title screen's backdrop, where a shadow reads as a blurred copy.
+ * Text with the ink outline only, no drop shadow: small text (hints,
+ * subtitles, statuses) straight on a backdrop, where a shadow reads as a
+ * blurred copy. Titles keep `OUTLINED`.
  */
 export const OUTLINED_FLAT: JSX.CSSProperties = {
 	color: 'white',

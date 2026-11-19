@@ -1,7 +1,7 @@
 import { For, type JSX, Show, createSignal, onCleanup, onMount } from 'solid-js'
 import type { Controls } from '../input'
 import { play } from '../sfx'
-import { OUTLINED } from '../ui/Menu'
+import { OUTLINED, OUTLINED_FLAT } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { onHover } from '../ui/hover'
 import { Medal, ordinal, pts } from './Medal'
@@ -323,7 +323,7 @@ const styles = {
 		animation: 'title-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both',
 	},
 	subtitle: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		position: 'relative',
 		'font-size': '18px',
 		'margin-top': '4px',
@@ -408,7 +408,7 @@ const styles = {
 		'z-index': 2,
 	},
 	next: {
-		...OUTLINED,
+		...OUTLINED_FLAT,
 		'font-size': '18px',
 		'line-height': 1.3,
 		'white-space': 'nowrap',

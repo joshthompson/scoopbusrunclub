@@ -43,10 +43,12 @@ import {
 	type PadMode,
 	type PadView,
 	type PauseItem,
+	type Reaction,
 	type RoomMode,
 	cleanCode,
 	cleanPlayerName,
 } from './protocol'
+import { ReactionBar } from './reactions'
 import { GAME_MODES, ROOM_MODES, roomModeInfo } from './roomModes'
 import { statusText } from './status'
 
@@ -368,7 +370,7 @@ function Controller(props: {
 		name,
 		held,
 	})
-	const { view, gone, reconnecting, start, feed, send } = link
+	const { view, gone, ended, reconnecting, start, feed, send } = link
 	const joining = () => joiningMessage(props.code, link)
 	const rename = (next: string) => {
 		const clean = cleanPlayerName(next)
@@ -469,6 +471,14 @@ function Controller(props: {
 		setChoosing(false)
 	}
 
+	/**
+	 * Watching the Round and not in it: joined while it was on, or out of it
+	 * while others race on. Reactions to send up the big screen, instead of
+	 * buttons to run with.
+	 */
+	const spectating = () => !!view()?.canReact
+	const react = (reaction: Reaction) => send({ type: 'react', reaction })
+
 	const press = (action: Action, down: boolean) => {
 		if (down) navigator.vibrate?.(8)
 		setTouched((all) => {
@@ -489,6 +499,17 @@ function Controller(props: {
 
 	return (
 		<Switch>
+			<Match when={ended()}>
+				<Message title="The Room's ended" text="Thanks for playing!">
+					<button
+						type="button"
+						style={styles.bigButton}
+						onClick={props.onLeave}
+					>
+						Join another
+					</button>
+				</Message>
+			</Match>
 			<Match when={gone()}>
 				<Message
 					title="Lost the big screen"
@@ -711,6 +732,7 @@ function Controller(props: {
 													navigator.vibrate?.(15)
 													send({ type: 'choose', course })
 												}}
+												onReact={spectating() ? react : undefined}
 											/>
 										)}
 									</Match>
@@ -768,6 +790,18 @@ function Controller(props: {
 										<div style={styles.lobby}>
 											<div style={styles.heading}>{statusText(v())}</div>
 											<div style={styles.text}>{betweenText(v())}</div>
+											<Show when={spectating()}>
+												<div style={styles.reactions}>
+													<ReactionBar
+														title={
+															v().stage === 'round'
+																? 'Cheer them on'
+																: 'How was that?'
+														}
+														onReact={react}
+													/>
+												</div>
+											</Show>
 											{/* The Starter's: on now, not waiting for the timer. */}
 											<Show when={v().stage === 'results' && v().isStarter}>
 												<button
@@ -813,7 +847,11 @@ function Controller(props: {
 								</Switch>
 							}
 						>
-							<ArrowPad press={press} />
+							<Show when={spectating()} fallback={<ArrowPad press={press} />}>
+								<div style={{ ...styles.lobby, ...styles.reactions }}>
+									<ReactionBar title="Cheer them on" onReact={react} />
+								</div>
+							</Show>
 						</Show>
 
 						<Show when={v().waitingForStarter}>
@@ -1264,6 +1302,8 @@ function PauseSheet(props: {
 function ChoosingScreen(props: {
 	choosing: NonNullable<PadView['choosing']>
 	onPick: (course: number) => void
+	/** Waiting on someone else to pick: a reaction to send up the big screen. */
+	onReact?: (reaction: Reaction) => void
 }) {
 	const who = () => props.choosing.name || `P${props.choosing.number}`
 	return (
@@ -1298,6 +1338,13 @@ function ChoosingScreen(props: {
 								)
 							}}
 						</For>
+					</div>
+				)}
+			</Show>
+			<Show when={!props.choosing.you && props.onReact}>
+				{(react) => (
+					<div style={styles.reactions}>
+						<ReactionBar title="While you wait" onReact={react()} />
 					</div>
 				)}
 			</Show>
@@ -1847,6 +1894,8 @@ const styles = {
 		gap: '8px',
 		padding: '10px 0',
 	},
+	/** Watching: the reaction buttons, across the phone. */
+	reactions: { width: '100%', padding: '0 16px', 'box-sizing': 'border-box' },
 	mirror: {
 		display: 'flex',
 		'justify-content': 'center',
