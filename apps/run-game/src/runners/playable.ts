@@ -92,6 +92,11 @@ export interface Playable {
 		 */
 		neck?: Neck
 		/**
+		 * Two heads, the Miner Twins': a space helmet goes on each of them.
+		 * Any other hat, just the one.
+		 */
+		twoHeads?: boolean
+		/**
 		 * A hat of their own, part of how they look: on their head whenever
 		 * they've no other on (see `OwnHat`). The Spirit of Jazz's top hat,
 		 * on fire.

@@ -145,6 +145,132 @@ const DINO_SEA: Tune = {
 	],
 }
 
+/**
+ * Rocket Launch's tune, in D minor, the same melody over the same chords in
+ * three versions, one for each stretch of it (see `Course['tunes']`): the
+ * launch's, a plucked arpeggio over a driving bass, from the pad to the
+ * blast-off; space's, floaty, a whistle over a soft bass, bells twinkling,
+ * for the drift past the asteroids; and the alien base's, a guitar and
+ * stabbing saws, for the boss. So one fades into the next mid-tune.
+ */
+const ROCKET_CHORD = {
+	Dm: { low: 'D2', tones: ['D4', 'F4', 'A4'] },
+	Bb: { low: 'Bb1', tones: ['Bb3', 'D4', 'F4'] },
+	F: { low: 'F2', tones: ['F3', 'A3', 'C4'] },
+	C: { low: 'C2', tones: ['G3', 'C4', 'E4'] },
+	Gm: { low: 'G1', tones: ['G3', 'Bb3', 'D4'] },
+	A: { low: 'A1', tones: ['A3', 'C#4', 'E4'] },
+} as const
+type RocketChord = keyof typeof ROCKET_CHORD
+
+/** Its 16 bars' chords: the tune twice, a middle bit on G minor and A, and the tune again. */
+const ROCKET_CHORDS: RocketChord[] = [
+	...(['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'F', 'C'] as const),
+	...(['Gm', 'Bb', 'F', 'A', 'Dm', 'Bb', 'F', 'C'] as const),
+]
+
+/** A pattern, a bar of it from each chord. */
+const rocketBars = (
+	bar: (chord: (typeof ROCKET_CHORD)[RocketChord]) => string,
+) => bars(...ROCKET_CHORDS.map((name) => bar(ROCKET_CHORD[name])))
+
+/** A note an octave up, or down. */
+const octave = (note: string, by: number) =>
+	note.replace(/\d$/, (o) => String(Number(o) + by))
+
+/** The bass driving: its root on the beat, the octave on the off-beats. */
+const ROCKET_BASS = rocketBars(({ low }) => {
+	const high = octave(low, 1)
+	return `${low} - ${low} ${high} ${low} - ${low} ${high} ${low} - ${low} ${high} ${low} ${high} ${low} -`
+})
+/** A soft held bass, for out in space. */
+const ROCKET_SUB = rocketBars(
+	({ low }) => `${low} _ _ _ _ _ _ _ ${octave(low, 1)} _ _ _ _ _ _ _`,
+)
+/** An arpeggio running up each chord and back, a note a step. */
+const ROCKET_ARP = rocketBars(({ tones }) => {
+	const [a, b, c] = tones.map((n) => octave(n, 1))
+	const d = octave(a, 1)
+	return [a, b, c, d, c, b, a, b, a, b, c, d, c, b, c, b].join(' ')
+})
+/** The same, a note every other step, to twinkle. */
+const ROCKET_TWINKLE = rocketBars(({ tones }) => {
+	const [a, b, c] = tones.map((n) => octave(n, 2))
+	return `${a} - ${b} - ${c} - ${octave(a, 1)} - ${c} - ${b} - ${a} - ${b} -`
+})
+/** Stabbing chords, on the off-beats. */
+const ROCKET_STAB = (which: number) =>
+	rocketBars(
+		({ tones }) =>
+			`- - ${tones[which]} - - - ${tones[which]} - - - ${tones[which]} - - ${tones[which]} - -`,
+	)
+
+const ROCKET_MELODY = bars(
+	'A5 - D6 - F6 _ _ - E6 - D6 - A5 _ _ -',
+	'Bb5 - D6 - F6 _ _ - D6 - Bb5 - F5 _ _ -',
+	'A5 - C6 - F6 _ _ - E6 - C6 - A5 _ _ -',
+	'G5 - C6 - E6 _ _ - D6 - C6 - G5 _ _ _',
+	'A5 - D6 - F6 _ _ - E6 - D6 - F6 _ A6 -',
+	'Bb5 - D6 - F6 _ _ - A6 - F6 - D6 _ Bb5 -',
+	'A5 - C6 - F6 _ _ - G6 - A6 _ C7 _ _ -',
+	'G6 _ _ _ E6 _ _ _ D6 - C6 - G5 _ _ _',
+	'G5 _ _ - Bb5 _ _ - D6 _ _ _ C6 - Bb5 -',
+	'Bb5 _ _ - D6 _ _ - F6 _ _ _ E6 - D6 -',
+	'C6 _ _ - F6 _ _ - A6 _ _ _ G6 - F6 -',
+	'E6 _ _ - A6 _ _ - C#7 _ _ _ - - - -',
+	'A5 - D6 - F6 _ _ - E6 - D6 - A5 _ _ -',
+	'Bb5 - D6 - F6 _ _ - D6 - Bb5 - F5 _ _ -',
+	'A5 - C6 - F6 _ _ - E6 - C6 - A5 _ _ -',
+	'G5 - C6 - E6 _ _ - G6 - E6 - C6 _ D6 -',
+)
+/** The melody two octaves down, for a guitar to chug. */
+const ROCKET_LOW_MELODY = ROCKET_MELODY.replace(
+	/([A-G][#b]?)(\d)/g,
+	(_, note, o) => `${note}${Number(o) - 2}`,
+)
+
+const ROCKET_LAUNCH: Tune = {
+	bars: 16,
+	tracks: [
+		{ voice: 'bass', pattern: ROCKET_BASS, gain: 0.12, gate: 0.45 },
+		{ voice: 'pluck', pattern: ROCKET_ARP, gain: 0.026, gate: 0.5 },
+		{ voice: 'square', pattern: ROCKET_MELODY, gain: 0.034, gate: 0.7 },
+		{
+			voice: 'bell',
+			pattern: bars(
+				'- - - - - - - - - - - - - - A6 -',
+				'- - - - - - - - - - - - - - D7 -',
+			),
+			gain: 0.02,
+		},
+	],
+}
+const ROCKET_SPACE: Tune = {
+	bars: 16,
+	beat: 0.5,
+	tracks: [
+		{ voice: 'sub', pattern: ROCKET_SUB, gain: 0.12, gate: 0.9 },
+		{ voice: 'bell', pattern: ROCKET_TWINKLE, gain: 0.022 },
+		{ voice: 'whistle', pattern: ROCKET_MELODY, gain: 0.035, gate: 0.9 },
+	],
+}
+const ROCKET_BOSS: Tune = {
+	bars: 16,
+	tracks: [
+		{ voice: 'bass', pattern: ROCKET_BASS, gain: 0.14, gate: 0.35 },
+		{ voice: 'guitar', pattern: ROCKET_LOW_MELODY, gain: 0.024, gate: 0.85 },
+		...[0, 1, 2].map(
+			(which): Track => ({
+				voice: 'supersaw',
+				pattern: ROCKET_STAB(which),
+				gain: 0.016,
+				gate: 0.4,
+			}),
+		),
+		{ voice: 'supersaw', pattern: ROCKET_MELODY, gain: 0.03, gate: 0.8 },
+	],
+}
+
 /** The menus': bright, in C, round and round while you pick. */
 const MENU: Tune = {
 	bars: 16,
@@ -1477,6 +1603,9 @@ export const TUNES: Record<string, Tune> = {
 	'dino-island': DINO_JUNGLE,
 	'dino-island:volcano': DINO_VOLCANO,
 	'dino-island:sea': DINO_SEA,
+	'rocket-launch': ROCKET_LAUNCH,
+	'rocket-launch:space': ROCKET_SPACE,
+	'rocket-launch:boss': ROCKET_BOSS,
 }
 
 /** A course with no tune of its own yet gets Haga's. */

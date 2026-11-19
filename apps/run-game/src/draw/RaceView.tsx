@@ -10,6 +10,7 @@ import {
 	VIEW_WIDTH,
 } from '../game/constants'
 import { portalView } from '../game/portals'
+import { bossShake } from '../game/space'
 import { onScreen } from '../game/step'
 import type { World } from '../game/world'
 import { playVersion, tuneAlong } from '../music/music'
@@ -47,8 +48,10 @@ import { createPyro, createSearchlights, createSmoke } from './nightRace'
 import { createOrgans } from './organs'
 import { createPortalFx } from './portalFx'
 import { createRiver, createRiverFront } from './river'
+import { createRocket } from './rocketLaunch'
 import { ScreenWashes, pictureStyle } from './screenFilters'
 import { createSecret } from './secret'
+import { BossBar, createSpaceFx } from './space'
 import {
 	createBanner,
 	createBoost,
@@ -263,6 +266,10 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createTowers(world),
 				// A Portal going off: the shrink ray's beam, the sneeze's spray.
 				...createPortalFx(world),
+				// Rocket Launch's plasma bolts, its cage, its boss and its doors.
+				...createSpaceFx(world),
+				// Its rocket: on its pad, taking off, and blowing up.
+				...createRocket(world),
 				// The first racer last, so they're drawn over everyone else racing.
 				...[...world.racers]
 					.reverse()
@@ -374,7 +381,7 @@ export function RaceCanvas(props: {
 					style={{
 						// Its size is the camera's, which takes in more zoomed out
 						// (to fit a Round's Players in): shrunk back to fill the screen.
-						transform: `translateX(${eruptionShake(props.world)}px) scale(${1 / zoom()})`,
+						transform: `translateX(${eruptionShake(props.world) + bossShake(props.world)}px) scale(${1 / zoom()})`,
 						'transform-origin': '0 0',
 						background: 'transparent',
 						// Black against a burning sky, in its silhouetted stretch.
@@ -391,6 +398,8 @@ export function RaceCanvas(props: {
 			<Show when={(portal()?.flash ?? 0) > 0}>
 				<div style={{ ...styles.flash, opacity: portal()?.flash }} />
 			</Show>
+			{/* A boss's health, over the top of the screen. */}
+			<BossBar world={props.world} />
 			{/* Into the dark, a Portal's words in it, shaking: the sneeze. */}
 			<Show when={(portal()?.dark ?? 0) > 0}>
 				<div style={{ ...styles.dark, opacity: portal()?.dark }} />

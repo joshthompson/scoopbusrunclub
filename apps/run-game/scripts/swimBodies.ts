@@ -457,6 +457,19 @@ export const BODIES: Body[] = [
 		legs: [{ top: 21, bottom: 26, cols: [11, 12], by: [1, 2] }],
 		reach: 9,
 	}),
+	bonus('tina', {
+		// Her wiry arms, hanging down either side of her: nothing behind them
+		// but sky, bar the end of her scarf.
+		clear: [
+			{ rows: [16, 21], cols: [6, 7] },
+			{ rows: [16, 21], cols: [13, 15] },
+		],
+		arms: { skin: 'd', from: [7, 13] },
+		head: { top: 3, left: 5, right: 16 },
+		shoulder: 16,
+		legs: [{ top: 21, cols: [10, 13], by: [1, 3] }],
+		reach: 9,
+	}),
 	bonus('the-miner', {
 		// Two of them in one shirt, and no arms: they dive as they stand,
 		// and swim kicking.

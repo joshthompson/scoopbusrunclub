@@ -503,6 +503,39 @@ const HEAD_BOUNCE = rowsArt(
 	},
 )
 
+/**
+ * Rocket Launch's: the prisoner's cage, its door swung open, the green
+ * alien in it waving, free.
+ */
+const PRISONER_FREED = rowsArt(
+	[
+		'......GG......',
+		'.....GGGG.....',
+		'..SSSSSSSSSS..',
+		'..S.GGGGGG.S..',
+		'..SGGKGGKGGS..',
+		'..SGgKGGKgGS..',
+		'Y.SGGGGGGGGS..',
+		'YG.S.GGGG.S.D.',
+		'.GGS.GppG.S.D.',
+		'...S.GppG.S.D.',
+		'...S.G..G.S.D.',
+		'...SGG..GGS.D.',
+		'..SSSSSSSSSSD.',
+		'..sssssssssss.',
+	],
+	{
+		S: '#9aa4b0',
+		s: '#5c6672',
+		G: '#5ec24a',
+		g: '#3c8a2e',
+		p: '#c9f0b8',
+		K: '#1d1d1d',
+		Y: '#ffd23f',
+		D: '#7a8490',
+	},
+)
+
 /** Each special goal's picture: any without, a trophy. */
 const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	haga: FOOTBALL,
@@ -523,6 +556,7 @@ const SPECIAL: Partial<Record<CourseId, GoalIcon>> = {
 	'machu-picchu': BROKEN_BRIDGE_ICON,
 	midnattsloppet: HEAD_BOUNCE,
 	'dino-island': HATCHLING_HOME,
+	'rocket-launch': PRISONER_FREED,
 }
 
 /**

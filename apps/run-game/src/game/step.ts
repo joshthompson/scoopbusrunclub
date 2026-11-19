@@ -8,7 +8,7 @@ import { flyerLook } from '../draw/flyerLook'
 import { rideLook } from '../draw/rideLook'
 import { bonusRunner } from '../runners/bonus'
 import { collect } from '../saved/collected'
-import { unlockRunner } from '../saved/unlocked'
+import { runnerUnlocked, unlockRunner } from '../saved/unlocked'
 import { play } from '../sfx'
 import {
 	GERM_GIVE,
@@ -187,6 +187,19 @@ import {
 	turbineHits,
 	whaleAt,
 } from './sky'
+import {
+	asteroidHeight,
+	asteroidReach,
+	bossArena,
+	bossFighting,
+	busSlowAt,
+	foundFree,
+	gravityAt,
+	intoAlien,
+	liftAt,
+	stepSpace,
+	stompAlien,
+} from './space'
 import { spiderAt, spiderLook } from './spiders'
 import { soundSplashes } from './splashes'
 import { soundStalactites, stalactiteAt, wakeStalactites } from './stalactites'
@@ -307,6 +320,9 @@ export function stepWorld(world: World) {
 			if (!isHeld(world, racer)) collide(world, racer)
 		startleGeese(world)
 		if (!busHeld(world)) stepBus(world)
+		// Rocket Launch's aliens' bolts, its cage and its boss; the bus
+		// waiting outside its room.
+		stepSpace(world)
 	}
 	// Everyone else out running isn't stopped, though: on into the shrink
 	// ray after the Players, and shrunk away themselves, as it goes off.
@@ -359,12 +375,15 @@ function stepPhase(world: World, frozen = false) {
 	}
 	if (phase === 'running') {
 		// Not while a Portal's going off: the clock stops, the bus with it.
-		if (!frozen) world.setRaceTicks(world.raceTicks() + 1)
+		// Nor while everyone's shut in with a boss, the bus waiting outside.
+		if (!frozen && !bossFighting(world))
+			world.setRaceTicks(world.raceTicks() + 1)
 		for (const racer of world.racers) {
 			if (racer.out || racer.body.x < world.terrain.finishX) continue
 			const ahead = world.racers.filter((r) => r.out === 'finished').length
 			racer.out = 'finished'
 			racer.outAt = world.ticks()
+			freedHome(world, racer)
 			racer.danceX =
 				world.terrain.finishX +
 				Math.max(DANCE_NEAREST, DANCE_PAST - ahead * DANCE_APART)
@@ -435,7 +454,7 @@ function busTicksToFinish(world: World) {
 			: 1
 		x += world.course.busDownhill
 			? Math.min(pace * busHill(world, x), topSpeed(world) - ROUND_SEA_SLACK)
-			: pace * swum
+			: pace * swum * busSlowAt(world.course, x)
 		ticks++
 	}
 	return ticks
@@ -871,7 +890,11 @@ function stepRunner(world: World, racer: Racer) {
 			if (b.on !== undefined && world.platforms[b.on].rope?.breaks)
 				b.bridgeJumps = (b.bridgeJumps ?? 0) + 1
 			// On a Ride, it leaps, with them on its back; otherwise, a jump.
-			jump(b, b.mount > 0 ? RIDE_LEAP : JUMP_SPEED)
+			// In low gravity, floatier: slower, higher.
+			jump(
+				b,
+				(b.mount > 0 ? RIDE_LEAP : JUMP_SPEED) * liftAt(world.course, b.x),
+			)
 			b.ducking = false
 			b.on = undefined
 			// Off the long jump's board, to be measured.
@@ -891,9 +914,10 @@ function stepRunner(world: World, racer: Racer) {
 			b.feetY -= rideLook(world.course).saddle
 			b.mount = 0
 		}
-		b.vy += GRAVITY
+		b.vy += GRAVITY * gravityAt(world.course, b.x)
 		// Let go of jump on the way up: cut short, a hop. Held: the whole jump.
-		if (b.jumping && !up && b.vy < -JUMP_CUT) b.vy = -JUMP_CUT
+		const cut = JUMP_CUT * liftAt(world.course, b.x)
+		if (b.jumping && !up && b.vy < -cut) b.vy = -cut
 		if (b.vy >= 0) b.jumping = false
 		if (mole) {
 			// A mole's always in the air, hopping: on at a gallop, whatever's held.
@@ -1044,7 +1068,7 @@ function stepRunner(world: World, racer: Racer) {
 			}
 		}
 		const platform =
-			b.vy >= 0
+			b.vy >= 0 && !b.flungDown
 				? landingOn(
 						terrain,
 						world.platforms,
@@ -1102,6 +1126,7 @@ function stepRunner(world: World, racer: Racer) {
 	if (b.grounded) {
 		b.floor = b.feetY
 		b.climbing = undefined
+		b.flungDown = undefined
 	}
 	// Coming up to whoever's at a Secret's far end: they call out.
 	if (racing && !b.greeted && comingAtLaunch(world, b)) {
@@ -1585,21 +1610,54 @@ const FOUND_HEIGHT = 40
 function meetFound(world: World, racer: Racer) {
 	const { found } = world.course
 	const b = racer.body
-	if (!found || b.metFound) return
+	if (!found || b.metFound || !foundFree(world)) return
 	if (
 		Math.abs(b.x - found.x) > FOUND_REACH ||
 		b.feetY > found.y + FOUND_HEIGHT ||
 		b.feetY < found.y - (found.over ?? FOUND_HEIGHT)
 	)
 		return
+	greetFound(world, racer)
+}
+
+/** Over the line with a bonus runner they freed: theirs to run as, now. */
+function freedHome(world: World, racer: Racer) {
+	const b = racer.body
+	const bonus = b.freeing && bonusRunner(b.freeing)
+	b.freeing = undefined
+	if (!bonus || !unlockRunner(bonus.id)) return
+	b.unlocked = bonus.id
+	play('cheer')
+	world.popup(`${bonus.name} unlocked!`, b.x, b.feetY - 110)
+}
+
+/**
+ * Hello from the course's hidden bonus runner, and the first time, they're
+ * `racer`'s to run as. `quiet`: what they say has been said already (out
+ * of a cage, "I'm free!").
+ */
+export function greetFound(
+	world: World,
+	racer: Racer,
+	quiet = false,
+	untilFinish = false,
+) {
+	const { found } = world.course
+	const b = racer.body
+	if (!found || b.metFound) return
 	const bonus = bonusRunner(found.runner)
 	if (!bonus) return
 	b.metFound = true
 	// Waiting, they've said it already, stood up as they came. To anyone
 	// running as them, something else.
 	const says = (racer.runner.id === found.runner && found.toSelf) || found.says
-	if (says && !found.waiting) world.popup(says, found.x, found.y - 80)
-	if (unlockRunner(bonus.id)) {
+	if (says && !found.waiting && !quiet) world.popup(says, found.x, found.y - 80)
+	// Freed, theirs once they're home: over the finish line with them.
+	if (untilFinish && !runnerUnlocked(bonus.id)) {
+		b.freeing = bonus.id
+		play('cheer')
+		world.popup(`Get ${bonus.name} home!`, b.x, b.feetY - 110)
+	} else if (unlockRunner(bonus.id)) {
 		b.unlocked = bonus.id
 		play('cheer')
 		world.popup(`${bonus.name} unlocked!`, b.x, b.feetY - 110)
@@ -1846,7 +1904,7 @@ function fireOffVent(
 	const fires = steamFires(o)
 	if (!b.grounded || Math.abs(b.x - o.x) >= fires.reach) return
 	state.flown = world.ticks()
-	b.vy = -fires.up
+	b.vy = -fires.up * liftAt(world.course, b.x)
 	if (fires.on) {
 		b.vx = Math.max(b.vx, fires.on)
 		b.facing = 1
@@ -2518,6 +2576,35 @@ function collide(world: World, racer: Racer) {
 				}
 				break
 			}
+			case 'alien': {
+				// Down onto its head: knocked out. Into it, still up: a stumble.
+				if (state.used || state.scooped) break
+				if (stompAlien(world, racer, state)) break
+				if (freshFor(state) && b.stumble === 0 && intoAlien(world, b, o)) {
+					hits(state)
+					stumble('Zap!')
+				}
+				break
+			}
+			case 'asteroid': {
+				// Swum into: knocked about.
+				const reach = asteroidReach(o)
+				const middle = ground - asteroidHeight(o, Math.max(0, world.ticks()))
+				if (
+					freshFor(state) &&
+					b.stumble === 0 &&
+					overlaps(
+						o.x - reach.along,
+						o.x + reach.along,
+						middle - reach.across,
+						middle + reach.across,
+					)
+				) {
+					hits(state)
+					stumble(o.satellite ? 'Clang!' : 'Thunk!')
+				}
+				break
+			}
 			case 'jellyfish': {
 				// Into its bell, or its tentacles under it: stung.
 				const bottom = ground - jellyfishHeight(o, Math.max(0, world.ticks()))
@@ -2847,7 +2934,8 @@ function stepBus(world: World) {
 			(inRiver(world, bus.frontX) ? RIVER_BUS_PACE : 1) *
 			(inDeepWater(world, bus.frontX - BUS_MIDDLE_BEHIND)
 				? (world.course.deepWater?.busPace ?? 1)
-				: 1)
+				: 1) *
+			busSlowAt(world.course, bus.frontX)
 		// Off a Leap, in a giant condor's talons: no faster than the condors
 		// carrying everyone down ahead of it, so it can't catch them while
 		// there's nothing they can do about it.
@@ -3025,7 +3113,10 @@ function knockOver(world: World) {
 			(o.kind === 'snowman' && !state.used) ||
 			(o.kind === 'cone' && !state.used) ||
 			// A Germ not yet popped.
-			(o.kind === 'germ' && !state.used)
+			(o.kind === 'germ' && !state.used) ||
+			// An alien, up or knocked out, if it's in reach, not high up on a
+			// Platform.
+			(o.kind === 'alien' && o.height < ALIEN_SCOOP_REACH)
 		) {
 			state.used = true
 			state.scooped = {
@@ -3075,6 +3166,9 @@ function startleGeese(world: World) {
 const GEESE_SCARE = 140
 /** How near a racer gets to geese before they fly off. */
 const GEESE_STARTLE = 70
+
+/** How high up an alien can be stood and still be scooped up by the bus. */
+const ALIEN_SCOOP_REACH = 120
 
 /** How fast something scooped is flung up, and how fast it spins, in degrees a tick. */
 const SCOOP_FLING = 12
@@ -3368,13 +3462,17 @@ function stepCamera(world: World) {
 				? CAMERA_LEAD
 				: 1 - CAMERA_LEAD
 	world.view.lead += (lead - world.view.lead) * CAMERA_TURN
-	const target = Math.max(
-		CAMERA_LEFTMOST,
-		Math.min(
-			world.terrain.finishX + CAMERA_PAST_FINISH - VIEW_WIDTH,
-			world.body.x - VIEW_WIDTH * world.view.lead,
-		),
-	)
+	// In a boss's room, the whole of it in view, held still: an arena.
+	const arena = bossArena(world, world.body.x)
+	const target =
+		arena ??
+		Math.max(
+			CAMERA_LEFTMOST,
+			Math.min(
+				world.terrain.finishX + CAMERA_PAST_FINISH - VIEW_WIDTH,
+				world.body.x - VIEW_WIDTH * world.view.lead,
+			),
+		)
 	const camera = world.camera()
 	world.setCamera(camera + (target - camera) * 0.25)
 }

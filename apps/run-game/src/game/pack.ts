@@ -45,7 +45,13 @@ import { rideCondor } from './flyers'
 import { atSea, flyPacer } from './gliders'
 import { mummyAt } from './mummies'
 import { landingOn, platformAt, platformMove } from './platforms'
-import { PACER_SHRINK, isHeld, shrinkRayOver, shrunkAt } from './portals'
+import {
+	PACER_SHRINK,
+	isHeld,
+	launchedAt,
+	shrinkRayOver,
+	shrunkAt,
+} from './portals'
 import { sagOf } from './ropeBridge'
 import { swampManAt } from './sewer'
 import { skiPacer } from './skis'
@@ -254,7 +260,8 @@ export function stepPack(world: World, frozen = false) {
 			if (
 				at < terrain.finishX - 300 &&
 				!terrain.inGap(at) &&
-				!shrunkAt(world.course, at)
+				!shrunkAt(world.course, at) &&
+				!launchedAt(world.course, at)
 			)
 				join(world, Math.round(at), world.course.ride === 'skis')
 			at += 18 + Math.random() * 30
@@ -287,7 +294,9 @@ export function stepPack(world: World, frozen = false) {
 			p.x > terrain.finishX + 700 ||
 			// Shrunk away to nothing in a shrink ray: gone, nobody else is
 			// shrunk.
-			(p.shrink ?? 0) >= PACER_SHRINK.gone
+			(p.shrink ?? 0) >= PACER_SHRINK.gone ||
+			// Aboard a rocket.
+			launchedAt(world.course, p.x)
 		)
 			pack.splice(i, 1)
 	}

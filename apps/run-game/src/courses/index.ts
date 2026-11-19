@@ -23,6 +23,7 @@ import { kristineberg } from './kristineberg'
 import { machuPicchu } from './machuPicchu'
 import { midnattsloppet } from './midnattsloppet'
 import { pyramids } from './pyramids'
+import { rocketLaunch } from './rocketLaunch'
 import { scoopLine } from './scoopLine'
 import { sewers } from './sewers'
 import { slopes } from './slopes'
@@ -108,6 +109,7 @@ export const COURSES: Course[] = [
 	karolinska,
 	midnattsloppet,
 	dinoIsland,
+	rocketLaunch,
 ].map((course, i) => {
 	const climb = climbOf(course)
 	// So a Round can always get everyone on the screen.

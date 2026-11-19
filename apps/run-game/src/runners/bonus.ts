@@ -82,6 +82,14 @@ import theMinerSkiTuck from '../assets/runners/the-miner/ski-tuck.png'
 import theMinerSki from '../assets/runners/the-miner/ski.png'
 import theMinerSnowboard from '../assets/runners/the-miner/snowboard.png'
 import theMinerStand from '../assets/runners/the-miner/stand.png'
+import tinaDance from '../assets/runners/tina/dance.png'
+import tinaFace from '../assets/runners/tina/face.png'
+import tinaRun from '../assets/runners/tina/run.png'
+import tinaSit from '../assets/runners/tina/sit.png'
+import tinaSkiTuck from '../assets/runners/tina/ski-tuck.png'
+import tinaSki from '../assets/runners/tina/ski.png'
+import tinaSnowboard from '../assets/runners/tina/snowboard.png'
+import tinaStand from '../assets/runners/tina/stand.png'
 import vikingDance from '../assets/runners/viking/dance.png'
 import vikingFace from '../assets/runners/viking/face.png'
 import vikingRun from '../assets/runners/viking/run.png'
@@ -407,6 +415,7 @@ export const MINER: Playable = {
 		face: theMinerFace,
 		dance: dance(theMinerDance, 'the-miner', MINER_WIDTH),
 		neck: { x: 10.5, y: 10 },
+		twoHeads: true,
 		width: MINER_WIDTH,
 		height: HEIGHT,
 	},
@@ -711,6 +720,41 @@ headShowsIn(
 	BUSHY_CROWN,
 )
 
+/**
+ * Tina: the alien prisoner, freed from the cage hanging in Rocket Launch's
+ * base. One of the troopers' own kind (see `ALIEN_ART` in
+ * `courses/kit/alienCreatures.ts`), side on: bare green skin, a big bald
+ * bulb of a head, two huge black eyes with a pale glint in each, a pale
+ * belly and wiry limbs, long thin legs and long feet. But a friendly one:
+ * no gun, no harness; a pink bow on her head, lashes, a cheeky grin, and a
+ * bright pink scarf round her neck, its tail streaming out behind her.
+ * Six frames to her run, the members' stride, her arms pumping and her
+ * scarf rippling. Squatted right down to duck. Her dance is her own, drawn
+ * by hand: a jig (`jig`). She hangs in her cage in her stand pose.
+ */
+export const TINA: Playable = {
+	id: 'bonus:tina',
+	name: 'Tina',
+	bonus: true,
+	unlock: 'Freed on Rocket Launch',
+	tagline: 'Out of the cage',
+	sprite: {
+		run: runFrames(tinaRun, 6),
+		sit: tinaSit,
+		stand: tinaStand,
+		ski: tinaSki,
+		skiTuck: tinaSkiTuck,
+		snowboard: tinaSnowboard,
+		face: tinaFace,
+		dance: dance(tinaDance, 'tina'),
+		neck: { x: 10, y: 14 },
+		width: WIDTH,
+		height: HEIGHT,
+	},
+}
+
+/** Temporary: `courses/rocketLaunch.ts` still imports the placeholder's name. */
+
 export const BONUS_RUNNERS: Playable[] = [
 	YETI,
 	BAT_PERSON,
@@ -726,6 +770,7 @@ export const BONUS_RUNNERS: Playable[] = [
 	DET_MUNCH,
 	HATCHLING,
 	BUSHY,
+	TINA,
 ]
 
 /**

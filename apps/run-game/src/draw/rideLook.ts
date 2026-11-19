@@ -99,6 +99,15 @@ import {
 	stoodBoardPicture,
 } from './art/skis'
 import {
+	SPACE_BUDDY_BACK,
+	SPACE_BUDDY_HEIGHT,
+	SPACE_BUDDY_OUTLINE,
+	SPACE_BUDDY_SADDLE,
+	SPACE_BUDDY_WIDTH,
+	SpaceBuddyArt,
+	spaceBuddyPicture,
+} from './art/spaceBuddy'
+import {
 	UNICORN_BACK,
 	UNICORN_HEIGHT,
 	UNICORN_OUTLINE,
@@ -373,6 +382,26 @@ const SKATEBOARD: RideLook = {
 	},
 }
 
+/**
+ * A space buddy, on Rocket Launch's planet: a little round alien, bounding
+ * along in the low gravity, a good long way, a little faster than running.
+ */
+const SPACE_BUDDY: RideLook = {
+	width: SPACE_BUDDY_WIDTH,
+	height: SPACE_BUDDY_HEIGHT,
+	back: SPACE_BUDDY_BACK,
+	saddle: SPACE_BUDDY_SADDLE,
+	Art: SpaceBuddyArt,
+	picture: spaceBuddyPicture,
+	shadow: SPACE_BUDDY_OUTLINE,
+	call: 'Bleep!',
+	sound: 'furby',
+	rides: 'Space buddy rides',
+	spent: { kind: 'droop', from: 16, droop: 3, face: [17, 10] },
+	speed: 7.5,
+	ticks: 320,
+}
+
 const RIDES = {
 	corgi: CORGI,
 	llama: LLAMA,
@@ -386,6 +415,7 @@ const RIDES = {
 	skis: SKIS,
 	bloodCell: BLOOD_CELL,
 	skateboard: SKATEBOARD,
+	spaceBuddy: SPACE_BUDDY,
 }
 
 export const rideLook = (course: Pick<Course, 'ride'>) =>

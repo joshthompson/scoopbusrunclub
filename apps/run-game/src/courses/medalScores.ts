@@ -33,4 +33,5 @@ export const MEDAL_SCORES: Record<CourseId, MedalPoints | null> = {
 	karolinska: null,
 	midnattsloppet: null,
 	'dino-island': null,
+	'rocket-launch': null,
 }

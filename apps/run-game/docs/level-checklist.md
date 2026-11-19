@@ -28,6 +28,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | 17 | The Hospital (Karolinska) | ✅ Grapes, oxygen, vitamins | ✅ Cure the common cold (pop every germ) | ✅ Spirit of Jazz | ✅ Head mirror | ✅ Red blood cell | ✅ Shrink ray, inside the body | 2026-11-18 |
 | 18 | Midnattsloppet | ✅ Water, blåbärssoppa, pizza slice (plus the banana hunt) | ✅ Bounce on 20 heads | ✅ Banana Girl | ✅ Disco ball | ✅ Skateboard | ✅ Rock band stage, church choir, banana stand | 2026-11-18 |
 | 19 | Dino Island | ✅ Fossil pops, lava cake, coconut | ✅ Hatch the egg and bring it home | ✅ Hatchling | ✅ Snorkel mask | ✅ Pterodactyl (flies over) | ✅ Up a diplodocus onto its lifting head; a volcano that erupts as the last runner crosses its crater, then a run down it on the skyline, in silhouette; a dive and a swim in Deep Water | 2026-11-18 |
+| 20 | Rocket Launch | ✅ Astronaut ice cream, space food tube, starfruit, alien jelly | ✅ Free the prisoner | ✅ Tina, the alien prisoner (drop her cage, and finish) | ✅ Alien antennae | ✅ Space buddy | ✅ The rocket's launch on the course, blowing up in space; a swim through space; a low-gravity planet with geysers; the alien base under its domes; the boss in its chamber | 2026-11-19 |
 
 ## Still to do
 
@@ -45,7 +46,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 
 These are rows from the `course-wiring` skill's standard that the table above doesn't cover:
 
-- **Tuned medal scores** (`src/courses/medalScores.ts`): ⬜ Haga, The Hospital, Midnattsloppet and Dino Island are still `null`, so their scores are worked out automatically.
+- **Tuned medal scores** (`src/courses/medalScores.ts`): ⬜ Haga, The Hospital, Midnattsloppet, Dino Island and Rocket Launch are still `null`, so their scores are worked out automatically.
 - **Own tune** (`src/music/tunes.ts`): ✅ every level has one.
 - **Special goal picture** (`src/draw/art/goals.tsx`): ✅ every level with a custom goal has one.
 - **Swim poses** (`scripts/make-swims.ts`): every member and bonus runner has two, made from their run strips, for Dino Island's Deep Water; anyone made from a look swims their run turned over.

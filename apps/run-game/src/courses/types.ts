@@ -186,6 +186,31 @@ export type Obstacle =
 	 * biting nobody else (see `sharks.ts`).
 	 */
 	| { kind: 'shark'; x: number; height: number }
+	/**
+	 * An asteroid, tumbling through space on Rocket Launch (see `DeepWater`'s
+	 * `space`), its middle drifting up and down from `low` to `high` over the
+	 * Ground: swim round it, or into it and you're knocked, a stumble.
+	 * `big` ones are twice the size.
+	 */
+	| {
+			kind: 'asteroid'
+			x: number
+			low: number
+			high: number
+			big?: boolean
+			/** A dead satellite, drifting the same, tilting: wider than it's tall. */
+			satellite?: boolean
+	  }
+	/**
+	 * An alien trooper, Rocket Launch's, stood `height` over the Ground at
+	 * `x` (up on a Platform, if it's not on it), facing the way everyone's
+	 * coming: as anyone comes near it fires slow plasma bolts at them, along
+	 * at the height of its gun (see `space.ts`). Jump them, or duck under
+	 * them; a `kneeling` one fires them low, to jump. Land on its head and
+	 * it's knocked down and out, a bounce off it, as off a head. Into it,
+	 * and you stumble.
+	 */
+	| { kind: 'alien'; x: number; height: number; kneeling?: boolean }
 
 /** Something on the course, at `x` along it, that speeds you up. */
 export type Boost =
@@ -598,6 +623,11 @@ export interface CourseLook {
 	 * back, roaring, its wheels tucked away; floating along over the floor,
 	 * up over whatever's in the way, bobbing. Shrunk, inside someone.
 	 */
+	/**
+	 * Where Steam Vents are geysers, from `from` to `to`: a hole in the
+	 * crust, steaming, blasting whoever's over it up. Rocket Launch's planet.
+	 */
+	geyser?: { from: number; to: number }
 	busJets?: {
 		from: number
 		to: number
@@ -1168,6 +1198,7 @@ export type CourseId =
 	| 'karolinska'
 	| 'midnattsloppet'
 	| 'dino-island'
+	| 'rocket-launch'
 
 /**
  * A Portal: a machine that shrinks everyone down, or a sneeze that blows
@@ -1178,7 +1209,13 @@ export type CourseId =
  * bus too, as far behind as it was. See `portals`.
  */
 export interface Portal {
-	kind: 'shrink' | 'grow'
+	/**
+	 * `launch`: a rocket, Rocket Launch's. Everyone climbs aboard at `in`,
+	 * and once they all have, it takes off, the camera following it up into
+	 * space, till it blows up, and they're thrown out into space at `out`
+	 * (see `rocketLaunch.ts` in `draw`).
+	 */
+	kind: 'shrink' | 'grow' | 'launch'
 	in: number
 	out: number
 	/**
@@ -1313,6 +1350,11 @@ export interface Course {
 		 * kickflips under you.
 		 */
 		| 'skateboard'
+		/**
+		 * On Rocket Launch's planet, space buddies: little round aliens,
+		 * bounding along in the low gravity with you on their back.
+		 */
+		| 'spaceBuddy'
 	/** Its Portals, a shrink and then a grow, in order along it: see `Portal`. */
 	portals?: Portal[]
 	/**
@@ -1403,6 +1445,26 @@ export interface Course {
 	leap?: { edge: number; catchAt: number; land: number }
 	/** A Secret: a way down one of its Gaps into a cavern under it. See `Secret`. */
 	secret?: Secret
+	/**
+	 * Low gravity, from `from` to `to`, `scale` of the usual: jumps rise as
+	 * high as `lift` times the usual, and take far longer about it. Rocket
+	 * Launch's planet.
+	 */
+	lowGravity?: { from: number; to: number; scale: number; lift: number }
+	/**
+	 * Where the bus goes slower than its own pace, `pace` of it: in Rocket
+	 * Launch's alien base, so there's time to climb about and stomp aliens.
+	 */
+	busSlow?: { from: number; to: number; pace: number }[]
+	/** A boss to beat in its own room: see `Boss`. */
+	boss?: Boss
+	/**
+	 * A cage hanging high over the course at `x`, its top at `top` (a y),
+	 * the course's `found` runner in it: land on it and it falls, smashing
+	 * open on the floor at `floor` (a y), and they're free. Rocket Launch's
+	 * alien prisoner.
+	 */
+	cage?: { x: number; top: number; floor: number; says: string }
 	/**
 	 * A bonus runner, stood somewhere hard to get to, waiting to be found:
 	 * get to them, and the first time, they're yours to run as (see
@@ -1790,6 +1852,8 @@ export interface SpecialRun {
 	toppedTower?: boolean
 	/** How many Germs they popped, landing on them. */
 	germsPopped?: number
+	/** Dropped the cage a prisoner was in, setting them free (see `Course['cage']`). */
+	freedPrisoner?: boolean
 	/** Been down the course's Secret, and back out of it. */
 	foundSecret?: boolean
 	/** Got to the course's hidden bonus runner (see `Course['found']`). */
@@ -1905,6 +1969,18 @@ export interface DeepWater {
 	to: number
 	surface: number
 	busPace: number
+	/**
+	 * Not water at all, but space: nothing floats you up, there's no
+	 * surface to splash into, nor seabed to bonk; its top is as high as
+	 * anyone can swim, its Ground as low. Out of it, the far side, you fall,
+	 * down onto whatever's there. Rocket Launch's.
+	 */
+	space?: boolean
+	/**
+	 * As low as anyone can swim, if not the Ground: space's floor, over a
+	 * planet's curved edge, drawn on down off the bottom of the screen.
+	 */
+	floor?: number
 }
 
 /** The sea's colours, swum through: its `water` near the surface, darkening to `deep`; the `light` playing down through it, and its `surface`'s shine. */
@@ -1932,6 +2008,26 @@ export interface BackdropBand {
  * hatchling, out of its egg on its own two legs.
  */
 export type FollowerKind = 'hatchling'
+
+/**
+ * A boss, in its own room from `room.from` to `room.to`, stood in the middle
+ * of it at `x`, `width` across and `height` tall: once everyone still racing
+ * is in, its door shuts behind them, the bus waits outside, and it wakes,
+ * firing plasma about the room. Land on its head `hp` times (that many for
+ * each of them, in a Round) and it's beaten, the door out the far side
+ * opening. Every `stompEvery` of those, it stomps, shaking everyone off
+ * whatever they're up on, down to the floor. Rocket Launch's giant alien.
+ */
+export interface Boss {
+	room: { from: number; to: number }
+	x: number
+	width: number
+	height: number
+	/** How wide its head is, to land on, across its top. */
+	head: number
+	hp: number
+	stompEvery: number
+}
 
 /** A course as it's written: its number comes from where it is in `COURSES`. */
 export type CourseDefinition = Omit<Course, 'number'>

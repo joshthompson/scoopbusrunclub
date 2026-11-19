@@ -44,6 +44,12 @@ import {
 	waterCup,
 } from '../../courses/kit/midnattsloppetFika'
 import { type PixelRect, pixelArt } from '../../courses/kit/pixelArt'
+import {
+	alienJelly,
+	astronautIceCream,
+	spaceTube,
+	starfruit,
+} from '../../courses/kit/rocketLaunchFika'
 import { dobryCola, mojito, popcorn } from '../../courses/kit/rooftopFika'
 import {
 	goldRing,
@@ -221,6 +227,10 @@ const ART: Record<FikaItem, string> = {
 	fossilPops,
 	lavaCake,
 	coconut,
+	astronautIceCream,
+	spaceTube,
+	starfruit,
+	alienJelly,
 }
 
 /** A fika item's picture, for a Draw Hook to draw at its size (see `FIKA_SIZE`). */

@@ -369,6 +369,24 @@ export const DANCES = {
 			{ arms: ['out', 'out'], bend: 2 },
 		],
 	},
+	/**
+	 * A jig: bouncing on her toes, her arms flung out and up and waved,
+	 * one then the other, a kick, her scarf flying up with every hop. Drawn
+	 * by hand, Tina's: her arms are her own wiry ones, not the template's.
+	 */
+	jig: {
+		interval: 140,
+		moves: [
+			{ bend: 2 },
+			{ lift: 3 },
+			{ sway: -1 },
+			{ bend: 2, sway: -1 },
+			{ lift: 3 },
+			{ sway: 1 },
+			{ bend: 2, sway: 1 },
+			{ lift: 4 },
+		],
+	},
 	/** Round and round, hopping, chasing its tail. */
 	zoomies: {
 		interval: 110,
@@ -438,6 +456,8 @@ export const RUNNER_DANCES: Record<string, DanceName> = {
 	hatchling: 'wobble',
 	// Waving, flag-waving, a spin and a star jump: drawn by hand.
 	bushy: 'mascot',
+	// Her arms waved, her scarf flying, bouncing along: drawn by hand.
+	tina: 'jig',
 }
 
 /** A dance for anyone not in `RUNNER_DANCES`, from something about them that stays the same. */

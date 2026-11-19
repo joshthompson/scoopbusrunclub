@@ -17,6 +17,7 @@ import { stillFollowed } from '../game/followers'
 import type { Hat } from '../game/hats'
 import { longJumpMetres } from '../game/longJump'
 import { type Medal, medalFor } from '../game/medals'
+import { busParkedFor } from '../game/space'
 import { POPUP_TICKS, onScreen, stepWorld } from '../game/step'
 import { type World, createWorld } from '../game/world'
 import { type Action, anyControls, setTouch, touchScreen } from '../input'
@@ -375,6 +376,7 @@ export function Game(props: {
 					rodeWearing: world.body.rodeWearing,
 					toppedTower: world.body.toppedTower,
 					germsPopped: world.body.germsPopped,
+					freedPrisoner: world.body.freedPrisoner,
 					foundSecret: world.body.foundSecret,
 					metFound: world.body.metFound,
 					brokeBridge: world.body.brokeBridge,
@@ -722,6 +724,8 @@ function Hud(props: {
 	const busGap = () => world.playerX() - world.busX()
 	/** The bus is off the left of the screen, so say how far back it is instead. */
 	const busOffScreen = () => world.busX() < world.camera()
+	/** Shut in with a boss, the bus waiting outside: no "← bus" to worry about. */
+	const busParked = () => world.ticks() >= 0 && busParkedFor(world)
 
 	return (
 		<div style={styles.hud}>
@@ -749,7 +753,9 @@ function Hud(props: {
 				</Show>
 			</div>
 
-			<Show when={world.phase() === 'running' && busOffScreen()}>
+			<Show
+				when={world.phase() === 'running' && busOffScreen() && !busParked()}
+			>
 				<div
 					style={{
 						...styles.busWarning,

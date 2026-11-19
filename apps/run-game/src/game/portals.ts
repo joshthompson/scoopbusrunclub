@@ -93,11 +93,118 @@ const FLASH_DOWN = 30
  */
 const MOST_APART = 24
 
+/**
+ * The rocket, on the course itself: everyone aboard, the countdown, "3, 2,
+ * 1...", and at `lift` it lifts off its pad, faster and faster, the camera
+ * going up after it a little way, then watching it go, up off the top of
+ * the screen. Gone, at `cut`, the camera's out in space, where it pops up
+ * from under the screen, slowing, risen by `risen`, and hangs there, in
+ * close on its windows from `windows` to `wobble`, everyone at them
+ * looking out, till it shudders, something going wrong, and at `snap` it
+ * blows up, and they're thrown out into space. Ticks from everyone getting
+ * aboard. Drawn in `draw/rocketLaunch.tsx`.
+ */
+export const LAUNCH = {
+	lift: 70,
+	cut: 170,
+	risen: 230,
+	windows: 236,
+	wobble: 306,
+	snap: 380,
+}
+/** How fast it speeds up, lifting off; how far the camera goes up after it, before it lets it go. */
+const LIFT_PULL = 0.09
+const CAMERA_FOLLOWS = 240
+/** How far under where it blows up it pops up from: off the bottom of the screen. */
+const POP_FROM = 560
+/** How far in on its windows the camera goes. */
+const WINDOW_ZOOM = 2.2
+
+/** Where in space a rocket blows up, and everyone's thrown out: in its middle, at its way out. */
+export function launchEnd(
+	world: Pick<World, 'course' | 'terrain'>,
+	portal: Portal,
+) {
+	const space = world.course.deepWater
+	const floor = world.terrain.groundY(portal.out)
+	return {
+		x: portal.out,
+		y: space ? (space.surface + floor) / 2 : floor - 200,
+	}
+}
+
+/**
+ * Where the rocket is, `t` ticks after everyone's aboard: its middle, and
+ * how far round it's leaning, in degrees, its nose to the right. On its pad
+ * (`focus`), up, and over, heading on along the course, sinking only
+ * towards the end, out over space, where up and down's no matter.
+ */
+export function rocketFlight(
+	world: Pick<World, 'course' | 'terrain'>,
+	portal: Portal,
+	t: number,
+) {
+	const pad = portal.focus
+	const end = launchEnd(world, portal)
+	// Shuddering on the pad, as it lifts, and as it goes wrong.
+	const shudder =
+		t >= LAUNCH.wobble
+			? Math.sin(t * 1.9) * (2 + (t - LAUNCH.wobble) / 6)
+			: t > LAUNCH.lift - 30 && t < LAUNCH.lift + 20
+				? (t % 4 < 2 ? 1 : -1) * 0.8
+				: 0
+	if (t < LAUNCH.cut) {
+		const up = Math.max(0, t - LAUNCH.lift)
+		return { x: pad.x, y: pad.y - up * up * LIFT_PULL, angle: shudder }
+	}
+	// Out in space: up from under the screen, slowing, then drifting.
+	const u = Math.min(1, (t - LAUNCH.cut) / (LAUNCH.risen - LAUNCH.cut))
+	const drift = Math.sin((t - LAUNCH.risen) / 24) * 6
+	return {
+		x: end.x,
+		y: end.y + POP_FROM * (1 - u) ** 2 + (u >= 1 ? drift : 0),
+		angle: shudder + (u >= 1 ? Math.sin(t / 30) * 3 : 0),
+	}
+}
+
+/** Where the camera looks while the rocket goes: up after it off the pad, then out in space. */
+function launchCamera(
+	world: Pick<World, 'course' | 'terrain'>,
+	portal: Portal,
+	t: number,
+) {
+	if (t < LAUNCH.cut) {
+		const rocket = rocketFlight(world, portal, t)
+		const y = Math.max(rocket.y, portal.focus.y - CAMERA_FOLLOWS)
+		return { x: portal.focus.x - VIEW_WIDTH / 2, y: y - VIEW_HEIGHT / 2 }
+	}
+	const end = launchEnd(world, portal)
+	return { x: end.x - VIEW_WIDTH / 2, y: end.y - VIEW_HEIGHT / 2 }
+}
+/** What's said, as the rocket goes: the countdown, lift-off, and something wrong. */
+const LAUNCH_WORDS = [
+	{ at: 0, to: 22, text: '3...', size: 70 },
+	{ at: 22, to: 44, text: '2...', size: 70 },
+	{ at: 44, to: LAUNCH.lift, text: '1...', size: 70 },
+	{ at: LAUNCH.lift, to: LAUNCH.lift + 40, text: 'Lift off!', size: 80 },
+	{ at: LAUNCH.wobble + 16, to: LAUNCH.snap - 10, text: 'Uh oh...', size: 70 },
+]
+
+/** How long after the first the last is thrown out, a tick or two each. */
+const THROWN_APART = 2
+/** How fast they're thrown out, on, and how far apart, up and down. */
+const THROWN_ON = 5
+const THROWN_SPREAD = 46
+
 const snapOf = (portal: Portal) =>
-	portal.kind === 'shrink' ? SHRINK.snap : SNEEZE.snap
+	portal.kind === 'shrink'
+		? SHRINK.snap
+		: portal.kind === 'launch'
+			? LAUNCH.snap
+			: SNEEZE.snap
 /** How long after their turn someone's flying, sneezed out, before they're down and running. */
 const emergeOf = (portal: Portal) =>
-	portal.kind === 'shrink' ? 0 : SNEEZE.flight
+	portal.kind === 'grow' ? SNEEZE.flight : 0
 
 /** Where someone in slot `slot` stands, across, from the middle. */
 const slotOffset = (slot: number) =>
@@ -105,6 +212,7 @@ const slotOffset = (slot: number) =>
 
 /** Where in a Portal they're held: on the shrink ray's plate, or just inside the nose. */
 function heldX(portal: Portal, slot: number) {
+	if (portal.kind === 'launch') return portal.in
 	const middle = portal.kind === 'shrink' ? portal.focus.x : portal.in + 70
 	return middle + slotOffset(slot)
 }
@@ -115,7 +223,10 @@ function heldX(portal: Portal, slot: number) {
  * after the one before them (see `bunchUp`).
  */
 const turnOf = (run: PortalRun, portal: Portal, held: Held) =>
-	(run.zappedAt ?? 0) + snapOf(portal) + (held.at - run.firstAt)
+	(run.zappedAt ?? 0) +
+	snapOf(portal) +
+	// Out of the rocket, blown up: all at once, near enough.
+	(portal.kind === 'launch' ? held.slot * THROWN_APART : held.at - run.firstAt)
 
 /** When the bus comes on again, the other side: as far behind the last of them as it was. */
 const busTurn = (run: PortalRun, portal: Portal) =>
@@ -199,6 +310,7 @@ export function stepPortals(world: World) {
 				play('zap')
 				world.popup('Shrink ray!', portal.focus.x, portal.focus.y - 110)
 			}
+			if (portal.kind === 'launch') play('count')
 		}
 		return false
 	}
@@ -209,6 +321,7 @@ export function stepPortals(world: World) {
 		// "Ah... Ah... AAH...", in the dark, a sniff each.
 		if (portal.kind === 'grow' && AH.some((ah) => ah.at === t)) play('sniff')
 		if (portal.kind === 'shrink' && t === SHRINK.charge) play('whoosh')
+		if (portal.kind === 'launch') soundLaunch(t)
 		return true
 	}
 	if (t === snap) through(world, run, portal)
@@ -219,7 +332,7 @@ export function stepPortals(world: World) {
 		const turn = turnOf(run, portal, held)
 		if (now < turn) {
 			// Not their turn yet: waiting, out of sight, the other side.
-			pin(world, racer, portal.kind === 'shrink' ? portal.out : portal.focus.x)
+			pin(world, racer, portal.kind === 'grow' ? portal.focus.x : portal.out)
 			if (portal.kind === 'grow') racer.body.feetY = portal.focus.y
 			continue
 		}
@@ -248,6 +361,19 @@ function hold(world: World, run: PortalRun, portal: Portal, racer: Racer) {
 	})
 	if (run.held.size === 1) run.firstAt = world.ticks()
 	if (portal.kind === 'shrink') world.popup('In you go!', b.x, b.feetY - 70)
+	if (portal.kind === 'launch') {
+		world.popup('All aboard!', b.x, b.feetY - 70)
+		play('scan')
+	}
+}
+
+/** The rocket's countdown, lift-off, roar, and the bang. */
+function soundLaunch(t: number) {
+	if (t === 22 || t === 44) play('count')
+	if (t === LAUNCH.lift) play('go')
+	if (t === LAUNCH.lift + 4 || t === LAUNCH.wobble) play('rumble')
+	if (t === LAUNCH.lift + 30) play('whoosh')
+	if (t === LAUNCH.snap - 8) play('eruption')
 }
 
 /** Stood still at `x`, on the floor, nothing going on. */
@@ -275,12 +401,13 @@ function through(world: World, run: PortalRun, portal: Portal) {
 	bus.frontX = portal.out - run.busGap
 	bus.reach = 0
 	if (portal.kind === 'grow') play('sneeze')
+	if (portal.kind === 'launch') world.space.boomAt = world.ticks()
 	// The camera straight there, not swept along the course.
-	const lookAt = portal.kind === 'shrink' ? portal.out : portal.focus.x + 120
+	const lookAt = portal.kind === 'grow' ? portal.focus.x + 120 : portal.out
 	world.setZoom(1)
 	world.view.lead = CAMERA_LEAD
 	world.setCamera(
-		lookAt - VIEW_WIDTH * (portal.kind === 'shrink' ? CAMERA_LEAD : 0.5),
+		lookAt - VIEW_WIDTH * (portal.kind === 'grow' ? 0.5 : CAMERA_LEAD),
 	)
 	const floor = world.terrain.groundY(portal.out)
 	world.setCameraY(Math.min(0, floor - CAMERA_HEADROOM))
@@ -332,6 +459,10 @@ export function sneezedTo(
 /** Their turn: let out, the other side, going as fast as they went in. */
 function letOut(world: World, racer: Racer, held: Held, portal: Portal) {
 	const b = racer.body
+	if (portal.kind === 'launch') {
+		thrownOut(world, racer, held, portal)
+		return
+	}
 	const x =
 		portal.kind === 'shrink'
 			? portal.out + held.over
@@ -348,6 +479,30 @@ function letOut(world: World, racer: Racer, held: Held, portal: Portal) {
 }
 
 /**
+ * Out of the rocket, as it blows up: thrown out into space, all over, on
+ * their way, swimming, a space helmet on each of them.
+ */
+function thrownOut(world: World, racer: Racer, held: Held, portal: Portal) {
+	const b = racer.body
+	const { y: middle } = launchEnd(world, portal)
+	const across = slotOffset(held.slot)
+	b.x = portal.out + held.over + across * 1.5
+	b.feetY =
+		middle +
+		Math.sign(across) * Math.min(3, Math.abs(across) / SLOT_GAP) * THROWN_SPREAD
+	b.floor = b.feetY
+	b.vx = THROWN_ON + (held.slot % 3) * 0.5
+	b.vy = (held.slot % 2 ? 1 : -1) * 1.2
+	b.grounded = false
+	b.swimming = true
+	b.facing = 1
+	b.on = undefined
+	b.hat = { kind: 'spaceHelmet' }
+	b.lostHat = undefined
+	if (held.slot === 0) world.popup('Wheee!', b.x, b.feetY - 70)
+}
+
+/**
  * How someone in a Portal is drawn this tick, if they're in one: where,
  * how big (1 their own size), or not at all, waiting their turn; and
  * whether they're `waiting` for everyone else to get to it.
@@ -358,6 +513,8 @@ export function heldLook(world: World, racer: Racer) {
 	const held = run?.held.get(racer.id)
 	if (!run || !portal || !held) return undefined
 	const b = racer.body
+	// Aboard the rocket, out of sight, till they're thrown out of it.
+	if (portal.kind === 'launch') return { hidden: true as const }
 	// Waiting for everyone else to get there.
 	if (run.zappedAt === undefined)
 		return { x: b.x, feetY: b.feetY, scale: 1, waiting: true as const }
@@ -401,6 +558,29 @@ export function portalView(world: World) {
 		t < snap
 			? Math.max(0, 1 - (snap - t) / FLASH_UP)
 			: Math.max(0, 1 - (t - snap) / FLASH_DOWN)
+	if (portal.kind === 'launch') {
+		// The take-off, on the course: in close on its windows a while,
+		// the countdown said, and a flash at the bang.
+		const rocket = rocketFlight(world, portal, Math.min(t, snap))
+		const into = (t - LAUNCH.windows) / 20
+		const outOf = (LAUNCH.wobble + 10 - t) / 20
+		const zoom = 1 + (WINDOW_ZOOM - 1) * ease(Math.min(into, outOf))
+		const said = LAUNCH_WORDS.findLast((w) => t >= w.at && t < w.to)
+		return {
+			zoom,
+			focus: { x: rocket.x, y: rocket.y },
+			shake: t >= LAUNCH.wobble && t < snap ? (t % 4 < 2 ? 3 : -3) : 0,
+			flash:
+				t < snap
+					? Math.max(0, 1 - (snap - t) / FLASH_UP)
+					: Math.max(0, 1 - (t - snap) / FLASH_DOWN),
+			words: said && {
+				text: said.text,
+				size: said.size,
+				grow: Math.max(0, 1 - (t - said.at) / 6),
+			},
+		}
+	}
 	if (portal.kind === 'shrink') {
 		return {
 			zoom: t < snap ? 1 / shrunk(t - SHRINK.lag) : 1,
@@ -461,6 +641,14 @@ export function portalCamera(world: World) {
 	const snap = snapOf(portal)
 	if (t >= snap + emergeOf(portal)) return false
 	if (t >= snap) return true
+	// The rocket's take-off: the camera after it, up and over.
+	if (portal.kind === 'launch') {
+		const camera = launchCamera(world, portal, t)
+		world.setZoom(1)
+		world.setCamera(camera.x)
+		world.setCameraY(Math.min(0, camera.y))
+		return true
+	}
 	// Onto it, zoomed back in to the usual, everyone held in it in the middle.
 	const middle = portal.kind === 'shrink' ? portal.focus.x : portal.in + 70
 	const floor = world.terrain.groundY(portal.in)
@@ -494,6 +682,14 @@ export function shrinkRayOver(course: { portals?: Portal[] }, x: number) {
  */
 export const shrunkAt = (course: { portals?: Portal[] }, x: number) =>
 	!!shrinkRayOver(course, x)
+
+/**
+ * Whether `x` is past a rocket's door: nobody else out running is past it.
+ * Any Pacer who gets to it goes aboard, and that's the last of them; nobody
+ * joins after.
+ */
+export const launchedAt = (course: { portals?: Portal[] }, x: number) =>
+	!!course.portals?.some((p) => p.kind === 'launch' && x >= p.in)
 
 /**
  * A Pacer into a shrink ray, on their own: stood on its plate, it charges

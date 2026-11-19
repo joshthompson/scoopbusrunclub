@@ -25,6 +25,7 @@ import purpleSignAsset from '../assets/signs/purple-sign.png'
 import { GERM_FRAMES, GERM_POPPED, VALVE } from '../courses/kit/bodyScenery'
 import { bouncyToadstool } from '../courses/kit/furbyScenery'
 import { ROCK, ROCK_BOX_HEIGHT } from '../courses/kit/rock'
+import { GEYSER } from '../courses/kit/rocketPlanetScenery'
 import {
 	ROOFTOP_VENT_FRONT,
 	ROOFTOP_VENT_HEIGHT,
@@ -249,7 +250,7 @@ import { frontParapet, frontParapetCaps } from './battlements'
 import { atSea, onJets, rideBus, startRide } from './busRide'
 import { cachedArt, svgArt } from './canvasArt'
 import { flyerLook } from './flyerLook'
-import { headTop } from './heads'
+import { headTop, headTops } from './heads'
 import { filtered, paletteOf } from './paint/css'
 import { cssColour } from './paint/cssBackground'
 import { flungReach, paintFlung } from './paint/dirtFly'
@@ -273,6 +274,14 @@ import { rideLook } from './rideLook'
 import { createCrocodile } from './river'
 import { createScoopable } from './scoopable'
 import { paintSoapBubble, soapReach } from './soapBubble'
+import {
+	GEYSER_REACH,
+	cagedFeet,
+	createAlien,
+	createAsteroid,
+	isGeyser,
+	paintGeyser,
+} from './space'
 
 /**
  * Everything in the game is drawn by one of these: engine controllers, the
@@ -623,6 +632,27 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				}
 				if (!worn) return
 				const art = hatArt(worn)
+				// Two heads, and a space helmet: one on each. Every other hat,
+				// just the one.
+				const both =
+					sprite.twoHeads && worn.kind === 'spaceHelmet' && frame
+						? headTops(frame, width, height, lying)
+						: undefined
+				if (both && both.length > 1) {
+					for (const one of both) {
+						const paint = (x: number, y: number) =>
+							paintHat(ctx, image, worn, x, y, { lit: true, now })
+						if (!lying) paint(one.x - art.middle, one.y - art.crown)
+						else {
+							ctx.save()
+							ctx.translate(one.x, one.y)
+							ctx.rotate(-Math.PI / 2)
+							paint(-art.middle, -art.crown)
+							ctx.restore()
+						}
+					}
+					return
+				}
 				onHead(art.middle, art.crown, (x, y) =>
 					paintHat(ctx, image, worn, x, y, {
 						lit: true,
@@ -3048,7 +3078,7 @@ export function createFound(world: World) {
 				id: 'found',
 				type: 'cheerer',
 				x: () => Math.round(found.x - size.width / 2),
-				y: () => found.y - size.height,
+				...createObjectSignal(found.y - size.height, 'y'),
 				width: () => size.width,
 				height: () => size.height,
 			}),
@@ -3071,6 +3101,9 @@ export function createFound(world: World) {
 					)
 				},
 			}),
+			// Caged, in the cage, hanging or falling, till it's smashed open.
+			onEnterFrame: ({ $ }) =>
+				$.setY?.((cagedFeet(world) ?? found.y) - size.height),
 		}),
 	]
 }
@@ -3690,6 +3723,26 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				},
 			})
 		case 'steam':
+			// A geyser, on an alien planet.
+			if (isGeyser(world, o.x))
+				return createFixture({
+					id,
+					type: 'hazard',
+					x: o.x,
+					sink: 6,
+					width: GEYSER.width,
+					height: GEYSER.height,
+					world,
+					// When it blew isn't a signal: reading the tick keeps it up to date.
+					draw: ({ ctx }) =>
+						paintGeyser(
+							ctx,
+							Math.max(0, world.ticks()),
+							world.ticks() >= 0 ? state.flown : undefined,
+							Math.round(o.x) % 60,
+						),
+					drawReach: GEYSER_REACH,
+				})
 			if (o.giant)
 				return createFixture({
 					id,
@@ -3919,6 +3972,10 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			return createSkyThing(world, state, o, id)
 		case 'germ':
 			return createGerm(world, state, o, id)
+		case 'alien':
+			return createAlien(world, state, o, id)
+		case 'asteroid':
+			return createAsteroid(world, o, id)
 		case 'jellyfish':
 			return createJellyfish(world, o, id)
 		case 'shark':

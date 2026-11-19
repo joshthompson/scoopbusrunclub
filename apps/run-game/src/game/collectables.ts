@@ -100,6 +100,10 @@ export const COLLECTABLE_NAMES = {
 	'fika:fossilPops': 'Fossil pops',
 	'fika:lavaCake': 'Lava cake',
 	'fika:coconut': 'Coconut',
+	'fika:astronautIceCream': 'Astronaut ice cream',
+	'fika:spaceTube': 'Space food tube',
+	'fika:starfruit': 'Starfruit',
+	'fika:alienJelly': 'Alien jelly',
 	'ride:corgi': 'Corgi',
 	'ride:llama': 'Llama',
 	'ride:camel': 'Camel',
@@ -120,6 +124,7 @@ export const COLLECTABLE_NAMES = {
 	'ride:lifeboat': 'Lifeboat',
 	'ride:bloodCell': 'Red blood cell',
 	'ride:skateboard': 'Skateboard',
+	'ride:spaceBuddy': 'Space buddy',
 	pumpkin: 'Pumpkin',
 	'hat:miner': "Miner's helmet",
 	'hat:skiHelmet': 'Ski helmet',
@@ -139,6 +144,7 @@ export const COLLECTABLE_NAMES = {
 	'hat:discoBall': 'Disco ball',
 	'hat:jazzHat': 'Flaming top hat',
 	'hat:snorkel': 'Snorkel mask',
+	'hat:antennae': 'Alien antennae',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
 
@@ -212,6 +218,10 @@ export const PICKUP_WORD = {
 	'fika:fossilPops': 'Fossil pops!',
 	'fika:lavaCake': 'Molten!',
 	'fika:coconut': 'Coconut!',
+	'fika:astronautIceCream': 'Freeze-dried!',
+	'fika:spaceTube': 'Squeeze!',
+	'fika:starfruit': 'Starfruit!',
+	'fika:alienJelly': 'Wobble!',
 	'ride:corgi': 'Giddy up!',
 	'ride:llama': 'Giddy up!',
 	'ride:camel': 'Giddy up!',
@@ -229,6 +239,7 @@ export const PICKUP_WORD = {
 	'ride:lifeboat': 'Abandon ship!',
 	'ride:bloodCell': 'Go with the flow!',
 	'ride:skateboard': 'Skate!',
+	'ride:spaceBuddy': 'Blast off!',
 	'ride:goat': 'G.O.A.T.!',
 	'ride:skis': 'Skis on!',
 	'ride:snowboard': 'Shred!',
@@ -251,6 +262,7 @@ export const PICKUP_WORD = {
 	'hat:discoBall': 'Disco!',
 	'hat:jazzHat': 'Hot hat!',
 	'hat:snorkel': 'Snorkel!',
+	'hat:antennae': 'Bzzt!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>
 
@@ -343,6 +355,13 @@ export const COLLECTABLE_ABOUT = {
 	'fika:lavaCake':
 		'A lava cake, on the way up the volcano. Molten in the middle.',
 	'fika:coconut': 'A coconut, a straw in it, on the island’s beach.',
+	'fika:astronautIceCream':
+		'Freeze-dried ice cream, in its foil packet: what astronauts take into space.',
+	'fika:spaceTube': 'Dinner in a tube, squeezed out in zero gravity.',
+	'fika:starfruit':
+		'A starfruit, growing wild on an alien planet. Probably safe.',
+	'fika:alienJelly':
+		'A jelly, glowing green, from the aliens’ canteen. It wobbles on its own.',
 	'ride:corgi': 'A corgi, sat on the track, barking for a rider.',
 	'ride:llama': 'A llama, humming for a rider.',
 	'ride:camel': 'A camel, grumbling for a rider.',
@@ -365,6 +384,8 @@ export const COLLECTABLE_ABOUT = {
 	'ride:lifeboat': 'A lifeboat, bobbing under the engine rooms.',
 	'ride:bloodCell': 'A red blood cell, bobbing in the bloodstream.',
 	'ride:skateboard': 'A skateboard, left on the road on Södermalm.',
+	'ride:spaceBuddy':
+		'A space buddy, a little round alien, bounding about its low-gravity planet.',
 	pumpkin: 'A carved pumpkin, worn on your head.',
 	'hat:miner': 'Its lamp lit, in a secret gallery reached by mine cart.',
 	'hat:skiHelmet': 'Safety first, on the slopes.',
@@ -388,6 +409,8 @@ export const COLLECTABLE_ABOUT = {
 		'The Spirit of Jazz’s own top hat, on fire. Find him again, once he’s yours, and take it.',
 	'hat:snorkel':
 		'A snorkel mask, lost on the seabed off Dino Island. Dive deep for it.',
+	'hat:antennae':
+		'Alien antennae, on a headband, high up in the aliens’ base. Climb for them.',
 	barcode: "Floating just before every parkrun's finish. Don't forget it!",
 } satisfies Record<Collectable, string>
 
@@ -422,6 +445,8 @@ const RIDE_BEHAVIOUR = {
 		'Jump on and go with the flow, faster than running. Duck to get off.',
 	skateboard:
 		'Run onto it and roll, faster than running. Jump to kickflip; duck to get off.',
+	spaceBuddy:
+		'Jump on to bound over everything in low gravity. Jump again to leap; duck to get off.',
 } satisfies Record<RideKind, string>
 
 /** What a hat does while it's on, from its rules: nothing, if it just looks good. */

@@ -35,6 +35,10 @@ import type { FikaItem } from './fika'
  * - `jazzHat`: the Spirit of Jazz's white top hat, on fire, stolen off his
  *   head up in Karolinska's lungs, once he's been found and unlocked
  * - `snorkel`: a snorkel mask, down on the seabed off Dino Island, dived for
+ * - `spaceHelmet`: a space helmet, a glass bubble over the whole head: put on
+ *   everyone thrown out of Rocket Launch's rocket, not a pickup
+ * - `antennae`: alien deely-boppers on a headband, high up in Rocket
+ *   Launch's alien base
  */
 export type HatKind =
 	| 'pumpkin'
@@ -57,6 +61,8 @@ export type HatKind =
 	| 'discoBall'
 	| 'jazzHat'
 	| 'snorkel'
+	| 'spaceHelmet'
+	| 'antennae'
 
 /** A hat someone's wearing: a Pumpkin by its carving, 1 to 5. */
 export interface Hat {
@@ -65,7 +71,7 @@ export interface Hat {
 }
 
 /** The hats that are a Boost of their own, to run into: not a Pumpkin, nor fika. */
-export type PickupHat = Exclude<HatKind, 'pumpkin' | 'captain'>
+export type PickupHat = Exclude<HatKind, 'pumpkin' | 'captain' | 'spaceHelmet'>
 
 export interface HatRules {
 	/** How much faster than top speed it keeps you, while it's on. */
@@ -124,6 +130,8 @@ export const HAT_RULES: Record<HatKind, HatRules> = {
 	discoBall: PLAIN,
 	jazzHat: PLAIN,
 	snorkel: PLAIN,
+	spaceHelmet: PLAIN,
+	antennae: PLAIN,
 }
 
 /** Fika that's a hat too, put on as it's had: the captain's hat, off the ferry's roof. */
@@ -156,6 +164,8 @@ const CODED: HatKind[] = [
 	'discoBall',
 	'jazzHat',
 	'snorkel',
+	'spaceHelmet',
+	'antennae',
 ]
 /** How many carvings a Pumpkin can have: its codes. */
 const CARVINGS = 5

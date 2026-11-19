@@ -38,6 +38,9 @@ const SWIM_DOWN_STEER = 0.16
 /** Diving in: how much of how fast they hit the water they keep, down and on. */
 const DIVE_KEEP_DOWN = 0.45
 const DIVE_KEEP_ON = 0.8
+/** In space, how fast they swim up or down, held; and left to it, how quickly they drift to a stop. */
+const SPACE_STEER = 4.2
+const SPACE_DRIFT = 0.03
 /** Diving into the seabed this fast or faster: a bonk, as running into a wall is. Holding down a good while gets there; a gentle swim down doesn't. */
 const SEABED_BONK = 5
 /** How shallow it has to be, the seabed under the surface, to stand up out of it. */
@@ -138,9 +141,14 @@ export function stepSwimming(
 		b.vx += (target - b.vx) * (boosted ? OVERSPEED_GRIP : SWIM_GRIP)
 	} else b.vx *= SWIM_COAST
 	const steer = racing ? Number(down) - Number(up) : 0
-	b.vy +=
-		((steer > 0 ? SWIM_DOWN : steer < 0 ? -SWIM_DIVE : -SWIM_FLOAT) - b.vy) *
-		(steer > 0 ? SWIM_DOWN_STEER : SWIM_STEER)
+	if (world.course.deepWater?.space) {
+		// In space: up and down alike, and left to it, drifting on as
+		// they were, slowing; nothing floats them up.
+		b.vy += (steer * SPACE_STEER - b.vy) * (steer ? SWIM_STEER : SPACE_DRIFT)
+	} else
+		b.vy +=
+			((steer > 0 ? SWIM_DOWN : steer < 0 ? -SWIM_DIVE : -SWIM_FLOAT) - b.vy) *
+			(steer > 0 ? SWIM_DOWN_STEER : SWIM_STEER)
 	if (b.vx > 0.5) b.facing = 1
 	else if (b.vx < -0.5) b.facing = -1
 
@@ -164,13 +172,17 @@ export function stepSwimming(
 		b.feetY = under + SWIM_TALL
 		b.vy = Math.max(0, b.vy)
 	}
-	// ...nor down into the seabed.
-	const ground = world.terrain.groundY(b.x)
+	// ...nor down into the seabed, nor lower than space goes.
+	const ground = Math.min(
+		world.terrain.groundY(b.x),
+		world.course.deepWater?.floor ?? Number.POSITIVE_INFINITY,
+	)
 	if (b.feetY > ground) {
 		// Hard enough, and it's a bonk: a stumble, as into a wall, unless a
 		// helmet takes the knock.
 		if (
 			racing &&
+			!world.course.deepWater?.space &&
 			b.vy >= SEABED_BONK &&
 			b.stumble === 0 &&
 			!shielded(world, b)
@@ -192,6 +204,13 @@ export function stepSwimming(
 
 	// Shallow enough to stand, or out the far side: up on their feet.
 	const { deepWater } = world.course
+	// Out of space the far side: falling, gravity's got them.
+	if (deepWater?.space && b.x >= deepWater.to) {
+		b.swimming = false
+		b.vy = Math.max(0, b.vy)
+		if (racing) world.popup('Gravity!', b.x, b.feetY - 80)
+		return true
+	}
 	if (
 		!deepWater ||
 		b.x >= deepWater.to ||

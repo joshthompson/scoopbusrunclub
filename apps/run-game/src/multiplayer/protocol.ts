@@ -543,6 +543,19 @@ export interface RaceFrame {
 		busGap: number,
 		held: [number, number, number][],
 	]
+	/**
+	 * Rocket Launch's goings-on, if it has any (see `SpaceRun`): every
+	 * plasma bolt in flight, [id, x, y, vx, vy, big: 1 or 0]; the boss,
+	 * [awake, hp, max, hurtAt, stompAt, downAt], -1 for any not yet, or 0
+	 * if there isn't one; and the cage, dropped, [when, by racer index],
+	 * or 0, still hanging; and when the rocket blew up, -1 if it hasn't.
+	 */
+	space?: [
+		bolts: [number, number, number, number, number, number][],
+		boss: [number, number, number, number, number, number] | 0,
+		cage: [number, number] | 0,
+		boom: number,
+	]
 	/** When a bad mushroom was last eaten, if one has been: see `trippedAt`. */
 	trippedAt?: number
 	/** When the course's harvester started on its tree, if it has: see `harvesterAt`. */

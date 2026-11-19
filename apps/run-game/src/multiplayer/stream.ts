@@ -2,6 +2,7 @@ import type { CartState } from '../game/carts'
 import { hatCode } from '../game/hats'
 import type { LifeboatState } from '../game/lifeboat'
 import { waitingLifts } from '../game/platforms'
+import { hasSpace, spaceFrame } from '../game/space'
 import {
 	type CorgiState,
 	type FlyerState,
@@ -117,6 +118,7 @@ export function createRaceStream(
 			cameraY: tenth(world.cameraY()),
 			zoom: Math.round(world.zoom() * 1000) / 1000,
 			...(world.trippedAt !== undefined ? { trippedAt: world.trippedAt } : {}),
+			...(hasSpace(world.course) ? { space: spaceFrame(world) } : {}),
 			...(world.harvesterAt !== undefined
 				? { harvesterAt: world.harvesterAt }
 				: {}),

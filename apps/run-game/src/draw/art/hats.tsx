@@ -727,6 +727,72 @@ const SNORKEL = cells(
 	6,
 )
 
+/** The space helmet's glass, its glint, its rim and collar. */
+const GLASS = 'rgba(190,225,255,0.35)'
+const GLASS_EDGE = 'rgba(150,200,240,0.8)'
+const GLASS_GLINT = '#ffffff'
+const COLLAR = '#f2f2ee'
+const COLLAR_SHADE = '#b8bcc4'
+const HELMET_SIZE = 18
+
+/**
+ * A space helmet, put on everyone thrown out of Rocket Launch's rocket: a
+ * glass bubble over the whole head, its rim catching the light, glints up
+ * on its front, and a white collar round the neck.
+ */
+const SPACE_HELMET: HatArt = {
+	src: paintedArt(HELMET_SIZE, HELMET_SIZE, (x, y) => {
+		const r = HELMET_SIZE / 2
+		const dx = x + 0.5 - r
+		const dy = y + 0.5 - r
+		const d = Math.hypot(dx, dy)
+		// The collar, round the neck.
+		if (y >= HELMET_SIZE - 3 && Math.abs(dx) < r - 2)
+			return y === HELMET_SIZE - 1 ? COLLAR_SHADE : COLLAR
+		if (d > r) return undefined
+		// Glints, up on its front: it faces left.
+		if ((x === 4 && y >= 4 && y <= 6) || (x === 5 && y === 3))
+			return GLASS_GLINT
+		return d > r - 1.2 ? GLASS_EDGE : GLASS
+	}),
+	width: HELMET_SIZE * CELL,
+	height: HELMET_SIZE * CELL,
+	// Down over the head to the neck.
+	crown: 4 * CELL,
+	middle: (HELMET_SIZE / 2) * CELL,
+}
+
+/**
+ * Alien antennae: deely-boppers, a black headband and two springy stalks
+ * up off it, wobbling, a glowing green ball on each, high up in Rocket
+ * Launch's alien base.
+ */
+const ANTENNAE = cells(
+	12,
+	10,
+	[
+		// The balls, lit on top.
+		[1, 0, 3, 3, '#7cf27a'],
+		[1, 0, 2, 1, '#d4ffc8'],
+		[8, 0, 3, 3, '#7cf27a'],
+		[8, 0, 2, 1, '#d4ffc8'],
+		// The stalks, springing.
+		[2, 3, 1, 1, '#c86ae0'],
+		[3, 4, 1, 1, '#c86ae0'],
+		[2, 5, 1, 1, '#c86ae0'],
+		[3, 6, 1, 2, '#c86ae0'],
+		[9, 3, 1, 1, '#c86ae0'],
+		[8, 4, 1, 1, '#c86ae0'],
+		[9, 5, 1, 1, '#c86ae0'],
+		[8, 6, 1, 2, '#c86ae0'],
+		// The headband.
+		[1, 8, 10, 2, '#2b2b2b'],
+		[1, 8, 10, 1, '#4a4a4a'],
+	],
+	9,
+	6,
+)
+
 const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	miner: MINER,
 	captain: CAPTAIN,
@@ -746,6 +812,8 @@ const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	headMirror: HEAD_MIRROR,
 	discoBall: DISCO_BALL,
 	snorkel: SNORKEL,
+	spaceHelmet: SPACE_HELMET,
+	antennae: ANTENNAE,
 	// Its flames still, as a picture: on a head, they flicker (see `paintHat`).
 	jazzHat: {
 		src: JAZZ_HAT.frames[0],

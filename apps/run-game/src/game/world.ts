@@ -28,6 +28,7 @@ import { racePlatforms } from './platforms'
 import type { PortalRun } from './portals'
 import { createRopeBridges } from './ropeBridge'
 import type { SharkSwim } from './sharks'
+import { createSpace } from './space'
 import type { Terrain } from './terrain'
 
 /**
@@ -214,6 +215,13 @@ export interface Body {
 	toppedTower?: boolean
 	/** Germs popped, landing on them: Karolinska's special goal. */
 	germsPopped?: number
+	/** Dropped the cage the prisoner was in, setting them free: Rocket Launch's special goal. */
+	freedPrisoner?: boolean
+	/**
+	 * Shaken off whatever they were up on by the boss's stomp: down through
+	 * every Platform in the way, to the floor.
+	 */
+	flungDown?: boolean
 	/**
 	 * How many of a River's crocodiles they're on, bouncing in turn from the
 	 * first, without touching down; and the most they've managed, every one
@@ -237,6 +245,11 @@ export interface Body {
 	unlocked?: string
 	/** Got to the course's hidden bonus runner, this go (see `Course['found']`). */
 	metFound?: boolean
+	/**
+	 * A bonus runner freed (Rocket Launch's prisoner), by id: theirs to run
+	 * as once they're over the finish line, and not if they're not.
+	 */
+	freeing?: string
 	/** How many of the course's hunted fika they've picked up, this go (see `Course['hunt']`). */
 	hunted?: number
 	/** How many times running they've jumped off a rope bridge that `breaks`: on the ground, back to none. */
@@ -847,6 +860,8 @@ export function createWorld(
 		foundHatStolen: false,
 		/** The course's Portals that have gone off, and let everyone through, by index. */
 		portalsDone: new Set<number>(),
+		/** Rocket Launch's plasma bolts, its cage and its boss: see `space.ts`. */
+		space: createSpace(course),
 		/**
 		 * A haunted house's bats, when they burst out of its door, and its
 		 * window, when it was smashed, if they have been (see `haunted.ts`).

@@ -94,7 +94,7 @@ A Platform that moves, such as a girder swinging from a crane. Most swing round 
 A stretch of a Course under a hill, with rock over the Ground, or dug down under the sand, as through the Sphinx on the Pyramids. Some Platforms in a Cave are shelves of solid rock: there's no jumping up through those from below. From outside, a Cave is solid rock, only its way in and its way out showing; it opens up once someone racing goes in. On Scoop Cruises the ferry is a Cave: its plated side is the rock, its rooms open up once someone's aboard, and its sun deck is open to the sky.
 
 **Portal**:
-A machine, or a sneeze, that changes everyone's size: in The Hospital, the **Shrink Ray** in the lab and the **Sneeze** that blows everyone back out of the scientist's nose. Whoever gets to one is held in it till every Player still racing is; then it goes off for all of them at once, the camera diving in (or pulling out), and they come out the other side in the order they went in, as far apart, each as fast as they went in. The Scoop Bus comes through after them, as far behind as it was, not a step nearer. The Sneeze is at the bottom of a Slide, and goes off in the dark: "Ah... Ah... AAH...", and out of the dark, "CHOO!". No Pacers go through.
+A machine, or a sneeze, that changes everyone's size: in The Hospital, the **Shrink Ray** in the lab and the **Sneeze** that blows everyone back out of the scientist's nose. On Rocket Launch, the **Rocket**: everyone climbs aboard at its door, it takes off once they all have, and blows up in space, throwing them out into it, space helmets on. Whoever gets to one is held in it till every Player still racing is; then it goes off for all of them at once, the camera diving in (or pulling out), and they come out the other side in the order they went in, as far apart, each as fast as they went in. The Scoop Bus comes through after them, as far behind as it was, not a step nearer. The Sneeze is at the bottom of a Slide, and goes off in the dark: "Ah... Ah... AAH...", and out of the dark, "CHOO!". No Pacers go through.
 _Avoid_: Teleport, warp
 
 **Slide**:
@@ -197,6 +197,24 @@ _Avoid_: Water, ocean
 **Deep Water**:
 Water to swim through, off Dino Island's cliff, from the foot of the cliff to the shore: not a Gap, its seabed the Ground. Dive in and you're **Swimming**, lying along in it, on as you hold right, up and down as you steer, floating up if you don't; under a shelf of rock and through, round its Jellyfish, and up onto the shore once it's shallow enough to stand. The bus follows on a turbine, slower than on land.
 _Avoid_: Sea (falling into that is Fallen), ocean
+
+**Space**:
+Deep Water that's space, on Rocket Launch: swum through the same, but nothing floats you up and there's no surface or seabed to it, only as high and as low as anyone can go. Out of its far side, the planet's gravity pulls you down onto it.
+_Avoid_: Zero gravity
+
+**Asteroid**:
+An Obstacle in Space, tumbling and drifting slowly up and down: swim into it and you're knocked, a stumble.
+
+**Low Gravity**:
+A stretch of a Course where jumps (and a Steam Vent's puff) go higher and take far longer about it: Rocket Launch's planet. Its Steam Vents are **Geysers**.
+
+**Alien**:
+An Obstacle in Rocket Launch's base, stood on the floor or up on a Platform: as anyone comes near it fires slow **Plasma Bolts** along at its gun's height, to jump or duck under (a kneeling one's, only to jump); hit by one, you stumble. Land on its head and it's knocked out, a bounce off it, as off a head.
+_Avoid_: Enemy, soldier
+
+**Boss**:
+A giant at the end of Rocket Launch, in its own room: once every Player still racing is in, the door shuts behind them, the bus waits outside, the race clock stops, and it wakes, firing Plasma Bolts about the room. Land on its head 15 times (15 for each Player, in a Round) to beat it; every 5th, it stomps, shaking everyone off whatever they're up on, down to the floor. Beaten, the door out opens.
+_Avoid_: Monster (that's the haunted house's)
 
 **Jellyfish**:
 An Obstacle in Deep Water, drifting slowly up and down: swim into it, or its tentacles under it, and you're stung, a stumble.

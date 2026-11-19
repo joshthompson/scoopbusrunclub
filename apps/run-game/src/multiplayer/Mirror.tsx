@@ -5,6 +5,7 @@ import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { hatCode, hatFromCode } from '../game/hats'
 import { waitingLifts } from '../game/platforms'
 import { stepSharks } from '../game/sharks'
+import { applySpaceFrame } from '../game/space'
 import {
 	type FloatBack,
 	type Flyer,
@@ -215,6 +216,8 @@ export default function Mirror(props: {
 		} else world.portal = undefined
 		world.trippedAt = a.trippedAt
 		world.harvesterAt = a.harvesterAt
+		// Rocket Launch's bolts, on from where they were, and its boss and cage.
+		if (a.space) applySpaceFrame(world, a.space, world.ticks() - a.ticks)
 		world.bus.frontX = mix(a.bus[0], b.bus[0])
 		world.bus.scooping = a.bus[1]
 		world.bus.reach = mix(a.bus[2], b.bus[2])

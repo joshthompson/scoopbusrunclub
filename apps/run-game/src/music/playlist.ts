@@ -51,6 +51,17 @@ export const PLAYLIST: NamedTune[] = [
 	{ id: 'dino-island', name: 'Jurassic Jungle', from: 'Dino Island' },
 	{ id: 'dino-island:volcano', name: 'Volcano Rumble', from: 'Dino Island' },
 	{ id: 'dino-island:sea', name: 'Deep Sea Dinos', from: 'Dino Island' },
+	{ id: 'rocket-launch', name: 'Countdown to Fika', from: 'Rocket Launch' },
+	{
+		id: 'rocket-launch:space',
+		name: 'Floating Past Asteroids',
+		from: 'Rocket Launch',
+	},
+	{
+		id: 'rocket-launch:boss',
+		name: 'Alien Base Boss Rush',
+		from: 'Rocket Launch',
+	},
 ]
 
 /** The menus' music, picked in Options: a tune's id, or one at random each time. */

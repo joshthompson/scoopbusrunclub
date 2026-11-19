@@ -84,6 +84,116 @@ export function headTop(
 export const headFront = (frame: string, width: number, height: number) =>
 	headTop(frame, width, height, true)
 
+/** Each frame at each size, both heads in it: see `headTops`. */
+const foundBoth = new Map<string, HeadTop[] | null | undefined>()
+
+/**
+ * Both heads in `frame`, for someone with two (the Miner Twins): the
+ * crowns of the two of them, upright, left first; lying along, the fronts
+ * of their two heads, the top one first. Just the one, if only one's
+ * found. Undefined till they've been found, as `headTop`.
+ */
+export function headTops(
+	frame: string,
+	width: number,
+	height: number,
+	lying = false,
+): HeadTop[] | undefined {
+	measured()
+	const key = `${frame}|${width}|${height}|${lying}`
+	if (!foundBoth.has(key)) {
+		foundBoth.set(key, undefined)
+		pixels(frame, width, height)
+			.then((got) => (got ? bothHeads(got, lying) : null))
+			.catch(() => null)
+			.then((heads) => {
+				foundBoth.set(key, heads)
+				setMeasured((n) => n + 1)
+			})
+	}
+	return foundBoth.get(key) ?? undefined
+}
+
+/** How far down from the topmost crown (or in from the frontmost face) another head's can be, in their own pixels, and still be a head. */
+const OTHER_HEAD = 5
+
+/**
+ * The heads in a picture, found from its edge: the top of each column
+ * (upright), or the front of each row (lying along). Runs of those near
+ * enough the very top (or front) are each a head; the two nearest it are
+ * theirs.
+ */
+function bothHeads(
+	{ solid, w, h, scale }: { solid: Solid; w: number; h: number; scale: number },
+	lying: boolean,
+): HeadTop[] {
+	const across = lying ? h : w
+	const along = lying ? w : h
+	const at = (i: number, j: number) => (lying ? solid(j, i) : solid(i, j))
+	/** Each column's top (or each row's front): undefined, none there. */
+	const edge: (number | undefined)[] = []
+	for (let i = 0; i < across; i++) {
+		let found: number | undefined
+		for (let j = 0; j < along && found === undefined; j++)
+			if (at(i, j)) found = j
+		edge.push(found)
+	}
+	const nearest = Math.min(...edge.filter((e) => e !== undefined))
+	if (!Number.isFinite(nearest)) return []
+	const near = nearest + OTHER_HEAD * scale
+	const runs: { from: number; to: number; edge: number }[] = []
+	for (let i = 0; i < across; i++) {
+		const e = edge[i]
+		if (e === undefined || e > near) continue
+		const last = runs[runs.length - 1]
+		if (last && i - last.to <= Math.ceil(scale)) {
+			last.to = i
+			last.edge = Math.min(last.edge, e)
+		} else runs.push({ from: i, to: i, edge: e })
+	}
+	return runs
+		.sort((a, b) => a.edge - b.edge)
+		.slice(0, 2)
+		.sort((a, b) => a.from - b.from)
+		.map((run) => {
+			const middle = (run.from + run.to + 1) / 2
+			const size = run.to + 1 - run.from
+			return lying
+				? { x: run.edge, y: middle, width: size }
+				: { x: middle, y: run.edge, width: size }
+		})
+}
+
+type Solid = (x: number, y: number) => boolean
+
+/** A frame drawn as the engine draws it, and whether each of its pixels is solid. */
+async function pixels(frame: string, width: number, height: number) {
+	const [url, crop] = frame.split('#')
+	const image = new Image()
+	image.src = url
+	await image.decode()
+	const w = Math.round(width)
+	const h = Math.round(height)
+	if (!w || !h) return null
+	const canvas = document.createElement('canvas')
+	canvas.width = w
+	canvas.height = h
+	const ctx = canvas.getContext('2d', { willReadFrequently: true })
+	if (!ctx) return null
+	ctx.imageSmoothingEnabled = false
+	if (crop) {
+		const [left, top] = crop.split(',').map(Number)
+		const scale = h / image.naturalHeight
+		const tile = image.naturalWidth * scale
+		let x = left
+		while (x > 0) x -= tile
+		for (; x < w; x += tile) ctx.drawImage(image, x, top, tile, h)
+	} else ctx.drawImage(image, 0, 0, w, h)
+	const { data } = ctx.getImageData(0, 0, w, h)
+	const solid: Solid = (x, y) => data[(y * w + x) * 4 + 3] > SOLID
+	return { solid, w, h, scale: h / image.naturalHeight }
+}
+
 async function measure(
 	frame: string,
 	width: number,

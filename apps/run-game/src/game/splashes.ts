@@ -33,7 +33,9 @@ export function waterSurface(world: World, x: number) {
 	const overboard = world.course.secret?.lifeboat
 	if (sea && atSea(world, x)) return sea.level
 	if (river && inRiver(world, x)) return river.level
-	if (deepWater && inDeepWater(world, x)) return deepWater.surface
+	// Space has no surface to splash into.
+	if (deepWater && !deepWater.space && inDeepWater(world, x))
+		return deepWater.surface
 	if (overboard && x > overboard.hole.from - 20 && x < overboard.hole.to + 20)
 		return overboard.water
 	return undefined

@@ -23,6 +23,7 @@ import { MoleArt } from './mole'
 import { PterodactylArt } from './pterodactyl'
 import { SkateboardArt } from './skateboard'
 import { StoodBoardArt } from './skis'
+import { SpaceBuddyArt } from './spaceBuddy'
 import { UnicornArt } from './unicorn'
 
 const isFika = (id: Collectable): id is `fika:${FikaItem}` =>
@@ -101,6 +102,8 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <BloodCellArt pose="sit" />
 		case 'ride:skateboard':
 			return <SkateboardArt pose="sit" />
+		case 'ride:spaceBuddy':
+			return <SpaceBuddyArt pose="sit" />
 		case 'barcode':
 			return (
 				<img

@@ -105,6 +105,14 @@ export type FikaItem =
 	| 'fossilPops'
 	| 'lavaCake'
 	| 'coconut'
+	/**
+	 * Rocket Launch's: astronaut ice cream and a tube of space food in
+	 * space, a starfruit on the planet, an alien jelly in its base.
+	 */
+	| 'astronautIceCream'
+	| 'spaceTube'
+	| 'starfruit'
+	| 'alienJelly'
 
 export const FIKA_ITEMS: FikaItem[] = [
 	'coffee',
@@ -251,6 +259,14 @@ export const CLIFF_FIKA: FikaItem[] = [
 /** Dino Island's: fossil pops, a lava cake, a coconut. */
 export const DINO_FIKA: FikaItem[] = ['fossilPops', 'lavaCake', 'coconut']
 
+/** Rocket Launch's: astronaut ice cream, a tube of space food, a starfruit, an alien jelly. */
+export const ROCKET_FIKA: FikaItem[] = [
+	'astronautIceCream',
+	'spaceTube',
+	'starfruit',
+	'alienJelly',
+]
+
 /** In Turku: a Karelian pie, a coffee, salmiakki. */
 export const TURKU_FIKA: FikaItem[] = ['karelianPie', 'coffee', 'salmiakki']
 
@@ -323,4 +339,8 @@ export const FIKA_SIZE: Record<FikaItem, { width: number; height: number }> = {
 	coconut: { width: 11 * CELL, height: 12 * CELL },
 	bubbleGum: { width: 12 * CELL, height: 6 * CELL },
 	cloudberries: { width: 9 * CELL, height: 9 * CELL },
+	astronautIceCream: { width: 12 * CELL, height: 12 * CELL },
+	spaceTube: { width: 8 * CELL, height: 14 * CELL },
+	starfruit: { width: 12 * CELL, height: 12 * CELL },
+	alienJelly: { width: 12 * CELL, height: 11 * CELL },
 }
