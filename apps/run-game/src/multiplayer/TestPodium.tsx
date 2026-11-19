@@ -115,7 +115,6 @@ export default function TestPodium(props: { onLeave: () => void }) {
 			rounds={3 + Math.floor(Math.random() * 6)}
 			seats={seats}
 			placings={[]}
-			lobbyIn={lobbyIn()}
 			onLobby={props.onLeave}
 			onEnd={props.onLeave}
 			endLabel="Back to the title"

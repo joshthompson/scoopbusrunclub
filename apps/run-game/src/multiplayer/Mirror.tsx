@@ -6,6 +6,7 @@ import { hatCode, hatFromCode } from '../game/hats'
 import { waitingLifts } from '../game/platforms'
 import { stepSharks } from '../game/sharks'
 import {
+	type FloatBack,
 	type Flyer,
 	type Out,
 	type Pacer,
@@ -30,6 +31,7 @@ import { RoundHud } from './Round'
 import {
 	HAT_FLAG,
 	type PacerIntro,
+	RACER_FLAGS,
 	type RaceFrame,
 	type RaceStart,
 	type RacerIntro,
@@ -42,6 +44,18 @@ import { CART_STATES, CORGI_STATES, FLYER_STATES, FURBY_STATES } from './stream'
  * sends (see `createRaceStream`). Nothing's worked out here: it's played
  * back a little behind the newest frame, smoothly in between them.
  */
+
+/**
+ * Someone floating back in a Baby Mode bubble, here: only that they are,
+ * for drawing it. Where they are comes in every frame.
+ */
+const FLOATING: FloatBack = {
+	from: { x: 0, y: 0 },
+	to: { x: 0, y: 0 },
+	at: 0,
+	ticks: 0,
+	glide: false,
+}
 
 /** Frames arrive here as they come, for the Mirror to play back. */
 export interface Feed {
@@ -220,6 +234,9 @@ export default function Mirror(props: {
 			body.cart = flags & 256 ? 0 : undefined
 			// A ghost, killed in a haunted house.
 			body.ghost = !!(flags & 512)
+			// Floating back in a bubble, in Baby Mode: only that they are, to
+			// draw it.
+			body.bubble = flags & RACER_FLAGS.bubble ? FLOATING : undefined
 			// Knocked off since the last frame, or swapped: flying.
 			const hat = Math.floor(flags / HAT_FLAG)
 			if (body.hat && hatCode(body.hat) !== hat)

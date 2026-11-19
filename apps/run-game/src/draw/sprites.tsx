@@ -284,6 +284,7 @@ import { platformLook, platformPainter } from './platformArt'
 import { rideLook } from './rideLook'
 import { createCrocodile } from './river'
 import { createScoopable } from './scoopable'
+import { paintSoapBubble, soapReach } from './soapBubble'
 
 /**
  * Everything in the game is drawn by one of these: engine controllers, the
@@ -335,6 +336,32 @@ export function volunteerFrame(
 ) {
 	return runners[member][0]().frames[post][0]
 }
+
+/** How far a Draw Hook paints past its box, for all of `reaches` at once: the most of them, each side. */
+function reachOf(
+	...reaches: { left?: number; top?: number; right?: number; bottom?: number }[]
+) {
+	const most = (side: 'left' | 'top' | 'right' | 'bottom') =>
+		Math.max(0, ...reaches.map((r) => r[side] ?? 0))
+	return {
+		left: most('left'),
+		top: most('top'),
+		right: most('right'),
+		bottom: most('bottom'),
+	}
+}
+
+/** Held in a Portal till everyone's there: what they say, and how big. */
+const WAITING_WORD = 'Waiting'
+const WAITING_SIZE = 16
+/** How far over their head it's lifted in a Round, clear of their name tag. */
+const OVER_NAME_TAG = 30
+/** How long its dots take to come one by one, and how long they look ahead, then back, for whoever's coming. */
+const WAITING_DOT = 20
+const WAITING_LOOK = 50
+/** Baby Mode's bubble: how long it takes to form round them, and to pop. */
+const SOAP_FORM = 14
+const SOAP_POP = 12
 
 export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	/** Up on a corgi's back, or a llama's, riding one: or stood up on a skateboard. */
@@ -452,6 +479,16 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const [sparks, setSparks] = createSignal(false)
 	/** The frame they're drawn in this tick, for where their head is in it. */
 	const [shown, setShown] = createSignal<string>()
+	/**
+	 * Baby Mode's bubble round them, floating them back after a fall: how
+	 * far it's formed, or popped; worked out from when they've been in one,
+	 * so a Remote Player's screen draws it too.
+	 */
+	const [soap, setSoap] = createSignal<{ grow?: number; pop?: number }>()
+	let bubbledAt: number | undefined
+	let poppedAt: number | undefined
+	/** In a Portal, waiting for everyone else to get to it: said, in a speech bubble. */
+	const [waitWord, setWaitWord] = createSignal<string>()
 	/** Floating down in a propeller beanie: its propeller whirring. */
 	const [floating, setFloating] = createSignal(false)
 	/** How long snow's been spraying off their board, and sparks flying, as it's painted. */
@@ -533,65 +570,101 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		},
 		// Over them: their skis or snowboard, under their feet; and their hat,
 		// on their head, wherever it is in the frame they're drawn in.
-		drawReach: WORN_HAT_REACH,
+		drawReach: reachOf(
+			WORN_HAT_REACH,
+			soapReach(runSize.width, runSize.height),
+			(() => {
+				const said = bubbleReach(
+					runSize.width,
+					WAITING_SIZE,
+					WAITING_WORD.length + 3,
+				)
+				return { ...said, top: said.top + OVER_NAME_TAG }
+			})(),
+		),
 		draw({ ctx, drawDefault, image, $, $currentFrame }) {
 			drawDefault()
-			const width = $.width()
-			const height = $.height()
-			const now = world.ticks()
-			const on = board()
-			const spraying = sprayFor(!!on && spray(), now)
-			const sparking = sparksFor(!!on && sparks(), now)
-			if (on)
-				paintBoardUnder(ctx, image, {
-					board: on,
-					width,
-					height,
-					spray: spraying,
-					sparks: sparking,
-				})
-			const worn = hat()
-			// No hat on: their own, if they've one.
-			const own = worn ? undefined : sprite.ownHat
-			if (!worn && !own) return
-			const frames = $.frames?.() ?? []
-			const frame = frames[$currentFrame] ?? frames[0]
-			// Swimming, or diving, in their swim frames: lying along, head
-			// first, so the hat's on the front of their head, turned a
-			// quarter round with them, its crown ahead.
-			const lying = !!swim && (swimming() || (diving() && !dive))
-			const head = frame ? headTop(frame, width, height, lying) : undefined
-			/** Paints a hat `middle` across and `crown` down, on their head. */
-			const onHead = (
-				middle: number,
-				crown: number,
-				paint: (x: number, y: number) => void,
-			) => {
-				if (!lying) {
-					paint((head?.x ?? width / 2) - middle, (head?.y ?? 2) - crown)
+			// Their skis or snowboard under their feet, and their hat on their head.
+			const paintWorn = () => {
+				const width = $.width()
+				const height = $.height()
+				const now = world.ticks()
+				const on = board()
+				const spraying = sprayFor(!!on && spray(), now)
+				const sparking = sparksFor(!!on && sparks(), now)
+				if (on)
+					paintBoardUnder(ctx, image, {
+						board: on,
+						width,
+						height,
+						spray: spraying,
+						sparks: sparking,
+					})
+				const worn = hat()
+				// No hat on: their own, if they've one.
+				const own = worn ? undefined : sprite.ownHat
+				if (!worn && !own) return
+				const frames = $.frames?.() ?? []
+				const frame = frames[$currentFrame] ?? frames[0]
+				// Swimming, or diving, in their swim frames: lying along, head
+				// first, so the hat's on the front of their head, turned a
+				// quarter round with them, its crown ahead.
+				const lying = !!swim && (swimming() || (diving() && !dive))
+				const head = frame ? headTop(frame, width, height, lying) : undefined
+				/** Paints a hat `middle` across and `crown` down, on their head. */
+				const onHead = (
+					middle: number,
+					crown: number,
+					paint: (x: number, y: number) => void,
+				) => {
+					if (!lying) {
+						paint((head?.x ?? width / 2) - middle, (head?.y ?? 2) - crown)
+						return
+					}
+					ctx.save()
+					ctx.translate(head?.x ?? 2, head?.y ?? height / 2)
+					ctx.rotate(-Math.PI / 2)
+					paint(-middle, -crown)
+					ctx.restore()
+				}
+				if (own) {
+					onHead(own.middle, own.crown, (x, y) =>
+						paintOwnHat(ctx, image, own, x, y, now),
+					)
 					return
 				}
+				if (!worn) return
+				const art = hatArt(worn)
+				onHead(art.middle, art.crown, (x, y) =>
+					paintHat(ctx, image, worn, x, y, {
+						lit: true,
+						whirring: floating(),
+						now,
+					}),
+				)
+			}
+			paintWorn()
+			// Baby Mode's bubble round them; waiting in a Portal, saying so.
+			const width = $.width()
+			const height = $.height()
+			const mirrored = $.xScale() < 0
+			const bubble = soap()
+			if (bubble)
+				paintSoapBubble(ctx, {
+					width,
+					height,
+					...bubble,
+					mirrored,
+					now: world.ticks(),
+				})
+			const word = waitWord()
+			if (word) {
 				ctx.save()
-				ctx.translate(head?.x ?? 2, head?.y ?? height / 2)
-				ctx.rotate(-Math.PI / 2)
-				paint(-middle, -crown)
+				// In a Round, over their name tag, not on it.
+				if (world.round) ctx.translate(0, -OVER_NAME_TAG)
+				paintBubble(ctx, word, { width, size: WAITING_SIZE, mirrored })
 				ctx.restore()
 			}
-			if (own) {
-				onHead(own.middle, own.crown, (x, y) =>
-					paintOwnHat(ctx, image, own, x, y, now),
-				)
-				return
-			}
-			if (!worn) return
-			const art = hatArt(worn)
-			onHead(art.middle, art.crown, (x, y) =>
-				paintHat(ctx, image, worn, x, y, {
-					lit: true,
-					whirring: floating(),
-					now,
-				}),
-			)
 		},
 		onEnterFrame({ $, $currentFrame }) {
 			const { body } = racer
@@ -741,6 +814,27 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			// In a Portal: shrinking, or growing as they're sneezed out, from
 			// their feet; or out of sight, waiting their turn the other side.
 			const portal = heldLook(world, racer)
+			// Waiting in it for everyone else: saying so, and now and then
+			// looking back for them.
+			const held = world.portal?.held.get(racer.id)
+			if (portal && 'waiting' in portal && held) {
+				const t = Math.max(0, now() - held.at)
+				setWaitWord(WAITING_WORD + '.'.repeat(Math.floor(t / WAITING_DOT) % 4))
+				if (Math.floor(t / WAITING_LOOK) % 2) $.setXScale(1)
+			} else setWaitWord(undefined)
+			// Baby Mode's bubble: forming round them, or just popped.
+			const tick = now()
+			if (body.bubble) {
+				bubbledAt ??= tick
+				poppedAt = undefined
+				setSoap({ grow: Math.min(1, (tick - bubbledAt) / SOAP_FORM) })
+			} else {
+				if (bubbledAt !== undefined) poppedAt = tick
+				bubbledAt = undefined
+				const since =
+					poppedAt === undefined ? Number.POSITIVE_INFINITY : tick - poppedAt
+				setSoap(since < SOAP_POP ? { pop: since / SOAP_POP } : undefined)
+			}
 			if (portal?.hidden) $.setStyle({ visibility: 'hidden' })
 			else if (portal && portal.scale !== 1) {
 				$.setX(portal.x - width / 2)

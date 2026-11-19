@@ -617,6 +617,13 @@ function stepRunner(world: World, racer: Racer) {
 		b.carried = 0
 		b.condorFrom = undefined
 	}
+	if (b.bubble) {
+		// Fallen, in Baby Mode: floating back in a bubble, nothing to do but
+		// wait till it pops.
+		floatBack(world, racer)
+		b.wasUp = up
+		return
+	}
 	if (b.stomped > 0) b.stomped--
 	// A stumble knocks a Pumpkin off, or a helmet.
 	if (b.stumble > 0 && b.hat && HAT_RULES[b.hat.kind].fallsOff)
@@ -1597,48 +1604,135 @@ function hunted(world: World, racer: Racer, item: FikaItem) {
 	}
 }
 
-/** How far past a Gap, or the sea, someone's put back on their feet in Baby Mode. */
+/** How far past a Gap someone's put back on their feet in Baby Mode. */
 const RESPAWN_PAST = 60
 /** And how long they're stumbling, getting going again. */
 const RESPAWN_STUMBLE = 24
+/**
+ * Into the sea off a glider, in Baby Mode: put back up on it how far along
+ * from where they went in, and how far up between the sea and the sky.
+ */
+const RESPAWN_GLIDE_ON = 80
+const RESPAWN_GLIDE_UP = 0.5
 
 /**
- * Baby Mode's fall: not out, but put back on their feet just past the Gap
- * they fell down (or past the sea, fallen in), stumbling a moment.
+ * Baby Mode's fall: not out, but floated back in a bubble (see `floatBack`)
+ * to just past the Gap they fell down, on their feet; or, crashed into the
+ * sea off a glider, back up on it, halfway up the sky, where they were.
  */
 function respawn(world: World, racer: Racer, sound: 'fallen' | 'splash') {
 	const b = racer.body
 	const { terrain } = world
-	const { sea } = world.course
-	const gap = terrain.gaps.find((g) => g.to > b.x - 120 && g.from < b.x + 120)
-	let x = (sea && atSea(world, b.x) ? sea.to : (gap?.to ?? b.x)) + RESPAWN_PAST
-	while (x < terrain.finishX && (terrain.inGap(x) || atSea(world, x))) x += 20
+	const { sea, sky } = world.course
+	const from = { x: b.x, y: b.feetY }
+	let to: { x: number; y: number }
+	const glide = !!sea && atSea(world, b.x) && b.gliding
+	if (glide && sea) {
+		const x = Math.min(b.x + RESPAWN_GLIDE_ON, sea.to - 200)
+		const top = sky ?? sea.level - 560
+		to = { x, y: sea.level - (sea.level - top) * RESPAWN_GLIDE_UP }
+	} else {
+		const gap = terrain.gaps.find((g) => g.to > b.x - 120 && g.from < b.x + 120)
+		let x =
+			(sea && atSea(world, b.x) ? sea.to : (gap?.to ?? b.x)) + RESPAWN_PAST
+		while (x < terrain.finishX && (terrain.inGap(x) || atSea(world, x))) x += 20
+		to = { x, y: terrain.groundY(x) }
+		// Down a pit in a Secret's floor: back up past it, on its floor.
+		const pit = b.secret && world.course.secret?.coaster?.leap?.pit
+		if (pit && world.course.secret)
+			to = { x: pit[1] + RESPAWN_PAST, y: world.course.secret.floor }
+	}
 	b.mount = 0
 	b.carried = 0
 	b.condorFrom = undefined
-	b.gliding = false
+	b.gliding = glide
 	b.ducking = false
 	b.trick = undefined
 	b.turn = 0
 	b.grind = undefined
 	b.launchX = undefined
-	b.x = x
-	b.feetY = terrain.groundY(x)
-	// Down a pit in a Secret's floor: back up past it, on its floor.
-	const pit = b.secret && world.course.secret?.coaster?.leap?.pit
-	if (pit && world.course.secret) {
-		b.x = pit[1] + RESPAWN_PAST
-		b.feetY = world.course.secret.floor
-	}
-	b.floor = b.feetY
-	b.vx = 2
+	b.vx = 0
 	b.vy = 0
-	b.grounded = true
+	b.grounded = false
 	b.jumping = false
+	b.floating = false
 	b.on = undefined
-	b.stumble = RESPAWN_STUMBLE
+	b.bed = undefined
+	b.combo = 0
+	const far = Math.hypot(to.x - from.x, to.y - from.y)
+	b.bubble = {
+		from,
+		to,
+		at: world.ticks(),
+		ticks: Math.round(
+			Math.max(BUBBLE_FEWEST, Math.min(BUBBLE_MOST, BUBBLE_FORM + far / 4)),
+		),
+		glide,
+	}
 	play(sound)
-	world.popup(`${racer.runner.name} fell! Back up`, b.x, b.feetY - 80)
+	world.popup(`${racer.runner.name} fell!`, b.x, Math.min(b.feetY, to.y) - 80)
+}
+
+/** How long a bubble takes to float someone back, at the least and the most, and to form round them first. */
+const BUBBLE_FEWEST = 70
+const BUBBLE_MOST = 170
+const BUBBLE_FORM = 24
+/** How far over where they're put back it pops, for them to drop the last of the way. */
+export const BUBBLE_POP_OVER = 18
+
+/**
+ * Along a bubble's way, `u` of the time it takes: slow to set off, quickest
+ * early on, and a long, slow ease in at the end, `lead` (higher) further
+ * along sooner. A cubic Bézier's ease, from rest.
+ */
+const bubbleEase = (u: number, lead: number) => {
+	const t = Math.max(0, Math.min(1, u))
+	const a = 0.15 + lead
+	return 3 * t * (1 - t) ** 2 * a + 3 * t ** 2 * (1 - t) + t ** 3
+}
+
+/**
+ * A tick in a Baby Mode bubble (see `respawn`): bobbing a moment where they
+ * fell as it forms round them, then floated back, up sooner than along, so
+ * on a curve, easing in slowly; and over where they're put back, it pops,
+ * and they drop the last little way onto it. On a glider, back on it.
+ */
+function floatBack(world: World, racer: Racer) {
+	const b = racer.body
+	const bubble = b.bubble
+	if (!bubble) return
+	const { from, to, at, ticks } = bubble
+	const t = world.ticks() - at
+	const over = to.y - BUBBLE_POP_OVER
+	const wasX = b.x
+	const wasY = b.feetY
+	if (t < BUBBLE_FORM) {
+		// Forming round them: held where they fell, bobbing up a little.
+		b.x = from.x
+		b.feetY = from.y - 12 * Math.sin(((t / BUBBLE_FORM) * Math.PI) / 2)
+	} else {
+		const u = (t - BUBBLE_FORM) / (ticks - BUBBLE_FORM)
+		const startY = from.y - 12
+		b.x = from.x + (to.x - from.x) * bubbleEase(u, 0)
+		b.feetY = startY + (over - startY) * bubbleEase(u, 0.6)
+	}
+	b.vx = b.x - wasX
+	b.vy = 0
+	b.grounded = false
+	b.floor = b.feetY
+	b.facing = to.x >= from.x ? 1 : -1
+	if (t < ticks) return
+	// Popped: dropping the last of the way.
+	b.bubble = undefined
+	b.x = to.x
+	b.feetY = over
+	b.vx = 0
+	b.vy = 0
+	b.facing = 1
+	b.stumble = RESPAWN_STUMBLE
+	if (bubble.glide) b.vy = 1
+	play('pop')
+	world.popup('Pop!', b.x, b.feetY - 90)
 }
 
 /** Baby Mode: this far behind whoever's furthest along, and you're carried along faster... */
@@ -1820,8 +1914,9 @@ function collide(world: World, racer: Racer) {
 	const { terrain } = world
 	const b = racer.body
 	if (world.phase() !== 'running' || racer.out) return
-	// Held by a monster, or coming up out of a grave: nor then.
-	if (b.haunt) return
+	// Held by a monster, or coming up out of a grave: nor then. Nor floating
+	// back in a bubble, in Baby Mode.
+	if (b.haunt || b.bubble) return
 
 	// On a glider: lying along under its wing, it over them. Swimming:
 	// lying along in the water.

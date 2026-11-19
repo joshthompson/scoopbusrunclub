@@ -733,6 +733,8 @@ export const slopes: CourseDefinition = {
 	skiJump: { takeoff: START_X + TAKEOFF, k: K_POINT },
 	// On skis too, it gains on you down the steep bits.
 	busDownhill: 2.6,
+	// Its ski jumps need full speed, in a Round too.
+	fullSpeedInRounds: true,
 	hut: {
 		from: START_X + HUT.from,
 		to: START_X + HUT.from + HUT.length,

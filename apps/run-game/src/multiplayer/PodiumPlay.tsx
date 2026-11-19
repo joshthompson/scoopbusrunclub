@@ -12,9 +12,9 @@ import {
 	RUN_GRIP,
 	RUN_TOP_SPEED,
 	SLIDE_KEEP,
-	STOMP_BOOST,
 	STOMP_BOUNCE,
 	STOMP_BOUNCE_HELD,
+	stompBoost,
 } from '../game/constants'
 import {
 	HEAD_GIVE,
@@ -390,9 +390,13 @@ export function PodiumPlay(props: {
 			// A bounce, not a jump of their own: letting go doesn't cut it short.
 			body.jumping = false
 			const along = Math.max(0, body.vx * body.facing)
+			// Faster, in proportion to how fast they were going: none, stood still.
 			body.vx =
 				body.facing *
-				Math.min(ROUND_MAX_SPEED * SIZE, along + STOMP_BOOST * SIZE)
+				Math.min(
+					ROUND_MAX_SPEED * SIZE,
+					along + stompBoost(along / SIZE) * SIZE,
+				)
 			// Steering on from here, a bounce's own speed.
 			body.airBase = body.vx
 			body.combo++

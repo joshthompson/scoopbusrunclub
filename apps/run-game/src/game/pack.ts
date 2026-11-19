@@ -31,7 +31,6 @@ import {
 	SLIDE_KEEP,
 	STAND_HEIGHT,
 	START_X,
-	STOMP_BOOST,
 	STOMP_BOUNCE,
 	STOMP_BOUNCE_HELD,
 	STOMP_POINTS,
@@ -39,6 +38,7 @@ import {
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
 	hillPull,
+	stompBoost,
 } from './constants'
 import { cyclistAt } from './cyclists'
 import { rideCondor } from './flyers'
@@ -829,7 +829,14 @@ export const STOMPED_GUARD = 60
 /** Coming down on someone's head: bounce off it, faster, and score. */
 function bounceOffHeads(world: World, racer: Racer) {
 	const b = racer.body
-	if (b.grounded || b.vy <= 0 || b.carried > 0 || b.gliding || b.swimming)
+	if (
+		b.grounded ||
+		b.vy <= 0 ||
+		b.carried > 0 ||
+		b.gliding ||
+		b.swimming ||
+		b.bubble
+	)
 		return
 	/** Where their feet were last tick. */
 	const was = b.feetY - b.vy
@@ -862,7 +869,8 @@ function bounceOffHeads(world: World, racer: Racer) {
 			other.out ||
 			o.stomped > 0 ||
 			o.mount > 0 ||
-			o.carried > 0
+			o.carried > 0 ||
+			o.bubble
 		)
 			continue
 		if (Math.abs(b.x - o.x) > HEAD_REACH) continue
@@ -892,7 +900,8 @@ export function bounceOff(world: World, racer: Racer, head: number, x: number) {
 	b.launchX = undefined
 	// A bounce, not a jump of their own: letting go doesn't cut it short.
 	b.jumping = false
-	b.vx = boost(world, b.vx, b.facing, STOMP_BOOST)
+	// Faster, in proportion to how fast they were going: none, stood still.
+	b.vx = boost(world, b.vx, b.facing, stompBoost(b.vx * b.facing))
 	// Steering on from here, a bounce's own speed.
 	b.airBase = b.vx
 

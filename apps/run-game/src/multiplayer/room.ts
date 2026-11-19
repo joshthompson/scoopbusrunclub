@@ -17,12 +17,15 @@ import {
 	type Playable,
 	customPlayable,
 } from '../runners/playable'
+import { effectsOn, musicOn } from '../saved/settings'
 import { openRoom } from './connection'
 import {
+	type Choosing,
 	type GameMode,
 	type PadMessage,
 	type PadMode,
 	type PadView,
+	type PauseItem,
 	type PlayerStatus,
 	type RaceFrame,
 	type RaceStart,
@@ -175,6 +178,12 @@ export function createRoom(code: string) {
 		finish: () => void
 		/** Leaving the Podium for the lobby. */
 		lobby: () => void
+		/** On to the next Round now, between Rounds, not waiting. */
+		next: () => void
+		/** Pausing the Round, or carrying on. */
+		pause: (paused: boolean) => void
+		/** Something from the pause menu. */
+		menu: (item: PauseItem) => void
 	} = {
 		start: () => false,
 		cancel: () => {},
@@ -182,7 +191,15 @@ export function createRoom(code: string) {
 		gameMode: () => {},
 		finish: () => {},
 		lobby: () => {},
+		next: () => {},
+		pause: () => {},
+		menu: () => {},
 	}
+	/** Pick and Choose: who's picking the next course, and the courses' names; the Party says. */
+	let choosing: () => { choosing: Choosing; courses: string[] } | undefined =
+		() => undefined
+	/** Whoever's picking having picked: the Party checks it's them. */
+	let onChoose: (seatId: string, course: number) => void = () => {}
 
 	/** What the Host's screens show, for computers that have joined: the Party says. */
 	let screenView: () => Omit<RoomView, 'seats' | 'starter'> = () => ({
@@ -191,7 +208,6 @@ export function createRoom(code: string) {
 		placings: [],
 		next: '',
 		nextIn: 0,
-		lobbyIn: 0,
 	})
 
 	/** How far through its go the Room is: the Party says. */
@@ -348,6 +364,18 @@ export function createRoom(code: string) {
 	const lobbyAs = (id: string) => {
 		if (isStarter(id)) onStarter.lobby()
 	}
+	/** `id` going on to the next Round now: only the Starter can. */
+	const nextAs = (id: string) => {
+		if (isStarter(id)) onStarter.next()
+	}
+	/** `id` pausing the Round, or carrying on: only the Starter can. */
+	const pauseAs = (id: string, paused: boolean) => {
+		if (isStarter(id)) onStarter.pause(paused)
+	}
+	/** `id` picking from the pause menu: only the Starter can. */
+	const menuAs = (id: string, item: PauseItem) => {
+		if (isStarter(id)) onStarter.menu(item)
+	}
 
 	pad.on((message, peer) => {
 		if (message.type === 'hello') {
@@ -409,6 +437,10 @@ export function createRoom(code: string) {
 		if (message.type === 'resync') onWatch(peer)
 		if (message.type === 'finish') finishAs(seat.id)
 		if (message.type === 'lobby') lobbyAs(seat.id)
+		if (message.type === 'next') nextAs(seat.id)
+		if (message.type === 'pause') pauseAs(seat.id, message.paused)
+		if (message.type === 'menu') menuAs(seat.id, message.item)
+		if (message.type === 'choose') onChoose(seat.id, message.course)
 		if (message.type === 'leave') removeSeat(seat.id)
 		tellPhones()
 	})
@@ -458,6 +490,8 @@ export function createRoom(code: string) {
 		const round = statusOf(seat)
 		const inLobby = stage() === 'lobby' || stage() === 'starting'
 		const first = inLobby ? starter() : undefined
+		const picking = choosing()
+		const you = picking?.choosing.seat === seat.id
 		return {
 			...(first === seat
 				? { starter: lobby() }
@@ -493,6 +527,18 @@ export function createRoom(code: string) {
 			gameMode: lobby().gameMode,
 			isStarter: starter() === seat,
 			...progress(),
+			...(starter() === seat && stage() === 'round'
+				? { sound: { effects: effectsOn(), music: musicOn() } }
+				: {}),
+			...(picking
+				? {
+						choosing: {
+							...picking.choosing,
+							you,
+							...(you ? { courses: picking.courses } : {}),
+						},
+					}
+				: {}),
 			...(seat.screen ? { room: roomView() } : {}),
 		}
 	}
@@ -502,6 +548,7 @@ export function createRoom(code: string) {
 		seats: seats.map(({ peer, device, ...seat }) => seat),
 		starter: starter()?.id,
 		...screenView(),
+		...(choosing() ? { choosing: choosing()?.choosing } : {}),
 	})
 
 	/** Every phone told what to show. */
@@ -592,6 +639,7 @@ export function createRoom(code: string) {
 		chooseGameModeAs,
 		finishAs,
 		lobbyAs,
+		nextAs,
 		/** Tells the Room how the lobby's going, for the Starter's phone. */
 		setLobby(next: typeof lobby) {
 			lobby = next
@@ -607,6 +655,14 @@ export function createRoom(code: string) {
 		/** Tells the Room how far through its go it is, for phones. */
 		setProgress(next: typeof progress) {
 			progress = next
+		},
+		/** Tells the Room who's picking the next course, in Pick and Choose, for phones. */
+		setChoosing(next: typeof choosing) {
+			choosing = next
+		},
+		/** What to do when whoever's picking the next course picks one. */
+		setOnChoose(next: typeof onChoose) {
+			onChoose = next
 		},
 		/** Tells the Room how seats are doing in the Round, for their phones. */
 		setStatusOf(next: typeof statusOf) {

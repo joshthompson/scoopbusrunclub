@@ -52,8 +52,14 @@ const FAMILY = [
  * faster, past anyone slowed down, up a hill or in the mud.
  */
 const SPEED = RUN_TOP_SPEED + 0.5
-/** How far back from `from` the sow starts: off the left of the screen, as whoever's there is at `from`. */
+/**
+ * How far back from `from` the sow starts: off the left of the screen, as
+ * whoever's there is at `from`. Or further, if the screen's zoomed out
+ * that far (a Round, everyone in view): always off its left edge, by
+ * `OFF_LEFT`, never popping up in plain sight.
+ */
 const START_BEHIND = 500
+const OFF_LEFT = 20
 /** How far a stride takes the sow, and a piglet, a frame of its run each. */
 const SOW_STRIDE = 9
 const PIGLET_STRIDE = 6
@@ -66,8 +72,9 @@ export function createBoars(world: World) {
 	// Taken out, for `step`, which is hoisted out of reach of the check.
 	const { from } = boars
 	const { groundY } = world.terrain
-	/** When they came out, by the tick, once they have. */
+	/** When they came out, by the tick, once they have; and where the sow started. */
 	let since: number | undefined
+	let start = from - START_BEHIND
 	/** The tick they were last moved on. */
 	let moved: number | undefined
 	const family = FAMILY.map((member) => {
@@ -97,11 +104,12 @@ export function createBoars(world: World) {
 			const ahead = world.racers.some((r) => !r.out && r.body.x >= from)
 			if (now < 0 || !ahead) return
 			since = now
+			start = Math.min(start, world.camera() - OFF_LEFT)
 		}
 		const t = now - since
 		for (const boar of family) {
 			// Steady, from just off the left of the screen, in a line.
-			const x = from - START_BEHIND - boar.behind - boar.width + t * SPEED
+			const x = start - boar.behind - boar.width + t * SPEED
 			boar.setX(x)
 			const stride = boar.frames === SOW_FRAMES ? SOW_STRIDE : PIGLET_STRIDE
 			boar.setFrame(Math.floor((t * SPEED) / stride) % boar.frames.length)

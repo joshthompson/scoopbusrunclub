@@ -43,6 +43,8 @@ export function Round(props: {
 	/** On its start screen, held for the Starter, or not any more. */
 	onWaiting?: (waiting: boolean) => void
 	onPause: (paused: boolean) => void
+	/** Given the way to pause it, or carry on, for the Starter's phone to. */
+	pauseWith?: (pause: (paused: boolean) => void) => void
 	onOver: (order: Racer[]) => void
 	/** The world, for the Room to tell phones how their Player's doing. */
 	onWorld: (world: ReturnType<typeof createWorld>) => void
@@ -111,6 +113,7 @@ export function Round(props: {
 	}
 	window.addEventListener('keydown', onKey)
 	onCleanup(() => window.removeEventListener('keydown', onKey))
+	props.pauseWith?.(pause)
 	// Switching away from the game pauses it, so nobody's scooped meanwhile.
 	const onBlur = () => !world.order() && pause(true)
 	window.addEventListener('blur', onBlur)

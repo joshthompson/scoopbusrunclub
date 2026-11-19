@@ -13,8 +13,11 @@ import { COURSES } from '../courses'
 import type { Hat } from '../game/hats'
 import type { Racer, RacerEntry, World } from '../game/world'
 import { playMenu, playTune } from '../music/music'
+import { effectsOn, musicOn, setEffectsOn, setMusicOn } from '../saved/settings'
+import { play } from '../sfx'
 import { MenuBackdrop } from '../ui/MenuBackdrop'
 import { Stage } from '../ui/Stage'
+import { CoursePick } from './CoursePick'
 import { JoinBadge } from './JoinBadge'
 import { Lobby } from './Lobby'
 import { Podium } from './Podium'
@@ -26,12 +29,16 @@ import { roomModeInfo } from './roomModes'
 import { type RaceStream, createRaceStream, raceStart } from './stream'
 
 /**
- * How long the lobby counts down once everyone's ready, the results stay up,
- * and the Podium.
+ * How long the lobby counts down once everyone's ready, the results stay
+ * up, and in Pick and Choose, whoever's picking has to pick the next
+ * course. The Podium stays up as long as everyone likes.
  */
 const START_SECONDS = 3
 const RESULTS_SECONDS = 8
-const PODIUM_SECONDS = 30
+const CHOOSE_SECONDS = 20
+
+/** At least how many other courses are raced before one comes round again, from one shuffle to the next. */
+const RESHUFFLE_GAP = 5
 
 /**
  * Two Players at least, for a Round to be worth having: one on their own,
@@ -43,18 +50,36 @@ const MIN_PLAYERS =
 		: 2
 
 /**
- * Every course, in a random order: not starting with `after`, so the same
- * course isn't raced twice running when one shuffle follows another.
+ * Every course, in a random order, but none of the `recent` ones (raced
+ * lately, the latest last) till at least `RESHUFFLE_GAP` others have been
+ * raced since it was: one shuffle following another, nobody's racing the
+ * same course again straight away.
  */
-function shuffledCourses(after?: number) {
+function shuffledCourses(recent: number[] = []) {
 	const order = COURSES.map((_, i) => i)
 	for (let i = order.length - 1; i > 0; i--) {
 		const j = Math.floor(Math.random() * (i + 1))
 		;[order[i], order[j]] = [order[j], order[i]]
 	}
-	if (order.length > 1 && order[0] === after)
-		order.push(order.shift() as number)
-	return order
+	/** How many have been raced since `course` was, if it has lately: none since, the last raced. */
+	const since = (course: number) => {
+		const at = recent.lastIndexOf(course)
+		return at < 0 ? Number.POSITIVE_INFINITY : recent.length - 1 - at
+	}
+	const out: number[] = []
+	while (order.length) {
+		const ok = order.findIndex((c) => since(c) + out.length >= RESHUFFLE_GAP)
+		// None of them can go here yet: the one raced longest ago, then.
+		const at =
+			ok >= 0
+				? ok
+				: order.reduce(
+						(best, c, i) => (since(c) > since(order[best]) ? i : best),
+						0,
+					)
+		out.push(...order.splice(at, 1))
+	}
+	return out
 }
 
 /**
@@ -71,9 +96,11 @@ export default function Party(props: { onLeave: () => void }) {
 	/** How its Rounds are raced: with the bus, or in Baby Mode. */
 	const [gameMode, setGameMode] = createSignal<GameMode>('scoop')
 	const info = () => roomModeInfo(mode())
+	/** Every course raced, in the order they were, the latest last: for the next shuffle to keep clear of. */
+	const raced: number[] = []
 	/** The courses for a go in `mode`: so many of them at random, or every one, shuffled. */
-	const coursesFor = (mode: RoomMode, after?: number) => {
-		const all = shuffledCourses(after)
+	const coursesFor = (mode: RoomMode) => {
+		const all = shuffledCourses(raced)
 		const count = roomModeInfo(mode).courses
 		return count ? all.slice(0, count) : all
 	}
@@ -85,30 +112,53 @@ export default function Party(props: { onLeave: () => void }) {
 	const roundsOf = () => (info().repeats ? undefined : courses().length)
 	/** Whether this is the last course of the go: never, in a Backyard Ultra. */
 	const lastCourse = () => !info().repeats && courseAt() + 1 >= courses().length
+	/**
+	 * The shuffle after this one, going round again, made as soon as it's
+	 * asked for, so what's next can be said before it's got to.
+	 */
+	let upcoming: number[] | undefined
+	const nextShuffle = () => {
+		upcoming ??= coursesFor(mode())
+		return upcoming
+	}
+	/** Its courses chosen afresh: `next`, or a new shuffle. */
+	const resetCourses = (next = coursesFor(mode())) => {
+		upcoming = undefined
+		setCourses(next)
+		setCourseAt(0)
+	}
 	/** The course after this one: the next in the shuffle, or the first of the next shuffle. */
 	const advance = () => {
 		if (courseAt() + 1 < courses().length) setCourseAt(courseAt() + 1)
-		else {
-			setCourses(coursesFor(mode(), courseIndex()))
-			setCourseAt(0)
-		}
+		else resetCourses(nextShuffle())
 	}
 	const nextCourseIndex = () =>
-		courseAt() + 1 < courses().length ? courses()[courseAt() + 1] : undefined
+		courseAt() + 1 < courses().length
+			? courses()[courseAt() + 1]
+			: info().repeats
+				? nextShuffle()[0]
+				: undefined
+	/** Pick and Choose: who picks each course, if it's that. */
+	const picks = () => info().picks
 	/** What's next, between Rounds. */
 	const nextText = () => {
+		if (picks() === 'starter') {
+			const starter = room.starter()
+			const number = starter ? room.seats.indexOf(starter) + 1 : 1
+			return `Next: P${number} picks the course`
+		}
+		if (picks()) return 'Next: someone picks the course'
 		const next = nextCourseIndex()
 		return lastCourse()
 			? 'That was the last! The Podium'
 			: next === undefined
-				? 'Next: a new shuffle'
+				? 'Next: the Podium'
 				: `Next: ${COURSES[next].name}`
 	}
 	/** The Starter choosing how the Room goes, in the lobby: its courses chosen afresh. */
 	const chooseMode = (next: RoomMode) => {
 		setMode(next)
-		setCourses(coursesFor(next))
-		setCourseAt(0)
+		resetCourses()
 	}
 	const [roundNumber, setRoundNumber] = createSignal(0)
 	/** The hat each seat's Player had on at the end of the last Round: still on for the next. */
@@ -116,7 +166,14 @@ export default function Party(props: { onLeave: () => void }) {
 	const [startingIn, setStartingIn] = createSignal<number>()
 	const [placings, setPlacings] = createSignal<Placing[]>([])
 	const [nextIn, setNextIn] = createSignal(RESULTS_SECONDS)
-	const [lobbyIn, setLobbyIn] = createSignal(PODIUM_SECONDS)
+	/** Pick and Choose: whose turn it is to pick the next course, by their seat's id; how long they've got; and which they're on. */
+	const [chooser, setChooser] = createSignal<string>()
+	const [chooseIn, setChooseIn] = createSignal(CHOOSE_SECONDS)
+	const [cursor, setCursor] = createSignal(0)
+	/** Who picked last, so someone at random picking isn't them again. */
+	let lastChooser: string | undefined
+	/** Pausing the Round on, or carrying on: the Round says how. */
+	let pauseRound: ((paused: boolean) => void) | undefined
 	/**
 	 * The Standings as they were at the end, for the Podium: fixed, so
 	 * anyone leaving while it's up stays on it, and nobody else moves up.
@@ -202,9 +259,31 @@ export default function Party(props: { onLeave: () => void }) {
 		placings: placings(),
 		next: nextText(),
 		nextIn: nextIn(),
-		lobbyIn: lobbyIn(),
 		podium: podium(),
 	}))
+	/** Pick and Choose: who's picking the next course, as everyone's shown. */
+	const choosing = () => {
+		const id = chooser()
+		const seat = id && room.stage() === 'choosing' && seatById(id)
+		if (!seat) return undefined
+		return {
+			seat: seat.id,
+			number: room.seats.indexOf(seat) + 1,
+			name: seatPlayable(seat)?.name ?? '',
+			colour: seat.colour,
+			secondsLeft: chooseIn(),
+			cursor: cursor(),
+			recent: raced.slice(-RESHUFFLE_GAP),
+		}
+	}
+	const seatById = (id: string) => room.seats.find((s) => s.id === id)
+	room.setChoosing(() => {
+		const now = choosing()
+		return now && { choosing: now, courses: COURSES.map((c) => c.name) }
+	})
+	room.setOnChoose((id, course) => {
+		if (id === chooser() && COURSES[course]) choose(course)
+	})
 	room.setOnStarter({
 		start: () => {
 			if (room.stage() !== 'lobby' || !canStart()) return false
@@ -225,6 +304,23 @@ export default function Party(props: { onLeave: () => void }) {
 		},
 		lobby: () => {
 			if (room.stage() === 'podium') toLobby()
+		},
+		next: () => {
+			if (room.stage() === 'results') nextRound()
+		},
+		pause: (paused) => {
+			if (room.stage() === 'round') pauseRound?.(paused)
+		},
+		menu: (item) => {
+			if (room.stage() !== 'round') return
+			if (item === 'effects') {
+				setEffectsOn(!effectsOn())
+				play('select')
+			}
+			if (item === 'music') setMusicOn(!musicOn())
+			if (item === 'lobby') toLobby()
+			if (item === 'end') end()
+			room.tellPhones()
 		},
 	})
 
@@ -257,7 +353,7 @@ export default function Party(props: { onLeave: () => void }) {
 			timer = window.setInterval(() => {
 				const left = (startingIn() ?? 1) - 1
 				setStartingIn(left)
-				if (left <= 0) startRound()
+				if (left <= 0) picks() ? toChoosing() : startRound()
 			}, 1000)
 		})
 	})
@@ -266,6 +362,8 @@ export default function Party(props: { onLeave: () => void }) {
 		stopTimer()
 		setStartingIn(undefined)
 		setStartPressed(false)
+		setChooser(undefined)
+		raced.push(courseIndex())
 		// Anyone who's still picking sits this one out.
 		for (const seat of room.seats)
 			room.update(seat.id, (s) => {
@@ -366,11 +464,62 @@ export default function Party(props: { onLeave: () => void }) {
 		if (picked().length < MIN_PLAYERS) return toLobby()
 		// The last of the go's courses: on to the Podium.
 		if (lastCourse()) return toPodium()
+		if (picks()) return toChoosing()
 		advance()
 		startRound()
 	}
 
-	/** All done: the top three on the Podium, then back to the lobby. */
+	/**
+	 * Pick and Choose: someone's turn to pick the next course, the Starter
+	 * or someone at random (someone new, if there's anyone else), with
+	 * `CHOOSE_SECONDS` to. Out of time, it's one at random.
+	 */
+	function toChoosing() {
+		stopTimer()
+		setStartingIn(undefined)
+		setStartPressed(false)
+		const everyone = picked().filter((s) => !s.lostAt)
+		const others = everyone.filter((s) => s.id !== lastChooser)
+		const from = others.length ? others : everyone
+		const seat =
+			picks() === 'starter'
+				? room.starter()
+				: from[Math.floor(Math.random() * from.length)]
+		if (!seat) return toLobby()
+		lastChooser = seat.id
+		setChooser(seat.id)
+		setCursor(raced.length ? courseIndex() : 0)
+		setChooseIn(CHOOSE_SECONDS)
+		room.setStage('choosing')
+		timer = window.setInterval(() => {
+			setChooseIn(chooseIn() - 1)
+			room.tellPhones()
+			if (chooseIn() > 0) return
+			// Out of time: one at random, not the last one raced.
+			const last = raced[raced.length - 1]
+			const any = COURSES.map((_, i) => i).filter((i) => i !== last)
+			choose(any[Math.floor(Math.random() * any.length)])
+		}, 1000)
+	}
+
+	/** Pick and Choose: the next Round's course picked, and off it goes. */
+	function choose(course: number) {
+		if (room.stage() !== 'choosing') return
+		resetCourses([course])
+		startRound()
+	}
+
+	/** Whoever's picking, if they're at the big screen: their controls, to pick with. */
+	const chooserControls = () => {
+		const id = chooser()
+		const seat = id ? seatById(id) : undefined
+		return seat && seat.kind !== 'phone' ? room.controlsFor(seat) : undefined
+	}
+
+	/**
+	 * All done: the top three on the Podium, everyone running about on it as
+	 * long as they like, till the Host or the Starter goes back to the lobby.
+	 */
 	function toPodium() {
 		stopTimer()
 		// Each in the hat they finished the last Round in.
@@ -378,11 +527,6 @@ export default function Party(props: { onLeave: () => void }) {
 			room.everyone().map((seat) => ({ ...seat, hat: hats.get(seat.id) })),
 		)
 		room.setStage('podium')
-		setLobbyIn(PODIUM_SECONDS)
-		timer = window.setInterval(() => {
-			setLobbyIn(lobbyIn() - 1)
-			if (lobbyIn() <= 0) toLobby()
-		}, 1000)
 	}
 
 	function toLobby() {
@@ -390,8 +534,9 @@ export default function Party(props: { onLeave: () => void }) {
 		world = undefined
 		stopStream()
 		// A fresh shuffle for the next go, and a fresh start to its Standings.
-		setCourses(coursesFor(mode(), roundNumber() ? courseIndex() : undefined))
-		setCourseAt(0)
+		resetCourses()
+		setChooser(undefined)
+		lastChooser = undefined
 		setRoundNumber(0)
 		hats.clear()
 		setPodium(undefined)
@@ -473,6 +618,9 @@ export default function Party(props: { onLeave: () => void }) {
 						onWorld={streamRound}
 						onTick={() => stream?.tick()}
 						onPause={room.setPaused}
+						pauseWith={(pause) => {
+							pauseRound = pause
+						}}
 						onOver={roundDone}
 						onLobby={toLobby}
 						onEnd={end}
@@ -504,13 +652,23 @@ export default function Party(props: { onLeave: () => void }) {
 								onLobby={toLobby}
 							/>
 						</Match>
+						<Match when={room.stage() === 'choosing' && choosing()}>
+							{(now) => (
+								<CoursePick
+									choosing={now()}
+									cursor={cursor()}
+									onCursor={chooserControls() ? setCursor : undefined}
+									onPick={chooserControls() ? choose : undefined}
+									controls={chooserControls()}
+								/>
+							)}
+						</Match>
 						<Match when={room.stage() === 'podium'}>
 							<Podium
 								title={info().label}
 								rounds={roundNumber()}
 								seats={podium() ?? room.everyone()}
 								placings={placings()}
-								lobbyIn={lobbyIn()}
 								onLobby={toLobby}
 								onEnd={end}
 								controlsFor={room.controlsFor}

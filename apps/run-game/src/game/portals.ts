@@ -10,8 +10,9 @@ import type { Racer, World } from './world'
  * still, till everyone still racing is too. Then it goes off, the same
  * moment for everyone, the camera diving in with them as they shrink (or
  * out, as they're sneezed out and grow), and they're let out the other
- * side as they went in: in the same order, as far apart, as fast. The bus
- * too, as far behind them as it was.
+ * side as they went in: in the same order, as fast, but hardly apart (no
+ * more than `MOST_APART`), so nobody first in is left waiting again the
+ * other side. The bus too, as far behind the last of them as it was.
  *
  * Plain state, like the body, on the world (`portal`), so a Remote Player
  * sees the same (see `RaceFrame`'s `portal`).
@@ -42,6 +43,11 @@ export interface PortalRun {
 	firstAt: number
 	/** When the last of them did, and it went off: undefined, still waiting for the rest. */
 	zappedAt?: number
+	/**
+	 * How long after the first of them the last is let out, the other side,
+	 * once it's gone off: see `MOST_APART`.
+	 */
+	lastOut?: number
 	/** How far behind the way in the bus was as it went off. */
 	busGap: number
 }
@@ -81,6 +87,12 @@ const SNEEZE_ARC = 70
 const FLASH_UP = 14
 const FLASH_DOWN = 30
 
+/**
+ * The longest anyone's let out after whoever got in just before them, the
+ * other side: under half a second, however long they took getting there.
+ */
+const MOST_APART = 24
+
 const snapOf = (portal: Portal) =>
 	portal.kind === 'shrink' ? SHRINK.snap : SNEEZE.snap
 /** How long after their turn someone's flying, sneezed out, before they're down and running. */
@@ -97,16 +109,37 @@ function heldX(portal: Portal, slot: number) {
 	return middle + slotOffset(slot)
 }
 
-/** When someone's let out, the other side: as long after the first as they got in after them. */
+/**
+ * When someone's let out, the other side: in the order they got in, as long
+ * after the first as they got in after them, but no more than `MOST_APART`
+ * after the one before them (see `bunchUp`).
+ */
 const turnOf = (run: PortalRun, portal: Portal, held: Held) =>
 	(run.zappedAt ?? 0) + snapOf(portal) + (held.at - run.firstAt)
 
-/** When the bus comes on again, the other side: as far behind them as it was. */
+/** When the bus comes on again, the other side: as far behind the last of them as it was. */
 const busTurn = (run: PortalRun, portal: Portal) =>
 	(run.zappedAt ?? 0) +
 	snapOf(portal) +
-	((run.zappedAt ?? 0) - run.firstAt) +
+	(run.lastOut ?? (run.zappedAt ?? 0) - run.firstAt) +
 	emergeOf(portal)
+
+/**
+ * Gone off: everyone's got in when they're to be let out, the other side,
+ * as `turnOf` has it: in the order they got in, but each no more than
+ * `MOST_APART` after the one before.
+ */
+function bunchUp(run: PortalRun) {
+	const held = [...run.held.values()].sort((a, b) => a.at - b.at)
+	let was = run.firstAt
+	let at = run.firstAt
+	for (const h of held) {
+		at += Math.min(MOST_APART, h.at - was)
+		was = h.at
+		h.at = at
+	}
+	run.lastOut = at - run.firstAt
+}
 
 const ease = (t: number) => {
 	const c = Math.max(0, Math.min(1, t))
@@ -161,6 +194,7 @@ export function stepPortals(world: World) {
 		if (racing.length && racing.every((r) => run.held.has(r.id))) {
 			run.zappedAt = now
 			run.busGap = Math.max(0, portal.in - world.bus.frontX)
+			bunchUp(run)
 			if (portal.kind === 'shrink') {
 				play('zap')
 				world.popup('Shrink ray!', portal.focus.x, portal.focus.y - 110)
@@ -315,7 +349,8 @@ function letOut(world: World, racer: Racer, held: Held, portal: Portal) {
 
 /**
  * How someone in a Portal is drawn this tick, if they're in one: where,
- * how big (1 their own size), or not at all, waiting their turn.
+ * how big (1 their own size), or not at all, waiting their turn; and
+ * whether they're `waiting` for everyone else to get to it.
  */
 export function heldLook(world: World, racer: Racer) {
 	const run = world.portal
@@ -323,7 +358,9 @@ export function heldLook(world: World, racer: Racer) {
 	const held = run?.held.get(racer.id)
 	if (!run || !portal || !held) return undefined
 	const b = racer.body
-	if (run.zappedAt === undefined) return { x: b.x, feetY: b.feetY, scale: 1 }
+	// Waiting for everyone else to get there.
+	if (run.zappedAt === undefined)
+		return { x: b.x, feetY: b.feetY, scale: 1, waiting: true as const }
 	const now = world.ticks()
 	const t = now - run.zappedAt
 	if (portal.kind === 'shrink') {

@@ -42,6 +42,7 @@ import {
 	MAX_PLAYER_NAME,
 	type PadMode,
 	type PadView,
+	type PauseItem,
 	type RoomMode,
 	cleanCode,
 	cleanPlayerName,
@@ -630,6 +631,28 @@ function Controller(props: {
 								</span>
 							</button>
 							<div style={styles.status}>{statusText(v())}</div>
+							{/* The Starter's: pausing the Round, for the whole menu. */}
+							<Show
+								when={
+									v().isStarter &&
+									v().stage === 'round' &&
+									v().status !== 'waiting' &&
+									!v().waitingForStarter &&
+									!v().paused
+								}
+							>
+								<button
+									type="button"
+									aria-label="Pause"
+									style={styles.pauseButton}
+									onClick={() => {
+										navigator.vibrate?.(8)
+										send({ type: 'pause', paused: true })
+									}}
+								>
+									II
+								</button>
+							</Show>
 						</div>
 
 						<Show when={watching()} keyed>
@@ -680,6 +703,17 @@ function Controller(props: {
 											onLeave={leave}
 										/>
 									</Match>
+									<Match when={v().stage === 'choosing' && v().choosing}>
+										{(choosing) => (
+											<ChoosingScreen
+												choosing={choosing()}
+												onPick={(course) => {
+													navigator.vibrate?.(15)
+													send({ type: 'choose', course })
+												}}
+											/>
+										)}
+									</Match>
 									<Match when={v().stage === 'podium'}>
 										<div style={styles.podium}>
 											<Show
@@ -705,7 +739,9 @@ function Controller(props: {
 											<Show
 												when={v().isStarter}
 												fallback={
-													<div style={styles.text}>Back to the lobby soon</div>
+													<div style={styles.text}>
+														Stay as long as you like
+													</div>
 												}
 											>
 												<button
@@ -732,6 +768,19 @@ function Controller(props: {
 										<div style={styles.lobby}>
 											<div style={styles.heading}>{statusText(v())}</div>
 											<div style={styles.text}>{betweenText(v())}</div>
+											{/* The Starter's: on now, not waiting for the timer. */}
+											<Show when={v().stage === 'results' && v().isStarter}>
+												<button
+													type="button"
+													style={styles.bigButton}
+													onClick={() => {
+														navigator.vibrate?.(15)
+														send({ type: 'next' })
+													}}
+												>
+													{nextLabel(v())}
+												</button>
+											</Show>
 											<Show
 												when={
 													v().stage === 'results' &&
@@ -777,7 +826,22 @@ function Controller(props: {
 							)}
 						</Show>
 						<Show when={v().paused}>
-							<div style={styles.paused}>Paused</div>
+							<Show
+								when={v().isStarter && v().stage === 'round'}
+								fallback={<div style={styles.paused}>Paused</div>}
+							>
+								<PauseSheet
+									view={v()}
+									onResume={() => {
+										navigator.vibrate?.(8)
+										send({ type: 'pause', paused: false })
+									}}
+									onItem={(item) => {
+										navigator.vibrate?.(8)
+										send({ type: 'menu', item })
+									}}
+								/>
+							</Show>
 						</Show>
 						<Show when={reconnecting()}>
 							<div style={styles.reconnecting}>
@@ -1126,6 +1190,118 @@ function Starter(props: {
 				</For>
 			</div>
 		</>
+	)
+}
+
+/** The Starter's button between Rounds, going on now: to what. */
+function nextLabel(view: PadView) {
+	if (roomModeInfo(view.roomMode).picks) return 'Pick the next course'
+	if (view.rounds && view.round >= view.rounds) return 'To the Podium'
+	return 'Next Round now'
+}
+
+/**
+ * The Starter's pause menu, on their phone, as the big screen has it:
+ * carrying on, the Host's sound effects and music, back to the lobby, and
+ * ending the Room, which takes a second tap to be sure.
+ */
+function PauseSheet(props: {
+	view: PadView
+	onResume: () => void
+	onItem: (item: PauseItem) => void
+}) {
+	const [ending, setEnding] = createSignal(false)
+	const onOff = (on: boolean | undefined) => (on ? 'On' : 'Off')
+	return (
+		<div style={styles.pauseSheet}>
+			<div style={styles.heading}>Paused</div>
+			<button type="button" style={styles.bigButton} onClick={props.onResume}>
+				Resume
+			</button>
+			<div style={styles.pauseItems}>
+				<button
+					type="button"
+					style={styles.pauseItem}
+					onClick={() => props.onItem('effects')}
+				>
+					<span>Sound effects</span>
+					<span>{onOff(props.view.sound?.effects)}</span>
+				</button>
+				<button
+					type="button"
+					style={styles.pauseItem}
+					onClick={() => props.onItem('music')}
+				>
+					<span>Music</span>
+					<span>{onOff(props.view.sound?.music)}</span>
+				</button>
+				<button
+					type="button"
+					style={styles.pauseItem}
+					onClick={() => props.onItem('lobby')}
+				>
+					Back to the lobby
+				</button>
+				<button
+					type="button"
+					style={{
+						...styles.pauseItem,
+						...(ending() ? { background: 'var(--bus-red)' } : {}),
+					}}
+					onClick={() => (ending() ? props.onItem('end') : setEnding(true))}
+				>
+					{ending() ? 'Tap again to end it' : 'End the Room'}
+				</button>
+			</div>
+		</div>
+	)
+}
+
+/**
+ * Pick and Choose, between Rounds: whoever's picking the next course, and
+ * how long they've got. To them, every course, to tap one.
+ */
+function ChoosingScreen(props: {
+	choosing: NonNullable<PadView['choosing']>
+	onPick: (course: number) => void
+}) {
+	const who = () => props.choosing.name || `P${props.choosing.number}`
+	return (
+		<div style={styles.choosing}>
+			<div style={styles.heading}>
+				{props.choosing.you ? 'Pick the next course' : `${who()} is picking…`}
+			</div>
+			<div style={styles.text}>
+				{props.choosing.secondsLeft}s left
+				{props.choosing.you ? ' · one at random if time runs out' : ''}
+			</div>
+			<Show when={props.choosing.you && props.choosing.courses}>
+				{(courses) => (
+					<div style={styles.courseList}>
+						<For each={courses()}>
+							{(name, i) => {
+								const recent = () => props.choosing.recent.includes(i())
+								return (
+									<button
+										type="button"
+										style={{
+											...styles.courseButton,
+											...(recent() ? { opacity: 0.6 } : {}),
+										}}
+										onClick={() => props.onPick(i())}
+									>
+										{name}
+										<Show when={recent()}>
+											<span style={styles.courseNote}>just raced</span>
+										</Show>
+									</button>
+								)
+							}}
+						</For>
+					</div>
+				)}
+			</Show>
+		</div>
 	)
 }
 
@@ -1722,6 +1898,84 @@ const styles = {
 		'pointer-events': 'none',
 		'z-index': 3,
 	},
+	pauseButton: {
+		width: '40px',
+		height: '40px',
+		'flex-shrink': 0,
+		padding: '4px 0 0',
+		background: 'rgba(255, 255, 255, 0.85)',
+		border: '3px solid var(--ink)',
+		color: 'var(--ink)',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '18px',
+		'line-height': 1,
+		'text-shadow': 'none',
+	},
+	pauseSheet: {
+		position: 'absolute',
+		inset: 0,
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'center',
+		'justify-content': 'center',
+		gap: '18px',
+		padding: '20px',
+		background: 'rgba(15, 31, 41, 0.92)',
+		color: 'white',
+		'z-index': 5,
+	},
+	pauseItems: {
+		display: 'flex',
+		'flex-direction': 'column',
+		gap: '10px',
+		width: '100%',
+		'max-width': '320px',
+	},
+	pauseItem: {
+		display: 'flex',
+		'justify-content': 'space-between',
+		gap: '12px',
+		padding: '10px 14px',
+		background: 'rgba(15, 31, 41, 0.85)',
+		color: 'white',
+		border: '3px solid white',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '18px',
+	},
+	choosing: {
+		flex: 1,
+		display: 'flex',
+		'flex-direction': 'column',
+		'align-items': 'center',
+		gap: '10px',
+		padding: '16px 14px',
+		'min-height': 0,
+	},
+	courseList: {
+		display: 'flex',
+		'flex-direction': 'column',
+		gap: '8px',
+		width: '100%',
+		'max-width': '360px',
+		'overflow-y': 'auto',
+		'min-height': 0,
+		flex: 1,
+	},
+	courseButton: {
+		display: 'flex',
+		'justify-content': 'space-between',
+		'align-items': 'center',
+		gap: '10px',
+		'flex-shrink': 0,
+		padding: '12px 14px',
+		background: 'var(--ink)',
+		color: 'white',
+		border: '3px solid white',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '18px',
+		'text-align': 'left',
+	},
+	courseNote: { 'font-size': '12px', opacity: 0.8 },
 	paused: {
 		position: 'absolute',
 		inset: 0,

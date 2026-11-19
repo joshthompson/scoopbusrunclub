@@ -92,9 +92,19 @@ export const MAX_SPEED = 12
  * scoops everyone else off the back of the screen.
  */
 export const ROUND_MAX_SPEED = 7
+/**
+ * Whether the lower top speed applies: in a multiplayer Round, unless the
+ * course needs full speed (see `Course['fullSpeedInRounds']`).
+ */
+export const roundCapped = (world: {
+	round: boolean
+	course?: { fullSpeedInRounds?: boolean }
+}) => world.round && !world.course?.fullSpeedInRounds
 /** How fast anyone can go: lower in a multiplayer Round. */
-export const topSpeed = (world: { round: boolean }) =>
-	world.round ? ROUND_MAX_SPEED : MAX_SPEED
+export const topSpeed = (world: {
+	round: boolean
+	course?: { fullSpeedInRounds?: boolean }
+}) => (roundCapped(world) ? ROUND_MAX_SPEED : MAX_SPEED)
 export const JUMP_SPEED = 9.5
 /**
  * How fast they're still going up, at most, once they let go of jump: a tap
@@ -162,7 +172,15 @@ export const MEMBER_SHARE = 0.25
 /** Bouncing off someone's head: as high as this, or higher holding jump. */
 export const STOMP_BOUNCE = 8.5
 export const STOMP_BOUNCE_HELD = 12
+/**
+ * And faster along, as much as `STOMP_BOOST` going flat out, less in
+ * proportion going slower (see `stompBoost`): so hopping onto someone stood
+ * still beside you doesn't fling you forwards, and a small jump's easy.
+ */
 export const STOMP_BOOST = 2
+/** How much faster bouncing off a head makes someone going `along` this fast their way. */
+export const stompBoost = (along: number) =>
+	(STOMP_BOOST * Math.max(0, along)) / RUN_TOP_SPEED
 /** Points for a head bounced off, doubling for each more before landing, up to `STOMP_POINTS_MAX`. */
 export const STOMP_POINTS = 100
 export const STOMP_POINTS_MAX = 1600

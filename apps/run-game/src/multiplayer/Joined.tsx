@@ -8,6 +8,7 @@ import {
 	createSignal,
 	onCleanup,
 	onMount,
+	untrack,
 } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
 import { COURSES } from '../courses'
@@ -21,6 +22,7 @@ import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { MenuBackdrop } from '../ui/MenuBackdrop'
 import { Stage } from '../ui/Stage'
+import { CoursePick } from './CoursePick'
 import { LobbyView, SIDE_PANEL, nextGameMode, nextMode } from './Lobby'
 import Mirror from './Mirror'
 import { Podium } from './Podium'
@@ -513,11 +515,36 @@ function InRoom(props: {
 										nextIn={r().nextIn}
 										placings={r().placings}
 										seats={seats}
+										onNext={
+											v().isStarter ? () => send({ type: 'next' }) : undefined
+										}
 										onFinish={
 											v().isStarter && roomModeInfo(v().roomMode).repeats
 												? () => send({ type: 'finish' })
 												: undefined
 										}
+									/>
+								)
+							}}
+						</Match>
+						<Match when={stage() === 'choosing' && room()?.choosing}>
+							{(choosing) => {
+								const mine = () => choosing().seat === me()?.id
+								/** Picking here: the one they're on, theirs; or the Host's, watching. */
+								const [cursor, setCursor] = createSignal(
+									untrack(() => choosing().cursor),
+								)
+								return (
+									<CoursePick
+										choosing={choosing()}
+										cursor={mine() ? cursor() : choosing().cursor}
+										onCursor={mine() ? setCursor : undefined}
+										onPick={
+											mine()
+												? (course) => send({ type: 'choose', course })
+												: undefined
+										}
+										controls={mine() ? anyControls : undefined}
 									/>
 								)
 							}}
@@ -531,7 +558,6 @@ function InRoom(props: {
 										rounds={v().round}
 										seats={r().podium ?? seats}
 										placings={r().placings}
-										lobbyIn={r().lobbyIn}
 										onLobby={
 											v().isStarter ? () => send({ type: 'lobby' }) : undefined
 										}

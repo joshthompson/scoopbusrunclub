@@ -10,6 +10,8 @@ export function statusText(view: PadView) {
 			: view.place
 				? `${ordinal(view.place)}${of}`
 				: 'All done!'
+	if (view.stage === 'choosing')
+		return view.choosing?.you ? 'Your pick!' : 'Picking a course…'
 	switch (view.status) {
 		case 'picking':
 			return !view.character

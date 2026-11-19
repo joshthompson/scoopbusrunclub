@@ -68,15 +68,16 @@ export type Sound =
 
 /**
  * [frequency in Hz, length in seconds, wave, how loud, out of the sound's
- * `volume`, and how far it slides, if not the sound's `slide`] for each
- * note, played one after another; or, in a `chord`, all at once.
+ * `volume`, how far it slides, if not the sound's `slide`, and in a
+ * `chord`, how long after the sound starts it does] for each note, played
+ * one after another; or, in a `chord`, all at once, unless held back.
  *
  * A `noise` note is a hiss, the NES's noise channel's: white noise, with
  * everything over its frequency muffled away. Sliding down, it's a boom
  * dying away, or a rush going by; a rumble, low.
  */
 type Wave = OscillatorType | 'noise'
-type Note = [number, number, Wave?, number?, number?]
+type Note = [number, number, Wave?, number?, number?, number?]
 
 const SOUNDS: Record<
 	Sound,
@@ -430,13 +431,23 @@ const SOUNDS: Record<
 		],
 		volume: 0.12,
 	},
-	/** Into water: a plunk as they go in, and the spray, bright, falling back. */
+	/**
+	 * Into water: a deep bloop as they go under, rising, the way water does,
+	 * with the slap of it, a crash of spray dying away, and drops pattering
+	 * back down after.
+	 */
 	splash: {
 		notes: [
-			[6000, 0.45, 'noise', 1, 0.12],
-			[220, 0.12, 'sine', 0.8, 2.2],
+			[140, 0.16, 'sine', 1, 4],
+			[2400, 0.06, 'noise', 0.9, 2.5],
+			[4200, 0.55, 'noise', 0.7, 0.3, 0.03],
+			[1500, 0.04, 'sine', 0.35, 1.8, 0.2],
+			[2100, 0.035, 'sine', 0.3, 1.6, 0.29],
+			[1200, 0.045, 'sine', 0.3, 2, 0.36],
+			[2600, 0.03, 'sine', 0.22, 1.5, 0.45],
+			[1700, 0.035, 'sine', 0.18, 1.7, 0.53],
 		],
-		volume: 0.1,
+		volume: 0.12,
 		chord: true,
 	},
 }
@@ -468,7 +479,9 @@ export function voice(
 		wave = 'square',
 		loud = 1,
 		slide = slides,
+		after = 0,
 	] of notes) {
+		const start = chord ? at + after : at
 		const gain = context.createGain()
 		// A hiss, through a filter muffling all over `frequency`; or a tone.
 		let source: AudioScheduledSourceNode
@@ -489,14 +502,14 @@ export function voice(
 			source = oscillator
 			pitch = oscillator.frequency
 		}
-		pitch.setValueAtTime(frequency, at)
+		pitch.setValueAtTime(frequency, start)
 		if (slide)
-			pitch.exponentialRampToValueAtTime(frequency * slide, at + length)
-		gain.gain.setValueAtTime(volume * loud, at)
-		gain.gain.exponentialRampToValueAtTime(0.0001, at + length)
+			pitch.exponentialRampToValueAtTime(frequency * slide, start + length)
+		gain.gain.setValueAtTime(volume * loud, start)
+		gain.gain.exponentialRampToValueAtTime(0.0001, start + length)
 		gain.connect(destination)
-		source.start(at)
-		source.stop(at + length)
+		source.start(start)
+		source.stop(start + length)
 		if (!chord) at += length
 	}
 }

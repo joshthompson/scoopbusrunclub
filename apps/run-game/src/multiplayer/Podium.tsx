@@ -45,7 +45,8 @@ const CONFETTI = Array.from({ length: 36 }, (_, i) => ({
  * The end of a Room's go, out on Haga: the Standings' top three on the
  * Podium, put up on its path, their medals round their necks, everyone
  * else beside it, and the Standings up in the corner, points and all.
- * Back to the lobby by itself, or straight away with Enter.
+ * Up as long as everyone likes, running about on it: back to the lobby
+ * only when the Host, or the Starter, says so.
  */
 export function Podium(props: {
 	/** How the Room went: Marathon, Backyard Ultra… */
@@ -54,7 +55,6 @@ export function Podium(props: {
 	seats: Seat[]
 	/** The last Round's, for anyone level on points. */
 	placings: Placing[]
-	lobbyIn: number
 	/** Back to the lobby: the Host's, or a joined computer's if it's the Starter's. */
 	onLobby?: () => void
 	onEnd: () => void
@@ -197,7 +197,11 @@ export function Podium(props: {
 			</div>
 
 			<div style={styles.footer}>
-				<span style={styles.next}>Back to the lobby in {props.lobbyIn}…</span>
+				<span style={styles.next}>
+					{props.onLobby
+						? 'Stay as long as you like'
+						: 'Back to the lobby when P1’s ready'}
+				</span>
 				<For each={buttons}>
 					{(button, i) => (
 						<button

@@ -43,6 +43,7 @@ import {
 	TRICK_POINTS_MAX,
 	WIPEOUT_KEEP,
 	WIPEOUT_TICKS,
+	roundCapped,
 	topSpeed,
 } from './constants'
 import { boost, scored, shielded, slowToDance } from './step'
@@ -494,7 +495,7 @@ export function stepSkiing(
 	}
 	// Tucked, a little faster than anyone else can go.
 	const tuck = b.ducking
-		? world.round
+		? roundCapped(world)
 			? SKI_TUCK_OVER_ROUND
 			: SKI_TUCK_OVER
 		: 0

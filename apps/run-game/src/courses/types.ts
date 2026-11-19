@@ -1330,6 +1330,11 @@ export interface Course {
 	 */
 	busDownhill?: number
 	/**
+	 * No lower top speed in a multiplayer Round (see `topSpeed`): The Slopes'
+	 * ski jumps need everything a tuck gives to clear them.
+	 */
+	fullSpeedInRounds?: boolean
+	/**
 	 * How far ahead down the hill the camera looks, down a mountain, so
 	 * what's coming is in view, not off the bottom of the screen.
 	 */

@@ -10,7 +10,6 @@ import {
 	VIEW_HEIGHT,
 } from '../game/constants'
 import { EVEREST_FIKA } from '../game/fika'
-import { GROUND_STEP } from '../game/groundColumns'
 import { CAMERA_HEADROOM, MAX_ZOOM } from '../game/step'
 import { type Gap, type Terrain, withGaps } from '../game/terrain'
 import { YETI } from '../runners/bonus'
@@ -216,18 +215,6 @@ const ICEFALL_END = 11600
 /** The Lhotse Face's blue ice, along the course; and the Yellow Band's rock, across it. */
 const LHOTSE_ICE: [from: number, to: number] = [12700, 14600]
 const YELLOW_BAND: [from: number, to: number] = [15350, 16450]
-
-/**
- * Fixed ropes, from and to along the course: up the Lhotse Face, and up the
- * ridge either side of the Hillary Step. Red, along the back of the path,
- * sagging between stakes every `ROPE_SPAN`.
- */
-const FIXED_ROPES: [from: number, to: number][] = [
-	[12650, 14700],
-	[17350, 18860],
-	[18940, 19820],
-]
-const ROPE_SPAN = 180
 
 /**
  * A smooth climb through `points`, never overshooting between them, so a
@@ -584,16 +571,6 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 		if (piece) out.push({ ...piece, x: Math.round(x) })
 	}
 
-	// The fixed ropes' stakes: a marker wand at each, the rope tied off to
-	// it. Clear of the crevasses and the steps.
-	for (const along of ROPE_STAKES) {
-		const x = START_X + along
-		if (nearGap(terrain, x, 40) || nearStep(along, 60)) continue
-		for (let i = out.length - 1; i >= 0; i--)
-			if (Math.abs(out[i].x - x) < 24) out.splice(i, 1)
-		out.push({ x, asset: wand, scale: 2, onFloor: true })
-	}
-
 	// At the lip of the crevasse down to the Yetis' den, a hint: an old
 	// signpost, pointing down. Nothing else stood too near it.
 	const sign = DEN.gap.from - 24
@@ -648,32 +625,6 @@ const yellowBandEnds = (x: number) => {
 	return (1 - t) * 520 + (t < 1 ? 10 * Math.sin(along / 9) : 0)
 }
 
-/** Where a fixed rope runs, and the stakes it's tied off to, along the course. */
-const onRope = (along: number) =>
-	FIXED_ROPES.some(([from, to]) => along >= from && along <= to)
-const ROPE_STAKES = FIXED_ROPES.flatMap(([from, to]) =>
-	Array.from(
-		{ length: Math.floor((to - from) / ROPE_SPAN) + 1 },
-		(_, k) => from + k * ROPE_SPAN,
-	),
-)
-/** How far the rope's sagged at `x`: none at a stake, most halfway between. */
-const ropeSag = (x: number) => {
-	const along = x - START_X
-	const rope = FIXED_ROPES.find(([from, to]) => along >= from && along <= to)
-	if (!rope) return 0
-	const t = ((along - rope[0]) % ROPE_SPAN) / ROPE_SPAN
-	return 6 * Math.sin(Math.PI * t)
-}
-/** How high over the path's back edge it's tied off. */
-const ROPE_UP = 14
-/**
- * How thick it's drawn at `x`: two pixels, and up a steep bit, as much as
- * the ground climbs across one of its columns, so it's a line, not dashes.
- */
-const ropeUnder = (x: number) =>
-	ropeSag(x) + Math.max(0, Math.abs(tilt(x)) * GROUND_STEP - 2)
-
 export const everest: CourseDefinition = {
 	id: 'everest',
 	name: 'Everest',
@@ -710,15 +661,6 @@ export const everest: CourseDefinition = {
 		horizonTrees: false,
 		ground: [
 			[-PATH_BACK - VERGE, 'url(#everest-verge)'],
-			// A fixed rope along the back of the path, sagging between its
-			// stakes: a line of red, the verge again just under it.
-			[-PATH_BACK - ROPE_UP, '#d8342c', false, only(onRope, ropeSag)],
-			[
-				-PATH_BACK - ROPE_UP + 2,
-				'url(#everest-verge)',
-				false,
-				only(onRope, ropeUnder),
-			],
 			[-PATH_BACK, 'url(#everest-path-edge)'],
 			[-PATH_BACK + 5, 'url(#everest-path)'],
 			// The path's own: grit and stones up the trek and the moraine,

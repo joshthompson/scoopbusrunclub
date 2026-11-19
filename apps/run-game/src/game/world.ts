@@ -85,6 +85,15 @@ export type RacerEntry = Pick<
 export const bodyHeight = (b: Body) =>
 	(b.ducking ? DUCK_HEIGHT : STAND_HEIGHT) * (b.squashed > 0 ? SQUASHED : 1)
 
+/** A Baby Mode bubble floating someone back after a fall: see `Body['bubble']`. */
+export interface FloatBack {
+	from: { x: number; y: number }
+	to: { x: number; y: number }
+	at: number
+	ticks: number
+	glide: boolean
+}
+
 export interface Body {
 	x: number
 	feetY: number
@@ -135,6 +144,12 @@ export interface Body {
 	 * shore the far side (see `swim.ts`).
 	 */
 	swimming?: boolean
+	/**
+	 * Baby Mode, fallen: floated back in a bubble, `from` where they fell
+	 * `to` where they're put back (see `respawn`), from the tick `at`, for
+	 * `ticks`; on a glider, `glide`, back up in the sky over the sea.
+	 */
+	bubble?: FloatBack
 	/** Ticks left being carried by a flying goose. */
 	carried: number
 	/**

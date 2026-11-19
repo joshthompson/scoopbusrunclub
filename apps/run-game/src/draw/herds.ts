@@ -24,8 +24,13 @@ const ONTO_BRIDGE = 70
 const SKYLINE_SINK = 2
 /** How much of them is under the water, swimming. */
 const SUNK = 0.45
-/** How far back from `from` the first of them starts: off the left of the screen. */
+/**
+ * How far back from `from` the first of them starts: off the left of the
+ * screen; or further, if it's zoomed out that far, always off its left
+ * edge by `OFF_LEFT`, never popping up in plain sight.
+ */
 const START_BEHIND = 560
+const OFF_LEFT = 20
 /** How far off the right of the screen they're gone. */
 const OFF_SCREEN = 20
 
@@ -38,6 +43,8 @@ export function createHerds(world: World) {
 function createHerd(world: World, herd: Herd, h: number) {
 	const { groundY } = world.terrain
 	let since: number | undefined
+	/** Where the first of them started, once they've come out. */
+	let start = herd.from - START_BEHIND
 	let moved: number | undefined
 	const state = herd.members.map(() => {
 		const [x, setX] = createSignal(0)
@@ -109,12 +116,12 @@ function createHerd(world: World, herd: Herd, h: number) {
 			const ahead = world.racers.some((r) => !r.out && r.body.x >= herd.from)
 			if (now < 0 || !ahead) return
 			since = now
+			start = Math.min(start, world.camera() - OFF_LEFT)
 		}
 		const t = now - since
 		herd.members.forEach((member, i) => {
 			const s = state[i]
-			const x =
-				herd.from - START_BEHIND - member.behind - member.width + t * herd.speed
+			const x = start - member.behind - member.width + t * herd.speed
 			s.setX(x)
 			s.frame =
 				Math.floor((t * herd.speed) / member.stride) % member.frames.length

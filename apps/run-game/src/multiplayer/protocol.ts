@@ -80,8 +80,18 @@ export type PadMode = 'controller' | 'remote'
  * - `marathon`: every course, once
  * - `backyard`: a Backyard Ultra, every course and round again, till the
  *   Starter (or the Host) calls it after a Round
+ * - `pick`: Pick and Choose, as long as a Backyard Ultra, but before each
+ *   Round, the Starter picks its course (see `Choosing`)
+ * - `pickAny`: Pick and Choose, someone at random picking each course,
+ *   someone new each time
  */
-export type RoomMode = 'parkrun' | 'half' | 'marathon' | 'backyard'
+export type RoomMode =
+	| 'parkrun'
+	| 'half'
+	| 'marathon'
+	| 'backyard'
+	| 'pick'
+	| 'pickAny'
 
 /**
  * How its Rounds are raced, as its Starter chooses in the lobby too:
@@ -132,6 +142,37 @@ export type PadMessage =
 	| { type: 'finish' }
 	/** The Starter, at the Podium: back to the lobby for another go. */
 	| { type: 'lobby' }
+	/** The Starter, between Rounds: on to the next now, not waiting. */
+	| { type: 'next' }
+	/** The Starter, pausing a Round, or carrying on. */
+	| { type: 'pause'; paused: boolean }
+	/** The Starter, from the pause menu on their phone: what they picked (see `PauseItem`). */
+	| { type: 'menu'; item: PauseItem }
+	/** Whoever's picking the next course, in Pick and Choose: this one, by its index. */
+	| { type: 'choose'; course: number }
+
+/**
+ * The pause menu's items, on the Starter's phone, as on the big screen: the
+ * Host's sound effects and music, on or off; back to the lobby; and ending
+ * the Room. Resuming is `pause`.
+ */
+export type PauseItem = 'effects' | 'music' | 'lobby' | 'end'
+
+/**
+ * Pick and Choose: who's picking the next course, and how long they've got
+ * left, in seconds, as everyone sees it (`seat` is their seat's id).
+ */
+export interface Choosing {
+	seat: string
+	number: number
+	name: string
+	colour: string
+	secondsLeft: number
+	/** The course they're on, by its index, picking on the big screen. */
+	cursor: number
+	/** The courses raced most recently, by their index, the latest last. */
+	recent: number[]
+}
 
 /**
  * Where the Room's got to:
@@ -139,9 +180,16 @@ export type PadMessage =
  * - `starting`: everyone's ready, and the first Round's about to start
  * - `round`: a Round's on
  * - `results`: between Rounds, the Standings up
+ * - `choosing`: Pick and Choose, someone picking the next Round's course
  * - `podium`: all done, the top three on the Podium
  */
-export type RoomStage = 'lobby' | 'starting' | 'round' | 'results' | 'podium'
+export type RoomStage =
+	| 'lobby'
+	| 'starting'
+	| 'choosing'
+	| 'round'
+	| 'results'
+	| 'podium'
 
 /**
  * How a Player's doing, for their phone:
@@ -216,6 +264,16 @@ export interface PadView {
 	}
 	/** If someone else is the Starter, their Player number. */
 	starterNumber?: number
+	/**
+	 * The Starter's, through a Round: the Host's sound effects and music,
+	 * on or not, for the pause menu on their phone.
+	 */
+	sound?: { effects: boolean; music: boolean }
+	/**
+	 * Pick and Choose, someone picking the next course: who, and whether it's
+	 * them, and so the courses to pick from, by name, in order.
+	 */
+	choosing?: Choosing & { you: boolean; courses?: string[] }
 	/** Joined from a computer: the whole Room, to show it as the Host does. */
 	room?: RoomView
 }
@@ -239,8 +297,8 @@ export interface RoomView {
 	/** Between Rounds: what's next, and in how long. */
 	next: string
 	nextIn: number
-	/** At the Podium: how long till it's back to the lobby. */
-	lobbyIn: number
+	/** Pick and Choose: who's picking the next course. */
+	choosing?: Choosing
 	/**
 	 * At the Podium: the Standings as they were at the end, fixed, with
 	 * anyone who's left since, or left during it, still on it.
@@ -318,9 +376,11 @@ export const RACER_FLAGS = {
 	cart: 256,
 	/** Killed by a haunted house's monster, and come back as a ghost. */
 	ghost: 512,
+	/** Fallen, in Baby Mode, and floating back in a bubble. */
+	bubble: 1024,
 }
 /** The hat a racer's wearing, as its `hatCode`, is the flags over this. */
-export const HAT_FLAG = 1024
+export const HAT_FLAG = 2048
 /**
  * [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding, 8 ducking,
  * 16 being shrunk), dazed, spin (or being shrunk, how far into it: never
