@@ -1,12 +1,9 @@
 import type { RunnerName } from '@/data/runners'
-import busBody from '../assets/bus/bus.png'
-import windows from '../assets/bus/windows.png'
 import theMinerHello from '../assets/runners/the-miner/hello.png'
 import theMinerStand from '../assets/runners/the-miner/stand.png'
 import crystals from '../assets/scenery/crystals.png'
 import tree1 from '../assets/scenery/tree1.png'
 import tree2 from '../assets/scenery/tree2.png'
-import { DRILL_FRAMES } from '../draw/art/drill'
 import { CART_SEAT } from '../game/carts'
 import {
 	GROUND_Y,
@@ -1263,10 +1260,7 @@ export const caves: CourseDefinition = {
 			rock: { lit: '#b9a08a', moss: '#6d9a4a', drip: ROCK_LIGHTEST },
 		},
 		bus: {
-			body: busBody,
-			windows,
-			scoop: DRILL_FRAMES[0],
-			drill: DRILL_FRAMES,
+			drill: true,
 		},
 		// The old mine under it all: the mine people's chamber, and the lift.
 		secret: {

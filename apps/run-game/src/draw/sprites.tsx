@@ -15,15 +15,6 @@ import {
 } from 'scoopjs'
 import { For, type JSX, Show, createMemo, createSignal } from 'solid-js'
 import barcodeAsset from '../assets/boosts/barcode.png'
-// The website's bus, turned round to chase to the right.
-import busBackAsset from '../assets/bus/bus-back.png'
-import busAsset from '../assets/bus/bus.png'
-import scoopAsset from '../assets/bus/scoop.png'
-import wheel1Asset from '../assets/bus/wheel1.png'
-import wheel2Asset from '../assets/bus/wheel2.png'
-import wheel3Asset from '../assets/bus/wheel3.png'
-import wheel4Asset from '../assets/bus/wheel4.png'
-import windowAsset from '../assets/bus/windows.png'
 import cyclist1Asset from '../assets/obstacles/cyclist-1.png'
 import cyclist2Asset from '../assets/obstacles/cyclist-2.png'
 import lowBranchLimbAsset from '../assets/obstacles/low-branch-limb.png'
@@ -44,6 +35,7 @@ import { seeded } from '../courses/kit/seeded'
 import { cone } from '../courses/kit/sewerScenery'
 import type {
 	Boost,
+	BusLook,
 	CourseLook,
 	Obstacle,
 	PlatformDefinition,
@@ -140,18 +132,12 @@ import { zombieSprite } from '../runners/skeleton'
 import { play } from '../sfx'
 import { WallBricks } from './Backdrop'
 import { bubbleReach, paintBubble } from './Bubble'
-import {
-	BUS_BOOSTER,
-	BUS_BUBBLES,
-	BUS_FIN,
-	BUS_FLAME,
-	BUS_PROPELLER,
-	BUS_WING,
-} from './art/busJets'
-import { LEGS_HEIGHT, LEGS_OUT, LEGS_WIDTH, paintBusLegs } from './art/busLegs'
+import type { JetPart } from './art/busJets'
+import { LEGS_HEIGHT, LEGS_OUT, legsWidth, paintBusLegs } from './art/busLegs'
+import { type BusStyle, busStyle } from './art/busStyle'
 import { CONDOR_CELLS, condorFrame, condorFrames } from './art/condor'
 import type { CorgiPose } from './art/corgi'
-import { DRILL_AT, DRILL_HEIGHT, DRILL_POINT, DRILL_WIDTH } from './art/drill'
+import { DRILL_HEIGHT, DRILL_POINT, DRILL_WIDTH } from './art/drill'
 import { DUCK_NOTE_HEIGHT, DUCK_NOTE_WIDTH, duckNote } from './art/duckNote'
 import { fikaPicture } from './art/fika'
 import { GEESE_HEIGHT, geeseReach, geeseWidth, paintGeese } from './art/geese'
@@ -1907,27 +1893,12 @@ function createFurby(world: World, f: Furby) {
 	})
 }
 
-const BUS_WIDTH = 247
-const BUS_HEIGHT = 127
-/**
- * The sleigh, in place of the bus down a ski slope (see `BusLook['sleigh']`):
- * its size, and how far above the top of the bus it's drawn, so its runners
- * are where the bus's wheels touch the ground. As on the website.
- */
-const SLEIGH_WIDTH = 312
-const SLEIGH_HEIGHT = 148
-const SLEIGH_Y = -6
-/** How far down into the bus's roof its glider's struts' feet go. */
-const BUS_GLIDER_ROOF = 10
-/** The giant condor carrying the bus off a Leap: px a cell, and how far down the roof its talons grip. */
+/** The giant condor carrying the bus off a Leap: px a cell. */
 const BUS_CONDOR_CELL = 4
-const BUS_CONDOR_ROOF = 16
 /** How far past the edge it beats its wings, taking the bus's weight, before it soars. */
 const BUS_CONDOR_BEATING = 260
 /** How long it takes, once it's let go of the bus, to fly off up and away out of sight. */
 const BUS_CONDOR_FLY_OFF = 150
-/** The scoop's front edge, this far in from the bus's left. */
-const SCOOP_FRONT = BUS_WIDTH + 22
 /** How many ticks its scoop takes to flick up, or back down: 60ms. */
 const SCOOP_FLICK = 60 / TICK_MS
 /** How long a bit of rock takes to fly off the drill, and the bits: up and back over the roof, or down ahead onto the floor. */
@@ -1942,8 +1913,6 @@ const DIRT = [
 	{ to: { x: -110, y: -80 }, size: 6, shade: 2, delay: 0.38 },
 	{ to: { x: -20, y: -118 }, size: 6, shade: 0, delay: 0.44 },
 ]
-/** Where the drill's tip is, down from the top of the bus. */
-const DRILL_TIP_DOWN = DRILL_AT.y + DRILL_POINT.y
 
 /**
  * Rock flying off the drill as the bus bores through a Cave: bits flung up
@@ -1954,6 +1923,9 @@ export function createBusDirt(world: World) {
 	const look = world.course.look
 	const rock = look?.cave
 	if (!look?.bus?.drill || !world.course.cave || !rock) return []
+	const style = busStyle()
+	/** Where the drill's tip is, down from the line the bus runs along. */
+	const tipDown = style.drill().at.y + DRILL_POINT.y - style.wheelBottom
 	const shades = [rock.edge, rock.rock, '#9a8270']
 	const bits = DIRT.map((bit) => ({
 		x: -bit.size / 2,
@@ -1978,11 +1950,7 @@ export function createBusDirt(world: World) {
 				const ride = world.bus.ride
 				const front = world.bus.frontX
 				$.setX(front - 4)
-				$.setY(
-					(ride?.y ?? world.terrain.groundY(front)) -
-						WHEEL_BOTTOM +
-						DRILL_TIP_DOWN,
-				)
+				$.setY((ride?.y ?? world.terrain.groundY(front)) + tipDown)
 				$.setStyle({
 					visibility:
 						world.ticks() >= 0 && drilling(world, front) ? 'visible' : 'hidden',
@@ -2020,30 +1988,29 @@ function drilling(world: World, front: number) {
 	)
 }
 
-/**
- * How much further out than a scoop a drill is: its point (see `DRILL_AT`
- * and `DRILL_POINT`) this far past the scoop's front.
- */
-const DRILL_OUT = 25
-/** Where the wheels touch the ground, from the top of the bus. */
-const WHEEL_BOTTOM = 141
+/** Which of its looks the bus has here: the course's own, or the yellow one. */
+const busLook = (world: World): BusLook => world.course.look?.bus ?? {}
 
-/** The bus's pictures: the course's own, or the yellow one. */
-const busLook = (world: World) =>
-	world.course.look?.bus ?? {
-		body: busAsset,
-		windows: windowAsset,
-		scoop: scoopAsset,
-	}
+/** The bus's pictures for that look, in the artwork picked in Options. */
+const busLooks = (style: BusStyle, look: BusLook) =>
+	look.spooky ? style.spooky : style.plain
 
 export function createBus(world: World) {
 	const look = busLook(world)
+	const style = busStyle()
+	const { width: busWidth, height: busHeight, wheelBottom, scoopFront } = style
+	const art = busLooks(style, look)
+	const drill = look.drill ? style.drill() : undefined
 	/** Whether it's got its drill on yet: from the start, or once it's got to where it goes on. */
 	const drillOn = () =>
-		!!look.drill &&
+		!!drill &&
 		(look.drillFrom === undefined || world.bus.frontX >= look.drillFrom)
-	/** A drill reaches further out than a scoop: the bus is that much further back, its tip where it scoops. */
-	const drillOut = () => (drillOn() ? DRILL_OUT : 0)
+	/**
+	 * A drill reaches further out than a scoop: its point this far past the
+	 * scoop's front. The bus is that much further back, its tip where it scoops.
+	 */
+	const drillOut = () =>
+		drill && drillOn() ? drill.at.x + DRILL_POINT.x - scoopFront : 0
 	/** Its floor's slope, at `x`: digging its own way, or the Ground's. */
 	const slope = (x: number) => {
 		const dug = world.course.busFloor
@@ -2057,14 +2024,14 @@ export function createBus(world: World) {
 	 */
 	const [flick, setFlick] = createSignal(0)
 	const bus = createController({
-		// A sleigh has no back to see through its windows.
-		frames: look.sleigh ? [] : [busBackAsset],
+		// The classic bus's back, seen through its windows; a sleigh has none.
+		frames: style.back && !look.sleigh ? [style.back] : [],
 		init: () => ({
 			id: 'bus',
 			type: 'bus',
-			width: () => BUS_WIDTH,
-			height: () => BUS_HEIGHT,
-			...createObjectSignal(world.bus.frontX - SCOOP_FRONT - drillOut(), 'x'),
+			width: () => busWidth,
+			height: () => busHeight,
+			...createObjectSignal(world.bus.frontX - scoopFront - drillOut(), 'x'),
 			...createObjectSignal(0, 'y'),
 			...createObjectSignal(0, 'rotation'),
 		}),
@@ -2075,11 +2042,11 @@ export function createBus(world: World) {
 					? Math.min(flicked, f + 1 / SCOOP_FLICK)
 					: Math.max(flicked, f - 1 / SCOOP_FLICK),
 			)
-			const middle = world.bus.frontX - SCOOP_FRONT - drillOut() + BUS_WIDTH / 2
+			const middle = world.bus.frontX - scoopFront - drillOut() + busWidth / 2
 			world.bus.ride ??= startRide(world, middle)
 			const ride = world.bus.ride
 			rideBus(world, ride, middle)
-			$.setX(world.bus.frontX - SCOOP_FRONT - drillOut())
+			$.setX(world.bus.frontX - scoopFront - drillOut())
 			// Off a Leap, hanging in a giant condor's talons: swaying a little,
 			// nose a little down, not driving down the air.
 			const { leap } = world.course
@@ -2090,7 +2057,7 @@ export function createBus(world: World) {
 			// Its engine rumbling it about, a little; a sleigh glides, smooth.
 			const rumbles = ride.grounded && !look.sleigh && !hanging
 			const flying = onJets(world, middle)
-			$.setY(ride.y - WHEEL_BOTTOM + (rumbles ? Math.cos(10 + $age / 2) : 0))
+			$.setY(ride.y - wheelBottom + (rumbles ? Math.cos(10 + $age / 2) : 0))
 			// Nose up as it jumps, down as it drops; with the hill, on it.
 			$.setRotation(
 				// On its jets, rocking gently as it floats, nose up as it climbs.
@@ -2137,7 +2104,7 @@ export function createBus(world: World) {
 	/** Whether it's on its jets now (see `CourseLook['busJets']`), flying. */
 	const jetting = () =>
 		world.ticks() >= 0 &&
-		onJets(world, world.bus.frontX - SCOOP_FRONT - drillOut() + BUS_WIDTH / 2)
+		onJets(world, world.bus.frontX - scoopFront - drillOut() + busWidth / 2)
 	/** Its wheels, tucked away on its jets. */
 	const wheelStyle = (): JSX.CSSProperties => ({
 		visibility: jetting() ? 'hidden' : 'visible',
@@ -2147,36 +2114,25 @@ export function createBus(world: World) {
 		'image-rendering': 'pixelated',
 		visibility: jetting() ? 'visible' : 'hidden',
 	})
-	if (world.course.look?.busJets) {
-		// Behind it, attached before its body: its fin, up off its roof, and
-		// its booster, roaring.
-		part(
-			'bus-glider',
-			BUS_FIN.asset,
-			BUS_FIN.width,
-			BUS_FIN.height,
-			BUS_FIN.at,
-			{
-				style: jetStyle,
-			},
-		)
-		// Its flame, roaring; or under the sea, its turbine's propeller,
-		// turning, and the bubbles churned out behind it.
-		const turbine = !!world.course.look.busJets.turbine
-		for (const out of turbine ? [BUS_BUBBLES, BUS_PROPELLER] : [BUS_FLAME])
-			part('bus-glider', out.frames[0], out.width, out.height, out.at, {
-				frames: out.frames,
+	/** One of its wings and jets, out only on them; turning, if it's a sheet of frames. */
+	const jet = (type: string, jetPart: JetPart) =>
+		part(type, jetPart.asset, jetPart.width, jetPart.height, jetPart.at, {
+			...(jetPart.frames && {
+				frames: jetPart.frames,
 				frame: () => Math.floor(Math.max(0, world.ticks()) / 3) % 3,
-				style: jetStyle,
-			})
-		part(
-			'bus-glider',
-			BUS_BOOSTER.asset,
-			BUS_BOOSTER.width,
-			BUS_BOOSTER.height,
-			BUS_BOOSTER.at,
-			{ style: jetStyle },
-		)
+			}),
+			style: jetStyle,
+		})
+	const { jets } = style
+	if (world.course.look?.busJets) {
+		// Behind it, attached before its body: its flame, roaring; or under
+		// the sea, its turbine's propeller, turning, and the bubbles churned
+		// out behind it; its booster; and on the classic bus, its fin.
+		const turbine = !!world.course.look.busJets.turbine
+		for (const out of turbine ? [jets.bubbles, jets.propeller] : [jets.flame])
+			jet('bus-glider', out)
+		jet('bus-glider', jets.booster)
+		if (!jets.finOver) jet('bus-glider', jets.fin)
 	}
 
 	/**
@@ -2192,79 +2148,56 @@ export function createBus(world: World) {
 				type,
 				base: bus,
 				draw: ({ ctx }) =>
-					paintBusLegs(ctx, legsLook, world.bus.frontX, WHEEL_BOTTOM, far),
-				width: () => LEGS_WIDTH,
+					paintBusLegs(ctx, style.legs, legsLook, world.bus.frontX, far),
+				width: () => legsWidth(style.legs),
 				height: () => LEGS_HEIGHT,
 				offset: { x: -LEGS_OUT, y: 0 },
 			}),
 		)
 	}
+	// Its far legs, behind it.
 	if (look.legs) legs('bus-legs-far', true)
-	else if (!look.sleigh) {
-		part(
-			'bus-wheel1',
-			wheel1Asset,
-			34,
-			38,
-			{ x: 140, y: 105 },
-			{ y: bounce(0), style: wheelStyle },
-		)
-		part(
-			'bus-wheel2',
-			wheel2Asset,
-			34,
-			38,
-			{ x: 208, y: 103 },
-			{ y: bounce(5), style: wheelStyle },
-		)
-		part(
-			'bus-wheel3',
-			wheel3Asset,
-			19,
-			23,
-			{ x: 68, y: 105 },
-			{ y: bounce(10), style: wheelStyle },
-		)
-		part(
-			'bus-wheel4',
-			wheel4Asset,
-			26,
-			30,
-			{ x: 24, y: 102 },
-			{ y: bounce(15), style: wheelStyle },
+	/**
+	 * Its wheels, bouncing, each in its own time: the new bus's in its
+	 * arches, over its body; the classic bus's behind it.
+	 */
+	const wheels = () => {
+		if (look.legs || look.sleigh) return
+		art.wheels.forEach((wheel, i) =>
+			part(
+				`bus-wheel${i + 1}`,
+				wheel.asset,
+				wheel.width,
+				wheel.height,
+				{ x: wheel.x, y: wheel.y },
+				{ y: bounce(i * 5), style: wheelStyle },
+			),
 		)
 	}
-	if (!look.sleigh)
+	if (!style.wheelsOver) wheels()
+	// The classic bus's windows, see-through, over its back.
+	if (art.windows && !look.sleigh)
 		part(
 			'bus-window',
-			look.windows,
-			212,
-			40,
-			{ x: 9, y: 26 },
-			{
-				style: () => ({ opacity: 0.75 }),
-			},
+			art.windows.asset,
+			art.windows.width,
+			art.windows.height,
+			art.windows,
+			{ style: () => ({ opacity: 0.75 }) },
 		)
-	// A sleigh, in place of its body: wider and taller than the bus, level
-	// with its front, and a little higher, its runners where its wheels touch.
-	if (look.sleigh)
-		part('bus-body', look.sleigh, SLEIGH_WIDTH, SLEIGH_HEIGHT, {
-			x: BUS_WIDTH - SLEIGH_WIDTH,
-			y: SLEIGH_Y,
-		})
-	else part('bus-body', look.body, BUS_WIDTH, BUS_HEIGHT, { x: 0, y: 0 })
+	// Its body, or a sleigh in place of it, its runners where its wheels touch.
+	if (look.sleigh) {
+		const { sleigh } = style
+		part('bus-body', sleigh.asset, sleigh.width, sleigh.height, sleigh)
+	} else part('bus-body', art.body, busWidth, busHeight, { x: 0, y: 0 })
+	if (style.wheelsOver) wheels()
 	legs('bus-legs', false)
-	// Its near wing, over its side, on its jets: attached after its body, so
-	// drawn over it.
-	if (world.course.look?.busJets)
-		part(
-			'bus-spray',
-			BUS_WING.asset,
-			BUS_WING.width,
-			BUS_WING.height,
-			BUS_WING.at,
-			{ style: jetStyle },
-		)
+	// Its near wing, out of its side, and on the new bus its fin, up off its
+	// roof, on its jets: attached after its body, so drawn over it.
+	if (world.course.look?.busJets) {
+		if (jets.finOver) jet('bus-spray', jets.fin)
+		jet('bus-spray', jets.wing)
+	}
 	// Snow sprayed off the back of its sleigh's runners, as it goes, from
 	// the start.
 	const sprayFor = goingFor()
@@ -2277,7 +2210,7 @@ export function createBus(world: World) {
 					paintBusSpray(ctx, sprayFor(true, world.ticks()) ?? 0),
 				width: () => 0,
 				height: () => 0,
-				offset: { x: BUS_WIDTH - SLEIGH_WIDTH + 14, y: WHEEL_BOTTOM - 10 },
+				offset: style.spray,
 			}),
 		)
 	// Its own glider, bolted to its roof, out over the sea.
@@ -2288,15 +2221,15 @@ export function createBus(world: World) {
 			BUS_GLIDER_WIDTH,
 			BUS_GLIDER_HEIGHT,
 			{
-				x: (BUS_WIDTH - BUS_GLIDER_WIDTH) / 2 + 10,
-				y: BUS_GLIDER_ROOF - BUS_GLIDER_HEIGHT,
+				x: style.glider.x - BUS_GLIDER_WIDTH / 2,
+				y: style.glider.y - BUS_GLIDER_HEIGHT,
 			},
 			{
 				style: () => ({
 					'image-rendering': 'pixelated',
 					visibility:
 						world.ticks() >= 0 &&
-						atSea(world, world.bus.frontX - SCOOP_FRONT + BUS_WIDTH / 2)
+						atSea(world, world.bus.frontX - scoopFront + busWidth / 2)
 							? 'visible'
 							: 'hidden',
 				}),
@@ -2305,7 +2238,7 @@ export function createBus(world: World) {
 	// Off a Leap: carried down in a giant condor's talons, by its roof.
 	const { leap } = world.course
 	if (leap) {
-		const middle = () => world.bus.frontX - SCOOP_FRONT + BUS_WIDTH / 2
+		const middle = () => world.bus.frontX - scoopFront + busWidth / 2
 		const carried = () =>
 			world.ticks() >= 0 &&
 			middle() > leap.edge &&
@@ -2330,8 +2263,8 @@ export function createBus(world: World) {
 			height * BUS_CONDOR_CELL,
 			{
 				// Its talons on the middle of the roof.
-				x: BUS_WIDTH / 2 - 45 * BUS_CONDOR_CELL,
-				y: BUS_CONDOR_ROOF - (body + 19) * BUS_CONDOR_CELL,
+				x: style.condor.x - 45 * BUS_CONDOR_CELL,
+				y: style.condor.y - (body + 19) * BUS_CONDOR_CELL,
 			},
 			{
 				// Gripping the bus, then its talons drawn up, let go.
@@ -2367,33 +2300,36 @@ export function createBus(world: World) {
 	 * this is. `scooping` and `reach` aren't signals: reading the tick redraws
 	 * it every tick. Gone up the Scoop Arm while that's out.
 	 */
-	const front = (drill: boolean) =>
+	const { scoop } = style
+	const front = (isDrill: boolean) => {
+		const width = isDrill ? DRILL_WIDTH : scoop.width
 		part(
 			'bus-scoop',
-			look.scoop,
-			drill ? DRILL_WIDTH : 88,
-			drill ? DRILL_HEIGHT : 57,
-			drill ? DRILL_AT : { x: 181, y: 94 },
+			drill && isDrill ? drill.frames[0] : art.scoop,
+			width,
+			isDrill ? DRILL_HEIGHT : scoop.height,
+			drill && isDrill ? drill.at : scoop.at,
 			{
 				...(drill &&
-					look.drill && {
-						frames: look.drill,
+					isDrill && {
+						frames: drill.frames,
 						frame: () => Math.floor(Math.max(0, world.ticks()) / 2) % 2,
 					}),
 				style: () => ({
 					// Lifted about its top front corner.
-					'transform-origin': `${drill ? DRILL_WIDTH : 88}px 0px`,
+					'transform-origin': `${width}px 0px`,
 					visibility:
-						world.ticks() >= 0 && (armOut(world) || drillOn() !== drill)
+						world.ticks() >= 0 && (armOut(world) || drillOn() !== isDrill)
 							? 'hidden'
 							: 'visible',
 					transform: `translateY(${-45 * flick()}px) rotate(${-10 * flick()}deg)`,
 				}),
 			},
 		)
-	if (look.drill) front(true)
+	}
+	if (drill) front(true)
 	// The scoop, till the drill goes on, if it doesn't from the start.
-	if (!look.drill || look.drillFrom !== undefined) front(false)
+	if (!drill || look.drillFrom !== undefined) front(false)
 
 	return bus
 }
@@ -2521,10 +2457,6 @@ const armOut = (world: World) => Math.abs(world.bus.reach) > ARM_SHOWS
 
 /** How far the arm has to reach before it's drawn at all. */
 const ARM_SHOWS = 6
-const SCOOP_WIDTH = 88
-const SCOOP_HEIGHT = 57
-/** The scoop's bottom edge, where it scoops from, from the top of its art. */
-const SCOOP_LIP = 44
 /**
  * How thick each section of the arm is, from the tip in: telescoping, so
  * each pokes out of the thicker one below it, and the thickest is drawn
@@ -2538,7 +2470,11 @@ const ARM_SECTIONS = [6, 10, 14]
  * down). It starts where the bus's own scoop would be, on the Ground's line.
  */
 export function createScoopArm(world: World) {
-	const { scoop } = busLook(world)
+	const style = busStyle()
+	const { scoop } = busLooks(style, busLook(world))
+	const { width: SCOOP_WIDTH, height: SCOOP_HEIGHT, tip, armX } = style.scoop
+	/** The scoop's bottom edge, where it scoops from, from the top of its art. */
+	const SCOOP_LIP = tip.y
 	const [reach, setReach] = createSignal(0)
 	const [scooping, setScooping] = createSignal(false)
 	const length = () => Math.abs(reach())
@@ -2563,7 +2499,7 @@ export function createScoopArm(world: World) {
 				const bottom = height - (SCOOP_HEIGHT - SCOOP_LIP)
 				paintHazardStripes(
 					ctx,
-					SCOOP_WIDTH / 2 - thickness / 2,
+					armX - thickness / 2,
 					up() ? bottom - long : 0,
 					thickness,
 					long,
@@ -2584,7 +2520,7 @@ export function createScoopArm(world: World) {
 			setScooping(world.bus.scooping > 0)
 			/** The scoop's lip, with the arm in: where the bus's wheels are. */
 			const lip = world.bus.ride?.y ?? world.terrain.groundY(world.bus.frontX)
-			$.setX(world.bus.frontX - SCOOP_WIDTH + 8)
+			$.setX(world.bus.frontX - tip.x)
 			$.setY(up() ? lip - reach() - SCOOP_LIP : lip - SCOOP_LIP)
 		},
 	})

@@ -10,16 +10,7 @@ import house2Asset from '@/assets/misc/house2.png'
 import pathAsset from '@/assets/misc/path.png'
 import shrub1Asset from '@/assets/misc/shrub1.png'
 import sunAsset from '@/assets/misc/sun.png'
-import { For, type JSX } from 'solid-js'
-// The website's bus, turned round to chase to the right.
-import busBackAsset from '../assets/bus/bus-back.png'
-import busAsset from '../assets/bus/bus.png'
-import scoopAsset from '../assets/bus/scoop.png'
-import wheel1Asset from '../assets/bus/wheel1.png'
-import wheel2Asset from '../assets/bus/wheel2.png'
-import wheel3Asset from '../assets/bus/wheel3.png'
-import wheel4Asset from '../assets/bus/wheel4.png'
-import windowAsset from '../assets/bus/windows.png'
+import { For, type JSX, Show } from 'solid-js'
 import gooseWingsDownAsset from '../assets/flyers/goose-wings-down.png'
 import gooseWingsUpAsset from '../assets/flyers/goose-wings-up.png'
 import tree1Asset from '../assets/scenery/tree1.png'
@@ -33,6 +24,7 @@ import {
 	parkBench,
 	parkLamp,
 } from '../courses/kit/hagaScenery'
+import { busStyle } from '../draw/art/busStyle'
 import { VIEW_HEIGHT } from '../game/constants'
 import { customRunners } from '../runners/customRunners'
 import { guests } from '../runners/guests'
@@ -341,48 +333,82 @@ function pickPack(): Playable[] {
 	)
 }
 
-/** The header's bus, turned round to chase to the right, built from its parts. */
+/** The game's bus, in the artwork picked in Options, built from its parts. */
 function Bus(props: { style?: JSX.CSSProperties }) {
 	const part = (
 		asset: string,
 		x: number,
 		y: number,
+		width: number,
+		height: number,
 		extra: JSX.CSSProperties = {},
 	) => (
 		<img
 			src={asset}
 			alt=""
-			style={{ position: 'absolute', left: `${x}px`, top: `${y}px`, ...extra }}
-		/>
-	)
-	const wheel = (asset: string, x: number, y: number, delay: number) =>
-		part(asset, x, y, {
-			animation: `wheel-bob 0.24s ${delay}s steps(2) infinite`,
-		})
-	return (
-		<div
-			class="pixelated"
 			style={{
 				position: 'absolute',
-				width: '247px',
-				height: '127px',
-				...props.style,
+				left: `${x}px`,
+				top: `${y}px`,
+				width: `${width}px`,
+				height: `${height}px`,
+				...extra,
 			}}
-		>
-			<div style={{ animation: 'bus-bob 0.48s steps(2) infinite' }}>
-				{part(busBackAsset, 0, 0)}
-				{wheel(wheel1Asset, 140, 105, 0)}
-				{wheel(wheel2Asset, 208, 103, 0.06)}
-				{wheel(wheel3Asset, 68, 105, 0.12)}
-				{wheel(wheel4Asset, 24, 102, 0.18)}
-				{part(windowAsset, 9, 26, { opacity: 0.75 })}
-				{part(busAsset, 0, 0)}
-				{part(scoopAsset, 181, 94, {
-					'transform-origin': '20% 80%',
-					animation: 'scoop-flick 3.2s ease-in-out infinite',
-				})}
-			</div>
-		</div>
+		/>
+	)
+	// Whichever artwork's picked in Options: changed there, changed here.
+	return (
+		<Show when={busStyle()} keyed>
+			{(style) => {
+				const art = style.plain
+				/** Its wheels, bobbing one after another. */
+				const wheels = () =>
+					art.wheels.map((wheel, i) =>
+						part(wheel.asset, wheel.x, wheel.y, wheel.width, wheel.height, {
+							animation: `wheel-bob 0.24s ${(i * 0.24) / art.wheels.length}s steps(2) infinite`,
+						}),
+					)
+				return (
+					<div
+						class="pixelated"
+						style={{
+							position: 'absolute',
+							width: `${style.width}px`,
+							height: `${style.height}px`,
+							...props.style,
+							top: `${PATH_TOP + style.menuTop}px`,
+						}}
+					>
+						<div style={{ animation: 'bus-bob 0.48s steps(2) infinite' }}>
+							{style.back && part(style.back, 0, 0, style.width, style.height)}
+							{!style.wheelsOver && wheels()}
+							{art.windows &&
+								part(
+									art.windows.asset,
+									art.windows.x,
+									art.windows.y,
+									art.windows.width,
+									art.windows.height,
+									{ opacity: 0.75 },
+								)}
+							{part(art.body, 0, 0, style.width, style.height)}
+							{style.wheelsOver && wheels()}
+							{part(
+								art.scoop,
+								style.scoop.at.x,
+								style.scoop.at.y,
+								style.scoop.width,
+								style.scoop.height,
+								{
+									'transform-origin': '20% 80%',
+									animation: 'scoop-flick 3.2s ease-in-out infinite',
+								},
+							)}
+						</div>
+					</div>
+				)
+			}}
+		</Show>
 	)
 }
 
@@ -538,7 +564,7 @@ export function MenuBackdrop() {
 					},
 				]}
 			/>
-			<Bus style={{ left: '40px', top: `${PATH_TOP + 46 - 143}px` }} />
+			<Bus style={{ left: '40px' }} />
 			<For each={pack}>
 				{(runner, i) => (
 					<div

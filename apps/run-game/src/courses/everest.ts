@@ -1,7 +1,4 @@
 import type { RunnerName } from '@/data/runners'
-import busAsset from '../assets/bus/bus.png'
-import scoopAsset from '../assets/bus/scoop.png'
-import windowAsset from '../assets/bus/windows.png'
 import {
 	PATH_BACK,
 	PATH_FRONT,
@@ -728,9 +725,6 @@ export const everest: CourseDefinition = {
 		snow: { from: START_X + HIGH, full: START_X + BLIZZARD },
 		rock: 'brightness(0.95) saturate(0.6)',
 		bus: {
-			body: busAsset,
-			windows: windowAsset,
-			scoop: scoopAsset,
 			legs: {
 				metal: '#9aa3ad',
 				shade: '#5d646d',

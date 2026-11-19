@@ -1,11 +1,7 @@
 import type { RunnerName } from '@/data/runners'
-import busBody from '../assets/bus/bus.png'
-import scoop from '../assets/bus/scoop.png'
-import windows from '../assets/bus/windows.png'
 import oldTownFar from '../assets/horizons/old-town-far.png'
 import oldTownNear from '../assets/horizons/old-town-near.png'
 import lamp from '../assets/scenery/lamp.png'
-import { DRILL_FRAMES } from '../draw/art/drill'
 import {
 	GROUND_Y,
 	PATH_BACK,
@@ -762,10 +758,7 @@ export const sewers: CourseDefinition = {
 			cable: '#262626',
 		},
 		bus: {
-			body: busBody,
-			windows,
-			scoop,
-			drill: DRILL_FRAMES,
+			drill: true,
 			drillFrom: DIG_FROM + 160,
 		},
 	},

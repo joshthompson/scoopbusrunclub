@@ -3,10 +3,12 @@ import { menuTunePicked, tryTune, untryTune } from '../music/music'
 import { PLAYLIST, RANDOM_TUNE, tuneName } from '../music/playlist'
 import { identity } from '../saved/identity'
 import {
+	busArtwork,
 	clearLocalData,
 	effectsOn,
 	menuTune,
 	musicOn,
+	setBusArtwork,
 	setEffectsOn,
 	setMenuTune,
 	setMusicOn,
@@ -59,6 +61,14 @@ export function OptionsScreen(props: { onBack: () => void }) {
 									label: 'Menu music',
 									value: tuneName(menuTune() ?? 'menu'),
 									choose: () => setTuning(true),
+								},
+								{
+									label: 'Bus',
+									value: busArtwork() === 'classic' ? 'Classic Bus' : 'New Bus',
+									choose: () =>
+										setBusArtwork(
+											busArtwork() === 'classic' ? 'new' : 'classic',
+										),
 								},
 								{
 									label: 'High score name',

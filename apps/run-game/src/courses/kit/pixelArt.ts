@@ -138,6 +138,10 @@ const GLYPHS: Record<string, string[]> = {
 	' ': ['.....', '.....', '.....', '.....', '.....', '.....', '.....'],
 }
 
+/** A letter's rows, 5 cells by 7, `#` lit: for lettering painted a cell at a time. */
+export const glyphRows = (char: string) =>
+	GLYPHS[char.toUpperCase()] ?? GLYPHS[' ']
+
 /** How wide `text` is in pixel letters, `cell` px a cell, a cell between letters. */
 export const pixelTextWidth = (text: string, cell: number) =>
 	Math.max(0, [...text].length * 6 - 1) * cell

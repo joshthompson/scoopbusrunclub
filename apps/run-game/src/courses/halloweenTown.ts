@@ -9,9 +9,6 @@ import shrub1 from '@/assets/misc/shrub1.png'
 import tree1Halloween from '@/assets/misc/tree1-halloween.png'
 import tree2Halloween from '@/assets/misc/tree2-halloween.png'
 import type { RunnerName } from '@/data/runners'
-import busHalloween from '../assets/bus/bus-halloween.png'
-import scoopHalloween from '../assets/bus/scoop-halloween.png'
-import windowsHalloween from '../assets/bus/windows-halloween.png'
 import purpleSignHalloween from '../assets/signs/purple-sign-halloween.png'
 import { PATH_BACK, PATH_FRONT, START_X, VERGE } from '../game/constants'
 import { HALLOWEEN_FIKA } from '../game/fika'
@@ -815,11 +812,7 @@ export const halloweenTown: CourseDefinition = {
 		sign: purpleSignHalloween,
 		// Gold doesn't show on its orange: black, as on the website.
 		signInk: '#1a1208',
-		bus: {
-			body: busHalloween,
-			windows: windowsHalloween,
-			scoop: scoopHalloween,
-		},
+		bus: { spooky: true },
 	},
 	...layOut(),
 }

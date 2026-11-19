@@ -1,8 +1,4 @@
 import type { RunnerName } from '@/data/runners'
-import busAsset from '../assets/bus/bus.png'
-import scoopAsset from '../assets/bus/scoop.png'
-import sleighAsset from '../assets/bus/sleigh.png'
-import windowAsset from '../assets/bus/windows.png'
 import { BOARDS } from '../game/boards'
 import { GROUND_Y, PATH_BACK, PATH_FRONT, START_X } from '../game/constants'
 import { SLOPES_FIKA } from '../game/fika'
@@ -797,12 +793,9 @@ export const slopes: CourseDefinition = {
 		},
 		rock: 'brightness(1.05) saturate(0.5)',
 		bus: {
-			body: busAsset,
-			windows: windowAsset,
-			scoop: scoopAsset,
 			// The website's Christmas sleigh, turned round to face right, its
 			// lettering still reading the right way.
-			sleigh: sleighAsset,
+			sleigh: true,
 		},
 	},
 	...layOut(),

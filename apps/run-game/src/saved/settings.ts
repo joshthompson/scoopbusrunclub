@@ -29,7 +29,12 @@ interface Settings {
 	 * last on.
 	 */
 	menuTune?: string
+	/** The bus's artwork, picked in Options: the new one, unless the classic one's picked. */
+	bus?: BusArtwork
 }
+
+/** The bus's artwork: the new bus, or the classic one, as on the website. */
+export type BusArtwork = 'new' | 'classic'
 
 const DEFAULTS: Settings = { effects: true, music: true }
 
@@ -73,6 +78,9 @@ export const setMusicOn = (music: boolean) => store({ ...settings(), music })
 export const menuTune = () => settings().menuTune
 export const setMenuTune = (menuTune: string) =>
 	store({ ...settings(), menuTune })
+
+export const busArtwork = (): BusArtwork => settings().bus ?? 'new'
+export const setBusArtwork = (bus: BusArtwork) => store({ ...settings(), bus })
 
 export const lastRunner = () => settings().lastRunner
 export const rememberRunner = (lastRunner: string) =>

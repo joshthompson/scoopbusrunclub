@@ -1,4 +1,5 @@
 import type { BusLook } from '../../courses/types'
+import { BUS_ACROSS, BUS_GROUND, BUS_UNDERSIDE, BUS_WIDTH } from './bus'
 
 /**
  * The bus's legs, a spider's, in place of its wheels, for climbing a
@@ -9,16 +10,58 @@ import type { BusLook } from '../../courses/types'
  * fourth: a foot stays put on the ground as the bus goes over it, then
  * steps up and on ahead.
  *
- * In the bus's own pixels, from its top left, its feet on the ground at
- * `ground`: drawn on the bus, so they lean with it, up the hill.
+ * In the bus's own pixels, from its top left: drawn on the bus, so they
+ * lean with it, up the hill. Where they go on it is the bus's own (see
+ * `LegsFit`).
  */
 
 /** How far out either side of the bus they're drawn, room for their knees and feet. */
 export const LEGS_OUT = 60
-/** The bus's own width, which they're drawn either side of. */
-const BUS_WIDTH = 247
-export const LEGS_WIDTH = BUS_WIDTH + LEGS_OUT * 2
 export const LEGS_HEIGHT = 150
+
+/**
+ * How they fit a bus: how wide it is, each leg's hip, along it and down
+ * it; where its near feet stand; how far along and up its far side's are
+ * from its near side's, hips and feet; and whether they're outlined in
+ * ink, as the classic bus is.
+ */
+export interface LegsFit {
+	width: number
+	hips: { hip: number; down: number }[]
+	ground: number
+	far: { x: number; y: number; foot: number }
+	inked: boolean
+}
+
+/** The new bus's: their hips along its near side's underside, their feet on the path's near edge, the far side's on its far edge. */
+export const NEW_LEGS: LegsFit = {
+	width: BUS_WIDTH,
+	hips: [
+		{ hip: 28, down: BUS_UNDERSIDE - 4 },
+		{ hip: 80, down: BUS_UNDERSIDE },
+		{ hip: 132, down: BUS_UNDERSIDE },
+		{ hip: 184, down: BUS_UNDERSIDE - 4 },
+	],
+	ground: BUS_GROUND,
+	far: { ...BUS_ACROSS, foot: BUS_ACROSS.y },
+	inked: false,
+}
+
+/** The classic bus's: under it, three-quarters on, the far side's a step out from the near side's. */
+export const CLASSIC_LEGS: LegsFit = {
+	width: 247,
+	hips: [
+		{ hip: 34, down: 104 },
+		{ hip: 92, down: 110 },
+		{ hip: 156, down: 110 },
+		{ hip: 214, down: 104 },
+	],
+	ground: 141,
+	far: { x: 6, y: -6, foot: -4 },
+	inked: true,
+}
+
+export const legsWidth = (fit: LegsFit) => fit.width + LEGS_OUT * 2
 
 /** A thigh's length, and a shin's. */
 const THIGH = 38
@@ -30,12 +73,12 @@ const STANCE = 0.6
 /** How high a foot lifts, stepping. */
 const LIFT = 14
 
-/** Each leg's hip, along the bus and down it, how far out its foot rests, and where in its stride it starts. */
+/** Each leg's foot, how far out it rests from its hip, and where in its stride it starts. */
 const LEGS = [
-	{ hip: 34, down: 104, reach: -26, phase: 0 },
-	{ hip: 92, down: 110, reach: -10, phase: 0.5 },
-	{ hip: 156, down: 110, reach: 10, phase: 0 },
-	{ hip: 214, down: 104, reach: 26, phase: 0.5 },
+	{ reach: -26, phase: 0 },
+	{ reach: -10, phase: 0.5 },
+	{ reach: 10, phase: 0 },
+	{ reach: 26, phase: 0.5 },
 ]
 
 /** Where a leg's foot is, along from its rest and up off the ground, `travelled` px along. */
@@ -68,14 +111,15 @@ function kneeAt(hx: number, hy: number, fx: number, fy: number, out: number) {
 const snap = (n: number) => Math.round(n / 2) * 2
 
 /** Where each leg's hip, knee and foot are, `travelled` px along. */
-function legsAt(travelled: number, ground: number, far: boolean | undefined) {
+function legsAt(fit: LegsFit, travelled: number, far: boolean | undefined) {
+	const across = far ? fit.far : { x: 0, y: 0, foot: 0 }
 	return LEGS.map((leg, i) => {
 		const phase = far ? leg.phase + 0.5 : leg.phase
 		const foot = footAt(travelled, phase)
-		const hx = leg.hip + LEGS_OUT + (far ? 6 : 0)
-		const hy = leg.down - (far ? 6 : 0)
+		const hx = fit.hips[i].hip + LEGS_OUT + across.x
+		const hy = fit.hips[i].down + across.y
 		const fx = hx + leg.reach + foot.along
-		const fy = ground - foot.up - (far ? 4 : 0)
+		const fy = fit.ground + across.foot - foot.up
 		const knee = kneeAt(hx, hy, fx, fy, Math.sign(leg.reach))
 		return {
 			i,
@@ -87,20 +131,20 @@ function legsAt(travelled: number, ground: number, far: boolean | undefined) {
 	})
 }
 
-/** The ink they're outlined in, and their knees' bolts set in. */
+/** The ink their knees' bolts are set in (and, on the classic bus, they're outlined in), and the far side's legs' undersides, in shadow. */
 const INK = '#2b2b2b'
+const FAR_UNDER = '#3d434a'
 
 /**
  * The legs, `travelled` px along, painted from the top left of the legs'
- * box, their feet on `ground`; the far side's in shadow, a step out from
- * the near side's. Painted again every time, since they step with every
- * tick.
+ * box, the far side's in shadow. Painted again every time, since they
+ * step with every tick.
  */
 export function paintBusLegs(
 	ctx: CanvasRenderingContext2D,
+	fit: LegsFit,
 	look: NonNullable<BusLook['legs']>,
 	travelled: number,
-	ground: number,
 	far?: boolean,
 ) {
 	const metal = far ? look.shade : look.metal
@@ -119,10 +163,18 @@ export function paintBusLegs(
 		ctx.lineTo(b.x, b.y)
 		ctx.stroke()
 	}
-	for (const leg of legsAt(travelled, ground, far)) {
-		// Outlined in ink, then its metal, lit along its top.
-		line(leg.hip, leg.knee, INK, 10)
-		line(leg.knee, leg.foot, INK, 8)
+	const under = far ? FAR_UNDER : look.shade
+	const down = (p: { x: number; y: number }) => ({ x: p.x, y: p.y + 2 })
+	for (const leg of legsAt(fit, travelled, far)) {
+		if (fit.inked) {
+			// Outlined in ink, as the classic bus is.
+			line(leg.hip, leg.knee, INK, 10)
+			line(leg.knee, leg.foot, INK, 8)
+		} else {
+			// In shade along its underside: no outline, as the new bus has none.
+			line(down(leg.hip), down(leg.knee), under, 6)
+			line(down(leg.knee), down(leg.foot), under, 4)
+		}
 		line(leg.hip, leg.knee, metal, 6)
 		line(leg.knee, leg.foot, metal, 4)
 		// A clawed foot, gripping.

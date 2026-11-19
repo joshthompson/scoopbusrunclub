@@ -915,13 +915,16 @@ export interface BuildingLook {
 	walls: string[]
 }
 
-/** The bus's pictures, facing right: its body, windows and scoop. */
+/**
+ * Which of the bus's looks a course has, in place of the yellow one: its
+ * pictures are the bus artwork picked in Options (see
+ * `draw/art/busStyle.ts`), new or classic.
+ */
 export interface BusLook {
-	body: string
-	windows: string
-	scoop: string
-	/** A drill in place of the scoop, turning: its two frames, one after the other. */
-	drill?: [string, string]
+	/** Halloween's: the bus left out too long, haunted, SPOOK BUS along it. */
+	spooky?: boolean
+	/** A drill in place of the scoop, turning. */
+	drill?: boolean
 	/** Where the drill goes on, the scoop till then: from the start, if not said. */
 	drillFrom?: number
 	/**
@@ -929,12 +932,8 @@ export interface BusLook {
 	 * climb a mountain on. Their metal, the joints' bolts, and their feet.
 	 */
 	legs?: { metal: string; shade: string; bolt: string; foot: string }
-	/**
-	 * A sleigh in place of the bus, down a ski slope, as on the website at
-	 * Christmas: its picture, facing right, in place of the body, and no
-	 * back, wheels or windows. Only its scoop's the bus's.
-	 */
-	sleigh?: string
+	/** A sleigh in place of the bus, down a ski slope, its body and wheels: only its scoop's the bus's. */
+	sleigh?: boolean
 }
 
 /**
