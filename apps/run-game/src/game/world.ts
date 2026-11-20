@@ -830,8 +830,8 @@ export function createWorld(
 		/** Its football, if it has one: see `Football`. Plain state, like the body. */
 		ball: createFootball({
 			football: course.football,
-			// An egg's as a football's kicked, but not in a Round.
-			egg: round ? undefined : course.egg,
+			// An egg's as a football's kicked, in a Round too.
+			egg: course.egg,
 			terrain,
 		}),
 		/** Whoever's following anyone along: see `Follower`. Plain state. */

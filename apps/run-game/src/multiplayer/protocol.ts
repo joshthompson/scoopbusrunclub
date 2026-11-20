@@ -149,10 +149,27 @@ export type PadMessage =
 /**
  * What a Player watching a Round can send up the big screen: having joined
  * while it was on, or out of it while others race on. A laugh, a cheer, a
- * poo, or a heart.
+ * poo, a heart, a skull and crossbones, a mind blown, a scream, or a cry.
  */
-export type Reaction = 'laugh' | 'cheer' | 'poop' | 'heart'
-export const REACTIONS: Reaction[] = ['laugh', 'cheer', 'poop', 'heart']
+export type Reaction =
+	| 'laugh'
+	| 'cheer'
+	| 'poop'
+	| 'heart'
+	| 'skull'
+	| 'mindBlown'
+	| 'shock'
+	| 'sad'
+export const REACTIONS: Reaction[] = [
+	'laugh',
+	'cheer',
+	'poop',
+	'heart',
+	'skull',
+	'mindBlown',
+	'shock',
+	'sad',
+]
 
 /**
  * A reaction on its way up the big screen: who sent it (their colour and
@@ -176,18 +193,23 @@ export type PauseItem = 'effects' | 'music' | 'lobby' | 'end'
 
 /**
  * Pick and Choose: who's picking the next course, and how long they've got
- * left, in seconds, as everyone sees it (`seat` is their seat's id).
+ * left, in seconds, as everyone sees it (`seat` is their seat's id). Or,
+ * `ahead`, picking it on their phone before this Round's over, done with
+ * it themselves: no hurry, the course they've `picked` so far theirs to
+ * change till the next Round starts.
  */
 export interface Choosing {
 	seat: string
 	number: number
 	name: string
 	colour: string
-	secondsLeft: number
+	secondsLeft?: number
+	ahead?: boolean
+	picked?: number
 	/** The course they're on, by its index, picking on the big screen. */
 	cursor: number
-	/** The courses raced most recently, by their index, the latest last. */
-	recent: number[]
+	/** How many times each course has been raced this go, by its index. */
+	played: number[]
 }
 
 /**
@@ -518,8 +540,17 @@ export interface RaceFrame {
 	 * any: -1, still waiting (see `setOffPlatforms`).
 	 */
 	lifts?: number[]
-	/** Haga's football, if there is one: [x, y, spin, out: 0 no, 1 home, 2 scooped]. */
-	ball?: [number, number, number, number]
+	/**
+	 * Haga's football, or Dino Island's egg, if there is one: [x, y, spin,
+	 * out: 0 no, 1 home, 2 scooped, 3 hatched, how cracked an egg is].
+	 */
+	ball?: [number, number, number, number, number?]
+	/**
+	 * Whoever's following anyone (Dino Island's hatchling, out of its egg):
+	 * [x, feetY, facing, grounded and carried (1, 2), how far it's run, out:
+	 * 0 no, 1 home, 2 scooped, spin].
+	 */
+	followers?: [number, number, number, number, number, number, number][]
 	/** Geese flying over. */
 	flyers: FlyerFrame[]
 	/** Every obstacle that's been used, scooped or flown off. */

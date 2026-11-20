@@ -10,8 +10,9 @@ import {
 	rocketPanel,
 } from '../courses/kit/rocketLaunchScenery'
 import type { Portal } from '../courses/types'
+import { RUNNER_SCALE } from '../game/constants'
 import { LAUNCH, launchEnd, rocketFlight } from '../game/portals'
-import type { World } from '../game/world'
+import type { Racer, World } from '../game/world'
 import { headTop } from './heads'
 import { paintPicture } from './paint/picture'
 
@@ -41,11 +42,11 @@ const WINDOWS = [
 const WINDOW_FRAME = 4
 const HEAD_ROOM = 4
 /**
- * How tall anyone is in it, head to toe, in px, if they were seen whole:
- * close to the glass, a grown-up's head and shoulders. Everyone's drawn to
- * it, so a little one (Lyra) fills it as much as anyone.
+ * How long whoever's at a window takes to come up into it from below, once
+ * it's going off, and how long after the first the second does.
  */
-const IN_WINDOW_TALL = 84
+const RISE_TICKS = 24
+const RISE_APART = 10
 const FRAME = '#8a94a0'
 const FRAME_LIT = '#c4ccd6'
 const CABIN = '#f2c978'
@@ -128,12 +129,14 @@ function createRocketSprite(
 		draw(painting) {
 			if (gone()) return
 			const { ctx, image } = painting
-			const t = since() ?? -1
+			const t = since()
 			const now = Math.max(0, world.ticks())
-			if (t >= LAUNCH.lift - 24) paintFlame(ctx, t, now, width, height)
+			if (t !== undefined && t >= LAUNCH.lift - 24)
+				paintFlame(ctx, t, now, width, height)
 			paintPicture(ctx, image, ROCKET.asset, 0, 0, width, height)
-			// Everyone aboard, at its windows, once it's on its way.
-			if (t >= LAUNCH.lift) paintFaces(painting, world)
+			// Its windows, and everyone aboard coming up to them, once it's going off.
+			paintWindows(painting, world, t)
+			if (t === undefined) return
 			if (t >= LAUNCH.wobble) paintTrouble(ctx, t, width, height)
 		},
 	})
@@ -168,16 +171,31 @@ function paintFlame(
 }
 
 /**
- * Everyone aboard, at its windows, a few of them if there are lots: stood
- * behind them, in the lit cabin, seen from the shoulders up, leaning as it
- * does. Each lined up by the top of their own head, so the short are as
- * much in view as the tall.
+ * Who's aboard, in the order they got in: the first two of them, one at
+ * each window.
  */
-function paintFaces({ ctx, image }: DrawPainting, world: World) {
-	const aboard = world.racers.filter((r) => r.out !== 'scooped')
+function aboard(world: World): Racer[] {
+	const held = world.portal?.held
+	if (!held?.size) return world.racers.filter((r) => r.out !== 'scooped')
+	return world.racers
+		.filter((r) => held.has(r.id))
+		.sort((a, b) => (held.get(a.id)?.slot ?? 0) - (held.get(b.id)?.slot ?? 0))
+}
+
+/**
+ * Its windows, square, lit inside: and once it's going off (`t` ticks
+ * since), everyone aboard, the first two, coming up into them from below,
+ * stood behind them in the lit cabin, as big as they are on the course,
+ * leaning as it does. Each lined up by the top of their own head, so the
+ * short are as much in view as the tall.
+ */
+function paintWindows(
+	{ ctx, image }: DrawPainting,
+	world: World,
+	t: number | undefined,
+) {
+	const who = t === undefined ? [] : aboard(world)
 	WINDOWS.forEach((w, i) => {
-		const runner = aboard[i]?.runner
-		if (!runner) return
 		const size = w.size * ROCKET.scale
 		const left = w.x * ROCKET.scale - size / 2
 		const top = w.y * ROCKET.scale - size / 2
@@ -201,14 +219,17 @@ function paintFaces({ ctx, image }: DrawPainting, world: World) {
 		ctx.fillRect(left, top, size, size)
 		ctx.fillStyle = CABIN_DARK
 		ctx.fillRect(left, top + size - 8, size, 8)
-		// Them, stood behind it, at their own size.
-		const src = runner.sprite.stand ?? runner.sprite.run[0]
+		// Them, stood behind it, coming up into it from below.
+		const runner = who[i]?.runner
+		const src = runner && (runner.sprite.stand ?? runner.sprite.run[0])
 		const picture = src ? image(src) : undefined
-		if (src && picture) {
-			// How tall they are, from the top of their head to their feet.
+		const rise = ease(((t ?? 0) - i * RISE_APART) / RISE_TICKS)
+		if (runner && src && picture && rise > 0) {
 			const own = headTop(src, runner.sprite.width, runner.sprite.height)
-			const tall = runner.sprite.height - (own?.y ?? 0)
-			const zoom = IN_WINDOW_TALL / tall
+			// As big as they are on the course, running.
+			const zoom = RUNNER_SCALE
+			// In whole cells, as everything is.
+			const below = Math.round(((1 - rise) * size) / 2) * 2
 			const width = runner.sprite.width * zoom
 			const height = runner.sprite.height * zoom
 			const head = own && {
@@ -223,7 +244,7 @@ function paintFaces({ ctx, image }: DrawPainting, world: World) {
 			ctx.drawImage(
 				picture.image,
 				Math.round(left + size / 2 - (head?.x ?? width / 2)),
-				Math.round(top + HEAD_ROOM - (head?.y ?? 2)),
+				Math.round(top + HEAD_ROOM + below - (head?.y ?? 2)),
 				width,
 				height,
 			)

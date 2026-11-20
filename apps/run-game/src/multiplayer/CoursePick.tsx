@@ -13,6 +13,7 @@ import { CoursePreview } from '../ui/CoursePreview'
 import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { onHover } from '../ui/hover'
 import type { Choosing } from './protocol'
+import { playedNote } from './roomModes'
 
 /** How many courses to a row. */
 const COLUMNS = 4
@@ -81,7 +82,7 @@ export function CoursePick(props: {
 	})
 	onCleanup(() => cancelAnimationFrame(frame))
 
-	const recent = (course: number) => props.choosing.recent.includes(course)
+	const played = (course: number) => playedNote(props.choosing.played, course)
 	const [shown, setShown] = createSignal(props.cursor)
 	// The look at it waits a moment as they go through them, so it's not
 	// built afresh for every one passed on the way.
@@ -121,7 +122,7 @@ export function CoursePick(props: {
 								style={{
 									...styles.card,
 									...(i() === props.cursor ? styles.cardOn : {}),
-									...(recent(i()) ? styles.cardRecent : {}),
+									...(played(i()).dim ? styles.cardPlayed : {}),
 									cursor: props.onPick ? 'pointer' : 'default',
 								}}
 								onMouseEnter={
@@ -132,8 +133,8 @@ export function CoursePick(props: {
 								onClick={() => pick(i())}
 							>
 								<span style={styles.cardName}>{course.name}</span>
-								<Show when={recent(i())}>
-									<span style={styles.cardNote}>Just raced</span>
+								<Show when={played(i()).note}>
+									{(note) => <span style={styles.cardNote}>{note()}</span>}
 								</Show>
 							</button>
 						)}
@@ -144,7 +145,7 @@ export function CoursePick(props: {
 				{props.onPick
 					? '← → to choose · ↑ or jump to pick · or click one'
 					: 'Picking on their phone…'}{' '}
-				· a course at random if time runs out
+				· one of the least raced, at random, if time runs out
 			</div>
 		</div>
 	)
@@ -229,7 +230,7 @@ const styles = {
 		'min-height': 0,
 	},
 	cardOn: { background: '#ffd23f', color: 'var(--ink)' },
-	cardRecent: { opacity: 0.6 },
+	cardPlayed: { opacity: 0.6 },
 	cardName: { 'font-size': '15px', 'line-height': 1.1 },
 	cardNote: { 'font-size': '11px' },
 	hint: { ...OUTLINED_FLAT, 'font-size': '16px' },

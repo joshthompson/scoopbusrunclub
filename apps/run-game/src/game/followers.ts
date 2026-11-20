@@ -9,7 +9,7 @@ import type { Racer, World } from './world'
  * legs (see `Course['egg']`). It goes where they went, jumps where they
  * jumped, swims where they swam, `FOLLOW_TICKS` behind, so wherever they
  * can go, it can; carried off by a flyer, another carries it after them. Let the bus get to it, and it's scooped, gone. Plain
- * state, on the world; not in a Round.
+ * state, on the world, sent to Remote Players in a Round (see `RaceFrame`).
  */
 export interface Follower {
 	kind: FollowerKind

@@ -1,8 +1,3 @@
-import pumpkin1Asset from '@/assets/halloween/pumpkin1.png'
-import pumpkin2Asset from '@/assets/halloween/pumpkin2.png'
-import pumpkin3Asset from '@/assets/halloween/pumpkin3.png'
-import pumpkin4Asset from '@/assets/halloween/pumpkin4.png'
-import pumpkin5Asset from '@/assets/halloween/pumpkin5.png'
 import tombstoneAsset from '@/assets/halloween/tombstone.png'
 import { type RunnerName, runners, strideFrameInterval } from '@/data/runners'
 import { imageSize } from '@/utils/imageSize'
@@ -153,6 +148,9 @@ import { BUS_GLIDER_HEIGHT, BUS_GLIDER_WIDTH, busGlider } from './art/glider'
 import { HANDS_HEIGHT, HANDS_WIDTH, paintHands } from './art/hands'
 import {
 	HAT_GLOW_OUT,
+	PUMPKINS,
+	PUMPKIN_HEIGHT,
+	PUMPKIN_WIDTH,
 	WORN_HAT_REACH,
 	hatArt,
 	paintHat,
@@ -2200,7 +2198,24 @@ export function createBus(world: World) {
 	if (look.sleigh) {
 		const { sleigh } = style
 		part('bus-body', sleigh.asset, sleigh.width, sleigh.height, sleigh)
-	} else part('bus-body', art.body, busWidth, busHeight, { x: 0, y: 0 })
+	} else {
+		// On its legs, its arches skirted over, with no wheels in them.
+		const { closed } = art
+		const body = look.legs ? (closed ?? art.body) : art.body
+		part('bus-body', body, busWidth, busHeight, { x: 0, y: 0 })
+		// And on its jets, its wheels tucked away, skirted over too.
+		if (closed && !look.legs && world.course.look?.busJets)
+			part(
+				'bus-body',
+				closed,
+				busWidth,
+				busHeight,
+				{ x: 0, y: 0 },
+				{
+					style: () => ({ visibility: jetting() ? 'visible' : 'hidden' }),
+				},
+			)
+	}
 	if (style.wheelsOver) wheels()
 	legs('bus-legs', false)
 	// Its near wing, out of its side, and on the new bus its fin, up off its
@@ -4366,7 +4381,7 @@ export function createBoost(world: World, state: BoostState, i: number) {
 				width: PUMPKIN_WIDTH,
 				height: PUMPKIN_HEIGHT,
 				world,
-				frames: [PUMPKINS[o.carving - 1] ?? pumpkin1Asset],
+				frames: [PUMPKINS[o.carving - 1] ?? PUMPKINS[0]],
 				// Picked up: gone, onto someone's head.
 				style: () => ({
 					visibility: world.ticks() >= 0 && state.used ? 'hidden' : 'visible',
@@ -4486,15 +4501,6 @@ export function createBoost(world: World, state: BoostState, i: number) {
  * runner goes past it, not through it.
  */
 
-const PUMPKINS = [
-	pumpkin1Asset,
-	pumpkin2Asset,
-	pumpkin3Asset,
-	pumpkin4Asset,
-	pumpkin5Asset,
-]
-const PUMPKIN_WIDTH = 29
-const PUMPKIN_HEIGHT = 23
 /** A traffic cone's size, drawn; and knocked over, how long it takes to tip, how far it skids, and for how long. */
 const CONE_WIDTH = 16
 const CONE_HEIGHT = 22

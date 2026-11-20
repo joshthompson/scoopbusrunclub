@@ -2013,8 +2013,8 @@ export type FollowerKind = 'hatchling'
  * A boss, in its own room from `room.from` to `room.to`, stood in the middle
  * of it at `x`, `width` across and `height` tall: once everyone still racing
  * is in, its door shuts behind them, the bus waits outside, and it wakes,
- * firing plasma about the room. Land on its head `hp` times (that many for
- * each of them, in a Round) and it's beaten, the door out the far side
+ * firing plasma about the room. Land on its head `hp` times (a few more for
+ * each Player after the first, in a Round) and it's beaten, the door out the far side
  * opening. Every `stompEvery` of those, it stomps, shaking everyone off
  * whatever they're up on, down to the floor. Rocket Launch's giant alien.
  */

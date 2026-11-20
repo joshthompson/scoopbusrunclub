@@ -13,7 +13,8 @@ import { REACTIONS, type Reaction, type ShownReaction } from './protocol'
 /**
  * Reactions: whoever's watching a Round and not in it (they joined while it
  * was on, or they're out and the others race on) sending a laugh, a cheer,
- * a poo or a heart up the big screen, with their name under it.
+ * a poo, a heart, a skull, a mind blown, a scream or a cry up the big
+ * screen, with their name under it.
  */
 
 /** Each cell twice the size of a screen pixel, as the runners are. */
@@ -129,17 +130,124 @@ const HEART = rowsArt(
 	{ R: '#e8473c', r: '#ff7a6b', W: '#ffd0c8', d: '#b8302a' },
 )
 
+/** A skull and crossbones: the bones crossed behind it, poking out at its corners. */
+const SKULL = rowsArt(
+	[
+		'BB..........BB',
+		'BBB..WWWW..BBB',
+		'.BBBWWWWWWBBB.',
+		'..BWWWWWWWWB..',
+		'..WWKKWWKKWW..',
+		'..WWKKWWKKWg..',
+		'..WWWWKKWWWg..',
+		'...gWWWWWWg...',
+		'....WKWKWg....',
+		'...BBgggggBB..',
+		'..BBB....BBB..',
+		'.BBB......BBB.',
+		'BBB........BBB',
+		'BB..........BB',
+	],
+	{ W: '#f4f1e6', g: '#b9b3a2', K: '#2b2722', B: '#c4bba3' },
+)
+
+/** A mind blown: the top of their head gone off, a puff of smoke and sparks out of it. */
+const MIND_BLOWN = rowsArt(
+	[
+		'.S..ssSs...S..',
+		'...sSSSSSs....',
+		'S.sSSFFSSSs.S.',
+		'...ssFRRFss...',
+		'..yy.FRRF.yy..',
+		'.yYYYYYYYYYYY.',
+		'.YYYYYYYYYYYYo',
+		'YYWWKYYYYWWKYo',
+		'YYWWKYYYYWWKYo',
+		'YYYYYYYYYYYYYo',
+		'.YYYYKKKKYYYo.',
+		'.oYYYKMMKYYoo.',
+		'..ooYYYYYYoo..',
+		'....oooooo....',
+	],
+	{
+		...FACE,
+		W: '#ffffff',
+		M: '#7a2a1f',
+		S: '#d6d2cc',
+		s: '#a8a29a',
+		F: '#ff9a2e',
+		R: '#e8473c',
+	},
+)
+
+/** A scream: pale with fright, eyes wide, mouth a long O, hands to its cheeks. */
+const SHOCK = rowsArt(
+	[
+		'....bbbbbb....',
+		'..bbbbbbbbbb..',
+		'.bBBBBBBBBBBB.',
+		'.BBWWBBBBWWBBd',
+		'BBWWKBBBBWKWBd',
+		'BBWWKBBBBWKWBd',
+		'BBBWWBBBBWWBBd',
+		'YYBBBBKKBBBBYY',
+		'YYYBBKMMKBBYYY',
+		'YYYBBKMMKBBYYY',
+		'YYYBBKMMKBBYYY',
+		'oYYdBBKKBBdYYo',
+		'.ooYdddddddYo.',
+		'..o..dddddd.o.',
+	],
+	{
+		...FACE,
+		B: '#cfe8c8',
+		b: '#e4f4df',
+		d: '#9cc292',
+		W: '#ffffff',
+		M: '#7a2a1f',
+	},
+)
+
+/** Sad: eyebrows up, mouth turned down, a tear running down one cheek. */
+const SAD = rowsArt(
+	[
+		'....yyyyyy....',
+		'..yyyyyyyyyy..',
+		'.yYYYYYYYYYYY.',
+		'.YYYKYYYYKYYYo',
+		'YYKKYYYYYYKKYo',
+		'YYYYYYYYYYYYYo',
+		'YYKKYYYYYYKKYo',
+		'YYKKYYYYYYKKYo',
+		'YBYYYYYYYYYYYo',
+		'YBYYYYYYYYYYYo',
+		'.BbYYKKKKYYYo.',
+		'.BboYKYYKYYoo.',
+		'..BbYYYYYYoo..',
+		'....oooooo....',
+	],
+	{ ...FACE, B: '#6fc3ff', b: '#bfe6ff' },
+)
+
 export const REACTION_ART: Record<Reaction, ReturnType<typeof rowsArt>> = {
 	laugh: LAUGH,
 	cheer: CHEER,
 	poop: POOP,
 	heart: HEART,
+	skull: SKULL,
+	mindBlown: MIND_BLOWN,
+	shock: SHOCK,
+	sad: SAD,
 }
 const LABELS: Record<Reaction, string> = {
 	laugh: 'Laugh',
 	cheer: 'Cheer',
 	poop: 'Poo',
 	heart: 'Love',
+	skull: 'Skull and crossbones',
+	mindBlown: 'Mind blown',
+	shock: 'Shock',
+	sad: 'Sad',
 }
 
 /** A reaction drawn `scale` times a cell's usual size. */

@@ -402,6 +402,11 @@ const VOLLEY_FASTEST = 70
 const BOSS_BOLT_SPEED = 2.8
 /** How much leeway landing on its head gets. */
 const HEAD_GIVE = 18
+/**
+ * How many more hits it takes for each Player after the first, in a Round:
+ * as many again as each of them was too slow a fight.
+ */
+const BOSS_HP_EACH = 5
 
 /** The boss as it starts: asleep. */
 export function bossStart(boss: Boss | undefined): BossRun | undefined {
@@ -519,9 +524,10 @@ function stepBoss(world: World) {
 		)
 			return
 		// Everyone in: the door shuts behind them, and it wakes. In a Round,
-		// as much more to it as there are of them.
+		// a little more to it for each of them after the first.
 		run.awake = now
-		run.max = run.hp = boss.hp * (world.round ? racing.length : 1)
+		run.max = run.hp =
+			boss.hp + (world.round ? (racing.length - 1) * BOSS_HP_EACH : 0)
 		run.nextVolley = now + 90
 		play('roar')
 		world.popup('Uh oh...', boss.x, head - 40)

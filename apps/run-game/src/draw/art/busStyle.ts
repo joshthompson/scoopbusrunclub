@@ -48,6 +48,12 @@ export interface BusPart extends Vector {
 /** One of a bus's looks: its body, its scoop, its wheels, and (on the classic bus) its windows, see-through, over its back. */
 export interface BusLooks {
 	body: string
+	/**
+	 * Its body with its wheel arches skirted over, for when its wheels are
+	 * away (on its jets or its legs), so no empty wells show; the classic
+	 * bus's wheels are behind it, so it has none.
+	 */
+	closed?: string
 	scoop: string
 	wheels: BusPart[]
 	windows?: BusPart
@@ -95,6 +101,7 @@ export interface BusStyle {
 /** The new bus's looks, its wheels each their size. */
 const looks = (art: BusArt): BusLooks => ({
 	body: art.body,
+	closed: art.closed,
 	scoop: art.scoop,
 	wheels: art.wheels.map((w) => ({
 		...w,

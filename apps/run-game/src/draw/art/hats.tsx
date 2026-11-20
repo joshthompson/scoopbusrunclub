@@ -1,8 +1,3 @@
-import pumpkin1Asset from '@/assets/halloween/pumpkin1.png'
-import pumpkin2Asset from '@/assets/halloween/pumpkin2.png'
-import pumpkin3Asset from '@/assets/halloween/pumpkin3.png'
-import pumpkin4Asset from '@/assets/halloween/pumpkin4.png'
-import pumpkin5Asset from '@/assets/halloween/pumpkin5.png'
 import type { DrawPainting } from 'scoopjs'
 import { type JSX, Show } from 'solid-js'
 import {
@@ -18,8 +13,7 @@ import { paintPicture } from '../paint/picture'
 /**
  * The hats, as they're worn: each facing left, the way the run sprites do,
  * so it turns round with whoever's wearing it. Drawn in cells twice the size
- * of a screen pixel, as the runners are, but for the Pumpkins, which are
- * pictures of their own.
+ * of a screen pixel, as the runners are.
  */
 
 const CELL = 2
@@ -547,21 +541,133 @@ const DISCO_GLINTS = Array.from({ length: DISCO_TURNS }, (_, turn) =>
 	),
 )
 
-const PUMPKINS = [
-	pumpkin1Asset,
-	pumpkin2Asset,
-	pumpkin3Asset,
-	pumpkin4Asset,
-	pumpkin5Asset,
+const PUMPKIN_ORANGE = '#e8842a'
+const PUMPKIN_LIT = '#f7a646'
+const PUMPKIN_SHADE = '#c4631e'
+const PUMPKIN_DEEP = '#93441a'
+const STALK = '#5f8a2c'
+const STALK_LIT = '#86b444'
+/** Carved through, a candle lit in it: glowing, the cut's lip in shade along a hole's top. */
+const CANDLE = '#ffe45c'
+const CANDLE_LIP = '#8a3a12'
+/** Or just a face drawn on it. */
+const DRAWN_ON = '#3b1d0c'
+
+/** A Pumpkin's size, in cells: its stalk on top, its round body under it. */
+const PUMPKIN_COLUMNS = 15
+const PUMPKIN_ROWS = 12
+/** Its body's middle and how far it reaches, across and down, in cells. */
+const PUMPKIN_BODY = { x: 7.5, y: 6.9, rx: 7.5, ry: 5 }
+/** Where its face starts, in cells: the top left of its carving's grid. */
+const FACE_AT = { x: 2, y: 4 }
+
+/**
+ * Its carvings, 11 cells across and 6 down, `#` cut through (or drawn on):
+ * a grin with teeth, a scowl, a fright, a smile, and stitched shut. The
+ * first two are carved, a candle lit inside; the rest are drawn on.
+ */
+const CARVINGS = [
+	{
+		lit: true,
+		rows: [
+			'.##.....##.',
+			'.###...###.',
+			'.....#.....',
+			'##.#####.##',
+			'.#########.',
+			'..#.#.#.#..',
+		],
+	},
+	{
+		lit: true,
+		rows: [
+			'##.......##',
+			'.###...###.',
+			'...........',
+			'#.........#',
+			'.#########.',
+			'...#.#.#...',
+		],
+	},
+	{
+		lit: false,
+		rows: [
+			'.##.....##.',
+			'.##.....##.',
+			'...........',
+			'....###....',
+			'...#...#...',
+			'....###....',
+		],
+	},
+	{
+		lit: false,
+		rows: [
+			'.##.....##.',
+			'...........',
+			'...........',
+			'#.........#',
+			'.#.......#.',
+			'..#######..',
+		],
+	},
+	{
+		lit: false,
+		rows: [
+			'.###...###.',
+			'...........',
+			'...........',
+			'.#.#.#.#.#.',
+			'###########',
+			'.#.#.#.#.#.',
+		],
+	},
 ]
+
+/**
+ * A Pumpkin, by its carving (1 to 5): round, ribbed, lit along its top and
+ * dark along its underside, a green stalk out of its top, and its face.
+ */
+function pumpkinArt(carving: number) {
+	const { rows, lit } = CARVINGS[carving - 1] ?? CARVINGS[0]
+	const { x: cx, y: cy, rx, ry } = PUMPKIN_BODY
+	const inside = (x: number, y: number) =>
+		((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1
+	const cut = (x: number, y: number) =>
+		rows[Math.floor(y) - FACE_AT.y]?.[Math.floor(x) - FACE_AT.x] === '#'
+	return paintedArt(PUMPKIN_COLUMNS, PUMPKIN_ROWS, (x, y) => {
+		// Its stalk, out of its top, lit down its left.
+		if (y < 3 && (x === 7.5 || (x === 8.5 && y < 1))) return STALK_LIT
+		if (y < 3 && x === 8.5) return STALK
+		if (!inside(x, y)) return undefined
+		if (cut(x, y)) {
+			if (!lit) return DRAWN_ON
+			// The lip of the cut in shade over a hole deeper than a cell.
+			return !cut(x, y - 1) && cut(x, y + 1) ? CANDLE_LIP : CANDLE
+		}
+		// Lit along its top, dark along its underside.
+		if (!inside(x, y - 1)) return PUMPKIN_LIT
+		if (!inside(x, y + 1)) return PUMPKIN_DEEP
+		// Its ribs, curving round it, and its far side in shade.
+		const across = (x - cx) / rx
+		const rib = Math.abs(Math.abs(across) - 0.5) < 0.07
+		if (rib || x > cx + rx - 1.5) return PUMPKIN_SHADE
+		return PUMPKIN_ORANGE
+	})
+}
+
+/** The Pumpkins, a picture for each carving, and how big they are, on a head or the path. */
+export const PUMPKINS = CARVINGS.map((_, i) => pumpkinArt(i + 1))
+export const PUMPKIN_WIDTH = PUMPKIN_COLUMNS * CELL
+export const PUMPKIN_HEIGHT = PUMPKIN_ROWS * CELL
 
 /** A Pumpkin, over the whole head, by its carving. */
 const pumpkin = (carving = 1): HatArt => ({
-	src: PUMPKINS[carving - 1] ?? pumpkin1Asset,
-	width: 29,
-	height: 23,
-	crown: 13,
-	middle: 14.5,
+	src: PUMPKINS[carving - 1] ?? PUMPKINS[0],
+	width: PUMPKIN_WIDTH,
+	height: PUMPKIN_HEIGHT,
+	crown: 6.5 * CELL,
+	middle: 7.5 * CELL,
 })
 
 /**

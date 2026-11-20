@@ -49,8 +49,9 @@ import {
 	cleanPlayerName,
 } from './protocol'
 import { ReactionBar } from './reactions'
-import { GAME_MODES, ROOM_MODES, roomModeInfo } from './roomModes'
+import { GAME_MODES, ROOM_MODES, playedNote, roomModeInfo } from './roomModes'
 import { statusText } from './status'
+import { keepScreenAwake } from './wakeLock'
 
 /** The race on the phone, for Remote Play: the game itself, so only loaded then. */
 const Mirror = lazy(() => import('./Mirror'))
@@ -406,22 +407,7 @@ function Controller(props: {
 	const watching = () =>
 		props.mode === 'remote' && view()?.stage === 'round' && start()
 	// Kept awake: a phone that locks drops out of the Room.
-	let wake: WakeLockSentinel | undefined
-	const keepAwake = async () => {
-		if (document.visibilityState !== 'visible') return
-		try {
-			wake = await navigator.wakeLock?.request('screen')
-		} catch {
-			// Not allowed, or not supported: it'll lock on its own timer.
-		}
-	}
-	onMount(() => void keepAwake())
-	document.addEventListener('visibilitychange', keepAwake)
-
-	onCleanup(() => {
-		document.removeEventListener('visibilitychange', keepAwake)
-		void wake?.release()
-	})
+	keepScreenAwake()
 
 	const leave = () => {
 		link.leave()
@@ -477,6 +463,19 @@ function Controller(props: {
 	 * buttons to run with.
 	 */
 	const spectating = () => !!view()?.canReact
+	/**
+	 * Pick and Choose: picking the next course ahead, done with this Round
+	 * before it's over, or with the Standings up: the courses, instead of
+	 * buttons to run with, or to react with.
+	 */
+	const pickingAhead = () => {
+		const choosing = view()?.choosing
+		return choosing?.you && choosing.ahead ? choosing : undefined
+	}
+	const pickCourse = (course: number) => {
+		navigator.vibrate?.(15)
+		send({ type: 'choose', course })
+	}
 	const react = (reaction: Reaction) => send({ type: 'react', reaction })
 
 	const press = (action: Action, down: boolean) => {
@@ -728,10 +727,7 @@ function Controller(props: {
 										{(choosing) => (
 											<ChoosingScreen
 												choosing={choosing()}
-												onPick={(course) => {
-													navigator.vibrate?.(15)
-													send({ type: 'choose', course })
-												}}
+												onPick={pickCourse}
 												onReact={spectating() ? react : undefined}
 											/>
 										)}
@@ -786,11 +782,31 @@ function Controller(props: {
 										<ArrowPad press={press} />
 									</Match>
 									<Match when={true}>
-										{/* Between Rounds, or waiting for the next one. */}
-										<div style={styles.lobby}>
-											<div style={styles.heading}>{statusText(v())}</div>
-											<div style={styles.text}>{betweenText(v())}</div>
-											<Show when={spectating()}>
+										{/* Between Rounds, or waiting for the next one. Picking the next
+										course ahead, its list scrolls, the Starter's buttons kept in view. */}
+										<div
+											style={{
+												...styles.lobby,
+												...(pickingAhead() ? { 'min-height': 0 } : {}),
+											}}
+										>
+											<Show
+												when={pickingAhead()}
+												fallback={
+													<>
+														<div style={styles.heading}>{statusText(v())}</div>
+														<div style={styles.text}>{betweenText(v())}</div>
+													</>
+												}
+											>
+												{(choosing) => (
+													<ChoosingScreen
+														choosing={choosing()}
+														onPick={pickCourse}
+													/>
+												)}
+											</Show>
+											<Show when={spectating() && !pickingAhead()}>
 												<div style={styles.reactions}>
 													<ReactionBar
 														title={
@@ -847,10 +863,22 @@ function Controller(props: {
 								</Switch>
 							}
 						>
-							<Show when={spectating()} fallback={<ArrowPad press={press} />}>
-								<div style={{ ...styles.lobby, ...styles.reactions }}>
-									<ReactionBar title="Cheer them on" onReact={react} />
-								</div>
+							<Show
+								when={pickingAhead()}
+								fallback={
+									<Show
+										when={spectating()}
+										fallback={<ArrowPad press={press} />}
+									>
+										<div style={{ ...styles.lobby, ...styles.reactions }}>
+											<ReactionBar title="Cheer them on" onReact={react} />
+										</div>
+									</Show>
+								}
+							>
+								{(choosing) => (
+									<ChoosingScreen choosing={choosing()} onPick={pickCourse} />
+								)}
 							</Show>
 						</Show>
 
@@ -1233,7 +1261,10 @@ function Starter(props: {
 
 /** The Starter's button between Rounds, going on now: to what. */
 function nextLabel(view: PadView) {
-	if (roomModeInfo(view.roomMode).picks) return 'Pick the next course'
+	if (roomModeInfo(view.roomMode).picks)
+		return view.choosing?.picked !== undefined
+			? 'Next Round now'
+			: 'Pick the next course'
 	if (view.rounds && view.round >= view.rounds) return 'To the Podium'
 	return 'Next Round now'
 }
@@ -1312,27 +1343,38 @@ function ChoosingScreen(props: {
 				{props.choosing.you ? 'Pick the next course' : `${who()} is picking…`}
 			</div>
 			<div style={styles.text}>
-				{props.choosing.secondsLeft}s left
-				{props.choosing.you ? ' · one at random if time runs out' : ''}
+				{props.choosing.ahead
+					? props.choosing.picked !== undefined
+						? 'Picked! Change it till the next Round starts'
+						: 'For after this Round · take your time'
+					: `${props.choosing.secondsLeft ?? 0}s left${
+							props.choosing.you
+								? ' · one of the least raced if time runs out'
+								: ''
+						}`}
 			</div>
 			<Show when={props.choosing.you && props.choosing.courses}>
 				{(courses) => (
 					<div style={styles.courseList}>
 						<For each={courses()}>
 							{(name, i) => {
-								const recent = () => props.choosing.recent.includes(i())
+								const played = () => playedNote(props.choosing.played, i())
+								const mine = () => props.choosing.picked === i()
 								return (
 									<button
 										type="button"
 										style={{
 											...styles.courseButton,
-											...(recent() ? { opacity: 0.6 } : {}),
+											...(played().dim && !mine() ? { opacity: 0.6 } : {}),
+											...(mine() ? styles.coursePicked : {}),
 										}}
 										onClick={() => props.onPick(i())}
 									>
 										{name}
-										<Show when={recent()}>
-											<span style={styles.courseNote}>just raced</span>
+										<Show when={mine() ? '✓ Picked' : played().note}>
+											{(note) => (
+												<span style={styles.courseNote}>{note()}</span>
+											)}
 										</Show>
 									</button>
 								)
@@ -2024,7 +2066,9 @@ const styles = {
 		'font-size': '18px',
 		'text-align': 'left',
 	},
-	courseNote: { 'font-size': '12px', opacity: 0.8 },
+	courseNote: { 'font-size': '12px', opacity: 0.8, 'white-space': 'nowrap' },
+	/** Picked ahead, for after this Round. */
+	coursePicked: { background: '#ffd23f', color: 'var(--ink)' },
 	paused: {
 		position: 'absolute',
 		inset: 0,

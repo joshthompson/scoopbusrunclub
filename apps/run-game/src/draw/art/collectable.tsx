@@ -1,4 +1,3 @@
-import pumpkinAsset from '@/assets/halloween/pumpkin1.png'
 import type { JSX } from 'solid-js'
 import barcodeAsset from '../../assets/boosts/barcode.png'
 import type { Collectable } from '../../game/collectables'
@@ -14,7 +13,7 @@ import { FikaArt } from './fika'
 import { GooseIcon } from './geese'
 import { GliderArt } from './glider'
 import { GoatArt } from './goat'
-import { HatPicture, hatArt } from './hats'
+import { HatPicture, PUMPKINS, hatArt } from './hats'
 import { HorseArt } from './horse'
 import { LifeboatArt } from './lifeboat'
 import { LlamaArt } from './llama'
@@ -116,10 +115,10 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 		case 'pumpkin':
 			return (
 				<img
-					src={pumpkinAsset}
+					src={PUMPKINS[0]}
 					alt=""
 					class="pixelated"
-					style={{ display: 'block', width: '44px' }}
+					style={{ display: 'block', width: '45px' }}
 				/>
 			)
 	}

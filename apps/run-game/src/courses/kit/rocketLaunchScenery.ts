@@ -137,7 +137,7 @@ const BUS_YELLOW = '#f6c445'
 
 /**
  * The rocket, stood on its pad, nose up: a tall white rocket, its red
- * capsule on top, a porthole, the club's yellow bus and "SBRC" on its side,
+ * capsule on top, its windows (drawn over it), the club's yellow bus and "SBRC" on its side,
  * fins at its foot, and a door into it on its left side, high up, where the
  * gantry's walkway meets it. Drawn at a cell a pixel; its sizes here are on
  * the screen. `door`: the middle of the door's sill, from the picture's top
@@ -199,10 +199,8 @@ export const ROCKET = (() => {
 	g.rect(12, 214, 40, 1, HULL_DARK)
 	for (const x of [17, 28, 39]) g.rect(x, 219, 8, 5, '#2e323b')
 
-	// Its porthole in the capsule.
-	g.disc(MID, 62, 7, METAL)
-	g.disc(MID, 62, 5.5, (x, y) => (x + y < MID + 62 - 4 ? GLASS_LIT : GLASS))
-	g.rect(28, 57, 2, 2, HULL_LIT)
+	// Its windows, square, one in its capsule and one down its body, are
+	// drawn over it (see `draw/rocketLaunch.tsx`), with whoever's aboard.
 
 	// The club's bus on a navy patch, with SBRC under it.
 	g.rect(20, 80, 24, 18, NAVY)

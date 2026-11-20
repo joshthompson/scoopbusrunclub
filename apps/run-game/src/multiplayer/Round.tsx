@@ -3,6 +3,7 @@ import {
 	type JSX,
 	Show,
 	createEffect,
+	createMemo,
 	createSignal,
 	onCleanup,
 	untrack,
@@ -224,11 +225,58 @@ export function RoundHud(props: {
 		return racer.out !== 'scooped' || racer.body.spin < 40
 	}
 
+	/**
+	 * How to join, in the corner, faded to `CORNER_SEEN_THROUGH` while
+	 * anyone's under it, so it never hides them: by where it is on the
+	 * stage, measured, against each runner's box, as the name tags are
+	 * placed. Eased in and out, a little a tick. Measured now and then, not
+	 * every tick: it only moves if the window's resized.
+	 */
+	let hud: HTMLDivElement | undefined
+	let cornerBox: HTMLDivElement | undefined
+	let box: ReturnType<typeof cornerOnStage>
+	let measuredAt = Number.NEGATIVE_INFINITY
+	const cornerOpacity = createMemo((was: number) => {
+		const now = world.ticks()
+		if (!box || Math.abs(now - measuredAt) > 60) {
+			box = cornerOnStage(hud, cornerBox)
+			measuredAt = now
+		}
+		const at = box
+		const under =
+			!!at &&
+			world.racers.some((racer) => {
+				if (!tagged(racer)) return false
+				const { body, runner } = racer
+				const zoom = world.zoom()
+				const half = (runner.sprite.width * RUNNER_SCALE) / 2
+				const feet = onScreen(world, body.x, body.feetY)
+				const head = onScreen(
+					world,
+					body.x,
+					body.feetY - runner.sprite.height * RUNNER_SCALE,
+				)
+				return (
+					feet.x + half / zoom > at.left &&
+					feet.x - half / zoom < at.right &&
+					feet.y > at.top &&
+					head.y < at.bottom
+				)
+			})
+		const to = under ? CORNER_SEEN_THROUGH : 1
+		return Math.abs(to - was) < 0.01 ? to : was + (to - was) * CORNER_FADE
+	}, 1)
+
 	return (
-		<div style={styles.hud}>
+		<div ref={hud} style={styles.hud}>
 			<div style={styles.topLeft}>
 				<Show when={props.corner}>
-					<div style={styles.corner}>{props.corner}</div>
+					<div
+						ref={cornerBox}
+						style={{ ...styles.corner, opacity: cornerOpacity() }}
+					>
+						{props.corner}
+					</div>
 				</Show>
 				<div>
 					<div style={{ 'font-size': size(18), opacity: 0.8 }}>
@@ -315,6 +363,32 @@ export function RoundHud(props: {
 			</For>
 		</div>
 	)
+}
+
+/** How see-through how to join is, in the corner, with someone under it, and how quickly it fades, a share a tick. */
+const CORNER_SEEN_THROUGH = 0.4
+const CORNER_FADE = 0.15
+
+/**
+ * Where `box` is on the stage, in its own pixels, as `onScreen` gives
+ * them: measured on the page, against the HUD it's in, which the stage
+ * scales to fit the window.
+ */
+function cornerOnStage(
+	hud: HTMLElement | undefined,
+	box: HTMLElement | undefined,
+) {
+	if (!hud || !box || !hud.offsetWidth) return undefined
+	const outer = hud.getBoundingClientRect()
+	const inner = box.getBoundingClientRect()
+	const scale = outer.width / hud.offsetWidth
+	if (!scale) return undefined
+	return {
+		left: (inner.left - outer.left) / scale,
+		right: (inner.right - outer.left) / scale,
+		top: (inner.top - outer.top) / scale,
+		bottom: (inner.bottom - outer.top) / scale,
+	}
 }
 
 const styles = {

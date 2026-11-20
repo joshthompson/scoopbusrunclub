@@ -348,6 +348,8 @@ export function stepWorld(world: World) {
 		if (world.round) frameEveryone(world)
 		else stepCamera(world)
 	}
+	// Anyone left behind off the screen in Baby Mode: floated back onto it.
+	rescueLost(world)
 
 	// Not while flying out of the scoop: how far they got is where it got them.
 	if (!isCaught(world.racers[0].out)) world.setPlayerX(world.body.x)
@@ -1742,6 +1744,31 @@ function respawn(world: World, racer: Racer, sound: 'fallen' | 'splash') {
 		if (pit && world.course.secret)
 			to = { x: pit[1] + RESPAWN_PAST, y: world.course.secret.floor }
 	}
+	floatTo(world, racer, from, to, glide)
+	play(sound)
+	world.popup(`${racer.runner.name} fell!`, b.x, Math.min(b.feetY, to.y) - 80)
+}
+
+/**
+ * Into a Baby Mode bubble, `from` where they are, to be floated `to`
+ * there (see `floatBack`): off whatever they were on, or in, and still.
+ */
+function floatTo(
+	world: World,
+	racer: Racer,
+	from: { x: number; y: number },
+	to: { x: number; y: number },
+	glide = false,
+) {
+	const b = racer.body
+	// Out of a cart, if they were in one: it goes on down the line without
+	// them, rather than pulling them back into it, wherever it's got to,
+	// once the bubble's popped.
+	if (b.cart !== undefined) {
+		const cart = world.carts[b.cart]
+		if (cart?.rider === racer.id) cart.rider = undefined
+		b.cart = undefined
+	}
 	b.mount = 0
 	b.carried = 0
 	b.condorFrom = undefined
@@ -1769,8 +1796,64 @@ function respawn(world: World, racer: Racer, sound: 'fallen' | 'splash') {
 		),
 		glide,
 	}
-	play(sound)
-	world.popup(`${racer.runner.name} fell!`, b.x, Math.min(b.feetY, to.y) - 80)
+}
+
+/**
+ * Baby Mode: this far off the left of the screen (past its edge, out of
+ * sight), for this long, and someone's lost, stuck somewhere or just too
+ * far behind for the camera to keep them in, everyone else gone on.
+ */
+const LOST_PAST = 40
+const LOST_TICKS = 60
+/** How far into the screen from its left edge they're floated back to, of its width. */
+const LOST_BACK_TO = 0.15
+/** How long each of them has been lost for, so far. */
+const lostFor = new WeakMap<Body, number>()
+
+/**
+ * Baby Mode: anyone lost off the left of the screen (see `LOST_TICKS`)
+ * floated back in a bubble, as after a fall, onto the Ground just inside
+ * it, wherever they were: in a cart, down a Secret, swimming. Not while
+ * a Portal's holding anyone: everyone's waited for there.
+ */
+function rescueLost(world: World) {
+	if (!world.baby || world.phase() !== 'running' || world.portal) return
+	const left = world.camera()
+	const width = VIEW_WIDTH * world.zoom()
+	const { terrain } = world
+	for (const racer of world.racers) {
+		const b = racer.body
+		const lost =
+			!racer.out &&
+			!b.bubble &&
+			!b.haunt &&
+			b.secret !== 'flung' &&
+			b.x < left - LOST_PAST
+		const ticks = lost ? (lostFor.get(b) ?? 0) + 1 : 0
+		lostFor.set(b, ticks)
+		if (ticks < LOST_TICKS) continue
+		lostFor.set(b, 0)
+		let x = left + width * LOST_BACK_TO
+		while (
+			x < terrain.finishX &&
+			(terrain.inGap(x) || atSea(world, x) || inDeepWater(world, x))
+		)
+			x += 20
+		const from = { x: b.x, y: b.feetY }
+		b.secret = undefined
+		b.swimming = false
+		b.lifeboat = false
+		b.climbing = undefined
+		b.hanging = undefined
+		b.held = 0
+		floatTo(world, racer, from, { x, y: terrain.groundY(x) })
+		play('pop')
+		world.popup(
+			`Back you come, ${racer.runner.name}!`,
+			x,
+			terrain.groundY(x) - 120,
+		)
+	}
 }
 
 /** How long a bubble takes to float someone back, at the least and the most, and to form round them first. */
@@ -1840,10 +1923,15 @@ const CATCH_UP_FROM = 360
 /** ...faster the further back, up to this much over top speed this much further back. */
 const CATCH_UP_MAX = 3
 const CATCH_UP_OVER = 600
+/** How hard that carries them along, of what it was at first: it pulled too hard. */
+const CATCH_UP_STRENGTH = 0.5
 
-/** How much faster than top speed someone can go, left behind in Baby Mode. */
+/**
+ * How much faster than top speed someone can go, left behind in Baby Mode.
+ * Not while everyone's shut in with a boss: it's a fight, not a race.
+ */
 function babyCatchUp(world: World, racer: Racer) {
-	if (!world.baby) return 0
+	if (!world.baby || bossFighting(world)) return 0
 	let front = Number.NEGATIVE_INFINITY
 	for (const r of world.racers)
 		if (r !== racer) front = Math.max(front, r.body.x)
@@ -1852,9 +1940,13 @@ function babyCatchUp(world: World, racer: Racer) {
 	// Someone's in: everyone else carried on in to the line too.
 	const home = front >= finishX && behind > 0
 	if (behind <= CATCH_UP_FROM && !home) return 0
-	return Math.min(
-		CATCH_UP_MAX,
-		0.5 + (Math.max(0, behind - CATCH_UP_FROM) / CATCH_UP_OVER) * CATCH_UP_MAX,
+	return (
+		CATCH_UP_STRENGTH *
+		Math.min(
+			CATCH_UP_MAX,
+			0.5 +
+				(Math.max(0, behind - CATCH_UP_FROM) / CATCH_UP_OVER) * CATCH_UP_MAX,
+		)
 	)
 }
 
@@ -3512,6 +3604,22 @@ function frameEveryone(world: World) {
 	const running = world.racers.filter((r) => !r.out)
 	// Left where it is once everyone's out: to watch the last of them fly off.
 	if (!running.length) return
+	// Everyone in a boss's room: the whole of it in view, held still, as in
+	// single player. An arena.
+	const arenas = running.map((r) => bossArena(world, r.body.x))
+	const boss = world.course.boss
+	if (boss && arenas.every((a) => a !== undefined)) {
+		const floor = world.terrain.groundY(boss.x)
+		world.setZoom(world.zoom() + (1 - world.zoom()) * ZOOM_EASE * 3)
+		const targetY = cameraYFor(floor - boss.height, floor, world.zoom())
+		world.setCameraY(
+			world.cameraY() + (targetY - world.cameraY()) * CAMERA_LIFT,
+		)
+		const width = VIEW_WIDTH * world.zoom()
+		const target = arenas[0] - (width - VIEW_WIDTH) / 2
+		world.setCamera(world.camera() + (target - world.camera()) * 0.25)
+		return
+	}
 	const xs = running.map((r) => r.body.x)
 	if (world.phase() === 'countdown' && !world.baby)
 		xs.push(world.bus.frontX - 80)

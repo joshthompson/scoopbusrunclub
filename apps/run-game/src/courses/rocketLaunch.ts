@@ -360,6 +360,28 @@ const PORTALS: Portal[] = [
 
 // --- Platforms --------------------------------------------------------------
 
+/** How far up each of the chamber's girders is over the last: an easy hop, not a full jump. */
+const GIRDER_STEP = 68
+
+/**
+ * The chamber's girders, up either side of the boss, zigzagging, the top
+ * ones right up against it, just under its head: a jump up off them, onto
+ * it. Low steps, so it's a climb anyone can make, a Round's slower runners
+ * too, not a test of a whole held jump each time.
+ */
+const CHAMBER_GIRDERS: PlatformDefinition[] = [
+	{ x: ROOM.from + 60, width: 130, height: GIRDER_STEP },
+	{ x: ROOM.from + 170, width: 150, height: GIRDER_STEP * 2 },
+	{ x: ROOM.from + 60, width: 130, height: GIRDER_STEP * 3 },
+	{ x: ROOM.from + 170, width: 150, height: GIRDER_STEP * 4 },
+	{ x: BOSS_X - BOSS_HALF - 140, width: 130, height: GIRDER_STEP * 5 },
+	{ x: ROOM.to - 190, width: 130, height: GIRDER_STEP },
+	{ x: ROOM.to - 320, width: 150, height: GIRDER_STEP * 2 },
+	{ x: ROOM.to - 190, width: 130, height: GIRDER_STEP * 3 },
+	{ x: ROOM.to - 320, width: 150, height: GIRDER_STEP * 4 },
+	{ x: BOSS_X + BOSS_HALF + 10, width: 130, height: GIRDER_STEP * 5 },
+]
+
 const PLATFORMS: PlatformDefinition[] = [
 	// The first dome: a ledge, an alien up on it, then two up a step.
 	{ x: 12700, width: 160, height: 85 },
@@ -377,16 +399,7 @@ const PLATFORMS: PlatformDefinition[] = [
 	{ x: 17300, width: 120, height: 340 },
 	{ x: 17800, width: 200, height: 85 },
 	{ x: 18250, width: 160, height: 110 },
-	// The chamber's girders, up either side of the boss, the top ones right
-	// up against it, just under its head: a jump up off them, onto it.
-	{ x: ROOM.from + 70, width: 130, height: 85 },
-	{ x: ROOM.from + 190, width: 150, height: 170 },
-	{ x: ROOM.from + 70, width: 130, height: 255 },
-	{ x: BOSS_X - BOSS_HALF - 140, width: 130, height: 340 },
-	{ x: ROOM.to - 200, width: 130, height: 85 },
-	{ x: ROOM.to - 340, width: 150, height: 170 },
-	{ x: ROOM.to - 200, width: 130, height: 255 },
-	{ x: BOSS_X + BOSS_HALF + 10, width: 130, height: 340 },
+	...CHAMBER_GIRDERS,
 ]
 
 /** The top of the cage dome's climb, and the antennae's perch. */
@@ -487,8 +500,8 @@ function obstacles(): Obstacle[] {
 		alien(18100),
 		alien(18450, 0, true),
 		// The chamber: on its girders.
-		alien(on(P[14], 0.4).x, P[14].height),
-		alien(on(P[19], 0.6).x, P[19].height),
+		alien(on(CHAMBER_GIRDERS[1], 0.4).x, CHAMBER_GIRDERS[1].height),
+		alien(on(CHAMBER_GIRDERS[7], 0.6).x, CHAMBER_GIRDERS[7].height),
 	)
 	return list
 }

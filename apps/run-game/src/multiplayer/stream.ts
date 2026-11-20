@@ -244,8 +244,27 @@ export function createRaceStream(
 								? 1
 								: world.ball.out === 'scooped'
 									? 2
-									: 0,
-						] as [number, number, number, number],
+									: world.ball.out === 'hatched'
+										? 3
+										: 0,
+							world.ball.stage,
+						] as [number, number, number, number, number],
+					}
+				: {}),
+			...(world.followers.length
+				? {
+						followers: world.followers.map(
+							(f) =>
+								[
+									tenth(f.x),
+									tenth(f.feetY),
+									f.facing,
+									(f.grounded ? 1 : 0) | (f.carried ? 2 : 0),
+									Math.round(f.run),
+									f.out === 'home' ? 1 : f.out === 'scooped' ? 2 : 0,
+									Math.round(f.spin),
+								] as [number, number, number, number, number, number, number],
+						),
 					}
 				: {}),
 			flyers: world.flyers.map((goose) => [

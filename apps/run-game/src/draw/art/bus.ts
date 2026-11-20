@@ -466,12 +466,17 @@ function ghoul(p: BusPalette, x: number, y: number, eyes: number) {
 	return spooky.ghoul
 }
 
-function paintBus(sheet: Sheet, p: BusPalette) {
+/**
+ * The bus's body. `closed`: its wheels tucked up away, on its jets or its
+ * legs, and its arches skirted over, its side carried on down over them,
+ * so no dark wells are left where its wheels were.
+ */
+function paintBus(sheet: Sheet, p: BusPalette, closed = false) {
 	const name = lettering(p.name, (char) => BOLD[char] ?? BOLD[' '])
 	const nameFrom = Math.round((DOOR.from - name.width) / 2)
 	const sign = lettering('SBRC', glyphRows)
 	const arch = (along: number, up: number) =>
-		WHEELS.some((x) => Math.hypot(along - x, up - AXLE) < ARCH)
+		!closed && WHEELS.some((x) => Math.hypot(along - x, up - AXLE) < ARCH)
 	const rusty = (along: number, up: number) =>
 		!!p.spooky &&
 		RUST.some(
@@ -771,9 +776,14 @@ export const BUS_SCOOP_TIP = {
 /** The scoop's front, from the bus's back: where it scoops. */
 export const SCOOP_FRONT = BUS_SCOOP_AT.x + BUS_SCOOP_TIP.x
 
-/** A bus's pictures: its body, its wheels, back and front, and its scoop. */
+/**
+ * A bus's pictures: its body, and its body with its arches skirted over
+ * (`closed`, for when its wheels are away), its wheels, back and front,
+ * and its scoop.
+ */
 export interface BusArt {
 	body: string
+	closed: string
 	wheels: { asset: string; x: number; y: number }[]
 	scoop: string
 }
@@ -781,8 +791,11 @@ export interface BusArt {
 function busArt(p: BusPalette): BusArt {
 	const sheet = new Sheet(COLUMNS, ROWS)
 	paintBus(sheet, p)
+	const closed = new Sheet(COLUMNS, ROWS)
+	paintBus(closed, p, true)
 	return {
 		body: sheet.art(),
+		closed: closed.art(),
 		wheels: WHEELS.map((x) => wheelArt(p, x)),
 		scoop: scoopArt(p),
 	}

@@ -317,8 +317,36 @@ export default function Mirror(props: {
 			world.ball.y = mix(a.ball[1], to[1])
 			world.ball.spin = mix(a.ball[2], to[2])
 			world.ball.out =
-				a.ball[3] === 1 ? 'home' : a.ball[3] === 2 ? 'scooped' : undefined
+				a.ball[3] === 1
+					? 'home'
+					: a.ball[3] === 2
+						? 'scooped'
+						: a.ball[3] === 3
+							? 'hatched'
+							: undefined
+			world.ball.stage = a.ball[4] ?? 0
 		}
+		// Whoever's following anyone: a hatchling, out of its egg.
+		const kind = world.ball?.egg?.follower
+		if (kind)
+			world.followers = (a.followers ?? []).map((from, i) => {
+				const to = b.followers?.[i] ?? from
+				return {
+					kind,
+					owner: '',
+					x: mix(from[0], to[0]),
+					feetY: mix(from[1], to[1]),
+					facing: from[2] === -1 ? -1 : 1,
+					grounded: !!(from[3] & 1),
+					carried: !!(from[3] & 2),
+					run: mix(from[4], to[4]),
+					trail: [],
+					out: from[5] === 1 ? 'home' : from[5] === 2 ? 'scooped' : undefined,
+					vx: 0,
+					vy: 0,
+					spin: mix(from[6], to[6]),
+				}
+			})
 		// A lift that waits, on its way, or waiting.
 		waitingLifts(world).forEach((lift, i) => {
 			const since = a.lifts?.[i] ?? -1

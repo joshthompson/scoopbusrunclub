@@ -91,3 +91,23 @@ export const GAME_MODES: GameModeInfo[] = [
 
 export const gameModeInfo = (mode: GameMode) =>
 	GAME_MODES.find((m) => m.mode === mode) ?? GAME_MODES[0]
+
+/**
+ * Pick and Choose: what's said of a course, by how many times each has been
+ * raced this go (`played`, by index), as they're picked from. Till every
+ * one's been raced, whether it has; then how many times each has. `dim`
+ * if it's been raced more than the least raced: others to have a go first.
+ */
+export function playedNote(played: number[], course: number) {
+	const times = played[course] ?? 0
+	const fewest = played.length ? Math.min(...played) : 0
+	const note =
+		fewest > 0
+			? `×${times}`
+			: times > 1
+				? `Played ×${times}`
+				: times
+					? 'Played'
+					: undefined
+	return { note, dim: times > fewest }
+}
