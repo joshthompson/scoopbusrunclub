@@ -23,6 +23,8 @@ export type RideKind =
 	| 'minecart'
 	/** On Scoop Cruises, the lifeboat, out of the engine rooms. */
 	| 'lifeboat'
+	/** Pogo Sticks' pogo stick, in the minigame: everyone's on one. */
+	| 'pogoStick'
 
 export type Collectable =
 	| `fika:${FikaItem}`
@@ -125,6 +127,7 @@ export const COLLECTABLE_NAMES = {
 	'ride:bloodCell': 'Red blood cell',
 	'ride:skateboard': 'Skateboard',
 	'ride:spaceBuddy': 'Space buddy',
+	'ride:pogoStick': 'Pogo stick',
 	pumpkin: 'Pumpkin',
 	'hat:miner': "Miner's helmet",
 	'hat:skiHelmet': 'Ski helmet',
@@ -145,6 +148,7 @@ export const COLLECTABLE_NAMES = {
 	'hat:jazzHat': 'Flaming top hat',
 	'hat:snorkel': 'Snorkel mask',
 	'hat:antennae': 'Alien antennae',
+	'hat:swordHat': 'Sword hat',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
 
@@ -240,6 +244,7 @@ export const PICKUP_WORD = {
 	'ride:bloodCell': 'Go with the flow!',
 	'ride:skateboard': 'Skate!',
 	'ride:spaceBuddy': 'Blast off!',
+	'ride:pogoStick': 'Boing!',
 	'ride:goat': 'G.O.A.T.!',
 	'ride:skis': 'Skis on!',
 	'ride:snowboard': 'Shred!',
@@ -263,6 +268,7 @@ export const PICKUP_WORD = {
 	'hat:jazzHat': 'Hot hat!',
 	'hat:snorkel': 'Snorkel!',
 	'hat:antennae': 'Bzzt!',
+	'hat:swordHat': 'En garde!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>
 
@@ -387,6 +393,8 @@ export const COLLECTABLE_ABOUT = {
 	'ride:spaceBuddy':
 		'A space buddy, a little round alien, bounding about its low-gravity planet.',
 	pumpkin: 'A carved pumpkin, worn on your head.',
+	'ride:pogoStick':
+		'A red pogo stick, in an empty car park. Harder to stay on than it looks.',
 	'hat:miner': 'Its lamp lit, in a secret gallery reached by mine cart.',
 	'hat:skiHelmet': 'Safety first, on the slopes.',
 	'hat:pharaoh': 'From the tomb under the Sphinx.',
@@ -411,6 +419,8 @@ export const COLLECTABLE_ABOUT = {
 		'A snorkel mask, lost on the seabed off Dino Island. Dive deep for it.',
 	'hat:antennae':
 		'Alien antennae, on a headband, high up in the aliens’ base. Climb for them.',
+	'hat:swordHat':
+		'A skullcap with a long sword sticking straight up out of it. Mind the ceiling.',
 	barcode: "Floating just before every parkrun's finish. Don't forget it!",
 } satisfies Record<Collectable, string>
 
@@ -447,6 +457,8 @@ const RIDE_BEHAVIOUR = {
 		'Run onto it and roll, faster than running. Jump to kickflip; duck to get off.',
 	spaceBuddy:
 		'Jump on to bound over everything in low gravity. Jump again to leap; duck to get off.',
+	pogoStick:
+		'Bounces by itself. Lean the other way as you tip to stay on; hold jump as you land to go high.',
 } satisfies Record<RideKind, string>
 
 /** What a hat does while it's on, from its rules: nothing, if it just looks good. */
@@ -477,6 +489,7 @@ export function collectableBehaviour(id: Collectable): string[] {
 			? ['A burst of speed.', ...hatPowers(worn)]
 			: ['A burst of speed.']
 	}
+	if (id === 'hat:swordHat') return ['Catch fruit on its point.']
 	if (id.startsWith('hat:'))
 		return hatPowers(id.slice('hat:'.length) as HatKind)
 	if (id === 'pumpkin') return hatPowers('pumpkin')

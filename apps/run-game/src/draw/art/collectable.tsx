@@ -1,4 +1,4 @@
-import type { JSX } from 'solid-js'
+import { type JSX, Show } from 'solid-js'
 import barcodeAsset from '../../assets/boosts/barcode.png'
 import type { Collectable } from '../../game/collectables'
 import type { FikaItem } from '../../game/fika'
@@ -19,6 +19,7 @@ import { LifeboatArt } from './lifeboat'
 import { LlamaArt } from './llama'
 import { MineCartArt } from './mineCart'
 import { MoleArt } from './mole'
+import { POGO_STICK, POGO_STICK_HEIGHT, POGO_STICK_WIDTH } from './pogoStick'
 import { PterodactylArt } from './pterodactyl'
 import { SkateboardArt } from './skateboard'
 import { StoodBoardArt } from './skis'
@@ -103,6 +104,19 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 			return <SkateboardArt pose="sit" />
 		case 'ride:spaceBuddy':
 			return <SpaceBuddyArt pose="sit" />
+		case 'ride:pogoStick':
+			return (
+				<img
+					src={POGO_STICK}
+					alt=""
+					class="pixelated"
+					style={{
+						display: 'block',
+						width: `${POGO_STICK_WIDTH}px`,
+						height: `${POGO_STICK_HEIGHT}px`,
+					}}
+				/>
+			)
 		case 'barcode':
 			return (
 				<img
@@ -126,9 +140,18 @@ export function CollectableArt(props: { id: Collectable }): JSX.Element {
 	return id satisfies never
 }
 
-/** A hat, on its own, at its size on a head, made a little bigger. */
+/** How tall a hat's icon can be: any taller, and it's drawn smaller to fit its card. */
+const HAT_ICON_TALLEST = 44
+
+/**
+ * A hat, on its own, at its size on a head, made a little bigger; or a tall
+ * one (the sword hat, its sword and all), half its size, to fit its card.
+ */
 function HatIcon(props: { hat: PickupHat }) {
 	const hat = () => ({ kind: props.hat })
+	const scale = () =>
+		[1.4, 1, 0.5].find((by) => hatArt(hat()).height * by <= HAT_ICON_TALLEST) ??
+		0.5
 	return (
 		<div
 			style={{
@@ -139,9 +162,34 @@ function HatIcon(props: { hat: PickupHat }) {
 				'place-items': 'center',
 			}}
 		>
-			<div style={{ transform: 'scale(1.4)', position: 'relative' }}>
-				<HatSized hat={hat()} />
-			</div>
+			<Show
+				when={scale() < 1.4}
+				fallback={
+					<div style={{ transform: 'scale(1.4)', position: 'relative' }}>
+						<HatSized hat={hat()} />
+					</div>
+				}
+			>
+				{/* Shrunk to fit: its room in the card shrunk with it, as a
+				    transform alone leaves it as tall as ever. */}
+				<div
+					style={{
+						position: 'relative',
+						width: `${hatArt(hat()).width * scale()}px`,
+						height: `${hatArt(hat()).height * scale()}px`,
+					}}
+				>
+					<div
+						style={{
+							position: 'absolute',
+							transform: `scale(${scale()})`,
+							'transform-origin': '0 0',
+						}}
+					>
+						<HatSized hat={hat()} />
+					</div>
+				</div>
+			</Show>
 		</div>
 	)
 }

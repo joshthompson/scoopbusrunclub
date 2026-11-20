@@ -184,10 +184,11 @@ export const stompBoost = (along: number) =>
 /** Points for a head bounced off, doubling for each more before landing, up to `STOMP_POINTS_MAX`. */
 export const STOMP_POINTS = 100
 export const STOMP_POINTS_MAX = 1600
-/** How long someone's dazed after being bounced on, plodding at `DAZED_SPEED`. */
+/** How long someone in the pack's dazed after being bounced on, sat down on the ground. */
 export const DAZED_TICKS = 100
 /** How long the screen goes funny for, after a bad mushroom's eaten: three seconds. */
 export const TRIP_TICKS = 180
+/** On skis, how fast someone in the pack plods on, dazed. */
 export const DAZED_SPEED = 1.2
 
 // --- Furby Fields: furbies and corgis -------------------------------------

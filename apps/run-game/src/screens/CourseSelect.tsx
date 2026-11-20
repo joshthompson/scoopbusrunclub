@@ -23,6 +23,7 @@ import { StarArt } from '../draw/art/star'
 import { courseHat } from '../game/collectables'
 import { MEDALS, type Medal, medalScores, nextMedal } from '../game/medals'
 import { touchScreen } from '../input'
+import { MINIGAMES, type Minigame, botsFor } from '../minigames'
 import type { Playable } from '../runners/playable'
 import { hasCollected } from '../saved/collected'
 import { specialDone } from '../saved/goals'
@@ -32,10 +33,15 @@ import { isUnlocked } from '../saved/progress'
 import { play } from '../sfx'
 import { CoursePreview } from '../ui/CoursePreview'
 import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
+import { MinigamePreview } from '../ui/MinigamePreview'
 import { onHover } from '../ui/hover'
 
-/** What's picked: Endless, or a course's id, to practise it. */
+/** What's picked: Endless, a course's id, to practise it, or `minigame:` a minigame's. */
 export type RunChoice = string
+
+/** The minigame a choice is, if it's one. */
+const minigameOf = (choice: RunChoice) =>
+	MINIGAMES.find((m) => `minigame:${m.id}` === choice)
 
 /**
  * Whether each course's blurb is shown under its name: hidden for now, the
@@ -47,8 +53,12 @@ const SHOW_BLURBS = false
 const PREVIEW_LEAST = 110
 const PREVIEW_BORDER = 6
 
-/** Everything in the list, top to bottom: Endless, then every course. */
-const CHOICES: RunChoice[] = ['endless', ...COURSES.map((course) => course.id)]
+/** Everything in the list, top to bottom: Endless, every course, then every minigame. */
+const CHOICES: RunChoice[] = [
+	'endless',
+	...COURSES.map((course) => course.id),
+	...MINIGAMES.map((m) => `minigame:${m.id}`),
+]
 
 /**
  * Endless, at the top of the list and picked to begin with, then every course
@@ -62,10 +72,13 @@ export function CourseSelect(props: {
 	onSelect: (choice: RunChoice) => void
 	onEndless: () => void
 	onPractice: (course: Course) => void
+	/** A minigame, played on your own against bots. */
+	onMinigame: (minigame: Minigame) => void
 	onBack: () => void
 }) {
 	const index = () => Math.max(0, CHOICES.indexOf(props.selected))
 	const picked = () => COURSES.find((course) => course.id === props.selected)
+	const pickedGame = () => minigameOf(props.selected)
 
 	/** How tall the preview can be, measured off the room it's been left. */
 	const [windowHeight, setWindowHeight] = createSignal(165)
@@ -81,13 +94,17 @@ export function CourseSelect(props: {
 	onCleanup(() => observer?.disconnect())
 	const open = (choice: RunChoice) =>
 		choice === 'endless' ||
+		// Minigames are always there to play.
+		!!minigameOf(choice) ||
 		isUnlocked(COURSES.findIndex((course) => course.id === choice))
 
 	const choose = (choice: RunChoice) => {
 		if (!open(choice)) return play('back')
 		play('select')
 		const practise = COURSES.find((course) => course.id === choice)
+		const game = minigameOf(choice)
 		if (practise) props.onPractice(practise)
+		else if (game) props.onMinigame(game)
 		else props.onEndless()
 	}
 	const select = (choice: RunChoice) => {
@@ -266,16 +283,54 @@ export function CourseSelect(props: {
 						)
 					}
 				</For>
+				<div style={styles.section}>Minigames</div>
+				<For each={MINIGAMES}>
+					{(game, i) =>
+						row(
+							`minigame:${game.id}`,
+							COURSES.length + 1 + i(),
+							<>
+								<span style={styles.number}>★</span>
+								<span style={styles.rowText}>
+									<span
+										ref={(el) => fitRowName(el, rowNameSize(game.name))}
+										style={styles.rowName}
+									>
+										{game.name}
+									</span>
+									<span style={styles.rowDetail}>
+										You and {botsFor(game)} bots
+									</span>
+								</span>
+							</>,
+						)
+					}
+				</For>
 			</div>
 
 			<Panel style={styles.preview}>
 				<div ref={measure} style={styles.window}>
 					{/* Rebuilt for each: a whole other course. None of one that's
 					    still locked: no seeing it till it's been got to. */}
-					<Show when={open(props.selected) && (picked() ?? COURSES[0])} keyed>
+					<Show
+						when={
+							open(props.selected) && !pickedGame() && (picked() ?? COURSES[0])
+						}
+						keyed
+					>
 						{(course) => (
 							<CoursePreview
 								course={course}
+								width={538}
+								height={windowHeight()}
+							/>
+						)}
+					</Show>
+					{/* A minigame: the whole of its arena, still, played by bots. */}
+					<Show when={pickedGame()} keyed>
+						{(game) => (
+							<MinigamePreview
+								minigame={game}
 								width={538}
 								height={windowHeight()}
 							/>
@@ -304,11 +359,17 @@ export function CourseSelect(props: {
 				</div>
 
 				<div style={styles.heading}>
-					<span style={styles.name}>{picked()?.name ?? 'Endless'}</span>
+					<span style={styles.name}>
+						{picked()?.name ?? pickedGame()?.name ?? 'Endless'}
+					</span>
 					<span style={styles.headingDetail}>
 						<Show
 							when={picked()}
-							fallback={`All ${COURSES.length} courses, in one go`}
+							fallback={
+								pickedGame()
+									? 'Minigame'
+									: `All ${COURSES.length} courses, in one go`
+							}
 						>
 							{(course) => <>Course {course().number}</>}
 						</Show>
@@ -323,82 +384,102 @@ export function CourseSelect(props: {
 				{/* Down one side, its medals, each and what it takes, in colour
 				    once got, and how many of its collectables have been found;
 				    down the other, the top scores on it. */}
-				<div style={styles.lower}>
-					<Show
-						when={picked()}
-						fallback={
-							// Endless's three goals, each its medal's: in colour once
-							// it's got.
-							<div style={styles.stats}>
-								<div style={styles.scoresLabel}>Your goals</div>
-								<For each={ENDLESS_GOALS}>
-									{({ medal, goal }) => (
+				<Show
+					when={pickedGame()}
+					fallback={
+						<div style={styles.lower}>
+							<Show
+								when={picked()}
+								fallback={
+									// Endless's three goals, each its medal's: in colour once
+									// it's got.
+									<div style={styles.stats}>
+										<div style={styles.scoresLabel}>Your goals</div>
+										<For each={ENDLESS_GOALS}>
+											{({ medal, goal }) => (
+												<div style={styles.goalLine}>
+													<span style={styles.goalText}>{goal}</span>
+													<span style={styles.goalIcon}>
+														<MedalArt
+															medal={
+																got(bestMedal(ENDLESS), medal)
+																	? medal
+																	: undefined
+															}
+															scale={1}
+														/>
+													</span>
+												</div>
+											)}
+										</For>
+									</div>
+								}
+							>
+								{(course) => (
+									<div style={styles.stats}>
+										<div style={styles.scoresLabel}>Your goals</div>
+										{/* The medal it's got, and the points for the next. */}
 										<div style={styles.goalLine}>
-											<span style={styles.goalText}>{goal}</span>
+											<span style={styles.goalText}>
+												{scoreGoal(course()).got}{' '}
+												<span style={styles.nextGoal}>
+													{scoreGoal(course()).next}
+												</span>
+											</span>
 											<span style={styles.goalIcon}>
-												<MedalArt
-													medal={
-														got(bestMedal(ENDLESS), medal) ? medal : undefined
-													}
-													scale={1}
-												/>
+												<MedalArt medal={bestMedal(course().id)} scale={1} />
 											</span>
 										</div>
-									)}
-								</For>
-							</div>
-						}
-					>
-						{(course) => (
-							<div style={styles.stats}>
-								<div style={styles.scoresLabel}>Your goals</div>
-								{/* The medal it's got, and the points for the next. */}
-								<div style={styles.goalLine}>
-									<span style={styles.goalText}>
-										{scoreGoal(course()).got}{' '}
-										<span style={styles.nextGoal}>
-											{scoreGoal(course()).next}
-										</span>
-									</span>
-									<span style={styles.goalIcon}>
-										<MedalArt medal={bestMedal(course().id)} scale={1} />
-									</span>
-								</div>
-								{/* Its collectables found, and its own hat: a shadow of it
+										{/* Its collectables found, and its own hat: a shadow of it
 								    till they all are. */}
-								<div style={styles.goalLine}>
-									<span style={styles.goalText}>
-										{found(course()).had}/{found(course()).of} Collectables
-									</span>
-									<span style={styles.goalIcon}>
-										<GoalHat
-											course={course()}
-											done={allFound(course())}
-											size={GOAL_ICON}
-										/>
-									</span>
-								</div>
-								{/* Its special goal, if it has one, and its picture: a
-								    shadow of it till it's done. */}
-								<Show when={course().special}>
-									{(special) => (
 										<div style={styles.goalLine}>
-											<span style={styles.goalText}>{special().goal}</span>
+											<span style={styles.goalText}>
+												{found(course()).had}/{found(course()).of} Collectables
+											</span>
 											<span style={styles.goalIcon}>
-												<SpecialGoalArt
-													course={course().id}
-													done={specialDone(course().id)}
+												<GoalHat
+													course={course()}
+													done={allFound(course())}
 													size={GOAL_ICON}
 												/>
 											</span>
 										</div>
-									)}
-								</Show>
+										{/* Its special goal, if it has one, and its picture: a
+								    shadow of it till it's done. */}
+										<Show when={course().special}>
+											{(special) => (
+												<div style={styles.goalLine}>
+													<span style={styles.goalText}>{special().goal}</span>
+													<span style={styles.goalIcon}>
+														<SpecialGoalArt
+															course={course().id}
+															done={specialDone(course().id)}
+															size={GOAL_ICON}
+														/>
+													</span>
+												</div>
+											)}
+										</Show>
+									</div>
+								)}
+							</Show>
+							<TopScores id={props.selected} />
+						</div>
+					}
+				>
+					{/* A minigame: how it's played, and who against. */}
+					{(game) => (
+						<div style={styles.lower}>
+							<div style={styles.stats}>
+								<div style={styles.scoresLabel}>How to play</div>
+								<div style={styles.goalText}>{game().blurb}</div>
+								<div style={styles.nextGoal}>
+									You against {botsFor(game())} bots
+								</div>
 							</div>
-						)}
-					</Show>
-					<TopScores id={props.selected} />
-				</div>
+						</div>
+					)}
+				</Show>
 			</Panel>
 
 			<div style={styles.hint}>

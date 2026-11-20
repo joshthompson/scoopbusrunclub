@@ -684,7 +684,7 @@ function createPadUnder() {
 }
 
 /** The keys that move between the summary's buttons, and which way. */
-const SUMMARY_MOVES: Record<string, number> = {
+export const SUMMARY_MOVES: Record<string, number> = {
 	ArrowLeft: -1,
 	ArrowUp: -1,
 	a: -1,
@@ -839,7 +839,8 @@ function Hud(props: {
 }
 
 /** On-screen buttons, on touch screens only. */
-function TouchControls() {
+/** On a touch screen, the four buttons along the bottom: single player's, and a minigame's on your own. */
+export function TouchControls() {
 	const coarse = touchScreen()
 	const button = (action: Action, label: string, place: JSX.CSSProperties) => (
 		<button

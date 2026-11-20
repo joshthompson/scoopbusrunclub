@@ -34,4 +34,13 @@ export const MEDAL_SCORES: Record<CourseId, MedalPoints | null> = {
 	midnattsloppet: null,
 	'dino-island': null,
 	'rocket-launch': null,
+	// A minigame's arena: never played for points, so no medals.
+	'fruit-kebab': null,
+	'potato-rain': null,
+	'jump-rope': null,
+	'pogo-sticks': null,
+	'iceberg-bump': null,
+	'beach-volleyball': null,
+	'red-light-green-light': null,
+	'memory-dunk': null,
 }

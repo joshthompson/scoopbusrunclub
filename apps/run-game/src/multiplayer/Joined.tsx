@@ -14,6 +14,7 @@ import { createStore, reconcile } from 'solid-js/store'
 import { COURSES } from '../courses'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { NOTHING_HELD, actionOfKey, anyControls } from '../input'
+import { MINIGAMES } from '../minigames'
 import { playMenu, playTune } from '../music/music'
 import type { Playable } from '../runners/playable'
 import { lastRunner } from '../saved/settings'
@@ -23,8 +24,15 @@ import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { MenuBackdrop } from '../ui/MenuBackdrop'
 import { Stage } from '../ui/Stage'
 import { CoursePick } from './CoursePick'
-import { LobbyView, SIDE_PANEL, nextGameMode, nextMode } from './Lobby'
+import {
+	LobbyView,
+	SIDE_PANEL,
+	nextGameMode,
+	nextMode,
+	nextRoundKind,
+} from './Lobby'
 import Mirror from './Mirror'
+import { typing } from './NameDialog'
 import { Podium } from './Podium'
 import { Results } from './Results'
 import {
@@ -35,6 +43,8 @@ import {
 	joiningMessage,
 	lastMode,
 	rememberMode,
+	savePlayerName,
+	savedPlayerName,
 } from './guest'
 import {
 	CODE_LENGTH,
@@ -180,7 +190,10 @@ function InRoom(props: {
 		code: props.code,
 		mode,
 		screen: true,
-		held: () => (menu() ? NOTHING_HELD : anyControls()),
+		// What this computer's Player goes by, saved, as a phone's is.
+		name: savedPlayerName,
+		// Nothing, with the menu open or typing a name.
+		held: () => (menu() || typing() ? NOTHING_HELD : anyControls()),
 	})
 	const { view, gone, ended, reconnecting, start, feed, send } = link
 	const joining = () => joiningMessage(props.code, link)
@@ -233,6 +246,8 @@ function InRoom(props: {
 	const tune = createMemo(() => {
 		const v = view()
 		if (v?.stage !== 'round' && v?.stage !== 'results') return 'menu'
+		const game = MINIGAMES.find((m) => m.name === v.minigame)
+		if (game) return game.tune
 		return COURSES.find((c) => c.name === v.course)?.id ?? 'menu'
 	})
 	createEffect(() => (tune() === 'menu' ? playMenu() : playTune(tune())))
@@ -292,7 +307,8 @@ function InRoom(props: {
 	// mind (or stop it starting). M for how far, G for Scoop or Baby Mode,
 	// Esc to leave.
 	const onKey = (event: KeyboardEvent) => {
-		if (event.repeat) return
+		// Typing a name: its letters aren't the game's keys.
+		if (event.repeat || typing()) return
 		const v = view()
 		if (!v || gone() || ended() || v.full) {
 			if (event.key === 'Escape') leave()
@@ -312,7 +328,14 @@ function InRoom(props: {
 			return
 		}
 		if (v.stage !== 'lobby' && v.stage !== 'starting') return
-		if (event.key === 'Escape') return leave()
+		if (event.key === 'Escape') {
+			// Counting down, started from here: stopped, not the Room left.
+			if (v.stage === 'starting' && v.isStarter) {
+				play('back')
+				return send({ type: 'cancel' })
+			}
+			return leave()
+		}
 		const seat = me()
 		if (!seat) return
 		const starting = v.stage === 'starting'
@@ -323,6 +346,10 @@ function InRoom(props: {
 		if ((event.key === 'g' || event.key === 'G') && v.isStarter && !starting) {
 			play('move')
 			send({ type: 'gameMode', mode: nextGameMode(v.gameMode) })
+		}
+		if ((event.key === 'r' || event.key === 'R') && v.isStarter && !starting) {
+			play('move')
+			send({ type: 'roundKind', kind: nextRoundKind(v.roundKind) })
 		}
 		const action = actionOfKey(event.key)
 		if (action === 'left' || action === 'right') {
@@ -626,12 +653,21 @@ function InRoom(props: {
 										onGameMode={(next) =>
 											send({ type: 'gameMode', mode: next })
 										}
+										onCancel={() => send({ type: 'cancel' })}
+										roundKind={v().roundKind}
+										onRoundKind={(next) =>
+											send({ type: 'roundKind', kind: next })
+										}
 										canStart={r().canStart}
 										startingIn={r().startingIn}
 										waitingFor={r().waitingFor}
 										leaveLabel="← Leave"
 										onLeave={leave}
 										here={(seat) => seat.id === me()?.id}
+										onRename={(_, name) => {
+											savePlayerName(name)
+											link.rename(name)
+										}}
 										you={me()?.id}
 										onStart={startIt}
 										onCycle={(_, by) => cycle(by)}

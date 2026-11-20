@@ -13,7 +13,7 @@ import {
 	BUS_LEASH_MAX,
 	BUS_START_X,
 	CAMERA_LEAD,
-	DAZED_SPEED,
+	COAST_KEEP,
 	DAZED_TICKS,
 	DUCK_HEIGHT,
 	GRAVITY,
@@ -361,16 +361,19 @@ function movePacer(world: World, p: Pacer) {
 		// hurdle, and on under the next if it's close; or now and then down
 		// a hill, for the fun of it.
 		const downhill = slideDownhill(world, p, slope)
-		p.ducking = duckUnder(world, p.x) || downhill
-		if (p.ducking && p.dazed === 0) {
+		// Bounced on: sat down on the ground, dazed, till they're up again.
+		p.ducking = duckUnder(world, p.x) || downhill || p.dazed > 0
+		if (p.dazed > 0) {
+			p.vx *= COAST_KEEP
+			p.vx += hillPull(slope) * PACER_HILL_PULL
+		} else if (p.ducking) {
 			// A slide: hardly slows on the flat, and gathers speed downhill,
 			// as anyone's. Never to a stop, under something.
 			p.vx *= SLIDE_KEEP
 			p.vx += hillPull(slope) * PACER_HILL_PULL * (slope > 0 ? 2 : 1)
 			p.vx = Math.min(RUN_TOP_SPEED, Math.max(PACER_CRAWL, p.vx))
 		} else {
-			const pace = p.dazed > 0 ? DAZED_SPEED : p.pace
-			p.vx += (pace - p.vx) * PACER_GRIP + hillPull(slope) * PACER_HILL_PULL
+			p.vx += (p.pace - p.vx) * PACER_GRIP + hillPull(slope) * PACER_HILL_PULL
 		}
 		// Carried along by a Moving Platform.
 		if (p.on !== undefined)
@@ -830,7 +833,7 @@ function hopAhead(world: World, x: number, feetY: number) {
 	})
 }
 
-/** How long a Player stumbles after another bounces on their head: a little. */
+/** How long a Player stumbles, sat down, after another bounces on their head: a little. */
 export const STOMPED_TICKS = 18
 /** And how long before anyone can bounce on them again. */
 export const STOMPED_GUARD = 60
@@ -841,6 +844,7 @@ function bounceOffHeads(world: World, racer: Racer) {
 	if (
 		b.grounded ||
 		b.vy <= 0 ||
+		!!world.minigame?.out(racer) ||
 		b.carried > 0 ||
 		b.gliding ||
 		b.swimming ||
@@ -876,6 +880,8 @@ function bounceOffHeads(world: World, racer: Racer) {
 		if (
 			other === racer ||
 			other.out ||
+			// Out of a minigame: buried, tripped, their head's not where it was.
+			!!world.minigame?.out(other) ||
 			o.stomped > 0 ||
 			o.mount > 0 ||
 			o.carried > 0 ||
@@ -891,6 +897,8 @@ function bounceOffHeads(world: World, racer: Racer) {
 
 		o.stomped = STOMPED_GUARD
 		o.stumble = Math.max(o.stumble, STOMPED_TICKS)
+		// Sat down on the ground for as long as it lasts.
+		o.knockedDown = Math.max(o.knockedDown, STOMPED_TICKS)
 		o.vx *= 0.5
 		bounceOff(world, racer, head, o.x)
 		return

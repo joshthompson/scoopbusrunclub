@@ -3,6 +3,7 @@ import {
 	type Collectable,
 	courseCollectables,
 } from '../game/collectables'
+import { MINIGAMES } from '../minigames'
 import { COURSES } from './index'
 import type { Course, CourseId } from './types'
 
@@ -20,6 +21,12 @@ const OWN = (() => {
 		for (const c of mine) seen.add(c)
 		own.set(course.id, mine)
 	}
+	// Then each minigame's, had playing it: its arena's, as a course's.
+	for (const { course, collectables } of MINIGAMES) {
+		const mine = collectables.filter((c) => !seen.has(c))
+		for (const c of mine) seen.add(c)
+		own.set(course.id, mine)
+	}
 	// Anything on no course at all has no "Somewhere on..." on the
 	// Collectables screen, and can't be had: a course meant to have it
 	// doesn't.
@@ -34,7 +41,7 @@ export const levelCollectables = (course: Course): Collectable[] =>
 
 /** The course `id` is first found on, if it's on one: see `OWN`. */
 export function collectableCourse(id: Collectable): Course | undefined {
-	for (const course of COURSES)
+	for (const course of [...COURSES, ...MINIGAMES.map((m) => m.course)])
 		if (OWN.get(course.id)?.includes(id)) return course
 	return undefined
 }
@@ -65,7 +72,19 @@ const WHERE: Record<CourseId, string> = {
 	midnattsloppet: 'at',
 	'dino-island': 'on',
 	'rocket-launch': 'on',
+	'fruit-kebab': 'in the',
+	'potato-rain': 'in the',
+	'jump-rope': 'in the',
+	'pogo-sticks': 'in the',
+	'iceberg-bump': 'in the',
+	'beach-volleyball': 'in the',
+	'red-light-green-light': 'in the',
+	'memory-dunk': 'in the',
 }
 
-/** Where on `course` something is: "in Haga", "on The Slopes". */
-export const onCourse = (course: Course) => `${WHERE[course.id]} ${course.name}`
+/**
+ * Where on `course` something is: "in Haga", "on The Slopes"; or in a
+ * minigame, "in the Fruit Kebab minigame".
+ */
+export const onCourse = (course: Course) =>
+	`${WHERE[course.id]} ${course.name}${MINIGAMES.some((m) => m.course.id === course.id) ? ' minigame' : ''}`

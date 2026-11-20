@@ -26,16 +26,25 @@ export function statusText(view: PadView) {
 		case 'ready':
 			return view.stage === 'starting' ? 'Get ready…' : 'Ready!'
 		case 'racing':
-			return view.stage === 'results' ? pts(view.points) : 'Run!'
+			return view.stage === 'results'
+				? pts(view.points)
+				: view.minigame
+					? 'Go go go!'
+					: 'Run!'
 		case 'scooped':
 			return view.place ? `Scooped! ${ordinal(view.place)}${of}` : 'Scooped!'
 		case 'fallen':
 			return view.place ? `Fell! ${ordinal(view.place)}${of}` : 'Fell!'
 		case 'finished': {
+			// A minigame, played: where they came.
+			if (view.minigame)
+				return view.place ? `${ordinal(view.place)}${of}` : 'Done!'
 			const word = view.gameMode === 'baby' ? 'Finished!' : 'Beat the bus!'
 			return view.place ? `${word} ${ordinal(view.place)}${of}` : word
 		}
 		case 'won':
 			return 'You won!'
+		case 'out':
+			return 'Out! Watch on…'
 	}
 }

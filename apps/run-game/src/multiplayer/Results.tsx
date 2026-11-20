@@ -11,8 +11,13 @@ export interface Placing {
 	seatId: string
 	place: number
 	points: number
-	/** `running`: still going when a Round in Baby Mode was called. */
-	how: 'won' | 'finished' | 'scooped' | 'fallen' | 'running'
+	/**
+	 * `running`: still going when a Round in Baby Mode was called. `played`:
+	 * in a minigame, and not its winner.
+	 */
+	how: 'won' | 'finished' | 'scooped' | 'fallen' | 'running' | 'played'
+	/** What they did in a minigame, in a few words: "3 fruit". */
+	note?: string
 }
 
 /**
@@ -46,8 +51,12 @@ export const joiningOf = (seats: Seat[], placings: Placing[]) =>
 const MOVES: Record<string, number> = {
 	ArrowLeft: -1,
 	ArrowUp: -1,
+	a: -1,
+	w: -1,
 	ArrowRight: 1,
 	ArrowDown: 1,
+	d: 1,
+	s: 1,
 }
 
 /**
@@ -146,17 +155,18 @@ export function Results(props: {
 									{(p) => (
 										<span style={styles.how}>
 											{ordinal(p().place)} ·{' '}
-											{p().how === 'won'
-												? 'Last standing'
-												: p().how === 'finished'
-													? props.baby
-														? 'Finished'
-														: 'Beat the bus'
-													: p().how === 'running'
-														? 'Still going'
-														: p().how === 'fallen'
-															? 'Fell'
-															: 'Scooped'}
+											{p().note ??
+												(p().how === 'won'
+													? 'Last standing'
+													: p().how === 'finished'
+														? props.baby
+															? 'Finished'
+															: 'Beat the bus'
+														: p().how === 'running'
+															? 'Still going'
+															: p().how === 'fallen'
+																? 'Fell'
+																: 'Scooped')}
 										</span>
 									)}
 								</Show>

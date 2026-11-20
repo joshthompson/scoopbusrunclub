@@ -1,11 +1,18 @@
-import { For, type JSX, Show, onCleanup } from 'solid-js'
+import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
+import { paintedArt } from '../courses/kit/pixelArt'
 import { play } from '../sfx'
 import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { RunStrip } from '../ui/RunStrip'
 import { nameSize } from '../ui/RunnerStage'
+import { NameDialog, typing } from './NameDialog'
 import { QrCode } from './QrCode'
 import { createLocalPlayers } from './localPlayers'
-import { type GameMode, type RoomMode, padLink } from './protocol'
+import {
+	type GameMode,
+	type RoomMode,
+	type RoundKind,
+	padLink,
+} from './protocol'
 import {
 	type HostRoom,
 	MAX_PLAYERS,
@@ -13,7 +20,29 @@ import {
 	seatLabel,
 	seatPlayable,
 } from './room'
-import { GAME_MODES, ROOM_MODES } from './roomModes'
+import { GAME_MODES, ROOM_MODES, ROUND_KINDS } from './roomModes'
+
+/** A pencil's size, in cells, drawn at 2 px a cell. */
+const PENCIL_CELLS = 9
+
+/**
+ * A pencil, slanted, its point down to the left: lead and bare wood at its
+ * point, yellow along it (shaded on its underside), a metal band, and a pink
+ * eraser. Beside your name in the lobby, to change it.
+ */
+const PENCIL = paintedArt(PENCIL_CELLS, PENCIL_CELLS, (x, y) => {
+	const end = PENCIL_CELLS - 0.5
+	// How far along it from its point, bottom left, and how far off its middle.
+	const along = (x - 0.5 - (y - end)) / 2
+	const across = (x - 0.5 + (y - end)) / 2
+	// Sharpened to a point.
+	if (Math.abs(across) > Math.min(1, along * 0.6 + 0.2)) return undefined
+	if (along < 1) return '#1d1d1d'
+	if (along < 2.5) return '#f2c9a0'
+	if (along < 6) return across > 0.4 ? '#c9971c' : '#ffd23f'
+	if (along < 7) return '#c9d0d8'
+	return '#ef6fb4'
+})
 
 /** How a Room can go, for the Starter to choose: M to go through them, or click. */
 const MODES = ROOM_MODES
@@ -33,6 +62,9 @@ export function Lobby(props: {
 	/** How its Rounds are raced, and choosing it here before anyone's joined. */
 	gameMode: GameMode
 	onGameMode: (mode: GameMode) => void
+	/** What its Rounds are, and choosing it here before anyone's joined. */
+	roundKind: RoundKind
+	onRoundKind: (kind: RoundKind) => void
 	/** Whether the Starter can start it: everyone else who's picked is ready. */
 	canStart: boolean
 	/** Seconds until the first Round, once the Starter's started it. */
@@ -58,13 +90,23 @@ export function Lobby(props: {
 		if (!starter) return props.onGameMode(mode)
 		room.chooseGameModeAs(starter.id, mode)
 	}
+	const chooseRoundKind = (kind: RoundKind) => {
+		const starter = room.starter()
+		if (!starter) return props.onRoundKind(kind)
+		room.chooseRoundKindAs(starter.id, kind)
+	}
 	const coarse = window.matchMedia('(pointer: coarse)').matches
 	const link = padLink(room.code)
 
 	const onKey = (event: KeyboardEvent) => {
+		// Typing a name: its letters aren't the lobby's keys.
+		if (typing()) return
 		if (event.key === 'Escape') {
 			play('back')
-			props.onLeave()
+			// Counting down to the first Round: stopped, not the Room left.
+			const starter = room.starter()
+			if (props.startingIn !== undefined && starter) room.cancelAs(starter.id)
+			else props.onLeave()
 		}
 		// M, for mode: the next one along.
 		if ((event.key === 'm' || event.key === 'M') && choosesHere()) {
@@ -75,6 +117,11 @@ export function Lobby(props: {
 		if ((event.key === 'g' || event.key === 'G') && choosesHere()) {
 			play('move')
 			chooseGameMode(nextGameMode(props.gameMode))
+		}
+		// R, for Rounds: races, minigames, or a mixup.
+		if ((event.key === 'r' || event.key === 'R') && choosesHere()) {
+			play('move')
+			chooseRoundKind(nextRoundKind(props.roundKind))
 		}
 	}
 	window.addEventListener('keydown', onKey)
@@ -89,6 +136,8 @@ export function Lobby(props: {
 			onMode={chooseMode}
 			gameMode={props.gameMode}
 			onGameMode={chooseGameMode}
+			roundKind={props.roundKind}
+			onRoundKind={chooseRoundKind}
 			canStart={props.canStart}
 			startingIn={props.startingIn}
 			waitingFor={props.waitingFor}
@@ -106,6 +155,16 @@ export function Lobby(props: {
 			onReady={(seat) => {
 				play('select')
 				room.setReady(seat.id, !seat.ready)
+			}}
+			onCancel={() => {
+				const starter = room.starter()
+				if (starter) room.cancelAs(starter.id)
+			}}
+			onRename={(seat, name) => {
+				room.update(seat.id, (s) => {
+					s.name = name || undefined
+				})
+				room.tellPhones()
 			}}
 			side={
 				<Panel style={SIDE_PANEL}>
@@ -152,6 +211,12 @@ export const nextGameMode = (mode: GameMode) =>
 		(GAME_MODES.findIndex((m) => m.mode === mode) + 1) % GAME_MODES.length
 	].mode
 
+/** What a Room's Rounds can be after `kind`, for R to go through them. */
+export const nextRoundKind = (kind: RoundKind) =>
+	ROUND_KINDS[
+		(ROUND_KINDS.findIndex((k) => k.mode === kind) + 1) % ROUND_KINDS.length
+	].mode
+
 /** The way a Room can go after `mode`, for M to go through them. */
 export const nextMode = (mode: RoomMode) =>
 	MODES[(MODES.findIndex((m) => m.mode === mode) + 1) % MODES.length].mode
@@ -172,6 +237,8 @@ export function LobbyView(props: {
 	onMode: (mode: RoomMode) => void
 	gameMode: GameMode
 	onGameMode: (mode: GameMode) => void
+	roundKind: RoundKind
+	onRoundKind: (kind: RoundKind) => void
 	canStart: boolean
 	startingIn: number | undefined
 	waitingFor: string
@@ -186,7 +253,17 @@ export function LobbyView(props: {
 	onStart: () => void
 	onCycle: (seat: Seat, by: number) => void
 	onReady: (seat: Seat) => void
+	/** What a Player here goes by, changed: blank, their runner's name. */
+	onRename: (seat: Seat, name: string) => void
+	/** Stopping the countdown to the first Round: here if its Starter is (see `choosesHere`). */
+	onCancel: () => void
 }) {
+	/** Whose name's being changed, in its dialog, if anyone's. */
+	const [naming, setNaming] = createSignal<string>()
+	const namingSeat = () => props.seats.find((s) => s.id === naming())
+	/** Who's in this seat, by their runner's own name: what a blank name is. */
+	const runnerName = (seat: Seat) =>
+		seatPlayable({ ...seat, name: undefined })?.name ?? ''
 	/** Who chooses how it goes, if it's not chosen here: the Starter, wherever they are. */
 	const chosenBy = () => {
 		if (props.choosesHere) return undefined
@@ -232,6 +309,10 @@ export function LobbyView(props: {
 											onStart={props.onStart}
 											onCycle={(by) => props.onCycle(seat(), by)}
 											onReady={() => props.onReady(seat())}
+											onRename={() => {
+												play('select')
+												setNaming(seat().id)
+											}}
 										/>
 									)}
 								</Show>
@@ -240,6 +321,14 @@ export function LobbyView(props: {
 					</div>
 
 					<div style={styles.options}>
+						<OptionPicker
+							caption="What to play"
+							keyName="R"
+							options={ROUND_KINDS}
+							value={props.roundKind}
+							onPick={props.onRoundKind}
+							chosenBy={chosenBy()}
+						/>
 						<OptionPicker
 							caption="How far"
 							keyName="M"
@@ -264,10 +353,35 @@ export function LobbyView(props: {
 							fallback={props.waitingFor}
 						>
 							Starting in {props.startingIn}…
+							{/* Whoever started it, here, can stop it: Esc does too. */}
+							<Show when={props.choosesHere}>
+								<button
+									type="button"
+									style={styles.cancel}
+									onClick={() => {
+										play('back')
+										props.onCancel()
+									}}
+								>
+									Cancel (Esc)
+								</button>
+							</Show>
 						</Show>
 					</div>
 				</div>
 			</div>
+			<Show when={namingSeat()}>
+				{(seat) => (
+					<NameDialog
+						who={`P${props.seats.indexOf(seat()) + 1}`}
+						colour={seat().colour}
+						name={seat().name ?? ''}
+						placeholder={runnerName(seat())}
+						onName={(name) => props.onRename(seat(), name)}
+						onClose={() => setNaming(undefined)}
+					/>
+				)}
+			</Show>
 		</div>
 	)
 }
@@ -384,9 +498,14 @@ function SeatCard(props: {
 	onStart: () => void
 	onCycle: (by: number) => void
 	onReady: () => void
+	/** Opening the dialog to change what they go by. */
+	onRename: () => void
 }) {
 	const runner = () => seatPlayable(props.seat)
 	const local = () => props.here
+	/** Whether they can still change their name here: here, and not ready yet (or, the Starter, not starting). */
+	const canRename = () =>
+		local() && (props.starter ? !props.starting : !props.seat.ready)
 	return (
 		<div
 			style={{
@@ -453,7 +572,19 @@ function SeatCard(props: {
 					'font-size': `${nameSize(runner()?.name ?? '', [20, 16, 13])}px`,
 				}}
 			>
-				{runner()?.name ?? ' '}
+				<span style={styles.cardNameText}>{runner()?.name ?? ' '}</span>
+				<Show when={canRename() && runner()}>
+					<button
+						type="button"
+						class="seat-arrow"
+						aria-label="Change your name"
+						title="Change your name"
+						style={styles.renameButton}
+						onClick={props.onRename}
+					>
+						<img src={PENCIL} alt="" class="pixelated" style={styles.pencil} />
+					</button>
+				</Show>
 			</div>
 			<Show
 				when={!props.seat.lostAt}
@@ -515,7 +646,7 @@ const styles = {
 	/** On the same columns as the cards over them: two each, edge to edge with them. */
 	options: {
 		display: 'grid',
-		'grid-template-columns': 'repeat(4, 1fr)',
+		'grid-template-columns': 'repeat(6, 1fr)',
 		gap: '10px',
 		'margin-top': '12px',
 		'flex-shrink': 0,
@@ -526,9 +657,10 @@ const styles = {
 		'min-width': 0,
 		display: 'flex',
 		'align-items': 'center',
-		gap: '8px',
+		// Three in a row: as little room round its words as will do.
+		gap: '4px',
 		height: '52px',
-		padding: '4px 8px',
+		padding: '4px 5px',
 		'box-sizing': 'border-box',
 		background: 'rgba(15, 31, 41, 0.92)',
 		border: '3px solid white',
@@ -599,11 +731,11 @@ const styles = {
 	},
 	optionLabel: {
 		color: '#ffd23f',
-		'font-size': '18px',
+		'font-size': '15px',
 		'line-height': 1,
 	},
 	optionNote: {
-		'font-size': '12px',
+		'font-size': '10px',
 		'line-height': 1,
 		opacity: 0.8,
 	},
@@ -773,6 +905,27 @@ const styles = {
 		overflow: 'hidden',
 		'line-height': 1,
 	},
+	cardNameText: {
+		'min-width': 0,
+		overflow: 'hidden',
+		'text-overflow': 'ellipsis',
+	},
+	/** Beside their name, to change it: a pencil. */
+	renameButton: {
+		'flex-shrink': 0,
+		'margin-left': '4px',
+		padding: '0 2px',
+		background: 'transparent',
+		color: 'white',
+		border: 'none',
+		'line-height': 0,
+		cursor: 'pointer',
+	},
+	pencil: {
+		display: 'block',
+		width: `${PENCIL_CELLS * 2}px`,
+		height: `${PENCIL_CELLS * 2}px`,
+	},
 	cardState: {
 		display: 'flex',
 		'align-items': 'center',
@@ -796,6 +949,17 @@ const styles = {
 	readyOn: {
 		background: '#ffd23f',
 		color: 'var(--ink)',
+	},
+	cancel: {
+		'margin-left': '12px',
+		padding: '2px 10px 3px',
+		background: 'rgba(15, 31, 41, 0.9)',
+		color: 'white',
+		border: '3px solid white',
+		'font-family': 'var(--font-pixel)',
+		'font-size': '16px',
+		'text-shadow': 'none',
+		'vertical-align': 'middle',
 	},
 	status: {
 		...OUTLINED_FLAT,

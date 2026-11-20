@@ -141,9 +141,9 @@ export function Podium(props: {
 				</For>
 			</div>
 
-			<div style={styles.title}>{props.title} finished!</div>
+			<div style={styles.title}>Finished!</div>
 			<div style={styles.subtitle}>
-				{props.rounds} Round{props.rounds === 1 ? '' : 's'}
+				{props.title} ·{props.rounds} Round{props.rounds === 1 ? '' : 's'}
 				{props.controlsFor ? ' · Run about, and jump on the podium!' : ''}
 			</div>
 

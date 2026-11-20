@@ -12,10 +12,30 @@ import type { Course } from '../courses/types'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { UNDER_LIFT } from '../draw/art/skis'
 import { rideLook } from '../draw/rideLook'
-import { PX_PER_M, RUNNER_SCALE } from '../game/constants'
-import { POPUP_TICKS, onScreen, roundOver, stepWorld } from '../game/step'
-import { type Racer, type RacerEntry, createWorld } from '../game/world'
+import {
+	COUNTDOWN_STEP_TICKS,
+	PX_PER_M,
+	RUNNER_SCALE,
+	TICK_MS,
+} from '../game/constants'
+import {
+	POPUP_TICKS,
+	countdownWord,
+	onScreen,
+	roundOver,
+	stepWorld,
+} from '../game/step'
+import {
+	type Racer,
+	type RacerEntry,
+	type World,
+	createWorld,
+} from '../game/world'
 import { type Controls, touchScreen } from '../input'
+import type { Minigame } from '../minigames'
+import { clock } from '../minigames/clock'
+import { buriedDepth } from '../minigames/potatoRain'
+import type { MinigameRun } from '../minigames/types'
 import { PauseMenu, SOUND_ITEMS } from '../screens/PauseMenu'
 import { RaceStartOverlay, createRaceStart } from '../ui/RaceStart'
 import { Stage } from '../ui/Stage'
@@ -31,6 +51,8 @@ export function Round(props: {
 	course: Course
 	/** Baby Mode: no bus, and nobody's out. */
 	baby?: boolean
+	/** A minigame, played in `course`, its arena, not a race. */
+	minigame?: Minigame
 	number: number
 	/** How many Rounds there are, if it isn't a Backyard Ultra. */
 	of?: number
@@ -61,10 +83,22 @@ export function Round(props: {
 	corner?: JSX.Element
 	/** Reactions on their way up the screen, from whoever's watching. */
 	reactions?: ShownReaction[]
+	/**
+	 * Played on your own, from Single Player, not in a Room: no Round number,
+	 * and its pause menu's way out its own, in place of the lobby and ending
+	 * the Room. And anything else over it: the buttons, on a touch screen.
+	 */
+	solo?: {
+		/** Another go, from the start: under Resume. */
+		restart?: () => void
+		menu: { label: string; choose: () => void }[]
+		over?: JSX.Element
+	}
 }) {
 	const world = createWorld(props.course, props.racers, {
 		round: true,
 		baby: props.baby,
+		minigame: props.minigame,
 	})
 	props.onWorld(world)
 	// Held, the world not moving on, while it's got ready and on its start
@@ -137,6 +171,8 @@ export function Round(props: {
 							world={world}
 							number={props.number}
 							of={props.of}
+							solo={!!props.solo}
+							pills={props.minigame?.pills}
 							onPause={() => pause(true)}
 							corner={props.corner}
 							reactions={props.reactions}
@@ -144,25 +180,41 @@ export function Round(props: {
 						<RaceStartOverlay
 							start={start}
 							title={props.course.name}
-							kicker={`Round ${props.number}${props.of ? ` of ${props.of}` : ''}`}
+							kicker={
+								props.solo
+									? 'Minigame'
+									: `Round ${props.number}${props.of ? ` of ${props.of}` : ''}${props.minigame ? ' · Minigame' : ''}`
+							}
 							prompt={
 								props.starter
 									? `${props.starter.name || `P${props.starter.number}`}: press any key to start`
 									: 'Press Enter to start'
 							}
-						/>
+						>
+							<Show when={props.minigame}>
+								{(minigame) => (
+									<div style={styles.blurb}>{minigame().blurb}</div>
+								)}
+							</Show>
+						</RaceStartOverlay>
 						<Show when={paused()}>
 							<PauseMenu
 								groups={[
-									[{ label: 'Resume', choose: () => pause(false) }],
-									SOUND_ITEMS,
 									[
+										{ label: 'Resume', choose: () => pause(false) },
+										...(props.solo?.restart
+											? [{ label: 'Restart', choose: props.solo.restart }]
+											: []),
+									],
+									SOUND_ITEMS,
+									props.solo?.menu ?? [
 										{ label: 'Back to the lobby', choose: props.onLobby },
 										{ label: 'End the Room', choose: props.onEnd },
 									],
 								]}
 							/>
 						</Show>
+						{props.solo?.over}
 					</>
 				}
 			/>
@@ -184,6 +236,10 @@ export function RoundHud(props: {
 	corner?: JSX.Element
 	/** Reactions on their way up the screen, from whoever's watching. */
 	reactions?: ShownReaction[]
+	/** Played on your own: no Round number, just what it is. */
+	solo?: boolean
+	/** Whether to show each Player's chip: see `Minigame['pills']`. */
+	pills?: boolean
 }) {
 	const { world } = props
 	const size = (px: number) => `${px * (props.textScale ?? 1)}px`
@@ -192,14 +248,18 @@ export function RoundHud(props: {
 	const tag = (racer: Racer) => {
 		// Read the tick, so this keeps up: bodies aren't signals.
 		world.ticks()
-		const height = racer.runner.sprite.height * RUNNER_SCALE
+		// Smaller, drawn far off: their tag down over them, as they are.
+		const scale = racer.body.scale ?? 1
+		const height = racer.runner.sprite.height * RUNNER_SCALE * scale
 		// Over their hat, if it stands up over their head.
-		const rise = hatRise(racer.runner, racer.body.hat, RUNNER_SCALE)
+		const rise = hatRise(racer.runner, racer.body.hat, RUNNER_SCALE) * scale
 		// Up on a camel's back, or a corgi's, or on skis: lifted as they are.
 		const { body } = racer
 		const lift =
 			(body.mount > 0 ? saddle : 0) + (body.board > 0 ? UNDER_LIFT : 0)
-		return onScreen(world, body.x, body.feetY - height - lift - 4 - rise)
+		// Down in the ground, buried in Potato Rain: down with them.
+		const sunk = buriedDepth(racer)
+		return onScreen(world, body.x, body.feetY - height - lift - 4 - rise + sunk)
 	}
 	const left = () => {
 		world.ticks()
@@ -210,6 +270,7 @@ export function RoundHud(props: {
 		world.ticks()
 		if (
 			world.baby ||
+			world.minigame ||
 			world.phase() !== 'running' ||
 			world.busX() >= world.camera()
 		)
@@ -267,6 +328,18 @@ export function RoundHud(props: {
 		return Math.abs(to - was) < 0.01 ? to : was + (to - was) * CORNER_FADE
 	}, 1)
 
+	/** A minigame's clock, stopped where it was once it's decided. */
+	let stoppedAt: number | undefined
+	const timeLeft = (minigame: MinigameRun) => {
+		const left = minigame.ticksLeft()
+		if (!world.order()) {
+			stoppedAt = undefined
+			return left
+		}
+		stoppedAt ??= left
+		return stoppedAt
+	}
+
 	return (
 		<div ref={hud} style={styles.hud}>
 			<div style={styles.topLeft}>
@@ -280,12 +353,48 @@ export function RoundHud(props: {
 				</Show>
 				<div>
 					<div style={{ 'font-size': size(18), opacity: 0.8 }}>
-						Round {props.number}
-						{props.of ? ` of ${props.of}` : ''} · {world.course.name}
+						<Show when={!props.solo} fallback={world.course.name}>
+							Round {props.number}
+							{props.of ? ` of ${props.of}` : ''} · {world.course.name}
+						</Show>
 					</div>
-					<div style={{ 'font-size': size(28), 'margin-top': '4px' }}>
-						{left()} of {world.racers.length} running
-					</div>
+					<Show
+						when={world.minigame}
+						fallback={
+							<div style={{ 'font-size': size(28), 'margin-top': '4px' }}>
+								{left()} of {world.racers.length} running
+							</div>
+						}
+					>
+						{(minigame) => (
+							<>
+								<div style={{ 'font-size': size(28), 'margin-top': '4px' }}>
+									{clock(timeLeft(minigame()))}
+								</div>
+								{/* Each Player's score, in their colour, under the clock. */}
+								<Show when={props.pills !== false}>
+									<div style={{ ...styles.scores, 'font-size': size(15) }}>
+										<For each={world.racers}>
+											{(racer) => (
+												<div
+													style={{
+														...styles.score,
+														background: racer.colour ?? 'var(--ink)',
+														outline: scoreOf(world, minigame(), racer).done
+															? '3px solid #ffd23f'
+															: undefined,
+													}}
+												>
+													{racer.runner.name}{' '}
+													{scoreOf(world, minigame(), racer).chip}
+												</div>
+											)}
+										</For>
+									</div>
+								</Show>
+							</>
+						)}
+					</Show>
 				</div>
 			</div>
 			{/* On a touch screen: with a keyboard, it's Esc or P. */}
@@ -343,6 +452,46 @@ export function RoundHud(props: {
 				/>
 			</Show>
 
+			{/* A minigame's news, big across the screen: "Penguins!". */}
+			<Show when={announcement(world)}>
+				{(words) => (
+					<div
+						style={{
+							...styles.announce,
+							'font-size': size(96),
+							// Wobbling, it's that exciting.
+							transform: `rotate(${Math.sin(world.ticks() / 4) * 4}deg) scale(${1 + 0.06 * Math.sin(world.ticks() / 6)})`,
+						}}
+					>
+						{words()}
+					</div>
+				)}
+			</Show>
+
+			{/*
+			  A minigame's "3, 2, 1, Go!", big in the middle of its arena: a
+			  race has its run director at the start line saying it instead.
+			*/}
+			<Show when={world.minigame && countdownWord(world)}>
+				{(word) => {
+					/** How far through saying it, 0 to 1: each word pops in, and "Go!" fades. */
+					const through = () =>
+						(world.ticks() % COUNTDOWN_STEP_TICKS) / COUNTDOWN_STEP_TICKS
+					return (
+						<div
+							style={{
+								...styles.countdown,
+								'font-size': size(word() === 'Go!' ? 110 : 120),
+								transform: `scale(${1 + 0.5 * (1 - through()) ** 3})`,
+								opacity: word() === 'Go!' ? 1 - through() : 1,
+							}}
+						>
+							{word()}
+						</div>
+					)
+				}}
+			</Show>
+
 			<For each={world.popups()}>
 				{(popup) => {
 					const at = () => onScreen(world, popup.x, popup.y)
@@ -363,6 +512,21 @@ export function RoundHud(props: {
 			</For>
 		</div>
 	)
+}
+
+/**
+ * A Player's score in a minigame, and whether they're done: read with the
+ * tick, so they keep up. Bodies aren't signals.
+ */
+function scoreOf(world: World, minigame: MinigameRun, racer: Racer) {
+	world.ticks()
+	return { chip: minigame.chip(racer), done: minigame.done(racer) }
+}
+
+/** A minigame's news just now, if any: read with the tick, so it keeps up. */
+function announcement(world: World) {
+	world.ticks()
+	return world.minigame?.announce?.()
 }
 
 /** How see-through how to join is, in the corner, with someone under it, and how quickly it fades, a share a tick. */
@@ -443,6 +607,51 @@ const styles = {
 		color: 'white',
 		padding: '6px 10px',
 		'font-size': '20px',
+	},
+	/** A minigame's news, big across the upper middle of the screen. */
+	announce: {
+		position: 'absolute',
+		left: 0,
+		right: 0,
+		top: '22%',
+		'text-align': 'center',
+		color: '#ffd23f',
+		'text-shadow':
+			'5px 0 var(--ink), -5px 0 var(--ink), 0 5px var(--ink), 0 -5px var(--ink), 6px 8px 0 rgba(15, 31, 41, 0.45)',
+		'pointer-events': 'none',
+		animation: 'panel-in 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both',
+	},
+	/** A minigame's countdown, big in the middle of the screen. */
+	countdown: {
+		position: 'absolute',
+		inset: 0,
+		display: 'grid',
+		'place-items': 'center',
+		color: '#ffd23f',
+		'text-shadow':
+			'5px 0 var(--ink), -5px 0 var(--ink), 0 5px var(--ink), 0 -5px var(--ink), 6px 8px 0 rgba(15, 31, 41, 0.45)',
+		'pointer-events': 'none',
+	},
+	/** A minigame's scores, under its clock, as many rows as it takes. */
+	scores: {
+		display: 'flex',
+		'flex-wrap': 'wrap',
+		'max-width': '520px',
+		gap: '6px',
+		'margin-top': '8px',
+		color: 'white',
+		'text-shadow': '1px 1px 0 var(--ink)',
+	},
+	score: {
+		padding: '4px 8px',
+		border: '2px solid white',
+		'white-space': 'nowrap',
+	},
+	blurb: {
+		'font-size': '18px',
+		'max-width': '420px',
+		'text-align': 'center',
+		'line-height': 1.3,
 	},
 	popup: {
 		position: 'absolute',

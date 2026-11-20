@@ -516,13 +516,17 @@ export interface CourseLook {
 	 * The ground's layers, in place of Haga's path and grass: offsets from
 	 * the line everyone runs along, each filled from there on down. Its
 	 * top `smooth`ed, if deep under the path; and given an `edge`, how much
-	 * further down it is at `x` along, its top ragged: bushes, say.
+	 * further down it is at `x` along, its top ragged: bushes, say. Land
+	 * set back behind the path can go on `acrossGaps`, behind the drop, its
+	 * top straight across from one side to the other, down to the backs of
+	 * their paths, where the drop starts: a crater's far side.
 	 */
 	ground?: [
 		offset: number,
 		fill: string,
 		smooth?: boolean,
 		edge?: (x: number) => number,
+		acrossGaps?: boolean,
 	][]
 	/**
 	 * Its Ledges, the steps up it a jump high, drawn as rock: a buttress of
@@ -1199,6 +1203,15 @@ export type CourseId =
 	| 'midnattsloppet'
 	| 'dino-island'
 	| 'rocket-launch'
+	/** Not a course: a minigame's arena, raced on in no Round (see `minigames`). */
+	| 'fruit-kebab'
+	| 'potato-rain'
+	| 'jump-rope'
+	| 'pogo-sticks'
+	| 'iceberg-bump'
+	| 'beach-volleyball'
+	| 'red-light-green-light'
+	| 'memory-dunk'
 
 /**
  * A Portal: a machine that shrinks everyone down, or a sneeze that blows
@@ -1520,6 +1533,8 @@ export interface Course {
 	 */
 	busFloor?: (x: number) => number | undefined
 	/** A haunted house on the course, to run through: see `HauntedHouse`. */
+	/** Icy stretches, `from` to `to` along: slippery, underfoot (see `game/ice`). */
+	ice?: { from: number; to: number }[]
 	haunted?: HauntedHouse
 }
 

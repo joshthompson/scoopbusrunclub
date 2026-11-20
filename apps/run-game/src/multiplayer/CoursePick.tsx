@@ -6,12 +6,12 @@ import {
 	createSignal,
 	onCleanup,
 } from 'solid-js'
-import { COURSES } from '../courses'
 import type { Controls } from '../input'
 import { play } from '../sfx'
 import { CoursePreview } from '../ui/CoursePreview'
 import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
 import { onHover } from '../ui/hover'
+import { PLAYS } from './plays'
 import type { Choosing } from './protocol'
 import { playedNote } from './roomModes'
 
@@ -39,11 +39,13 @@ export function CoursePick(props: {
 	/** Their controls, if they're picking with them here. */
 	controls?: () => Controls
 }) {
-	const count = COURSES.length
-	const wrap = (n: number) => ((n % count) + count) % count
+	/** What can be picked (see `Choosing['pool']`), and where the cursor is along it. */
+	const pool = () => props.choosing.pool
+	const at = () => Math.max(0, pool().indexOf(props.cursor))
 	const move = (by: number) => {
 		play('move')
-		props.onCursor?.(wrap(props.cursor + by))
+		const count = pool().length
+		props.onCursor?.(pool()[(((at() + by) % count) + count) % count])
 	}
 	const pick = (course: number) => {
 		if (!props.onPick) return
@@ -105,35 +107,41 @@ export function CoursePick(props: {
 			<div style={styles.body}>
 				<Panel style={styles.previewPanel}>
 					<div style={styles.window}>
-						<Show when={COURSES[shown()]} keyed>
+						<Show when={PLAYS[shown()]?.course} keyed>
 							{(course) => (
 								<CoursePreview course={course} width={300} height={169} />
 							)}
 						</Show>
 					</div>
-					<div style={styles.previewName}>{COURSES[props.cursor]?.name}</div>
-					<div style={styles.blurb}>{COURSES[props.cursor]?.blurb}</div>
+					<div style={styles.previewName}>
+						{PLAYS[props.cursor]?.course.name}
+					</div>
+					<div style={styles.blurb}>
+						{PLAYS[props.cursor]?.minigame?.blurb ??
+							PLAYS[props.cursor]?.course.blurb}
+					</div>
 				</Panel>
 				<div style={styles.grid}>
-					<For each={COURSES}>
-						{(course, i) => (
+					<For each={pool()}>
+						{(i) => (
 							<button
 								type="button"
 								style={{
 									...styles.card,
-									...(i() === props.cursor ? styles.cardOn : {}),
-									...(played(i()).dim ? styles.cardPlayed : {}),
+									...(i === props.cursor ? styles.cardOn : {}),
+									...(played(i).dim ? styles.cardPlayed : {}),
 									cursor: props.onPick ? 'pointer' : 'default',
 								}}
 								onMouseEnter={
-									props.onPick
-										? onHover(() => props.onCursor?.(i()))
-										: undefined
+									props.onPick ? onHover(() => props.onCursor?.(i)) : undefined
 								}
-								onClick={() => pick(i())}
+								onClick={() => pick(i)}
 							>
-								<span style={styles.cardName}>{course.name}</span>
-								<Show when={played(i()).note}>
+								<span style={styles.cardName}>{PLAYS[i].course.name}</span>
+								<Show when={PLAYS[i].minigame}>
+									<span style={styles.cardNote}>Minigame</span>
+								</Show>
+								<Show when={played(i).note}>
 									{(note) => <span style={styles.cardNote}>{note()}</span>}
 								</Show>
 							</button>

@@ -531,7 +531,20 @@ export function overhear(listener: ((sound: Sound) => void) | undefined) {
 	overheard = listener
 }
 
+/** How many quiet goings-on are under way just now (see `hush`). */
+let hushed = 0
+/** `fn` done without a sound: a minigame's preview, its game played silently. */
+export function hush<T>(fn: () => T): T {
+	hushed++
+	try {
+		return fn()
+	} finally {
+		hushed--
+	}
+}
+
 export function play(sound: Sound) {
+	if (hushed) return
 	overheard?.(sound)
 	// Not while the tab's hidden: held, they'd all play at once on coming back.
 	if (!effectsOn() || document.hidden) return

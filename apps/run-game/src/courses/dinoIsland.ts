@@ -782,6 +782,21 @@ const landEdge = (x: number) =>
 			2,
 	) * 2
 
+/**
+ * The land further back, ragged as anywhere, and on behind the crater, its
+ * far side, falling away across it to the far rim, where there's nothing
+ * behind the path: the skyline, down the far side (see `SKYLINE`).
+ */
+const behindCrater = (x: number) =>
+	landEdge(x) +
+	(x <= CRATER.from
+		? 0
+		: Math.round(
+				(LAND *
+					Math.min(1, (x - CRATER.from) / (CRATER.to - CRATER.from)) ** 1.6) /
+					2,
+			) * 2)
+
 /** A ground layer's `edge` that's only there where `where` says: pushed off down out of sight anywhere else. */
 const only =
 	(where: (x: number) => boolean, edge?: (x: number) => number) =>
@@ -893,8 +908,9 @@ export const dinoIsland: CourseDefinition = {
 		],
 		ground: [
 			// The land further back, the forest floor, its top ragged with
-			// undergrowth: what's set back from the path stands on it.
-			[-PATH_BACK - LAND, 'url(#d-land)', false, landEdge],
+			// undergrowth: what's set back from the path stands on it. On
+			// behind the crater too, its far side, not cut off at its edge.
+			[-PATH_BACK - LAND, 'url(#d-land)', false, behindCrater, true],
 			[
 				-PATH_BACK - LAND,
 				'url(#dino-forest-land)',

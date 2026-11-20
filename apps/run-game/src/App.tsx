@@ -11,6 +11,7 @@ import { COURSES } from './courses'
 import type { Course } from './courses/types'
 import { podiumTests } from './debug'
 import type { Hat } from './game/hats'
+import type { Minigame } from './minigames'
 import { playMenu, playTune, unlockMusic } from './music/music'
 import type { CustomRunner } from './runners/customRunners'
 import type { Playable } from './runners/playable'
@@ -30,6 +31,7 @@ import { InstructionsScreen } from './screens/InstructionsScreen'
 import { MultiPlayerScreen } from './screens/MultiPlayerScreen'
 import { OptionsScreen } from './screens/OptionsScreen'
 import { RunnerEditor } from './screens/RunnerEditor'
+import { SoloMinigame } from './screens/SoloMinigame'
 import { TitleScreen } from './screens/TitleScreen'
 import { MenuBackdrop } from './ui/MenuBackdrop'
 import { Stage } from './ui/Stage'
@@ -56,6 +58,8 @@ type Screen =
 			/** Another go at it: no start screen this time. */
 			restart?: boolean
 	  }
+	/** A minigame on your own, from Single Player: `again`, another go at it, so a new one. */
+	| { kind: 'minigame'; runner: Playable; minigame: Minigame; again?: number }
 	| { kind: 'party' }
 	/** Joined to someone else's Room, from this computer: `code`, if it came with one. */
 	| { kind: 'join'; code?: string }
@@ -103,6 +107,7 @@ export function App(props: {
 	createEffect(() => {
 		const now = screen()
 		if (now.kind === 'play') playTune(now.course.id)
+		else if (now.kind === 'minigame') playTune(now.minigame.tune)
 		else if (now.kind !== 'party' && now.kind !== 'join') playMenu()
 	})
 	// It can only start once something's been pressed or tapped.
@@ -195,6 +200,23 @@ export function App(props: {
 					/>
 				)}
 			</Match>
+			{/* Keyed: another go is a whole new game. */}
+			<Match when={screen().kind === 'minigame' && screen()} keyed>
+				{(now) => {
+					const solo = now as Extract<Screen, { kind: 'minigame' }>
+					return (
+						<SoloMinigame
+							minigame={solo.minigame}
+							runner={solo.runner}
+							onAgain={() =>
+								setScreen({ ...solo, again: (solo.again ?? 0) + 1 })
+							}
+							onBack={() => setScreen({ kind: 'courses', runner: solo.runner })}
+							onMenu={go('title')}
+						/>
+					)
+				}}
+			</Match>
 			<Match when={screen().kind !== 'play'}>
 				<Stage>
 					<MenuBackdrop />
@@ -243,6 +265,14 @@ export function App(props: {
 											runner: (courses() as { runner: Playable }).runner,
 											course,
 											mode: { kind: 'practice' },
+										})
+									}}
+									onMinigame={(minigame) => {
+										rememberRun(`minigame:${minigame.id}`)
+										setScreen({
+											kind: 'minigame',
+											runner: (courses() as { runner: Playable }).runner,
+											minigame,
 										})
 									}}
 									onBack={go('select')}

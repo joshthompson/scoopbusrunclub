@@ -115,6 +115,7 @@ import { DRAWN_FROM } from './groundColumns'
 import { stepHarvester } from './harvester'
 import { HAT_RULES, type Hat, WORN_FIKA, sameHat } from './hats'
 import { hearHouse, stepHaunt } from './haunted'
+import { ICE_COAST_KEEP, ICE_GRIP, ICE_SLIDE, onIce } from './ice'
 import {
 	BELL_UP,
 	JELLYFISH_REACH,
@@ -318,8 +319,10 @@ export function stepWorld(world: World) {
 		soundStalactites(world)
 		for (const racer of world.racers)
 			if (!isHeld(world, racer)) collide(world, racer)
+		// A minigame: its own goings-on, and no bus.
+		world.minigame?.step()
 		startleGeese(world)
-		if (!busHeld(world)) stepBus(world)
+		if (!busHeld(world) && !world.minigame) stepBus(world)
 		// Rocket Launch's aliens' bolts, its cage and its boss; the bus
 		// waiting outside its room.
 		stepSpace(world)
@@ -342,9 +345,10 @@ export function stepWorld(world: World) {
 				...world.pack.map((p) => ({ x: p.x, y: p.feetY })),
 			],
 		)
-	if (world.round) decideRound(world)
+	// A minigame decides its own Round, its arena kept still on the screen.
+	if (world.round && !world.minigame) decideRound(world)
 	// The camera on the Portal going off, if one is; or as usual.
-	if (!portalCamera(world)) {
+	if (!world.minigame && !portalCamera(world)) {
 		if (world.round) frameEveryone(world)
 		else stepCamera(world)
 	}
@@ -592,6 +596,8 @@ function noteDancing(world: World, racer: Racer) {
 	if (!dancing) racer.dancingSince = undefined
 	else racer.dancingSince ??= world.ticks()
 }
+/** How much speed a minigame's winner keeps a tick, off ice: stopping quickly, to dance. */
+const CELEBRATING_KEEP = 0.85
 /** How slow someone has to be going to be stood still, dancing. */
 export const DANCING_STILL = 0.3
 
@@ -811,6 +817,8 @@ function stepRunner(world: World, racer: Racer) {
 		b.vy = 1
 	}
 
+	// On ice, stood still or running against the slide: worked out below, on their feet.
+	b.icePose = undefined
 	if (b.grounded) {
 		b.airBase = undefined
 		// Platforms are flat, and so's a bed.
@@ -821,11 +829,15 @@ function stepRunner(world: World, racer: Racer) {
 		const low = inTunnel(world, b.x, b.feetY)
 		if (!low) b.tunnelSpeed = undefined
 		else b.tunnelSpeed ??= Math.abs(b.vx)
+		// Bounced on: sat down on the ground till they're up again.
+		const knockedDown = b.knockedDown > 0
+		if (knockedDown) b.knockedDown--
 		// On a Slide: sat down sliding, whatever's held.
-		b.ducking = down || low || onSlide(world, b.x)
+		b.ducking = down || low || onSlide(world, b.x) || knockedDown
 		if (b.stumble > 0) b.stumble--
 		if (b.squashed > 0) b.squashed--
-		const canDrive = b.stumble === 0
+		// Won, or done all there is in a minigame: stopped, dancing, whatever's held.
+		const canDrive = b.stumble === 0 && !b.celebrating
 		// Ducking, off a Ride: slid off its back, going as fast as it was.
 		// Not off a mole in the rock, though.
 		if (b.mount > 0 && down && !burrowing(world, b)) b.mount = 0
@@ -836,6 +848,10 @@ function stepRunner(world: World, racer: Racer) {
 			b.facing = 1
 			b.vx +=
 				((rideLook(world.course).speed ?? CORGI_GALLOP) - b.vx) * CORGI_GRIP
+		} else if (knockedDown) {
+			// Sat down, bounced on: coming to a stop, sliding on any ice.
+			b.vx *= onIce(world.course, b.x) ? ICE_COAST_KEEP : COAST_KEEP
+			b.vx += hillPull(slope) * HILL_PULL
 		} else if (b.ducking) {
 			// A slide: hardly slows on the flat, and gathers speed downhill.
 			b.vx *= SLIDE_KEEP
@@ -871,14 +887,30 @@ function stepRunner(world: World, racer: Racer) {
 			const drive = canDrive
 				? Number(right) - Number(left) || (catchUp > 0 ? 1 : 0)
 				: 0
+			// On ice: slow to get going, sliding on, and down any slope.
+			const icy = onIce(world.course, b.x)
 			if (finished) b.vx += (RUN_OFF_SPEED - b.vx) * RUN_GRIP * 2
 			else if (drive) {
 				const target = drive * top
 				// Boosted past top speed the way they're going: let it last.
 				const boosted = b.vx * drive > top
-				b.vx += (target - b.vx) * (boosted ? OVERSPEED_GRIP : RUN_GRIP)
-			} else b.vx *= COAST_KEEP
-			b.vx += hillPull(slope) * HILL_PULL
+				b.vx +=
+					(target - b.vx) *
+					(boosted ? OVERSPEED_GRIP : RUN_GRIP) *
+					(icy ? ICE_GRIP : 1)
+			} else
+				b.vx *= icy
+					? ICE_COAST_KEEP
+					: b.celebrating
+						? CELEBRATING_KEEP
+						: COAST_KEEP
+			// On ice: holding a way, running that way, legs going, whichever
+			// way they're sliding; holding nothing, stood, sliding.
+			if (icy && !finished) {
+				b.icePose = drive ? 'run' : 'stand'
+				if (drive) b.facing = drive > 0 ? 1 : -1
+			}
+			b.vx += hillPull(slope) * HILL_PULL * (icy ? ICE_SLIDE : 1)
 			if (slowTo !== undefined && Math.abs(b.vx) > slowTo) b.vx *= 0.93
 			if (b.squashed > 0 && Math.abs(b.vx) > SQUASHED_TOP_SPEED) b.vx *= 0.95
 			b.vx = slowToDance(racer, b.vx)
@@ -887,7 +919,7 @@ function stepRunner(world: World, racer: Racer) {
 		// Through a long jump's sand: slowed down in it.
 		sandDrag(world, b)
 
-		if (up && !b.wasUp && !low) {
+		if (up && !b.wasUp && !low && !knockedDown && !b.celebrating) {
 			// Off a rope bridge that breaks: one more jump it's taken.
 			if (b.on !== undefined && world.platforms[b.on].rope?.breaks)
 				b.bridgeJumps = (b.bridgeJumps ?? 0) + 1
@@ -968,8 +1000,11 @@ function stepRunner(world: World, racer: Racer) {
 	}
 	if (b.grounded) b.floating = false
 	b.wasUp = up
-	if (b.vx > 0.5) b.facing = 1
-	else if (b.vx < -0.5) b.facing = -1
+	// Facing the way they're going; on ice, the way they're running, or as they were.
+	if (!b.icePose) {
+		if (b.vx > 0.5) b.facing = 1
+		else if (b.vx < -0.5) b.facing = -1
+	}
 
 	const top = topSpeed(world) + catchUp
 	b.vx = grabbed ? 0 : Math.max(-top, Math.min(top, b.vx))

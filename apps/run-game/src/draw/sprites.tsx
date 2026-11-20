@@ -120,6 +120,7 @@ import type {
 	World,
 } from '../game/world'
 import { zombieAt } from '../game/zombies'
+import { buriedDepth } from '../minigames/potatoRain'
 import { bonusRunner } from '../runners/bonus'
 import { customRunners } from '../runners/customRunners'
 import { guests } from '../runners/guests'
@@ -137,6 +138,12 @@ import type { CorgiPose } from './art/corgi'
 import { DRILL_HEIGHT, DRILL_POINT, DRILL_WIDTH } from './art/drill'
 import { DUCK_NOTE_HEIGHT, DUCK_NOTE_WIDTH, duckNote } from './art/duckNote'
 import { fikaPicture } from './art/fika'
+import {
+	FRUIT_ART,
+	type FruitKind,
+	SKEWERED_GAP,
+	SKEWERED_SCALE,
+} from './art/fruit'
 import { GEESE_HEIGHT, geeseReach, geeseWidth, paintGeese } from './art/geese'
 import {
 	FACE_FRONT,
@@ -151,6 +158,7 @@ import {
 	PUMPKINS,
 	PUMPKIN_HEIGHT,
 	PUMPKIN_WIDTH,
+	SWORD_GUARD_DOWN,
 	WORN_HAT_REACH,
 	hatArt,
 	paintHat,
@@ -165,6 +173,7 @@ import {
 } from './art/jellyfish'
 import { KIDS_HEIGHT, KIDS_REACH, kidsPainter, kidsWidth } from './art/kids'
 import { mudReach, paintMud } from './art/mud'
+import { MOUND, MOUND_HEIGHT, MOUND_WIDTH } from './art/potato'
 import { ROADBLOCK, ROADBLOCK_HEIGHT, ROADBLOCK_WIDTH } from './art/roadblock'
 import { FOOTING_REACH, footingPainter, paintTombstone } from './art/scenery'
 import {
@@ -385,12 +394,13 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const dancing = () =>
 		world.ticks() >= 0 &&
 		!!dance &&
-		racer.out === 'finished' &&
+		(racer.out === 'finished' || !!body.celebrating) &&
 		body.grounded &&
 		!body.gliding &&
 		body.mount === 0 &&
 		body.carried === 0 &&
-		Math.abs(body.vx) < DANCING_STILL
+		// Won a minigame: dancing straight away, still sliding to a stop or not.
+		(!!body.celebrating || Math.abs(body.vx) < DANCING_STILL)
 	/** Where in their dance they start: anywhere, so nobody's in step. */
 	const danceStart = Math.floor(Math.random() * (dance?.frames.length ?? 1))
 	let wasDancing = false
@@ -428,11 +438,16 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const standing = () =>
 		world.ticks() >= 0 &&
 		!!stand &&
-		!ducking() &&
-		body.grounded &&
-		body.carried === 0 &&
-		racer.out !== 'scooped' &&
-		Math.abs(body.vx) < STILL_SPEED
+		// Stood still on something, whatever they're doing: a pogo stick;
+		// or on ice, holding nothing, sliding.
+		(!!body.standStill ||
+			body.icePose === 'stand' ||
+			(body.icePose !== 'run' &&
+				!ducking() &&
+				body.grounded &&
+				body.carried === 0 &&
+				racer.out !== 'scooped' &&
+				Math.abs(body.vx) < STILL_SPEED))
 	/**
 	 * Under the sea, swimming: worked out from where they are, so a Remote
 	 * Player's screen draws it too. In their swim frames, or their run
@@ -512,7 +527,15 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			...(dive ? [dive] : []),
 		],
 		init() {
-			const size = () =>
+			/** Drawn smaller, if they're to be: far off, in Red Light, Green Light. */
+			const size = () => {
+				const full = fullSize()
+				const scale = body.scale ?? 1
+				return scale === 1
+					? full
+					: { width: full.width * scale, height: full.height * scale }
+			}
+			const fullSize = () =>
 				// Stood, as tall and wide as a run frame: a custom runner's stand
 				// is one frame of a strip, not a picture of its own.
 				dancing() && dance
@@ -576,9 +599,39 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				)
 				return { ...said, top: said.top + OVER_NAME_TAG }
 			})(),
+			// Potato Rain's heap of earth round anyone buried, wider than them.
+			{
+				left: Math.max(0, (MOUND_WIDTH - runSize.width) / 2),
+				right: Math.max(0, (MOUND_WIDTH - runSize.width) / 2),
+			},
 		),
 		draw({ ctx, drawDefault, image, $, $currentFrame }) {
-			drawDefault()
+			// Knocked into the ground, in Potato Rain: only what's above it
+			// shows, a heap of earth round them where they went in.
+			const sunk = buriedDepth(racer)
+			if (sunk) {
+				const ground = $.height() - sunk
+				ctx.save()
+				ctx.beginPath()
+				ctx.rect(
+					-$.width(),
+					-$.height() * 2,
+					$.width() * 3,
+					ground + $.height() * 2,
+				)
+				ctx.clip()
+				drawDefault()
+				ctx.restore()
+				paintPicture(
+					ctx,
+					image,
+					MOUND,
+					Math.round(($.width() - MOUND_WIDTH) / 2),
+					ground - MOUND_HEIGHT + 4,
+					MOUND_WIDTH,
+					MOUND_HEIGHT,
+				)
+			} else drawDefault()
 			// Their skis or snowboard under their feet, and their hat on their head.
 			const paintWorn = () => {
 				const width = $.width()
@@ -612,13 +665,19 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 					crown: number,
 					paint: (x: number, y: number) => void,
 				) => {
+					// As small as they're drawn, far off.
+					const scale = body.scale ?? 1
+					ctx.save()
 					if (!lying) {
-						paint((head?.x ?? width / 2) - middle, (head?.y ?? 2) - crown)
+						ctx.translate(head?.x ?? width / 2, head?.y ?? 2)
+						ctx.scale(scale, scale)
+						paint(-middle, -crown)
+						ctx.restore()
 						return
 					}
-					ctx.save()
 					ctx.translate(head?.x ?? 2, head?.y ?? height / 2)
 					ctx.rotate(-Math.PI / 2)
+					ctx.scale(scale, scale)
 					paint(-middle, -crown)
 					ctx.restore()
 				}
@@ -651,13 +710,17 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 					}
 					return
 				}
-				onHead(art.middle, art.crown, (x, y) =>
+				onHead(art.middle, art.crown, (x, y) => {
 					paintHat(ctx, image, worn, x, y, {
 						lit: true,
 						whirring: floating(),
 						now,
-					}),
-				)
+					})
+					// Fruit Kebab's sword hat: whatever's skewered on it, slid down
+					// its blade to its guard, one on another.
+					if (worn.kind === 'swordHat')
+						paintSkewered(ctx, image, body.skewered ?? [], x + art.middle, y)
+				})
 			}
 			paintWorn()
 			// Baby Mode's bubble round them; waiting in a Portal, saying so.
@@ -690,11 +753,13 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			setFloating(!!body.floating)
 			$.setX(body.x - width / 2)
 			// Up on a corgi's back, riding one; or on their skis.
+			// Or down in the ground, buried in Potato Rain.
 			$.setY(
 				body.feetY -
 					$.height() -
 					(body.mount > 0 ? saddle : 0) -
-					(body.board > 0 ? UNDER_LIFT : 0),
+					(body.board > 0 ? UNDER_LIFT : 0) +
+					buriedDepth(racer),
 			)
 
 			if (racer.out === 'scooped') {
@@ -722,6 +787,8 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 						: runnerLean(world, body),
 				)
 			}
+			// Tipped over as a minigame says: off balance on a pogo stick, or fallen off it.
+			if (body.tilt !== undefined) $.setRotation(body.tilt)
 			// In a cart: turned with it, sat in it, tipped up the secret line
 			// and round a coaster's loop. Turned about their middle, so that
 			// put where it is turned, their feet on its seat.
@@ -757,9 +824,20 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 							? undefined
 							: 1,
 				)
-				const speed = Math.abs(body.vx)
+				// On ice, running against the slide: legs going, however
+				// slow they're going.
+				const running = body.icePose === 'run'
+				const speed = running
+					? Math.max(4, Math.abs(body.vx))
+					: Math.abs(body.vx)
 				$.setState(
-					body.grounded && !body.board && speed > 0.3 ? 'play' : 'pause',
+					running ||
+						(body.grounded &&
+							!body.board &&
+							speed > 0.3 &&
+							body.icePose !== 'stand')
+						? 'play'
+						: 'pause',
 				)
 				$.setFrameInterval(
 					strideFrameInterval(Math.max(45, 190 - speed * 22), run.length),
@@ -5467,4 +5545,33 @@ const signWraps = (name: string) => name.length > 8 && name.includes(' ')
 function signLetters(name: string) {
 	const longest = Math.max(...name.split(' ').map((word) => word.length))
 	return Math.min(name.length > 8 ? 22 : 32, Math.floor(84 / (longest * 0.36)))
+}
+
+/**
+ * Fruit skewered on a sword hat whose point is at `x`, `top`: down its
+ * blade on its guard, the first at the bottom, each a little smaller than
+ * it flies.
+ */
+function paintSkewered(
+	ctx: CanvasRenderingContext2D,
+	image: DrawPainting['image'],
+	skewered: FruitKind[],
+	x: number,
+	top: number,
+) {
+	skewered.forEach((kind, i) => {
+		const art = FRUIT_ART[kind]
+		const width = Math.round(art.width * SKEWERED_SCALE)
+		const height = Math.round(art.height * SKEWERED_SCALE)
+		const middle = top + SWORD_GUARD_DOWN - (i + 0.5) * SKEWERED_GAP
+		paintPicture(
+			ctx,
+			image,
+			art.src,
+			Math.round(x - width / 2),
+			Math.round(middle - height / 2),
+			width,
+			height,
+		)
+	})
 }

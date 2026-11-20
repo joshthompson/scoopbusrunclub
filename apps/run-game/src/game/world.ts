@@ -1,9 +1,12 @@
 import type { RunnerName } from '@/data/runners'
 import { type Accessor, createSignal } from 'solid-js'
 import type { Boost, Course, Obstacle } from '../courses/types'
+import type { FruitKind } from '../draw/art/fruit'
 import type { BusRide } from '../draw/busRide'
 import { rideLook } from '../draw/rideLook'
 import type { Controls } from '../input'
+import { PLAIN_ARENA } from '../minigames/arena'
+import type { Minigame, MinigameRun } from '../minigames/types'
 import type { Avatar } from '../runners/looks'
 import type { Playable } from '../runners/playable'
 import { dressed } from '../runners/raceShirts'
@@ -169,6 +172,8 @@ export interface Body {
 	secret?: 'in' | 'flung'
 	/** Ticks before another Player can bounce on their head again. */
 	stomped: number
+	/** Ticks left sat down on the ground, bounced on: no running, no jumping, till they're up. */
+	knockedDown: number
 	/** The Platform they're stood on, by its index: on the Ground if none. */
 	on?: number
 	/**
@@ -275,6 +280,32 @@ export interface Body {
 	haunt?: { stage: 'caught' | 'rising'; at: number }
 	/** Killed by its monster, and come back a ghost: Halloween Town's special goal. */
 	ghost?: boolean
+	/** Fruit Kebab: the fruit skewered on their sword, the first at the bottom. */
+	skewered?: FruitKind[]
+	/**
+	 * Done all there is to do in a minigame (see `MinigameRun['done']`):
+	 * stood still, they dance, as over the line.
+	 */
+	celebrating?: boolean
+	/**
+	 * Potato Rain: hit by a potato, and knocked into the ground up to the
+	 * waist, stuck there, from this race tick on (see `minigames/potatoRain`).
+	 */
+	buriedAt?: number
+	/** Jump Rope: tripped by the rope, sat down out of it, from this race tick on. */
+	trippedAt?: number
+	/** Drawn stood up straight, whatever they're doing: on a pogo stick, say. */
+	standStill?: boolean
+	/** Drawn tipped this far, in degrees, clockwise, about their middle: a minigame's say. */
+	tilt?: number
+	/** Drawn at this share of their size: small, far off, in Red Light, Green Light. Full size, if not said. */
+	scale?: number
+	/**
+	 * On their feet on ice (see `game/ice`): `stand`, holding nothing, stood
+	 * up, sliding; or `run`, holding a way, running that way, legs going,
+	 * whichever way they're sliding.
+	 */
+	icePose?: 'stand' | 'run'
 }
 
 /**
@@ -549,6 +580,16 @@ export interface WorldOptions {
 	 * past the Gap), and anyone left behind is carried along faster.
 	 */
 	baby?: boolean
+	/**
+	 * A Round that's a minigame, not a race: played in its arena, the camera
+	 * kept still on it, no bus and nobody else about, and decided by it.
+	 */
+	minigame?: Minigame
+	/**
+	 * Only a preview, on the menu: played by bots, silently (see `hush`),
+	 * and nothing in it counts, so nothing's collected by it.
+	 */
+	preview?: boolean
 }
 
 /** Where the bus is in Baby Mode: parked well out of the way, off the course. */
@@ -579,6 +620,7 @@ export function startingBody(terrain: Terrain, x: number): Body {
 		gliding: false,
 		carried: 0,
 		stomped: 0,
+		knockedDown: 0,
 		dropping: 0,
 		floor: terrain.groundY(x),
 		board: 0,
@@ -606,7 +648,13 @@ export function createWorld(
 	entries: RacerEntry[],
 	options: WorldOptions = {},
 ) {
-	const { startScore = 0, round = false, baby = false } = options
+	const {
+		startScore = 0,
+		round = false,
+		baby = false,
+		minigame,
+		preview = false,
+	} = options
 	const terrain: Terrain = course.terrain
 	const racers: Racer[] = entries.map(({ hat, ...entry }, i) => ({
 		...entry,
@@ -670,7 +718,7 @@ export function createWorld(
 
 	const body = racers[0].body
 	const bus: Bus = {
-		frontX: baby ? BABY_BUS_PARKED : BUS_START_X,
+		frontX: baby || minigame ? BABY_BUS_PARKED : BUS_START_X,
 		speed: 0,
 		scooping: 0,
 		leash: START_X - BUS_START_X,
@@ -747,6 +795,10 @@ export function createWorld(
 		round,
 		/** Baby Mode: see `WorldOptions`. */
 		baby: round && baby,
+		/** Only a preview, on the menu: see `WorldOptions`. */
+		preview,
+		/** The minigame being played, if it's one: see `WorldOptions`. Set once it's made. */
+		minigame: undefined as MinigameRun | undefined,
 		runDirector,
 		terrain,
 		body,
@@ -791,7 +843,11 @@ export function createWorld(
 		/** Everyone else on the path. Plain state, like the body. */
 		pack: [] as Pacer[],
 		/** At most this many of them: in a Round, fewer the more Players there are. */
-		packSize: round ? Math.max(0, PACK_SIZE - racers.length) : PACK_SIZE,
+		packSize: minigame
+			? 0
+			: round
+				? Math.max(0, PACK_SIZE - racers.length)
+				: PACK_SIZE,
 		/** Who's next to join the pack, and when. */
 		packState: { nextId: 0, nextJoin: 0 },
 		metres,
@@ -888,6 +944,13 @@ export function createWorld(
 		),
 	}
 	lineUp(world)
+	if (minigame) {
+		// Kept still on the arena, from the first tick.
+		const arena = minigame.arena ?? PLAIN_ARENA
+		world.setCamera(arena.left)
+		world.setCameraY(arena.cameraY)
+		world.minigame = minigame.start(world)
+	}
 	return world
 }
 

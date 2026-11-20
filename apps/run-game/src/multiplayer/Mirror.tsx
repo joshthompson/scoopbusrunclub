@@ -1,5 +1,4 @@
 import { type JSX, createSignal } from 'solid-js'
-import { COURSES } from '../courses'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { hatCode, hatFromCode } from '../game/hats'
@@ -17,6 +16,7 @@ import {
 	createWorld,
 } from '../game/world'
 import { NOTHING_HELD } from '../input'
+import { minigameById } from '../minigames'
 import { bonusRunner } from '../runners/bonus'
 import { guests } from '../runners/guests'
 import { DEFAULT_AVATAR } from '../runners/looks'
@@ -29,6 +29,7 @@ import {
 import { SKELETON_SPRITE } from '../runners/skeleton'
 import { play } from '../sfx'
 import { RoundHud } from './Round'
+import { PLAYS } from './plays'
 import {
 	HAT_FLAG,
 	type PacerIntro,
@@ -132,7 +133,8 @@ export default function Mirror(props: {
 	textScale?: number
 }) {
 	const { start, feed } = props
-	const course = COURSES.find((l) => l.id === start.course) ?? COURSES[0]
+	const course = (PLAYS.find((p) => p.course.id === start.course) ?? PLAYS[0])
+		.course
 	const world = createWorld(
 		course,
 		start.racers.map((intro) => ({
@@ -142,7 +144,11 @@ export default function Mirror(props: {
 			colour: intro.colour,
 			number: intro.number,
 		})),
-		{ round: true, baby: start.baby },
+		{
+			round: true,
+			baby: start.baby,
+			minigame: minigameById(start.minigame),
+		},
 	)
 	/** Reactions on their way up the screen, as the Host last sent them. */
 	const [reactions, setReactions] = createSignal<ShownReaction[]>([])
@@ -214,6 +220,8 @@ export default function Mirror(props: {
 				),
 			}
 		} else world.portal = undefined
+		// A minigame's own goings-on: Fruit Kebab's fruit, and what's skewered.
+		if (a.minigame) world.minigame?.apply(a.minigame, b.minigame, share)
 		world.trippedAt = a.trippedAt
 		world.harvesterAt = a.harvesterAt
 		// Rocket Launch's bolts, on from where they were, and its boss and cage.
@@ -249,6 +257,13 @@ export default function Mirror(props: {
 			// Floating back in a bubble, in Baby Mode: only that they are, to
 			// draw it.
 			body.bubble = flags & RACER_FLAGS.bubble ? FLOATING : undefined
+			// On ice: stood, sliding, or running against it.
+			body.icePose =
+				flags & RACER_FLAGS.iceStand
+					? 'stand'
+					: flags & RACER_FLAGS.iceRun
+						? 'run'
+						: undefined
 			// Knocked off since the last frame, or swapped: flying.
 			const hat = Math.floor(flags / HAT_FLAG)
 			if (body.hat && hatCode(body.hat) !== hat)
@@ -471,6 +486,7 @@ export default function Mirror(props: {
 							world={world}
 							number={start.round}
 							reactions={reactions()}
+							pills={minigameById(start.minigame)?.pills}
 							// Small on a phone: everything on it bigger.
 							textScale={props.textScale ?? Math.min(2.2, 0.9 / scale())}
 						/>

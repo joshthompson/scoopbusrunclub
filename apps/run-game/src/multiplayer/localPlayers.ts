@@ -9,9 +9,13 @@ import {
 	keyboardControls,
 } from '../input'
 import { play } from '../sfx'
+import { typing } from './NameDialog'
 import type { RoomMode } from './protocol'
 import { type HostRoom, type Seat, localCharacters } from './room'
 import { ROOM_MODES } from './roomModes'
+
+/** Every action held: what's taken as held while someone's typing. */
+const ALL_HELD: Controls = { left: true, right: true, up: true, down: true }
 
 /**
  * Local Players in the lobby: anyone at the Host's keyboard or gamepads
@@ -124,6 +128,13 @@ export function createLocalPlayers(
 		const seatOf = (id: string) => room.seats.find((s) => s.id === id)
 
 		for (const half of ['wasd', 'arrows'] as const) {
+			// Typing a name: its letters aren't anyone's keys. As if everything
+			// were held, so nothing still down once it's done (the Enter that
+			// saved it) is a press till it's let go and pressed again.
+			if (typing()) {
+				before.set(half, ALL_HELD)
+				continue
+			}
 			const held = keyboardControls(half)()
 			// Enter takes the arrows' seat too: it's next to them.
 			if (half === 'arrows') held.up ||= keyDown('Enter')

@@ -17,12 +17,14 @@ import { playVersion, tuneAlong } from '../music/music'
 import { dressedIn, inRaceShirt } from '../runners/raceShirts'
 import { FrameMeter, showFrameMeter } from './FrameMeter'
 import { createLongJump } from './LongJump'
+import { createArenaSet } from './arenaSets'
 import {
 	BEHIND_TYPES,
 	OVER_TYPES,
 	createBackdrop,
 	createWeather,
 } from './backdropControllers'
+import { createBeachVolleyball } from './beachVolleyball'
 import { createBoars } from './boars'
 import { createCoaster } from './coaster'
 import { createDeepWater } from './deepWater'
@@ -38,15 +40,22 @@ import {
 import { createFollowers } from './followers'
 import { createFootballSprite } from './football'
 import { createCaveCover, createSeaFront } from './frontControllers'
+import { createFruitKebab } from './fruitKebab'
 import { createGiantMouth } from './giantMouth'
 import { createHarvester } from './harvester'
 import { createHauntedHouse } from './hauntedHouse'
 import { createHerds } from './herds'
+import { createIcebergBump } from './icebergBump'
+import { createJumpRope } from './jumpRope'
 import { createLava } from './lava'
+import { createMemoryDunk } from './memoryDunk'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPyro, createSearchlights, createSmoke } from './nightRace'
 import { createOrgans } from './organs'
+import { createPogoSticks } from './pogoSticks'
 import { createPortalFx } from './portalFx'
+import { createPotatoRain } from './potatoRain'
+import { createRedLightGreenLight } from './redLightGreenLight'
 import { createRiver, createRiverFront } from './river'
 import { createRocket } from './rocketLaunch'
 import { ScreenWashes, pictureStyle } from './screenFilters'
@@ -208,17 +217,23 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createOrgans(world),
 				// A haunted house's bats, window, monster and grave.
 				...createHauntedHouse(world),
-				// Just ahead of the runner, so they toe the line rather than stand on it.
-				...createBanner(world, START_X + HITBOX_HALF_WIDTH + 4, 'START'),
-				createParkrunSign(world, START_X - 190),
-				// Across the way back, at the far left, for anyone going the wrong way.
-				createRoadblock(world),
-				...createKmSigns(world),
-				...createWarnings(world),
-				// A running track's long jump pit, near the finish.
-				...createLongJump(world),
-				...createBanner(world, world.terrain.finishX, 'FINISH'),
-				createRunDirector(world),
+				// A race's start and finish, and who's counting everyone down: not
+				// in a minigame's arena, which is nothing but path.
+				...(world.minigame
+					? createMinigame(world)
+					: [
+							// Just ahead of the runner, so they toe the line rather than stand on it.
+							...createBanner(world, START_X + HITBOX_HALF_WIDTH + 4, 'START'),
+							createParkrunSign(world, START_X - 190),
+							// Across the way back, at the far left, for anyone going the wrong way.
+							createRoadblock(world),
+							...createKmSigns(world),
+							...createWarnings(world),
+							// A running track's long jump pit, near the finish.
+							...createLongJump(world),
+							...createBanner(world, world.terrain.finishX, 'FINISH'),
+							createRunDirector(world),
+						]),
 				// Whoever's hiding on the course, waiting to be found.
 				...createFound(world),
 				...createPlatforms(world),
@@ -310,6 +325,36 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 		)
 	window.raceScene = scene
 	return scene
+}
+
+/** A minigame's own goings-on, drawn: whichever it is. */
+function createMinigame(world: World) {
+	// Its set: what's round its arena, so it's somewhere.
+	return [...createArenaSet(world), ...createMinigameItself(world)]
+}
+
+/** What's going on in a minigame, drawn: its cannons and fruit, its potatoes. */
+function createMinigameItself(world: World) {
+	switch (world.minigame?.id) {
+		case 'fruit-kebab':
+			return createFruitKebab(world)
+		case 'potato-rain':
+			return createPotatoRain(world)
+		case 'jump-rope':
+			return createJumpRope(world)
+		case 'pogo-sticks':
+			return createPogoSticks(world)
+		case 'iceberg-bump':
+			return createIcebergBump(world)
+		case 'beach-volleyball':
+			return createBeachVolleyball(world)
+		case 'red-light-green-light':
+			return createRedLightGreenLight(world)
+		case 'memory-dunk':
+			return createMemoryDunk(world)
+		default:
+			return []
+	}
 }
 
 /** The scene's camera put where the world's is: see `createRaceScene`. */

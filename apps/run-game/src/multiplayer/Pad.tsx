@@ -45,11 +45,18 @@ import {
 	type PauseItem,
 	type Reaction,
 	type RoomMode,
+	type RoundKind,
 	cleanCode,
 	cleanPlayerName,
 } from './protocol'
 import { ReactionBar } from './reactions'
-import { GAME_MODES, ROOM_MODES, playedNote, roomModeInfo } from './roomModes'
+import {
+	GAME_MODES,
+	ROOM_MODES,
+	ROUND_KINDS,
+	playedNote,
+	roomModeInfo,
+} from './roomModes'
 import { statusText } from './status'
 import { keepScreenAwake } from './wakeLock'
 
@@ -716,6 +723,10 @@ function Controller(props: {
 												navigator.vibrate?.(8)
 												send({ type: 'gameMode', mode })
 											}}
+											onRoundKind={(kind) => {
+												navigator.vibrate?.(8)
+												send({ type: 'roundKind', kind })
+											}}
 											onStart={() => {
 												navigator.vibrate?.(15)
 												send({ type: 'start' })
@@ -882,6 +893,21 @@ function Controller(props: {
 							</Show>
 						</Show>
 
+						{/* Counting down to the first Round: its Starter can stop it. */}
+						<Show when={v().stage === 'starting' && v().isStarter}>
+							<div style={styles.starting}>
+								<button
+									type="button"
+									style={styles.smallButton}
+									onClick={() => {
+										navigator.vibrate?.(8)
+										send({ type: 'cancel' })
+									}}
+								>
+									Cancel the start
+								</button>
+							</div>
+						</Show>
 						<Show when={v().waitingForStarter}>
 							{(number) => (
 								<div style={styles.starting}>
@@ -953,6 +979,7 @@ function LobbyScreen(props: {
 	onReady: (ready: boolean) => void
 	onRoomMode: (mode: RoomMode) => void
 	onGameMode: (mode: GameMode) => void
+	onRoundKind: (kind: RoundKind) => void
 	onStart: () => void
 	onLeave: () => void
 }) {
@@ -1019,6 +1046,7 @@ function LobbyScreen(props: {
 								starter={starter()}
 								onMode={props.onRoomMode}
 								onGameMode={props.onGameMode}
+								onRoundKind={props.onRoundKind}
 							/>
 						)}
 					</Show>
@@ -1063,7 +1091,7 @@ function LobbyScreen(props: {
 								disabled={!starter().canStart}
 								onClick={props.onStart}
 							>
-								Start the race
+								{starter().roundKind === 'races' ? 'Start the race' : 'Start'}
 							</button>
 							<div style={styles.footerNote}>
 								{starter().canStart ? 'Everyone’s ready' : starter().why}
@@ -1200,9 +1228,36 @@ function Starter(props: {
 	starter: NonNullable<PadView['starter']>
 	onMode: (mode: RoomMode) => void
 	onGameMode: (mode: GameMode) => void
+	onRoundKind: (kind: RoundKind) => void
 }) {
 	return (
 		<>
+			<div style={styles.sectionTitle}>What to play?</div>
+			<div style={styles.modeList}>
+				<For each={ROUND_KINDS}>
+					{(k) => {
+						const on = () => props.starter.roundKind === k.mode
+						return (
+							<button
+								type="button"
+								aria-pressed={on()}
+								style={{ ...styles.modeCard, ...(on() ? styles.readyOn : {}) }}
+								onClick={() => !on() && props.onRoundKind(k.mode)}
+							>
+								<span style={styles.modeMark}>
+									<Show when={on()}>
+										<span style={styles.modeDot} />
+									</Show>
+								</span>
+								<span style={styles.modeWords}>
+									<span style={styles.modeLabel}>{k.label}</span>
+									<span style={styles.modeAbout}>{k.about}</span>
+								</span>
+							</button>
+						)
+					}}
+				</For>
+			</div>
 			<div style={styles.sectionTitle}>How to race?</div>
 			<div style={styles.modeList}>
 				<For each={GAME_MODES}>
@@ -1356,10 +1411,11 @@ function ChoosingScreen(props: {
 			<Show when={props.choosing.you && props.choosing.courses}>
 				{(courses) => (
 					<div style={styles.courseList}>
-						<For each={courses()}>
-							{(name, i) => {
-								const played = () => playedNote(props.choosing.played, i())
-								const mine = () => props.choosing.picked === i()
+						<For each={props.choosing.pool}>
+							{(i) => {
+								const name = courses()[i]
+								const played = () => playedNote(props.choosing.played, i)
+								const mine = () => props.choosing.picked === i
 								return (
 									<button
 										type="button"
@@ -1368,7 +1424,7 @@ function ChoosingScreen(props: {
 											...(played().dim && !mine() ? { opacity: 0.6 } : {}),
 											...(mine() ? styles.coursePicked : {}),
 										}}
-										onClick={() => props.onPick(i())}
+										onClick={() => props.onPick(i)}
 									>
 										{name}
 										<Show when={mine() ? '✓ Picked' : played().note}>

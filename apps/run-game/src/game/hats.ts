@@ -39,6 +39,9 @@ import type { FikaItem } from './fika'
  *   everyone thrown out of Rocket Launch's rocket, not a pickup
  * - `antennae`: alien deely-boppers on a headband, high up in Rocket
  *   Launch's alien base
+ * - `swordHat`: a skullcap with a long sword sticking straight up out of
+ *   it: put on everyone playing Fruit Kebab, the minigame, for skewering
+ *   fruit on (see `minigames/fruitKebab`), not a pickup
  */
 export type HatKind =
 	| 'pumpkin'
@@ -63,6 +66,8 @@ export type HatKind =
 	| 'snorkel'
 	| 'spaceHelmet'
 	| 'antennae'
+	| 'swordHat'
+	| 'bobbleHatBlue'
 
 /** A hat someone's wearing: a Pumpkin by its carving, 1 to 5. */
 export interface Hat {
@@ -70,8 +75,14 @@ export interface Hat {
 	carving?: number
 }
 
-/** The hats that are a Boost of their own, to run into: not a Pumpkin, nor fika. */
-export type PickupHat = Exclude<HatKind, 'pumpkin' | 'captain' | 'spaceHelmet'>
+/**
+ * The hats that are a Boost of their own, to run into, and so collectables:
+ * not a Pumpkin, nor fika. And the sword hat, had playing Fruit Kebab.
+ */
+export type PickupHat = Exclude<
+	HatKind,
+	'pumpkin' | 'captain' | 'spaceHelmet' | 'bobbleHatBlue'
+>
 
 export interface HatRules {
 	/** How much faster than top speed it keeps you, while it's on. */
@@ -126,12 +137,15 @@ export const HAT_RULES: Record<HatKind, HatRules> = {
 	topHat: PLAIN,
 	flyingHelmet: PLAIN,
 	bobbleHat: PLAIN,
+	// Beach Volleyball's blue team's, as the red team wear the red one.
+	bobbleHatBlue: PLAIN,
 	headMirror: { ...PLAIN, germProof: true },
 	discoBall: PLAIN,
 	jazzHat: PLAIN,
 	snorkel: PLAIN,
 	spaceHelmet: PLAIN,
 	antennae: PLAIN,
+	swordHat: PLAIN,
 }
 
 /** Fika that's a hat too, put on as it's had: the captain's hat, off the ferry's roof. */
@@ -166,6 +180,7 @@ const CODED: HatKind[] = [
 	'snorkel',
 	'spaceHelmet',
 	'antennae',
+	'swordHat',
 ]
 /** How many carvings a Pumpkin can have: its codes. */
 const CARVINGS = 5

@@ -1,4 +1,4 @@
-import type { GameMode, RoomMode } from './protocol'
+import type { GameMode, RoomMode, RoundKind } from './protocol'
 
 /** One way a Room can go, as the lobby and the Starter's phone offer it. */
 export interface RoomModeInfo {
@@ -111,3 +111,37 @@ export function playedNote(played: number[], course: number) {
 					: undefined
 	return { note, dim: times > fewest }
 }
+
+/** What a Room's Rounds can be, as the lobby and the Starter's phone offer it. */
+export interface RoundKindInfo {
+	mode: RoundKind
+	label: string
+	/** What it's like, in a few words, on the big screen. */
+	note: string
+	/** What it's like, for the Starter choosing on their phone. */
+	about: string
+}
+
+export const ROUND_KINDS: RoundKindInfo[] = [
+	{
+		mode: 'races',
+		label: 'Races',
+		note: 'Courses, raced',
+		about: 'Every Round a course, raced',
+	},
+	{
+		mode: 'minigames',
+		label: 'Minigames',
+		note: 'One-screen games',
+		about: 'Every Round a minigame: no racing, all on one screen',
+	},
+	{
+		mode: 'mixup',
+		label: 'Mixup',
+		note: 'A race, then a minigame',
+		about: 'A race, then a minigame, then a race, and so on',
+	},
+]
+
+export const roundKindInfo = (kind: RoundKind) =>
+	ROUND_KINDS.find((k) => k.mode === kind) ?? ROUND_KINDS[0]

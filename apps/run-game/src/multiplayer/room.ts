@@ -33,6 +33,7 @@ import {
 	type RoomMode,
 	type RoomStage,
 	type RoomView,
+	type RoundKind,
 	cleanPlayerName,
 } from './protocol'
 
@@ -153,6 +154,8 @@ export function createRoom(code: string) {
 	/** A Round on its start screen: its Starter's Player number (see `PadView`). */
 	const [waitingForStarter, setWaitingForStarter] = createSignal<number>()
 	const [course, setCourse] = createSignal('')
+	/** The Round on, or just had, if it's a minigame: its name, for phones. */
+	const [minigame, setMinigame] = createSignal<string>()
 	/** How each seat's doing in the Round, for their phone: the Party says. */
 	let statusOf: (
 		seat: Seat,
@@ -163,11 +166,13 @@ export function createRoom(code: string) {
 	let lobby: () => {
 		roomMode: RoomMode
 		gameMode: GameMode
+		roundKind: RoundKind
 		canStart: boolean
 		why: string
 	} = () => ({
 		roomMode: 'backyard',
 		gameMode: 'scoop',
+		roundKind: 'races',
 		canStart: false,
 		why: '',
 	})
@@ -177,6 +182,7 @@ export function createRoom(code: string) {
 		cancel: () => void
 		roomMode: (mode: RoomMode) => void
 		gameMode: (mode: GameMode) => void
+		roundKind: (kind: RoundKind) => void
 		/** Calling a Backyard Ultra, between Rounds. */
 		finish: () => void
 		/** Leaving the Podium for the lobby. */
@@ -192,6 +198,7 @@ export function createRoom(code: string) {
 		cancel: () => {},
 		roomMode: () => {},
 		gameMode: () => {},
+		roundKind: () => {},
 		finish: () => {},
 		lobby: () => {},
 		next: () => {},
@@ -363,6 +370,10 @@ export function createRoom(code: string) {
 	const chooseGameModeAs = (id: string, mode: GameMode) => {
 		if (isStarter(id)) onStarter.gameMode(mode)
 	}
+	/** `id` choosing what its Rounds are: only the Starter can. */
+	const chooseRoundKindAs = (id: string, kind: RoundKind) => {
+		if (isStarter(id)) onStarter.roundKind(kind)
+	}
 	/** `id` calling a Backyard Ultra between Rounds: only the Starter can. */
 	const finishAs = (id: string) => {
 		if (isStarter(id)) onStarter.finish()
@@ -440,6 +451,7 @@ export function createRoom(code: string) {
 		if (message.type === 'cancel') cancelAs(seat.id)
 		if (message.type === 'roomMode') chooseModeAs(seat.id, message.mode)
 		if (message.type === 'gameMode') chooseGameModeAs(seat.id, message.mode)
+		if (message.type === 'roundKind') chooseRoundKindAs(seat.id, message.kind)
 		// Missed the start of the Round: sent it again, and caught up.
 		if (message.type === 'resync') onWatch(peer)
 		if (message.type === 'finish') finishAs(seat.id)
@@ -491,6 +503,7 @@ export function createRoom(code: string) {
 		course: course(),
 		roomMode: lobby().roomMode,
 		gameMode: lobby().gameMode,
+		roundKind: lobby().roundKind,
 		isStarter: false,
 		...progress(),
 	})
@@ -534,6 +547,8 @@ export function createRoom(code: string) {
 			course: course(),
 			roomMode: lobby().roomMode,
 			gameMode: lobby().gameMode,
+			roundKind: lobby().roundKind,
+			...(minigame() ? { minigame: minigame() } : {}),
 			isStarter: starter() === seat,
 			...progress(),
 			...(starter() === seat && stage() === 'round'
@@ -632,6 +647,7 @@ export function createRoom(code: string) {
 		},
 		course,
 		setCourse,
+		setMinigame,
 		taken,
 		addSeat,
 		removeSeat,
@@ -665,6 +681,7 @@ export function createRoom(code: string) {
 		cancelAs,
 		chooseModeAs,
 		chooseGameModeAs,
+		chooseRoundKindAs,
 		finishAs,
 		lobbyAs,
 		nextAs,

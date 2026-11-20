@@ -170,6 +170,8 @@ export function scatteredItems(world: View, scattering: Scattering) {
 	const from = (START_X - 1300 - VIEW_WIDTH * CAMERA_LEAD) * parallax - 100
 	const to = (world.terrain.finishX + 500) * parallax + VIEW_WIDTH + 100
 	const items: { piece: Piece; x: number; bottom: number }[] = []
+	// Nothing to dot about: a minigame's arena, say.
+	if (!pieces.length) return items
 	for (let x = from; x < to; x += gap[0] + random() * (gap[1] - gap[0])) {
 		const piece = pieces[Math.floor(random() * pieces.length)]
 		items.push({
@@ -1030,12 +1032,48 @@ export function Ground(props: { world: View }) {
 		smoothed = tops.map((_, i) => smoothedTop(tops, i))
 		return smoothed
 	}
+	/**
+	 * The tops across each Gap too, straight across from one side's to the
+	 * other's; and down there, where the drop starts, at the backs of their
+	 * paths: for land behind it (see `CourseLook['ground']`).
+	 */
+	let bridged: { tops: (number | undefined)[]; under: number[] } | undefined
+	const bridgeGaps = () => {
+		if (bridged) return bridged
+		const across = [...tops]
+		const under = tops.map(() => VIEW_HEIGHT)
+		for (let i = 0; i < across.length; ) {
+			if (across[i] !== undefined) {
+				i++
+				continue
+			}
+			let j = i
+			while (j < across.length && across[j] === undefined) j++
+			const from = across[i - 1]
+			const to = across[j]
+			if (from !== undefined && to !== undefined)
+				for (let k = i; k < j; k++) {
+					const top =
+						Math.round((from + ((to - from) * (k - i + 1)) / (j - i + 1)) / 2) *
+						2
+					across[k] = top
+					under[k] = top - PATH_BACK
+				}
+			i = j
+		}
+		bridged = { tops: across, under }
+		return bridged
+	}
 	const outline = (
 		offset: number,
 		smooth = false,
 		edge?: (x: number) => number,
+		acrossGaps = false,
 	) => {
-		const along = smooth ? smoothTops() : tops
+		const along = acrossGaps ? bridgeGaps().tops : smooth ? smoothTops() : tops
+		/** Where it stops, down each column: over a Gap, where the drop starts. */
+		const bottom = (i: number) =>
+			acrossGaps && tops[i] === undefined ? bridgeGaps().under[i] : bottoms[i]
 		/** Its top in column `i`: ragged, if it has an edge. */
 		const top = (i: number) =>
 			(along[i] ?? 0) +
@@ -1050,12 +1088,12 @@ export function Ground(props: { world: View }) {
 			for (const i of run) d += ` V${top(i)} H${(i + 1) * STEP}`
 			for (let k = run.length - 1; k >= 0; k--) {
 				const i = run[k]
-				d += ` V${Math.max(top(i), bottoms[i])} H${i * STEP}`
+				d += ` V${Math.max(top(i), bottom(i))} H${i * STEP}`
 			}
 			d += ' Z'
 			run = []
 		}
-		tops.forEach((top, i) => {
+		along.forEach((top, i) => {
 			if (top === undefined) flush()
 			else run.push(i)
 		})
@@ -1438,8 +1476,8 @@ export function Ground(props: { world: View }) {
 					)}
 				</Show>
 				<For each={layers}>
-					{([offset, fill, smooth, edge]) => (
-						<path d={outline(offset, smooth, edge)} fill={fill} />
+					{([offset, fill, smooth, edge, acrossGaps]) => (
+						<path d={outline(offset, smooth, edge, acrossGaps)} fill={fill} />
 					)}
 				</For>
 				{/* Its Ledges, drawn as rock. */}

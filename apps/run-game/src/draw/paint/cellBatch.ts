@@ -45,3 +45,10 @@ export function cellBatch(ctx: CanvasRenderingContext2D) {
 		},
 	}
 }
+
+/**
+ * A colour, `#rrggbb`, as see-through as `alpha` says: for a batch, which
+ * takes its see-through-ness from its colours, not from `globalAlpha`.
+ */
+export const seeThrough = (hex: string, alpha: number) =>
+	`rgba(${Number.parseInt(hex.slice(1, 3), 16)}, ${Number.parseInt(hex.slice(3, 5), 16)}, ${Number.parseInt(hex.slice(5, 7), 16)}, ${alpha.toFixed(3)})`

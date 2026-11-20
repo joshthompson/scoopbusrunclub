@@ -1,4 +1,5 @@
 import type { Phase } from '../game/world'
+import type { MinigameFrame } from '../minigames/types'
 import type { CustomRunner } from '../runners/customRunners'
 import type { Avatar } from '../runners/looks'
 import type { Sound } from '../sfx'
@@ -95,6 +96,15 @@ export type RoomMode = 'parkrun' | 'half' | 'marathon' | 'backyard' | 'pick'
  */
 export type GameMode = 'scoop' | 'baby'
 
+/**
+ * What its Rounds are, as its Starter chooses in the lobby too:
+ * - `races`: courses, raced
+ * - `minigames`: minigames, each played in its arena (see `minigames`),
+ *   any that are for too many Players left out
+ * - `mixup`: a race, then a minigame, and so on
+ */
+export type RoundKind = 'races' | 'minigames' | 'mixup'
+
 /** Phone → Host, on the `pad` action. Its controls go on `input`, as packed bits. */
 export type PadMessage =
 	/**
@@ -122,6 +132,8 @@ export type PadMessage =
 	| { type: 'roomMode'; mode: RoomMode }
 	/** The Starter, choosing how its Rounds are raced. */
 	| { type: 'gameMode'; mode: GameMode }
+	/** The Starter, choosing what its Rounds are: races, minigames, or both. */
+	| { type: 'roundKind'; kind: RoundKind }
 	/**
 	 * Playing remotely, and there's a Round on that this phone's not been
 	 * sent the start of, or has lost: sent again, please.
@@ -210,6 +222,11 @@ export interface Choosing {
 	cursor: number
 	/** How many times each course has been raced this go, by its index. */
 	played: number[]
+	/**
+	 * Which can be picked, by index (see `PLAYS`): races, minigames, or
+	 * both, as the Room's set; no minigame that's for fewer Players.
+	 */
+	pool: number[]
 }
 
 /**
@@ -243,6 +260,8 @@ export type PlayerStatus =
 	| 'fallen'
 	| 'finished'
 	| 'won'
+	/** Out of a minigame, still being played: buried, in Potato Rain. */
+	| 'out'
 
 /** Host → Phone, on the `view` action: everything its screen shows, but the race. */
 export interface PadView {
@@ -283,6 +302,8 @@ export interface PadView {
 	of?: number
 	/** Their Standings. */
 	points: number
+	/** The Round on, or just had, if it's a minigame: its name. */
+	minigame?: string
 	paused: boolean
 	/**
 	 * A Round on its start screen, held till its Starter presses anything: the
@@ -293,6 +314,7 @@ export interface PadView {
 	/** How the Room's set to go, and how its Rounds are raced, for everyone to see. */
 	roomMode: RoomMode
 	gameMode: GameMode
+	roundKind: RoundKind
 	/** Whether they're the Starter, whatever the stage. */
 	isStarter: boolean
 	/** Which Round the Room's on, or just had, and out of how many, unless it's a Backyard Ultra. */
@@ -305,6 +327,7 @@ export interface PadView {
 	starter?: {
 		roomMode: RoomMode
 		gameMode: GameMode
+		roundKind: RoundKind
 		canStart: boolean
 		why: string
 	}
@@ -384,6 +407,8 @@ export interface RaceStart {
 	round: number
 	/** Raced in Baby Mode: no bus. */
 	baby?: boolean
+	/** A minigame, not a race: its id, `course` its arena. */
+	minigame?: string
 	/** The course's id. */
 	course: string
 	racers: RacerIntro[]
@@ -426,9 +451,13 @@ export const RACER_FLAGS = {
 	ghost: 512,
 	/** Fallen, in Baby Mode, and floating back in a bubble. */
 	bubble: 1024,
+	/** On ice, stood still, sliding (see `Body['icePose']`). */
+	iceStand: 2048,
+	/** On ice, running, whichever way they're sliding. */
+	iceRun: 4096,
 }
 /** The hat a racer's wearing, as its `hatCode`, is the flags over this. */
-export const HAT_FLAG = 2048
+export const HAT_FLAG = 8192
 /**
  * [id, x, feetY, vx, flags (1 grounded, 2 scooped, 4 gliding, 8 ducking,
  * 16 being shrunk), dazed, spin (or being shrunk, how far into it: never
@@ -587,6 +616,8 @@ export interface RaceFrame {
 		cage: [number, number] | 0,
 		boom: number,
 	]
+	/** A minigame's own goings-on, if it's one (see `MinigameFrame`). */
+	minigame?: MinigameFrame
 	/** When a bad mushroom was last eaten, if one has been: see `trippedAt`. */
 	trippedAt?: number
 	/** When the course's harvester started on its tree, if it has: see `harvesterAt`. */

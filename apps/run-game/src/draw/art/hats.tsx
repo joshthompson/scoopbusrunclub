@@ -2,6 +2,7 @@ import type { DrawPainting } from 'scoopjs'
 import { type JSX, Show } from 'solid-js'
 import {
 	type PixelRect,
+	letterArt,
 	paintedArt,
 	pixelArt,
 } from '../../courses/kit/pixelArt'
@@ -17,6 +18,17 @@ import { paintPicture } from '../paint/picture'
  */
 
 const CELL = 2
+
+/**
+ * The sword hat's blade (see `SWORD_HAT`): how many cells long it is, under
+ * its point; and so, in px, how far its point is over the top of the head
+ * (`SWORD_TIP_OVER_HEAD`), and how far down from its point fruit stops,
+ * sliding down onto its guard (`SWORD_GUARD_DOWN`). For the physics too.
+ */
+const SWORD_BLADE_ROWS = 26
+export const SWORD_GUARD_DOWN = (SWORD_BLADE_ROWS + 1) * CELL
+/** Its guard, two rows; its grip, three; and its cap's top row, over the crown. */
+export const SWORD_TIP_OVER_HEAD = SWORD_GUARD_DOWN + (2 + 3 + 1) * CELL
 
 /** A hat's picture, and where on it the top of a head goes. */
 export interface HatArt {
@@ -386,6 +398,25 @@ const BOBBLE_HAT = cells(
 		[3, 0, 2, 2, '#ffffff'],
 		[2, 2, 4, 1, '#d23a3a'],
 		[1, 3, 6, 1, '#d23a3a'],
+		[3, 3, 1, 1, '#ffffff'],
+		[5, 3, 1, 1, '#ffffff'],
+		[1, 4, 6, 2, '#f2f2f2'],
+		[2, 4, 1, 2, '#d8d8d8'],
+		[4, 4, 1, 2, '#d8d8d8'],
+		[6, 4, 1, 2, '#d8d8d8'],
+	],
+	4,
+	4,
+)
+
+/** The bobble hat in blue: Beach Volleyball's blue team's, the red team in the red one. */
+const BOBBLE_HAT_BLUE = cells(
+	8,
+	7,
+	[
+		[3, 0, 2, 2, '#ffffff'],
+		[2, 2, 4, 1, '#3a62d2'],
+		[1, 3, 6, 1, '#3a62d2'],
 		[3, 3, 1, 1, '#ffffff'],
 		[5, 3, 1, 1, '#ffffff'],
 		[1, 4, 6, 2, '#f2f2f2'],
@@ -899,6 +930,44 @@ const ANTENNAE = cells(
 	6,
 )
 
+/**
+ * The sword hat, Fruit Kebab's: a red skullcap, a dark band round it, and a
+ * long sword stuck straight up out of its top, hilt and all, its point up,
+ * for fruit to be skewered on. They slide down its blade to its guard.
+ */
+const SWORD_ROWS = [
+	'.....W.....',
+	...Array.from({ length: SWORD_BLADE_ROWS }, () => '....WSL....'),
+	'.GGGGGGGGG.',
+	'..gGGGGGg..',
+	'....BbB....',
+	'....BbB....',
+	'....BbB....',
+	'...RRRRR...',
+	'..RRrRRRR..',
+	'.RRRRRRRRR.',
+	'.KKKKKKKKK.',
+]
+const SWORD_HAT: HatArt = {
+	src: letterArt(SWORD_ROWS, {
+		W: '#ffffff',
+		S: '#c8d0d8',
+		L: '#8a95a1',
+		G: '#e8b52c',
+		g: '#a87a12',
+		B: '#5a3418',
+		b: '#7a4a26',
+		R: '#d8342c',
+		r: '#f47a70',
+		K: '#2b2b2b',
+	}),
+	width: SWORD_ROWS[0].length * CELL,
+	height: SWORD_ROWS.length * CELL,
+	// Its cap down over the top of the head: its point that far over it.
+	crown: SWORD_TIP_OVER_HEAD,
+	middle: (SWORD_ROWS[0].length / 2) * CELL,
+}
+
 const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	miner: MINER,
 	captain: CAPTAIN,
@@ -915,11 +984,13 @@ const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
 	topHat: TOP_HAT,
 	flyingHelmet: FLYING_HELMET,
 	bobbleHat: BOBBLE_HAT,
+	bobbleHatBlue: BOBBLE_HAT_BLUE,
 	headMirror: HEAD_MIRROR,
 	discoBall: DISCO_BALL,
 	snorkel: SNORKEL,
 	spaceHelmet: SPACE_HELMET,
 	antennae: ANTENNAE,
+	swordHat: SWORD_HAT,
 	// Its flames still, as a picture: on a head, they flicker (see `paintHat`).
 	jazzHat: {
 		src: JAZZ_HAT.frames[0],
