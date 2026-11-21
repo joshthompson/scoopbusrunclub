@@ -125,6 +125,7 @@ mixpanel.init(MIXPANEL_TOKEN, {
 | `graph_option_changed` | A checkbox under the member graph | `graph_option` (`personal_bests`, `course_personal_bests`, `other_celebrations`, `walks_filtered`), `is_enabled` | `components/GraphSVG.tsx` |
 | `graph_club_added` / `graph_club_removed` | A club is added to or removed from the largest clubs graph | `club_name` | `components/LargestClubsGraph.tsx` |
 | `graph_clubs_reset` | The largest clubs graph is reset | none | `components/LargestClubsGraph.tsx` |
+| `projection_window_changed` | The projection slider on the largest clubs page is let go | `projection_weeks` | `pages/LargestClubsPage.tsx` |
 | `table_sorted` | A sortable table column is clicked | `sort_column`, `sort_direction` | `components/ui/Table.tsx` |
 | `connection_selected` | A pair is picked on the connections page | `first_member_name`, `second_member_name`, `selection_source` (`graph`, `table`) | `pages/ConnectionsPage.tsx` |
 | `connection_member_pinned` | A member is pinned on the connections graph | `member_name` | `pages/ConnectionsPage.tsx` |

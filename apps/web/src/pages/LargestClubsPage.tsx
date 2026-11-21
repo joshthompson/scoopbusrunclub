@@ -3,18 +3,16 @@ import { LargestClubsGraph } from '@/components/LargestClubsGraph'
 import { DirtBlock } from '@/components/ui/DirtBlock'
 import { FieldBlock } from '@/components/ui/FieldBlock'
 import { Table } from '@/components/ui/Table'
+import { track } from '@/utils/analytics'
 import {
 	RATE_WINDOW_WEEKS,
 	averageWeeklyEvents,
+	projectLargestClubs,
 	weeksBetween,
 } from '@shared/largest-clubs-rate'
 import { css } from '@style/css'
 import { Show, createMemo, createResource, createSignal } from 'solid-js'
-import {
-	type LargestClubSnapshot,
-	fetchAllLargestClubs,
-	fetchLargestClubs,
-} from '../utils/api'
+import { type LargestClubSnapshot, fetchAllLargestClubs } from '../utils/api'
 import { SCOOP_BUS_CLUB_NAME, largestClubMessage } from '../utils/largestClubs'
 
 /**
@@ -23,7 +21,11 @@ import { SCOOP_BUS_CLUB_NAME, largestClubMessage } from '../utils/largestClubs'
  * tooltip names the week actually being compared against, and says how far back
  * it is when that isn't seven days.
  */
-function buildColumns(week: string | null, previousWeek: string | null) {
+function buildColumns(
+	week: string | null,
+	previousWeek: string | null,
+	windowWeeks: number,
+) {
 	let changeInfo = 'In brackets: change since the previous snapshot'
 	if (week && previousWeek) {
 		const weeks = Math.round(weeksBetween(previousWeek, week))
@@ -38,12 +40,15 @@ function buildColumns(week: string | null, previousWeek: string | null) {
 		{ id: 'name', title: 'Club', sortable: true },
 		{ id: 'members', title: 'Members', info: changeInfo, sortable: true },
 		{ id: 'runs', title: 'Runs', info: changeInfo, sortable: true },
-		// The window comes from the same constant the projection uses, so the
-		// tooltip can't drift from the maths behind the column.
+		// The window is the same one the projection uses, so the tooltip can't
+		// drift from the maths behind the column.
 		{
 			id: 'rate',
 			title: 'Avg/week',
-			info: `Average over the last ${RATE_WINDOW_WEEKS} weeks`,
+			info:
+				windowWeeks === 1
+					? 'Average over the last week'
+					: `Average over the last ${windowWeeks} weeks`,
 			sortable: true,
 		},
 	]
@@ -164,9 +169,33 @@ function totalCell(total: number, change: number | null) {
  */
 export function LargestClubsPage() {
 	const [snapshots] = createResource(fetchAllLargestClubs)
-	const [summary] = createResource(fetchLargestClubs)
 
-	const message = () => largestClubMessage(summary())
+	/**
+	 * The longest rate window the snapshots can fill: the weeks between the first
+	 * snapshot and the latest. It grows by one with every weekly snapshot.
+	 */
+	const maxWindowWeeks = createMemo(() => {
+		const weeks = (snapshots() ?? []).map((snapshot) => snapshot.week)
+		if (weeks.length === 0) return 1
+		const first = weeks.reduce((a, b) => (b < a ? b : a))
+		const last = weeks.reduce((a, b) => (b > a ? b : a))
+		return Math.max(1, Math.round(weeksBetween(first, last)))
+	})
+
+	/** How many weeks the reader wants the projection and Avg/week to cover. */
+	const [chosenWindowWeeks, setChosenWindowWeeks] =
+		createSignal(RATE_WINDOW_WEEKS)
+	const windowWeeks = () => Math.min(chosenWindowWeeks(), maxWindowWeeks())
+
+	/**
+	 * Projected here rather than fetched, so it follows the slider. At the default
+	 * window it's the same maths and the same answer as the homepage's summary.
+	 */
+	const message = createMemo(() => {
+		const data = snapshots()
+		if (!data) return null
+		return largestClubMessage(projectLargestClubs(data, windowWeeks()))
+	})
 
 	const [sortKey, setSortKey] = createSignal<SortKey>('rank')
 	const [sortDir, setSortDir] = createSignal<SortDir>('asc')
@@ -232,7 +261,11 @@ export function LargestClubsPage() {
 				change: changeSincePrevious(history.get(snapshot.name) ?? [], week),
 				// The same function the projection uses, over the same window — the
 				// column's tooltip promises as much.
-				rate: averageWeeklyEvents(history.get(snapshot.name) ?? [], week),
+				rate: averageWeeklyEvents(
+					history.get(snapshot.name) ?? [],
+					week,
+					windowWeeks(),
+				),
 			}))
 
 		return { week, previousWeek, standings }
@@ -274,6 +307,38 @@ export function LargestClubsPage() {
 				<Show when={message()}>
 					<p class={styles.message}>{message()}</p>
 				</Show>
+				{/* Below two weeks of history there's only one window to pick. */}
+				<Show when={maxWindowWeeks() > 1}>
+					<label class={styles.window}>
+						<span>
+							Projected from the last{' '}
+							<strong class={styles.windowWeeks}>
+								{windowWeeks() === 1 ? 'week' : `${windowWeeks()} weeks`}
+							</strong>
+						</span>
+						<input
+							type="range"
+							min="1"
+							max={maxWindowWeeks()}
+							step="1"
+							value={windowWeeks()}
+							class={styles.windowSlider}
+							style={{
+								'--fill': `${(windowWeeks() - 1) / (maxWindowWeeks() - 1)}`,
+								'--ticks': `${maxWindowWeeks() - 1}`,
+							}}
+							onInput={(event) =>
+								setChosenWindowWeeks(Number(event.currentTarget.value))
+							}
+							// On release, not on every step of the drag.
+							onChange={(event) =>
+								track('projection_window_changed', {
+									projection_weeks: Number(event.currentTarget.value),
+								})
+							}
+						/>
+					</label>
+				</Show>
 				<Show
 					when={!snapshots.loading}
 					fallback={<div class={styles.loading}>Loading...</div>}
@@ -290,7 +355,11 @@ export function LargestClubsPage() {
 						{(week) => <p class={styles.week}>Snapshot taken {week()}</p>}
 					</Show>
 					<Table
-						columns={buildColumns(latest().week, latest().previousWeek)}
+						columns={buildColumns(
+							latest().week,
+							latest().previousWeek,
+							windowWeeks(),
+						)}
 						data={rows()}
 						empty="No snapshots have been taken yet."
 						sortKey={sortKey()}
@@ -316,6 +385,81 @@ const styles = {
 	message: css({
 		mb: '1rem',
 		textAlign: 'center',
+	}),
+	window: css({
+		display: 'flex',
+		flexDirection: 'column',
+		alignItems: 'center',
+		gap: '0.25rem',
+		mb: '1rem',
+		fontSize: '0.8rem',
+	}),
+	windowWeeks: css({
+		fontFamily: '"Jersey 10", sans-serif',
+		fontSize: '1.4rem',
+		fontWeight: 'normal',
+		lineHeight: 1,
+	}),
+	/**
+	 * A chunky pixel track: hard-edged fill up to the thumb, a notch for every
+	 * week, and a square wooden block for a thumb — the same dirt palette and
+	 * notched corners as the checkboxes and the replay scrubber.
+	 */
+	windowSlider: css({
+		'--thumb': '18px',
+		width: '100%',
+		maxWidth: '320px',
+		height: '14px',
+		appearance: 'none',
+		cursor: 'pointer',
+		border: '2px solid var(--dirt-darker-brown)',
+		borderRadius: '3px',
+		cornerShape: 'notch',
+		// The fill stops at the thumb's centre, which sits half a thumb in from
+		// each end of the track.
+		background: `
+			repeating-linear-gradient(
+				to right,
+				transparent 0 calc((100% - var(--thumb)) / var(--ticks) - 2px),
+				var(--overlay-black-30) 0 calc((100% - var(--thumb)) / var(--ticks))
+			) calc(var(--thumb) / 2 + 1px) 0 / calc(100% - var(--thumb)) 100% no-repeat,
+			linear-gradient(
+				to right,
+				var(--dirt-dark-brown) 0 calc(var(--thumb) / 2 + var(--fill) * (100% - var(--thumb))),
+				var(--dirt-parchment) 0
+			)
+		`,
+		outline: 'none',
+		'&::-webkit-slider-thumb': {
+			appearance: 'none',
+			width: 'var(--thumb)',
+			height: '24px',
+			boxSizing: 'border-box',
+			background: 'var(--dirt-control)',
+			border: '2px solid var(--dirt-control-dark)',
+			borderRadius: '2px',
+			cornerShape: 'notch',
+			boxShadow: 'inset 0 -4px 0 var(--dirt-control-dark)',
+			cursor: 'grab',
+		},
+		'&::-moz-range-thumb': {
+			width: 'var(--thumb)',
+			height: '24px',
+			boxSizing: 'border-box',
+			background: 'var(--dirt-control)',
+			border: '2px solid var(--dirt-control-dark)',
+			borderRadius: '2px',
+			cornerShape: 'notch',
+			boxShadow: 'inset 0 -4px 0 var(--dirt-control-dark)',
+			cursor: 'grab',
+		},
+		'&::-moz-range-track': {
+			background: 'transparent',
+		},
+		_focusVisible: {
+			outline: '2px solid var(--dirt-darker-brown)',
+			outlineOffset: '3px',
+		},
 	}),
 	week: css({
 		fontSize: '0.8rem',

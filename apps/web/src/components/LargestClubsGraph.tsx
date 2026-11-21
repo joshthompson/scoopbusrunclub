@@ -40,6 +40,8 @@ const LABEL_FONT_SIZE = '13'
 /** Black outline drawn behind the coloured label text, so it reads on any line. */
 const LABEL_OUTLINE_WIDTH = '3'
 const MAX_LABEL_CHARS = 18
+/** Size of the "+N new members" labels over the points. */
+const GAIN_FONT_SIZE = '10'
 /**
  * Below this width the name gutter would leave almost no room to plot, so the
  * names move into a legend underneath instead.
@@ -61,6 +63,8 @@ interface ClubSeries {
 	path: string
 	/** The last point with data, where the name label is anchored. */
 	lastPoint: GraphPoint | null
+	/** Points where the club gained members since its previous snapshot. */
+	memberGains: { point: GraphPoint; gain: number }[]
 }
 
 function truncate(name: string): string {
@@ -92,13 +96,21 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 		),
 	)
 
-	/** Runs per club per week, and each club's most recent total. */
+	/** Runs and members per club per week, and each club's most recent total. */
 	const clubIndex = createMemo(() => {
-		const byClub = new Map<string, Map<string, number>>()
+		const byClub = new Map<
+			string,
+			Map<string, { events: number; members: number }>
+		>()
 		const latestByClub = new Map<string, { week: string; events: number }>()
 		for (const snapshot of props.snapshots) {
-			const weekMap = byClub.get(snapshot.name) ?? new Map<string, number>()
-			weekMap.set(snapshot.week, snapshot.events)
+			const weekMap =
+				byClub.get(snapshot.name) ??
+				new Map<string, { events: number; members: number }>()
+			weekMap.set(snapshot.week, {
+				events: snapshot.events,
+				members: snapshot.members,
+			})
 			byClub.set(snapshot.name, weekMap)
 
 			const latest = latestByClub.get(snapshot.name)
@@ -198,7 +210,7 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 		let maxEvents = Number.NEGATIVE_INFINITY
 		for (const name of chosen) {
 			for (const week of allWeeks) {
-				const events = byClub.get(name)?.get(week)
+				const events = byClub.get(name)?.get(week)?.events
 				if (events === undefined) continue
 				minEvents = Math.min(minEvents, events)
 				maxEvents = Math.max(maxEvents, events)
@@ -243,13 +255,27 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 			const isScoopBus = name === SCOOP_BUS_CLUB_NAME
 			const color = colors.get(name) ?? SERIES_COLORS[0]
 
-			const values = allWeeks.map((week) => byClub.get(name)?.get(week) ?? null)
+			const weekData = allWeeks.map((week) => byClub.get(name)?.get(week))
+			const values = weekData.map((week) => week?.events ?? null)
 			const points = values.map((value, i) =>
 				value === null ? null : { x: toX(i), y: toY(value) },
 			)
 
 			let lastPoint: GraphPoint | null = null
 			for (const point of points) if (point) lastPoint = point
+
+			// New members, measured against the club's previous snapshot — a missed
+			// week folds its gain into the next one rather than losing it.
+			const memberGains: ClubSeries['memberGains'] = []
+			let previousMembers: number | null = null
+			weekData.forEach((week, i) => {
+				const point = points[i]
+				if (!week || !point) return
+				if (previousMembers !== null && week.members > previousMembers) {
+					memberGains.push({ point, gain: week.members - previousMembers })
+				}
+				previousMembers = week.members
+			})
 
 			return {
 				name,
@@ -260,6 +286,7 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 				points,
 				path: buildLinePath(points),
 				lastPoint,
+				memberGains,
 			}
 		})
 
@@ -282,6 +309,10 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 		const weeksPer100px = (allWeeks.length / Math.max(1, plotW)) * 100
 		const pointSize = weeksPer100px < 8 ? 7 : weeksPer100px < 16 ? 5 : 0
 		const lineWidth = weeksPer100px < 16 ? 3 : 2
+		// The gain labels sit on the points, so they go when the points do —
+		// past that they'd be a smear of overlapping numbers.
+		const showMemberGains =
+			pointSize > 0 && series.some((s) => s.memberGains.length > 0)
 
 		return {
 			geometry,
@@ -294,6 +325,7 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 			verticalLines,
 			pointSize,
 			lineWidth,
+			showMemberGains,
 		}
 	})
 
@@ -398,6 +430,33 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 													/>
 												)}
 											</Show>
+										)}
+									</For>
+								)}
+							</For>
+						</Show>
+
+						{/* "+N" new members above the points where a club grew */}
+						<Show when={data().showMemberGains}>
+							<For each={data().series}>
+								{(series) => (
+									<For each={series.memberGains}>
+										{(gain) => (
+											<text
+												x={gain.point.x}
+												y={gain.point.y - data().pointSize / 2 - 4}
+												fill={series.color}
+												stroke="var(--color-black)"
+												stroke-width={LABEL_OUTLINE_WIDTH}
+												stroke-linejoin="round"
+												paint-order="stroke"
+												font-size={GAIN_FONT_SIZE}
+												font-weight="bold"
+												text-anchor="middle"
+												pointer-events="none"
+											>
+												+{gain.gain}
+											</text>
 										)}
 									</For>
 								)}
@@ -513,6 +572,13 @@ export function LargestClubsGraph(props: { snapshots: LargestClubSnapshot[] }) {
 				</div>
 			</Show>
 
+			<Show when={chartData()?.showMemberGains}>
+				<p class={styles.note}>
+					+N above a point is how many new members that club gained since its
+					previous snapshot.
+				</p>
+			</Show>
+
 			<Show when={snappedTotals()}>
 				{(totals) => (
 					<GraphTooltip
@@ -596,6 +662,12 @@ const styles = {
 		opacity: 0.7,
 		textDecoration: 'underline',
 		cursor: 'pointer',
+	}),
+	note: css({
+		margin: '0.5rem 0 0',
+		textAlign: 'center',
+		fontSize: '0.75rem',
+		opacity: 0.8,
 	}),
 	tooltipTitle: css({
 		fontWeight: 'bold',
