@@ -149,6 +149,7 @@ export const COLLECTABLE_NAMES = {
 	'hat:snorkel': 'Snorkel mask',
 	'hat:antennae': 'Alien antennae',
 	'hat:swordHat': 'Sword hat',
+	'hat:paintbrush': 'Paintbrush',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
 
@@ -269,6 +270,7 @@ export const PICKUP_WORD = {
 	'hat:snorkel': 'Snorkel!',
 	'hat:antennae': 'Bzzt!',
 	'hat:swordHat': 'En garde!',
+	'hat:paintbrush': 'Splosh!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>
 
@@ -421,6 +423,8 @@ export const COLLECTABLE_ABOUT = {
 		'Alien antennae, on a headband, high up in the aliens’ base. Climb for them.',
 	'hat:swordHat':
 		'A skullcap with a long sword sticking straight up out of it. Mind the ceiling.',
+	'hat:paintbrush':
+		'The top of a paintbrush, loaded with paint in your own colour, for painting a warehouse wall.',
 	barcode: "Floating just before every parkrun's finish. Don't forget it!",
 } satisfies Record<Collectable, string>
 
@@ -490,6 +494,7 @@ export function collectableBehaviour(id: Collectable): string[] {
 			: ['A burst of speed.']
 	}
 	if (id === 'hat:swordHat') return ['Catch fruit on its point.']
+	if (id === 'hat:paintbrush') return ['Paints the wall behind you.']
 	if (id.startsWith('hat:'))
 		return hatPowers(id.slice('hat:'.length) as HatKind)
 	if (id === 'pumpkin') return hatPowers('pumpkin')

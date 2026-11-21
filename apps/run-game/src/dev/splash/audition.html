@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Splash audition</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/src/dev/splash/style.css">
+</head>
+<body>
+<main>
+	<section class="intro">
+		<h1>Splash audition</h1>
+		<p>Every splash sound tried so far, and a few new ideas. Click ▶, or press a sound's number key. They play through the game's own synth, with the game's splash beside them.</p>
+		<p>A blind version, numbered in a random order with notes for a tester, is at <a href="/run/dev/splash-blind">/run/dev/splash-blind</a>.</p>
+		<div class="bar">
+			<label class="check"><input type="checkbox" id="other"> As someone else's (<code>splashOther</code>, half volume)</label>
+		</div>
+	</section>
+	<div class="stage">
+		<div class="list" id="list"></div>
+		<aside class="scene" aria-label="Splash animation">
+			<canvas id="scene"></canvas>
+			<p id="playing">Press play on a sound</p>
+		</aside>
+	</div>
+</main>
+<script type="module" src="/src/dev/splash/audition.ts"></script>
+</body>
+</html>

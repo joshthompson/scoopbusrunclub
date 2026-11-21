@@ -42,6 +42,10 @@ import type { FikaItem } from './fika'
  * - `swordHat`: a skullcap with a long sword sticking straight up out of
  *   it: put on everyone playing Fruit Kebab, the minigame, for skewering
  *   fruit on (see `minigames/fruitKebab`), not a pickup
+ * - `paintbrush`: the top of a paintbrush, its handle painted and its
+ *   bristles loaded, in the wearer's colour: put on everyone playing
+ *   Paintbrush, the minigame, painting the wall with it (see
+ *   `minigames/paintbrush`), not a pickup
  */
 export type HatKind =
 	| 'pumpkin'
@@ -68,16 +72,23 @@ export type HatKind =
 	| 'antennae'
 	| 'swordHat'
 	| 'bobbleHatBlue'
+	| 'paintbrush'
 
-/** A hat someone's wearing: a Pumpkin by its carving, 1 to 5. */
+/**
+ * A hat someone's wearing: a Pumpkin by its carving, 1 to 5; a paintbrush
+ * in its wearer's colour, worked out from them where it's drawn (see
+ * `createPlayer`), not sent.
+ */
 export interface Hat {
 	kind: HatKind
 	carving?: number
+	colour?: string
 }
 
 /**
  * The hats that are a Boost of their own, to run into, and so collectables:
- * not a Pumpkin, nor fika. And the sword hat, had playing Fruit Kebab.
+ * not a Pumpkin, nor fika. And the sword hat, had playing Fruit Kebab, and
+ * the paintbrush, had playing Paintbrush.
  */
 export type PickupHat = Exclude<
 	HatKind,
@@ -146,6 +157,7 @@ export const HAT_RULES: Record<HatKind, HatRules> = {
 	spaceHelmet: PLAIN,
 	antennae: PLAIN,
 	swordHat: PLAIN,
+	paintbrush: PLAIN,
 }
 
 /** Fika that's a hat too, put on as it's had: the captain's hat, off the ferry's roof. */
@@ -181,6 +193,7 @@ const CODED: HatKind[] = [
 	'spaceHelmet',
 	'antennae',
 	'swordHat',
+	'paintbrush',
 ]
 /** How many carvings a Pumpkin can have: its codes. */
 const CARVINGS = 5

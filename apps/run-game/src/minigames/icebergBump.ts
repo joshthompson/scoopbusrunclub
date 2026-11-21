@@ -415,6 +415,9 @@ function startIcebergBump(world: World): MinigameRun {
 		id: 'iceberg-bump',
 		ticksLeft,
 		chip: (racer) => (inSea(racer) ? 'Out' : 'On'),
+		// Still on it; then whoever lasted longest.
+		score: (racer) =>
+			inSea(racer) ? (inSeaAt.get(racer.id) ?? 0) : Number.POSITIVE_INFINITY,
 		timeNote: (racer) => {
 			const at = inSeaAt.get(racer.id)
 			if (at !== undefined) return `Lasted ${clock(at, 'down')}`

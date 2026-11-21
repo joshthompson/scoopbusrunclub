@@ -20,6 +20,8 @@ export type MinigameId =
 	| 'beach-volleyball'
 	| 'red-light-green-light'
 	| 'memory-dunk'
+	| 'paintbrush'
+	| 'hungry-goose'
 
 export interface Minigame {
 	id: MinigameId
@@ -29,9 +31,10 @@ export interface Minigame {
 	/** The most Players it's for: any more, and it's left out. Any, if not said. */
 	maxPlayers?: number
 	/**
-	 * Whether each Player's chip's shown under the clock: not if the game
-	 * says it all already (a scoreboard) or has something of its own
-	 * there. Shown, if not said.
+	 * Whether there's a leaderboard up in the top right corner, everyone
+	 * ranked by their `score`, best first, with their chip, as the Podium's
+	 * Standings are: not if the game says it all already (a scoreboard) or
+	 * has something of its own there. Shown, if not said.
 	 */
 	pills?: boolean
 	/** One of the courses' tunes, to play it to. */
@@ -59,6 +62,8 @@ export interface MinigameRun {
 	ticksLeft(): number
 	/** How `racer`'s doing, in a word or two, on the HUD: "2/4", "Out". */
 	chip(racer: Racer): string
+	/** How `racer`'s doing, as a number, for ranking them on the leaderboard (see `Minigame['pills']`): more is better. In the order they're in, if not said. */
+	score?(racer: Racer): number
 	/** What `racer` did, in a few words, for the Results: "3 fruit". */
 	note(racer: Racer): string
 	/** Whether `racer`'s done all there is to do: they dance, stood still. */
@@ -140,6 +145,36 @@ export interface MinigameFrame {
 	dunkSeed?: number
 	dunkEnd?: number
 	dunkFell?: number[]
+	// Paintbrush's fields, below this line.
+	/**
+	 * Paintbrush: the tick this frame was made, and its brush strokes from
+	 * `strokesFrom` on, [tick, racer (their place in the racers), x0, y0, x1,
+	 * y1 (px across and down the wall), big (1)], in the order they were
+	 * painted; and now and then the whole wall, [tick, its cells run-length
+	 * coded], for a screen that's missed some.
+	 */
+	paintAt?: number
+	strokesFrom?: number
+	strokes?: [number, number, number, number, number, number, number][]
+	wall?: [number, string]
+	/** Its paint cans, [id, x, y, since]; till when each racer has a big brush; each rotten plank's [stood on since, gone at] (-1 not); and bursts of paint off heads, [whose, x, y, at]. */
+	paintCans?: [number, number, number, number][]
+	bigUntil?: number[]
+	planks?: [number, number][]
+	splats?: [number, number, number, number][]
+	// Hungry Hungry Goose's fields, below this line.
+	/**
+	 * Its eggs, in the nests too: [id, x, y, spin, carried by (their place
+	 * in the racers, -1 not), golden (1)]; each nest's eggs, worth and all;
+	 * when the goose last laid, and which way she faced; and who won (a
+	 * team, -1 a draw, -2 not yet).
+	 */
+	eggs?: [number, number, number, number, number, number][]
+	nests?: [number, number]
+	laidAt?: [number, number]
+	winner?: number
+	/** Who's stealing from the other team's nest: [their place in the racers, since when]. */
+	stealing?: [number, number][]
 }
 
 /** Nothing held: what a bot holds with nothing to do. */

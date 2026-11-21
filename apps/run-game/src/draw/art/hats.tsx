@@ -968,7 +968,85 @@ const SWORD_HAT: HatArt = {
 	middle: (SWORD_ROWS[0].length / 2) * CELL,
 }
 
-const ART: Record<Exclude<HatKind, 'pumpkin'>, HatArt> = {
+/** `hex` (`#rrggbb`) mixed `share` of the way to `toward`: a colour's lit or shaded tone. */
+export function mixHex(hex: string, toward: string, share: number) {
+	const channel = (c: string, at: number) =>
+		Number.parseInt(c.slice(at, at + 2), 16)
+	const out = [1, 3, 5].map((at) =>
+		Math.round(
+			channel(hex, at) + (channel(toward, at) - channel(hex, at)) * share,
+		)
+			.toString(16)
+			.padStart(2, '0'),
+	)
+	return `#${out.join('')}`
+}
+
+/**
+ * The paintbrush hat (see `paintbrush`): the top of a paintbrush stood on
+ * the head, its handle's end a cap down over the crown, then its neck,
+ * its silver ferrule crimped round the bristles, and the bristles, their
+ * tips loaded with paint. Its handle's painted, and its paint is, in `P`.
+ */
+const PAINTBRUSH_ROWS = [
+	'....PPPP....',
+	'...PpPPPP...',
+	'..PpPPPPPP..',
+	'..PPPPPPdP..',
+	'..PPPPPPdP..',
+	'..BPBPPBdB..',
+	'..BbBBbBBb..',
+	'..BbBBbBBb..',
+	'..BbBBbBBb..',
+	'..SSSSSSSS..',
+	'..LSSSSSSs..',
+	'..ssssssss..',
+	'..LSSSSSSs..',
+	'...SSSSSS...',
+	'....HhHH....',
+	'....HhHH....',
+	'...HHhHHH...',
+	'..HHHHHHHH..',
+	'.HHhHHHHHHH.',
+	'.KKKKKKKKKK.',
+]
+/** The row the top of the head comes up to, under its cap, and the middle row of its bristles' paint. */
+const PAINTBRUSH_CROWN = 18
+const PAINTBRUSH_PAINT = 4
+/** How far the middle of the paintbrush's bristles is over the top of the head: where it paints from. */
+export const BRISTLES_OVER_HEAD = (PAINTBRUSH_CROWN - PAINTBRUSH_PAINT) * CELL
+/** Its colour where it's shown on its own, in no one's hand: a collectable. */
+const PAINTBRUSH_PLAIN = '#e8423f'
+const paintbrushes = new Map<string, HatArt>()
+/** The paintbrush hat in `colour`: its handle and paint. */
+function paintbrush(colour = PAINTBRUSH_PLAIN): HatArt {
+	let art = paintbrushes.get(colour)
+	if (!art) {
+		art = {
+			src: letterArt(PAINTBRUSH_ROWS, {
+				P: colour,
+				p: mixHex(colour, '#ffffff', 0.35),
+				d: mixHex(colour, '#000000', 0.25),
+				H: colour,
+				h: mixHex(colour, '#ffffff', 0.3),
+				K: mixHex(colour, '#000000', 0.45),
+				B: '#d9b77a',
+				b: '#a8834a',
+				S: '#c8d0d8',
+				s: '#8a95a1',
+				L: '#ffffff',
+			}),
+			width: PAINTBRUSH_ROWS[0].length * CELL,
+			height: PAINTBRUSH_ROWS.length * CELL,
+			crown: PAINTBRUSH_CROWN * CELL,
+			middle: (PAINTBRUSH_ROWS[0].length / 2) * CELL,
+		}
+		paintbrushes.set(colour, art)
+	}
+	return art
+}
+
+const ART: Record<Exclude<HatKind, 'pumpkin' | 'paintbrush'>, HatArt> = {
 	miner: MINER,
 	captain: CAPTAIN,
 	skiHelmet: SKI_HELMET,
@@ -1009,7 +1087,11 @@ const BLADES = pixelArt(9, 1, [
 ])
 
 export const hatArt = (hat: Hat): HatArt =>
-	hat.kind === 'pumpkin' ? pumpkin(hat.carving) : ART[hat.kind]
+	hat.kind === 'pumpkin'
+		? pumpkin(hat.carving)
+		: hat.kind === 'paintbrush'
+			? paintbrush(hat.colour)
+			: ART[hat.kind]
 
 /** How far ahead the miner's lamp shines, and how wide its beam gets, in cells. */
 const BEAM_CELLS = 75
@@ -1058,7 +1140,7 @@ export const WORN_HAT_REACH = {
 		DISCO_BALL.crown + GLINT_OUT * CELL,
 		JAZZ_HAT.crown,
 		DEERSTALKER.crown,
-		...[...Object.values(ART), pumpkin()].map(
+		...[...Object.values(ART), pumpkin(), paintbrush()].map(
 			(art) => art.crown + (art === PROPELLER ? 3 * CELL : 0),
 		),
 	),

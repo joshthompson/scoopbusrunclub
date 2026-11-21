@@ -120,6 +120,7 @@ import type {
 	World,
 } from '../game/world'
 import { zombieAt } from '../game/zombies'
+import { volleyOf } from '../minigames/beachVolleyball'
 import { buriedDepth } from '../minigames/potatoRain'
 import { bonusRunner } from '../runners/bonus'
 import { customRunners } from '../runners/customRunners'
@@ -505,12 +506,23 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	const sprayFor = goingFor()
 	const sparksFor = goingFor()
 	const now = () => world.ticks()
-	/** The hat they've on, if any. `body` isn't a signal: reading the tick keeps this up to date. */
+	/**
+	 * The hat they've on, if any: a paintbrush in their colour. `body` isn't
+	 * a signal: reading the tick keeps this up to date.
+	 */
 	const hat = createMemo(
-		() => (world.ticks() >= 0 ? body.hat : undefined),
+		() => {
+			const worn = world.ticks() >= 0 ? body.hat : undefined
+			return worn?.kind === 'paintbrush'
+				? { ...worn, colour: racer.colour }
+				: worn
+		},
 		undefined,
 		{
-			equals: (a, b) => a?.kind === b?.kind && a?.carving === b?.carving,
+			equals: (a, b) =>
+				a?.kind === b?.kind &&
+				a?.carving === b?.carving &&
+				a?.colour === b?.colour,
 		},
 	)
 
@@ -556,7 +568,12 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 										: runSize
 			return {
 				id: `player-${racer.id}`,
-				type: 'player',
+				// Beach Volleyball's left team, on the far side of its net as it
+				// leans across the sand: drawn behind it (see `RaceView`).
+				type:
+					volleyOf(world)?.teamOf(racer) === 0
+						? 'player-behind-net'
+						: 'player',
 				...createObjectSignal(0, 'x'),
 				...createObjectSignal(0, 'y'),
 				width: () => size().width,
@@ -2706,7 +2723,8 @@ export function createPlatforms(world: World) {
 			if (!art) return
 			const x0 = (width - art.width) / 2
 			if (platform.broken) {
-				paintBroken(ctx, picture, x0)
+				// Anything but a rope bridge, broken, is gone: crumbled away.
+				if (platform.rope) paintBroken(ctx, picture, x0)
 				return
 			}
 			if (!platform.rope) {
@@ -2827,7 +2845,10 @@ export function createPlatforms(world: World) {
 						const at = platformAt(world.terrain, platform, world.ticks())
 						$.setX(at.left)
 						$.setY(at.top)
-						if (cave) setCable(cableTo(platform, at))
+						// Up into a Cave's rock, or up to its own hook: as long as it
+						// needs to be, wherever it's swung to.
+						if (cave || platform.hook !== undefined)
+							setCable(cableTo(platform, at))
 					}
 				: undefined,
 		})

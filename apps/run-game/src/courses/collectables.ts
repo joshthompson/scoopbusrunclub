@@ -80,6 +80,8 @@ const WHERE: Record<CourseId, string> = {
 	'beach-volleyball': 'in the',
 	'red-light-green-light': 'in the',
 	'memory-dunk': 'in the',
+	paintbrush: 'in the',
+	'hungry-goose': 'in the',
 }
 
 /**

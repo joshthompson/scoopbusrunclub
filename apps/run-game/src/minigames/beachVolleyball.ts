@@ -179,6 +179,8 @@ export interface VolleyShow {
 	ground: number
 	/** Where the court ends, either side: its walls. */
 	walls: { left: number; right: number }
+	/** Which team `racer` is on: 0 the left, 1 the right. */
+	teamOf: (racer: Racer) => number
 }
 const shows = new WeakMap<World, VolleyShow>()
 
@@ -269,6 +271,7 @@ function startBeachVolleyball(world: World): MinigameRun {
 		pointAt: 0,
 		ground,
 		walls: ARENA_WALLS,
+		teamOf,
 	}
 	shows.set(world, show)
 	/** When each last hit it, by the world's ticks. */

@@ -45,6 +45,7 @@ import { createGiantMouth } from './giantMouth'
 import { createHarvester } from './harvester'
 import { createHauntedHouse } from './hauntedHouse'
 import { createHerds } from './herds'
+import { createHungryGoose } from './hungryGoose'
 import { createIcebergBump } from './icebergBump'
 import { createJumpRope } from './jumpRope'
 import { createLava } from './lava'
@@ -52,6 +53,7 @@ import { createMemoryDunk } from './memoryDunk'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createPyro, createSearchlights, createSmoke } from './nightRace'
 import { createOrgans } from './organs'
+import { createPaintbrush } from './paintbrush'
 import { createPogoSticks } from './pogoSticks'
 import { createPortalFx } from './portalFx'
 import { createPotatoRain } from './potatoRain'
@@ -143,6 +145,12 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 			// In front of whoever's in one: sat down inside it.
 			'cart',
 			'player',
+			// Beach Volleyball's net leans across the sand, front left to back
+			// right, so its left team and the ball on their side are behind it
+			// and the right team in front.
+			'net',
+			'ball-behind-net',
+			'player-behind-net',
 			// Behind them: they sit on its back.
 			'corgi',
 			'pacer',
@@ -352,6 +360,10 @@ function createMinigameItself(world: World) {
 			return createRedLightGreenLight(world)
 		case 'memory-dunk':
 			return createMemoryDunk(world)
+		case 'paintbrush':
+			return createPaintbrush(world)
+		case 'hungry-goose':
+			return createHungryGoose(world)
 		default:
 			return []
 	}

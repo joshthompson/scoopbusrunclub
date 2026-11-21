@@ -20,12 +20,19 @@ const WOOD_SHADE = '#5a3a1a'
 const STAND_WIDTH = 40
 const BOARD = 6
 const LEG = 4
+/**
+ * How much further the rope's drawn swinging down at the bottom of a
+ * turn, at its middle, than it reaches: so a little of it drags along the
+ * deck, flat, rather than only just touching it. Only as drawn: jumping it
+ * goes by where it reaches (see `ropeDrop`).
+ */
+const DRAGS = 8
 
 /**
  * Jump Rope, drawn: its two holders, either end, up on wooden stands
  * turning it; and its rope, between their hands, behind everyone as it
  * swings away round the back, and in front of them as it comes round the
- * front, brushing the bridge at the bottom of each turn. Nothing, if the
+ * front, dragging a little along the bridge at the bottom of each turn. Nothing, if the
  * world's not a game of it.
  */
 export function createJumpRope(world: World) {
@@ -59,9 +66,15 @@ export function createJumpRope(world: World) {
 				}
 				if (inFront !== front) return
 				let was: number | undefined
+				const middle = (hands.left + hands.right) / 2
+				const half = (hands.right - hands.left) / 2
 				for (let x = hands.left; x <= hands.right; x += CELL) {
-					// Down to the bridge's deck, and no further.
-					const y = Math.min(show.floor, hands.y + ropeDrop(x, turn))
+					// Down to the bridge's deck, and no further: dragging along
+					// it a little, at the bottom of its turn.
+					const u = (x - middle) / half
+					const drag =
+						DRAGS * Math.max(0, Math.cos(turn)) * Math.max(0, 1 - u * u)
+					const y = Math.min(show.floor, hands.y + ropeDrop(x, turn) + drag)
 					const at = Math.round((y - top) / CELL) * CELL
 					// Joined up with the step before: no gaps where it's steep.
 					const from = was === undefined ? at : Math.min(was, at)

@@ -256,13 +256,20 @@ function startRedLight(world: World): MinigameRun {
 	const landed = new Set<number>()
 	let lastFire = Number.NEGATIVE_INFINITY
 
-	/** How far along to the line someone's got, as a share, never quite the whole of it. */
+	/**
+	 * How far along someone's got, start line to finish line, as a share:
+	 * none till they're over the start line, never quite the whole of it
+	 * till they're over the finish.
+	 */
 	const progressOf = (racer: Racer) =>
 		crossed(racer)
 			? 1
 			: Math.max(
 					0,
-					Math.min(0.99, (racer.body.x - walls.left) / (FINISH_X - walls.left)),
+					Math.min(
+						0.99,
+						(racer.body.x - START_LINE_X) / (FINISH_X - START_LINE_X),
+					),
 				)
 	const percent = (racer: Racer) => `${Math.floor(progressOf(racer) * 100)}%`
 	const took = (racer: Racer) =>
@@ -382,6 +389,12 @@ function startRedLight(world: World): MinigameRun {
 		ticksLeft,
 		chip: (racer) =>
 			crossed(racer) ? 'Safe' : out(racer) ? 'Out' : percent(racer),
+		// Across, the first first; then those still going, furthest first;
+		// then those out, furthest first.
+		score: (racer) =>
+			crossed(racer)
+				? 3 - (show.crossedAt.get(racer.id) ?? 0) / 1e6
+				: (out(racer) ? 0 : 1) + progressOf(racer),
 		note: (racer) => {
 			if (crossed(racer))
 				return `${solo ? 'Crossed in' : 'Across at'} ${took(racer)}`

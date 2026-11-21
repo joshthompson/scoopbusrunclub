@@ -296,6 +296,8 @@ function startPotatoRain(world: World): MinigameRun {
 		ticksLeft,
 		chip: (racer) =>
 			buried(racer) ? `${tulipsOf(racer)} Out` : `${tulipsOf(racer)}`,
+		// Most tulips; between those with as many, whoever's still up.
+		score: (racer) => tulipsOf(racer) * 2 + (buried(racer) ? 0 : 1),
 		timeNote: (racer) => {
 			const at = racer.body.buriedAt
 			return at !== undefined

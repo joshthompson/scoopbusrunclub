@@ -217,8 +217,13 @@ export function createBeachVolleyball(world: World) {
 		)
 	})
 
-	/** The net: its back pole, its mesh and tape across to its front pole; behind everyone, who never get to it. */
-	const net = layer('volley-net', 'boost', (ctx) => {
+	/**
+	 * The net: its back pole, its mesh and tape across to its front pole. It
+	 * leans across from front left to back right, so the left team, and the
+	 * ball on their side, are beyond it and drawn behind it; the right team,
+	 * and the ball on theirs, nearer and drawn in front.
+	 */
+	const net = layer('volley-net', 'net', (ctx) => {
 		const backX = middle + NET_LEAN
 		const frontX = middle - NET_LEAN
 		const backTop = netTop - PATH_BACK
@@ -337,8 +342,13 @@ export function createBeachVolleyball(world: World) {
 		cells.flush()
 	})
 
-	/** The ball, in front of everyone: a beach ball, round, in 2 px cells, its stripes turning. */
-	const ballLayer = layer('volley-ball', 'furby', (ctx) => {
+	/**
+	 * The ball: a beach ball, round, in 2 px cells, its stripes turning. Over
+	 * the left side it's behind the net, in front of the left team; over the
+	 * right, in front of everyone. It goes over at the net's middle, where the
+	 * net crosses the path it's on, so it's right on either side.
+	 */
+	const paintBall = (ctx: CanvasRenderingContext2D) => {
 		const r = ball.r
 		const cx = ball.x - ARENA_LEFT
 		const cy = ball.y
@@ -372,8 +382,14 @@ export function createBeachVolleyball(world: World) {
 				cells.fillRect(x, y, CELL, CELL)
 			}
 		cells.flush()
+	}
+	const ballBehind = layer('volley-ball-behind', 'ball-behind-net', (ctx) => {
+		if (ball.x < NET_X) paintBall(ctx)
 	})
-	return [umpire, court, net, shadow, ballLayer]
+	const ballInFront = layer('volley-ball', 'furby', (ctx) => {
+		if (ball.x >= NET_X) paintBall(ctx)
+	})
+	return [umpire, court, net, shadow, ballBehind, ballInFront]
 }
 
 /** A pole of the net, from `top` down to `foot`, `x` its middle: lit on its left, snow on top. */

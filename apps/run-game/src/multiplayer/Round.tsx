@@ -39,6 +39,7 @@ import type { MinigameRun } from '../minigames/types'
 import { PauseMenu, SOUND_ITEMS } from '../screens/PauseMenu'
 import { RaceStartOverlay, createRaceStart } from '../ui/RaceStart'
 import { Stage } from '../ui/Stage'
+import { MinigameBoard } from './MinigameBoard'
 import { NameTag, hatRise } from './NameTag'
 import type { ShownReaction } from './protocol'
 import { ReactionsLayer } from './reactions'
@@ -238,7 +239,7 @@ export function RoundHud(props: {
 	reactions?: ShownReaction[]
 	/** Played on your own: no Round number, just what it is. */
 	solo?: boolean
-	/** Whether to show each Player's chip: see `Minigame['pills']`. */
+	/** Whether to show the leaderboard, everyone's chip: see `Minigame['pills']`. */
 	pills?: boolean
 }) {
 	const { world } = props
@@ -371,32 +372,22 @@ export function RoundHud(props: {
 								<div style={{ 'font-size': size(28), 'margin-top': '4px' }}>
 									{clock(timeLeft(minigame()))}
 								</div>
-								{/* Each Player's score, in their colour, under the clock. */}
-								<Show when={props.pills !== false}>
-									<div style={{ ...styles.scores, 'font-size': size(15) }}>
-										<For each={world.racers}>
-											{(racer) => (
-												<div
-													style={{
-														...styles.score,
-														background: racer.colour ?? 'var(--ink)',
-														outline: scoreOf(world, minigame(), racer).done
-															? '3px solid #ffd23f'
-															: undefined,
-													}}
-												>
-													{racer.runner.name}{' '}
-													{scoreOf(world, minigame(), racer).chip}
-												</div>
-											)}
-										</For>
-									</div>
-								</Show>
 							</>
 						)}
 					</Show>
 				</div>
 			</div>
+			{/* A minigame's leaderboard, top right, under any pause button. */}
+			<Show when={props.pills !== false && world.minigame}>
+				{(minigame) => (
+					<MinigameBoard
+						world={world}
+						minigame={minigame()}
+						textScale={props.textScale}
+						top={props.onPause && touchScreen() ? 68 : 14}
+					/>
+				)}
+			</Show>
 			{/* On a touch screen: with a keyboard, it's Esc or P. */}
 			<Show when={props.onPause && touchScreen()}>
 				<div style={styles.topRight}>
@@ -514,15 +505,6 @@ export function RoundHud(props: {
 	)
 }
 
-/**
- * A Player's score in a minigame, and whether they're done: read with the
- * tick, so they keep up. Bodies aren't signals.
- */
-function scoreOf(world: World, minigame: MinigameRun, racer: Racer) {
-	world.ticks()
-	return { chip: minigame.chip(racer), done: minigame.done(racer) }
-}
-
 /** A minigame's news just now, if any: read with the tick, so it keeps up. */
 function announcement(world: World) {
 	world.ticks()
@@ -631,21 +613,6 @@ const styles = {
 		'text-shadow':
 			'5px 0 var(--ink), -5px 0 var(--ink), 0 5px var(--ink), 0 -5px var(--ink), 6px 8px 0 rgba(15, 31, 41, 0.45)',
 		'pointer-events': 'none',
-	},
-	/** A minigame's scores, under its clock, as many rows as it takes. */
-	scores: {
-		display: 'flex',
-		'flex-wrap': 'wrap',
-		'max-width': '520px',
-		gap: '6px',
-		'margin-top': '8px',
-		color: 'white',
-		'text-shadow': '1px 1px 0 var(--ink)',
-	},
-	score: {
-		padding: '4px 8px',
-		border: '2px solid white',
-		'white-space': 'nowrap',
 	},
 	blurb: {
 		'font-size': '18px',

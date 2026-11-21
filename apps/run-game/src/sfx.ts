@@ -81,10 +81,18 @@ export type Sound =
  * like a whip: swelled up, even a few hundredths of a second, it's a whoosh.
  */
 type Wave = OscillatorType | 'noise'
-type Note = [number, number, Wave?, number?, number?, number?, number?]
+export type Note = [number, number, Wave?, number?, number?, number?, number?]
+
+/** A sound: its notes, how loud, how far each slides, and whether they're a chord. */
+export type SoundNotes = {
+	notes: Note[]
+	volume: number
+	slide?: number
+	chord?: boolean
+}
 
 /** A splash's notes: see `splash`. */
-const SPLASH: Note[] = [
+export const SPLASH: Note[] = [
 	[180, 0.18, 'sine', 0.65, 3, 0, 0.01],
 	[1800, 0.5, 'noise', 0.85, 0.4, 0, 0.035],
 	[8000, 0.8, 'noise', 0.5, 0.55, 0.03, 0.07],
@@ -93,10 +101,7 @@ const SPLASH: Note[] = [
 	[700, 0.07, 'sine', 0.06, 2.2, 0.31, 0.005],
 ]
 
-const SOUNDS: Record<
-	Sound,
-	{ notes: Note[]; volume: number; slide?: number; chord?: boolean }
-> = {
+const SOUNDS: Record<Sound, SoundNotes> = {
 	move: { notes: [[660, 0.04, 'square']], volume: 0.05 },
 	select: {
 		notes: [
@@ -475,7 +480,23 @@ export function voice(
 	destination: AudioNode,
 	sound: Sound,
 ) {
-	const { notes, volume, slide: slides, chord } = SOUNDS[sound]
+	voiceNotes(context, destination, SOUNDS[sound])
+}
+
+/** `sound`'s notes, how loud and the rest, as `voice` plays them. */
+export function notesOf(sound: Sound): SoundNotes {
+	return SOUNDS[sound]
+}
+
+/**
+ * Notes played as `voice` plays a sound's: for trying out a sound that isn't
+ * one yet, as the dev pages' splash audition does.
+ */
+export function voiceNotes(
+	context: BaseAudioContext,
+	destination: AudioNode,
+	{ notes, volume, slide: slides, chord }: SoundNotes,
+) {
 	let at = context.currentTime
 	for (const [
 		frequency,

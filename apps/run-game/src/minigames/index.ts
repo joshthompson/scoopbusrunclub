@@ -1,8 +1,10 @@
 import { beachVolleyball } from './beachVolleyball'
 import { fruitKebab } from './fruitKebab'
+import { hungryGoose } from './hungryGoose'
 import { icebergBump } from './icebergBump'
 import { jumpRope } from './jumpRope'
 import { memoryDunk } from './memoryDunk'
+import { paintbrush } from './paintbrush'
 import { pogoSticks } from './pogoSticks'
 import { potatoRain } from './potatoRain'
 import { redLightGreenLight } from './redLightGreenLight'
@@ -18,6 +20,8 @@ export const MINIGAMES: Minigame[] = [
 	beachVolleyball,
 	redLightGreenLight,
 	memoryDunk,
+	paintbrush,
+	hungryGoose,
 ]
 
 export const minigameById = (id: string | undefined) =>

@@ -1,4 +1,8 @@
-import { createController, createObjectSignal } from 'scoopjs'
+import {
+	type DrawPainting,
+	createController,
+	createObjectSignal,
+} from 'scoopjs'
 import type { JSX } from 'solid-js'
 import {
 	BEACH_FOAM,
@@ -39,6 +43,20 @@ import {
 	TROLLEY_WIDTH,
 } from '../courses/kit/carParkScenery'
 import {
+	BALE,
+	BALE_HEIGHT,
+	BALE_WIDTH,
+	FENCE,
+	FENCE_LIT,
+	FENCE_SHADE,
+	HAY_STACK,
+	HAY_STACK_HEIGHT,
+	HAY_STACK_WIDTH,
+	SHEEP,
+	SHEEP_HEIGHT,
+	SHEEP_WIDTH,
+} from '../courses/kit/farmScenery'
+import {
 	BEACH_SNOWMAN,
 	BEACH_SNOWMAN_HEIGHT,
 	BEACH_SNOWMAN_WIDTH,
@@ -73,6 +91,7 @@ import {
 	WINDMILL_WIDTH,
 } from '../courses/kit/tulipScenery'
 import {
+	GROUND_Y,
 	PATH_BACK,
 	PATH_FRONT,
 	START_X,
@@ -81,6 +100,14 @@ import {
 } from '../game/constants'
 import type { World } from '../game/world'
 import { ARENA_LEFT } from '../minigames/arena'
+import {
+	FIELD_LEFT,
+	FIELD_TOP,
+	SEEN_WIDTH,
+	groundY as fieldGround,
+} from '../minigames/hungryGoose'
+import { mixHex } from './art/hats'
+import { cachedArt } from './canvasArt'
 import { cellBatch, seeThrough } from './paint/cellBatch'
 import { paintPicture } from './paint/picture'
 
@@ -133,6 +160,8 @@ export function createArenaSet(world: World) {
 			return createCarPark(world)
 		case 'beach-volleyball':
 			return createFrozenBeach(world)
+		case 'hungry-goose':
+			return createFarm(world)
 		default:
 			return []
 	}
@@ -400,6 +429,326 @@ function createTulipField(world: World) {
 			TULIPS_FRONT_WIDTH,
 			TULIPS_FRONT_HEIGHT,
 		),
+	]
+}
+
+// --- Hungry Hungry Goose's farm ------------------------------------------------------
+
+/** Where the farmland behind the field ends, down the world: the back of the field's path, and lower. */
+const FARMLAND_BOTTOM = GROUND_Y
+/** Where the far hills sit, the patchwork of fields runs back to, and the pasture starts, down the world. */
+const HILLS_BASE = 170
+const FIELDS_FROM = 196
+const PASTURE_FROM = 300
+/** Where the fields' boundaries all run back to: a point on the horizon, in the middle. */
+const VANISH = { x: 960, y: 60 }
+/** The patchwork's colours: grass, a paler grass, wheat, and ploughed earth. */
+const PATCHES = ['#86bf5f', '#9ccb6e', '#78b356', '#d9c36a', '#a07a4c']
+const HEDGE = '#4f7f45'
+const HEDGE_LIT = '#5f9452'
+const PASTURE = '#6eab4c'
+const TUFT_DARK = '#5a9440'
+const TUFT_LIT = '#84bf5e'
+
+/** A number from a place, the same every time. */
+const farmHash = (x: number, y: number) => {
+	let h = Math.imul(x * 374761393 + y * 668265263, 1274126177)
+	h ^= h >>> 13
+	return ((h >>> 0) % 1000) / 1000
+}
+
+/**
+ * The farmland behind the field, painted once, across the screen and down
+ * from its top: the sky, paler down to the horizon, and the sun; two
+ * ranges of hills, hazy blue-green far off; a patchwork of fields running
+ * back to them, grass, wheat and ploughed earth, hedgerows between, a tree
+ * here and there; and the sheep's pasture, its grass in tufts, on down
+ * behind the field.
+ */
+function paintFarmland(ctx: CanvasRenderingContext2D) {
+	ctx.translate(0, -FIELD_TOP)
+	const cells = cellBatch(ctx)
+	const rect = (x: number, y: number, w: number, h: number, c: string) => {
+		cells.fillStyle = c
+		cells.fillRect(x, y, w, h)
+	}
+	const W = SEEN_WIDTH
+	// The sky, in steps, paler to the horizon.
+	const steps = 10
+	for (let k = 0; k < steps; k++) {
+		const top = FIELD_TOP + ((HILLS_BASE - FIELD_TOP) * k) / steps
+		rect(
+			0,
+			Math.round(top / CELL) * CELL,
+			W,
+			Math.ceil((HILLS_BASE - FIELD_TOP) / steps / CELL) * CELL + CELL,
+			mixHex('#78c4ee', '#d6efff', k / (steps - 1)),
+		)
+	}
+	cells.flush()
+	// The sun, and its glow.
+	for (let y = -64; y <= 64; y += CELL)
+		for (let x = -64; x <= 64; x += CELL) {
+			const d = Math.hypot(x, y)
+			if (d < 40) rect(1640 + x, -400 + y, CELL, CELL, '#fff3b0')
+			else if (d < 52 && (x + y) % 4 === 0)
+				rect(1640 + x, -400 + y, CELL, CELL, '#fff7cc')
+		}
+	cells.flush()
+	// The hills: far, hazy; then nearer, greener, a tree or two along them.
+	const hills = (
+		base: number,
+		high: (x: number) => number,
+		colour: string,
+		trees: string | undefined,
+	) => {
+		for (let x = 0; x < W; x += CELL) {
+			const top = Math.round((base - high(x)) / CELL) * CELL
+			rect(x, top, CELL, FIELDS_FROM + 40 - top, colour)
+			if (trees && farmHash(x, base) < 0.03) {
+				rect(x - 4, top - 10, 10, 10, trees)
+				rect(x, top - 4, 2, 6, trees)
+			}
+		}
+		cells.flush()
+	}
+	hills(
+		HILLS_BASE,
+		(x) => 70 + 28 * Math.sin(x / 260) + 14 * Math.sin(x / 97 + 1),
+		'#b3d3c0',
+		undefined,
+	)
+	hills(
+		HILLS_BASE + 26,
+		(x) => 46 + 22 * Math.sin(x / 190 + 2) + 9 * Math.sin(x / 61),
+		'#93c48c',
+		'#7aab6e',
+	)
+
+	// The patchwork of fields, in rows, deeper the nearer, each cut up
+	// by boundaries running back to the horizon, hedgerows along them.
+	const rows = [FIELDS_FROM, 210, 228, 252, 282, PASTURE_FROM]
+	/** Where boundary `bx` (where it reaches the pasture) is at `y`, running back to the horizon. */
+	const along = (bx: number, y: number) =>
+		VANISH.x + ((bx - VANISH.x) * (y - VANISH.y)) / (PASTURE_FROM - VANISH.y)
+	const bounds: number[] = []
+	for (let bx = -700; bx < W + 700; bx += 220 + farmHash(bx, 3) * 220)
+		bounds.push(bx)
+	for (let r = 0; r < rows.length - 1; r++) {
+		for (let y = rows[r]; y < rows[r + 1]; y += CELL) {
+			for (let k = 0; k < bounds.length - 1; k++) {
+				const from = Math.round(along(bounds[k], y) / CELL) * CELL
+				const to = Math.round(along(bounds[k + 1], y) / CELL) * CELL
+				if (to < 0 || from > W) continue
+				const patch = PATCHES[Math.floor(farmHash(k, r) * PATCHES.length)]
+				// Ploughed earth in furrows, wheat in rows: a darker line every so often.
+				const furrow =
+					(patch === '#a07a4c' || patch === '#d9c36a') &&
+					(y - rows[r]) % 6 === 4
+				rect(
+					from,
+					y,
+					to - from,
+					CELL,
+					furrow ? mixHex(patch, '#000000', 0.15) : patch,
+				)
+				// The hedge along its side.
+				rect(from, y, CELL * (1 + Math.floor(r / 2)), CELL, HEDGE)
+			}
+		}
+		// The hedge along its back, and a tree in it now and then.
+		rect(0, rows[r], W, CELL * (1 + Math.floor(r / 2)), HEDGE)
+		for (let x = 0; x < W; x += CELL * 4)
+			if (farmHash(x, r + 10) < 0.02) {
+				const size = 8 + r * 4
+				rect(x, rows[r] - size, size, size, HEDGE)
+				rect(x + 2, rows[r] - size, size - 4, CELL, HEDGE_LIT)
+				rect(x + size / 2 - 1, rows[r] - 2, 2, 4, '#6b4f30')
+			}
+		cells.flush()
+	}
+
+	// The pasture, on down to the back of the field's path, up and down
+	// its lumps, and no further: its grass in tufts.
+	const backOf = (x: number) =>
+		Math.round((fieldGround(FIELD_LEFT + x) - PATH_BACK) / CELL) * CELL
+	for (let x = 0; x < W; x += CELL)
+		rect(x, PASTURE_FROM, CELL, backOf(x) - PASTURE_FROM, PASTURE)
+	rect(0, PASTURE_FROM, W, CELL * 2, HEDGE)
+	cells.flush()
+	for (let y = PASTURE_FROM + 6; y < FARMLAND_BOTTOM; y += CELL * 3)
+		for (let x = (y / CELL) % 2 ? 0 : CELL * 2; x < W; x += CELL * 4) {
+			if (y + CELL * 2 > backOf(x)) continue
+			const n = farmHash(x, y)
+			if (n < 0.1) rect(x, y, CELL, CELL * 2, TUFT_DARK)
+			else if (n < 0.14) {
+				rect(x, y, CELL, CELL * 2, TUFT_DARK)
+				rect(x + CELL, y - CELL, CELL, CELL * 2, TUFT_DARK)
+			} else if (n < 0.19) rect(x, y, CELL, CELL, TUFT_LIT)
+		}
+	cells.flush()
+}
+
+/** The sheep in the pasture: [across the screen, down the world, how big, how far they wander]. */
+const FLOCK: [number, number, number, number][] = [
+	[180, 342, 0.8, 60],
+	[300, 380, 1, 90],
+	[420, 330, 0.75, 50],
+	[560, 400, 1.1, 80],
+	[640, 352, 0.85, 70],
+	[1250, 410, 1.1, 90],
+	[1380, 346, 0.8, 60],
+	[1540, 392, 1, 70],
+	[1700, 360, 0.9, 80],
+	[1820, 420, 1.15, 50],
+]
+/** How long a sheep's round of grazing and wandering takes, and how much of it's walking. */
+const GRAZING = 600
+const WALKING = 140
+
+/**
+ * A field on a farm, seen zoomed out: the farmland behind it (see
+ * `paintFarmland`); the red barn and its silo, and a stack of hay bales by
+ * them; a flock of sheep in the pasture, grazing, now and then wandering
+ * a little way; and a wooden fence along the back of the field, up and
+ * down its lumps, round bales against it here and there.
+ */
+function createFarm(world: World) {
+	/** Across the screen, from the arena's left edge, as `still` places things: the field's twice as wide. */
+	const across = (x: number) => FIELD_LEFT - ARENA_LEFT + x
+	/** The fence's foot, along the back of the field, across the screen. */
+	const footAt = (x: number) =>
+		Math.round((world.terrain.groundY(FIELD_LEFT + x) - PATH_BACK) / CELL) *
+		CELL
+	const view = (
+		id: string,
+		draw: (
+			ctx: CanvasRenderingContext2D,
+			image: DrawPainting['image'],
+			now: number,
+		) => void,
+	) =>
+		createController({
+			init: () => ({
+				id,
+				type: 'scenery',
+				...createObjectSignal(FIELD_LEFT, 'x'),
+				...createObjectSignal(FIELD_TOP, 'y'),
+				...createObjectSignal({} as JSX.CSSProperties, 'style'),
+				width: () => SEEN_WIDTH,
+				height: () => FARMLAND_BOTTOM - FIELD_TOP + PATH_FRONT,
+			}),
+			draw({ ctx, image }) {
+				const now = world.ticks()
+				ctx.save()
+				ctx.translate(0, -FIELD_TOP)
+				draw(ctx, image, now)
+				ctx.restore()
+			},
+		})
+	const farmland = view('farmland', (ctx) => {
+		const height = FARMLAND_BOTTOM - FIELD_TOP
+		ctx.drawImage(
+			cachedArt('farmland', SEEN_WIDTH, height, paintFarmland, 1),
+			0,
+			FIELD_TOP,
+			SEEN_WIDTH,
+			height,
+		)
+	})
+	const sheep = view('farm-sheep', (ctx, image, now) => {
+		FLOCK.forEach(([x0, y, size, wander], i) => {
+			// Grazing most of the time; now and then a few steps, one way, then
+			// the next time, back.
+			const t = (now + i * 137) % GRAZING
+			const round = Math.floor((now + i * 137) / GRAZING)
+			const way = round % 2 ? -1 : 1
+			const walked = Math.min(t, WALKING) / WALKING
+			const from = round % 2 ? wander : 0
+			const x = x0 + from + way * walked * wander
+			const walking = t < WALKING
+			const src = walking ? SHEEP.walk[Math.floor(now / 8) % 2] : SHEEP.graze
+			const w = SHEEP_WIDTH * size * 1.4
+			const h = SHEEP_HEIGHT * size * 1.4
+			ctx.save()
+			ctx.translate(Math.round(x), Math.round(y - h))
+			// Walking right, turned round: their pictures face left.
+			if (walking ? way > 0 : (round + i) % 2 === 0) {
+				ctx.scale(-1, 1)
+				ctx.translate(-w, 0)
+			}
+			paintPicture(ctx, image, src, 0, 0, w, h)
+			ctx.restore()
+		})
+	})
+	const fence = view('farm-fence', (ctx, image) => {
+		// Bales first, against it, then the fence in front of them.
+		for (const x of [300, 820, 1480, 1760]) {
+			const foot = footAt(x + BALE_WIDTH)
+			paintPicture(
+				ctx,
+				image,
+				BALE,
+				x,
+				foot - BALE_HEIGHT * 2 + 8,
+				BALE_WIDTH * 2,
+				BALE_HEIGHT * 2,
+			)
+		}
+		const cells = cellBatch(ctx)
+		// Its two rails, stepping up and down with the ground, and its posts.
+		for (let x = 0; x < SEEN_WIDTH; x += CELL * 2) {
+			const foot = footAt(x)
+			for (const up of [22, 44]) {
+				cells.fillStyle = FENCE
+				cells.fillRect(x, foot - up - 6, CELL * 2, 6)
+				cells.fillStyle = FENCE_LIT
+				cells.fillRect(x, foot - up - 6, CELL * 2, CELL)
+			}
+		}
+		for (let x = 8; x < SEEN_WIDTH; x += 96) {
+			const foot = footAt(x)
+			cells.fillStyle = FENCE_SHADE
+			cells.fillRect(x, foot - 56, 10, 56)
+			cells.fillStyle = FENCE
+			cells.fillRect(x, foot - 56, 6, 56)
+			cells.fillStyle = FENCE_LIT
+			cells.fillRect(x, foot - 56, CELL, 56)
+		}
+		cells.flush()
+	})
+	// Seen from twice as far: the barn and the rest drawn twice the size, to look as big.
+	return [
+		farmland,
+		still(
+			'farm-silo',
+			'scenery',
+			SILO,
+			across(1060 + BARN_WIDTH * 2 - 12),
+			336 - SILO_HEIGHT * 2,
+			SILO_WIDTH * 2,
+			SILO_HEIGHT * 2,
+		),
+		still(
+			'farm-barn',
+			'scenery',
+			BARN,
+			across(1060),
+			340 - BARN_HEIGHT * 2,
+			BARN_WIDTH * 2,
+			BARN_HEIGHT * 2,
+		),
+		still(
+			'farm-hay',
+			'scenery',
+			HAY_STACK,
+			across(1430),
+			356 - HAY_STACK_HEIGHT * 2,
+			HAY_STACK_WIDTH * 2,
+			HAY_STACK_HEIGHT * 2,
+		),
+		sheep,
+		fence,
 	]
 }
 

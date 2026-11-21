@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Splash listening test</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/src/dev/splash/style.css">
+</head>
+<body>
+<main>
+	<section class="intro">
+		<h1>Splash listening test</h1>
+		<p>Fifteen versions of a splash sound for a game, in no particular order. Play each one (as often as you like), then write what you think: does it sound like water, is it too harsh, too quiet, which ones you like best.</p>
+		<p>Only reveal a name once you've written your notes for it. Keys <kbd>1</kbd>–<kbd>9</kbd> play sounds 1 to 9 when you're not typing.</p>
+		<div class="bar">
+			<button class="ghost" id="copy" type="button">Copy all my notes</button>
+			<button class="ghost" id="revealAll" type="button">Reveal all names</button>
+			<span class="status" id="status" role="status">Your notes are kept in this browser. Use “Copy all my notes” to send them.</span>
+		</div>
+	</section>
+	<div class="stage">
+		<div class="list" id="list"></div>
+		<aside class="scene" aria-label="Splash animation">
+			<canvas id="scene"></canvas>
+			<p id="playing">Press play on a sound</p>
+		</aside>
+	</div>
+</main>
+<script type="module" src="/src/dev/splash/blind.ts"></script>
+</body>
+</html>

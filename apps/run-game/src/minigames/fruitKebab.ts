@@ -281,6 +281,11 @@ function startFruitKebab(world: World): MinigameRun {
 		id: 'fruit-kebab',
 		ticksLeft,
 		chip: (racer) => `${count(racer)}/${KEBAB}`,
+		// Most fruit; of those done, whoever was first.
+		score: (racer) => {
+			const at = doneAt.get(racer.id)
+			return count(racer) + (at === undefined ? 0 : 1 / (1 + at))
+		},
 		timeNote: (racer) => {
 			const at = doneAt.get(racer.id)
 			return at === undefined ? undefined : `Kebab in ${clock(at, 'down')}`

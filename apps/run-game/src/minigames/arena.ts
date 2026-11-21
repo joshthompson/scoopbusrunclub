@@ -19,6 +19,8 @@ export interface Arena {
 	left: number
 	cameraY: number
 	walls: { left: number; right: number }
+	/** How far zoomed out it's seen: more of it on the screen, everyone smaller. 1, if not said. */
+	zoom?: number
 }
 
 /** The left edge of the screen, kept there: the arena's the screen, the start line in its middle. */

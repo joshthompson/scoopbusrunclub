@@ -294,6 +294,8 @@ function startJumpRope(world: World): MinigameRun {
 		id: 'jump-rope',
 		ticksLeft,
 		chip: (racer) => (tripped(racer) ? 'Out' : `${jumped(racer)}`),
+		// Still jumping; then most jumps.
+		score: (racer) => (tripped(racer) ? 0 : 1e6) + jumped(racer),
 		timeNote: (racer) => {
 			const at = racer.body.trippedAt
 			const n = `${jumped(racer)} jumps`

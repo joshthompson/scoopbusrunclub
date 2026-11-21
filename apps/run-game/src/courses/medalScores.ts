@@ -43,4 +43,6 @@ export const MEDAL_SCORES: Record<CourseId, MedalPoints | null> = {
 	'beach-volleyball': null,
 	'red-light-green-light': null,
 	'memory-dunk': null,
+	paintbrush: null,
+	'hungry-goose': null,
 }

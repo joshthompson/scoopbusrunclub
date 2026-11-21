@@ -364,6 +364,8 @@ function startPogoSticks(world: World): MinigameRun {
 		id: 'pogo-sticks',
 		ticksLeft,
 		chip: (racer) => (fallen(racer) ? 'Out' : 'Up'),
+		// Still up; then whoever lasted longest.
+		score: (racer) => pogoOfRacer(racer).fellAt ?? Number.POSITIVE_INFINITY,
 		timeNote: (racer) => {
 			const at = pogoOfRacer(racer).fellAt
 			if (at !== undefined) return `Lasted ${clock(at, 'down')}`

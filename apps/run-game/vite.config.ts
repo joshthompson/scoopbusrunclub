@@ -4,6 +4,7 @@ import path from 'node:path'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 import { defineConfig, type Plugin } from 'vite'
 import solidPlugin from 'vite-plugin-solid'
+import { devPages } from './vite-dev-pages'
 
 /**
  * The game runs on ScoopJS (the `scoopjs` package) and on the website's runner
@@ -69,7 +70,12 @@ export default defineConfig({
 	base: '/run/',
 	// The website's env, for the same backend: the guests come from it.
 	envDir: path.resolve(__dirname, '../web'),
-	plugins: [solidPlugin(), websiteIcons, ...(phones ? [basicSsl()] : [])],
+	plugins: [
+		solidPlugin(),
+		websiteIcons,
+		devPages,
+		...(phones ? [basicSsl()] : []),
+	],
 	// The Room's QR code points phones here, even with the Host on localhost.
 	define: network
 		? {

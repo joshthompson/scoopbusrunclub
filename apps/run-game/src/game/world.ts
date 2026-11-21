@@ -949,6 +949,7 @@ export function createWorld(
 		const arena = minigame.arena ?? PLAIN_ARENA
 		world.setCamera(arena.left)
 		world.setCameraY(arena.cameraY)
+		world.setZoom(arena.zoom ?? 1)
 		world.minigame = minigame.start(world)
 	}
 	return world

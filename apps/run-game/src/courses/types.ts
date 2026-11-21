@@ -1084,7 +1084,11 @@ export interface PlatformDefinition {
 	 * end of one (see `breakBridge`). Not in a Round.
 	 */
 	rope?: { give: number; breaks?: number }
-	/** A rope bridge that's snapped, where, and when: a race's own (see `racePlatforms`). */
+	/**
+	 * A rope bridge that's snapped, where, and when: a race's own (see
+	 * `racePlatforms`). Anything else broken is gone, not drawn: a
+	 * minigame's rotten plank, crumbled away (see `minigames/paintbrush`).
+	 */
 	broken?: { x: number; at: number }
 }
 
@@ -1212,6 +1216,8 @@ export type CourseId =
 	| 'beach-volleyball'
 	| 'red-light-green-light'
 	| 'memory-dunk'
+	| 'paintbrush'
+	| 'hungry-goose'
 
 /**
  * A Portal: a machine that shrinks everyone down, or a sneeze that blows
