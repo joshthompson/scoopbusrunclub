@@ -125,7 +125,13 @@ const App: Component = () => {
 	// depth drives the `-snow` asset variants, mirrored onto <body> for the snowy
 	// CSS palette; the type drives the precipitation over the header.
 	createEffect(() => reportWeatherType(appWeather().type))
-	createEffect(() => reportSnowDepth(appWeather().snowDepth))
+	// Only once a forecast is in: while loading, or if it fails, the remembered
+	// depth stands.
+	createEffect(() => {
+		if (weather.state === 'ready' && weather()) {
+			reportSnowDepth(appWeather().snowDepth)
+		}
+	})
 	createEffect(() => document.body.classList.toggle('snow', isSnowy()))
 	// The club goes by its Halloween name for Halloween.
 	createEffect(() => {

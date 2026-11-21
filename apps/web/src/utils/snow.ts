@@ -11,7 +11,30 @@ import { assetVariants } from './assetVariants'
  */
 export const SNOW_THRESHOLD_CM = 2
 
-const [snowDepth, setSnowDepth] = createSignal(0)
+/**
+ * The last real snow depth is remembered, so a load during a snowy spell starts
+ * snowy rather than flicking from plain to snowy once the weather arrives.
+ */
+const STORAGE_KEY = 'scoopbus-snow-depth'
+
+function loadSnowDepth(): number {
+	try {
+		const stored = Number(localStorage.getItem(STORAGE_KEY))
+		return Number.isFinite(stored) ? stored : 0
+	} catch {
+		return 0
+	}
+}
+
+function saveSnowDepth(cm: number) {
+	try {
+		localStorage.setItem(STORAGE_KEY, String(cm))
+	} catch {
+		// Storage unavailable: the next load just starts from no snow
+	}
+}
+
+const [snowDepth, setSnowDepth] = createSignal(loadSnowDepth())
 
 /** Current snow depth in cm. */
 export { snowDepth }
@@ -22,8 +45,12 @@ export const isSnowy = () => snowDepth() >= SNOW_THRESHOLD_CM
 /** Set from the console, and then left alone by the weather. */
 let overridden = false
 
-/** Report the real snow depth from the weather. */
+/**
+ * Report the real snow depth from the weather, once it has loaded (reporting
+ * while it's still loading would undo the remembered depth).
+ */
 export function reportSnowDepth(cm: number) {
+	saveSnowDepth(cm)
 	if (!overridden) setSnowDepth(cm)
 }
 
