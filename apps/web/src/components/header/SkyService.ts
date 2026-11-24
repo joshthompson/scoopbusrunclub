@@ -19,8 +19,21 @@
  */
 
 import { isHalloween } from '@/utils/halloween'
-import { createEffect, on } from 'solid-js'
+import { createEffect, createSignal, on } from 'solid-js'
 import SunCalc from 'suncalc'
+
+/**
+ * `--cloud-opacity` as a number, for the clouds, which are painted on the
+ * header's canvas where a CSS variable can't reach them.
+ */
+const [cloudOpacity, setCloudOpacity] = createSignal(1)
+export { cloudOpacity }
+
+/** Sets `--cloud-opacity`, and `cloudOpacity` along with it. */
+function applyCloudOpacity(el: HTMLElement, opacity: number) {
+	el.style.setProperty('--cloud-opacity', opacity.toFixed(4))
+	setCloudOpacity(Number(opacity.toFixed(4)))
+}
 
 // ─── Configuration ───────────────────────────────────────────────
 
@@ -397,7 +410,7 @@ function applySkyCSSVariablesForHour(h: number): void {
 	el.style.setProperty('--moon-y', moonPositionAtHour(h).toFixed(4))
 	el.style.setProperty('--moon-opacity', moonOpacityAtHour(h).toFixed(4))
 	el.style.setProperty('--stars-opacity', starsOpacityAtHour(h).toFixed(4))
-	el.style.setProperty('--cloud-opacity', cloudOpacityAtHour(h).toFixed(4))
+	applyCloudOpacity(el, cloudOpacityAtHour(h))
 	el.style.setProperty('--light', lightLevelAtHour(h).toFixed(4))
 }
 
@@ -425,7 +438,7 @@ function applyHalloweenSkyCSSVariables(): void {
 	el.style.setProperty('--moon-y', HALLOWEEN_MOON_Y.toFixed(4))
 	el.style.setProperty('--moon-opacity', '1')
 	el.style.setProperty('--stars-opacity', '1')
-	el.style.setProperty('--cloud-opacity', '0.1')
+	applyCloudOpacity(el, 0.1)
 	el.style.setProperty('--light', '0')
 }
 

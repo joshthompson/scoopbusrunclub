@@ -1,16 +1,15 @@
 import shadowAsset from '@/assets/runners/shadow.png'
 import { RUNNER_SIZE } from '@/data/runners'
 import { furbyAssets } from '@/utils/furbys'
-import { css } from '@style/css'
 import { type Scene, createController, createObjectSignal } from 'scoopjs'
 import { addToPath } from './PathOrder'
 import { type RunnerController, isStandingState } from './RunnerController'
 
-const FURBY_TYPE = 'furby'
+export const FURBY_TYPE = 'furby'
 const SHADOW_TYPE = 'furby-shadow'
 
 export const FURBY_LINK = 'https://www.forbifartspremiaren.se/'
-const FURBY_LABEL = 'Furbyfartspremiären'
+export const FURBY_LABEL = 'Furbyfartspremiären'
 
 /** Enough to fill the path without it turning into a stampede. */
 const FURBY_COUNT = Math.max(6, furbyAssets.length)
@@ -273,28 +272,6 @@ function createFurbyController(
 			const { scooped, setScooped } = createObjectSignal(false, 'scooped')
 			const { hovered, setHovered } = createObjectSignal(false, 'hovered')
 
-			// Built once and handed back every frame: the sprite re-reads its
-			// children whenever the furby moves, and a fresh link each tick would
-			// lose the hover before anyone could click it.
-			const link = (
-				<a
-					href={FURBY_LINK}
-					target="_blank"
-					rel="noopener noreferrer"
-					tabIndex={-1}
-					class={styles.link}
-					onMouseEnter={() => setHovered(true)}
-					onMouseLeave={() => setHovered(false)}
-					// The header canvas navigates home on any click or touch that
-					// reaches it, so keep this one to ourselves.
-					onClick={(e) => e.stopPropagation()}
-					onTouchStart={(e) => e.stopPropagation()}
-					onTouchEnd={(e) => e.stopPropagation()}
-				>
-					<span class={styles.label}>{FURBY_LABEL}</span>
-				</a>
-			)
-
 			return {
 				id,
 				type: FURBY_TYPE,
@@ -313,12 +290,14 @@ function createFurbyController(
 				...createObjectSignal(1, 'yScale'),
 				...createObjectSignal(0, 'rotation'),
 				hovered,
+				// Set by the furby's link in the header's overlay, which is what
+				// the mouse is over (see `FurbyLinks`).
+				setHovered,
 				// Squashes sit on the ground, but a tumble spins round the middle.
 				origin: () => ({
 					x: size().x / 2,
 					y: scooped() ? size().y / 2 : size().y,
 				}),
-				children: () => link,
 			}
 		},
 		onEnterFrame({ $, $scene, $controller }) {
@@ -496,6 +475,8 @@ function createFurbyController(
 	return [shadow, furby] as const
 }
 
+export type FurbyController = ReturnType<typeof createFurbyController>[1]
+
 /**
  * Let the furbies out, or put them away again, keeping only as many out as the
  * screen has room for. Safe to call repeatedly, and again as the screen
@@ -563,31 +544,4 @@ export function syncFurbies(scene: Scene, on: boolean) {
 		joining.map(([, furby]) => furby),
 		joining.map(([shadow]) => shadow),
 	)
-}
-
-const styles = {
-	link: css({
-		position: 'absolute',
-		inset: 0,
-		pointerEvents: 'auto',
-		cursor: 'pointer',
-	}),
-	label: css({
-		display: 'none',
-		position: 'absolute',
-		left: '50%',
-		top: 0,
-		transform: 'translate(-50%, -120%)',
-		background: 'var(--color-black)',
-		color: 'var(--color-white)',
-		fontFamily: '"Jersey 10", sans-serif',
-		fontSize: '12px',
-		p: '0px 8px',
-		width: 'max-content',
-		borderRadius: '3px',
-		cornerShape: 'notch',
-		'a:hover > &': {
-			display: 'block',
-		},
-	}),
 }

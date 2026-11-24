@@ -345,30 +345,25 @@ export function createBatControllers(
 			const flapInterval = between(FLAP_INTERVAL)
 			// Each bat sways out of step with the others.
 			const phase = Math.random() * Math.PI * 2
-			let ref: HTMLDivElement | undefined
 			let lastMouse: Vector | undefined
 
 			/**
-			 * The mouse, in the scene, if it's just come over this bat. Only
-			 * looked at when the mouse has moved, so a still mouse doesn't cost a
-			 * layout a tick. Measured on screen, so it doesn't matter where the
-			 * page is scrolled. Not until it's been drawn, though: hidden, its box
-			 * is all zeros, right where the mouse is said to be before it's moved
-			 * at all.
+			 * The mouse's x, in the scene, if it's just come over this bat, which
+			 * is hanging where `bat` says. Only looked at when the mouse has
+			 * moved, so a bat isn't frightened again by a mouse left still.
 			 */
 			const disturbed = () => {
 				const mouse = mousePosition()
-				if (mouse === lastMouse || !ref) return undefined
-				const box = ref.getBoundingClientRect()
-				if (!box.width) return undefined
+				if (mouse === lastMouse) return undefined
 				lastMouse = mouse
-				const middle = box.left + box.width / 2
 				if (
-					Math.hypot(mouse.x - middle, mouse.y - (box.top + box.height / 2)) >=
-					SCARE_DISTANCE
+					Math.hypot(
+						mouse.x - (bat.x + BAT_WIDTH / 2),
+						mouse.y - (bat.y + BAT_HEIGHT / 2),
+					) >= SCARE_DISTANCE
 				)
 					return undefined
-				return bat.x + BAT_WIDTH / 2 + (mouse.x - middle)
+				return mouse.x
 			}
 
 			return createController({
@@ -404,9 +399,6 @@ export function createBatControllers(
 						},
 						style: () => ({ display: shown() ? 'block' : 'none' }),
 					}
-				},
-				onMount({ $ref }) {
-					ref = $ref
 				},
 				onEnterFrame({ $, $scene, $age }) {
 					if (!isHalloween()) {

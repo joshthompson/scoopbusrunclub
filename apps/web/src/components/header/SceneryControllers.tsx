@@ -14,7 +14,8 @@ import tree2Asset from '@/assets/misc/tree2.png'
 import { imageSize } from '@/utils/imageSize'
 import { seasonalAsset } from '@/utils/seasons'
 import { isSnowy } from '@/utils/snow'
-import { css } from '@style/css'
+import type { Accessor } from 'solid-js'
+import { cloudOpacity } from './SkyService'
 
 /**
  * `roosts` are where Halloween's bats hang: the pixel on the underside of a
@@ -100,6 +101,10 @@ export function createPlantController(id: string, x: number) {
 	const size = Math.random() * 1 + 1
 	const plant = plants[Math.floor(Math.random() * plants.length)]
 	const xScale = Math.random() < 0.5 ? -1 : 1
+	// Rolled once, like the trees' jitter: the canvas reads `x` and `y`
+	// every time it paints, and a fresh roll each read would shake them about.
+	const plantX = x + Math.random() * 100 - 50
+	const plantY = 130 + Math.random() * 11
 	return createController({
 		frames: [plant.asset],
 		init() {
@@ -108,8 +113,8 @@ export function createPlantController(id: string, x: number) {
 				type: 'plant',
 				width: () => plant.w * size,
 				height: () => plant.h * size,
-				x: () => x + Math.random() * 100 - 50,
-				y: () => 130 + Math.random() * 11,
+				x: () => plantX,
+				y: () => plantY,
 				xScale: () => xScale,
 				frameInterval: () => Number.POSITIVE_INFINITY,
 			}
@@ -121,7 +126,13 @@ const clouds = [
 	{ asset: cloud1Asset, w: 74, h: 26 },
 	{ asset: cloud2Asset, w: 74, h: 26 },
 ]
-export function createCloudController(id: string, x: number, startX: number) {
+export function createCloudController(
+	id: string,
+	x: number,
+	startX: number,
+	/** The weather's `filter` on the clouds, or `none`. */
+	dim: Accessor<string>,
+) {
 	const size = Math.random() * 0.5 + 1
 	const cloud = clouds[Math.floor(Math.random() * clouds.length)]
 	const xScale = Math.random() < 0.5 ? -1 : 1
@@ -137,14 +148,9 @@ export function createCloudController(id: string, x: number, startX: number) {
 				...createObjectSignal(x + Math.random() * 200 - 100, 'x'),
 				...createObjectSignal(Math.random() * 20 + 5, 'y'),
 				frameInterval: () => Number.POSITIVE_INFINITY,
-				// `--cloud-opacity` is the time of day, from `SkyService`;
-				// `--cloud-dim` is the weather, from the header. Both inherit in, so
-				// a cloud never has to know about either.
-				class: () =>
-					css({
-						opacity: 'var(--cloud-opacity)',
-						filter: 'var(--cloud-dim, none)',
-					}),
+				// Faded by the time of day, from `SkyService`, and darkened by the
+				// weather, from the header.
+				style: () => ({ opacity: cloudOpacity(), filter: dim() }),
 			}
 		},
 		onEnterFrame({ $, $age }) {
@@ -250,7 +256,6 @@ function pickClearX(trees: Span[], sceneWidth: number): number {
  * would almost always come back false — and `setSnow()` from the console would
  * never bring it back.
  */
-const snowmanHidden = css({ display: 'none' })
 export function createSnowmanController(
 	id: string,
 	trees: Span[],
@@ -268,7 +273,7 @@ export function createSnowmanController(
 				x: () => x,
 				y: () => PATH_TOP_Y - SNOWMAN_HEIGHT - 30,
 				frameInterval: () => Number.POSITIVE_INFINITY,
-				class: () => (isSnowy() ? '' : snowmanHidden),
+				style: () => ({ display: isSnowy() ? undefined : 'none' }),
 			}
 		},
 	})

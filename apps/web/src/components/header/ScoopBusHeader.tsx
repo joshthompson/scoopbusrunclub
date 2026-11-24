@@ -47,7 +47,7 @@ import { seasonalAsset } from '@/utils/seasons'
 import type { WeatherType } from '@/utils/weather'
 import { A, useNavigate } from '@solidjs/router'
 import { css, cx } from '@style/css'
-import { Canvas, Scene } from 'scoopjs'
+import { CanvasRenderer, Scene } from 'scoopjs'
 import {
 	Show,
 	createEffect,
@@ -65,6 +65,7 @@ import { createBatControllers } from './BatController'
 import { createBusController } from './BusController'
 import { syncFurbies } from './FurbyController'
 import { createGhostController } from './GhostController'
+import { HeaderOverlay } from './HeaderOverlay'
 import { addBehindBus, addToPath } from './PathOrder'
 import { pumpkinAt, syncPumpkins } from './PumpkinController'
 import {
@@ -581,7 +582,14 @@ function registerGuestRunners(
 
 export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	const navigate = useNavigate()
-	const [mousePosition, setMousePosition] = createSignal({ x: 0, y: 0 })
+	// The mouse in the scene, wherever the page is scrolled to. Off in the
+	// distance until it's moved, so nothing's under it.
+	const [mousePosition, setMousePosition] = createSignal<Vector>({
+		x: Number.NEGATIVE_INFINITY,
+		y: Number.NEGATIVE_INFINITY,
+	})
+	// Around the Renderer, and the same size: where the scene is on the page.
+	let sceneBox: HTMLDivElement | undefined
 	// What the mouse is on, by id: the carved pumpkin it's naming, or else the
 	// runner whose name is showing. Worked out once a tick for the whole scene.
 	const [hoveredPumpkin, setHoveredPumpkin] = createSignal<string>()
@@ -610,6 +618,17 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	// set above, since their pace is derived from the club's spread
 	registerCustomRacers(props.customRacers)
 
+	/**
+	 * Rain clouds go down by half — twice what the sky behind them takes, so
+	 * they read as the heavy things the rain is falling out of rather than the
+	 * same fair-weather puffs on a duller day. Each cloud takes it as its own
+	 * `filter`, along with the time-of-day opacity from `SkyService`.
+	 */
+	const cloudDim = () =>
+		props.weatherType === 'rain' || props.weatherType === 'thunderstorm'
+			? 'brightness(0.5)'
+			: 'none'
+
 	const sceneWidth = window.innerWidth
 	const scene = new Scene('header', {
 		width: sceneWidth,
@@ -619,6 +638,8 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		// look while that's on.
 		resolveAsset: seasonalAsset,
 		afterEnterFrames({ $scene }) {
+			// Worked out once a tick, for the labels in `HeaderOverlay` and the
+			// pumpkins lighting up.
 			const mouse = mousePosition()
 			const pumpkin = pumpkinAt($scene, mouse)?.data.id
 			setHoveredPumpkin(pumpkin)
@@ -644,7 +665,6 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						runnerId as keyof typeof runners,
 						Math.ceil(Math.random() * 30),
 						$scene,
-						labelledRunner,
 					),
 				)
 				// Nearer the front of the path draws on top.
@@ -659,6 +679,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						`cloud${i}`,
 						150 + i * CLOUD_DIST,
 						CLOUD_DIST * CLOUD_COUNT,
+						cloudDim,
 					),
 				)
 			}
@@ -777,6 +798,10 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 		},
 	})
 
+	// For the console while developing: `headerScene.canvasIssues()` lists
+	// whatever the Canvas Renderer has been asked for and can't draw.
+	if (import.meta.env.DEV) Object.assign(window, { headerScene: scene })
+
 	/**
 	 * Racers added after the header was built — someone finishing the form in
 	 * another tab of this session — join the running scene rather than waiting for
@@ -793,7 +818,6 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 				runnerId,
 				Math.ceil(Math.random() * 30),
 				scene,
-				labelledRunner,
 			)
 			addToPath(
 				scene,
@@ -819,9 +843,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	// Halloween's skeletons, running with everyone else for as long as it's on.
 	// Only tracks the toggle, the same as the furbies, not the controllers that
 	// putting them out or away changes.
-	createEffect(
-		on(isHalloween, (enabled) => syncSkeletons(scene, enabled, labelledRunner)),
-	)
+	createEffect(on(isHalloween, (enabled) => syncSkeletons(scene, enabled)))
 
 	// A birthday said from the console, flown for straight away. Only tracks
 	// the name: today's real birthdays are flown for in setup.
@@ -848,7 +870,11 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 	}
 
 	const windowMouseMoveHandler = (e: MouseEvent) => {
-		setMousePosition({ x: e.clientX, y: e.clientY })
+		const box = sceneBox?.getBoundingClientRect()
+		setMousePosition({
+			x: e.clientX - (box?.left ?? 0),
+			y: e.clientY - (box?.top ?? 0),
+		})
 	}
 
 	onMount(() => {
@@ -916,19 +942,57 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			? 'brightness(0.75)'
 			: 'none'
 
-	/**
-	 * Rain clouds go down by half — twice what the sky behind them takes, so
-	 * they read as the heavy things the rain is falling out of rather than the
-	 * same fair-weather puffs on a duller day.
-	 *
-	 * Set on the scene's wrapper rather than on the clouds, which are drawn by
-	 * their own controller and inherit it along with the time-of-day opacity
-	 * `SkyService` puts on the document.
-	 */
-	const cloudDim = () =>
-		props.weatherType === 'rain' || props.weatherType === 'thunderstorm'
-			? 'brightness(0.5)'
-			: 'none'
+	/** Where a click on the scene goes, by what's under it. */
+	const onSceneClick = ({ x, y }: Vector) => {
+		// A carved pumpkin on the path, which is in front of
+		// whoever's running past it, goes to the patch.
+		if (pumpkinAt(scene, { x, y })) {
+			// Track the pumpkin patch being opened from the header in Mixpanel
+			// (not the pumpkin's name, which is free text)
+			track('header_pumpkin_clicked')
+			navigate('/pumpkins')
+			return
+		}
+		const closest = scene
+			.getControllersByType<RunnerController>('runner')
+			// A skeleton has no page to go to, so a click on one
+			// goes through to whatever's behind it.
+			.filter((c) => !isSkeleton(c.data.runnerId))
+			.map((c) => ({
+				runnerId: c.data.runnerId,
+				dist: Math.hypot(
+					c.data.x() + c.data.width() / 2 - x,
+					c.data.y() + c.data.height() / 2 - y,
+				),
+			}))
+			.filter(({ dist }) => dist < RUNNER_LABEL_RENDER_DISTANCE)
+			.sort((a, b) => a.dist - b.dist)[0]
+
+		if (closest) {
+			if (closest.runnerId.startsWith('custom_')) {
+				// No name: a racer's is whatever its visitor typed in
+				track('header_runner_clicked', {
+					runner_type: 'custom_racer',
+				})
+				navigate('/custom-racer')
+			} else if (closest.runnerId.startsWith('guest_')) {
+				track('header_runner_clicked', { runner_type: 'guest' })
+				const entry = guestRunners[closest.runnerId]
+				if (entry) {
+					navigate(`/guests/${entry[0]().id}`)
+				}
+			} else {
+				track('header_runner_clicked', {
+					runner_type: 'member',
+					member_name: closest.runnerId,
+				})
+				navigate(`/member/${closest.runnerId}`)
+			}
+		} else {
+			track('header_background_clicked')
+			navigate('/')
+		}
+	}
 
 	return (
 		<div
@@ -942,11 +1006,7 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 			<A href="/custom-racer/add" class={styles.addRacer}>
 				+ Add Racer
 			</A>
-			<div
-				aria-hidden="true"
-				class={styles.root}
-				style={{ '--cloud-dim': cloudDim() }}
-			>
+			<div aria-hidden="true" class={styles.root}>
 				<div class={styles.underlay}>
 					<div
 						class={styles.path}
@@ -1023,60 +1083,19 @@ export function ScoopBusHeader(props: ScoopBusHeaderProps) {
 						}}
 					/>
 				</div>
-				<div class={styles.canvas}>
-					<Canvas
+				<div class={styles.canvas} ref={sceneBox}>
+					<CanvasRenderer
 						scene={scene}
 						style={{ cursor: 'pointer', background: 'transparent' }}
-						onClick={({ x, y }) => {
-							// A carved pumpkin on the path, which is in front of
-							// whoever's running past it, goes to the patch.
-							if (pumpkinAt(scene, { x, y })) {
-								// Track the pumpkin patch being opened from the header in Mixpanel
-								// (not the pumpkin's name, which is free text)
-								track('header_pumpkin_clicked')
-								navigate('/pumpkins')
-								return
-							}
-							const closest = scene
-								.getControllersByType<RunnerController>('runner')
-								// A skeleton has no page to go to, so a click on one
-								// goes through to whatever's behind it.
-								.filter((c) => !isSkeleton(c.data.runnerId))
-								.map((c) => ({
-									runnerId: c.data.runnerId,
-									dist: Math.hypot(
-										c.data.x() + c.data.width() / 2 - x,
-										c.data.y() + c.data.height() / 2 - y,
-									),
-								}))
-								.filter(({ dist }) => dist < RUNNER_LABEL_RENDER_DISTANCE)
-								.sort((a, b) => a.dist - b.dist)[0]
-
-							if (closest) {
-								if (closest.runnerId.startsWith('custom_')) {
-									// No name: a racer's is whatever its visitor typed in
-									track('header_runner_clicked', {
-										runner_type: 'custom_racer',
-									})
-									navigate('/custom-racer')
-								} else if (closest.runnerId.startsWith('guest_')) {
-									track('header_runner_clicked', { runner_type: 'guest' })
-									const entry = guestRunners[closest.runnerId]
-									if (entry) {
-										navigate(`/guests/${entry[0]().id}`)
-									}
-								} else {
-									track('header_runner_clicked', {
-										runner_type: 'member',
-										member_name: closest.runnerId,
-									})
-									navigate(`/member/${closest.runnerId}`)
-								}
-							} else {
-								track('header_background_clicked')
-								navigate('/')
-							}
-						}}
+						onClick={onSceneClick}
+						overlay={
+							<HeaderOverlay
+								scene={scene}
+								labelledRunner={labelledRunner}
+								hoveredPumpkin={hoveredPumpkin}
+							/>
+						}
+						pixelated
 					/>
 				</div>
 				<div

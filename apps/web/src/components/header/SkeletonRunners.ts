@@ -15,7 +15,7 @@ import {
 	skeletonRunners,
 } from '@/data/runners'
 import type { Scene } from 'scoopjs'
-import { type Accessor, createSignal } from 'solid-js'
+import { createSignal } from 'solid-js'
 import { addToPath } from './PathOrder'
 import {
 	type RunnerController,
@@ -105,11 +105,7 @@ function registerSkeletons() {
  * the depth their feet put them, or take them away again. Safe to call
  * whenever: it only adds the ones that aren't already out.
  */
-export function syncSkeletons(
-	scene: Scene,
-	on: boolean,
-	labelled: Accessor<string | undefined>,
-) {
+export function syncSkeletons(scene: Scene, on: boolean) {
 	const out = scene
 		.getControllersByType<RunnerController>('runner')
 		.filter((runner) => isSkeleton(runner.data.runnerId))
@@ -134,7 +130,6 @@ export function syncSkeletons(
 				key,
 				Math.ceil(Math.random() * 30),
 				scene,
-				labelled,
 			),
 		)
 	if (!joining.length) return

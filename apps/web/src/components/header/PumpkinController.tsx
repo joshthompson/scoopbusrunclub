@@ -1,3 +1,4 @@
+import pumpkinBaseAsset from '@/assets/halloween/pumpkin-base.png'
 import { RUNNER_SIZE } from '@/data/runners'
 import { halloweenAssetSize, isHalloween, pumpkinTint } from '@/utils/halloween'
 import {
@@ -5,12 +6,17 @@ import {
 	headerPumpkin,
 	isCarvedPumpkin,
 } from '@/utils/pumpkins'
-import { css } from '@style/css'
-import { type Scene, createController, createObjectSignal } from 'scoopjs'
-import { type Accessor, Show } from 'solid-js'
-import { PumpkinLight, createBlink } from '../PumpkinLight'
+import {
+	type DrawPainting,
+	type Scene,
+	createController,
+	createObjectSignal,
+} from 'scoopjs'
+import type { Accessor } from 'solid-js'
+import { createBlink } from '../PumpkinLight'
 import { addBehindBus, addToPath } from './PathOrder'
 import type { RunnerController } from './RunnerController'
+import { tintedLayers } from './canvasArt'
 
 /**
  * Pumpkins are drawn at their own pixel size, the same as the scenery and the
@@ -66,26 +72,35 @@ const HOVER_SLOP = 4
 /** How far the bus's scoop sticks out in front of it (see `BusController`). */
 const SCOOP_REACH = 22
 
+/** A carved pumpkin's inside, dark, and lit up: as `PumpkinLight` has it. */
+const LIGHT_OFF = '#000'
+const LIGHT_ON = '#ffe90a'
+
 /**
- * A pumpkin drawn as a child of its sprite rather than as the sprite's frame,
- * so its tint can go on it and its inside together. On the sprite's inner box
- * the filter makes that box a stacking context of its own, and the inside,
- * which sits behind at `z-index: -1`, ends up in front of the box's own
- * background, which is where the frame's drawn. Here the image is the
- * inside's sibling instead, and the label (the loose one's) stays untinted.
+ * A pumpkin, in a Draw Hook: the one at `url`, with its inside showing
+ * through the holes if it's a carved one, all tinted together. The tint is worked into the picture, which is kept, since
+ * WebKit's canvas can't filter what a Draw Hook draws.
  */
-function TintedPumpkin(props: { image: string; lit?: boolean }) {
-	return (
-		<span class={styles.tinted} style={{ filter: pumpkinTint(props.image) }}>
-			<Show when={isCarvedPumpkin(props.image)}>
-				<PumpkinLight lit={props.lit} />
-			</Show>
-			<span
-				class={styles.image}
-				style={{ 'background-image': `url(${props.image})` }}
-			/>
-		</span>
-	)
+function paintPumpkin(
+	{ ctx, image }: DrawPainting,
+	url: string,
+	lit: boolean,
+	width: number,
+	height: number,
+) {
+	const front = image(url)
+	if (!front) return
+	const layers: Parameters<typeof tintedLayers>[0] = [{ url, loaded: front }]
+	if (isCarvedPumpkin(url)) {
+		const inside = image(pumpkinBaseAsset)
+		if (!inside) return
+		layers.unshift({
+			url: pumpkinBaseAsset,
+			loaded: inside,
+			fill: lit ? LIGHT_ON : LIGHT_OFF,
+		})
+	}
+	ctx.drawImage(tintedLayers(layers, pumpkinTint(url)), 0, 0, width, height)
 }
 
 /** The bits of a runner a pumpkin on their head needs. */
@@ -119,7 +134,7 @@ export function createPumpkinController(runner: Wearer) {
 		init: () => ({
 			id: `${runner.id}-pumpkin`,
 			type: 'pumpkin',
-			// Drawn by `TintedPumpkin` instead.
+			// Drawn by `paintPumpkin` instead.
 			frames: () => [],
 			x: () => (head()?.x ?? 0) * RUNNER_SIZE - width() / 2,
 			y: () => (head()?.y ?? 0) * RUNNER_SIZE + NECK_DROP - height(),
@@ -131,13 +146,12 @@ export function createPumpkinController(runner: Wearer) {
 			style: () => ({
 				display: size() && head() ? 'block' : 'none',
 			}),
-			// A carved one still has its inside while it's worn.
-			children: () => (
-				<Show when={asset()}>
-					{(worn) => <TintedPumpkin image={worn()} lit={blinkedOn()} />}
-				</Show>
-			),
 		}),
+		// A carved one still has its inside while it's worn.
+		draw(painting) {
+			const worn = asset()
+			if (worn) paintPumpkin(painting, worn, blinkedOn(), width(), height())
+		},
 	})
 }
 
@@ -236,7 +250,7 @@ function createLoosePumpkinController(
 			return {
 				id,
 				type: LOOSE_PUMPKIN_TYPE,
-				// Drawn by `TintedPumpkin` instead.
+				// Drawn by `paintPumpkin` instead.
 				frames: () => [],
 				...createObjectSignal(x, 'x'),
 				y: () => bottom() - height(),
@@ -251,23 +265,19 @@ function createLoosePumpkinController(
 				height,
 				label: () => pumpkin().label,
 				style: () => ({ display: shown() && size() ? 'block' : 'none' }),
-				// The pumpkin, with its inside if it's a carved one, lit up while
-				// it's hovered and occasionally by itself, and its name, styled to
-				// match the runners'.
-				children: () => (
-					<>
-						<TintedPumpkin image={asset()} lit={hovered() || blinkedOn()} />
-						<div
-							class={styles.label}
-							style={{
-								display: hovered() ? 'block' : 'none',
-							}}
-						>
-							{pumpkin().label}
-						</div>
-					</>
-				),
 			}
+		},
+		// The pumpkin, with its inside if it's a carved one, lit up while it's
+		// hovered and occasionally by itself. Its name is shown by the header
+		// while it's hovered.
+		draw(painting) {
+			paintPumpkin(
+				painting,
+				asset(),
+				hovered() || blinkedOn(),
+				width(),
+				height(),
+			)
 		},
 		onEnterFrame({ $, $scene, $controller }) {
 			if (!size()) return
@@ -416,32 +426,4 @@ export function pumpkinAt(scene: Scene, point: Vector) {
 				point.y >= data.y() - HOVER_SLOP &&
 				point.y <= data.bottom() + HOVER_SLOP,
 		)
-}
-
-const styles = {
-	tinted: css({
-		position: 'absolute',
-		inset: 0,
-		isolation: 'isolate',
-	}),
-	image: css({
-		position: 'absolute',
-		inset: 0,
-		backgroundSize: '100% 100%',
-		backgroundRepeat: 'no-repeat',
-	}),
-	label: css({
-		position: 'absolute',
-		left: '50%',
-		bottom: '100%',
-		translate: '-50% -4px',
-		background: 'var(--color-black)',
-		color: 'var(--color-white)',
-		fontFamily: '"Jersey 10", sans-serif',
-		fontSize: '12px',
-		p: '0px 8px',
-		width: 'max-content',
-		borderRadius: '3px',
-		cornerShape: 'notch',
-	}),
 }

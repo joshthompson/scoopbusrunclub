@@ -100,6 +100,8 @@ export function createGhostController(id: string, index: number) {
 			const { out, setOut } = createObjectSignal(false, 'out')
 			// Where it's drawn, bob and all, which is what the floor cuts off.
 			const y = () => ghostY() + bob()
+			// How much of it is below the floor, from the bottom of its box.
+			const underground = () => Math.max(0, y() + height() - FLOOR_Y)
 			return {
 				id,
 				type: 'ghost',
@@ -117,12 +119,20 @@ export function createGhostController(id: string, index: number) {
 				...createObjectSignal(0, 'rotation'),
 				width,
 				height,
+				underground,
 				style: () => ({
 					display: out() && size() ? 'block' : 'none',
 					opacity: opacity(),
-					'clip-path': `inset(0 0 ${Math.max(0, y() + height() - FLOOR_Y)}px 0)`,
 				}),
 			}
+		},
+		// Only what's above the floor. It's upright by the time it's going under,
+		// so the bottom of its own box is the bottom on the screen.
+		draw({ ctx, drawDefault, $ }) {
+			ctx.beginPath()
+			ctx.rect(0, 0, $.width(), $.height() - $.underground())
+			ctx.clip()
+			drawDefault()
 		},
 		onEnterFrame({ $, $scene, $age }) {
 			if (!isHalloween()) {

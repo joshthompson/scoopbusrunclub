@@ -7,12 +7,13 @@ import {
 } from '@/data/runners'
 import { ZOMBIE_PACE, ZOMBIE_TINT, isHalloween } from '@/utils/halloween'
 import { imageSize } from '@/utils/imageSize'
-import { css } from '@style/css'
+import { seasonalAsset } from '@/utils/seasons'
 import { type Scene, createController, createObjectSignal } from 'scoopjs'
-import type { Accessor, JSX } from 'solid-js'
+import type { JSX } from 'solid-js'
 import { createCameraFlashController } from './CameraFlashController'
 import { createChristmasHatController } from './ChristmasHatController'
 import { createPumpkinController } from './PumpkinController'
+import { tinted } from './canvasArt'
 
 export const RUNNER_LABEL_RENDER_DISTANCE = 50
 
@@ -156,8 +157,6 @@ export function createRunnerController(
 	runnerId: keyof typeof runners | string,
 	yShift: number,
 	scene: Scene,
-	/** The id of whichever runner's name is showing (see `labelledRunnerAt`). */
-	labelled: Accessor<string | undefined>,
 ) {
 	const [runner] = findRunnerSignal(runnerId) ?? []
 	if (!runner) throw new Error(`Runner "${runnerId}" not found`)
@@ -253,24 +252,11 @@ export function createRunnerController(
 				undeadPace,
 				// The pumpkin they've picked up off the path, if they're wearing one.
 				...createObjectSignal(undefined as string | undefined, 'wornPumpkin'),
-				inner: {
-					style: (): JSX.CSSProperties => {
-						const size = still()
-						return {
-							// On the frame image alone, so their pumpkin stays orange.
-							...(zombie() ? { filter: ZOMBIE_TINT } : {}),
-							// A single image at its own size, feet on the ground, rather
-							// than stretched to fill a box the size of their run frames.
-							...(size
-								? {
-										'background-size': `${size.width * RUNNER_SIZE}px ${size.height * RUNNER_SIZE}px`,
-										'background-position': 'left bottom',
-										'background-repeat': 'no-repeat',
-									}
-								: {}),
-						}
-					},
-				},
+				still,
+				// The canvas tints whatever they carry too, which never matters: a
+				// pumpkin cures a zombie, and nobody's one for Christmas.
+				style: (): JSX.CSSProperties =>
+					zombie() ? { filter: ZOMBIE_TINT } : {},
 				// How far they run in a tick, on average: what a furby aims ahead by.
 				step: () =>
 					runner().speed * pace * undeadPace() * (1 + STRIDE_JITTER / 2),
@@ -278,48 +264,47 @@ export function createRunnerController(
 				ground: () => baseY + height(),
 				width,
 				height,
-				// Their name, shown while they're the runner `labelled` says.
-				children: () => {
-					const label = () => {
-						const name = runner().name
-						const parts: string[] = []
-						if (runner().latestTime && runnerId !== 'link')
-							// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-							parts.push(runner().latestTime!)
-						if (runner().volunteerRoles?.length)
-							// biome-ignore lint/style/noNonNullAssertion: value guaranteed by surrounding logic
-							parts.push(...runner().volunteerRoles!)
-						const suffix = parts.length ? ` - ${parts.join(', ')}` : ''
-						return name + suffix
-					}
-
-					return (
-						<div
-							style={{
-								display: labelled() === id ? 'block' : 'none',
-								transform:
-									runnerId === 'lyra' || runnerId === 'link'
-										? 'translate(-50%, -50%)'
-										: 'translate(-50%, -150%)',
-							}}
-							class={css({
-								position: 'absolute',
-								background: 'var(--color-black)',
-								left: '50%',
-								color: 'var(--color-white)',
-								fontFamily: '"Jersey 10", sans-serif',
-								fontSize: '12px',
-								p: '0px 8px',
-								width: 'max-content',
-								borderRadius: '3px',
-								cornerShape: 'notch',
-							})}
-						>
-							{label()}
-						</div>
-					)
+				// Their name, with their time or what they volunteered as, shown
+				// over them by the header while they're nearest the mouse (see
+				// `labelledRunnerAt`).
+				label: () => {
+					const parts: string[] = []
+					const { name, latestTime, volunteerRoles } = runner()
+					if (latestTime && runnerId !== 'link') parts.push(latestTime)
+					if (volunteerRoles?.length) parts.push(...volunteerRoles)
+					return parts.length ? `${name} - ${parts.join(', ')}` : name
 				},
+				// How far up the label sits, in its own heights: Lyra and Link are
+				// small enough that it would float off above them.
+				labelRaise: () =>
+					runnerId === 'lyra' || runnerId === 'link' ? 0.5 : 1.5,
 			}
+		},
+		// A single image at its own size, feet on the ground, rather than
+		// stretched to fill a box the size of their run frames. A zombie's tint is
+		// worked into the image, since WebKit's canvas can't filter what a Draw
+		// Hook draws.
+		draw({ ctx, drawDefault, image, $, $currentFrame }) {
+			const size = $.still()
+			if (!size) {
+				drawDefault()
+				return
+			}
+			const url = $.frames()[$currentFrame]
+			const loaded = url && image(url)
+			if (!loaded) return
+			ctx.filter = 'none'
+			const width = size.width * RUNNER_SIZE
+			const height = size.height * RUNNER_SIZE
+			ctx.drawImage(
+				$.zombie()
+					? tinted(seasonalAsset(url), loaded, ZOMBIE_TINT)
+					: loaded.image,
+				0,
+				$.height() - height,
+				width,
+				height,
+			)
 		},
 		onEnterFrame({ $, $scene }) {
 			const state = headerState(runner().runnerState)

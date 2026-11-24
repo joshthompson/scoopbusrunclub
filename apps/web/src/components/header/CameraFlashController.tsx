@@ -15,6 +15,7 @@ export function createCameraFlashController(id: string, x: number, y: number) {
 	const [opacity, setOpacity] = createSignal(1)
 
 	return createController({
+		frames: [flashAsset],
 		init() {
 			return {
 				id,
@@ -24,11 +25,8 @@ export function createCameraFlashController(id: string, x: number, y: number) {
 				width: () => FLASH_SIZE,
 				height: () => FLASH_SIZE,
 				style: () => ({
-					'background-image': `url(${flashAsset})`,
-					'background-size': '100% 100%',
 					'image-rendering': 'pixelated',
 					opacity: opacity() * MAX_OPACITY,
-					'pointer-events': 'none',
 				}),
 			}
 		},

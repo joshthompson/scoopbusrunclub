@@ -119,8 +119,11 @@ function createStringSegment(
 				return (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI
 			},
 			origin: () => ({ x: 0, y: STRING_THICKNESS / 2 }),
-			style: () => ({ background: STRING_COLOR }),
 		}),
+		draw({ ctx, $ }) {
+			ctx.fillStyle = STRING_COLOR
+			ctx.fillRect(0, 0, $.width(), $.height())
+		},
 	})
 }
 
