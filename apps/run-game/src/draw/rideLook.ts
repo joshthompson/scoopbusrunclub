@@ -163,7 +163,7 @@ export interface RideLook {
 	 */
 	trick?: { frames: string[]; ticks: number; word: string }
 	/**
-	 * A rarer one, now and then one of them, `share` of the time: its own
+	 * A rarer one, occasionally one of them, `share` of the time: its own
 	 * look, and its own Collectable, ridden the same.
 	 */
 	rare?: {
@@ -216,7 +216,7 @@ const CAMEL: RideLook = {
 	sound: 'groan',
 	rides: 'Camel rides',
 	spent: { kind: 'droop', from: 21, droop: 3, face: [29, 19] },
-	// Now and then, two humps.
+	// Occasionally, two humps.
 	rare: {
 		picture: bactrianPicture,
 		shadow: CAMEL_OUTLINE,

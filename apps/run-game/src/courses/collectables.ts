@@ -82,6 +82,12 @@ const WHERE: Record<CourseId, string> = {
 	'memory-dunk': 'in the',
 	paintbrush: 'in the',
 	'hungry-goose': 'in the',
+	'bomb-hat': 'in the',
+	lollapascoopza: 'in the',
+	'mr-claws': 'in the',
+	'fika-defence': 'in the',
+	'skate-jam': 'in the',
+	jughead: 'in the',
 }
 
 /**

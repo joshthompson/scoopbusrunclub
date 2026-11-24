@@ -1,3 +1,4 @@
+import { SONGS } from './lollapascoopza'
 import type { Track } from './synth'
 
 /**
@@ -11,7 +12,7 @@ import type { Track } from './synth'
  * to a line, 16 bars long, about half a minute, so it's a while before it
  * comes round again: its tune, the tune again with a new turn to it, a
  * middle bit on other chords, and the tune once more to bring it home. A
- * shorter pattern, a bell now and then, goes round again to fill it. Change
+ * shorter pattern, a bell occasionally, goes round again to fill it. Change
  * a note, and that's the tune changed.
  */
 
@@ -470,7 +471,7 @@ const MIDNATT_ROCK: Tune = {
 
 /**
  * The choir's, up at Sofiakyrkan: the beat all but gone, the chords sung
- * and held, a deep bass under them, a bell now and then, and the tune sung
+ * and held, a deep bass under them, a bell occasionally, and the tune sung
  * over it all.
  */
 const MIDNATT_CHOIR: Tune = {
@@ -774,8 +775,8 @@ export const TUNES: Record<string, Tune> = {
 		],
 	},
 
-	// Along the wall: C pentatonic, plucked like a guzheng, a bell now and
-	// then, and a higher, slower middle over A minor.
+	// Along the wall: C pentatonic, plucked like a guzheng, a bell occasionally,
+	// and a higher, slower middle over A minor.
 	'great-wall': {
 		bars: 16,
 		tracks: [
@@ -1606,6 +1607,8 @@ export const TUNES: Record<string, Tune> = {
 	'rocket-launch': ROCKET_LAUNCH,
 	'rocket-launch:space': ROCKET_SPACE,
 	'rocket-launch:boss': ROCKET_BOSS,
+	// Lollapascoopza's songs, for the menus: the minigame plays them itself.
+	...Object.fromEntries(SONGS.map((song) => [song.id, song.tune])),
 }
 
 /** A course with no tune of its own yet gets Haga's. */

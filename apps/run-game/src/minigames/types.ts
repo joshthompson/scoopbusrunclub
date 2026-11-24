@@ -22,6 +22,12 @@ export type MinigameId =
 	| 'memory-dunk'
 	| 'paintbrush'
 	| 'hungry-goose'
+	| 'bomb-hat'
+	| 'lollapascoopza'
+	| 'mr-claws'
+	| 'fika-defence'
+	| 'skate-jam'
+	| 'jughead'
 
 export interface Minigame {
 	id: MinigameId
@@ -58,6 +64,17 @@ export interface MinigameRun {
 	id: MinigameId
 	/** A tick of it, after everyone's moved. On the Host only. */
 	step(): void
+	/**
+	 * How much higher than usual `racer`'s name tag goes, in px: over
+	 * whatever the game's put on their head (Bomb Hat's bomb). None, if not said.
+	 */
+	tagRise?(racer: Racer): number
+	/**
+	 * What `racer` holding `held` comes to, for running about: Mr Claws'
+	 * up is a Pinch, not a jump, so the engine's told it's not held. As
+	 * held, if not said. On the Host only.
+	 */
+	controls?(racer: Racer, held: Controls): Controls
 	/** Ticks left on its clock, which starts on "Go!", by the race's ticks. */
 	ticksLeft(): number
 	/** How `racer`'s doing, in a word or two, on the HUD: "2/4", "Out". */
@@ -150,7 +167,7 @@ export interface MinigameFrame {
 	 * Paintbrush: the tick this frame was made, and its brush strokes from
 	 * `strokesFrom` on, [tick, racer (their place in the racers), x0, y0, x1,
 	 * y1 (px across and down the wall), big (1)], in the order they were
-	 * painted; and now and then the whole wall, [tick, its cells run-length
+	 * painted; and occasionally the whole wall, [tick, its cells run-length
 	 * coded], for a screen that's missed some.
 	 */
 	paintAt?: number
@@ -175,6 +192,91 @@ export interface MinigameFrame {
 	winner?: number
 	/** Who's stealing from the other team's nest: [their place in the racers, since when]. */
 	stealing?: [number, number][]
+	// Bomb Hat's fields, below this line.
+	/**
+	 * Bomb Hat's bomb: [on whose head (their place in the racers, -1 none),
+	 * lit at, which creature, passed from (-1 nobody), passed at, how many
+	 * lit, the next lit at (-1 not due)], by the race's ticks; when each
+	 * racer was blown up (-1 not), and how many times they've passed it on;
+	 * and its blasts, [x, y, at, creature].
+	 */
+	bomb?: [number, number, number, number, number, number, number]
+	blown?: number[]
+	tags?: number[]
+	blasts?: [number, number, number, number][]
+	// Lollapascoopza's fields, below this line.
+	/**
+	 * Lollapascoopza: each racer's [track and podium x, Rock Meter (out of
+	 * 1000), points, notes hit, notes there were, combo, booed off at (-1
+	 * not), last grade, graded at, last arrow pressed, pressed at], by the
+	 * race's ticks; the steps of the notes each has played lately; which
+	 * song it is (its place in `SONGS`); and when it was decided (-1 not yet).
+	 */
+	rock?: number[][]
+	rockHits?: number[][]
+	rockSong?: number
+	rockEnd?: number
+	// Mr Claws' fields, below this line.
+	/**
+	 * Mr Claws: each racer's [Pinch begun at (-1 not), who they're carrying
+	 * (their place in the racers, -1 nobody), carrying since, Struggle
+	 * (out of 100), in the Sea at (-1 not), how many they've sent in,
+	 * safe till, Guard left (out of 100), Guard broken (1)], by the race's
+	 * ticks; and Clashes, [x, y, at]; and
+	 * splashes, [x, at].
+	 */
+	claws?: number[][]
+	clashes?: [number, number, number][]
+	clawSplashes?: [number, number][]
+	// Fika Defence's fields, below this line.
+	/** Fika Defence: each table's places, what's on each (its place in `SPREAD`, -1 nothing). */
+	fikaTables?: [number[], number[]]
+	/**
+	 * Its raiders: [id, kind (its place in `RAIDER_KINDS`), x, y, stage (its
+	 * place in `RAIDER_STAGES`), since (the world's ticks), facing, what it's
+	 * carrying off (-1 nothing), how shoved a moose is].
+	 */
+	fikaRaiders?: [
+		number,
+		number,
+		number,
+		number,
+		number,
+		number,
+		number,
+		number,
+		number,
+	][]
+	/** Fika dropped, or being carried: [id, what (its place in `SPREAD`), x, y, carried by (their place in the racers, -1 not)]. */
+	fikaLoose?: [number, number, number, number, number][]
+	// Skate Jam's fields, below this line.
+	/**
+	 * Skate Jam: each racer's [x, y, in the air (1), turned in the air,
+	 * facing, board trick (its place in `SKATE_TRICKS`; -1 none), ticks
+	 * into it, wipeout ticks left, grinding since (-1 not), points banked,
+	 * combo's points, combo's times, last landed at, won and dancing (1),
+	 * grabbing till, manual's balance
+	 * (out of 100; -999 not in one), on its nose (1)], by the world's ticks.
+	 */
+	skaters?: number[][]
+	// Jughead's fields, below this line.
+	/** Jughead: each racer's jug, [how full (out of 1000), its surface's tilt (out of 1000), filled at (-1 not)]. */
+	jugs?: [number, number, number][]
+	/** Its jets of water, [id, kind (its place in `JET_KINDS`), x, y, vx and vy (out of 100), from, until, strength (out of 100), what's said (its place in `MISHAPS`, -1 nothing)]. */
+	jets?: [
+		number,
+		number,
+		number,
+		number,
+		number,
+		number,
+		number,
+		number,
+		number,
+		number,
+	][]
+	/** Jughead: how deep the floor's flooded, in px (out of 100). */
+	flood?: number
 }
 
 /** Nothing held: what a bot holds with nothing to do. */

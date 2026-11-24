@@ -253,7 +253,11 @@ export function RoundHud(props: {
 		const scale = racer.body.scale ?? 1
 		const height = racer.runner.sprite.height * RUNNER_SCALE * scale
 		// Over their hat, if it stands up over their head.
-		const rise = hatRise(racer.runner, racer.body.hat, RUNNER_SCALE) * scale
+		// And over anything a minigame's put on their head: Bomb Hat's bomb.
+		const rise =
+			(hatRise(racer.runner, racer.body.hat, RUNNER_SCALE) +
+				(world.minigame?.tagRise?.(racer) ?? 0)) *
+			scale
 		// Up on a camel's back, or a corgi's, or on skis: lifted as they are.
 		const { body } = racer
 		const lift =
@@ -291,7 +295,7 @@ export function RoundHud(props: {
 	 * How to join, in the corner, faded to `CORNER_SEEN_THROUGH` while
 	 * anyone's under it, so it never hides them: by where it is on the
 	 * stage, measured, against each runner's box, as the name tags are
-	 * placed. Eased in and out, a little a tick. Measured now and then, not
+	 * placed. Eased in and out, a little a tick. Measured occasionally, not
 	 * every tick: it only moves if the window's resized.
 	 */
 	let hud: HTMLDivElement | undefined

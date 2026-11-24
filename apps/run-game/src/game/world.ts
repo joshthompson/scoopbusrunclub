@@ -152,6 +152,12 @@ export interface Body {
 	 */
 	swimming?: boolean
 	/**
+	 * Swimming along the surface, out of a minigame, in its water: drawn
+	 * lying along, head first, in their swim pose, as under the sea (see
+	 * `minigames/treadWater`).
+	 */
+	paddling?: boolean
+	/**
 	 * Baby Mode, fallen: floated back in a bubble, `from` where they fell
 	 * `to` where they're put back (see `respawn`), from the tick `at`, for
 	 * `ticks`; on a glider, `glide`, back up in the sky over the sea.
@@ -242,6 +248,11 @@ export interface Body {
 	airBase?: number
 	/** In a River, wading, last tick: to splash in only on the way in. */
 	wading?: boolean
+	/**
+	 * Wading a minigame's flood (Jughead's): no faster than this, the next
+	 * tick. Set by the minigame every tick they're in it, and used up.
+	 */
+	wadeTop?: number
 	/** Been down a Secret, and thrown back up out of it: Everest's special goal. */
 	foundSecret?: boolean
 	/** Called out to, coming up to whoever's at a Secret's far end (see `Secret['greets']`). */
@@ -306,6 +317,15 @@ export interface Body {
 	 * whichever way they're sliding.
 	 */
 	icePose?: 'stand' | 'run'
+	/**
+	 * Stood on a skateboard, as Skate Jam has them: drawn on it in their
+	 * snowboard stance, their feet on its deck wherever they are on the
+	 * ramp, turned `turn` degrees; `across` their width, 1 to -1 and back,
+	 * spun round; curled up in a trick, or in a heap, wiped out; and the
+	 * board, in a kickflip, turning over under them, which of its frames
+	 * (`SKATEBOARD_FLIP`), if it is.
+	 */
+	skate?: { turn: number; across: number; crouched: boolean; flip?: number }
 }
 
 /**
@@ -321,7 +341,7 @@ export const TRICK_KINDS: TrickKind[] = [
 ]
 
 /**
- * Someone else out running: anyone at all, or now and then a club member.
+ * Someone else out running: anyone at all, or occasionally a club member.
  * Like the runner's body, `x` is the middle of their feet.
  */
 export interface Pacer {
@@ -749,7 +769,7 @@ export function createWorld(
 
 	/**
 	 * Which of the course's Rides is the rarer one, this time, if its Rides
-	 * have one and it's turned up: now and then, one in place of any of them.
+	 * have one and it's turned up: occasionally, one in place of any of them.
 	 * A Remote Player's is the Host's, sent with the rest (see `Mirror`).
 	 */
 	const share = rideLook(course).rare?.share ?? 0

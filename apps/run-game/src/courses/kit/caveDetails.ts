@@ -168,7 +168,7 @@ const explorer = still(
 
 /**
  * Rock, in whatever shape `inside` says, lit as the cave's is: a lit cell
- * along its tops, shade along its undersides and its right, now and then
+ * along its tops, shade along its undersides and its right, occasionally
  * a seam.
  */
 function rock(

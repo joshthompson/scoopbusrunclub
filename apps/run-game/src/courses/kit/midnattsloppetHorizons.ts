@@ -229,7 +229,7 @@ export const SODER_NEAR = (() => {
 				const on = random()
 				if (on < 0.07) rect(wx, y, 2, 4, on < 0.05 ? WINDOW : LAMP)
 			}
-		// A gap now and then, a lower roof in it.
+		// A gap occasionally, a lower roof in it.
 		if (random() < 0.35) {
 			const gap = even(10 + random() * 16)
 			const low = even(118 + random() * 14)

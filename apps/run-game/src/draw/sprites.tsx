@@ -191,6 +191,16 @@ import {
 } from './art/sewer'
 import { SHARK_FRAMES, SHARK_HEIGHT, SHARK_WIDTH } from './art/shark'
 import {
+	SKATEBOARD_FLIP,
+	SKATEBOARD_HEIGHT,
+	SKATEBOARD_SADDLE,
+	SKATEBOARD_WIDTH,
+	skateboardPicture,
+} from './art/skateboard'
+
+/** How far down off their feet a skateboard's kicked, kickflipping, in Skate Jam: a cell or two. */
+const KICKED_DOWN = 4
+import {
 	STOOD_HEIGHT,
 	STOOD_WIDTH,
 	UNDER_LIFT,
@@ -416,7 +426,8 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		(body.ducking ||
 			sat(body) ||
 			(seated && body.carried > 0) ||
-			(body.board > 0 && crouched(body))) &&
+			(body.board > 0 && crouched(body)) ||
+			!!body.skate?.crouched) &&
 		!!sit
 	/**
 	 * Tucked down on skis, on the snow, or curled up in a trick: in their ski
@@ -431,10 +442,10 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		(curled(body) || body.ducking)
 	/** Stood up on skis, not a snowboard, in their ski pose, if they've one: poles in hand. */
 	const onSkis = () =>
-		world.ticks() >= 0 &&
-		!!stanceOf(sprite, body.board) &&
-		!tucked() &&
-		!ducking()
+		world.ticks() >= 0 && !!stance() && !tucked() && !ducking()
+	/** How they stand on what's under their feet: skis, a snowboard, or a skateboard, in their snowboard stance. */
+	const stance = () =>
+		body.skate ? sprite.snowboard : stanceOf(sprite, body.board)
 	// Stood still, on their feet: on the start line, or stopped.
 	const standing = () =>
 		world.ticks() >= 0 &&
@@ -458,7 +469,8 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 		world.ticks() >= 0 &&
 		racer.out !== 'scooped' &&
 		!body.grounded &&
-		underwater(world, body.x, body.feetY)
+		// Or along the surface of a minigame's water, out of it.
+		(!!body.paddling || underwater(world, body.x, body.feetY))
 	const swim = sprite.swim
 	const dive = sprite.dive
 	const swimSize = swim
@@ -480,7 +492,10 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 	// the stand frame, turned over. On skis, stood up on them.
 	const lying = () =>
 		world.ticks() >= 0 &&
-		(body.gliding || body.board > 0 || (!!stood && body.mount > 0))
+		(body.gliding ||
+			body.board > 0 ||
+			!!body.skate ||
+			(!!stood && body.mount > 0))
 	/** How they're tipped, lying on a glider: nose up climbing, down diving. */
 	let was = body.feetY
 	let tilt = 0
@@ -522,7 +537,10 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			equals: (a, b) =>
 				a?.kind === b?.kind &&
 				a?.carving === b?.carving &&
-				a?.colour === b?.colour,
+				a?.colour === b?.colour &&
+				// A Crab Hat's claws moving, and its colour fading as its Guard wears out.
+				a?.pose === b?.pose &&
+				a?.tired === b?.tired,
 		},
 	)
 
@@ -564,16 +582,14 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 								: ducking()
 									? poseSize(sit, sprite)
 									: onSkis()
-										? poseSize(stanceOf(sprite, body.board), sprite)
+										? poseSize(stance(), sprite)
 										: runSize
 			return {
 				id: `player-${racer.id}`,
 				// Beach Volleyball's left team, on the far side of its net as it
 				// leans across the sand: drawn behind it (see `RaceView`).
 				type:
-					volleyOf(world)?.teamOf(racer) === 0
-						? 'player-behind-net'
-						: 'player',
+					volleyOf(world)?.teamOf(racer) === 0 ? 'player-behind-net' : 'player',
 				...createObjectSignal(0, 'x'),
 				...createObjectSignal(0, 'y'),
 				width: () => size().width,
@@ -590,7 +606,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 									: ducking() && sit
 										? [sit]
 										: onSkis()
-											? [stanceOf(sprite, body.board) ?? stand ?? run[0]]
+											? [stance() ?? stand ?? run[0]]
 											: (standing() || lying()) && stand
 												? [stand]
 												: run,
@@ -620,6 +636,12 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			{
 				left: Math.max(0, (MOUND_WIDTH - runSize.width) / 2),
 				right: Math.max(0, (MOUND_WIDTH - runSize.width) / 2),
+			},
+			// Skate Jam's skateboard, under their feet, wider than them.
+			{
+				left: Math.max(0, (SKATEBOARD_WIDTH - runSize.width) / 2),
+				right: Math.max(0, (SKATEBOARD_WIDTH - runSize.width) / 2),
+				bottom: SKATEBOARD_SADDLE + KICKED_DOWN,
 			},
 		),
 		draw({ ctx, drawDefault, image, $, $currentFrame }) {
@@ -665,6 +687,27 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 						spray: spraying,
 						sparks: sparking,
 					})
+				// A skateboard, in Skate Jam: its deck under their feet; or in a
+				// kickflip, turning over, kicked a little way down off them.
+				else if (body.skate) {
+					const { flip } = body.skate
+					paintPicture(
+						ctx,
+						image,
+						flip === undefined
+							? skateboardPicture('sit')
+							: SKATEBOARD_FLIP[flip],
+						Math.round((width - SKATEBOARD_WIDTH) / 2),
+						height +
+							SKATEBOARD_SADDLE -
+							SKATEBOARD_HEIGHT +
+							(flip === undefined || flip === SKATEBOARD_FLIP.length - 1
+								? 0
+								: KICKED_DOWN),
+						SKATEBOARD_WIDTH,
+						SKATEBOARD_HEIGHT,
+					)
+				}
 				const worn = hat()
 				// No hat on: their own, if they've one.
 				const own = worn ? undefined : sprite.ownHat
@@ -706,16 +749,28 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				}
 				if (!worn) return
 				const art = hatArt(worn)
-				// Two heads, and a space helmet: one on each. Every other hat,
-				// just the one.
+				// Two heads: a hat on each, the same.
 				const both =
-					sprite.twoHeads && worn.kind === 'spaceHelmet' && frame
+					sprite.twoHeads && frame
 						? headTops(frame, width, height, lying)
 						: undefined
 				if (both && both.length > 1) {
 					for (const one of both) {
-						const paint = (x: number, y: number) =>
-							paintHat(ctx, image, worn, x, y, { lit: true, now })
+						const paint = (x: number, y: number) => {
+							paintHat(ctx, image, worn, x, y, {
+								lit: true,
+								whirring: floating(),
+								now,
+							})
+							if (worn.kind === 'swordHat')
+								paintSkewered(
+									ctx,
+									image,
+									body.skewered ?? [],
+									x + art.middle,
+									y,
+								)
+						}
 						if (!lying) paint(one.x - art.middle, one.y - art.crown)
 						else {
 							ctx.save()
@@ -796,6 +851,16 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				$.setRotation(pose.rotation)
 				setSpray(pose.spray)
 				setSparks(pose.sparks)
+			} else if (body.skate) {
+				// On a skateboard, in Skate Jam: turned as it says, about their
+				// middle, so put where their feet, on its deck, are on the ramp.
+				const { turn, across } = body.skate
+				const turned = (turn * Math.PI) / 180
+				const half = $.height() / 2 + SKATEBOARD_SADDLE
+				$.setXScale(xScale * across)
+				$.setRotation(turn)
+				$.setX(body.x + half * Math.sin(turned) - width / 2)
+				$.setY(body.feetY - half * Math.cos(turned) - $.height() / 2)
 			} else {
 				$.setXScale(xScale)
 				$.setRotation(
@@ -925,7 +990,7 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			// In a Portal: shrinking, or growing as they're sneezed out, from
 			// their feet; or out of sight, waiting their turn the other side.
 			const portal = heldLook(world, racer)
-			// Waiting in it for everyone else: saying so, and now and then
+			// Waiting in it for everyone else: saying so, and occasionally
 			// looking back for them.
 			const held = world.portal?.held.get(racer.id)
 			if (portal && 'waiting' in portal && held) {
@@ -1006,6 +1071,12 @@ function carriedBy(world: World, goose: Flyer) {
 }
 /** How far from their feet each racer's head was last drawn. */
 const headFromFeet = new WeakMap<Body, { x: number; y: number }>()
+/**
+ * How far from `body`'s feet the top of their head was last drawn, its
+ * middle, as they bob through their run: for something sat on it, a jug
+ * (see `draw/jughead`), to sit on it. Undefined till they've been drawn.
+ */
+export const headFromFeetOf = (body: Body) => headFromFeet.get(body)
 
 /** When each racer was first seen in a haunted house's monster's clutches, on this screen. */
 const caughtSince = new WeakMap<Body, number>()
@@ -1592,8 +1663,8 @@ const GIANT_BLINK = 9
 /**
  * A Giant Furby's face, on the front of its head: its beak swung open as
  * anyone, or the bus, comes near its mouth, and shut again once they've
- * all gone through; its eye on whoever's nearest coming, blinking now and
- * then. All from where everyone is, so the same on every screen.
+ * all gone through; its eye on whoever's nearest coming, blinking occasionally.
+ * All from where everyone is, so the same on every screen.
  */
 export function createGiantFurby(world: World) {
 	const giant = world.course.giantFurby

@@ -84,7 +84,7 @@ function shore(
 
 /**
  * A tuft of reeds growing out of the shallows at `x`, its foot at `base`:
- * a few blades, some bent over at the top, and now and then a bulrush.
+ * a few blades, some bent over at the top, and occasionally a bulrush.
  */
 function tuft(
 	ctx: CanvasRenderingContext2D,
@@ -117,7 +117,7 @@ function tuft(
 	}
 }
 
-/** A lily pad floating at `x`, `y`, and now and then a lotus flower on it. */
+/** A lily pad floating at `x`, `y`, and occasionally a lotus flower on it. */
 function pad(
 	ctx: CanvasRenderingContext2D,
 	x: number,

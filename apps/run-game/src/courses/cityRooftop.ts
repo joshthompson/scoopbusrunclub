@@ -399,7 +399,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 }
 
 /**
- * Washing lines, roof gardens, and now and then a neon sign, each wholly on
+ * Washing lines, roof gardens, and occasionally a neon sign, each wholly on
  * one roof: their own random numbers, so everything else is where it was.
  */
 function rooftopLife(blocks: Block[]): Course['scenery'] {

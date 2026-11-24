@@ -9,7 +9,7 @@ import { COLOURS, type Seat } from './room'
 
 /**
  * A Podium to try out, from the console (`testPodium()` in `debug.ts`):
- * 4 to 8 Players (or as many as it's told), made up, the club's members as them (now and then a
+ * 4 to 8 Players (or as many as it's told), made up, the club's members as them (occasionally a
  * runner or two there is to unlock, too, as if someone had), points and
  * all, and some in a hat, as if they'd finished the last Round in one.
  * You're on the arrows, someone else can have WASD, and everyone else
@@ -28,7 +28,7 @@ const STAYS_UP = 90
 function made(): Seat[] {
 	const count = podiumPlayers ?? 4 + Math.floor(Math.random() * 5)
 	const shuffled = <T,>(all: T[]) => [...all].sort(() => Math.random() - 0.5)
-	// Now and then, one to three of them a runner to unlock: unlocked or
+	// Occasionally, one to three of them a runner to unlock: unlocked or
 	// not in this browser, to see them on the Podium.
 	const unlocked =
 		Math.random() < 0.4 ? Math.min(count, 1 + Math.floor(Math.random() * 3)) : 0
@@ -36,7 +36,7 @@ function made(): Seat[] {
 		...shuffled(UNLOCKABLES).slice(0, unlocked),
 		...shuffled(CLUB).slice(0, count - unlocked),
 	]
-	// Points, each a few under the one before, now and then level.
+	// Points, each a few under the one before, occasionally level.
 	let points = 14 + Math.floor(Math.random() * 20)
 	const seats = who.map(
 		(runner, i): Seat => ({
@@ -65,7 +65,7 @@ function made(): Seat[] {
 
 /**
  * Someone running about by themselves: off one way or the other, or stood
- * still, a while each, a jump now and then, and now and then, running, a
+ * still, a while each, a jump occasionally, and occasionally, running, a
  * slide.
  */
 function wanderer(): () => Controls {

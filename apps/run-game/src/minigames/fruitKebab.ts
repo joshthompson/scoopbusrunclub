@@ -193,7 +193,7 @@ function startFruitKebab(world: World): MinigameRun {
 	const ticksLeft = () => Math.max(0, KEBAB_TICKS - world.raceTicks())
 	const count = (racer: Racer) => racer.body.skewered?.length ?? 0
 	const done = (racer: Racer) => count(racer) >= KEBAB
-	/** How far off each bot aims, changing now and then: they're not that good. */
+	/** How far off each bot aims, changing occasionally: they're not that good. */
 	const aims = new Map<string, { off: number; until: number }>()
 	const botAim = (id: string) => {
 		const now = world.ticks()

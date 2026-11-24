@@ -1,7 +1,7 @@
 import { imageSize } from '@/utils/imageSize'
-import { Show } from 'solid-js'
+import { For, Show } from 'solid-js'
 import { hatArt } from '../draw/art/hats'
-import { headTop } from '../draw/heads'
+import { headTop, headTops } from '../draw/heads'
 import { RUNNER_SCALE } from '../game/constants'
 import type { Hat } from '../game/hats'
 import type { Playable } from '../runners/playable'
@@ -12,8 +12,8 @@ import { WornMedal } from './Medal'
  * Round in, and their medal, if they're in the top three. Both go where
  * their head is in the frame they're shown in (found from the picture, as
  * a hat's is in a Round: see `headTop`): the hat on top of it, as it sits
- * on in a Round, and the medal round their neck, under it. Turned round
- * with them.
+ * on in a Round (one on each of the Miner Twins' heads), and the medal
+ * round their neck, under it. Turned round with them.
  */
 
 /**
@@ -71,6 +71,36 @@ export function Worn(props: {
 		}
 	}
 	/**
+	 * Where each of their heads is for a hat, the top of it, in their box:
+	 * both of them, the Miner Twins', a hat on each; or the one.
+	 */
+	const hatHeads = (): { x: number; y: number }[] => {
+		const frame = props.frame
+		const one = head()
+		if (!frame || !props.sprite?.twoHeads) return one ? [one] : []
+		if (!props.single) {
+			const found = headTops(
+				frame,
+				(props.width / props.scale) * RUNNER_SCALE,
+				(props.height / props.scale) * RUNNER_SCALE,
+			)
+			if (!found || found.length < 2) return one ? [one] : []
+			return found.map((f) => ({ x: f.x * k(), y: f.y * k() }))
+		}
+		const size = imageSize(frame)
+		if (!size) return one ? [one] : []
+		const found = headTops(
+			frame,
+			size.width * RUNNER_SCALE,
+			size.height * RUNNER_SCALE,
+		)
+		if (!found || found.length < 2) return one ? [one] : []
+		return found.map((f) => ({
+			x: (props.width - size.width * props.scale) / 2 + f.x * k(),
+			y: props.height - size.height * props.scale + f.y * k(),
+		}))
+	}
+	/**
 	 * Their neck, from the top of their head, in their own pixels at
 	 * `RUNNER_SCALE`: from where it is in their first run frame.
 	 */
@@ -110,31 +140,33 @@ export function Worn(props: {
 					/>
 				)}
 			</Show>
-			<Show when={hat() && head()}>
-				{(_) => {
-					const art = () => hat() as NonNullable<ReturnType<typeof hat>>
-					const at = () => head() as { x: number; y: number }
-					// Facing left as the runners do: turned round with them, its
-					// middle stays over their head.
-					const middle = () =>
-						props.flipped ? art().width - art().middle : art().middle
-					return (
-						<img
-							src={art().src}
-							alt=""
-							class="pixelated"
-							style={{
-								position: 'absolute',
-								left: `${across(at().x) - middle() * k()}px`,
-								top: `${at().y - art().crown * k()}px`,
-								width: `${art().width * k()}px`,
-								height: `${art().height * k()}px`,
-								transform: props.flipped ? 'scaleX(-1)' : undefined,
-								'pointer-events': 'none',
-							}}
-						/>
-					)
-				}}
+			<Show when={hat()}>
+				{(art) => (
+					<For each={hatHeads()}>
+						{(at) => {
+							// Facing left as the runners do: turned round with them, its
+							// middle stays over their head.
+							const middle = () =>
+								props.flipped ? art().width - art().middle : art().middle
+							return (
+								<img
+									src={art().src}
+									alt=""
+									class="pixelated"
+									style={{
+										position: 'absolute',
+										left: `${across(at.x) - middle() * k()}px`,
+										top: `${at.y - art().crown * k()}px`,
+										width: `${art().width * k()}px`,
+										height: `${art().height * k()}px`,
+										transform: props.flipped ? 'scaleX(-1)' : undefined,
+										'pointer-events': 'none',
+									}}
+								/>
+							)
+						}}
+					</For>
+				)}
 			</Show>
 		</>
 	)

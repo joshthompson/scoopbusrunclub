@@ -44,7 +44,7 @@ export type Obstacle =
 			range?: [from: number, to: number]
 	  }
 	/**
-	 * A Steam Vent, a grate in the ground: now and then it puffs, and whoever's
+	 * A Steam Vent, a grate in the ground: occasionally it puffs, and whoever's
 	 * on it as it does is fired up into the air.
 	 */
 	| {
@@ -75,7 +75,7 @@ export type Obstacle =
 			shuttle?: [from: number, to: number]
 	  }
 	/**
-	 * A Swamp Man, in a pool of sludge at `x`: now and then he rises out of
+	 * A Swamp Man, in a pool of sludge at `x`: occasionally he rises out of
 	 * it, and grabs whoever's in reach, holding them still till he sinks
 	 * back. Jump him.
 	 */
@@ -104,7 +104,7 @@ export type Obstacle =
 	 */
 	| { kind: 'balloon'; x: number; low: number; high: number }
 	/**
-	 * A Storm Cloud, its middle `height` over the sea: now and then lightning
+	 * A Storm Cloud, its middle `height` over the sea: occasionally lightning
 	 * strikes down out of it into the sea. Into the cloud, or under it as
 	 * it strikes, and you're zapped.
 	 */
@@ -116,7 +116,7 @@ export type Obstacle =
 	 */
 	| { kind: 'turbine'; x: number; height: number }
 	/**
-	 * A whale, surfacing now and then, and spouting `height` up into the
+	 * A whale, surfacing occasionally, and spouting `height` up into the
 	 * air: through the spout as it blows, and you're soaked.
 	 */
 	| { kind: 'whale'; x: number; height: number }
@@ -500,6 +500,14 @@ export interface CourseLook {
 	 */
 	harvester?: { x: number; tree: string; filter?: string }
 	/**
+	 * A big stadium screen behind the track, its middle at `x`, showing a
+	 * broadcast: once whoever's leading gets to `droneFrom`, a drone flies
+	 * in and follows them in, over the line and dancing, and what's behind
+	 * it is shown live on the screen. Only to be seen (see
+	 * `draw/bigScreen.ts`). Kristineberg's.
+	 */
+	bigScreen?: { x: number; droneFrom: number }
+	/**
 	 * Colours that change along the course, for the Ground's layers to fill
 	 * with, as `url(#id)`: each stop a colour from `x` on, till the next.
 	 * A ferry's carpet indoors, its decking out on deck, a quay's granite.
@@ -607,7 +615,7 @@ export interface CourseLook {
 			deep?: { from: number; to: number }
 		}
 	}
-	/** Lightning, flashing now and then. */
+	/** Lightning, flashing occasionally. */
 	lightning?: boolean
 	/** What flies about the sky: bats, ghosts. */
 	skyFlyers?: SkyFlyer[]
@@ -1133,7 +1141,7 @@ export interface Scenery {
 	scale?: number
 	/** A CSS filter, to recolour it. */
 	filter?: string
-	/** Hops on the spot now and then. */
+	/** Hops on the spot occasionally. */
 	hops?: boolean
 	/**
 	 * Animated: these pictures in turn, each for `frameTicks`, by the race's
@@ -1218,6 +1226,12 @@ export type CourseId =
 	| 'memory-dunk'
 	| 'paintbrush'
 	| 'hungry-goose'
+	| 'bomb-hat'
+	| 'lollapascoopza'
+	| 'mr-claws'
+	| 'fika-defence'
+	| 'skate-jam'
+	| 'jughead'
 
 /**
  * A Portal: a machine that shrinks everyone down, or a sneeze that blows

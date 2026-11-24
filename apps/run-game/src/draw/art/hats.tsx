@@ -7,9 +7,17 @@ import {
 	pixelArt,
 } from '../../courses/kit/pixelArt'
 import { TICK_MS } from '../../game/constants'
-import type { Hat, HatKind } from '../../game/hats'
+import type { CrabPose, Hat, HatKind } from '../../game/hats'
+import { TEAM_COLOURS } from '../../game/teams'
 import { cachedArt } from '../canvasArt'
 import { paintPicture } from '../paint/picture'
+import {
+	CRAB_HAT_FRAMES,
+	CRAB_HAT_HEAD_X,
+	CRAB_HAT_HEAD_Y,
+	CRAB_HAT_HEIGHT,
+	CRAB_HAT_WIDTH,
+} from './crabHat'
 
 /**
  * The hats, as they're worn: each facing left, the way the run sprites do,
@@ -409,23 +417,81 @@ const BOBBLE_HAT = cells(
 	4,
 )
 
-/** The bobble hat in blue: Beach Volleyball's blue team's, the red team in the red one. */
-const BOBBLE_HAT_BLUE = cells(
-	8,
-	7,
+/**
+ * A team's hat in its colour, from rows of letters: `L` its colour lit,
+ * `B` its colour, `S` shaded, `D` deep (its band), `U` under its brim, and
+ * `P` pale, for a detail; all shades of the one colour.
+ */
+function teamHatArt(
+	rows: string[],
+	colour: string,
+	crown: number,
+	middle: number,
+): HatArt {
+	return {
+		src: letterArt(rows, {
+			L: mixHex(colour, '#ffffff', 0.3),
+			B: colour,
+			S: mixHex(colour, '#000000', 0.25),
+			D: mixHex(colour, '#000000', 0.5),
+			U: mixHex(colour, '#000000', 0.4),
+			P: mixHex(colour, '#ffffff', 0.55),
+		}),
+		width: rows[0].length * CELL,
+		height: rows.length * CELL,
+		crown: crown * CELL,
+		middle: middle * CELL,
+	}
+}
+
+/**
+ * The red team's hat: a tall top hat, all in the team's red, lit down its
+ * front and shaded down its back, a deep red band round it with a pale
+ * pin on the front, and its brim curling up at either end.
+ */
+const RED_TEAM_HAT = teamHatArt(
 	[
-		[3, 0, 2, 2, '#ffffff'],
-		[2, 2, 4, 1, '#3a62d2'],
-		[1, 3, 6, 1, '#3a62d2'],
-		[3, 3, 1, 1, '#ffffff'],
-		[5, 3, 1, 1, '#ffffff'],
-		[1, 4, 6, 2, '#f2f2f2'],
-		[2, 4, 1, 2, '#d8d8d8'],
-		[4, 4, 1, 2, '#d8d8d8'],
-		[6, 4, 1, 2, '#d8d8d8'],
+		'..LLLLLLL..',
+		'..LBBBBBS..',
+		'..LBBBBBS..',
+		'..LBBBBBS..',
+		'..LBBBBBS..',
+		'..LBBBBBS..',
+		'..LBBBBBS..',
+		'..DPDDDDD..',
+		'..DDDDDDD..',
+		'L.BBBBBBS.S',
+		'BBBBBBBBBBS',
+		'.UUUUUUUUU.',
 	],
-	4,
-	4,
+	TEAM_COLOURS[0],
+	// Down over the head a cell and a half more than its brim: it sits low.
+	10.5,
+	5.5,
+)
+
+/**
+ * The blue team's hat: a tall bowler, all in the team's blue, its crown
+ * domed and lit on top, a deep blue band round it tied in a pale bow on
+ * the front, and its brim curled up at both ends.
+ */
+const BLUE_TEAM_HAT = teamHatArt(
+	[
+		'....LLLL....',
+		'...LLBBBS...',
+		'..LLBBBBBS..',
+		'..LBBBBBBS..',
+		'..LBBBBBBS..',
+		'..LBBBBBBS..',
+		'..DPDDDDDD..',
+		'..DDDDDDDD..',
+		'S.BBBBBBBS.S',
+		'SBBBBBBBBBBS',
+		'.UUUUUUUUUU.',
+	],
+	TEAM_COLOURS[1],
+	9.5,
+	6,
 )
 
 /**
@@ -1046,7 +1112,60 @@ function paintbrush(colour = PAINTBRUSH_PLAIN): HatArt {
 	return art
 }
 
-const ART: Record<Exclude<HatKind, 'pumpkin' | 'paintbrush'>, HatArt> = {
+const PUNK_LEATHER = '#2e2a35'
+const PUNK_LEATHER_LIT = '#5e5868'
+const PUNK_LEATHER_SHADE = '#18151c'
+const PUNK_BELT = '#0a090c'
+const PUNK_SILVER = '#c8ccd4'
+const PUNK_SILVER_LIT = '#ffffff'
+const PUNK_SILVER_SHADE = '#7d838e'
+/**
+ * A punk's cap: black leather, a baker boy's, its crown puffed out wide
+ * over a short peak, lit along its top. A belt round it, buckled in
+ * silver at the side, studs in it; spikes out of it at the front; a
+ * studded strap down the peak; and a safety pin hung off the belt.
+ */
+const PUNK_CAP = cells(
+	15,
+	8,
+	[
+		// Its crown, puffed out, lit along its top, shaded at the back.
+		[5, 0, 7, 1, PUNK_LEATHER_LIT],
+		[4, 1, 10, 1, PUNK_LEATHER],
+		[5, 1, 5, 1, PUNK_LEATHER_LIT],
+		[3, 2, 12, 2, PUNK_LEATHER],
+		[13, 2, 2, 2, PUNK_LEATHER_SHADE],
+		// Its peak, short, out in front and down.
+		[1, 5, 5, 1, PUNK_LEATHER],
+		[0, 6, 5, 1, PUNK_LEATHER_SHADE],
+		[1, 5, 3, 1, PUNK_LEATHER_LIT],
+		// The belt round it, studded, buckled at the side.
+		[4, 4, 10, 2, PUNK_BELT],
+		[6, 4, 1, 1, PUNK_SILVER],
+		[13, 4, 1, 1, PUNK_SILVER],
+		[9, 4, 3, 2, PUNK_SILVER],
+		[10, 4, 1, 1, PUNK_BELT],
+		[11, 5, 1, 1, PUNK_SILVER_SHADE],
+		// Spikes out of it at the front, catching the light at their tips.
+		[1, 4, 3, 1, PUNK_SILVER_SHADE],
+		[0, 4, 1, 1, PUNK_SILVER_LIT],
+		[2, 3, 2, 1, PUNK_SILVER_SHADE],
+		[1, 3, 1, 1, PUNK_SILVER_LIT],
+		// The strap down its peak, studded.
+		[2, 6, 1, 1, PUNK_SILVER],
+		[4, 5, 1, 1, PUNK_SILVER],
+		// A safety pin, hung off the belt.
+		[8, 6, 1, 2, PUNK_SILVER],
+		[8, 6, 1, 1, PUNK_SILVER_LIT],
+	],
+	4.5,
+	8.5,
+)
+
+const ART: Record<
+	Exclude<HatKind, 'pumpkin' | 'paintbrush' | 'crabHat'>,
+	HatArt
+> = {
 	miner: MINER,
 	captain: CAPTAIN,
 	skiHelmet: SKI_HELMET,
@@ -1062,13 +1181,15 @@ const ART: Record<Exclude<HatKind, 'pumpkin' | 'paintbrush'>, HatArt> = {
 	topHat: TOP_HAT,
 	flyingHelmet: FLYING_HELMET,
 	bobbleHat: BOBBLE_HAT,
-	bobbleHatBlue: BOBBLE_HAT_BLUE,
 	headMirror: HEAD_MIRROR,
 	discoBall: DISCO_BALL,
 	snorkel: SNORKEL,
 	spaceHelmet: SPACE_HELMET,
 	antennae: ANTENNAE,
 	swordHat: SWORD_HAT,
+	redTeamHat: RED_TEAM_HAT,
+	blueTeamHat: BLUE_TEAM_HAT,
+	punkCap: PUNK_CAP,
 	// Its flames still, as a picture: on a head, they flicker (see `paintHat`).
 	jazzHat: {
 		src: JAZZ_HAT.frames[0],
@@ -1086,12 +1207,31 @@ const BLADES = pixelArt(9, 1, [
 	[5, 0, 4, 1, '#f2c12e'],
 ])
 
+/**
+ * Mr Claws' Crab Hat, in each of its poses, at each step of how worn out
+ * its Guard is: its shell's underside on the head.
+ */
+const CRAB_HATS = Object.fromEntries(
+	Object.entries(CRAB_HAT_FRAMES).map(([pose, srcs]) => [
+		pose,
+		srcs.map((src) => ({
+			src,
+			width: CRAB_HAT_WIDTH,
+			height: CRAB_HAT_HEIGHT,
+			crown: CRAB_HAT_HEAD_Y,
+			middle: CRAB_HAT_HEAD_X,
+		})),
+	]),
+) as Record<CrabPose, HatArt[]>
+
 export const hatArt = (hat: Hat): HatArt =>
 	hat.kind === 'pumpkin'
 		? pumpkin(hat.carving)
 		: hat.kind === 'paintbrush'
 			? paintbrush(hat.colour)
-			: ART[hat.kind]
+			: hat.kind === 'crabHat'
+				? CRAB_HATS[hat.pose ?? 'rest'][hat.tired ?? 0]
+				: ART[hat.kind]
 
 /** How far ahead the miner's lamp shines, and how wide its beam gets, in cells. */
 const BEAM_CELLS = 75
@@ -1131,18 +1271,24 @@ const BEAM = paintedArt(BEAM_CELLS, BEAM_ROWS, (x, y) => {
  * How far a hat on someone's head gets out of their box, at most, for
  * their Draw Hook's `drawReach`: the miner's lamp's beam, out ahead of
  * them, and up over their head, as does any hat's crown, a propeller
- * beanie's propeller on top of it, and the glints round a disco ball.
+ * beanie's propeller on top of it, and the glints round a disco ball;
+ * and out behind them, a Crab Hat's claw.
  */
 export const WORN_HAT_REACH = {
 	left: BEAM_CELLS * CELL + MINER.middle,
+	// A Crab Hat's claws, out either side, past their middle.
+	right: CRAB_HAT_WIDTH - CRAB_HAT_HEAD_X,
 	top: Math.max(
 		BEAM_ROWS - 4 + MINER.crown,
 		DISCO_BALL.crown + GLINT_OUT * CELL,
 		JAZZ_HAT.crown,
 		DEERSTALKER.crown,
-		...[...Object.values(ART), pumpkin(), paintbrush()].map(
-			(art) => art.crown + (art === PROPELLER ? 3 * CELL : 0),
-		),
+		...[
+			...Object.values(ART),
+			...Object.values(CRAB_HATS).flat(),
+			pumpkin(),
+			paintbrush(),
+		].map((art) => art.crown + (art === PROPELLER ? 3 * CELL : 0)),
 	),
 }
 

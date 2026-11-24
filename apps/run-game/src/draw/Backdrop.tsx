@@ -761,7 +761,7 @@ const HORIZON_TREES = [
 ]
 
 /**
- * Lightning, now and then: a flash over the sky, and a bolt or two out of
+ * Lightning, occasionally: a flash over the sky, and a bolt or two out of
  * the top of it, on two beats that don't line up, so it's never regular.
  */
 function Lightning() {
@@ -1983,7 +1983,7 @@ const DRIP_EVERY = 36
 
 /**
  * How far a stalactite hangs down off a Cave's Ceiling at `x`, if there's
- * one there: one now and then, each its own length and width, tapering to
+ * one there: one occasionally, each its own length and width, tapering to
  * its tip. The same every time for the same `x`.
  */
 function stalactite(x: number) {

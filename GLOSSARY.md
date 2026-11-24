@@ -132,7 +132,7 @@ A bandaged mummy in the Sphinx's tomb on the Pyramids, shuffling to and fro, arm
 _Avoid_: Zombie (Zombies walk Halloween Town)
 
 **Zombie**:
-A club member risen from the grave, now and then just a skeleton, walking the wrong way along Halloween Town: an Obstacle. One that walks into an open grave is gone, and the Scoop Bus Scoops any it reaches. (Skeletons also run the right way, as Pacers.)
+A club member risen from the grave, occasionally just a skeleton, walking the wrong way along Halloween Town: an Obstacle. One that walks into an open grave is gone, and the Scoop Bus Scoops any it reaches. (Skeletons also run the right way, as Pacers.)
 _Avoid_: Pacer (Pacers race the right way)
 
 **Crocodile**:
@@ -150,7 +150,7 @@ _Avoid_: Mansion; dying (a Ghost isn't out, and runs on)
 A flap in the floor of the heart, in The Hospital, that opens on every beat, spurting blood, and fires whoever's on it up into the air: the way over the ridges between the heart's chambers. Between the two ridges, a pad of heart muscle pumping up and down on the beat is a way over the second without its valve.
 
 **Steam Vent**:
-A grate in the Ground that puffs steam now and then, firing whoever's on it as it puffs high into the air. Not an Obstacle: nothing to stumble on. A **Giant Vent** is The Sewers' way out: it fires whoever's on it right up out of the sewer and on, back onto the street.
+A grate in the Ground that puffs steam occasionally, firing whoever's on it as it puffs high into the air. Not an Obstacle: nothing to stumble on. A **Giant Vent** is The Sewers' way out: it fires whoever's on it right up out of the sewer and on, back onto the street.
 
 **Bouncy Toadstool**:
 Furby Fields' Steam Vents: great spotted toadstools that squash flat as someone steps on one, and spring them high into the air, onto a candyfloss cloud.
@@ -160,7 +160,7 @@ _Avoid_: Mushroom, trampoline
 A furby as big as a hill, on the path in Furby Fields: a Cave, its head. Its eye follows whoever's coming, and its beak swings open as they near, its mouth the way in; inside, its workings, and out past its tail at the back.
 
 **Swamp Man**:
-A creature in a pool of sludge in The Sewers, who now and then rises out of it and grabs whoever's in reach, holding them still till he sinks back: an Obstacle. Jump him.
+A creature in a pool of sludge in The Sewers, who occasionally rises out of it and grabs whoever's in reach, holding them still till he sinks back: an Obstacle. Jump him.
 _Avoid_: Zombie, Mummy
 
 **Sewage Drain**:
@@ -179,7 +179,7 @@ A parkrun barcode, floating in the run-in just before every parkrun Course's fin
 _Avoid_: Barcode (on its own: a real parkrunner's barcode is theirs, not a thing on a Course)
 
 **Ride**:
-Something that carries a runner along for a while: a corgi, at Kristineberg, or in Gamla Stan a Royal Guard's horse, on Machu Picchu a llama, at the Pyramids a camel (now and then, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon, or on Dino Island a pterodactyl. One on the ground leaps when its rider jumps, with them on its back, and of its own accord over whatever's low in its way; a Steam Vent or a Heart Valve fires it up, rider and all; ducking gets them off it.
+Something that carries a runner along for a while: a corgi, at Kristineberg, or in Gamla Stan a Royal Guard's horse, on Machu Picchu a llama, at the Pyramids a camel (occasionally, one race in ten, a two-humped Bactrian camel among them), in Huddinge's forest a deer, in Furby Fields a unicorn, or on The Cliff a Glider; or flying over, a goose, or on the Great Wall a dragon, or on Dino Island a pterodactyl. One on the ground leaps when its rider jumps, with them on its back, and of its own accord over whatever's low in its way; a Steam Vent or a Heart Valve fires it up, rider and all; ducking gets them off it.
 _Avoid_: Mount, vehicle
 
 **Glider**:
@@ -191,7 +191,7 @@ Water across a Course, bank to bank, the Nile near the start of the Pyramids: no
 _Avoid_: Sea (falling into that is Fallen), lake
 
 **Sea**:
-The Cliff's Gap, from the foot of its cliff out to the island. Down into it is Fallen, there and then.
+The Cliff's Gap, from the foot of its cliff out to the island. Down into it is Fallen, there and then. In Mr Claws, the water all round the sea stack: anyone in it is out, bobbing there till the end.
 _Avoid_: Water, ocean
 
 **Deep Water**:
@@ -237,7 +237,7 @@ A Boost in the sky over the Sea: glide through one for a burst of speed. There f
 _Avoid_: Hoop
 
 **Storm Cloud**:
-A dark cloud over the Sea that now and then flickers, then strikes lightning down into it: an Obstacle, to fly over, or to time going under.
+A dark cloud over the Sea that occasionally flickers, then strikes lightning down into it: an Obstacle, to fly over, or to time going under.
 _Avoid_: Thundercloud
 
 **Cheerer**:
@@ -252,6 +252,43 @@ Anything a runner can have on a Course: each fika, each Ride, a Pumpkin, a Barco
 
 **Tourist**:
 Someone stood in the street in Gamla Stan, in everyday clothes, never kit: an Obstacle to jump, in groups.
+
+### Minigames
+
+**Minigame**:
+A Round that isn't a race: everyone on one still screen at once, at something else, such as Iceberg Bump or Mr Claws.
+_Avoid_: Party game, mini-game
+
+**Mr Claws**:
+A Minigame on top of a sea stack, sheer cliffs down to the Sea on both sides, its edges crumbling away in the last half minute, everyone in a Crab Hat. Grab someone and Drop them in; the last one still on top wins, or when time's up, whoever's still on top, by how many they've Dropped.
+
+**Crab Hat**:
+A crab worn on the head in Mr Claws, a claw out to each side. In place of jumping, it Pinches.
+_Avoid_: Claw hat, crab helmet
+
+**Pinch**:
+The Crab Hat's claws snapping shut, both at once, a short way out to either side: what pressing up does in Mr Claws, in place of a jump.
+_Avoid_: Attack, snip, snap, jump
+
+**Grabbed**:
+Caught in someone's Pinch, unGuarded, and held up in their claws, carried wherever they go till they Drop you or you struggle free.
+_Avoid_: Caught, captured
+
+**Guard**:
+Crouched with your claws crossed, holding down, in Mr Claws: no Pinch gets you, but each one that hits shoves you back a step, off the edge if you're on it.
+_Avoid_: Block, duck
+
+**Drop**:
+Letting go of whoever you've Grabbed. Over the edge, it puts them in the Sea.
+_Avoid_: Throw, dunk
+
+**Clash**:
+Two Pinches at each other at the same moment: the claws meet, nobody's Grabbed, and both are shoved apart a step.
+_Avoid_: Parry, trade
+
+**Struggle**:
+Wriggling to get free while Grabbed, by mashing: it gets easier the longer you're held, and you're always free in the end if you haven't been Dropped first.
+_Avoid_: Escape, break out
 
 ### Multiplayer
 

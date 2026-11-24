@@ -228,13 +228,13 @@ function skyLayOut(random: () => number) {
 		const closed = LANES.filter((other) => other !== lane)
 		const walls = zone === 'open' ? [closed[Math.floor(random() * 2)]] : closed
 		for (const other of walls) obstacles.push(...block(other, zone, x, random))
-		// A Ring in the way through, and now and then one leading to it.
+		// A Ring in the way through, and occasionally one leading to it.
 		const [lo, hi] = LANE_RING[lane]
 		const through = lo + random() * (hi - lo)
 		if (random() < 0.4) ring(x - 300, (last + through) / 2)
 		ring(x, through)
 		last = through
-		// Now and then, a fika, up here: a flying strawberry, or bubble gum.
+		// Occasionally, a fika, up here: a flying strawberry, or bubble gum.
 		if (random() < 0.12 && fika < 4)
 			boosts.push({
 				kind: 'fika',

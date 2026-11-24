@@ -88,7 +88,7 @@ const BACTRIAN: Record<CorgiPose, string> = {
 export const bactrianPicture = (pose: CorgiPose) => BACTRIAN[pose]
 
 /**
- * A Bactrian camel, now and then one of the Pyramids' camels: two great
+ * A Bactrian camel, occasionally one of the Pyramids' camels: two great
  * shaggy humps, a fine cloth over each, a saddle in the dip between them,
  * a darker, shaggier coat. Ridden the same as any.
  */

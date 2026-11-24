@@ -1,4 +1,5 @@
 import { For, type JSX, Show, createSignal, onCleanup } from 'solid-js'
+import { debugMenuOpen } from '../draw/debugOpen'
 import { effectsOn, musicOn, setEffectsOn, setMusicOn } from '../saved/settings'
 import { play } from '../sfx'
 import { onHover } from '../ui/hover'
@@ -71,8 +72,14 @@ export function PauseMenu(props: {
 	const firstOf = (group: number) =>
 		props.groups.slice(0, group).reduce((n, items) => n + items.length, 0)
 
+	// Hidden under the debug menu, on the dev server (see `DebugMenu`).
 	return (
-		<div style={styles.backdrop}>
+		<div
+			style={{
+				...styles.backdrop,
+				...(debugMenuOpen() ? { display: 'none' } : {}),
+			}}
+		>
 			<div style={styles.panel}>
 				<div style={styles.title}>{props.title ?? 'Paused'}</div>
 				<For each={props.groups}>

@@ -37,7 +37,7 @@ const hash = (i: number, salt: number) => {
 
 /**
  * How bright shaft `i` is, `seconds` in: each fading in and out on its
- * own, slowly, as the surface over it ripples, now and then gone.
+ * own, slowly, as the surface over it ripples, occasionally gone.
  */
 const shaftLight = (i: number, seconds: number) =>
 	Math.max(

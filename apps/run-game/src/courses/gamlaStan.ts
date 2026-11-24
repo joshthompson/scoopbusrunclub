@@ -127,7 +127,7 @@ const drottninggatan = () => {
 /**
  * The old town's houses along the street from Stallbron to Guldbron,
  * shops in their ground floors, side by side, an alley off between them
- * now and then: each on the street where it is, up and down with it.
+ * occasionally: each on the street where it is, up and down with it.
  * Laid out with their own seed, so the course's own layout's as it was.
  */
 const oldTownStreet = () => {

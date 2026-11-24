@@ -485,10 +485,10 @@ function scenery(random: () => number, clearOf: number[]): Scenery[] {
 	}
 	for (let x = POND.from - 10; x < POND.to + 20; x += 34 + random() * 30)
 		pieces.push(art(x, FLORA[n++ % 2 ? 2 : 3], POND_BACK - 2))
-	// Now and then a mossy log fallen by the path, in the forest.
+	// Occasionally a mossy log fallen by the path, in the forest.
 	for (const x of [900, 2150, 3400, 6600, 7900])
 		pieces.push(art(x, fallenLog, 2))
-	// Close up, in front of everyone on the path, now and then: a big fern
+	// Close up, in front of everyone on the path, occasionally: a big fern
 	// or a cycad, going by.
 	n = 0
 	for (let x = START_X + 600; x < VOLCANO.from; x += 520 + random() * 520) {

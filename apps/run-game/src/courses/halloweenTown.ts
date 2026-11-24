@@ -595,7 +595,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		boosts: [...outside(boosts), ...HOUSE_BOOSTS].sort((a, b) => a.x - b.x),
 	}
 
-	// A graveyard along the path: dead trees, headstones, and now and then a
+	// A graveyard along the path: dead trees, headstones, and occasionally a
 	// skeleton sat down for a rest. No pumpkins: they're to be worn, so none
 	// back here to be mistaken for one.
 	const scenery: Course['scenery'] = []
@@ -634,7 +634,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 
 /**
  * More of the graveyard, in between: crosses, old stones leaning and sunk,
- * railings, lanterns, and now and then a mausoleum. Their own random
+ * railings, lanterns, and occasionally a mausoleum. Their own random
  * numbers, so everything else is where it was.
  */
 function moreGraveyard(): Course['scenery'] {

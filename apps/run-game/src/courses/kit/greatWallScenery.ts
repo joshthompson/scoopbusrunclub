@@ -38,7 +38,7 @@ const BRICKS = [
 
 /**
  * The wall's face: courses of grey brick, each its own shade, their
- * joints dark, lit along their tops; now and then one crumbled away, a
+ * joints dark, lit along their tops; occasionally one crumbled away, a
  * dark hole; and weeds growing out of the joints. A pattern, opaque.
  */
 const BRICK_TILE = (() => {
@@ -167,7 +167,7 @@ const BUSH_SPACING = 26
 
 /**
  * The tops of the bushes at the wall's foot, `x` along: how far up from
- * where the hill meets the wall they reach, each bush a dome, now and then
+ * where the hill meets the wall they reach, each bush a dome, occasionally
  * a taller one climbing the wall. Negative, as it's up.
  */
 export function wallBushes(x: number) {
@@ -235,7 +235,7 @@ export function wallWoods(
  * The forest on down the slope below the woods, to the wall's foot behind
  * it: treetops all the way down, packed in, the gaps between them in deep
  * shade, each lit on its upper left; bigger the lower, as they're nearer;
- * now and then a pine, dark, standing up out of them.
+ * occasionally a pine, dark, standing up out of them.
  * Another of the horizon's nearer bands, under `wallWoods`, its top a
  * ragged line of treetops against the woods' green: at `top`, up close
  * under theirs, so none of the woods' plain green shows between them.

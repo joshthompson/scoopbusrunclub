@@ -766,7 +766,7 @@ export const PLANET_ROCK = (() => {
 	}
 })()
 
-/** A geyser: a vent in the crust, steaming, now and then blasting up. */
+/** A geyser: a vent in the crust, steaming, occasionally blasting up. */
 export const GEYSER = { width: 48, height: 18 }
 
 // --- The ground ---------------------------------------------------------------------
@@ -774,7 +774,7 @@ export const GEYSER = { width: 48, height: 18 }
 /**
  * The dust under the path, over `#5d4580`: strata, faint bands of darker and
  * paler sediment running along it, the odd pit with a lit lip, pebbles
- * each with a shadow, and now and then a glint of crystal set in it.
+ * each with a shadow, and occasionally a glint of crystal set in it.
  * See-through, so its colour shows. 96 by 64 px.
  */
 export const PLANET_UNDER = (() => {

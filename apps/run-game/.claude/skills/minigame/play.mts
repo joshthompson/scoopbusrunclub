@@ -77,7 +77,7 @@ const prelude = (n: number) => `
 	)} + '.ts').catch(() => ({}))
 	const colours = ['#e8423f', '#3f7fe8', '#f2c230', '#3fb950', '#a35de8', '#f28c28', '#ef6fb4', '#2fc6c0']
 	let world
-	/** Restless: running about, now one way, now the other, and jumping now and then. */
+	/** Restless: running about, now one way, now the other, and jumping every now and then. */
 	const restless = (i) => () => {
 		const t = world.ticks() + i * 37
 		return { left: t % 170 < 60, right: t % 170 > 100, up: t % 47 < 18, down: false }

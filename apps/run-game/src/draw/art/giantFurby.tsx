@@ -7,7 +7,7 @@ import { pixelPolygon } from '../../courses/kit/pixelArt'
 
 /**
  * The Giant Furby's face, on the front of its head, facing left, at whoever's
- * coming: one great eye, looking at them, blinking now and then, a tuft over
+ * coming: one great eye, looking at them, blinking occasionally, a tuft over
  * it, and its beak, hanging shut over its mouth till someone's near, and
  * then swung up open, its tongue inside. Its front is `FACE_FRONT` in from
  * the drawing's left, its mouth's floor the drawing's bottom.

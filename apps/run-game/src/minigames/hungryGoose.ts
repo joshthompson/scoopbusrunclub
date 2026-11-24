@@ -18,6 +18,7 @@ import {
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
 } from '../game/constants'
+import { TEAM_COLOURS, teamHat } from '../game/teams'
 import type { Terrain } from '../game/terrain'
 import { type Racer, type World, bodyHeight, startingBody } from '../game/world'
 import type { Controls } from '../input'
@@ -25,6 +26,7 @@ import { CLUB } from '../runners/playable'
 import { play } from '../sfx'
 import { type Arena, arenaCourse, inRandomOrder } from './arena'
 import { TEAM_NAMES } from './beachVolleyball'
+import { collectTeamHats, isBot } from './teams'
 import {
 	IDLE,
 	type Minigame,
@@ -45,8 +47,8 @@ import {
  * nest is that team's: so run into the other team's nest and you can take
  * one of theirs, and run through it carrying one and you'll knock theirs
  * about, maybe out. Your own nest's eggs you leave be. Carrying one slows
- * you; come down on the head of someone carrying one, and they drop it. Now
- * and then an egg's golden, worth three.
+ * you; come down on the head of someone carrying one, and they drop it. Occasionally
+ * an egg's golden, worth three.
  *
  * She lays quicker and quicker, and the last 10 seconds are an egg frenzy.
  * After a minute, the team with the most in their nest wins; level, the
@@ -72,8 +74,8 @@ export const LAY_FLAP = 24
 /** How long "Egg frenzy!" and "Next lead wins!" are up, big. */
 const ANNOUNCED_FOR = 100
 
-/** The teams' colours, for their nests' boards, Red's and Blue's as their bobble hats. */
-export const NEST_COLOURS = ['#d23a3a', '#3a62d2'] as const
+/** The teams' colours, for their nests' boards, Red's and Blue's as their hats (see `game/teams`). */
+export const NEST_COLOURS = TEAM_COLOURS
 /** The bot added to a team that's a Player short: its id, so every screen finds it. */
 const TEAM_BOT = 'goose-bot'
 
@@ -212,7 +214,7 @@ export const hungryGoose: Minigame = {
 	tune: 'haga',
 	// The nests' boards say it all.
 	pills: false,
-	collectables: [],
+	collectables: ['hat:redTeamHat', 'hat:blueTeamHat'],
 	course: {
 		...arenaCourse(
 			'hungry-goose',
@@ -342,8 +344,6 @@ function settle(eggs: Egg[]) {
 
 function startHungryGoose(world: World): MinigameRun {
 	const { racers } = world
-	const hatOf = (team: number) =>
-		({ kind: team === 0 ? 'bobbleHat' : 'bobbleHatBlue' }) as const
 
 	// A team a Player short: a bot added to it, to make it even. On a phone,
 	// already there, sent with everyone else.
@@ -370,6 +370,13 @@ function startHungryGoose(world: World): MinigameRun {
 		teams.set(teamBot.id, reds * 2 < racers.length ? 0 : 1)
 	}
 	const teamOf = (racer: Racer) => teams.get(racer.id) ?? 0
+	/** Each team's hat kept, once teams are known: on the Host, on the first tick; on a phone, once it's told. */
+	let hatsKept = false
+	const keepHats = () => {
+		if (hatsKept) return
+		hatsKept = true
+		collectTeamHats(world, teamOf, (r) => isBot(r, TEAM_BOT))
+	}
 	const teamMates = (team: number) => racers.filter((r) => teamOf(r) === team)
 	/** The middle of `team`'s nest. */
 	const nestMiddle = (team: number) => {
@@ -378,7 +385,7 @@ function startHungryGoose(world: World): MinigameRun {
 	}
 
 	// Each by their own nest, spread out, facing the goose, in their team's
-	// bobble hat.
+	// hat.
 	for (const racer of racers) {
 		const team = teamOf(racer)
 		const mates = teamMates(team)
@@ -390,7 +397,7 @@ function startHungryGoose(world: World): MinigameRun {
 		b.floor = b.feetY
 		b.grounded = true
 		b.facing = team === 0 ? 1 : -1
-		b.hat = hatOf(team)
+		b.hat = teamHat(team)
 		b.celebrating = false
 	}
 
@@ -560,7 +567,7 @@ function startHungryGoose(world: World): MinigameRun {
 			if (!plan || now >= plan.until) {
 				// An egg, near and golden, not one a team mate's already after,
 				// and not one already home; theirs, in their nest, worth going
-				// for too. Or now and then, someone on the other team carrying
+				// for too. Or occasionally, someone on the other team carrying
 				// one, to bounce on.
 				const mates = teamMates(team).filter((r) => r !== racer)
 				const taken = new Set(mates.map((m) => after.get(m.id)?.egg))
@@ -616,7 +623,7 @@ function startHungryGoose(world: World): MinigameRun {
 			if (was.ticks > 6) jump()
 		} else stuck.set(racer.id, { x: b.x, ticks: 0 })
 		if (was) was.x = b.x
-		// Hopping over the lumps now and then, as people do.
+		// Hopping over the lumps occasionally, as people do.
 		if (go && Math.random() < 0.01) jump()
 		return {
 			left: go < 0,
@@ -665,6 +672,7 @@ function startHungryGoose(world: World): MinigameRun {
 		},
 		bot,
 		step() {
+			keepHats()
 			if (world.phase() !== 'running') return
 			// Nobody past the walls; anyone carrying an egg, slowed by it.
 			racers.forEach((racer, i) => {
@@ -805,8 +813,9 @@ function startHungryGoose(world: World): MinigameRun {
 				const racer = racers[i]
 				if (!racer) return
 				teams.set(racer.id, team)
-				racer.body.hat = hatOf(team)
+				racer.body.hat = teamHat(team)
 			})
+			if (a.teams) keepHats()
 			winner = a.winner === undefined || a.winner < -1 ? undefined : a.winner
 			show.stealing = new Map(a.stealing ?? [])
 			for (const racer of racers) racer.body.celebrating = won(racer)

@@ -302,8 +302,8 @@ function startJumpRope(world: World): MinigameRun {
 			return at === undefined ? n : `Lasted ${clock(at, 'down')} · ${n}`
 		},
 		// A bot: jumping as the rope comes round, each turn a little early
-		// or late, by a different amount; quick enough, it misses. And now
-		// and then it misjudges one altogether, and doesn't jump: the worse
+		// or late, by a different amount; quick enough, it misses. And occasionally
+		// it misjudges one altogether, and doesn't jump: the worse
 		// it is, the more often, and more often the quicker it's going.
 		bot: (racer) => {
 			if (tripped(racer)) return IDLE

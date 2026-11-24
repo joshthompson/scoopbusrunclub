@@ -27,7 +27,7 @@ export interface Placing {
 	unlocked?: string
 	/**
 	 * Bonus runners just unlocked, for the first time: found on the way
-	 * round, or for finishing every course. Most often none, now and then
+	 * round, or for finishing every course. Most often none, occasionally
 	 * one, and two at once can happen. Shown off before this, one at a time
 	 * (see `UnlockReveal`), not on it.
 	 */

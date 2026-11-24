@@ -441,7 +441,7 @@ function oneWay(x: number) {
  * Traffic cones, out in the way, there to be knocked over: every one of
  * them, the special goal. A few up on the catwalks, to go up for; a row
  * of them at the roadworks before the manhole; then on along wherever
- * there's only the one way, now and then two or three together, clear of
+ * there's only the one way, occasionally two or three together, clear of
  * whatever else is there.
  */
 function trafficCones(
@@ -481,7 +481,7 @@ function trafficCones(
 		along += 20
 		if (along < every * (0.6 + random() * 0.8) || !clear(x)) continue
 		along = 0
-		// Now and then, two or three together.
+		// Occasionally, two or three together.
 		const group = random() < 0.3 ? 2 + Math.floor(random() * 2) : 1
 		for (let i = 0; i < group && cones.length < CONES; i++) {
 			const at = x + i * CONE_GROUP_GAP
@@ -533,7 +533,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 					}
 				return cheer(x)
 			}
-			// Rubble, puddles of sludge, and now and then a Swamp Man.
+			// Rubble, puddles of sludge, and occasionally a Swamp Man.
 			if (roll < 0.34) return { kind: 'rock', x }
 			if (roll < 0.58)
 				return { kind: 'mud', x, width: 70 + Math.round(random() * 50) }

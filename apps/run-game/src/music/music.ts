@@ -72,6 +72,41 @@ let playing:
 /** Whether anything's been pressed yet: browsers won't play a note before. */
 const [unlocked, setUnlocked] = createSignal(false)
 
+/**
+ * Till when the music's held quiet, by `performance.now()`: something's
+ * playing its own (see `holdMusic`). And whether it's quiet now.
+ */
+let heldUntil = 0
+let quiet = false
+
+/**
+ * The music held quiet for `ms` from now, faded out, for something
+ * playing a song of its own in time with what's on the screen:
+ * Lollapascoopza's, faster each round. Kept up as long as it's wanted, a
+ * frame at a time; let go of (the game left, paused), the music fades
+ * back in by itself.
+ */
+export function holdMusic(ms: number) {
+	heldUntil = performance.now() + ms
+	hush()
+}
+
+/** The music faded out, or back in, if it's been held or let go of since. */
+function hush() {
+	if (!playing) return
+	const want = performance.now() < heldUntil
+	if (want === quiet) return
+	quiet = want
+	const { master, context } = playing
+	const now = context.currentTime
+	master.gain.cancelScheduledValues(now)
+	master.gain.setValueAtTime(master.gain.value, now)
+	master.gain.linearRampToValueAtTime(
+		want ? 0 : VOLUME,
+		now + (want ? 0.25 : 1),
+	)
+}
+
 /** Something pressed or tapped: the music can start. */
 export function unlockMusic() {
 	setUnlocked(true)
@@ -244,6 +279,7 @@ function start() {
 			layers: [],
 		}
 		playing.layers.push(layer(wanted, 0, 0, 0))
+		quiet = false
 		tick()
 	} catch {
 		// No Web Audio: the game's just quiet.
@@ -283,6 +319,7 @@ function tick() {
 		setTimeout(() => layer.fader.disconnect(), 1000)
 		playing.layers.splice(playing.layers.indexOf(layer), 1)
 	}
+	hush()
 }
 
 /** Step `step`'s notes, at `time`: the beat's, and every tune's that's playing. */

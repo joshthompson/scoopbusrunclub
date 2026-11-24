@@ -121,6 +121,9 @@ export const kristineberg: CourseDefinition = {
 	look: {
 		stadium: true,
 		ground: TRACK_GROUND,
+		// The big screen, between the grandstands before the line, and the
+		// drone filming whoever's leading for it from the long jump's run-up.
+		bigScreen: { x: BOARD + 700, droneFrom: BOARD - RUN_UP },
 	},
 	// A sweatband, high over a hurdle past halfway: too high to jump for,
 	// only got by bouncing up off someone's head.

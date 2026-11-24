@@ -212,7 +212,7 @@ function startPotatoRain(world: World): MinigameRun {
 
 	function drop() {
 		const up = standing()
-		// Right over someone, now and then, so nobody can stand still.
+		// Right over someone, occasionally, so nobody can stand still.
 		const over =
 			up.length && Math.random() < AIMED
 				? up[Math.floor(Math.random() * up.length)].body.x +
@@ -288,7 +288,7 @@ function startPotatoRain(world: World): MinigameRun {
 
 	/** The winner, once it's over, up on their feet to dance. */
 	const done = (racer: Racer) => world.order()?.[0] === racer && !buried(racer)
-	/** What each bot's decided to hold, and till when: it only looks now and then. */
+	/** What each bot's decided to hold, and till when: it only looks occasionally. */
 	const choices = new Map<string, { held: Controls; until: number }>()
 
 	return {

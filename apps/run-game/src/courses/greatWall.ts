@@ -148,7 +148,7 @@ const onStairs = (x: number) =>
 	!!STAIR_TOWER &&
 	x > STAIR_TOWER - 220 - STAIRS * TREAD - 160 &&
 	x < STAIR_TOWER + TOP_PAST_TOWER
-/** Dragons flying over, now and then, one at a time. */
+/** Dragons flying over, occasionally, one at a time. */
 function dragons(): NonNullable<Course['flyovers']> {
 	const random = seeded(1949)
 	const from = START_X + 1800
@@ -208,7 +208,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 			break
 		}
 	// Red lanterns along the walkway, and in between them dragon banners,
-	// now and then an old cannon at the parapet, and grass in the cracks.
+	// occasionally an old cannon at the parapet, and grass in the cracks.
 	const scenery: Course['scenery'] = []
 	let n = 0
 	for (let at = -300; at < terrain.finishX + 900; at += 260 + random() * 200) {
@@ -245,7 +245,7 @@ export const greatWall: CourseDefinition = {
 		goal: 'On top of a tower',
 		done: (run) => !!run.toppedTower,
 	},
-	// A dragon now and then, flying over from behind: jump into it for a ride.
+	// A dragon occasionally, flying over from behind: jump into it for a ride.
 	flyer: 'dragon',
 	flyovers: dragons(),
 	runDirectors: ['lyra', 'josh'],

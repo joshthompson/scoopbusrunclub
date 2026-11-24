@@ -34,7 +34,7 @@ import { RunStrip } from './RunStrip'
 /**
  * The menus' scene: Haga scrolling by, the header's scenery bands, houses and
  * trees at their own depths, Haga's own birches, lilacs and benches in among
- * them, Ekotemplet going by now and then and geese flying over, and a few of
+ * them, Ekotemplet going by occasionally and geese flying over, and a few of
  * the club running along the header's path with the Scoop Bus right behind
  * them. All CSS animation, so it costs nothing to keep running behind the
  * menus.
@@ -262,7 +262,7 @@ const SKEIN = [
 ]
 
 /**
- * Haga's Canada geese flying over, a skein of four, now and then: across
+ * Haga's Canada geese flying over, a skein of four, occasionally: across
  * the sky the way the bus is going, their wings beating, rising and dipping
  * a little as they go. The course's own flying-goose art, turned round.
  */
@@ -507,7 +507,7 @@ export function MenuBackdrop() {
 			{/*
 			 * Trees and shrubs stood on the field, going by with it, as fast: the
 			 * header's oaks and pines, and Haga's own birches, lilacs and a bench
-			 * with its lamp in among them, and Ekotemplet now and then.
+			 * with its lamp in among them, and Ekotemplet occasionally.
 			 */}
 			<Strip
 				speed={FIELD_SPEED}

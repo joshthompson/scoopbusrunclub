@@ -63,7 +63,7 @@ const MAX_TILT = 20
 /** Milliseconds a wingbeat frame, a little different for every bat. */
 const FLAP_INTERVAL = [60, 85]
 
-/** Hanging: a slow sway from its feet, and now and then a stretch of the wings. */
+/** Hanging: a slow sway from its feet, and occasionally a stretch of the wings. */
 const SWAY = 4
 const SWAY_SPEED = 0.06
 const STRETCH_CHANCE = 1 / 400

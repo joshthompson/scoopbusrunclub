@@ -29,7 +29,7 @@ import {
  * running, still sliding on, or jumping, after a short grace, she spits a
  * ball at, out of her mouth, and it knocks them flat: out, lying where
  * they fell. She turns back, sings again, and on it goes, the greens
- * shorter and her turns quicker the longer it lasts, and now and then a
+ * shorter and her turns quicker the longer it lasts, and occasionally a
  * fake-out: she starts to turn and doesn't. Over the line you're safe,
  * and dance. First across wins, then whoever got furthest, then whoever
  * lasted longest; or it's over when everyone's across or out, or after a
@@ -356,7 +356,7 @@ function startRedLight(world: World): MinigameRun {
 	// A bot: runs when she's singing, lets go when she starts to turn, a
 	// little late, by a different amount each time. The more skilled brake
 	// with a tap the other way; the hopeless are slow on every turn, and so
-	// get caught. And now and then it's taken in by a fake-out.
+	// get caught. And occasionally it's taken in by a fake-out.
 	const bots = new Map<
 		string,
 		{
@@ -441,7 +441,7 @@ function startRedLight(world: World): MinigameRun {
 			if (stop !== bot.stopping) {
 				bot.stopping = stop
 				bot.changedAt = now
-				// Now and then it's not paying attention at all, the more so the
+				// Occasionally it's not paying attention at all, the more so the
 				// worse it is.
 				const lapse = Math.random() < (1 - bot.skill) * 0.3 ? 40 : 0
 				bot.react = stop

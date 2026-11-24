@@ -96,7 +96,7 @@ const hash = (x: number, y: number) => {
 
 /**
  * Hungry Hungry Goose, drawn: the giant goose on her mound, pecking and
- * honking now and then, flapping as she lays, turned the way she's facing;
+ * honking occasionally, flapping as she lays, turned the way she's facing;
  * each team's nest, a bowl of straw, its back behind the eggs lying in it
  * and its front over them, and a board on a post behind it with their
  * score; and the eggs, wherever they are, carried ones up over heads.
@@ -162,7 +162,7 @@ export function createHungryGoose(world: World) {
 		ctx.restore()
 	}
 
-	// Up in the sky: big clouds drifting by, and now and then a V of geese
+	// Up in the sky: big clouds drifting by, and occasionally a V of geese
 	// flying over, the giant one's little cousins.
 	const sky = layer('goose-sky', 'scenery', (ctx, now, image) => {
 		const cells = cellBatch(ctx)
@@ -211,7 +211,7 @@ export function createHungryGoose(world: World) {
 	// Behind everyone: the goose, the nests' boards and backs, and every egg
 	// that's not carried; and the nests' fronts, over the eggs in them.
 	const behind = layer('goose-field', 'boost', (ctx, now, image) => {
-		// The goose: flapping, laying; honking now and then; pecking; stood.
+		// The goose: flapping, laying; honking occasionally; pecking; stood.
 		const laying = now - show.laidAt < LAY_FLAP
 		const honking = (now + 40) % HONK_EVERY < HONK_FOR
 		const pecking = (now + 100) % PECK_EVERY < PECK_FOR

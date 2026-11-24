@@ -1092,7 +1092,7 @@ function escalator(down: boolean) {
 			[x, top - 4, 2, 4, STEEL],
 			[x, top - 4, 2, 1, STEEL_LIT],
 		)
-		// The glass's posts, now and then.
+		// The glass's posts, occasionally.
 		if (x % 40 === 20) rects.push([x, rail + 3, 2, top - rail - 7, STEEL_DARK])
 		// A glint across the glass.
 		if (x % 60 < 6)

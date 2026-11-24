@@ -28,8 +28,8 @@ export const WALL = '#221a16'
 
 /**
  * Rock, 96 by 72, to tile: strata running along it, a little wavy, pebbles
- * set in it, lit along their tops and shadowed under, cracks, and now and
- * then a fleck of crystal.
+ * set in it, lit along their tops and shadowed under, cracks, and occasionally
+ * a fleck of crystal.
  */
 function rockTile() {
 	const width = 96
@@ -70,7 +70,7 @@ function rockTile() {
 			y += random() < 0.5 ? 2 : -2
 		}
 	}
-	// A fleck of crystal now and then.
+	// A fleck of crystal occasionally.
 	const flecks = ['#6fe3d4', '#e48ad8', '#9fd0ff']
 	for (let i = 0; i < 3; i++) {
 		const x = Math.floor(random() * (width / 2)) * 2
@@ -125,7 +125,7 @@ function wallTile() {
 			y += random() < 0.5 ? 2 : -2
 		}
 	}
-	// A glint of crystal, now and then.
+	// A glint of crystal, occasionally.
 	for (let i = 0; i < 2; i++) {
 		const x = Math.floor(random() * 64) * 2
 		const y = Math.floor(random() * 48) * 2

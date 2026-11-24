@@ -30,9 +30,23 @@ export type Voice =
 	| 'guitar'
 	/** Voices singing "aah": detuned saws through a vowel's formants, swelling in, with vibrato. */
 	| 'choir'
+	/** A saxophone: a breathy, reedy saw and square, scooped up into each note, vibrato coming in as it's held. */
+	| 'sax'
 	| 'kick'
 	| 'snare'
 	| 'hat'
+	/** A crash cymbal: a hiss, high up, ringing on and dying away. */
+	| 'crash'
+	/** A ride cymbal: a ping and a shimmer, quieter and shorter than a crash. */
+	| 'ride'
+	/** A hand clap: a few hands, a hair apart, and the room after them. */
+	| 'clap'
+	/** An open hi-hat: a hiss, high, left to ring a moment. */
+	| 'openHat'
+	/** A record's crackle: a click or two, now and then, in a faint hiss. */
+	| 'vinyl'
+	/** A horn section: bright brass, swelling open as it's blown, punchy. */
+	| 'brass'
 
 export interface Track {
 	voice: Voice
@@ -94,7 +108,14 @@ export function parse(track: Track, steps: number): Parsed {
 }
 
 export const isDrum = (voice: Voice) =>
-	voice === 'kick' || voice === 'snare' || voice === 'hat'
+	voice === 'kick' ||
+	voice === 'snare' ||
+	voice === 'hat' ||
+	voice === 'crash' ||
+	voice === 'ride' ||
+	voice === 'clap' ||
+	voice === 'openHat' ||
+	voice === 'vinyl'
 
 /** A distortion pedal's curve: soft clipping, driven hard. */
 let driveCurve: Float32Array<ArrayBuffer> | undefined
@@ -131,6 +152,9 @@ export function playVoice(
 	gain: number,
 ) {
 	const env = ctx.createGain()
+	// Silent till the note's own envelope starts: a sound started between
+	// two samples is heard from the one before, and at full level, a click.
+	env.gain.value = 0
 	env.connect(out)
 
 	switch (voice) {
@@ -170,6 +194,224 @@ export function playVoice(
 			src.connect(filter).connect(env)
 			src.start(time)
 			src.stop(time + 0.05)
+			return
+		}
+		case 'crash': {
+			const src = ctx.createBufferSource()
+			src.buffer = noise(ctx)
+			src.loop = true
+			const filter = ctx.createBiquadFilter()
+			filter.type = 'highpass'
+			filter.frequency.value = 4500
+			env.gain.setValueAtTime(gain, time)
+			env.gain.exponentialRampToValueAtTime(0.001, time + 1.4)
+			src.connect(filter).connect(env)
+			src.start(time)
+			src.stop(time + 1.45)
+			return
+		}
+		case 'ride': {
+			// A hiss, high, and a bell-like ping in it, dying away.
+			const src = ctx.createBufferSource()
+			src.buffer = noise(ctx)
+			src.loop = true
+			const filter = ctx.createBiquadFilter()
+			filter.type = 'highpass'
+			filter.frequency.value = 6000
+			env.gain.setValueAtTime(gain, time)
+			env.gain.exponentialRampToValueAtTime(0.001, time + 0.45)
+			src.connect(filter).connect(env)
+			src.start(time)
+			src.stop(time + 0.5)
+			const ping = ctx.createOscillator()
+			ping.type = 'sine'
+			ping.frequency.value = 5200
+			const pingGain = ctx.createGain()
+			pingGain.gain.value = 0
+			pingGain.gain.setValueAtTime(gain * 0.5, time)
+			pingGain.gain.exponentialRampToValueAtTime(0.001, time + 0.3)
+			ping.connect(pingGain).connect(env)
+			ping.start(time)
+			ping.stop(time + 0.32)
+			return
+		}
+		case 'clap': {
+			// Three hands a hair apart, then the room.
+			const filter = ctx.createBiquadFilter()
+			filter.type = 'bandpass'
+			filter.frequency.value = 1300
+			filter.Q.value = 1.1
+			filter.connect(env)
+			env.gain.setValueAtTime(1, time)
+			for (const [at, level, decay] of [
+				[0, 1, 0.012],
+				[0.011, 0.9, 0.012],
+				[0.022, 1, 0.14],
+			]) {
+				const src = ctx.createBufferSource()
+				src.buffer = noise(ctx)
+				const hand = ctx.createGain()
+				hand.gain.value = 0
+				// Loud: a narrow band of noise is quiet for its level.
+				hand.gain.setValueAtTime(gain * level * 3, time + at)
+				hand.gain.exponentialRampToValueAtTime(0.001, time + at + decay)
+				src.connect(hand).connect(filter)
+				src.start(time + at)
+				src.stop(time + at + decay + 0.02)
+			}
+			return
+		}
+		case 'openHat': {
+			const src = ctx.createBufferSource()
+			src.buffer = noise(ctx)
+			src.loop = true
+			const filter = ctx.createBiquadFilter()
+			filter.type = 'highpass'
+			filter.frequency.value = 6500
+			env.gain.setValueAtTime(gain, time)
+			env.gain.exponentialRampToValueAtTime(0.001, time + 0.28)
+			src.connect(filter).connect(env)
+			src.start(time)
+			src.stop(time + 0.3)
+			return
+		}
+		case 'vinyl': {
+			// A faint hiss, and a click or two at random in it.
+			const src = ctx.createBufferSource()
+			src.buffer = noise(ctx)
+			const filter = ctx.createBiquadFilter()
+			filter.type = 'bandpass'
+			filter.frequency.value = 2600
+			filter.Q.value = 0.5
+			env.gain.setValueAtTime(gain * 0.25, time)
+			env.gain.linearRampToValueAtTime(gain * 0.25, time + 0.1)
+			env.gain.linearRampToValueAtTime(0.0001, time + 0.12)
+			for (let i = 0; i < 2; i++) {
+				if (Math.random() < 0.55) continue
+				const at = time + Math.random() * 0.1
+				env.gain.setValueAtTime(gain * (0.6 + Math.random()), at)
+				env.gain.setValueAtTime(gain * 0.25, at + 0.002)
+			}
+			src.connect(filter).connect(env)
+			src.start(time)
+			src.stop(time + 0.13)
+			return
+		}
+		case 'brass': {
+			// Two saws, a little apart, through a filter that opens as the
+			// note's blown and settles back: the swell of a horn. Scooped up
+			// into the note, and a little vibrato as it's held.
+			const frequency = noteToFrequency(note)
+			const filter = ctx.createBiquadFilter()
+			filter.type = 'lowpass'
+			filter.Q.value = 1.2
+			filter.frequency.setValueAtTime(frequency * 1.2, time)
+			filter.frequency.exponentialRampToValueAtTime(
+				Math.min(7000, frequency * 7),
+				time + 0.05,
+			)
+			filter.frequency.exponentialRampToValueAtTime(
+				Math.min(5000, frequency * 4),
+				time + 0.25,
+			)
+			const lfo = ctx.createOscillator()
+			lfo.frequency.value = 5.5
+			const depth = ctx.createGain()
+			depth.gain.setValueAtTime(0, time)
+			depth.gain.linearRampToValueAtTime(
+				frequency * 0.006,
+				time + Math.min(0.3, duration),
+			)
+			lfo.connect(depth)
+			const each = gain / 1.6
+			env.gain.setValueAtTime(0.0001, time)
+			env.gain.exponentialRampToValueAtTime(each, time + 0.02)
+			env.gain.setValueAtTime(
+				each * 0.85,
+				time + Math.max(0.03, duration - 0.03),
+			)
+			env.gain.exponentialRampToValueAtTime(0.001, time + duration + 0.06)
+			for (const detune of [-8, 8]) {
+				const osc = ctx.createOscillator()
+				osc.type = 'sawtooth'
+				osc.detune.value = detune
+				osc.frequency.setValueAtTime(frequency * 0.985, time)
+				osc.frequency.exponentialRampToValueAtTime(frequency, time + 0.03)
+				depth.connect(osc.frequency)
+				osc.connect(filter)
+				osc.start(time)
+				osc.stop(time + duration + 0.08)
+			}
+			filter.connect(env)
+			lfo.start(time)
+			lfo.stop(time + duration + 0.08)
+			return
+		}
+		case 'sax': {
+			// A saw and a quieter square, scooped up a little into the note,
+			// through a reedy band of the mouth and a soft top end; breathy
+			// to start, vibrato coming in as it's held.
+			const frequency = noteToFrequency(note)
+			const mouth = ctx.createBiquadFilter()
+			mouth.type = 'peaking'
+			mouth.frequency.value = 1300
+			mouth.Q.value = 1.4
+			mouth.gain.value = 7
+			const top = ctx.createBiquadFilter()
+			top.type = 'lowpass'
+			top.frequency.setValueAtTime(frequency * 3, time)
+			top.frequency.linearRampToValueAtTime(
+				Math.min(5200, frequency * 6),
+				time + 0.08,
+			)
+			top.Q.value = 0.8
+			const lfo = ctx.createOscillator()
+			lfo.frequency.value = 5.2
+			const depth = ctx.createGain()
+			depth.gain.setValueAtTime(0, time)
+			depth.gain.linearRampToValueAtTime(
+				frequency * 0.01,
+				time + Math.min(0.35, duration),
+			)
+			lfo.connect(depth)
+			env.gain.setValueAtTime(0.0001, time)
+			env.gain.exponentialRampToValueAtTime(gain, time + 0.04)
+			env.gain.setValueAtTime(
+				gain * 0.85,
+				time + Math.max(0.05, duration - 0.04),
+			)
+			env.gain.exponentialRampToValueAtTime(0.001, time + duration + 0.05)
+			for (const [type, level] of [
+				['sawtooth', 1],
+				['square', 0.35],
+			] as const) {
+				const osc = ctx.createOscillator()
+				osc.type = type
+				osc.frequency.setValueAtTime(frequency * 0.976, time)
+				osc.frequency.exponentialRampToValueAtTime(frequency, time + 0.05)
+				depth.connect(osc.frequency)
+				const g = ctx.createGain()
+				g.gain.value = level
+				osc.connect(g).connect(mouth)
+				osc.start(time)
+				osc.stop(time + duration + 0.07)
+			}
+			// Breath: a whisper of noise as it starts.
+			const breath = ctx.createBufferSource()
+			breath.buffer = noise(ctx)
+			const air = ctx.createBiquadFilter()
+			air.type = 'bandpass'
+			air.frequency.value = 2400
+			const airGain = ctx.createGain()
+			airGain.gain.value = 0
+			airGain.gain.setValueAtTime(gain * 0.25, time)
+			airGain.gain.exponentialRampToValueAtTime(0.001, time + 0.09)
+			breath.connect(air).connect(airGain).connect(env)
+			breath.start(time)
+			breath.stop(time + 0.1)
+			mouth.connect(top).connect(env)
+			lfo.start(time)
+			lfo.stop(time + duration + 0.07)
 			return
 		}
 		case 'pluck': {

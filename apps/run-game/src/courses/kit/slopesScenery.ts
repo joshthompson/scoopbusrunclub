@@ -921,7 +921,7 @@ export function crowd(seed: number, slope = 0) {
 		rects.push([x + 1, top, 4, 2, hat])
 		rects.push([x + 2, top - 1, 2, 1, '#ffffff'])
 		rects.push([x, top + 6, 6, 1, hat])
-		// Now and then a flag, waved over their head.
+		// Occasionally a flag, waved over their head.
 		if (random() < 0.4) {
 			const swede = random() < 0.6
 			rects.push([x + 5, top - 8, 1, 10, '#6b4a2b'])

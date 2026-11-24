@@ -172,7 +172,7 @@ function parkScenery(): Course['scenery'] {
 		if (Math.abs(x - TEMPLE_X) < TEMPLE_ROOM) continue
 		if (Math.abs(x - GATE_MIDDLE) < GATE_ROOM) continue
 		const roll = random()
-		// Now and then a bench, with a lamp beside it.
+		// Occasionally a bench, with a lamp beside it.
 		if (roll < 0.12) {
 			scenery.push({ x, asset: parkBench, scale: 2 })
 			scenery.push({ x: x + 34, asset: parkLamp, scale: 2 })
@@ -236,7 +236,7 @@ function addGeese(obstacles: Obstacle[], boosts: Boost[]) {
 const FLYOVERS = 6
 
 /**
- * Geese flying over from behind, now and then: their own random numbers
+ * Geese flying over from behind, occasionally: their own random numbers
  * too, to leave everything else where it was.
  */
 function flyOvers(): NonNullable<Course['flyovers']> {

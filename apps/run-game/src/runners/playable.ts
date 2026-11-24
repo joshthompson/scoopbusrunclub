@@ -92,8 +92,8 @@ export interface Playable {
 		 */
 		neck?: Neck
 		/**
-		 * Two heads, the Miner Twins': a space helmet goes on each of them.
-		 * Any other hat, just the one.
+		 * Two heads, the Miner Twins': any hat goes on each of them, the
+		 * same one twice.
 		 */
 		twoHeads?: boolean
 		/**

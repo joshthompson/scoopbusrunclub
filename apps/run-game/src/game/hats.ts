@@ -46,6 +46,17 @@ import type { FikaItem } from './fika'
  *   bristles loaded, in the wearer's colour: put on everyone playing
  *   Paintbrush, the minigame, painting the wall with it (see
  *   `minigames/paintbrush`), not a pickup
+ * - `punkCap`: a punk's black leather cap, its peak short, a belt round
+ *   it buckled in silver, spikes and studs: put on everyone playing the
+ *   Anthem in Lollapascoopza, the minigame (see
+ *   `minigames/lollapascoopza`), not a pickup
+ * - `crabHat`: a crab, a claw out to each side: put on everyone playing Mr
+ *   Claws, the minigame, its claws posed as they're used, Pinching,
+ *   Guarding, carrying (see `minigames/mrClaws`), not a pickup
+ * - `redTeamHat`, `blueTeamHat`: a top hat in the red team's red, and a tall
+ *   bowler in the blue team's blue, put on everyone playing a team
+ *   minigame, so it's plain who's on which team (see `game/teams`), not a
+ *   pickup: kept by playing on that team
  */
 export type HatKind =
 	| 'pumpkin'
@@ -71,8 +82,25 @@ export type HatKind =
 	| 'spaceHelmet'
 	| 'antennae'
 	| 'swordHat'
-	| 'bobbleHatBlue'
 	| 'paintbrush'
+	| 'redTeamHat'
+	| 'blueTeamHat'
+	| 'crabHat'
+	| 'punkCap'
+
+/**
+ * How a Crab Hat's claws are: out, opening, snapped shut and shooting out
+ * (a little, further, right out) or back in, crossed in Guard, or up
+ * holding someone.
+ */
+export type CrabPose =
+	| 'rest'
+	| 'open'
+	| 'snap1'
+	| 'snap2'
+	| 'snap'
+	| 'guard'
+	| 'carry'
 
 /**
  * A hat someone's wearing: a Pumpkin by its carving, 1 to 5; a paintbrush
@@ -83,16 +111,21 @@ export interface Hat {
 	kind: HatKind
 	carving?: number
 	colour?: string
+	/** A Crab Hat's claws, as they are just now: out, if not said. */
+	pose?: CrabPose
+	/** And how worn out its Guard is, 0 not at all to 3 spent, its colour fading: fresh, if not said. */
+	tired?: number
 }
 
 /**
  * The hats that are a Boost of their own, to run into, and so collectables:
- * not a Pumpkin, nor fika. And the sword hat, had playing Fruit Kebab, and
- * the paintbrush, had playing Paintbrush.
+ * not a Pumpkin, nor fika. And the sword hat, had playing Fruit Kebab,
+ * the paintbrush, had playing Paintbrush, and the team hats, had playing
+ * on a team.
  */
 export type PickupHat = Exclude<
 	HatKind,
-	'pumpkin' | 'captain' | 'spaceHelmet' | 'bobbleHatBlue'
+	'pumpkin' | 'captain' | 'spaceHelmet' | 'crabHat' | 'punkCap'
 >
 
 export interface HatRules {
@@ -148,8 +181,6 @@ export const HAT_RULES: Record<HatKind, HatRules> = {
 	topHat: PLAIN,
 	flyingHelmet: PLAIN,
 	bobbleHat: PLAIN,
-	// Beach Volleyball's blue team's, as the red team wear the red one.
-	bobbleHatBlue: PLAIN,
 	headMirror: { ...PLAIN, germProof: true },
 	discoBall: PLAIN,
 	jazzHat: PLAIN,
@@ -158,6 +189,10 @@ export const HAT_RULES: Record<HatKind, HatRules> = {
 	antennae: PLAIN,
 	swordHat: PLAIN,
 	paintbrush: PLAIN,
+	redTeamHat: PLAIN,
+	blueTeamHat: PLAIN,
+	crabHat: PLAIN,
+	punkCap: PLAIN,
 }
 
 /** Fika that's a hat too, put on as it's had: the captain's hat, off the ferry's roof. */
@@ -194,6 +229,10 @@ const CODED: HatKind[] = [
 	'antennae',
 	'swordHat',
 	'paintbrush',
+	'redTeamHat',
+	'blueTeamHat',
+	'crabHat',
+	'punkCap',
 ]
 /** How many carvings a Pumpkin can have: its codes. */
 const CARVINGS = 5

@@ -89,7 +89,7 @@ function vein(
 		t.rect(at[0], at[1], across ? 4 : 2, across ? 2 : 4, fill)
 		if (across) at = [at[0] + 4, at[1] + (random() < 0.5 ? 2 : -2)]
 		else at = [at[0] + (random() < 0.5 ? 2 : -2), at[1] + 4]
-		// Now and then, a branch off it.
+		// Occasionally, a branch off it.
 		if (random() < 0.06) vein(t, random, at[0], at[1], 3, fill, !across)
 	}
 }
@@ -735,7 +735,7 @@ export const bronchus = paintedArt(60, 50, (x, y) => {
 	]) {
 		if (part.d > part.r) continue
 		if (part.d > part.r - 1.2) return '#c86a7c'
-		// A ring round it, now and then.
+		// A ring round it, occasionally.
 		if (Math.round(part.t * 8) % 2 === 0 && part.d < part.r - 2)
 			return '#f6d0d4'
 		return '#e9a0aa'

@@ -445,7 +445,7 @@ export const STARFISH = letterArt(
 
 /**
  * Beach sand, all over, a tile of it: fine grains lighter and darker, a few
- * soft ripples left by the wind, and now and then a bit of broken shell.
+ * soft ripples left by the wind, and occasionally a bit of broken shell.
  * See-through, over `BEACH_SAND`: quieter than the desert's.
  */
 export const BEACH_SAND_TEXTURE = (() => {

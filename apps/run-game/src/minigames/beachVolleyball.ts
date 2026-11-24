@@ -15,11 +15,13 @@ import {
 	START_X,
 	TICK_MS,
 } from '../game/constants'
+import { TEAM_COLOURS, teamHat } from '../game/teams'
 import { type Racer, type World, startingBody } from '../game/world'
 import type { Controls } from '../input'
 import { CLUB } from '../runners/playable'
 import { play } from '../sfx'
 import { ARENA_WALLS, arenaCourse, inRandomOrder } from './arena'
+import { collectTeamHats, isBot } from './teams'
 import {
 	IDLE,
 	type Minigame,
@@ -104,9 +106,9 @@ export const SCORED_PAUSE = 110
 /** How long "Match point!" and the like are up, big. */
 const ANNOUNCED_FOR = 80
 
-/** The teams: their names, and their colours (as their hats). */
+/** The teams: their names, and their colours (as their hats: see `game/teams`). */
 export const TEAM_NAMES = ['Red', 'Blue'] as const
-export const TEAM_COLOURS = ['#d23a3a', '#3a62d2'] as const
+export { TEAM_COLOURS }
 /** The bot added to a team that's a Player short: its id, so every screen finds it. */
 const TEAM_BOT = 'volley-bot'
 
@@ -128,7 +130,7 @@ export const beachVolleyball: Minigame = {
 	tune: 'slopes',
 	// Its board's up top, and who's in the sea says who's out.
 	pills: false,
-	collectables: [],
+	collectables: ['hat:redTeamHat', 'hat:blueTeamHat'],
 	course: arenaCourse(
 		'beach-volleyball',
 		'Beach Volleyball',
@@ -235,6 +237,13 @@ function startBeachVolleyball(world: World): MinigameRun {
 		teams.set(teamBot.id, reds * 2 < racers.length ? 0 : 1)
 	}
 	const teamOf = (racer: Racer) => teams.get(racer.id) ?? 0
+	/** Each team's hat kept, once teams are known: on the Host, on the first tick; on a phone, once it's told. */
+	let hatsKept = false
+	const keepHats = () => {
+		if (hatsKept) return
+		hatsKept = true
+		collectTeamHats(world, teamOf, (r) => isBot(r, TEAM_BOT))
+	}
 	const teamMates = (team: number) => racers.filter((r) => teamOf(r) === team)
 	/** Which way's over the net for `team`: right for the left team. */
 	const over = (team: number) => (team === 0 ? 1 : -1)
@@ -251,7 +260,7 @@ function startBeachVolleyball(world: World): MinigameRun {
 	}
 
 	// Each on their own side, spread out, facing the net, in their team's
-	// bobble hat.
+	// hat.
 	for (const racer of racers) {
 		const b = racer.body
 		const team = teamOf(racer)
@@ -260,7 +269,7 @@ function startBeachVolleyball(world: World): MinigameRun {
 		b.floor = ground
 		b.grounded = true
 		b.facing = over(team) as 1 | -1
-		b.hat = { kind: team === 0 ? 'bobbleHat' : 'bobbleHatBlue' }
+		b.hat = teamHat(team)
 	}
 
 	const points: [number, number] = [0, 0]
@@ -483,7 +492,7 @@ function startBeachVolleyball(world: World): MinigameRun {
 		// and it's the nearest of its team to it, a little off, the worse it
 		// is the more; back to its place, if not. Slow to think again, the
 		// worse it is. By the net, as the ball comes down to it, it jumps
-		// up at it, now and then, to spike it.
+		// up at it, occasionally, to spike it.
 		bot: (racer) => {
 			const b = racer.body
 			const team = teamOf(racer)
@@ -509,7 +518,7 @@ function startBeachVolleyball(world: World): MinigameRun {
 				}
 				plans.set(racer.id, plan)
 			}
-			// Under it, by the net, as it comes down: up at it, now and then.
+			// Under it, by the net, as it comes down: up at it, occasionally.
 			const head = b.feetY - racer.runner.sprite.height * RUNNER_SCALE
 			if (
 				b.grounded &&
@@ -542,6 +551,7 @@ function startBeachVolleyball(world: World): MinigameRun {
 		done: (racer) => won(racer),
 		out: () => false,
 		step() {
+			keepHats()
 			if (world.phase() !== 'running') return
 			const now = world.ticks()
 
@@ -669,8 +679,9 @@ function startBeachVolleyball(world: World): MinigameRun {
 				const racer = racers[i]
 				if (!racer) return
 				teams.set(racer.id, team)
-				racer.body.hat = { kind: team === 0 ? 'bobbleHat' : 'bobbleHatBlue' }
+				racer.body.hat = teamHat(team)
 			})
+			if (a.teams) keepHats()
 			if (a.pointAt !== undefined) show.pointAt = a.pointAt
 			show.scored =
 				a.scored && a.scored[0] >= 0

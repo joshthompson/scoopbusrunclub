@@ -509,8 +509,8 @@ const lampRects = (glass: string, core: string): PixelRect[] => [
 ]
 
 /**
- * A bulkhead lamp, a dome in a wire cage on its bracket, warm, and now and
- * then not quite. 8 by 8, light all round it.
+ * A bulkhead lamp, a dome in a wire cage on its bracket, warm, and occasionally
+ * not quite. 8 by 8, light all round it.
  */
 export const BULKHEAD_LAMP: SecretProp = prop(
 	8,

@@ -587,7 +587,7 @@ const PACER_TRICKS = 0.7
 /**
  * A tick of one of the pack on skis: down the hill at their own pace,
  * hopping what's in the way and jumping what's too wide to ski over,
- * flying off kickers, and now and then a trick in the air, always landed.
+ * flying off kickers, and occasionally a trick in the air, always landed.
  * Never down a Gap: Pacers never fall.
  */
 export function skiPacer(
@@ -690,7 +690,7 @@ export function skiPacer(
 
 /**
  * Off into the air, one of the pack: if it looks like they'll be up long
- * enough for one, now and then a trick.
+ * enough for one, occasionally a trick.
  */
 function airborne(p: Pacer) {
 	if (p.vy > -5 || Math.random() > PACER_TRICKS) return

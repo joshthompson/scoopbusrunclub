@@ -7,4 +7,6 @@ export const cheats = {
 	busOff: false,
 	/** On the next tick that's racing, everyone put just short of the finish, running: to test what comes after one. */
 	toFinish: false,
+	/** Kristineberg's long jump replayed again after the interview every time, not now and then (see `encoreTimes`). */
+	alwaysEncore: false,
 }

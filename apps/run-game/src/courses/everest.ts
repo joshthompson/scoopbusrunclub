@@ -521,7 +521,7 @@ function scenery(obstacles: Obstacle[]): Scenery[] {
 				piece = { x, asset: pick(maniWall, maniWall, prayerWheels), scale: 2 }
 			else if (roll < 0.9)
 				piece = { x, asset: prayerFlags, scale: 2, setBack: 2, onFloor: true }
-			// A lodge now and then, set back up the hillside.
+			// A lodge occasionally, set back up the hillside.
 			else if (variety() < 0.3)
 				piece = {
 					x,

@@ -252,7 +252,7 @@ function createLoosePumpkinController(
 				label: () => pumpkin().label,
 				style: () => ({ display: shown() && size() ? 'block' : 'none' }),
 				// The pumpkin, with its inside if it's a carved one, lit up while
-				// it's hovered and now and then by itself, and its name, styled to
+				// it's hovered and occasionally by itself, and its name, styled to
 				// match the runners'.
 				children: () => (
 					<>

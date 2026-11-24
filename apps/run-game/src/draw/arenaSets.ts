@@ -5,6 +5,44 @@ import {
 } from 'scoopjs'
 import type { JSX } from 'solid-js'
 import {
+	AUTUMN_BIRCH,
+	AUTUMN_BIRCH_HEIGHT,
+	AUTUMN_BIRCH_WIDTH,
+	AUTUMN_FIELD,
+	AUTUMN_FIELD_HEIGHT,
+	AUTUMN_FIELD_WIDTH,
+	AUTUMN_FRONT,
+	AUTUMN_FRONT_HEIGHT,
+	AUTUMN_FRONT_WIDTH,
+	AUTUMN_HEDGEHOG,
+	AUTUMN_HEDGEHOG_HEIGHT,
+	AUTUMN_HEDGEHOG_WIDTH,
+	AUTUMN_LEAF_PILE,
+	AUTUMN_LEAF_PILE_HEIGHT,
+	AUTUMN_LEAF_PILE_WIDTH,
+	AUTUMN_LOG,
+	AUTUMN_LOG_HEIGHT,
+	AUTUMN_LOG_WIDTH,
+	AUTUMN_MAPLE,
+	AUTUMN_MAPLE_HEIGHT,
+	AUTUMN_MAPLE_WIDTH,
+	AUTUMN_OAK,
+	AUTUMN_OAK_HEIGHT,
+	AUTUMN_OAK_WIDTH,
+	AUTUMN_SPRUCE,
+	AUTUMN_SPRUCE_HEIGHT,
+	AUTUMN_SPRUCE_WIDTH,
+	AUTUMN_SQUIRREL,
+	AUTUMN_SQUIRREL_HEIGHT,
+	AUTUMN_SQUIRREL_WIDTH,
+	AUTUMN_TOADSTOOLS,
+	AUTUMN_TOADSTOOLS_HEIGHT,
+	AUTUMN_TOADSTOOLS_WIDTH,
+	FALLING_LEAF_SIZE,
+	FALLING_LEAVES,
+	autumnNearTrunk,
+} from '../courses/kit/autumnForestScenery'
+import {
 	BEACH_FOAM,
 	BEACH_SEA,
 	BEACH_SHALLOWS,
@@ -100,6 +138,7 @@ import {
 } from '../game/constants'
 import type { World } from '../game/world'
 import { ARENA_LEFT } from '../minigames/arena'
+import { BRANCH_SPOTS, LADDERS } from '../minigames/bombHat'
 import {
 	FIELD_LEFT,
 	FIELD_TOP,
@@ -110,11 +149,12 @@ import { mixHex } from './art/hats'
 import { cachedArt } from './canvasArt'
 import { cellBatch, seeThrough } from './paint/cellBatch'
 import { paintPicture } from './paint/picture'
+import { createRockStage } from './rockStage'
 
 /**
  * The minigames' sets: what's round each arena, so it's somewhere. Fruit
  * Kebab's beach, the sea coming in and going out over the sand, palms, and
- * a crab now and then; Potato Rain's clearing in a tulip field, a barn and
+ * a crab occasionally; Potato Rain's clearing in a tulip field, a barn and
  * a windmill off behind it; Pogo Sticks' near-empty car park; Beach
  * Volleyball's beach in winter. Placed by where they are on the screen, which
  * never moves in an arena.
@@ -162,6 +202,10 @@ export function createArenaSet(world: World) {
 			return createFrozenBeach(world)
 		case 'hungry-goose':
 			return createFarm(world)
+		case 'bomb-hat':
+			return createAutumnForest(world)
+		case 'lollapascoopza':
+			return createRockStage(world)
 		default:
 			return []
 	}
@@ -256,7 +300,7 @@ function createBeach(world: World) {
 		},
 	})
 	/**
-	 * A crab now and then, scuttling across in front of the path, one way
+	 * A crab occasionally, scuttling across in front of the path, one way
 	 * then the other: when, by the tick, so every screen sees the same one.
 	 */
 	const crabY = ground + PATH_FRONT + 4
@@ -556,7 +600,7 @@ function paintFarmland(ctx: CanvasRenderingContext2D) {
 				rect(from, y, CELL * (1 + Math.floor(r / 2)), CELL, HEDGE)
 			}
 		}
-		// The hedge along its back, and a tree in it now and then.
+		// The hedge along its back, and a tree in it occasionally.
 		rect(0, rows[r], W, CELL * (1 + Math.floor(r / 2)), HEDGE)
 		for (let x = 0; x < W; x += CELL * 4)
 			if (farmHash(x, r + 10) < 0.02) {
@@ -609,7 +653,7 @@ const WALKING = 140
 /**
  * A field on a farm, seen zoomed out: the farmland behind it (see
  * `paintFarmland`); the red barn and its silo, and a stack of hay bales by
- * them; a flock of sheep in the pasture, grazing, now and then wandering
+ * them; a flock of sheep in the pasture, grazing, occasionally wandering
  * a little way; and a wooden fence along the back of the field, up and
  * down its lumps, round bales against it here and there.
  */
@@ -658,7 +702,7 @@ function createFarm(world: World) {
 	})
 	const sheep = view('farm-sheep', (ctx, image, now) => {
 		FLOCK.forEach(([x0, y, size, wander], i) => {
-			// Grazing most of the time; now and then a few steps, one way, then
+			// Grazing most of the time; occasionally a few steps, one way, then
 			// the next time, back.
 			const t = (now + i * 137) % GRAZING
 			const round = Math.floor((now + i * 137) / GRAZING)
@@ -870,6 +914,249 @@ function createFrozenBeach(world: World) {
 			850,
 			back - 24,
 			TALL_FOOT,
+		),
+	]
+}
+
+// --- Bomb Hat's autumn forest --------------------------------------------------------
+
+/** How many leaves are falling at once, behind everyone and in front. */
+const LEAVES_BEHIND = 16
+const LEAVES_FRONT = 6
+
+/** A number from a seed, the same every time, 0 to 1. */
+const leafHash = (n: number) => {
+	let h = Math.imul(n * 2654435761 + 97, 1597334677)
+	h ^= h >>> 15
+	return ((h >>> 0) % 10000) / 10000
+}
+
+/**
+ * Leaves falling across the screen, `count` of them, swaying and turning
+ * over as they come down, and on round again from the top: where each is
+ * goes by the tick, so every screen sees the same ones.
+ */
+function fallingLeaves(
+	world: World,
+	id: string,
+	type: string,
+	count: number,
+	seed: number,
+) {
+	return createController({
+		init: () => ({
+			id,
+			type,
+			...createObjectSignal(ARENA_LEFT, 'x'),
+			...createObjectSignal(0, 'y'),
+			...createObjectSignal({} as JSX.CSSProperties, 'style'),
+			width: () => VIEW_WIDTH,
+			height: () => VIEW_HEIGHT,
+		}),
+		draw({ ctx, image }) {
+			// Read the tick, so it's painted again every one.
+			const t = world.ticks()
+			for (let i = 0; i < count; i++) {
+				const s = seed + i * 13
+				const speed = 0.35 + 0.5 * leafHash(s)
+				const span = VIEW_HEIGHT + 60
+				const fall = (t * speed + leafHash(s + 1) * span) % span
+				const y = fall - 40
+				const sway =
+					Math.sin(t / (40 + 30 * leafHash(s + 2)) + i) *
+					(10 + 24 * leafHash(s + 3))
+				// Blown a little to the left as they fall, round again off the edge.
+				const x =
+					(((leafHash(s + 4) * VIEW_WIDTH - fall * 0.3 + sway) % VIEW_WIDTH) +
+						VIEW_WIDTH) %
+					VIEW_WIDTH
+				const kind = FALLING_LEAVES[i % FALLING_LEAVES.length]
+				const turn = Math.floor(t / (10 + 8 * leafHash(s + 5)) + i) % 4
+				const frame = kind[turn === 3 ? 1 : turn]
+				paintPicture(
+					ctx,
+					image,
+					frame,
+					Math.round(x / CELL) * CELL,
+					Math.round(y / CELL) * CELL,
+					FALLING_LEAF_SIZE,
+					FALLING_LEAF_SIZE,
+				)
+			}
+		},
+	})
+}
+
+/**
+ * The great trees either side, right in front, a collar on each where its
+ * branches (Bomb Hat's Platforms, see `BRANCH_SPOTS`) come out from behind
+ * it: on its inward side, at each branch's top, in cells down the screen.
+ */
+const NEAR_TRUNKS = (() => {
+	const joins = (side: 'left' | 'right') =>
+		BRANCH_SPOTS.filter((b) => b.side === side).map((b) =>
+			Math.round((GROUND_Y - b.height) / CELL),
+		)
+	return {
+		left: autumnNearTrunk('right', joins('left'), 11),
+		right: autumnNearTrunk('left', joins('right'), 12),
+	}
+})()
+
+/**
+ * Bomb Hat's clearing in an autumn forest: the forest floor carpeted in
+ * leaves, a great red maple behind its middle, golden birches to the
+ * right, an oak and a spruce further back, toadstools, a mossy log with a
+ * squirrel on it, a hedgehog by a pile of leaves; ladders up to the
+ * branches (its Platforms); leaves along the front of the path, and
+ * leaves falling, behind everyone and in front; and the trunks of two
+ * great trees right in front either side, the branches coming out from
+ * behind them.
+ */
+function createAutumnForest(world: World) {
+	const back = world.terrain.groundY(START_X) - PATH_BACK
+	const ground = world.terrain.groundY(START_X)
+	/** A picture stood with its foot's middle at `x` across, `foot` down. */
+	const stood = (
+		id: string,
+		src: string,
+		width: number,
+		height: number,
+		x: number,
+		foot: number,
+	) => still(id, 'platform', src, x - width / 2, foot - height, width, height)
+	return [
+		// The forest floor, back from the path to the trees.
+		still(
+			'autumn-field',
+			'scenery',
+			AUTUMN_FIELD,
+			0,
+			back - AUTUMN_FIELD_HEIGHT,
+			AUTUMN_FIELD_WIDTH,
+			AUTUMN_FIELD_HEIGHT,
+		),
+		// Further back: an oak, and a spruce.
+		stood(
+			'autumn-spruce',
+			AUTUMN_SPRUCE,
+			AUTUMN_SPRUCE_WIDTH,
+			AUTUMN_SPRUCE_HEIGHT,
+			640,
+			back - 120,
+		),
+		stood(
+			'autumn-oak',
+			AUTUMN_OAK,
+			AUTUMN_OAK_WIDTH,
+			AUTUMN_OAK_HEIGHT,
+			300,
+			back - 104,
+		),
+		// The great red maple, behind the clearing, its crown off the top of the screen.
+		stood(
+			'autumn-maple',
+			AUTUMN_MAPLE,
+			AUTUMN_MAPLE_WIDTH,
+			AUTUMN_MAPLE_HEIGHT,
+			470,
+			// Back far enough up the floor that its crown's off the top of the screen.
+			back - 60,
+		),
+		fallingLeaves(world, 'autumn-leaves-behind', 'platform', LEAVES_BEHIND, 1),
+		// On the floor: a log with a squirrel on it, toadstools, a pile of
+		// leaves and a hedgehog snuffling by it.
+		stood(
+			'autumn-log',
+			AUTUMN_LOG,
+			AUTUMN_LOG_WIDTH,
+			AUTUMN_LOG_HEIGHT,
+			470,
+			back - 60,
+		),
+		stood(
+			'autumn-squirrel',
+			AUTUMN_SQUIRREL,
+			AUTUMN_SQUIRREL_WIDTH,
+			AUTUMN_SQUIRREL_HEIGHT,
+			486,
+			back - 60 - AUTUMN_LOG_HEIGHT + 6,
+		),
+		stood(
+			'autumn-toadstools',
+			AUTUMN_TOADSTOOLS,
+			AUTUMN_TOADSTOOLS_WIDTH,
+			AUTUMN_TOADSTOOLS_HEIGHT,
+			380,
+			back - 30,
+		),
+		stood(
+			'autumn-leaf-pile',
+			AUTUMN_LEAF_PILE,
+			AUTUMN_LEAF_PILE_WIDTH,
+			AUTUMN_LEAF_PILE_HEIGHT,
+			720,
+			back - 20,
+		),
+		stood(
+			'autumn-hedgehog',
+			AUTUMN_HEDGEHOG,
+			AUTUMN_HEDGEHOG_WIDTH,
+			AUTUMN_HEDGEHOG_HEIGHT,
+			680,
+			back - 18,
+		),
+		// The birches on the right.
+		stood(
+			'autumn-birch',
+			AUTUMN_BIRCH,
+			AUTUMN_BIRCH_WIDTH,
+			AUTUMN_BIRCH_HEIGHT,
+			790,
+			back - 8,
+		),
+		// Ladders up to the low branches, stood on the path, hooked over them.
+		...LADDERS.map((l, i) =>
+			still(
+				`autumn-ladder-${i}`,
+				'platform',
+				l.art.src,
+				Math.round((l.x - ARENA_LEFT - l.art.width / 2) / CELL) * CELL,
+				ground - l.art.height,
+				l.art.width,
+				l.art.height,
+			),
+		),
+		// Leaves along the front of the path, and leaves falling in front of everyone.
+		still(
+			'autumn-front',
+			'foreground',
+			AUTUMN_FRONT,
+			0,
+			ground + PATH_FRONT - 2,
+			AUTUMN_FRONT_WIDTH,
+			AUTUMN_FRONT_HEIGHT,
+		),
+		fallingLeaves(world, 'autumn-leaves-front', 'foreground', LEAVES_FRONT, 7),
+		// The two great trees right in front, either side, that the branches
+		// come out from behind.
+		still(
+			'autumn-near-trunk-left',
+			'foreground',
+			NEAR_TRUNKS.left.src,
+			0,
+			VIEW_HEIGHT - NEAR_TRUNKS.left.height,
+			NEAR_TRUNKS.left.width,
+			NEAR_TRUNKS.left.height,
+		),
+		still(
+			'autumn-near-trunk-right',
+			'foreground',
+			NEAR_TRUNKS.right.src,
+			VIEW_WIDTH - NEAR_TRUNKS.right.width,
+			VIEW_HEIGHT - NEAR_TRUNKS.right.height,
+			NEAR_TRUNKS.right.width,
+			NEAR_TRUNKS.right.height,
 		),
 	]
 }

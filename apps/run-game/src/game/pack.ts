@@ -133,7 +133,7 @@ interface Lineup {
 }
 
 /**
- * Someone to join: now and then someone the club knows, a member or one of
+ * Someone to join: occasionally someone the club knows, a member or one of
  * its guests, as long as they're not running already (or racing). Never
  * Link, or anyone else to unlock: one pacing you would look like they're
  * yours to run as already.
@@ -358,7 +358,7 @@ function movePacer(world: World, p: Pacer) {
 	if (p.grounded) {
 		const slope = p.on === undefined ? terrain.slope(p.x) : 0
 		// Down, sliding, as a Player does: under a low branch or a tall
-		// hurdle, and on under the next if it's close; or now and then down
+		// hurdle, and on under the next if it's close; or occasionally down
 		// a hill, for the fun of it.
 		const downhill = slideDownhill(world, p, slope)
 		// Bounced on: sat down on the ground, dazed, till they're up again.
@@ -744,7 +744,7 @@ function duckUnder(world: World, x: number) {
 
 /**
  * How steep a hill has to be, on average over the next `SLIDE_HILL_AHEAD`
- * px, for a Pacer to slide down it, now and then; and how steep back up a
+ * px, for a Pacer to slide down it, occasionally; and how steep back up a
  * hill gets them up again, short of the end of their slide.
  */
 const SLIDE_HILL = 0.08
@@ -757,7 +757,7 @@ const SLIDE_HILL_SHORTEST = 50
 const SLIDE_HILL_LONGEST = 120
 
 /**
- * Whether a Pacer's sliding down the hill they're on: now and then, for a
+ * Whether a Pacer's sliding down the hill they're on: occasionally, for a
  * while, as a Player might, down one steep enough a good way ahead; up
  * again once it's over, or it's uphill.
  */

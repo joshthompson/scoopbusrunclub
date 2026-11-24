@@ -560,7 +560,7 @@ export function oldTownHouse(seed: number): StreetPiece {
 	r.push([glass, shop + 8, w - 18, 2, SHOP_GLASS_LIT])
 	r.push([door, shop + 8, 8, SHOP - 8, shade])
 	r.push([door + (doorLeft ? 6 : 1), shop + 18, 1, 2, lit])
-	// Now and then, an iron sign hanging off it on a bracket, up out of
+	// Occasionally, an iron sign hanging off it on a bracket, up out of
 	// the way.
 	if (random() < 0.35) {
 		const sx = Math.floor(w / 2) - 4
@@ -633,7 +633,7 @@ export function oldTownHouse(seed: number): StreetPiece {
  * An alley off the street, different with every `seed`, 22 to 26 cells
  * wide: down it, its walls closing in on the far end, sunny on the left,
  * shady on the right, its steps rising away to a hazy house across the
- * end of it, the sky and the skyline over it; and now and then one of the
+ * end of it, the sky and the skyline over it; and occasionally one of the
  * old town's arches across it, holding the houses apart.
  */
 export function oldTownAlley(seed: number): StreetPiece {

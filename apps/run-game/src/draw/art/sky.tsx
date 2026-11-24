@@ -222,7 +222,7 @@ interface Storming {
 	reach: number
 }
 
-/** Whether it's lit up: striking, or now and then while brewing a strike. */
+/** Whether it's lit up: striking, or occasionally while brewing a strike. */
 const flickering = (storm: Storming) =>
 	storm.striking || (storm.brewing && Math.floor(storm.now / 4) % 3 === 0)
 

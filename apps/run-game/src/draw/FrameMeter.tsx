@@ -1,18 +1,30 @@
 import { createSignal, onCleanup } from 'solid-js'
 
 /**
- * Whether to show the frame meter: `?fps=1` in the page's address. Kept for
- * the whole visit, so going from screen to screen doesn't lose it.
+ * Whether to show the frame meter: `?fps=1` in the page's address, or
+ * switched on from the debug menu (see `DebugMenu`). Kept for the whole
+ * visit, so going from screen to screen doesn't lose it.
  */
-export const showFrameMeter = (() => {
-	const value = new URLSearchParams(location.search).get('fps')
+export const [showFrameMeter, setShowFrameMeter] = createSignal(
+	(() => {
+		const value = new URLSearchParams(location.search).get('fps')
+		try {
+			if (value !== null) sessionStorage.setItem('frame-meter', value)
+			return (value ?? sessionStorage.getItem('frame-meter')) === '1'
+		} catch {
+			return value === '1'
+		}
+	})(),
+)
+
+/** The frame meter on, or off: and kept that way for the visit. */
+export function toggleFrameMeter() {
+	const on = !showFrameMeter()
+	setShowFrameMeter(on)
 	try {
-		if (value !== null) sessionStorage.setItem('frame-meter', value)
-		return (value ?? sessionStorage.getItem('frame-meter')) === '1'
-	} catch {
-		return value === '1'
-	}
-})()
+		sessionStorage.setItem('frame-meter', on ? '1' : '0')
+	} catch {}
+}
 
 /**
  * The frame rate and frame time over the last second, in the corner, timed

@@ -12,6 +12,7 @@ import type { Racer, World } from '../game/world'
 import { play } from '../sfx'
 import { ARENA_LEFT, arenaCourse, inRandomOrder } from './arena'
 import { clock } from './clock'
+import { poseInWater, treadWater, waterBot } from './treadWater'
 import {
 	IDLE,
 	type Minigame,
@@ -40,11 +41,7 @@ export const BERG_TOP = 470
 export const BERG_HALF = 280
 /** How far down its sides the sea comes: the waterline, under its top. */
 export const WATERLINE = BERG_TOP + 26
-/** How far down into the sea anyone in it is, their feet under the waterline. */
-const SWIMS_AT = 34
-/** In the sea, how fast they paddle, how quickly they get going, and how near the screen's edges they can go. */
-const SWIM_SPEED = 0.8
-const SWIM_GRIP = 0.08
+/** In the sea, how near the screen's edges they can swim. */
 const SWIM_IN = 24
 /** Won, how much of its tilt the iceberg keeps a tick, settling level; and the winner's speed, stopping. */
 const SETTLES = 0.9
@@ -60,7 +57,7 @@ const RIGHTING_FIRST = 0.0009
 const RIGHTING_LAST = 0.00042
 const STEADY = 0.012
 const MOST_TILT = 0.5
-/** How the sea moves it of its own accord: its bob, up and down, and a nudge now and then. */
+/** How the sea moves it of its own accord: its bob, up and down, and a nudge occasionally. */
 const BOB_FIRST = 2
 const BOB_LAST = 5
 const BOB_TICKS = 170
@@ -260,7 +257,7 @@ function startIcebergBump(world: World): MinigameRun {
 		play('finished')
 	}
 
-	/** In the sea: floating, bobbing with the waves, paddling about with left and right. */
+	/** In the sea: treading water, swimming about with left and right, hopping up out of it. */
 	function swim(racer: Racer) {
 		const b = racer.body
 		if (!inSeaAt.has(racer.id)) {
@@ -272,24 +269,17 @@ function startIcebergBump(world: World): MinigameRun {
 			)
 			splash(b.x)
 		}
-		// Paddling about, slowly, whichever way's held.
-		const held = racer.controls()
-		const way = Number(held.right) - Number(held.left)
-		b.vx += (way * SWIM_SPEED - b.vx) * SWIM_GRIP
-		if (way) b.facing = way > 0 ? 1 : -1
-		b.vy = 0
-		b.x = Math.max(
-			ARENA_LEFT + SWIM_IN,
-			Math.min(ARENA_LEFT + VIEW_WIDTH - SWIM_IN, b.x + b.vx),
-		)
-		b.feetY = WATERLINE + SWIMS_AT + Math.sin((world.ticks() + b.x) / 23) * 2
-		b.standStill = true
-		b.tilt = Math.sin((world.ticks() + b.x) / 31) * 8
-		b.held = 2
+		// Treading water, swimming about, hopping up out of it.
+		treadWater(world, racer, {
+			waterline: WATERLINE,
+			left: ARENA_LEFT + SWIM_IN,
+			right: ARENA_LEFT + VIEW_WIDTH - SWIM_IN,
+			splash: (x) => show.splashes.push({ x, at: world.ticks() }),
+		})
 	}
 
 	const done = (racer: Racer) => !!world.order() && !inSea(racer)
-	/** Which way each bot's decided to go, and till when: it only looks now and then. */
+	/** Which way each bot's decided to go, and till when: it only looks occasionally. */
 	const choices = new Map<
 		string,
 		{ go: number; jumpTill: number; until: number }
@@ -340,7 +330,7 @@ function startIcebergBump(world: World): MinigameRun {
 			}
 			const from = Math.random() < 0.5 ? -1 : 1
 			leap(from)
-			// Later on, now and then, two at once, one from each end.
+			// Later on, occasionally, two at once, one from each end.
 			if (Math.random() < PENGUIN_PAIRS * late) leap(-from)
 			nextPenguin =
 				now +
@@ -427,10 +417,10 @@ function startIcebergBump(world: World): MinigameRun {
 		},
 		// A bot: making for a spot of its own near the middle, uphill when it
 		// tips; and near an edge, or sliding fast towards one, running back
-		// from it, now and then jumping too, since it can turn round in the
+		// from it, occasionally jumping too, since it can turn round in the
 		// air quicker than on the ice. Slow to look, so not always in time.
 		bot: (racer) => {
-			if (inSea(racer)) return IDLE
+			if (inSea(racer)) return waterBot(world, racer)
 			const b = racer.body
 			// A penguin coming at it: jumped, if it's noticed it, as it does
 			// about two in three.
@@ -608,11 +598,8 @@ function startIcebergBump(world: World): MinigameRun {
 				if (at < 0) inSeaAt.delete(racer.id)
 				else inSeaAt.set(racer.id, at)
 				racer.body.celebrating = done(racer)
-				// In the sea: floating upright, rocking with the waves.
-				if (at >= 0) {
-					racer.body.standStill = true
-					racer.body.tilt = Math.sin((world.ticks() + racer.body.x) / 31) * 8
-				}
+				// In the sea: treading water, swimming about, or hopping.
+				if (at >= 0) poseInWater(world, racer, WATERLINE)
 			})
 		},
 	}

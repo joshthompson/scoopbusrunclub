@@ -81,7 +81,7 @@ function tufted(options: {
 /**
  * A trail's surface, over a tile `width` by `height`: grit, lighter and
  * darker, and here and there a pebble, lit on top; and, if it's a forest's,
- * `strewn`, pine needles, and a root across it now and then.
+ * `strewn`, pine needles, and a root across it occasionally.
  */
 function gritty(options: {
 	seed: number
@@ -253,7 +253,7 @@ export const FURBY_FIELD = FURBY_SPRINKLES.pattern('furby-sprinkles')
 /** The same, as a CSS background, for the field behind the path. */
 export const FURBY_FIELD_FAR = FURBY_SPRINKLES.url()
 
-/** The path, pink sugar: grains, lighter and darker, and now and then a heart sweet. */
+/** The path, pink sugar: grains, lighter and darker, and occasionally a heart sweet. */
 export const FURBY_SUGAR = (() => {
 	const random = seeded(5301)
 	const width = 160

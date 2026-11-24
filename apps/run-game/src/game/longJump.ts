@@ -20,7 +20,7 @@ export const PIT_FROM = LONG_JUMP_PX_PER_M
 /** How long the sand is: to 11 m from the board. */
 export const PIT_LENGTH = 10 * LONG_JUMP_PX_PER_M
 /** How far before the board a jump still counts as a long jump. */
-const TAKEOFF_ZONE = 110
+export const TAKEOFF_ZONE = 110
 /** Points a metre jumped, and the most a jump gets. */
 const LONG_JUMP_POINTS_M = 100
 const LONG_JUMP_POINTS_MAX = 1200

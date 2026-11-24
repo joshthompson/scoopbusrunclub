@@ -404,7 +404,7 @@ const clearSand = (at: number) =>
 
 /**
  * What's left lying about the desert: columns standing and broken,
- * tumbled blocks, scrub, and now and then an obelisk. Their own random
+ * tumbled blocks, scrub, and occasionally an obelisk. Their own random
  * numbers, so everything else is where it was.
  */
 function ruins(): Course['scenery'] {
@@ -475,7 +475,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery' | 'corgis'> {
 	// The Nile's crocodiles.
 	for (const x of CROCODILES) obstacles.push({ kind: 'crocodile', x })
 	obstacles.sort((a, b) => a.x - b.x)
-	// A palm now and then, an oasis, but not on a pyramid, nor by the
+	// A palm occasionally, an oasis, but not on a pyramid, nor by the
 	// Sphinx, nor in the Nile.
 	const scenery: Course['scenery'] = []
 	for (let at = -300; at < terrain.finishX + 900; at += 300 + random() * 700)

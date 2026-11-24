@@ -1,8 +1,9 @@
-import { START_X } from '../game/constants'
+import { START_X, VIEW_WIDTH } from '../game/constants'
 import type { Terrain } from '../game/terrain'
 import type { Racer, World } from '../game/world'
 import { play } from '../sfx'
 import { ARENA_LEFT, ARENA_WALLS, arenaCourse, inRandomOrder } from './arena'
+import { poseInWater, treadWater, waterBot } from './treadWater'
 import {
 	IDLE,
 	type Minigame,
@@ -48,8 +49,8 @@ export const platformAtX = (x: number) => {
 	if (i < 0 || i >= PLATFORM_COUNT) return -1
 	return x - platformLeft(i) <= PLATFORM_WIDTH ? i : -1
 }
-/** How far down in the sea anyone who's fallen floats, their feet under its surface. */
-const SWIMS_AT = 30
+/** In the sea, how near the screen's edges they can swim. */
+const SWIM_IN = 24
 
 // --- The timeline, in ticks from "Go!" ------------------------------------
 /** Before the first sequence. */
@@ -371,7 +372,7 @@ function startMemoryDunk(world: World): MinigameRun {
 		play('finished')
 	}
 
-	/** In the sea: floating where they went in, bobbing with the waves. */
+	/** In the sea: treading water where they went in, swimming about, hopping up out of it. */
 	function swim(racer: Racer, m: Moment) {
 		const b = racer.body
 		if (!show.fell.has(racer.id)) {
@@ -385,13 +386,15 @@ function startMemoryDunk(world: World): MinigameRun {
 			show.splashes.push({ x: b.x, at: world.ticks() })
 			play('splash')
 		}
-		b.vx *= 0.9
-		b.vy = 0
-		b.x += b.vx
-		b.feetY = WATERLINE + SWIMS_AT + Math.sin((world.ticks() + b.x) / 23) * 2
-		b.standStill = true
-		b.tilt = Math.sin((world.ticks() + b.x) / 31) * 8
-		b.held = 2
+		// Treading water, swimming about, hopping up out of it.
+		treadWater(world, racer, {
+			waterline: WATERLINE,
+			left: ARENA_LEFT + SWIM_IN,
+			right: ARENA_LEFT + VIEW_WIDTH - SWIM_IN,
+			splash: (x) => show.splashes.push({ x, at: world.ticks() }),
+			// Not under a platform: there's no room, it's that low over the water.
+			canHop: (x) => platformAtX(x) < 0,
+		})
 	}
 
 	// --- The bot --------------------------------------------------------------
@@ -418,7 +421,7 @@ function startMemoryDunk(world: World): MinigameRun {
 		Math.min(0.75, 0.01 + (1 - skill) * 0.05 * (n - 2) + 0.004 * n * n * 0.1)
 
 	function bot(racer: Racer) {
-		if (inSea(racer)) return IDLE
+		if (inSea(racer)) return waterBot(world, racer)
 		const m = moment()
 		if (m.phase !== 'move') return IDLE
 		const skill = skillOf(racer)
@@ -552,10 +555,8 @@ function startMemoryDunk(world: World): MinigameRun {
 						step: (code % 1000) - 1,
 					})
 				racer.body.celebrating = done(racer)
-				if (at >= 0) {
-					racer.body.standStill = true
-					racer.body.tilt = Math.sin((world.ticks() + racer.body.x) / 31) * 8
-				}
+				// In the sea: treading water, swimming about, or hopping.
+				if (at >= 0) poseInWater(world, racer, WATERLINE)
 			})
 			setDoors()
 		},

@@ -687,7 +687,7 @@ export const MACHU_PAVING = (() => {
 
 /**
  * The mountain's face under the path: granite showing through the forest
- * in outcrops, ferns and bromeliads clinging on, and now and then an old
+ * in outcrops, ferns and bromeliads clinging on, and occasionally an old
  * terrace wall, its stones in a row. As a pattern laid over its colour.
  */
 export const MACHU_FACE = (() => {

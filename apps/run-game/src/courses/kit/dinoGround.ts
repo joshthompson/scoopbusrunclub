@@ -172,7 +172,7 @@ export const DINO_FOREST_LAND = (() => {
 
 /**
  * Dino Island's dirt trail, over its tan: grit, lighter and darker, a
- * pebble here and there lit on top, and now and then a three-toed dinosaur
+ * pebble here and there lit on top, and occasionally a three-toed dinosaur
  * footprint pressed into it, shadowed along its top edge.
  */
 export const DINO_TRAIL = (() => {

@@ -742,7 +742,7 @@ export const hangingVines = (() => {
 		for (let y = 2; y < len; y++) {
 			const px = x + Math.round(Math.sin(y / 5 + x) * sway)
 			vines.add(px, y)
-			// A leaf now and then, pointing out.
+			// A leaf occasionally, pointing out.
 			if (y % 9 === 5 && y < len - 6) {
 				const d = sway > 0 ? 1 : -1
 				leaves.line(px, y, px + d * 4, y + 2, 2, 1)

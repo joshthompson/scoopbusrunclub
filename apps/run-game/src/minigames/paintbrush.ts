@@ -63,7 +63,7 @@ import {
  * The wall's a grid of cells (`WALL_CELL` px square), painted one stroke
  * at a time, a stroke each Player a tick, from where their brush was to
  * where it is. Remote Players' screens are sent the strokes and paint them
- * just as the Host did, and now and then the whole wall, to catch up from.
+ * just as the Host did, and occasionally the whole wall, to catch up from.
  */
 
 /** How long it goes on: a minute. */
@@ -1074,7 +1074,7 @@ function startPaintbrush(world: World): MinigameRun {
 				sweeping.delete(racer.id)
 				plan.until = now
 			} else if (Math.random() < 0.25) jump()
-			// Down low, on the yard, now and then: the bottom of the wall.
+			// Down low, on the yard, occasionally: the bottom of the wall.
 			if (here.index < 0 && Math.random() < 0.01)
 				ducks.set(racer.id, now + 25 + Math.floor(Math.random() * 25))
 		}

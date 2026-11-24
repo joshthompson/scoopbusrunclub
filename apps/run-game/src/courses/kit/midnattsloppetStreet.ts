@@ -131,7 +131,7 @@ function soderBlock(options: {
 	r.push([0, EAVES + 2, W, 1, shade])
 	r.push([W - 2, EAVES, 2, FOOT - EAVES, shade])
 
-	// Five storeys of windows, most dark, now and then one lit.
+	// Five storeys of windows, most dark, occasionally one lit.
 	const across = Math.floor((W - 6) / 10)
 	const from = Math.floor((W - (across * 10 - 5)) / 2)
 	for (let s = 0; s < 5; s++) {
@@ -465,7 +465,7 @@ export const lightRig = (() => {
  * `url(#midnatt-pavement)`. See-through but for hints, over the road's and
  * the pavement's own colours: on the road, a glint of stone here and there
  * and a patch or two, darker, where it's been mended; on the pavement, a
- * slab's edge now and then, a joint in shadow and the street lights'
+ * slab's edge occasionally, a joint in shadow and the street lights'
  * glint along it.
  */
 export const ASPHALT = (() => {

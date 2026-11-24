@@ -627,7 +627,7 @@ const MINE_SECRET: Secret = {
 
 /**
  * Someone stood about, or something flickering, from its `frames`: mostly
- * the first, now and then one of the others, as a prop's frames go round
+ * the first, occasionally one of the others, as a prop's frames go round
  * (see `SecretProp`), so a blink's a blink, not a flicker.
  */
 function idle(frames: string[]) {
@@ -643,7 +643,7 @@ const minePerson = (i: number): SecretProp => {
 
 /**
  * The Miner, beside the lift: two in the one cape, hopping, hellos from
- * both of them now and then. From their own pictures, a pixel a cell.
+ * both of them occasionally. From their own pictures, a pixel a cell.
  */
 const THE_MINER: SecretProp = {
 	frames: idle([theMinerStand, theMinerHello]),
@@ -1112,7 +1112,7 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	}
 
 	// Timbers along the tunnels and through the mine, every so often, a
-	// lamp hung now and then between them.
+	// lamp hung occasionally between them.
 	for (const section of SECTIONS) {
 		if (section.kind !== 'tunnel' && section.kind !== 'mine') continue
 		for (

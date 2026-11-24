@@ -401,7 +401,7 @@ export const ICEBERG = (() => {
 	let wobbleLeft = 0
 	let wobbleRight = 0
 	for (let y = BERG_TOP_ROW; y < BERG_ROWS; y++) {
-		// Ragged: now and then a row steps a cell or two in or out.
+		// Ragged: occasionally a row steps a cell or two in or out.
 		if (random() < 0.35) wobbleLeft = between(random, -1, 2)
 		if (random() < 0.35) wobbleRight = between(random, -2, 1)
 		const stay = y < 10 ? 0 : 1
@@ -427,7 +427,7 @@ export const ICEBERG = (() => {
 			// How far across the berg it is: lighter on the left, darker on the right.
 			const across = (x - BERG_LEFT) / BERG_TOP_COLUMNS
 			let body = across < 0.3 ? ICE_LIT : across > 0.68 ? ICE_SHADE : ICE
-			// A facet leaning away is a shade darker in itself, now and then.
+			// A facet leaning away is a shade darker in itself, occasionally.
 			if (f % 3 === 1 && body !== ICE_SHADE)
 				body = body === ICE_LIT ? ICE : ICE_SHADE
 			let colour = body

@@ -15,7 +15,7 @@ export type RideKind =
 	| NonNullable<Course['flyer']>
 	| 'corgi'
 	| 'goose'
-	/** The Pyramids' rarer camel, with two humps, now and then. */
+	/** The Pyramids' rarer camel, with two humps, occasionally. */
 	| 'bactrian'
 	/** On The Slopes, a snowboard, rather than skis, out of the rack. */
 	| 'snowboard'
@@ -150,6 +150,8 @@ export const COLLECTABLE_NAMES = {
 	'hat:antennae': 'Alien antennae',
 	'hat:swordHat': 'Sword hat',
 	'hat:paintbrush': 'Paintbrush',
+	'hat:redTeamHat': 'Red Team Hat',
+	'hat:blueTeamHat': 'Blue Team Hat',
 	barcode: 'parkrun barcode',
 } satisfies Record<Collectable, string>
 
@@ -271,6 +273,8 @@ export const PICKUP_WORD = {
 	'hat:antennae': 'Bzzt!',
 	'hat:swordHat': 'En garde!',
 	'hat:paintbrush': 'Splosh!',
+	'hat:redTeamHat': 'Go Red!',
+	'hat:blueTeamHat': 'Go Blue!',
 	barcode: 'Scanned!',
 } satisfies Record<Collectable, string>
 
@@ -381,8 +385,7 @@ export const COLLECTABLE_ABOUT = {
 	'ride:glider': 'A hang glider, parked along the top of the cliff.',
 	'ride:goat': 'A mountain goat, sure-footed, for the climb.',
 	'ride:skis': 'A pair of skis, stood up in the snow at the top.',
-	'ride:snowboard':
-		'Now and then, a snowboard, out of the same rack as the skis.',
+	'ride:snowboard': 'A snowboard, stood up in the snow at the top.',
 	'ride:goose': 'A goose, flying over, honking.',
 	'ride:dragon': 'A dragon, rippling along the Wall.',
 	'ride:condor': 'A giant condor, patrolling the skies around Machu Picchu.',
@@ -425,6 +428,8 @@ export const COLLECTABLE_ABOUT = {
 		'A skullcap with a long sword sticking straight up out of it. Mind the ceiling.',
 	'hat:paintbrush':
 		'The top of a paintbrush, loaded with paint in your own colour, for painting a warehouse wall.',
+	'hat:redTeamHat': 'A tall red top hat worn by proud team members.',
+	'hat:blueTeamHat': 'A large blue bowler worn by proud team members.',
 	barcode: "Floating just before every parkrun's finish. Don't forget it!",
 } satisfies Record<Collectable, string>
 
@@ -495,6 +500,8 @@ export function collectableBehaviour(id: Collectable): string[] {
 	}
 	if (id === 'hat:swordHat') return ['Catch fruit on its point.']
 	if (id === 'hat:paintbrush') return ['Paints the wall behind you.']
+	if (id === 'hat:redTeamHat' || id === 'hat:blueTeamHat')
+		return ['Shows which team you’re on.']
 	if (id.startsWith('hat:'))
 		return hatPowers(id.slice('hat:'.length) as HatKind)
 	if (id === 'pumpkin') return hatPowers('pumpkin')

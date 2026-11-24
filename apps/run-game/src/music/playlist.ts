@@ -62,6 +62,27 @@ export const PLAYLIST: NamedTune[] = [
 		name: 'Alien Base Boss Rush',
 		from: 'Rocket Launch',
 	},
+	{
+		id: 'lollapascoopza',
+		name: 'Lollapascoopza Anthem',
+		from: 'Lollapascoopza',
+	},
+	{
+		id: 'lollapascoopza:hiphop',
+		name: 'Bus Stop Bounce',
+		from: 'Lollapascoopza',
+	},
+	{ id: 'lollapascoopza:metal', name: 'Fika Metal', from: 'Lollapascoopza' },
+	{
+		id: 'lollapascoopza:edm',
+		name: 'Night Bus Rave',
+		from: 'Lollapascoopza',
+	},
+	{
+		id: 'lollapascoopza:jazz',
+		name: 'Cool Scoop Swing',
+		from: 'Lollapascoopza',
+	},
 ]
 
 /** The menus' music, picked in Options: a tune's id, or one at random each time. */

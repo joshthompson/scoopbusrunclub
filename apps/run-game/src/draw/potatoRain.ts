@@ -41,7 +41,7 @@ const GLINT_FOR = 8
 
 /**
  * Potato Rain, drawn. Behind everyone: the tulips coming up out of the
- * path, a shoot, a sprout, a bud, then in flower, glinting now and then to
+ * path, a shoot, a sprout, a bud, then in flower, glinting occasionally to
  * be picked; each potato's shadow on the path,
  * growing and darkening as it comes (all the warning there is), and the
  * potatoes landed there, split open, steaming, then fading away. In front:
@@ -92,7 +92,7 @@ export function createPotatoRain(world: World) {
 				TULIP_WIDTH,
 				TULIP_HEIGHT,
 			)
-			// In flower: a glint at its top left, now and then.
+			// In flower: a glint at its top left, occasionally.
 			if (stage === 3 && (now + t.id * 17) % GLINT_EVERY < GLINT_FOR) {
 				ctx.fillStyle = '#ffffff'
 				ctx.fillRect(x, ground - TULIP_HEIGHT - CELL, CELL, CELL)

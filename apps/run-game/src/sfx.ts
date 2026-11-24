@@ -67,6 +67,10 @@ export type Sound =
 	| 'splash'
 	/** Someone else, or something, into water: a pacer, the egg, the hatchling. Quieter. */
 	| 'splashOther'
+	/** A Crab Hat's claws snapping shut: a Pinch, in Mr Claws. */
+	| 'pinch'
+	/** Two Pinches meeting, claw on claw: a Clash, a hard clack. */
+	| 'clash'
 
 /**
  * [frequency in Hz, length in seconds, wave, how loud, out of the sound's
@@ -459,6 +463,24 @@ const SOUNDS: Record<Sound, SoundNotes> = {
 	splash: { notes: SPLASH, volume: 0.16, chord: true },
 	/** Someone else's splash, or the egg's: the same, but quieter, as for `whoosh`. */
 	splashOther: { notes: SPLASH, volume: 0.08, chord: true },
+	pinch: {
+		notes: [
+			[3000, 0.02, 'noise', 1],
+			[1400, 0.04, 'square', 0.5],
+		],
+		volume: 0.07,
+		slide: 0.6,
+	},
+	clash: {
+		notes: [
+			[6000, 0.05, 'noise', 1],
+			[1900, 0.12, 'square', 0.6],
+			[2533, 0.12, 'square', 0.45],
+		],
+		volume: 0.07,
+		slide: 0.9,
+		chord: true,
+	},
 }
 
 /** A second of white noise, made once, looped for a `noise` note. */

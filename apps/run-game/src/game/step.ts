@@ -97,6 +97,7 @@ import {
 import { MUMMY_HEIGHT } from './constants'
 import { scoopCorgis, stepCorgis } from './corgis'
 import { cyclistAt, deckAt, deckUnder } from './cyclists'
+import { stepDrone } from './drone'
 import { soundEruption } from './eruptionSounds'
 import { FIKA_SIZE, type FikaItem } from './fika'
 import {
@@ -116,6 +117,7 @@ import { stepHarvester } from './harvester'
 import { HAT_RULES, type Hat, WORN_FIKA, sameHat } from './hats'
 import { hearHouse, stepHaunt } from './haunted'
 import { ICE_COAST_KEEP, ICE_GRIP, ICE_SLIDE, onIce } from './ice'
+import { interviewUnderway, interviewing, stepInterview } from './interview'
 import {
 	BELL_UP,
 	JELLYFISH_REACH,
@@ -319,6 +321,10 @@ export function stepWorld(world: World) {
 		soundStalactites(world)
 		for (const racer of world.racers)
 			if (!isHeld(world, racer)) collide(world, racer)
+		// Kristineberg's drone, after everyone's moved: bumping heads, or knocked out of the sky.
+		stepDrone(world)
+		// Its reporter, interviewing whoever wins.
+		stepInterview(world)
 		// A minigame: its own goings-on, and no bus.
 		world.minigame?.step()
 		startleGeese(world)
@@ -410,10 +416,13 @@ function stepPhase(world: World, frozen = false) {
 		phase === 'finished' &&
 		!world.result() &&
 		((player.dancingSince !== undefined &&
-			world.ticks() - player.dancingSince > DANCE_TICKS) ||
+			world.ticks() - player.dancingSince > DANCE_TICKS &&
+			// Kristineberg's reporter, still asking them how it was.
+			!interviewing(world, player)) ||
 			world.body.x > world.camera() + VIEW_WIDTH + RUN_OFF_PAST ||
 			(player.out === 'finished' &&
-				world.ticks() - player.outAt > FINISHED_MOST_TICKS))
+				world.ticks() - player.outAt > FINISHED_MOST_TICKS &&
+				!interviewing(world, player)))
 	)
 		world.setResult({
 			kind: 'finished',
@@ -603,7 +612,12 @@ export const DANCING_STILL = 0.3
 
 /** Whether a decided Round's done with: the winner's run on, and the last scooped landed. */
 export function roundOver(world: World) {
-	return !!world.order() && world.ticks() - world.decidedAt > WINNER_RUN_TICKS
+	return (
+		!!world.order() &&
+		world.ticks() - world.decidedAt > WINNER_RUN_TICKS &&
+		// Kristineberg's winner, still being interviewed.
+		!interviewUnderway(world)
+	)
 }
 
 /** The countdown's word, if one's being said: "3", "2", "1", then "Go!" for a moment after. */
@@ -643,7 +657,12 @@ function stepRunner(world: World, racer: Racer) {
 	// Held by a Swamp Man: nothing they press does anything till he lets go.
 	const grabbed = racing && b.held > 0
 	if (grabbed) b.held--
-	const held = racing && !grabbed ? racer.controls() : undefined
+	// A minigame's own say on what holding them does: up's a Pinch in Mr Claws, not a jump.
+	const pressed = racing && !grabbed ? racer.controls() : undefined
+	const held =
+		pressed && world.minigame?.controls
+			? world.minigame.controls(racer, pressed)
+			: pressed
 	const right = !!held?.right
 	const left = !!held?.left
 	const up = !!held?.up
@@ -870,12 +889,13 @@ function stepRunner(world: World, racer: Racer) {
 				b.vx = (b.vx < 0 ? -1 : 1) * Math.max(Math.abs(b.vx), b.tunnelSpeed)
 			}
 		} else {
-			// Bogged down in mud, or wading a River.
+			// Bogged down in mud, or wading a River, or a minigame's flood.
 			const slowTo = b.muddy
 				? MUD_TOP_SPEED
 				: wading(world, b)
 					? WADE_TOP_SPEED
-					: undefined
+					: b.wadeTop
+			b.wadeTop = undefined
 			const running =
 				slowTo ?? RUN_TOP_SPEED + (b.hat ? HAT_RULES[b.hat.kind].speed : 0)
 			// Squashed by a furby: slower, till they spring back up.

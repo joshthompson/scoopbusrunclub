@@ -268,7 +268,9 @@ export default function Mirror(props: {
 			const hat = Math.floor(flags / HAT_FLAG)
 			if (body.hat && hatCode(body.hat) !== hat)
 				body.lostHat = { hat: body.hat, at: world.ticks() }
-			body.hat = hatFromCode(hat)
+			// The same hat kept, as it is: a Crab Hat's pose, put on it by
+			// the minigame's frame, just before.
+			if (!body.hat || hatCode(body.hat) !== hat) body.hat = hatFromCode(hat)
 			body.stumble = from[4]
 			body.spin = mix(from[5], to[5])
 			racer.out = OUTS[from[6]]

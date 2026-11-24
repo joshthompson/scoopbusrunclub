@@ -245,7 +245,7 @@ export const EVEREST_YELLOW_BAND = (() => {
 /**
  * The worn trail on the trek and moraine, over the path's dirt and then its
  * gravel: grit, single dark cells; small stones, a shadow under each and a
- * glint on top; and a flagstone now and then, set flat in the ground.
+ * glint on top; and a flagstone occasionally, set flat in the ground.
  * Sparse.
  */
 export const EVEREST_TRAIL = (() => {

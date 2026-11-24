@@ -95,7 +95,7 @@ const nearLedge = (x: number) =>
 	x > LEDGE.x - 160 && x < LEDGE.x + LEDGE.width + 40
 
 /**
- * An anthill now and then, by the path: their own random numbers, so
+ * An anthill occasionally, by the path: their own random numbers, so
  * everything else is where it was.
  */
 function anthills(): Course['scenery'] {

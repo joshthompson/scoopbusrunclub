@@ -1,13 +1,19 @@
 import { beachVolleyball } from './beachVolleyball'
+import { bombHat } from './bombHat'
+import { fikaDefence } from './fikaDefence'
 import { fruitKebab } from './fruitKebab'
 import { hungryGoose } from './hungryGoose'
 import { icebergBump } from './icebergBump'
+import { jughead } from './jughead'
 import { jumpRope } from './jumpRope'
+import { lollapascoopza } from './lollapascoopza'
 import { memoryDunk } from './memoryDunk'
+import { mrClaws } from './mrClaws'
 import { paintbrush } from './paintbrush'
 import { pogoSticks } from './pogoSticks'
 import { potatoRain } from './potatoRain'
 import { redLightGreenLight } from './redLightGreenLight'
+import { skateJam } from './skateJam'
 import type { Minigame, MinigameId } from './types'
 
 /** Every minigame there is, in the order they're shown. */
@@ -22,6 +28,12 @@ export const MINIGAMES: Minigame[] = [
 	memoryDunk,
 	paintbrush,
 	hungryGoose,
+	fikaDefence,
+	bombHat,
+	lollapascoopza,
+	mrClaws,
+	skateJam,
+	jughead,
 ]
 
 export const minigameById = (id: string | undefined) =>

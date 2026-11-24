@@ -1,5 +1,5 @@
 import { CanvasRenderer, Scene } from 'scoopjs'
-import { type JSX, Show, createMemo } from 'solid-js'
+import { type JSX, Show, createMemo, lazy } from 'solid-js'
 import { HEARTBEAT_DUB, beatAt } from '../game/body'
 import {
 	CAMERA_LEAD,
@@ -25,8 +25,11 @@ import {
 	createWeather,
 } from './backdropControllers'
 import { createBeachVolleyball } from './beachVolleyball'
+import { createBigScreen } from './bigScreen'
 import { createBoars } from './boars'
+import { createBombHat } from './bombHat'
 import { createCoaster } from './coaster'
+import { debugMenuOpen } from './debugOpen'
 import { createDeepWater } from './deepWater'
 import { createDiplodocus } from './diplodocus'
 import { createLifeboatRide } from './engineRoom'
@@ -37,6 +40,7 @@ import {
 	eruptionShake,
 	silhouetteFilter,
 } from './eruption'
+import { createFikaDefence } from './fikaDefence'
 import { createFollowers } from './followers'
 import { createFootballSprite } from './football'
 import { createCaveCover, createSeaFront } from './frontControllers'
@@ -47,10 +51,14 @@ import { createHauntedHouse } from './hauntedHouse'
 import { createHerds } from './herds'
 import { createHungryGoose } from './hungryGoose'
 import { createIcebergBump } from './icebergBump'
+import { createInterview } from './interview'
+import { createJughead } from './jughead'
 import { createJumpRope } from './jumpRope'
 import { createLava } from './lava'
+import { createLollapascoopza } from './lollapascoopza'
 import { createMemoryDunk } from './memoryDunk'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
+import { createMrClaws } from './mrClaws'
 import { createPyro, createSearchlights, createSmoke } from './nightRace'
 import { createOrgans } from './organs'
 import { createPaintbrush } from './paintbrush'
@@ -62,6 +70,7 @@ import { createRiver, createRiverFront } from './river'
 import { createRocket } from './rocketLaunch'
 import { ScreenWashes, pictureStyle } from './screenFilters'
 import { createSecret } from './secret'
+import { createSkateJam } from './skateJam'
 import { BossBar, createSpaceFx } from './space'
 import {
 	createBanner,
@@ -95,6 +104,11 @@ import {
 } from './sprites'
 import { createStairs } from './stairs'
 
+/** The debug menu (see `DebugMenu`), on the dev server only: left out of a build altogether. */
+const DebugMenu = import.meta.env.DEV
+	? lazy(() => import('./DebugMenu').then((m) => ({ default: m.DebugMenu })))
+	: undefined
+
 declare global {
 	interface Window {
 		/** The race on the screen, for `raceScene.canvasIssues()` in the console. */
@@ -118,6 +132,10 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 		frameRate: TICK_MS,
 		// Front to back.
 		assetOrder: [
+			// Kristineberg's drone, over everything; and just under it, what it
+			// films: everything but itself (see `bigScreen`).
+			'drone',
+			'drone-camera',
 			// A haunted house's bats, bursting out of it at you, over its cover.
 			'bats',
 			// Snow and fog over everything.
@@ -219,6 +237,10 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				...createScenery(world),
 				// A harvester at work: after the scenery, over the trees round it.
 				...createHarvester(world),
+				// A big screen behind the track, and the drone filming for it.
+				...createBigScreen(world),
+				// Its reporter, interviewing the winner.
+				...createInterview(world),
 				// A giant's mouth, opening, over its face: after the scenery, over it.
 				...createGiantMouth(world),
 				// A heart beating, lungs breathing: behind everything in their chambers.
@@ -364,6 +386,18 @@ function createMinigameItself(world: World) {
 			return createPaintbrush(world)
 		case 'hungry-goose':
 			return createHungryGoose(world)
+		case 'fika-defence':
+			return createFikaDefence(world)
+		case 'bomb-hat':
+			return createBombHat(world)
+		case 'lollapascoopza':
+			return createLollapascoopza(world)
+		case 'mr-claws':
+			return createMrClaws(world)
+		case 'skate-jam':
+			return createSkateJam(world)
+		case 'jughead':
+			return createJughead(world)
 		default:
 			return []
 	}
@@ -477,13 +511,15 @@ export function RaceCanvas(props: {
 			</Show>
 			{/* Paused, or between Rounds: the whole screen shaded, not just the
 			    canvas, which goes with the camera (see `styles.css`). */}
-			<Show when={props.scene.modal.get()}>
+			<Show when={props.scene.modal.get() && !debugMenuOpen()}>
 				<div style={styles.shade} />
 			</Show>
 			{props.overlay}
-			<Show when={showFrameMeter}>
+			<Show when={showFrameMeter()}>
 				<FrameMeter />
 			</Show>
+			{/* On the dev server: Esc twice, quickly, for the debug menu. */}
+			{DebugMenu && <DebugMenu world={props.world} scene={props.scene} />}
 		</div>
 	)
 }

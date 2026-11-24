@@ -88,7 +88,7 @@ npx tsx .claude/skills/minigame/play.mts sim <id> <scratchpad> --players 1 --bot
 ```
 
 - `shot` screenshots it so many ticks after "Go!". Read every PNG.
-- `sim` plays whole games out and prints each player's place and note. Its default bot is restless: running about, jumping now and then.
+- `sim` plays whole games out and prints each player's place and note. Its default bot is restless: running about, jumping every now and then.
 - A `--bot` file is a function body given `world`, `racer` and `game` (the minigame's module, for its getters), returning `{ left, right, up, down }`. Write a skilled one to check the ramp: it should be beaten eventually, or nearly. A bot file of `return world.minigame.bot(racer)` plays the minigame's own bot.
 
 Then run `npx tsc --noEmit -p .` and `npx biome check --write <changed files>` from the repo root, and `npx vite build --outDir <scratchpad>/dist`.

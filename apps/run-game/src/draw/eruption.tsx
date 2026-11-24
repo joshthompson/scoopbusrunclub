@@ -379,7 +379,7 @@ const hash = (i: number, salt: number) => {
  * The volcano going off, at its crater: lava bombs hurled up out of it,
  * glowing yellow, then orange, then a dull red as they come down, back
  * into it and over its sides; a fountain for a while, then dying down to
- * now and then; and smoke pouring up off it, on and on, billowing out as
+ * occasionally; and smoke pouring up off it, on and on, billowing out as
  * it rises. All by the tick since it went off.
  */
 export function createEruptionBurst(world: World) {
