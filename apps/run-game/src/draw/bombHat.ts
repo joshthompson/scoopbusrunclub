@@ -21,7 +21,10 @@ import {
 	type BombHead,
 	EXPLOSION_FRAMES,
 	EXPLOSION_SIZE,
+	FUSE_BENDS,
 	SPARK_COLOURS,
+	fuseCells,
+	paintCord,
 } from './art/bombHeads'
 import { paintPicture } from './paint/picture'
 
@@ -39,46 +42,8 @@ const SCRAPS_LIE = 420
 const SCRAPS_FADE = 60
 /** How long whoever's been blown up smokes for. */
 const SMOKES_FOR = 420
-/**
- * The fuse's way out of the collar, in cells, through these points: up out
- * of it, then curling back over the top of the head (its art faces left,
- * so right) and up again, a long one, to be seen burning down from afar.
- */
-const FUSE_BENDS: [number, number][] = [
-	[0, 0],
-	[0, -4],
-	[1, -7],
-	[3, -10],
-	[6, -12],
-	[9, -13],
-	[12, -13],
-	[14, -15],
-	[15, -18],
-	[15, -FUSE_TALL / CELL],
-]
-/** Every cell along it, in order from the collar, none twice. */
-const FUSE_PATH: [number, number][] = (() => {
-	const cells: [number, number][] = []
-	for (let i = 1; i < FUSE_BENDS.length; i++) {
-		const [ax, ay] = FUSE_BENDS[i - 1]
-		const [bx, by] = FUSE_BENDS[i]
-		const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) * 2
-		for (let j = 0; j <= steps; j++) {
-			const x = Math.round(ax + ((bx - ax) * j) / steps)
-			const y = Math.round(ay + ((by - ay) * j) / steps)
-			const last = cells[cells.length - 1]
-			if (!last || last[0] !== x || last[1] !== y) cells.push([x, y])
-		}
-	}
-	return cells
-})()
-/**
- * Its cord: dark tarred twine, so it shows against the sky and the leaves
- * both, lit along its top, a dark band round it every few cells.
- */
-const CORD = '#5a3e26'
-const CORD_LIT = '#8a6440'
-const CORD_SHADE = '#3a2616'
+/** Every cell of the fuse, in order from the collar: its bends, then on straight up, a long one, to be seen burning down from afar. */
+const FUSE_PATH = fuseCells([...FUSE_BENDS, [15, -FUSE_TALL / CELL]])
 /** Its cord's charred, just behind the spark, black, then ash. */
 const FUSE_CHAR = '#1d1a18'
 const FUSE_ASH = '#6e6660'
@@ -174,16 +139,7 @@ export function createBombHat(world: World) {
 			ctx.fillStyle = colour
 			ctx.fillRect(x + across * CELL - CELL, y + down * CELL, CELL, CELL)
 		}
-		// A thick braided cord, two cells across: lit along its top left,
-		// shaded along its bottom right, a dark band round it every few cells.
-		for (let i = 0; i < cells; i++) {
-			const [across, down] = FUSE_PATH[i]
-			const band = i % 4 === 3
-			cell(across, down, band ? CORD_SHADE : CORD_LIT)
-			cell(across + 1, down, band ? CORD_SHADE : CORD)
-			cell(across, down + 1, band ? CORD_SHADE : CORD)
-			cell(across + 1, down + 1, CORD_SHADE)
-		}
+		paintCord(ctx, x, y, FUSE_PATH.slice(0, cells))
 		if (!lit) return
 		// Burning: charred black just behind the spark, ash before that.
 		const [across, down] = FUSE_PATH[cells - 1]

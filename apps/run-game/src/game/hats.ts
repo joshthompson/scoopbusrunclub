@@ -119,14 +119,14 @@ export interface Hat {
 
 /**
  * The hats that are a Boost of their own, to run into, and so collectables:
- * not a Pumpkin, nor fika. And the sword hat, had playing Fruit Kebab,
- * the paintbrush, had playing Paintbrush, and the team hats, had playing
- * on a team.
+ * not a Pumpkin, nor fika. And every minigame's: the sword hat, had playing
+ * Fruit Kebab, the paintbrush, had playing Paintbrush, the Crab Hat, had
+ * playing Mr Claws, the punk cap, had playing the Anthem in Lollapascoopza
+ * (as the disco ball can be, playing Night Bus Rave), and the team hats, had
+ * playing on a team. Bomb Hat's bomb isn't a hat of these, but a
+ * collectable of its own (see `game/collectables`).
  */
-export type PickupHat = Exclude<
-	HatKind,
-	'pumpkin' | 'captain' | 'spaceHelmet' | 'crabHat' | 'punkCap'
->
+export type PickupHat = Exclude<HatKind, 'pumpkin' | 'captain' | 'spaceHelmet'>
 
 export interface HatRules {
 	/** How much faster than top speed it keeps you, while it's on. */

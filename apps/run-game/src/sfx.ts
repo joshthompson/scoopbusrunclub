@@ -67,6 +67,16 @@ export type Sound =
 	| 'splash'
 	/** Someone else, or something, into water: a pacer, the egg, the hatchling. Quieter. */
 	| 'splashOther'
+	/**
+	 * Huddinge's wild boar, squealing, out of the trees; the puff of smoke
+	 * it turns into ManBearPig in; its roar; and its fists coming down.
+	 */
+	| 'squeal'
+	| 'poof'
+	| 'beastRoar'
+	/** And its first, in its cut scene: huge, long, everything shaking. */
+	| 'manBearPigRoar'
+	| 'pound'
 	/** A Crab Hat's claws snapping shut: a Pinch, in Mr Claws. */
 	| 'pinch'
 	/** Two Pinches meeting, claw on claw: a Clash, a hard clack. */
@@ -463,6 +473,66 @@ const SOUNDS: Record<Sound, SoundNotes> = {
 	splash: { notes: SPLASH, volume: 0.16, chord: true },
 	/** Someone else's splash, or the egg's: the same, but quieter, as for `whoosh`. */
 	splashOther: { notes: SPLASH, volume: 0.08, chord: true },
+	/** A boar's squeal: high, quick, and up again. */
+	squeal: {
+		notes: [
+			[900, 0.07, 'square'],
+			[1400, 0.1, 'square'],
+			[1200, 0.16, 'square'],
+		],
+		volume: 0.05,
+		slide: 1.25,
+	},
+	/** A puff of smoke: a soft rush of air, swelling and gone. */
+	poof: {
+		notes: [
+			[2400, 0.4, 'noise', 1, 0.25, 0, 0.05],
+			[160, 0.25, 'sine', 0.5, 2.2, 0, 0.01],
+		],
+		volume: 0.14,
+		chord: true,
+	},
+	/**
+	 * ManBearPig: three roars at once, bear, pig and man, low and growling,
+	 * with a rasp over them, falling away.
+	 */
+	beastRoar: {
+		notes: [
+			[85, 1.1, 'sawtooth', 1, 0.55],
+			[128, 1, 'sawtooth', 0.7, 0.5, 0.04],
+			[340, 0.7, 'square', 0.35, 0.4, 0.08],
+			[900, 0.9, 'noise', 0.6, 0.4, 0, 0.06],
+		],
+		volume: 0.1,
+		chord: true,
+	},
+	/**
+	 * ManBearPig's first roar, in its cut scene: huge. A rumble under it all,
+	 * a bear's bellow and a man's yell over it, swelling up and falling away
+	 * long, a pig's scream on top, and a rasp of breath through the lot.
+	 */
+	manBearPigRoar: {
+		notes: [
+			[48, 2.2, 'sine', 1, 0.6, 0, 0.08],
+			[72, 2, 'sawtooth', 0.9, 0.5, 0, 0.12],
+			[108, 1.8, 'sawtooth', 0.75, 0.45, 0.05, 0.12],
+			[150, 1.6, 'square', 0.4, 0.5, 0.1, 0.15],
+			[1100, 0.9, 'square', 0.18, 0.55, 0.2, 0.05],
+			[700, 2, 'noise', 0.8, 0.3, 0, 0.1],
+			[180, 1.8, 'noise', 0.7, 0.5, 0, 0.05],
+		],
+		volume: 0.2,
+		chord: true,
+	},
+	/** Its fists coming down on someone: a heavy thud. */
+	pound: {
+		notes: [
+			[110, 0.22, 'sine', 1, 0.35],
+			[600, 0.14, 'noise', 0.8, 0.5],
+		],
+		volume: 0.2,
+		chord: true,
+	},
 	pinch: {
 		notes: [
 			[3000, 0.02, 'noise', 1],

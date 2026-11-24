@@ -26,11 +26,38 @@ export type RideKind =
 	/** Pogo Sticks' pogo stick, in the minigame: everyone's on one. */
 	| 'pogoStick'
 
+/**
+ * Bomb Hat's bombs, one for each papier-mache creature, in `BOMB_KINDS`'
+ * order (see `minigames/bombHat`), so the bomb a game lights is kept by
+ * its place. Each is had by wearing it: lit on you, or passed to you.
+ */
+export const BOMB_HATS = [
+	'frogBomb',
+	'owlBomb',
+	'pigBomb',
+	'foxBomb',
+	'ladybirdBomb',
+	'hedgehogBomb',
+	'catBomb',
+	'octopusBomb',
+	'llamaBomb',
+	'mountainGoatBomb',
+	'axolotlBomb',
+] as const
+export type BombHat = (typeof BOMB_HATS)[number]
+
+/** Whether `id` is one of Bomb Hat's bombs. */
+export const isBombHat = (id: Collectable): id is `hat:${BombHat}` =>
+	id.startsWith('hat:') &&
+	(BOMB_HATS as readonly string[]).includes(id.slice('hat:'.length))
+
 export type Collectable =
 	| `fika:${FikaItem}`
 	| `ride:${RideKind}`
 	| 'pumpkin'
 	| `hat:${PickupHat}`
+	/** Bomb Hat's bombs, worn over the head: the minigame's own, not hats of `HatKind`'s. */
+	| `hat:${BombHat}`
 	| 'barcode'
 
 /**
@@ -150,6 +177,19 @@ export const COLLECTABLE_NAMES = {
 	'hat:antennae': 'Alien antennae',
 	'hat:swordHat': 'Sword hat',
 	'hat:paintbrush': 'Paintbrush',
+	'hat:crabHat': 'Crab Hat',
+	'hat:punkCap': 'Punk cap',
+	'hat:frogBomb': 'Frog bomb',
+	'hat:owlBomb': 'Owl bomb',
+	'hat:pigBomb': 'Pig bomb',
+	'hat:foxBomb': 'Fox bomb',
+	'hat:ladybirdBomb': 'Ladybird bomb',
+	'hat:hedgehogBomb': 'Hedgehog bomb',
+	'hat:catBomb': 'Cat bomb',
+	'hat:octopusBomb': 'Octopus bomb',
+	'hat:llamaBomb': 'Llama bomb',
+	'hat:mountainGoatBomb': 'Mountain goat bomb',
+	'hat:axolotlBomb': 'Axolotl bomb',
 	'hat:redTeamHat': 'Red Team Hat',
 	'hat:blueTeamHat': 'Blue Team Hat',
 	barcode: 'parkrun barcode',
@@ -273,6 +313,19 @@ export const PICKUP_WORD = {
 	'hat:antennae': 'Bzzt!',
 	'hat:swordHat': 'En garde!',
 	'hat:paintbrush': 'Splosh!',
+	'hat:crabHat': 'Snip snip!',
+	'hat:punkCap': 'Oi oi!',
+	'hat:frogBomb': 'Frog bomb!',
+	'hat:owlBomb': 'Owl bomb!',
+	'hat:pigBomb': 'Pig bomb!',
+	'hat:foxBomb': 'Fox bomb!',
+	'hat:ladybirdBomb': 'Ladybird bomb!',
+	'hat:hedgehogBomb': 'Hedgehog bomb!',
+	'hat:catBomb': 'Cat bomb!',
+	'hat:octopusBomb': 'Octopus bomb!',
+	'hat:llamaBomb': 'Llama bomb!',
+	'hat:mountainGoatBomb': 'Mountain goat bomb!',
+	'hat:axolotlBomb': 'Axolotl bomb!',
 	'hat:redTeamHat': 'Go Red!',
 	'hat:blueTeamHat': 'Go Blue!',
 	barcode: 'Scanned!',
@@ -417,7 +470,7 @@ export const COLLECTABLE_ABOUT = {
 	'hat:bobbleHat': 'Up the mountain: get to it on a goat.',
 	'hat:headMirror': "A doctor's head mirror, high in the lungs.",
 	'hat:discoBall':
-		'A disco ball, over your whole head, up on the rock band’s speakers.',
+		'A disco ball, over your whole head, up on the rock band’s speakers, or worn for Night Bus Rave at Lollapascoopza.',
 	'hat:jazzHat':
 		'The Spirit of Jazz’s own top hat, on fire. Find him again, once he’s yours, and take it.',
 	'hat:snorkel':
@@ -428,6 +481,30 @@ export const COLLECTABLE_ABOUT = {
 		'A skullcap with a long sword sticking straight up out of it. Mind the ceiling.',
 	'hat:paintbrush':
 		'The top of a paintbrush, loaded with paint in your own colour, for painting a warehouse wall.',
+	'hat:crabHat':
+		'A crab, sat on your head, a claw out to each side, for playing Mr Claws on a sea stack.',
+	'hat:punkCap':
+		"A punk's black leather cap, spiked and studded, for playing the Anthem at Lollapascoopza.",
+	'hat:frogBomb':
+		'A papier-mache frog, over your whole head, its fuse lit. Ribbit, then boom.',
+	'hat:owlBomb':
+		'A papier-mache owl, wide-eyed, as well it might be: its fuse is lit.',
+	'hat:pigBomb': 'A papier-mache pig, its fuse lit. Not a piggy bank.',
+	'hat:foxBomb':
+		'A papier-mache fox, its fuse lit. Pass it on before it outfoxes you.',
+	'hat:ladybirdBomb':
+		'A papier-mache ladybird, spots and all, its fuse lit. Fly away home!',
+	'hat:hedgehogBomb':
+		'A papier-mache hedgehog, prickles and all, its fuse lit. Nobody wants to hold it.',
+	'hat:catBomb':
+		'A papier-mache cat, its fuse lit. It has nine lives; you have one.',
+	'hat:octopusBomb':
+		'A papier-mache octopus, its fuse lit. Eight arms, and none of them will take it.',
+	'hat:llamaBomb': 'A papier-mache llama, its fuse lit. It hums as it burns.',
+	'hat:mountainGoatBomb':
+		'A papier-mache mountain goat, horns and all, its fuse lit. Sure-footed; you, less so.',
+	'hat:axolotlBomb':
+		'A papier-mache axolotl, frills and a grin, its fuse lit. It grins right up to the bang.',
 	'hat:redTeamHat': 'A tall red top hat worn by proud team members.',
 	'hat:blueTeamHat': 'A large blue bowler worn by proud team members.',
 	barcode: "Floating just before every parkrun's finish. Don't forget it!",
@@ -500,6 +577,13 @@ export function collectableBehaviour(id: Collectable): string[] {
 	}
 	if (id === 'hat:swordHat') return ['Catch fruit on its point.']
 	if (id === 'hat:paintbrush') return ['Paints the wall behind you.']
+	if (isBombHat(id))
+		return [
+			'Heavy: you’re a little slower.',
+			'Touch someone to pass it on, before it goes off.',
+		]
+	if (id === 'hat:crabHat')
+		return ['Up to Pinch, down to Guard, and carry whoever you grab.']
 	if (id === 'hat:redTeamHat' || id === 'hat:blueTeamHat')
 		return ['Shows which team you’re on.']
 	if (id.startsWith('hat:'))

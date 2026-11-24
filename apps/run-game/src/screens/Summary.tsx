@@ -233,7 +233,9 @@ export function Summary(props: {
 								: 'Finished!'
 							: props.result.kind === 'fallen'
 								? 'Fell!'
-								: 'Scooped!'}
+								: props.result.smashed
+									? 'Smashed!'
+									: 'Scooped!'}
 					</div>
 					<div style={styles.subtitle}>
 						<Show

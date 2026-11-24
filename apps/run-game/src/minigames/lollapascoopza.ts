@@ -1,5 +1,5 @@
 import { START_X, TICK_MS } from '../game/constants'
-import type { HatKind } from '../game/hats'
+import type { PickupHat } from '../game/hats'
 import type { Racer, World } from '../game/world'
 import type { Controls } from '../input'
 import {
@@ -9,6 +9,7 @@ import {
 	SONGS,
 	midiOf,
 } from '../music/lollapascoopza'
+import { collect } from '../saved/collected'
 import { play } from '../sfx'
 import { ARENA_WALLS, arenaCourse, inRandomOrder } from './arena'
 import { clock } from './clock'
@@ -305,7 +306,8 @@ export const lollapascoopza: Minigame = {
 	tune: 'lollapascoopza',
 	// Everyone's score's over their track, their multiplier under it.
 	pills: false,
-	collectables: [],
+	// The disco ball's found at Midnattsloppet too.
+	collectables: ['hat:punkCap', 'hat:discoBall'],
 	course: arenaCourse(
 		'lollapascoopza',
 		'Lollapascoopza',
@@ -332,16 +334,16 @@ export const lollapascoopza: Minigame = {
  * their neck, drawn with the stage (see `draw/lollapascoopza`). The
  * Anthem, a punk's spiked leather cap; Bus Stop Bounce, a giant clock
  * on a gold chain; Fika Metal, an electric guitar; Night Bus Rave, a disco
- * ball over the head; and Cool Scoop Swing, a saxophone and the Spirit of
- * Jazz's hat. With no hat said, they keep their own on.
+ * ball over the head; and Cool Scoop Swing, a saxophone. With no hat said,
+ * they keep their own on. A hat said is collected, playing it.
  */
 export type NeckWear = 'guitar' | 'sax' | 'clock'
-export const OUTFITS: { hat?: HatKind; neck?: NeckWear }[] = [
+export const OUTFITS: { hat?: PickupHat; neck?: NeckWear }[] = [
 	{ hat: 'punkCap' },
 	{ neck: 'clock' },
 	{ neck: 'guitar' },
 	{ hat: 'discoBall' },
-	{ hat: 'jazzHat', neck: 'sax' },
+	{ neck: 'sax' },
 ]
 
 /**
@@ -396,6 +398,8 @@ function startLollapascoopza(world: World): MinigameRun {
 	const outfit = OUTFITS[show.song]
 	if (outfit?.hat)
 		for (const racer of racers) racer.body.hat = { kind: outfit.hat }
+	// Its hat, found by playing it: not by watching its preview.
+	if (outfit?.hat && !world.preview) collect(`hat:${outfit.hat}`)
 
 	inRandomOrder(racers).forEach((racer, i) => {
 		rockers.set(racer.id, {

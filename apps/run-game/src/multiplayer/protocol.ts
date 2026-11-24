@@ -1,3 +1,4 @@
+import type { BeastFrame } from '../game/manBearPig'
 import type { Phase } from '../game/world'
 import type { MinigameFrame } from '../minigames/types'
 import type { CustomRunner } from '../runners/customRunners'
@@ -622,6 +623,8 @@ export interface RaceFrame {
 	trippedAt?: number
 	/** When the course's harvester started on its tree, if it has: see `harvesterAt`. */
 	harvesterAt?: number
+	/** Huddinge's wild boar, or ManBearPig, once it's out of the trees: see `beastFrame`. */
+	beast?: BeastFrame
 	/** What was heard since the last frame. */
 	sounds: Sound[]
 }

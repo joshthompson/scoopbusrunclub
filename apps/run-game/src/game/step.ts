@@ -133,6 +133,7 @@ import {
 	stepLifeboat,
 } from './lifeboat'
 import { callOut, landLongJump, longJumpTakeOff, sandDrag } from './longJump'
+import { beastCamera, beastHolding, stepBeast } from './manBearPig'
 import { MOLE_HOP, burrowing, onMole } from './moles'
 import { mummyAt } from './mummies'
 import { bounceOff, scoopPack, stepPack } from './pack'
@@ -292,8 +293,11 @@ export function stepWorld(world: World) {
 	if (cheats.toFinish && world.phase() === 'running') toFinish(world)
 	// A Portal going off: everything stopped still till it's done.
 	const frozen = stepPortals(world)
-	stepPhase(world, frozen)
-	if (!frozen) {
+	// Or ManBearPig's cut scene: everything held but it, changing and roaring.
+	const held = beastHolding(world)
+	stepPhase(world, frozen || held)
+	if (held) stepBeast(world)
+	else if (!frozen) {
 		// A lift waiting for someone, set off by whoever's stood on it.
 		setOffPlatforms(world)
 		for (const racer of world.racers)
@@ -321,6 +325,8 @@ export function stepWorld(world: World) {
 		soundStalactites(world)
 		for (const racer of world.racers)
 			if (!isHeld(world, racer)) collide(world, racer)
+		// Huddinge's wild boar, out on the path; or ManBearPig, after someone.
+		stepBeast(world)
 		// Kristineberg's drone, after everyone's moved: bumping heads, or knocked out of the sky.
 		stepDrone(world)
 		// Its reporter, interviewing whoever wins.
@@ -353,13 +359,15 @@ export function stepWorld(world: World) {
 		)
 	// A minigame decides its own Round, its arena kept still on the screen.
 	if (world.round && !world.minigame) decideRound(world)
-	// The camera on the Portal going off, if one is; or as usual.
-	if (!world.minigame && !portalCamera(world)) {
+	// The camera on the Portal going off, if one is, or ManBearPig's cut
+	// scene; or as usual.
+	if (!world.minigame && !portalCamera(world) && !beastCamera(world)) {
 		if (world.round) frameEveryone(world)
 		else stepCamera(world)
 	}
 	// Anyone left behind off the screen in Baby Mode: floated back onto it.
-	rescueLost(world)
+	// Not while ManBearPig's cut scene has the camera, everyone held still.
+	if (!beastHolding(world)) rescueLost(world)
 
 	// Not while flying out of the scoop: how far they got is where it got them.
 	if (!isCaught(world.racers[0].out)) world.setPlayerX(world.body.x)
@@ -434,6 +442,7 @@ function stepPhase(world: World, frozen = false) {
 			kind: 'scooped',
 			distance: Math.max(0, world.playerX() - START_X),
 			busGap: 0,
+			...(world.body.smashed ? { smashed: true } : {}),
 		})
 	if (
 		phase === 'fallen' &&
@@ -3124,7 +3133,7 @@ function stepBus(world: World) {
 		// In a Portal: out of its reach.
 		if (isHeld(world, racer)) continue
 		if (bus.frontX < body.x - HITBOX_HALF_WIDTH) continue
-		scoop(world, racer, body)
+		scoop(world, racer)
 	}
 }
 
@@ -3155,9 +3164,30 @@ function reachFor(world: World, running: Racer[]) {
 }
 
 /** Caught by the bus: flung up out of the scoop, and out. */
-function scoop(world: World, racer: Racer, body: Body) {
+function scoop(world: World, racer: Racer) {
 	const { bus } = world
 	bus.scooping = 10
+	flungOut(
+		world,
+		racer,
+		Math.max(bus.speed, 2) + 2,
+		-15,
+		`Scooped ${racer.runner.name}!`,
+	)
+}
+
+/**
+ * Out, flung up and away at `vx`, `vy`, spinning, as out of the bus's
+ * scoop: by the bus, or ManBearPig. What's said, `says`.
+ */
+export function flungOut(
+	world: World,
+	racer: Racer,
+	vx: number,
+	vy: number,
+	says: string,
+) {
+	const body = racer.body
 	body.mount = 0
 	body.carried = 0
 	body.gliding = false
@@ -3167,14 +3197,14 @@ function scoop(world: World, racer: Racer, body: Body) {
 	body.trick = undefined
 	body.turn = 0
 	body.grind = undefined
-	body.vx = Math.max(bus.speed, 2) + 2
-	body.vy = -15
+	body.vx = vx
+	body.vy = vy
 	body.spin = 0
 	racer.out = 'scooped'
 	racer.outAt = world.ticks()
 	if (!world.round) world.setPhase('scooped')
 	play('scooped')
-	world.popup(`Scooped ${racer.runner.name}!`, body.x, body.feetY - 80)
+	world.popup(says, body.x, body.feetY - 80)
 }
 
 /**

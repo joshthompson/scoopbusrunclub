@@ -47,6 +47,19 @@ export function collectableCourse(id: Collectable): Course | undefined {
 }
 
 /**
+ * Everywhere `id` can be had, said: the course it's first found on, then
+ * any minigame that gives it too, as Lollapascoopza does Midnattsloppet's
+ * disco ball. Only minigames are added, not every course a fika's on.
+ */
+export function collectablePlaces(id: Collectable): Course[] {
+	const first = collectableCourse(id)
+	const minigames = MINIGAMES.filter(
+		(m) => m.course.id !== first?.id && m.collectables.includes(id),
+	).map((m) => m.course)
+	return first ? [first, ...minigames] : minigames
+}
+
+/**
  * How each course is said, where something's found on it: in Haga, on The
  * Slopes, at the Pyramids. A `Record`, so a new course won't build till
  * it's said.
@@ -96,3 +109,7 @@ const WHERE: Record<CourseId, string> = {
  */
 export const onCourse = (course: Course) =>
 	`${WHERE[course.id]} ${course.name}${MINIGAMES.some((m) => m.course.id === course.id) ? ' minigame' : ''}`
+
+/** Where each of `courses` something is, any of them: "at Midnattsloppet, or in the Lollapascoopza minigame". */
+export const onCourses = (courses: Course[]) =>
+	courses.map(onCourse).join(', or ')

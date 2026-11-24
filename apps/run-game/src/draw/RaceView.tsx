@@ -9,6 +9,7 @@ import {
 	VIEW_HEIGHT,
 	VIEW_WIDTH,
 } from '../game/constants'
+import { beastHolding, beastShake } from '../game/manBearPig'
 import { portalView } from '../game/portals'
 import { bossShake } from '../game/space'
 import { onScreen } from '../game/step'
@@ -56,6 +57,7 @@ import { createJughead } from './jughead'
 import { createJumpRope } from './jumpRope'
 import { createLava } from './lava'
 import { createLollapascoopza } from './lollapascoopza'
+import { createManBearPig } from './manBearPig'
 import { createMemoryDunk } from './memoryDunk'
 import { createMine, createMineCarts, createMoleTrails } from './mine'
 import { createMrClaws } from './mrClaws'
@@ -287,6 +289,8 @@ export function createRaceScene(world: World, step?: (world: World) => void) {
 				),
 				...world.boosts.flatMap((state, i) => createBoost(world, state, i)),
 				...createCorgis(world),
+				// Huddinge's wild boar, on the path; or ManBearPig, after someone.
+				...createManBearPig(world),
 				...createFurbies(world),
 				createBus(world),
 				// Black smoke rolling down a volcano, level with the bus.
@@ -433,6 +437,24 @@ export function RaceCanvas(props: {
 }) {
 	const zoom = () => props.world.zoom()
 	/**
+	 * Punched in a little on ManBearPig as it roars, the screen shaking: so
+	 * its shaking never shows past the picture's edges. Kept centred.
+	 */
+	const punchIn = () => {
+		const { x, y } = beastShake(props.world)
+		if (!x && !y) return { scale: 1, x: 0, y: 0 }
+		return {
+			scale: PUNCH_IN,
+			x: ((PUNCH_IN - 1) * VIEW_WIDTH) / 2,
+			y: ((PUNCH_IN - 1) * VIEW_HEIGHT) / 2,
+		}
+	}
+	/** ManBearPig's cut scene's black bars: in while it's on. */
+	const cutsceneBar = () => {
+		props.world.ticks()
+		return beastHolding(props.world) ? '11%' : '0%'
+	}
+	/**
 	 * A Portal going off (see `portals`): diving in after everyone as they
 	 * shrink, or pulling back from the nose they're sneezed out of, zoomed
 	 * in on that point; the screen shaking, "Ah... Ah..."; and a flash.
@@ -472,7 +494,7 @@ export function RaceCanvas(props: {
 					style={{
 						// Its size is the camera's, which takes in more zoomed out
 						// (to fit a Round's Players in): shrunk back to fill the screen.
-						transform: `translateX(${eruptionShake(props.world) + bossShake(props.world)}px) scale(${1 / zoom()})`,
+						transform: `translate(${eruptionShake(props.world) + bossShake(props.world) + beastShake(props.world).x - punchIn().x}px, ${beastShake(props.world).y - punchIn().y}px) scale(${punchIn().scale / zoom()})`,
 						'transform-origin': '0 0',
 						background: 'transparent',
 						// Black against a burning sky, in its silhouetted stretch.
@@ -485,6 +507,11 @@ export function RaceCanvas(props: {
 			</div>
 			{/* A heart beating: the screen thumping red with it. */}
 			<Heartbeat world={props.world} />
+			{/* ManBearPig's cut scene: black bars in over the top and bottom. */}
+			<div style={{ ...styles.cutsceneBar, top: 0, height: cutsceneBar() }} />
+			<div
+				style={{ ...styles.cutsceneBar, bottom: 0, height: cutsceneBar() }}
+			/>
 			<ScreenWashes world={props.world} />
 			<Show when={(portal()?.flash ?? 0) > 0}>
 				<div style={{ ...styles.flash, opacity: portal()?.flash }} />
@@ -549,7 +576,18 @@ function Heartbeat(props: { world: World }) {
 	)
 }
 
+/** How far the picture's punched in, ManBearPig roaring: past its shaking. */
+const PUNCH_IN = 1.05
+
 const styles = {
+	cutsceneBar: {
+		position: 'absolute',
+		left: 0,
+		right: 0,
+		background: '#000',
+		transition: 'height 0.35s ease-out',
+		'pointer-events': 'none',
+	},
 	flash: {
 		position: 'absolute',
 		inset: 0,

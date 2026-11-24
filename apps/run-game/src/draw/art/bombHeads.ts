@@ -3,8 +3,8 @@ import { paintedArt } from '../../courses/kit/pixelArt'
 /**
  * Bomb Hat's art: the eleven papier-mâché bomb heads, one a creature (a
  * frog, an owl, a pig, a fox, a ladybird, a hedgehog, a cat, an octopus),
- * the blast they go off in, and the colours of the fuse the game draws
- * itself. The heads are 2 px cells, like the runners', facing left.
+ * the blast they go off in, and the fuse, which is painted in code. The
+ * heads are 2 px cells, like the runners', facing left.
  */
 
 const CELL = 2
@@ -29,13 +29,70 @@ const COLLAR_HOLE = '#25272c'
 const NECK_HOLE = '#2b2230'
 const NECK_RIM = '#3d3340'
 
+/** The fuse's tarred twine, dark so it shows against the sky and the leaves both: its base, lit and shaded tones. */
+const CORD = '#5a3e26'
+const CORD_LIT = '#8a6440'
+const CORD_SHADE = '#3a2616'
+
 /**
- * The fuse's braided cord, which the game draws in code: its tan, its lit
- * strands and the shade in between them.
+ * The fuse's way out of the collar, in cells, through these points: up out
+ * of it, then curling back over the top of the head (its art faces left,
+ * so right). The game runs it on straight up from the last, as tall as it
+ * wants it.
  */
-export const FUSE_CORD = '#b08a52'
-export const FUSE_CORD_LIT = '#d6b474'
-export const FUSE_CORD_SHADE = '#7a5a30'
+export const FUSE_BENDS: [number, number][] = [
+	[0, 0],
+	[0, -4],
+	[1, -7],
+	[3, -10],
+	[6, -12],
+	[9, -13],
+	[12, -13],
+	[14, -15],
+	[15, -18],
+]
+
+/** Every cell along a fuse through `bends`, in order, none twice. */
+export function fuseCells(bends: [number, number][]): [number, number][] {
+	const cells: [number, number][] = []
+	for (let i = 1; i < bends.length; i++) {
+		const [ax, ay] = bends[i - 1]
+		const [bx, by] = bends[i]
+		const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) * 2
+		for (let j = 0; j <= steps; j++) {
+			const x = Math.round(ax + ((bx - ax) * j) / steps)
+			const y = Math.round(ay + ((by - ay) * j) / steps)
+			const last = cells[cells.length - 1]
+			if (!last || last[0] !== x || last[1] !== y) cells.push([x, y])
+		}
+	}
+	return cells
+}
+
+/**
+ * A fuse's cord along `cells`, out of the collar at `x`, `y` (px): thick and
+ * braided, two cells across, lit along its top left, shaded along its bottom
+ * right, a dark band round it every few cells.
+ */
+export function paintCord(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	cells: [number, number][],
+) {
+	const cell = (across: number, down: number, colour: string) => {
+		ctx.fillStyle = colour
+		ctx.fillRect(x + across * CELL - CELL, y + down * CELL, CELL, CELL)
+	}
+	cells.forEach(([across, down], i) => {
+		const band = i % 4 === 3
+		cell(across, down, band ? CORD_SHADE : CORD_LIT)
+		cell(across + 1, down, band ? CORD_SHADE : CORD)
+		cell(across, down + 1, band ? CORD_SHADE : CORD)
+		cell(across + 1, down + 1, CORD_SHADE)
+	})
+}
+
 /**
  * The burning spark at the end of the fuse, hottest first: white-hot,
  * yellow, orange and a red ember.

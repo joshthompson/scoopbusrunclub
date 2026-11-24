@@ -3,8 +3,7 @@ import lowBranchLimbAutumn from '../assets/obstacles/low-branch-limb-autumn.png'
 import lowBranchTreeAutumn from '../assets/obstacles/low-branch-tree-autumn.png'
 import tree1Autumn from '../assets/scenery/tree1-autumn.png'
 import tree2 from '../assets/scenery/tree2.png'
-import huddingeSign from '../assets/signs/purple-sign-huddinge.png'
-import { PATH_BACK, START_X } from '../game/constants'
+import { PATH_BACK, PX_PER_M, START_X } from '../game/constants'
 import { HUDDINGE_FIKA } from '../game/fika'
 import { createTerrain } from '../game/terrain'
 import {
@@ -99,6 +98,18 @@ const nearHarvester = (x: number) =>
  * front: past the second deer, on the way down into the second loop's dip.
  */
 const BOARS_FROM = START_X + 12900
+
+/**
+ * And a boar on its own, further on: out of the trees onto the path at
+ * 3.85 km as whoever's in front comes up to it, trotting along it till
+ * 4.1 km, when it bolts. Caught up with about 4 km, and jumped on, it's
+ * ManBearPig, and it chases you the last kilometre to the finish (see
+ * `game/manBearPig.ts`).
+ */
+const MAN_BEAR_PIG = {
+	x: START_X + 3850 * PX_PER_M,
+	leaves: START_X + 4100 * PX_PER_M,
+}
 
 /** A couple of deer, lying in the bracken by the path, waiting to be ridden. */
 const DEER = [START_X + 3600, START_X + 11600]
@@ -315,8 +326,6 @@ export const huddinge: CourseDefinition = {
 		branch: { tree: lowBranchTreeAutumn, limb: lowBranchLimbAutumn },
 		horizonTrees: [tree1Autumn, tree2],
 		foliage: LEAF_SHADE,
-		// Its sign by the start, spruce green, in place of Haga's purple.
-		sign: huddingeSign,
 		harvester: { x: HARVESTER_X, tree: tree2, filter: SHADE },
 		boars: { from: BOARS_FROM },
 		// Leaves coming down, a few at a time.
@@ -393,4 +402,5 @@ export const huddinge: CourseDefinition = {
 	},
 	corgis: DEER,
 	ride: 'deer',
+	manBearPig: MAN_BEAR_PIG,
 }

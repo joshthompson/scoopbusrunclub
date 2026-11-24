@@ -7,7 +7,7 @@ import {
 	onCleanup,
 	onMount,
 } from 'solid-js'
-import { collectableCourse, onCourse } from '../courses/collectables'
+import { collectablePlaces, onCourses } from '../courses/collectables'
 import { CollectableArt } from '../draw/art/collectable'
 import {
 	COLLECTABLES,
@@ -229,7 +229,7 @@ function Card(props: {
 /** The card the keys are on, bigger, and all about it. */
 function Details(props: { id: Collectable }) {
 	const got = () => hasCollected(props.id)
-	const course = () => collectableCourse(props.id)
+	const places = () => collectablePlaces(props.id)
 	return (
 		<div style={styles.details}>
 			<div
@@ -249,10 +249,8 @@ function Details(props: { id: Collectable }) {
 			<Show
 				when={got()}
 				fallback={
-					<Show when={course()}>
-						{(course) => (
-							<div style={styles.about}>Somewhere {onCourse(course())}.</div>
-						)}
+					<Show when={places().length}>
+						<div style={styles.about}>Somewhere {onCourses(places())}.</div>
 					</Show>
 				}
 			>
@@ -263,10 +261,8 @@ function Details(props: { id: Collectable }) {
 				<For each={collectableBehaviour(props.id)}>
 					{(line) => <div style={styles.behaviour}>{line}</div>}
 				</For>
-				<Show when={course()}>
-					{(course) => (
-						<div style={styles.from}>Found {onCourse(course())}</div>
-					)}
+				<Show when={places().length}>
+					<div style={styles.from}>Found {onCourses(places())}</div>
 				</Show>
 			</Show>
 		</div>

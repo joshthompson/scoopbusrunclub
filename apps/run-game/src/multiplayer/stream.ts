@@ -1,6 +1,7 @@
 import type { CartState } from '../game/carts'
 import { hatCode } from '../game/hats'
 import type { LifeboatState } from '../game/lifeboat'
+import { beastFrame } from '../game/manBearPig'
 import { waitingLifts } from '../game/platforms'
 import { hasSpace, spaceFrame } from '../game/space'
 import {
@@ -123,6 +124,9 @@ export function createRaceStream(
 			...(hasSpace(world.course) ? { space: spaceFrame(world) } : {}),
 			...(world.harvesterAt !== undefined
 				? { harvesterAt: world.harvesterAt }
+				: {}),
+			...(world.beast && world.beast.state !== 'waiting'
+				? { beast: beastFrame(world.beast) }
 				: {}),
 			...(world.portal
 				? {

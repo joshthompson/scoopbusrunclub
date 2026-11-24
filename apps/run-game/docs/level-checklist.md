@@ -12,7 +12,7 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 | 1 | Haga | ✅ The standard fika (kaffe, kanelbulle, chokladboll, prinsesstårta), parkrun barcode | ✅ Score a goal | ✅ Bushy (finish it as Deri) | ✅ Flower crown | ✅ Goose (flies over) | ✅ Football to kick into the goal | 2026-11-18 |
 | 2 | Kristineberg | ✅ Energy drink, sports gel, banana | ✅ Long jump 10 m | ✅ Link (ride a corgi) | ✅ Sweatband | ✅ Corgi | ✅ Long jump pit | 2026-11-18 |
 | 3 | Gamla Stan | ✅ Semla, dammsugare, kardemummabulle, ale | ✅ Find the viking | ✅ Sven the Viking | ✅ Royal Guard's helmet | ✅ Royal Guard horse | ✅ Tavern under the street, down a manhole | 2026-11-18 |
-| 4 | Huddinge | ✅ Cake in a can, wild berries, kantareller, bad mushroom (one, halfway: the screen trips for 3 s) | ✅ Deer riding deer | ⬜ | ✅ Antlers | ✅ Deer | ⬜ Flavour so far: a wild boar family running alongside, a harvester felling a pine, the granite ledge onto the deer | 2026-11-24 (autumn) |
+| 4 | Huddinge | ✅ Cake in a can, wild berries, kantareller, bad mushroom (one, halfway: the screen trips for 3 s) | ✅ Deer riding deer | ✅ ManBearPig (jump on the wild boar on the path at 4 km, then outrun it to the finish) | ✅ Antlers | ✅ Deer | ✅ A wild boar on the path at 4 km that turns into ManBearPig, jumped on, and chases you the last kilometre. Also a wild boar family running alongside, a harvester felling a pine, the granite ledge onto the deer | 2026-11-24 (autumn) |
 | 5 | Pyramids | ✅ Falafel, knafeh, koshary | ✅ Bounce across the crocodiles | ✅ Ms Crocodile | ✅ Pharaoh's headdress | ✅ Camel, rare bactrian camel | ✅ Tomb under the Sphinx, the Nile | 2026-11-18 |
 | 6 | Halloween Town | ✅ Candyfloss, toffee apple, spider cupcake, pumpkin | ✅ Become a ghost | ✅ Skeleton | ✅ Pumpkin | ⬜ | ✅ Haunted house | 2026-11-18 |
 | 7 | Scoop Cruises | ✅ Kladdkaka, lingondricka, lösgodis, salmiakki, karjalanpiirakka | ⬜ | ⬜ | ✅ Captain's hat | ✅ Lifeboat (out of the engine rooms) | ✅ The ferry, roof route; below decks, down through the stairs to the engine rooms, a lifeboat ride and a trick ramp back up into the buffet | 2026-11-19 (below decks) |
@@ -36,10 +36,10 @@ What each level has, in course order (`src/courses/index.ts`). ✅ means it has 
 |---|---|---|
 | Unique collectables | 0 | |
 | Custom goal | 1 | Scoop Cruises |
-| Unlockable character | 8 | Haga, Huddinge, Scoop Cruises, Great Wall, Machu Picchu, The Sewers, The Cliff, The Slopes |
+| Unlockable character | 6 | Scoop Cruises, Great Wall, Machu Picchu, The Sewers, The Cliff, The Slopes |
 | Unique hat | 0 | |
 | Ride | 3 | Halloween Town, The Sewers, City Rooftop |
-| Set piece | 1 | Huddinge |
+| Set piece | 0 | |
 | Art pass | 0 | |
 
 ## Also in the course standard
@@ -49,4 +49,4 @@ These are rows from the `course-wiring` skill's standard that the table above do
 - **Tuned medal scores** (`src/courses/medalScores.ts`): ⬜ Haga, The Hospital, Midnattsloppet, Dino Island and Rocket Launch are still `null`, so their scores are worked out automatically.
 - **Own tune** (`src/music/tunes.ts`): ✅ every level has one.
 - **Special goal picture** (`src/draw/art/goals.tsx`): ✅ every level with a custom goal has one.
-- **Swim poses** (`scripts/make-swims.ts`): every member and bonus runner has two, made from their run strips, for Dino Island's Deep Water; anyone made from a look swims their run turned over.
+- **Swim poses** (`scripts/make-swims.ts`): every member and bonus runner has two, made from their run strips, for Dino Island's Deep Water (ManBearPig's are drawn by hand); anyone made from a look swims their run turned over.

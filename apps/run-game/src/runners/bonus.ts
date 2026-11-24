@@ -56,6 +56,14 @@ import hatchlingSkiTuck from '../assets/runners/hatchling/ski-tuck.png'
 import hatchlingSki from '../assets/runners/hatchling/ski.png'
 import hatchlingSnowboard from '../assets/runners/hatchling/snowboard.png'
 import hatchlingStand from '../assets/runners/hatchling/stand.png'
+import manBearPigDance from '../assets/runners/man-bear-pig/dance.png'
+import manBearPigFace from '../assets/runners/man-bear-pig/face.png'
+import manBearPigRun from '../assets/runners/man-bear-pig/run.png'
+import manBearPigSit from '../assets/runners/man-bear-pig/sit.png'
+import manBearPigSkiTuck from '../assets/runners/man-bear-pig/ski-tuck.png'
+import manBearPigSki from '../assets/runners/man-bear-pig/ski.png'
+import manBearPigSnowboard from '../assets/runners/man-bear-pig/snowboard.png'
+import manBearPigStand from '../assets/runners/man-bear-pig/stand.png'
 import msCrocodileDance from '../assets/runners/ms-crocodile/dance.png'
 import msCrocodileFace from '../assets/runners/ms-crocodile/face.png'
 import msCrocodileRun from '../assets/runners/ms-crocodile/run.png'
@@ -134,7 +142,8 @@ import { SWIM_AHEAD } from './swimAhead'
  * The Spirit of Jazz lives up at the top of Karolinska's lungs.
  * Bonnie Bottle is for getting through every course in one Endless run, and
  * Det. Munch for finding every collectable there is. Bushy is for finishing
- * Haga as Deri.
+ * Haga as Deri. ManBearPig is for outrunning it, on Huddinge, once it's
+ * been woken.
  *
  * Their pictures are PNGs in `assets/runners/<who>/`, a pixel a cell, facing
  * left, as the members' are: `run.png` a strip of frames side by side, and
@@ -753,6 +762,64 @@ export const TINA: Playable = {
 	},
 }
 
+/** ManBearPig's frames: hulking, wider than the club's template. */
+const MAN_BEAR_PIG_WIDTH = 27
+
+/**
+ * ManBearPig: half man, half bear, half pig. A pig's head, red, its snout
+ * out in front, a pointed pig's ear and a round bear's one behind it, a
+ * yellow eye under a heavy brow and fangs; a bear's brown fur over its
+ * back and shoulders, a hump of it, and a ragged skirt of it round its
+ * hips. Its near arm a bear's, black claws out; its far one a man's,
+ * a fist. A man's pale chest and legs, slab-muscled, splashed with
+ * blood. Side on, facing left, as everyone is. Six frames to its run, the
+ * members' stride, bobbing heavily, the claws swinging. Ducking, it
+ * crouches right down; on skis, its poles in claw and fist; on a
+ * snowboard, claws up. Swimming, a front crawl, claw over its head, then
+ * fist; diving, both up behind its head. Its dance is its own, drawn by
+ * hand (`rampage`). The wild boar on Huddinge's path, jumped on, is it
+ * (see `game/manBearPig.ts`): outrun it to the finish line, and it's yours
+ * to run as.
+ */
+export const MAN_BEAR_PIG: Playable = {
+	id: 'bonus:man-bear-pig',
+	name: 'ManBearPig',
+	bonus: true,
+	unlock: 'Survived in Huddinge',
+	tagline: 'Half man, half bear, half pig',
+	sprite: {
+		run: runFrames(manBearPigRun, 6, MAN_BEAR_PIG_WIDTH),
+		sit: manBearPigSit,
+		stand: manBearPigStand,
+		ski: manBearPigSki,
+		skiTuck: manBearPigSkiTuck,
+		snowboard: manBearPigSnowboard,
+		face: manBearPigFace,
+		dance: dance(manBearPigDance, 'man-bear-pig', MAN_BEAR_PIG_WIDTH),
+		neck: { x: 11, y: 10 },
+		width: MAN_BEAR_PIG_WIDTH,
+		height: HEIGHT,
+	},
+}
+
+/**
+ * A hat goes on its head, not on a claw or a fist held up over it: its
+ * head's found from a pig's reds.
+ */
+const MAN_BEAR_PIG_HEAD = ['#cf1b20', '#640910', '#ec4c40']
+headShowsIn(
+	[
+		manBearPigRun,
+		manBearPigSit,
+		manBearPigStand,
+		manBearPigSki,
+		manBearPigSkiTuck,
+		manBearPigSnowboard,
+		manBearPigDance,
+	],
+	MAN_BEAR_PIG_HEAD,
+)
+
 /** Temporary: `courses/rocketLaunch.ts` still imports the placeholder's name. */
 
 export const BONUS_RUNNERS: Playable[] = [
@@ -771,6 +838,7 @@ export const BONUS_RUNNERS: Playable[] = [
 	HATCHLING,
 	BUSHY,
 	TINA,
+	MAN_BEAR_PIG,
 ]
 
 /**

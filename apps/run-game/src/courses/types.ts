@@ -1540,6 +1540,17 @@ export interface Course {
 	/** A mine, with mine carts to ride: see `Mine`. */
 	mine?: Mine
 	/**
+	 * A wild boar, bursting out of the trees behind the path at `x` as
+	 * whoever's in front comes up to it, and trotting along the path till
+	 * it bolts off it past `leaves`. Run into it and you trip; land on it,
+	 * and everything stops for a cut scene: in a puff of smoke it's
+	 * ManBearPig, roaring at you. Then it's after you, faster than the bus,
+	 * never off the screen. Outrun it over the finish line, and it's yours
+	 * to run as.
+	 * Huddinge's (see `game/manBearPig.ts`).
+	 */
+	manBearPig?: { x: number; leaves: number }
+	/**
 	 * A football, lying on the path at `x`: run into it and you kick it on
 	 * ahead (see `Football`).
 	 */

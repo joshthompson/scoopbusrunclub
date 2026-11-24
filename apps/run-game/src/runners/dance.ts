@@ -387,6 +387,24 @@ export const DANCES = {
 			{ lift: 4 },
 		],
 	},
+	/**
+	 * A rampage: beating its chest, a bear's claw, a man's fist and the claw
+	 * again; a roar, arms up; stamping one way and then the other, claws
+	 * raking the air; and a hop, grinning. Drawn by hand, ManBearPig's.
+	 */
+	rampage: {
+		interval: 140,
+		moves: [
+			{},
+			{ bend: 1 },
+			{ bend: 1 },
+			{ bend: 1 },
+			{ lift: 1 },
+			{ sway: -1 },
+			{ sway: 1 },
+			{ lift: 4 },
+		],
+	},
 	/** Round and round, hopping, chasing its tail. */
 	zoomies: {
 		interval: 110,
@@ -458,6 +476,8 @@ export const RUNNER_DANCES: Record<string, DanceName> = {
 	bushy: 'mascot',
 	// Her arms waved, her scarf flying, bouncing along: drawn by hand.
 	tina: 'jig',
+	// Chest beating, roaring and stamping: drawn by hand.
+	'man-bear-pig': 'rampage',
 }
 
 /** A dance for anyone not in `RUNNER_DANCES`, from something about them that stays the same. */

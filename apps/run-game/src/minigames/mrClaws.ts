@@ -18,6 +18,7 @@ import type { CrabPose } from '../game/hats'
 import type { Terrain } from '../game/terrain'
 import type { Racer, World } from '../game/world'
 import type { Controls } from '../input'
+import { collect } from '../saved/collected'
 import { play } from '../sfx'
 import { ARENA_LEFT, arenaCourse, inRandomOrder } from './arena'
 import { clock } from './clock'
@@ -222,7 +223,7 @@ export const mrClaws: Minigame = {
 	blurb:
 		'Crab on your head: up to Pinch, down to Guard. Grab someone and Drop them in the Sea! Last one on top wins.',
 	tune: 'dino-island:sea',
-	collectables: [],
+	collectables: ['hat:crabHat'],
 	course: {
 		...arenaCourse(
 			'mr-claws',
@@ -293,6 +294,8 @@ function startMrClaws(world: World): MinigameRun {
 			was: { ...IDLE },
 		})
 	})
+	// Found, by playing it: not by watching its preview.
+	if (!world.preview) collect('hat:crabHat')
 
 	const ticksLeft = () => Math.max(0, CLAWS_TICKS - now())
 	const inSea = (racer: Racer) => clawOf(racer).inSeaAt >= 0

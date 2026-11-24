@@ -14,6 +14,7 @@ import {
 } from '../courses/kit/autumnForestScenery'
 import type { PlatformDefinition } from '../courses/types'
 import { BOMB_HEADS } from '../draw/art/bombHeads'
+import { BOMB_HATS } from '../game/collectables'
 import {
 	GROUND_Y,
 	HITBOX_HALF_WIDTH,
@@ -23,6 +24,7 @@ import {
 import type { Hat } from '../game/hats'
 import { type Racer, type World, bodyHeight } from '../game/world'
 import type { Controls } from '../input'
+import { collect } from '../saved/collected'
 import { play } from '../sfx'
 import { ARENA_LEFT, ARENA_WALLS, arenaCourse, inRandomOrder } from './arena'
 import { clock } from './clock'
@@ -155,6 +157,8 @@ export const BOMB_KINDS = [
 	'Mountain goat',
 	'Axolotl',
 ] as const
+// Each a collectable, in the same order: one for every creature, no more.
+BOMB_HATS.length satisfies (typeof BOMB_KINDS)['length']
 
 /** A bomb going off, where and when (the race's ticks), and which creature it was. */
 export interface Blast {
@@ -203,7 +207,7 @@ export const bombHat: Minigame = {
 	blurb:
 		"Got the bomb on your head? Touch someone to pass it on before the fuse burns down! It's heavy: you're a little slower. Last one not blown up wins!",
 	tune: 'huddinge',
-	collectables: [],
+	collectables: BOMB_HATS.map((bomb) => `hat:${bomb}` as const),
 	course: {
 		...arenaCourse(
 			'bomb-hat',
@@ -257,7 +261,6 @@ function startBombHat(world: World): MinigameRun {
 		b.facing = x < (left + right) / 2 ? 1 : -1
 		b.ducking = false
 	})
-
 	const bomb: Bomb = {
 		holder: -1,
 		litAt: FIRST_LIT,
@@ -319,6 +322,27 @@ function startBombHat(world: World): MinigameRun {
 	}
 	// The first, on someone from the start, there under the start screen.
 	light(FIRST_LIT)
+
+	/**
+	 * Which bomb was last on whose head, kept: its count, and who. Worked out
+	 * in `step`, which only the Host runs, so a Remote Player's screen, which
+	 * lights a bomb of its own as it starts, before the Host's arrives, keeps
+	 * nothing it shouldn't.
+	 */
+	let kept = ''
+	/**
+	 * The bomb on someone's head, kept as a collectable once it's newly on a
+	 * Player's: lit on them, or passed to them. Not a bot's (Single Player's
+	 * are `bot-`), and not in a preview.
+	 */
+	function keepBomb() {
+		const holder = holderOf()
+		const now = `${bomb.count} ${bomb.holder}`
+		if (!holder || now === kept) return
+		kept = now
+		if (world.preview || holder.id.startsWith('bot-')) return
+		collect(`hat:${BOMB_HATS[bomb.kind]}`)
+	}
 
 	/** How fast the one with it on can go: slower, less so with fewer left. */
 	function bombSpeed() {
@@ -703,6 +727,7 @@ function startBombHat(world: World): MinigameRun {
 		step() {
 			const now = world.raceTicks()
 			const holder = holderOf()
+			keepBomb()
 			for (const racer of racers) {
 				const b = racer.body
 				// Blown up: sat in the leaves where they came down.

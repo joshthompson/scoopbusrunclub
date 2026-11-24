@@ -2,6 +2,7 @@ import { type JSX, createSignal } from 'solid-js'
 import { RaceCanvas, createRaceScene } from '../draw/RaceView'
 import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import { hatCode, hatFromCode } from '../game/hats'
+import { applyBeastFrame } from '../game/manBearPig'
 import { waitingLifts } from '../game/platforms'
 import { stepSharks } from '../game/sharks'
 import { applySpaceFrame } from '../game/space'
@@ -224,6 +225,8 @@ export default function Mirror(props: {
 		if (a.minigame) world.minigame?.apply(a.minigame, b.minigame, share)
 		world.trippedAt = a.trippedAt
 		world.harvesterAt = a.harvesterAt
+		// Huddinge's boar, or ManBearPig, where it is.
+		if (world.beast && a.beast) applyBeastFrame(world.beast, a.beast)
 		// Rocket Launch's bolts, on from where they were, and its boss and cage.
 		if (a.space) applySpaceFrame(world, a.space, world.ticks() - a.ticks)
 		world.bus.frontX = mix(a.bus[0], b.bus[0])

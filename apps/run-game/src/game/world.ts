@@ -26,6 +26,7 @@ import type { Follower } from './followers'
 import { createFootball } from './football'
 import type { Hat } from './hats'
 import { createLifeboat } from './lifeboat'
+import { createBeast } from './manBearPig'
 import { lineUp } from './pack'
 import { racePlatforms } from './platforms'
 import type { PortalRun } from './portals'
@@ -263,6 +264,8 @@ export interface Body {
 	foundSecret?: boolean
 	/** Called out to, coming up to whoever's at a Secret's far end (see `Secret['greets']`). */
 	greeted?: boolean
+	/** Caught by ManBearPig, not the bus: smashed, flying, and out. */
+	smashed?: boolean
 	/** The bonus runner they unlocked on this course, by runner id, if they did: for the finish screen. */
 	unlocked?: string
 	/** Got to the course's hidden bonus runner, this go (see `Course['found']`). */
@@ -587,6 +590,8 @@ export type BonusKind =
 
 export interface Result {
 	kind: 'scooped' | 'fallen' | 'finished'
+	/** Scooped, not by the bus but smashed by ManBearPig (see `manBearPig.ts`). */
+	smashed?: boolean
 	/** How far the runner got, in world pixels from the start line. */
 	distance: number
 	/** For a finish, how far back the bus was. */
@@ -944,6 +949,11 @@ export function createWorld(
 		portalsDone: new Set<number>(),
 		/** Rocket Launch's plasma bolts, its cage and its boss: see `space.ts`. */
 		space: createSpace(course),
+		/**
+		 * Huddinge's wild boar, and what it turns into, jumped on: see
+		 * `manBearPig.ts`. Plain state, like the body.
+		 */
+		beast: createBeast(course),
 		/**
 		 * A haunted house's bats, when they burst out of its door, and its
 		 * window, when it was smashed, if they have been (see `haunted.ts`).

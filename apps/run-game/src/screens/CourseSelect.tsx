@@ -349,20 +349,15 @@ export function CourseSelect(props: {
 							/>
 						)}
 					</Show>
-					{/* A minigame: the whole of its arena, still, played by bots. */}
+					{/* A minigame: the whole of its arena, still, played by bots,
+					    four of them, however many are picked to play it with. */}
 					<Show when={pickedGame()} keyed>
 						{(game) => (
-							// Played again from the start with however many bots are picked.
-							<Show when={bots(game)} keyed>
-								{(count) => (
-									<MinigamePreview
-										minigame={game}
-										bots={count}
-										width={538}
-										height={windowHeight()}
-									/>
-								)}
-							</Show>
+							<MinigamePreview
+								minigame={game}
+								width={538}
+								height={windowHeight()}
+							/>
 						)}
 					</Show>
 					<Show

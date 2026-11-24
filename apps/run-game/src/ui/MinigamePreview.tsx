@@ -14,6 +14,12 @@ import { hush } from '../sfx'
 const LEAD_IN = 150
 /** How long it's watched once it's decided, the winner dancing, before another. */
 const WATCHED_AFTER = 120
+/**
+ * How many play it: always four, whatever Single Player's set to, so the
+ * preview doesn't change as the count does; fewer or more only where the
+ * minigame needs it (see `botsFor`).
+ */
+const PREVIEW_PLAYERS = 4
 
 /**
  * A minigame, seen through a little window onto it: the whole of its
@@ -24,8 +30,6 @@ const WATCHED_AFTER = 120
  */
 export function MinigamePreview(props: {
 	minigame: Minigame
-	/** How many bots, as Single Player's set to play it with. */
-	bots: number
 	width: number
 	height: number
 }) {
@@ -43,7 +47,6 @@ export function MinigamePreview(props: {
 				{(_game) => (
 					<Played
 						minigame={props.minigame}
-						bots={props.bots}
 						width={props.width}
 						height={props.height}
 						onOver={() => setGame((n) => n + 1)}
@@ -57,16 +60,15 @@ export function MinigamePreview(props: {
 /** One game of it, by bots, from a little way in, till it's over. */
 function Played(props: {
 	minigame: Minigame
-	bots: number
 	width: number
 	height: number
 	onOver: () => void
 }) {
 	const { minigame } = props
-	/** As many as Single Player has you play with, counting you: the club, at random. */
+	/** Four of the club, at random, as if you and three bots. */
 	const players = inRandomOrder(CLUB).slice(
 		0,
-		botsFor(minigame, props.bots) + 1,
+		botsFor(minigame, PREVIEW_PLAYERS - 1) + 1,
 	)
 	const world: World = createWorld(
 		minigame.course,
