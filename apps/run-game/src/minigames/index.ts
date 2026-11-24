@@ -45,6 +45,24 @@ export const playableBy = (minigame: Minigame, players: number) =>
 
 export type { Minigame, MinigameId }
 
-/** How many bots play a minigame with you, on your own: three, or as many as it's for. */
-export const botsFor = (minigame: Minigame) =>
-	Math.min(3, (minigame.maxPlayers ?? 8) - 1)
+/** The fewest and most bots that can play a minigame with you, on your own. */
+export const FEWEST_BOTS = 2
+export const MOST_BOTS = 7
+
+/**
+ * How many bots play a minigame with you, on your own: as many as
+ * `wanted`, between the fewest and most, and no more than it's for; and,
+ * played in even teams, one more if that's what evens them, and enough to
+ * make up the fewest it's played by.
+ */
+export function botsFor(minigame: Minigame, wanted: number) {
+	let bots = Math.min(
+		Math.max(FEWEST_BOTS, Math.min(MOST_BOTS, wanted)),
+		(minigame.maxPlayers ?? MOST_BOTS + 1) - 1,
+	)
+	if (minigame.evenTeamsOf !== undefined) {
+		bots = Math.max(bots, minigame.evenTeamsOf - 1)
+		if ((bots + 1) % 2) bots++
+	}
+	return bots
+}

@@ -11,6 +11,7 @@ import {
 	RUN_TOP_SPEED,
 	START_X,
 	TICK_MS,
+	VIEW_HEIGHT,
 	VIEW_WIDTH,
 } from '../game/constants'
 import type { CrabPose } from '../game/hats'
@@ -217,6 +218,7 @@ export const clawsOf = (world: World) => shows.get(world)
 export const mrClaws: Minigame = {
 	id: 'mr-claws',
 	name: 'Mr Claws',
+	tagline: 'Pinch them into the sea',
 	blurb:
 		'Crab on your head: up to Pinch, down to Guard. Grab someone and Drop them in the Sea! Last one on top wins.',
 	tune: 'dino-island:sea',
@@ -474,6 +476,8 @@ function startMrClaws(world: World): MinigameRun {
 			left: left ? ARENA_LEFT + SWIM_IN : STACK_MIDDLE + foot,
 			right: left ? STACK_MIDDLE - foot : ARENA_LEFT + VIEW_WIDTH - SWIM_IN,
 			splash: (x) => show.splashes.push({ x, at: world.ticks() }),
+			// Diving: no deeper than still shows, at the bottom of the screen.
+			bottom: VIEW_HEIGHT,
 		})
 	}
 

@@ -23,13 +23,20 @@ import { StarArt } from '../draw/art/star'
 import { courseHat } from '../game/collectables'
 import { MEDALS, type Medal, medalScores, nextMedal } from '../game/medals'
 import { touchScreen } from '../input'
-import { MINIGAMES, type Minigame, botsFor } from '../minigames'
+import {
+	FEWEST_BOTS,
+	MINIGAMES,
+	MOST_BOTS,
+	type Minigame,
+	botsFor,
+} from '../minigames'
 import type { Playable } from '../runners/playable'
 import { hasCollected } from '../saved/collected'
 import { specialDone } from '../saved/goals'
 import { type TableId, table, topScore } from '../saved/highScores'
 import { bestMedal } from '../saved/medals'
 import { isUnlocked } from '../saved/progress'
+import { setSoloBots, soloBots } from '../saved/settings'
 import { play } from '../sfx'
 import { CoursePreview } from '../ui/CoursePreview'
 import { OUTLINED, OUTLINED_FLAT, Panel } from '../ui/Menu'
@@ -124,6 +131,18 @@ export function CourseSelect(props: {
 		play('back')
 		props.onBack()
 	}
+	/** A minigame picked: how many bots it's played against, and one more or fewer, `by`, between the fewest and most there can be. */
+	const bots = (game: Minigame) => botsFor(game, soloBots())
+	const changeBots = (by: number) => {
+		const game = pickedGame()
+		if (!game) return
+		// Played in even teams, it goes up and down two at a time.
+		const one = botsFor(game, bots(game) + by)
+		const next = one === bots(game) ? botsFor(game, bots(game) + by * 2) : one
+		if (next === bots(game)) return play('back')
+		play('move')
+		setSoloBots(next)
+	}
 
 	const rows: HTMLElement[] = []
 	// Keep the picked row in view as the keyboard moves down a long list.
@@ -132,6 +151,12 @@ export function CourseSelect(props: {
 	const onKey = (event: KeyboardEvent) => {
 		const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
 		const move = { ArrowUp: -1, w: -1, ArrowDown: 1, s: 1 }[key]
+		// A minigame picked: left and right for fewer or more bots.
+		const more = { ArrowLeft: -1, a: -1, ArrowRight: 1, d: 1 }[key]
+		if (more && pickedGame()) {
+			event.preventDefault()
+			changeBots(more)
+		}
 		if (move) {
 			event.preventDefault()
 			// Round from the bottom to the top, and back.
@@ -298,9 +323,7 @@ export function CourseSelect(props: {
 									>
 										{game.name}
 									</span>
-									<span style={styles.rowDetail}>
-										You and {botsFor(game)} bots
-									</span>
+									<span style={styles.rowDetail}>{game.tagline}</span>
 								</span>
 							</>,
 						)
@@ -329,11 +352,17 @@ export function CourseSelect(props: {
 					{/* A minigame: the whole of its arena, still, played by bots. */}
 					<Show when={pickedGame()} keyed>
 						{(game) => (
-							<MinigamePreview
-								minigame={game}
-								width={538}
-								height={windowHeight()}
-							/>
+							// Played again from the start with however many bots are picked.
+							<Show when={bots(game)} keyed>
+								{(count) => (
+									<MinigamePreview
+										minigame={game}
+										bots={count}
+										width={538}
+										height={windowHeight()}
+									/>
+								)}
+							</Show>
 						)}
 					</Show>
 					<Show
@@ -473,8 +502,37 @@ export function CourseSelect(props: {
 							<div style={styles.stats}>
 								<div style={styles.scoresLabel}>How to play</div>
 								<div style={styles.goalText}>{game().blurb}</div>
-								<div style={styles.nextGoal}>
-									You against {botsFor(game())} bots
+								{/* How many bots, fewer or more: the buttons, or left and right. */}
+								<div style={styles.bots}>
+									<span>You against</span>
+									<button
+										type="button"
+										aria-label="Fewer bots"
+										style={{
+											...styles.botsButton,
+											opacity:
+												bots(game()) <= botsFor(game(), FEWEST_BOTS) ? 0.35 : 1,
+										}}
+										disabled={bots(game()) <= botsFor(game(), FEWEST_BOTS)}
+										onClick={() => changeBots(-1)}
+									>
+										◀
+									</button>
+									<span style={styles.botsCount}>{bots(game())}</span>
+									<button
+										type="button"
+										aria-label="More bots"
+										style={{
+											...styles.botsButton,
+											opacity:
+												bots(game()) >= botsFor(game(), MOST_BOTS) ? 0.35 : 1,
+										}}
+										disabled={bots(game()) >= botsFor(game(), MOST_BOTS)}
+										onClick={() => changeBots(1)}
+									>
+										▶
+									</button>
+									<span>bots</span>
 								</div>
 							</div>
 						</div>
@@ -485,7 +543,9 @@ export function CourseSelect(props: {
 			<div style={styles.hint}>
 				{touchScreen()
 					? 'Tap a run to see it · tap Run ▶ to start'
-					: '↑ ↓ to pick · Enter to run · Esc to change runner'}
+					: pickedGame()
+						? '↑ ↓ to pick · ← → bots · Enter to play · Esc to change runner'
+						: '↑ ↓ to pick · Enter to run · Esc to change runner'}
 			</div>
 		</div>
 	)
@@ -736,6 +796,28 @@ const styles = {
 	},
 	/** What the next medal up takes: quieter than the medal got. */
 	nextGoal: { color: 'rgba(255, 255, 255, 0.5)' },
+	/** A minigame's bots: how many, between a button for fewer and one for more. */
+	bots: {
+		display: 'flex',
+		'align-items': 'center',
+		gap: '8px',
+		'margin-top': '4px',
+	},
+	botsButton: {
+		padding: '0 8px',
+		background: 'var(--ink)',
+		color: 'white',
+		border: '2px solid white',
+		'font-size': '14px',
+		'line-height': '22px',
+	},
+	botsCount: {
+		...OUTLINED_FLAT,
+		color: '#ffd23f',
+		'font-size': '20px',
+		'min-width': '14px',
+		'text-align': 'center',
+	},
 	rowDetail: {
 		'font-family': '"Cabin", sans-serif',
 		'font-size': '12px',

@@ -34,8 +34,16 @@ export interface Minigame {
 	name: string
 	/** What it's about, a line, where it's picked and on its start screen. */
 	blurb: string
+	/** It in a few words, under its name in Single Player's list. */
+	tagline: string
 	/** The most Players it's for: any more, and it's left out. Any, if not said. */
 	maxPlayers?: number
+	/**
+	 * Played in two even teams, by at least this many: bots make it up to
+	 * that, and to an even number, if there aren't (see Jughead). Played on
+	 * your own, against as many bots as make it so.
+	 */
+	evenTeamsOf?: number
 	/**
 	 * Whether there's a leaderboard up in the top right corner, everyone
 	 * ranked by their `score`, best first, with their chip, as the Podium's
@@ -81,6 +89,10 @@ export interface MinigameRun {
 	chip(racer: Racer): string
 	/** How `racer`'s doing, as a number, for ranking them on the leaderboard (see `Minigame['pills']`): more is better. In the order they're in, if not said. */
 	score?(racer: Racer): number
+	/** The colour of `racer`'s name on the leaderboard: their team's, in a team game. White, if not said. */
+	nameColour?(racer: Racer): string | undefined
+	/** Whether `racer` can bounce on `other`'s head, coming down on it: not a teammate's, in Jughead. Anyone's, if not said. */
+	bounces?(racer: Racer, other: Racer): boolean
 	/** What `racer` did, in a few words, for the Results: "3 fruit". */
 	note(racer: Racer): string
 	/** Whether `racer`'s done all there is to do: they dance, stood still. */
@@ -260,8 +272,11 @@ export interface MinigameFrame {
 	 */
 	skaters?: number[][]
 	// Jughead's fields, below this line.
-	/** Jughead: each racer's jug, [how full (out of 1000), its surface's tilt (out of 1000), filled at (-1 not)]. */
-	jugs?: [number, number, number][]
+	/** Jughead: each racer's jug, [how full (out of 1000), its surface's tilt (out of 1000), being sucked empty into their team's tank (1), how much they've poured into it, all told, in jugs (out of 1000)]; and how full each team's tank is, in jugs (out of 1000). Its teams and who won in Hungry Goose's and Beach Volleyball's fields. */
+	jugs?: [number, number, number, number][]
+	tanks?: [number, number]
+	/** Each team's sucker: [whose jug its hose is in (their place in the racers, -1 nobody's), how far down (out of 100), letting go (1)]. */
+	docks?: [number, number, number][]
 	/** Its jets of water, [id, kind (its place in `JET_KINDS`), x, y, vx and vy (out of 100), from, until, strength (out of 100), what's said (its place in `MISHAPS`, -1 nothing)]. */
 	jets?: [
 		number,

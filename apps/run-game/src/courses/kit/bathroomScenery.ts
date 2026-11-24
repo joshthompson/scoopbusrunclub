@@ -26,8 +26,12 @@ export const BATHROOM_HEIGHT = ROWS * CELL
 
 // --- Where the water comes from, in px on the screen -------------------------
 
-/** The spouts under the big pipe, across, in cells; and where the water leaves them, down. */
-const SPOUT_CELLS = [60, 115, 170, 235, 300, 360, 420]
+/**
+ * The spouts under the big pipe, across, in cells, the outer two well in
+ * from the teams' suckers in Jughead, so nobody's filling up under one and
+ * being sucked out at once; and where the water leaves them, down.
+ */
+const SPOUT_CELLS = [80, 115, 170, 235, 300, 360, 398]
 export const SPOUTS_X = SPOUT_CELLS.map((c) => c * CELL)
 export const SPOUT_Y = 46 * CELL
 /** The big pipe's underside, where it's leaking along a seam: dripping all along it. */

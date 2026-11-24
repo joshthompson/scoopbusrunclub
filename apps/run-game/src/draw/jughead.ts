@@ -12,6 +12,7 @@ import type { Racer, World } from '../game/world'
 import { ARENA_LEFT } from '../minigames/arena'
 import {
 	FLOOR_Y,
+	HOOD_BOTTOM,
 	JET_HALF,
 	JUG_CELL,
 	JUG_ROWS,
@@ -19,13 +20,21 @@ import {
 	JUG_TALL,
 	type Jet,
 	MOUTH_HALF,
+	NOZZLE_IN,
 	PUDDLES_TILL,
 	RISEN_AT,
+	TANK_CAP,
+	TANK_FRAME,
+	TANK_PLINTH,
+	TANK_TOP,
+	TANK_WIDE,
 	WARN_TICKS,
 	WATER_FALL,
+	capacityOf,
 	depthIn,
 	findHeadsBy,
 	floodTopOf,
+	hoodX,
 	jetAt,
 	jetEnds,
 	jugFootOf,
@@ -33,6 +42,7 @@ import {
 	mouthOf,
 	running,
 	surfaceOf,
+	tankLeft,
 } from '../minigames/jughead'
 import { paintPicture } from './paint/picture'
 import { headFromFeetOf } from './sprites'
@@ -54,6 +64,10 @@ const GLASS_SHADE = '#8fb4c8'
 const GLASS_LIP = '#eef8fd'
 const GLASS_FOOT = '#a8c8d8'
 const GLASS_SHINE = '#ffffff'
+/** The sucker's hood: chrome, lit and shaded. */
+const CHROME_HOOD = '#a7adb3'
+const CHROME_HOOD_LIT = '#d4d9de'
+const CHROME_HOOD_SHADE = '#6f757b'
 /** The tube: its housing, chains; lit, and off; its glow, which is air. */
 const HOUSING = '#5b5e5a'
 const HOUSING_LIT = '#7d807a'
@@ -62,15 +76,48 @@ const TUBE_OFF = '#8a8f86'
 const TUBE_GLOW = 'rgba(246, 251, 220, 0.10)'
 const CHAIN = '#4a4c48'
 /**
- * The straps the jug's held on by: red, lit and shaded; how far up from
- * the jug's foot, in its rows, the band round it is; and how far either
- * side of their head's middle the headband goes.
+ * The straps the jug's held on by, in their team's colour, Red's and
+ * Blue's, lit and shaded; how far up from the jug's foot, in its rows, the
+ * band round it is, and how many rows thick, thick enough to see from
+ * across the room; and how far either side of their head's middle the
+ * headband goes.
  */
-const BAND = '#d8342c'
-const BAND_LIT = '#f47a70'
-const BAND_SHADE = '#9c1f1a'
-const RING_UP = 4
+const BANDS = [
+	{ band: '#d8342c', lit: '#f47a70', shade: '#9c1f1a' },
+	{ band: '#2f5fd8', lit: '#7fa2f4', shade: '#1d3c9c' },
+]
+const RING_UP = 5
+const RING_THICK = 2
 const BAND_HALF = 10
+/**
+ * The teams' tanks: their frames, metal, lit and shaded; their caps and
+ * plinths in their team's colour (as the bands); the line on each, how
+ * much fills it, and the marks up it, a jug apart.
+ */
+const METAL = '#4e5258'
+const METAL_LIT = '#7c828a'
+const METAL_SHADE = '#33363b'
+const TANK_GLASS = '#c5dbe3'
+const TANK_GLASS_SHADE = '#a9c3cd'
+const MARK_LINE = '#ffd23f'
+const MARK_SHADE = '#a8801c'
+const JUG_MARK = '#e6eef2'
+/**
+ * The pipe up from each sucker to its tank, and the hose down out of the
+ * sucker: glass, so the water's seen going up it, over and down into the
+ * tank. How high the pipe goes over; how thick it and the hose are, a cell
+ * of glass either side of their bore; the glass, lit and shaded, and the
+ * bore, see-through; and how fast water goes along them, a tick.
+ */
+const PIPE_OVER_Y = 176
+const PIPE_THICK = 8
+const TUBE_LIT = '#e4f3fa'
+const TUBE_SHADE = '#7fa4b8'
+const TUBE_BORE = 'rgba(214, 236, 247, 0.45)'
+const FLOW_SPEED = 14
+/** The sucker's hood, a funnel down over their heads: how tall, and how wide at its mouth. */
+const HOOD_TALL = 20
+const HOOD_HALF = 16
 /** Spilt drops: how fast they fall, how many at most a tick and for how much spilt, and how big puddles grow and their most. */
 const DROP_FALL = 0.3
 const DROPS_A_TICK = 12
@@ -190,6 +237,7 @@ export function createJughead(world: World) {
 	const room = layer('jug-room', 'scenery', (ctx, image, now) => {
 		paintPicture(ctx, image, BATHROOM, 0, 0, BATHROOM_WIDTH, BATHROOM_HEIGHT)
 		paintTube(ctx, now)
+		for (const team of [0, 1]) paintTank(ctx, team, now)
 	})
 
 	const water = layer('jug-water', 'boost', (ctx, _image, now) => {
@@ -212,6 +260,8 @@ export function createJughead(world: World) {
 			stepDrops()
 		}
 		for (const racer of show.racers) paintJug(ctx, racer, now)
+		// The suckers' hoses, down into jugs.
+		for (const team of [0, 1]) paintHose(ctx, team, now)
 		// Splashing up out of whoever's catching.
 		for (const jet of show.jets) {
 			if (!running(jet, race) || jet.kind === 'seep') continue
@@ -242,7 +292,9 @@ export function createJughead(world: World) {
 			const before = wasFull.get(racer.id) ?? jug.fill
 			wasFull.set(racer.id, jug.fill)
 			const lost = before - jug.fill
-			if (lost > 0.0003) {
+			// Sucked out by their team's sucker, not spilt: it goes up the hose.
+			const docked = show.docks.some((d) => d.id === racer.id)
+			if (lost > 0.0003 && !docked) {
 				const tipped = Math.sign(jug.tilt) || racer.body.facing
 				const top = mouthOf(racer).y
 				// A lot at once (bounced on): a burst, out of both sides, higher.
@@ -746,7 +798,382 @@ export function createJughead(world: World) {
 				ctx.fillRect(left + JUG_CELL * 2, y, JUG_CELL, JUG_CELL)
 			}
 		})
-		paintStraps(ctx, middle, top, bottom, b.facing)
+		paintStraps(
+			ctx,
+			middle,
+			top,
+			bottom,
+			b.facing,
+			show.teams.get(racer.id) ?? 0,
+		)
+	}
+
+	/** Whether anyone on `team` is being sucked empty just now. */
+	const teamSucking = (team: number) =>
+		show.racers.some(
+			(r) => show.sucking.has(r.id) && (show.teams.get(r.id) ?? 0) === team,
+		)
+
+	/**
+	 * Team `team`'s tank, stood at their end of the room: a tall glass tank
+	 * in a metal frame, a cap and plinth in their colour; the water in it,
+	 * as full as it is, lit along its top; marks up it a jug apart, and the
+	 * line, how much fills it, sticking out either side. Its pipe, from its
+	 * cap, up, over and down to the sucker's hood, hanging in from the wall;
+	 * and, sucking, water going along it, and pouring into the tank.
+	 */
+	function paintTank(ctx: CanvasRenderingContext2D, team: number, now: number) {
+		const colours = BANDS[team] ?? BANDS[0]
+		const left = tankLeft(team)
+		const right = left + TANK_WIDE
+		const bottom = FLOOR_Y + CELL
+		const innerLeft = left + TANK_FRAME
+		const innerRight = right - TANK_FRAME
+		const innerTop = TANK_TOP + TANK_CAP
+		const innerBottom = bottom - TANK_PLINTH
+		const tall = innerBottom - innerTop
+		const capacity = capacityOf(show)
+		const middle = snap((left + right) / 2)
+		const hood = snap(across(hoodX(team)))
+
+		// The pipe, glass, behind the tank's cap: up from the hood, over, and
+		// down to the tank; and the water going along it.
+		const way = waterWay(team)
+		const flow = flowOf(team, now)
+		const half = PIPE_THICK / 2
+		const hoodTop = HOOD_BOTTOM - HOOD_TALL
+		paintGlassTube(ctx, hood, hoodTop, hood, PIPE_OVER_Y, way.pipe, flow, now)
+		paintGlassTube(
+			ctx,
+			hood,
+			PIPE_OVER_Y,
+			middle,
+			PIPE_OVER_Y,
+			way.pipe + way.up,
+			flow,
+			now,
+		)
+		paintGlassTube(
+			ctx,
+			middle,
+			PIPE_OVER_Y,
+			middle,
+			TANK_TOP,
+			way.pipe + way.up + way.over,
+			flow,
+			now,
+		)
+		// Its elbows and collars, where it bends and where it meets the hood and the cap.
+		ctx.fillStyle = METAL
+		for (const [x, y] of [
+			[middle, PIPE_OVER_Y],
+			[hood, PIPE_OVER_Y],
+			[hood, hoodTop - CELL * 2],
+			[middle, TANK_TOP - CELL * 2],
+		])
+			ctx.fillRect(x - half - CELL, y - CELL, PIPE_THICK + CELL * 2, CELL * 2)
+
+		// The hood: a funnel, wider down to its mouth, chrome, dark inside.
+		for (let row = 0; row < HOOD_TALL; row += CELL) {
+			const w = snap(half + ((HOOD_HALF - half) * row) / (HOOD_TALL - CELL))
+			const y = HOOD_BOTTOM - HOOD_TALL + row
+			ctx.fillStyle = CHROME_HOOD
+			ctx.fillRect(hood - w, y, w * 2, CELL)
+			ctx.fillStyle = CHROME_HOOD_LIT
+			ctx.fillRect(hood - w, y, CELL, CELL)
+			ctx.fillStyle = CHROME_HOOD_SHADE
+			ctx.fillRect(hood + w - CELL, y, CELL, CELL)
+		}
+		// Its hose's nozzle, tucked up in its mouth till it comes down.
+		if ((show.docks[team]?.reach ?? 0) <= 0) {
+			ctx.fillStyle = CHROME_HOOD_SHADE
+			ctx.fillRect(hood - CELL * 2, HOOD_BOTTOM - CELL, CELL * 4, CELL * 2)
+		}
+		ctx.fillStyle = flowing(flow, way.hose, way.pipe) ? WATER : '#1d1f22'
+		ctx.fillRect(
+			hood - HOOD_HALF + CELL * 2,
+			HOOD_BOTTOM - CELL,
+			HOOD_HALF * 2 - CELL * 4,
+			CELL,
+		)
+		ctx.fillStyle = colours.band
+		ctx.fillRect(
+			hood - HOOD_HALF,
+			HOOD_BOTTOM - HOOD_TALL / 2,
+			HOOD_HALF * 2,
+			CELL,
+		)
+
+		// The tank's glass, thick, nothing seen through it; and its water.
+		ctx.fillStyle = TANK_GLASS
+		ctx.fillRect(innerLeft, innerTop, innerRight - innerLeft, tall)
+		ctx.fillStyle = TANK_GLASS_SHADE
+		ctx.fillRect(innerRight - CELL * 4, innerTop, CELL * 4, tall)
+		// As full as the water that's got there: what's on its way up the
+		// pipe isn't in it yet.
+		const level = snap(Math.min(1, shownTank(team, now, way) / capacity) * tall)
+		// Poured into, the water coming down out of the pipe getting to it.
+		const sucking = flowing(
+			flow,
+			way.pour + way.fall - CELL,
+			way.pour + way.fall,
+		)
+		if (level > 0) {
+			const top = innerBottom - level
+			ctx.fillStyle = WATER
+			ctx.fillRect(innerLeft, top, innerRight - innerLeft, level)
+			ctx.fillStyle = WATER_DEEP
+			ctx.fillRect(innerRight - CELL * 3, top, CELL * 3, level)
+			ctx.fillStyle = WATER_LIT
+			// Its top, rippling, rougher being poured into.
+			for (let x = innerLeft; x < innerRight; x += CELL) {
+				const lift =
+					sucking && hash(Math.floor((x + now * 3) / 6)) < 0.4 ? CELL : 0
+				ctx.fillRect(x, top - lift, CELL, CELL)
+			}
+			// Bubbles, rising, poured into.
+			if (sucking) {
+				ctx.fillStyle = FOAM
+				for (let k = 0; k < 6; k++) {
+					const rise = (now * 1.5 + k * 37) % Math.max(CELL, level)
+					const x =
+						innerLeft +
+						CELL * 2 +
+						snap(hash(k * 5 + 1) * (innerRight - innerLeft - CELL * 6))
+					ctx.fillRect(x, snap(innerBottom - rise), CELL, CELL)
+				}
+			}
+		}
+		// Poured in from the pipe, down from the top of it to the water.
+		for (let y = innerTop; y < innerBottom - level; y += CELL) {
+			if (!flowing(flow, way.pour + (y - innerTop), way.pour + (y - innerTop)))
+				continue
+			ctx.fillStyle = WATER
+			ctx.fillRect(middle - CELL, y, CELL * 2, CELL)
+			ctx.fillStyle = WATER_LIT
+			ctx.fillRect(middle - CELL, y, CELL, CELL)
+		}
+		// Marks up it, a jug apart, on its left; the line, sticking out either side.
+		ctx.fillStyle = JUG_MARK
+		for (let jugs = 1; jugs < show.target; jugs++) {
+			const y = snap(innerBottom - (jugs / capacity) * tall)
+			ctx.fillRect(innerLeft, y, CELL * 3, CELL)
+		}
+		const line = snap(innerBottom - (show.target / capacity) * tall)
+		ctx.fillStyle = MARK_SHADE
+		ctx.fillRect(left - CELL * 3, line + CELL, TANK_WIDE + CELL * 6, CELL)
+		ctx.fillStyle = MARK_LINE
+		ctx.fillRect(left - CELL * 3, line, TANK_WIDE + CELL * 6, CELL)
+		// Arrows in at it, either side.
+		for (const [x, way] of [
+			[left - CELL * 5, 1],
+			[right + CELL * 4, -1],
+		]) {
+			ctx.fillRect(x, line - CELL, CELL, CELL * 3)
+			ctx.fillRect(x - way * CELL, line - CELL * 2, CELL, CELL * 5)
+		}
+		// A shine down the glass.
+		ctx.fillStyle = 'rgba(255, 255, 255, 0.35)'
+		ctx.fillRect(
+			innerLeft + CELL * 4,
+			innerTop + CELL * 2,
+			CELL,
+			tall - CELL * 4,
+		)
+
+		// Its frame, its cap and its plinth, in their colour.
+		ctx.fillStyle = METAL
+		ctx.fillRect(left, innerTop, TANK_FRAME, tall)
+		ctx.fillRect(innerRight, innerTop, TANK_FRAME, tall)
+		ctx.fillStyle = METAL_LIT
+		ctx.fillRect(left, innerTop, CELL, tall)
+		ctx.fillStyle = METAL_SHADE
+		ctx.fillRect(right - CELL, innerTop, CELL, tall)
+		for (const [y, h] of [
+			[TANK_TOP, TANK_CAP],
+			[innerBottom, TANK_PLINTH],
+		]) {
+			ctx.fillStyle = colours.band
+			ctx.fillRect(left - CELL, y, TANK_WIDE + CELL * 2, h)
+			ctx.fillStyle = colours.lit
+			ctx.fillRect(left - CELL, y, TANK_WIDE + CELL * 2, CELL)
+			ctx.fillStyle = colours.shade
+			ctx.fillRect(left - CELL, y + h - CELL, TANK_WIDE + CELL * 2, CELL)
+		}
+		// Bolts on its plinth.
+		ctx.fillStyle = colours.shade
+		for (let x = left + CELL * 2; x < right - CELL; x += CELL * 6)
+			ctx.fillRect(x, innerBottom + CELL * 3, CELL, CELL)
+	}
+
+	/**
+	 * Team `team`'s water's way, from the end of its sucker's hose (down in
+	 * a jug, if it is), along it, in px: `hose`, up the hose to the hood;
+	 * `pipe`, where the pipe starts, at the top of the hood; `up`, `over`
+	 * and `down` its three lengths; `pour`, where it comes out of the tank's
+	 * cap; and `fall`, how far it falls to the water in the tank.
+	 */
+	function waterWay(team: number) {
+		const left = tankLeft(team)
+		const middle = snap(left + TANK_WIDE / 2)
+		const hood = snap(across(hoodX(team)))
+		const tip = hoseTip(team)
+		const hose = tip ? tip.y - (HOOD_BOTTOM - CELL * 2) : 0
+		const pipe = hose + HOOD_TALL - CELL * 2
+		const up = HOOD_BOTTOM - HOOD_TALL - PIPE_OVER_Y
+		const over = Math.abs(hood - middle)
+		const down = TANK_TOP - PIPE_OVER_Y
+		const pour = pipe + up + over + down + TANK_CAP
+		const innerTop = TANK_TOP + TANK_CAP
+		const innerBottom = FLOOR_Y + CELL - TANK_PLINTH
+		const tall = innerBottom - innerTop
+		const fall = tall - Math.min(1, show.tanks[team] / capacityOf(show)) * tall
+		return { hose, pipe, up, over, down, pour, fall }
+	}
+
+	/** Where team `team`'s sucker's hose's end is, down in someone's jug, if it's down. */
+	function hoseTip(team: number) {
+		const dock = show.docks[team]
+		const racer = show.racers.find((r) => r.id === dock?.id)
+		if (!dock || !racer || dock.reach <= 0) return undefined
+		const top = HOOD_BOTTOM - CELL * 2
+		const mouth = mouthOf(racer)
+		const hood = snap(across(hoodX(team)))
+		return {
+			x: snap(hood + (across(mouth.x) - hood) * dock.reach),
+			y: snap(top + (mouth.y + NOZZLE_IN - top) * dock.reach),
+		}
+	}
+
+	/**
+	 * The water going up each team's hose and pipe, by the tick: since it
+	 * started, its front on along it; since it stopped, its tail after it.
+	 * The tank's level by the tick, too, to show it as full as the water
+	 * that's reached it.
+	 */
+	const flows = [0, 1].map(() => ({
+		on: false,
+		from: 0,
+		off: Number.NEGATIVE_INFINITY,
+		tick: -1,
+		tanks: [] as { at: number; full: number }[],
+	}))
+	type Flow = { front: number; tail: number }
+	function flowOf(team: number, now: number): Flow {
+		const f = flows[team]
+		if (f.tick !== now) {
+			f.tick = now
+			const sucking = teamSucking(team)
+			if (sucking && !f.on) {
+				f.on = true
+				f.from = now
+			} else if (!sucking && f.on) {
+				f.on = false
+				f.off = now
+			}
+			f.tanks.push({ at: now, full: show.tanks[team] })
+			if (f.tanks.length > 240) f.tanks.shift()
+		}
+		return {
+			front: (now - f.from) * FLOW_SPEED,
+			tail: f.on ? 0 : (now - f.off) * FLOW_SPEED,
+		}
+	}
+	/** Whether there's water anywhere from `from` to `to` along the way, in px. */
+	const flowing = (flow: Flow, from: number, to: number) =>
+		to >= flow.tail && from <= flow.front
+	/** How full team `team`'s tank's shown: as it was as long ago as water takes to get there. */
+	function shownTank(
+		team: number,
+		now: number,
+		way: ReturnType<typeof waterWay>,
+	) {
+		const lag = Math.round((way.pour + way.fall) / FLOW_SPEED)
+		const { tanks } = flows[team]
+		let full = tanks[0]?.full ?? show.tanks[team]
+		for (const t of tanks) {
+			if (t.at > now - lag) break
+			full = t.full
+		}
+		return full
+	}
+
+	/**
+	 * A straight length of glass tube, from `x0`, `y0` to `x1`, `y1` (across
+	 * the screen), a cell of glass either side of its bore, `start` px along
+	 * the water's way where it begins: water in it as far as it's got, lit
+	 * where it's bubbling along.
+	 */
+	function paintGlassTube(
+		ctx: CanvasRenderingContext2D,
+		x0: number,
+		y0: number,
+		x1: number,
+		y1: number,
+		start: number,
+		flow: Flow,
+		now: number,
+	) {
+		const long = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))
+		const half = PIPE_THICK / 2
+		const flat = Math.abs(x1 - x0) > Math.abs(y1 - y0)
+		for (let d = 0; d <= long; d += CELL) {
+			const x = snap(x0 + ((x1 - x0) * d) / Math.max(1, long))
+			const y = snap(y0 + ((y1 - y0) * d) / Math.max(1, long))
+			const along = start + d
+			const wet = flowing(flow, along, along)
+			const bubble = (along - now * FLOW_SPEED) % 28 > -6
+			if (flat) {
+				ctx.fillStyle = TUBE_LIT
+				ctx.fillRect(x, y - half, CELL, CELL)
+				ctx.fillStyle = wet ? (bubble ? WATER_LIT : WATER) : TUBE_BORE
+				ctx.fillRect(x, y - half + CELL, CELL, PIPE_THICK - CELL * 2)
+				ctx.fillStyle = TUBE_SHADE
+				ctx.fillRect(x, y + half - CELL, CELL, CELL)
+			} else {
+				ctx.fillStyle = TUBE_LIT
+				ctx.fillRect(x - half, y, CELL, CELL)
+				ctx.fillStyle = wet ? (bubble ? WATER_LIT : WATER) : TUBE_BORE
+				ctx.fillRect(x - half + CELL, y, PIPE_THICK - CELL * 2, CELL)
+				ctx.fillStyle = TUBE_SHADE
+				ctx.fillRect(x + half - CELL, y, CELL, CELL)
+			}
+		}
+	}
+
+	/**
+	 * Team `team`'s sucker's hose, glass, coming down out of its hood, as
+	 * far as it's come, into the jug of whoever it's for, down its neck, a
+	 * nozzle on its end; the water going up it out of their jug.
+	 */
+	function paintHose(ctx: CanvasRenderingContext2D, team: number, now: number) {
+		const tip = hoseTip(team)
+		if (!tip) return
+		const hood = snap(across(hoodX(team)))
+		const flow = flowOf(team, now)
+		// From its end, up to the hood: the water's way starts in the jug.
+		paintGlassTube(
+			ctx,
+			tip.x,
+			tip.y - CELL * 2,
+			hood,
+			HOOD_BOTTOM - CELL * 2,
+			CELL * 2,
+			flow,
+			now,
+		)
+		// Its nozzle, on its end, down the jug's neck; a collar at the top.
+		ctx.fillStyle = CHROME_HOOD_SHADE
+		ctx.fillRect(tip.x - CELL * 2, tip.y - CELL * 2, CELL * 4, CELL * 2)
+		ctx.fillStyle = CHROME_HOOD
+		ctx.fillRect(tip.x - CELL * 2, tip.y - CELL * 2, CELL * 3, CELL)
+		ctx.fillRect(hood - CELL * 3, HOOD_BOTTOM - CELL * 2, CELL * 6, CELL)
+		// Sucking: the water in their jug drawn in round it, swirling.
+		if (flowing(flow, 0, 0)) {
+			ctx.fillStyle = FOAM
+			const swirl = Math.floor(now / 3) % 4
+			ctx.fillRect(tip.x - CELL * 3 + swirl * CELL, tip.y, CELL, CELL)
+		}
 	}
 
 	/**
@@ -760,22 +1187,30 @@ export function createJughead(world: World) {
 		top: number,
 		bottom: number,
 		facing: 1 | -1,
+		team: number,
 	) {
+		const {
+			band: BAND,
+			lit: BAND_LIT,
+			shade: BAND_SHADE,
+		} = BANDS[team] ?? BANDS[0]
 		const ring = JUG_ROWS.length - RING_UP
 		const ringY = top + ring * JUG_CELL
 		const ringHalf = (JUG_ROWS[ring] * JUG_CELL) / 2
-		// The band round the jug.
+		const ringTall = RING_THICK * JUG_CELL
+		// The band round the jug, thick: lit along its top, shaded under.
 		ctx.fillStyle = BAND
-		ctx.fillRect(middle - ringHalf, ringY, ringHalf * 2, CELL)
+		ctx.fillRect(middle - ringHalf, ringY, ringHalf * 2, ringTall)
 		ctx.fillStyle = BAND_LIT
-		ctx.fillRect(middle - ringHalf, ringY, CELL, CELL)
+		ctx.fillRect(middle - ringHalf, ringY, ringHalf * 2 - CELL, CELL)
 		ctx.fillStyle = BAND_SHADE
-		ctx.fillRect(middle + ringHalf - CELL, ringY, CELL, CELL)
+		ctx.fillRect(middle + ringHalf - CELL, ringY, CELL, ringTall)
+		ctx.fillRect(middle - ringHalf, ringY + ringTall - CELL, ringHalf * 2, CELL)
 		// The straps, down from it, either side, to the headband.
 		for (const side of [-1, 1]) {
 			const from = middle + side * (ringHalf - CELL)
 			const to = middle + side * (BAND_HALF - CELL)
-			for (let y = ringY + CELL; y < bottom; y += CELL) {
+			for (let y = ringY + ringTall; y < bottom; y += CELL) {
 				const share = (y - ringY) / Math.max(CELL, bottom - ringY)
 				ctx.fillStyle = side < 0 ? BAND : BAND_SHADE
 				ctx.fillRect(

@@ -250,6 +250,7 @@ export const skateOf = (world: World) => shows.get(world)
 export const skateJam: Minigame = {
 	id: 'skate-jam',
 	name: 'Skate Jam',
+	tagline: 'Kickflips for points',
 	blurb:
 		'Pump the ramp and fly off the coping! In the air, up kickflips, down heelflips, left or right grabs. Tap up or down landing to manual, and press a way on the rail to switch grinds. Keep landing them for a bigger combo. Most points after a minute wins!',
 	tune: 'midnattsloppet:rock',

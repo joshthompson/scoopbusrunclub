@@ -140,6 +140,7 @@ export const buriedDepth = (racer: Racer) =>
 export const potatoRain: Minigame = {
 	id: 'potato-rain',
 	name: 'Potato Rain',
+	tagline: 'Pick tulips, dodge potatoes',
 	blurb:
 		'Pick the tulips as they flower, and keep out from under the falling potatoes: watch for their shadows! Most tulips wins. The last one standing gets 5 seconds more to pick.',
 	tune: 'cliff',

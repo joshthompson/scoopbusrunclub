@@ -1,4 +1,4 @@
-import { START_X, VIEW_WIDTH } from '../game/constants'
+import { START_X, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import type { Terrain } from '../game/terrain'
 import type { Racer, World } from '../game/world'
 import { play } from '../sfx'
@@ -266,6 +266,7 @@ const terrain: Terrain = {
 export const memoryDunk: Minigame = {
 	id: 'memory-dunk',
 	name: 'Memory Dunk',
+	tagline: 'Remember, or get dunked',
 	blurb:
 		'Remember the shapes! Be on the right platform when the trapdoors open, or it’s a dunk in the sea. Every round’s one shape longer.',
 	tune: 'haga',
@@ -392,6 +393,8 @@ function startMemoryDunk(world: World): MinigameRun {
 			left: ARENA_LEFT + SWIM_IN,
 			right: ARENA_LEFT + VIEW_WIDTH - SWIM_IN,
 			splash: (x) => show.splashes.push({ x, at: world.ticks() }),
+			// Diving: no deeper than still shows, at the bottom of the screen.
+			bottom: VIEW_HEIGHT,
 			// Not under a platform: there's no room, it's that low over the water.
 			canHop: (x) => platformAtX(x) < 0,
 		})

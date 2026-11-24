@@ -6,6 +6,7 @@ import { IDLE } from '../minigames/types'
 import { ordinal } from '../multiplayer/Medal'
 import { Round } from '../multiplayer/Round'
 import { CLUB, type Playable } from '../runners/playable'
+import { soloBots } from '../saved/settings'
 import { play } from '../sfx'
 import { OUTLINED, Panel } from '../ui/Menu'
 import { onHover } from '../ui/hover'
@@ -47,7 +48,7 @@ export function SoloMinigame(props: {
 	const bots = [...CLUB]
 		.filter((runner) => runner.id !== props.runner.id)
 		.sort(() => Math.random() - 0.5)
-		.slice(0, botsFor(props.minigame))
+		.slice(0, botsFor(props.minigame, soloBots()))
 	/** A bot's controls: the minigame's own bot, playing it as them. */
 	const botControls = (id: string) => (): Controls => {
 		const racer = world?.racers.find((r) => r.id === id)

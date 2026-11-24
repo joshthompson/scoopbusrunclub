@@ -158,6 +158,12 @@ export interface Body {
 	 */
 	paddling?: boolean
 	/**
+	 * In a minigame's water: how far over they're turned, from 0, stood up
+	 * treading water, to 1, lying along swimming; between, turning over from
+	 * one to the other (see `minigames/treadWater`). Not in it, not said.
+	 */
+	lie?: number
+	/**
 	 * Baby Mode, fallen: floated back in a bubble, `from` where they fell
 	 * `to` where they're put back (see `respawn`), from the tick `at`, for
 	 * `ticks`; on a glider, `glide`, back up in the sky over the sea.

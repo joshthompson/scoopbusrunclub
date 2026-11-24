@@ -882,6 +882,8 @@ function bounceOffHeads(world: World, racer: Racer) {
 			other.out ||
 			// Out of a minigame: buried, tripped, their head's not where it was.
 			!!world.minigame?.out(other) ||
+			// Not theirs to bounce on, the minigame says: a teammate.
+			world.minigame?.bounces?.(racer, other) === false ||
 			o.stomped > 0 ||
 			o.mount > 0 ||
 			o.carried > 0 ||

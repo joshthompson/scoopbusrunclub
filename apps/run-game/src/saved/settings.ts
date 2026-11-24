@@ -31,6 +31,8 @@ interface Settings {
 	menuTune?: string
 	/** The bus's artwork, picked in Options: the new one, unless the classic one's picked. */
 	bus?: BusArtwork
+	/** How many bots play a minigame with you, from Single Player, picked on its panel (see `botsFor`). */
+	soloBots?: number
 }
 
 /** The bus's artwork: the new bus, or the classic one, as on the website. */
@@ -81,6 +83,11 @@ export const setMenuTune = (menuTune: string) =>
 
 export const busArtwork = (): BusArtwork => settings().bus ?? 'new'
 export const setBusArtwork = (bus: BusArtwork) => store({ ...settings(), bus })
+
+/** How many bots you play a minigame against, from Single Player, as picked: three, till one is. */
+export const soloBots = () => settings().soloBots ?? 3
+export const setSoloBots = (soloBots: number) =>
+	store({ ...settings(), soloBots })
 
 export const lastRunner = () => settings().lastRunner
 export const rememberRunner = (lastRunner: string) =>

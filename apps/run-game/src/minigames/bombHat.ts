@@ -199,6 +199,7 @@ export const bombOf = (world: World) => shows.get(world)
 export const bombHat: Minigame = {
 	id: 'bomb-hat',
 	name: 'Bomb Hat',
+	tagline: 'Pass the bomb, quick!',
 	blurb:
 		"Got the bomb on your head? Touch someone to pass it on before the fuse burns down! It's heavy: you're a little slower. Last one not blown up wins!",
 	tune: 'huddinge',

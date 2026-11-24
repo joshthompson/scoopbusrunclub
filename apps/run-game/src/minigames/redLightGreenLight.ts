@@ -164,6 +164,7 @@ export const lightsOf = (world: World) => shows.get(world)
 export const redLightGreenLight: Minigame = {
 	id: 'red-light-green-light',
 	name: 'Red Light, Green Light',
+	tagline: 'Freeze when she turns',
 	blurb:
 		'Run for the line while the doll sings, and freeze the moment she turns round! If she sees you move, you get a ball in the face. First across wins!',
 	tune: 'haga',

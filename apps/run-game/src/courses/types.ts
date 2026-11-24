@@ -292,6 +292,12 @@ export interface CourseLook {
 	sun?: string
 	/** Over the trees and leaves on and over the course: the branches, the trees on the brow. */
 	foliage?: string
+	/**
+	 * The low branch's pictures, its tree and its limb, in place of the
+	 * summer oak's: the same size, 190 by 260, the limb where the oak's is.
+	 * Turned for autumn, at Huddinge.
+	 */
+	branch?: { tree: string; limb: string }
 	/** A Pothole's colours: a road's, in place of a running track's. */
 	pothole?: PotholeLook
 	/** Over the mud. */
@@ -572,6 +578,8 @@ export interface CourseLook {
 	 * to as thick as it gets by `full`.
 	 */
 	snow?: { from: number; full: number }
+	/** Autumn leaves coming down, over everything, `count` on the screen at once (see `draw/Leaves.ts`). */
+	leaves?: { count: number }
 	/** What a Gap's drop looks like: a CSS background, from the path down; `none` to see through it. */
 	gap?: string
 	/**

@@ -209,6 +209,7 @@ export function heldAt(racer: Racer) {
 export const hungryGoose: Minigame = {
 	id: 'hungry-goose',
 	name: 'Hungry Hungry Goose',
+	tagline: 'Egg heist, team against team',
 	blurb:
 		'A giant goose is laying eggs! Carry them home to your team’s nest, or steal them from theirs. Bounce on a carrier to make them drop it. Golden eggs are worth 3. Most eggs in your nest after a minute wins!',
 	tune: 'haga',

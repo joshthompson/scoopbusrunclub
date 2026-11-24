@@ -125,6 +125,7 @@ export interface Ball {
 export const beachVolleyball: Minigame = {
 	id: 'beach-volleyball',
 	name: 'Beach Volleyball',
+	tagline: 'Two teams, one floaty ball',
 	blurb:
 		'Two teams, a net and a big floaty ball: run or jump into it to send it over. It comes down on your side, they score. It gets smaller and quicker the longer a point goes on. First team to 3 wins!',
 	tune: 'slopes',

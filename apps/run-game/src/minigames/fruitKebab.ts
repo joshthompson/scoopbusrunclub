@@ -117,6 +117,7 @@ export function swordPoint(racer: Racer) {
 export const fruitKebab: Minigame = {
 	id: 'fruit-kebab',
 	name: 'Fruit Kebab',
+	tagline: 'Skewer the flying fruit',
 	blurb:
 		'Cannons fire fruit into the air: catch it on the sword on your head. First to four wins!',
 	tune: 'furby-fields',

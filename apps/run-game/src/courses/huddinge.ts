@@ -1,9 +1,12 @@
 import type { RunnerName } from '@/data/runners'
+import lowBranchLimbAutumn from '../assets/obstacles/low-branch-limb-autumn.png'
+import lowBranchTreeAutumn from '../assets/obstacles/low-branch-tree-autumn.png'
+import tree1Autumn from '../assets/scenery/tree1-autumn.png'
 import tree2 from '../assets/scenery/tree2.png'
+import huddingeSign from '../assets/signs/purple-sign-huddinge.png'
 import { PATH_BACK, START_X } from '../game/constants'
 import { HUDDINGE_FIKA } from '../game/fika'
 import { createTerrain } from '../game/terrain'
-import { pinesFar, pinesNear } from './kit/backdrops'
 import {
 	HUDDINGE_FLOOR,
 	HUDDINGE_TRAIL,
@@ -13,9 +16,18 @@ import { withHat } from './kit/hats'
 import { huddingeLedgeArt } from './kit/huddinge-ledge'
 import { STEP_M, heights } from './kit/huddinge-profile'
 import {
+	aspen,
+	autumnBlueberry,
+	birchLog,
+	bracken,
+	goldenBirch,
+	goldenBirchB,
+	leafDrift,
+	rowan,
+} from './kit/huddingeAutumn'
+import { autumnRidgeFar, autumnRidgeNear } from './kit/huddingeAutumnBands'
+import {
 	anthill,
-	blueberryBush,
-	fern,
 	mossyBoulder,
 	scotsPine,
 	spruceA,
@@ -34,7 +46,9 @@ import type {
 /**
  * Huddinge: Haga's kind of parkrun, but deep in the forest. Its own hills,
  * twice Haga's climb, through pines on every side, and branches everywhere.
- * No geese out here, but the mud Haga doesn't have.
+ * No geese out here, but the mud Haga doesn't have. And it's autumn here,
+ * where Haga's always summer: birches gone gold, aspens and rowans red,
+ * the dark spruce among them, leaves on the ground and coming down.
  */
 
 /** Members with a volunteer sprite to stand and cheer in: the cheerers. */
@@ -51,9 +65,25 @@ const CHEERERS: RunnerName[] = [
 /** A parkrun is 5 km. Huddinge's GPS track came out at 5.40. */
 const terrain = createTerrain(heights, STEP_M, 5000)
 
-/** Darker under the trees: the leaves and the grass in their shade. */
+/** Darker under the trees: the spruce, and the floor in their shade. */
 const SHADE = 'brightness(0.78) saturate(1.15)'
 const DEEP_SHADE = 'brightness(0.62) saturate(1.2) hue-rotate(-8deg)'
+/**
+ * The autumn leaves in the same shade, a lighter hand: they're what
+ * catches the light, gold and red against the spruce.
+ */
+const LEAF_SHADE = 'brightness(0.92) saturate(1.05)'
+const LEAF_DEEP_SHADE = 'brightness(0.78) saturate(1.1) hue-rotate(-6deg)'
+
+/** The trees and plants that have turned, gold and red, for their lighter shade. */
+const TURNED = new Set([
+	goldenBirch,
+	goldenBirchB,
+	aspen,
+	rowan,
+	autumnBlueberry,
+	bracken,
+])
 
 /**
  * A forest harvester at work, behind the path, on the level stretch at the
@@ -111,6 +141,36 @@ function anthills(): Course['scenery'] {
 	return out
 }
 
+/** The trees that drop their leaves, for drifts of them round their feet. */
+const DROPPING = new Set([goldenBirch, goldenBirchB, aspen, rowan])
+
+/**
+ * What's come down: a drift of leaves at the foot of every other tree
+ * that's dropping them, and now and then a fallen birch, lying along
+ * behind the path. Their own random numbers, so everything else is where
+ * it was; and clear of the harvester's clearing, as the trees are.
+ */
+function fallen(trees: Course['scenery']): Course['scenery'] {
+	const random = seeded(4611)
+	const out: Course['scenery'] = []
+	for (const tree of trees)
+		if (DROPPING.has(tree.asset) && random() < 0.5)
+			out.push({
+				x: tree.x + Math.round((random() - 0.5) * 30),
+				asset: leafDrift,
+				scale: 2,
+				filter: LEAF_SHADE,
+			})
+	for (
+		let at = START_X + 1300;
+		at < terrain.finishX;
+		at += 1800 + random() * 2200
+	)
+		if (!nearHarvester(at))
+			out.push({ x: Math.round(at), asset: birchLog, scale: 2, filter: SHADE })
+	return out
+}
+
 function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 	const random = seeded(1410)
 	const obstacles: Obstacle[] = []
@@ -143,34 +203,47 @@ function layOut(): Pick<Course, 'obstacles' | 'boosts' | 'scenery'> {
 		x += 380 + random() * (500 - progress * 260)
 	}
 
-	// Spruce, mostly, close together along the path, a pine here and there,
-	// and the forest floor: as many kinds as ever, so the same random
-	// numbers place them.
+	// Spruce and birch close together along the path, aspen and rowan
+	// turned red among them, a pine here and there, and the forest floor's
+	// bracken and blueberry gone red: each still three random numbers, so
+	// the same numbers place them as ever.
 	let scenery: Course['scenery'] = []
 	const plants = [
 		spruceA,
+		goldenBirch,
 		spruceB,
-		spruceA,
+		aspen,
+		goldenBirchB,
 		scotsPine,
-		spruceB,
+		rowan,
+		spruceA,
+		goldenBirch,
 		mossyBoulder,
-		blueberryBush,
-		fern,
+		autumnBlueberry,
+		bracken,
 	]
 	for (let at = -400; at < terrain.finishX + 900; at += 50 + random() * 120) {
 		const asset = plants[Math.floor(random() * plants.length)]
+		// Some in deeper shade than others, so they don't all look one tree.
+		const deep = random() < 0.4
+		const turned = TURNED.has(asset)
 		scenery.push({
 			x: Math.round(at),
 			asset,
 			scale: 2,
-			// Some in deeper shade than others, so they don't all look one tree.
-			filter: random() < 0.4 ? DEEP_SHADE : SHADE,
+			filter: turned
+				? deep
+					? LEAF_DEEP_SHADE
+					: LEAF_SHADE
+				: deep
+					? DEEP_SHADE
+					: SHADE,
 		})
 	}
 	// A clearing round the harvester: the trees round it left out once
 	// they're all placed, so where everything else is doesn't change.
 	scenery = scenery.filter((s) => !nearHarvester(s.x))
-	scenery.push(...anthills())
+	scenery.push(...anthills(), ...fallen(scenery))
 	const kept = {
 		obstacles: obstacles.filter((o) => !nearDeer(o.x) && !nearLedge(o.x)),
 		boosts: boosts.filter((b) => !nearDeer(b.x) && !nearLedge(b.x)),
@@ -215,53 +288,80 @@ export const huddinge: CourseDefinition = {
 	runDirectors: ['adam', 'keith'],
 	cheerers: CHEERERS,
 	look: {
+		// Autumn: a crisp sky warming to a golden haze low down, and the
+		// forest floor gone olive and ochre under its fallen leaves.
 		palette: {
-			'--sky-blue-top': '#bfe3e6',
-			'--sky-blue-bottom': '#e4f1dc',
-			'--grass-green': '#4d7a3c',
-			'--grass-dark-green': '#3b6230',
-			'--grass-darker-green': '#28441f',
-			'--dirt-brown': '#a87d55',
-			'--dirt-dark-brown': '#7d5937',
-			'--dirt-darker-brown': '#4e3520',
+			'--sky-blue-top': '#93bcdc',
+			'--sky-blue-bottom': '#f4d9ac',
+			'--grass-green': '#857538',
+			'--grass-dark-green': '#6a5b2c',
+			'--grass-darker-green': '#46391e',
+			'--dirt-brown': '#9a6b44',
+			'--dirt-dark-brown': '#71492b',
+			'--dirt-darker-brown': '#47301b',
 		},
-		// The hills under the forest: darker and greener the nearer they are.
+		// The hills under the forest, turned: hazy ochre far off, darker and
+		// browner the nearer they are, down into the floor.
 		hills: [
-			'brightness(0.85) saturate(1.1)',
-			'brightness(0.72) saturate(1.2)',
-			'brightness(0.66) saturate(1.3) hue-rotate(-6deg)',
+			'sepia(0.6) saturate(1.2) brightness(0.98)',
+			'sepia(0.85) saturate(1.5) brightness(0.74)',
+			'sepia(0.9) saturate(1.6) brightness(0.66)',
 		],
-		foliage: SHADE,
+		// A low autumn sun, more orange than Haga's, and clouds warmed by it.
+		sun: 'hue-rotate(-18deg) saturate(1.3)',
+		clouds: 'sepia(0.25) brightness(1.02)',
+		// The oak the low branches come off, and the oaks over the brow,
+		// turned rust and gold (the spruce over the brow stays green).
+		branch: { tree: lowBranchTreeAutumn, limb: lowBranchLimbAutumn },
+		horizonTrees: [tree1Autumn, tree2],
+		foliage: LEAF_SHADE,
+		// Its sign by the start, spruce green, in place of Haga's purple.
+		sign: huddingeSign,
 		harvester: { x: HARVESTER_X, tree: tree2, filter: SHADE },
 		boars: { from: BOARS_FROM },
-		// Ridges of pines, one behind another: far off and blue in the haze
-		// over the far hills, then a dark wall of them over the middle ones.
+		// Leaves coming down, a few at a time.
+		leaves: { count: 12 },
+		// Ridges of forest, one behind another: far off and hazy, patched
+		// gold and rust, over the far hills, then a dark wall of spruce with
+		// birch and aspen blazing in it over the middle ones.
 		hillBands: [
-			{ asset: pinesFar, top: 118, height: 100, parallax: 0.15, over: 'far' },
 			{
-				asset: pinesNear,
+				asset: autumnRidgeFar,
+				top: 118,
+				height: 100,
+				parallax: 0.15,
+				over: 'far',
+			},
+			{
+				asset: autumnRidgeNear,
 				top: 140,
 				height: 120,
 				parallax: 0.25,
 				over: 'middle',
 			},
 		],
-		// Its forest floor, moss and needles and fallen leaves, and needles
-		// and roots across its trail.
+		// Its forest floor, dry tufts and needles and fallen leaves, and
+		// needles and roots and leaves across its trail.
 		ground: texturedGround('huddinge-floor', 'huddinge-trail'),
 		groundDefs: HUDDINGE_FLOOR + HUDDINGE_TRAIL,
-		// A wall of pines over the hills.
+		// Spruce and birch over the hills, in the haze.
 		far: [
 			piece(spruceA, 116, 'brightness(0.7)'),
+			piece(goldenBirch, 128, 'brightness(0.85) saturate(0.8)'),
 			piece(spruceB, 116, 'brightness(0.6)'),
-			piece(spruceA, 116, 'brightness(0.75) saturate(1.2)'),
+			piece(aspen, 120, 'brightness(0.8) saturate(0.8)'),
 		],
-		// And thick on the field behind the path.
+		// And thick on the field behind the path, the spruce dark, the
+		// birch and aspen lit up among them.
 		near: [
 			piece(spruceA, 116, SHADE),
+			piece(goldenBirch, 128, LEAF_SHADE),
 			piece(spruceB, 116, DEEP_SHADE),
+			piece(aspen, 120, LEAF_DEEP_SHADE),
 			piece(spruceB, 116, SHADE),
+			piece(goldenBirchB, 140, LEAF_SHADE),
 			piece(spruceA, 116, DEEP_SHADE),
+			piece(rowan, 88, LEAF_SHADE),
 		],
 		nearGap: [12, 56],
 		// Granite, grey and mossy, as the forest's boulders are.

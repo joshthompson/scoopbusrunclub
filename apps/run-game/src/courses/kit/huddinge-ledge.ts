@@ -32,7 +32,8 @@ const GRANITE = {
 	lichen: '#c9c79a',
 }
 const MOSS = { dark: '#3f6a30', mid: '#5f8a45', light: '#7fa95a' }
-const GRASS = ['#3b6230', '#4d7a3c', '#28441f']
+/** The floor's colours at its foot, autumn's: olive and ochre. */
+const GRASS = ['#6a5b2c', '#857538', '#46391e']
 
 export function huddingeLedgeArt(
 	terrain: Terrain,

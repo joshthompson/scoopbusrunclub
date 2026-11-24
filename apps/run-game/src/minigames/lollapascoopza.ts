@@ -299,6 +299,7 @@ export const NEWS_TICKS = 70
 export const lollapascoopza: Minigame = {
 	id: 'lollapascoopza',
 	name: 'Lollapascoopza',
+	tagline: 'Hit the notes, rock out',
 	blurb:
 		'Rock out! Press each arrow as it hits the line to play the song, hold the long ones, and hit double arrows together. Ten in a row doubles your points, up to four times, and your track glows blue. Highest score wins!',
 	tune: 'lollapascoopza',

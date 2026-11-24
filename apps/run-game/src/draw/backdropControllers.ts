@@ -26,6 +26,7 @@ import {
 	pitInside,
 } from './Backdrop'
 import { deckBox, deckTiles, paintFog, paintFogDeck } from './Fog'
+import { paintLeaves } from './Leaves'
 import { paintSnow } from './Snow'
 import { createBackdropPainter } from './backdropPaint'
 import { cachedArt } from './canvasArt'
@@ -68,6 +69,7 @@ export const BEHIND_TYPES = [
 export const OVER_TYPES = [
 	'fog',
 	'snow',
+	'leaves',
 	'sea-front',
 	'river-front',
 	'cave-cover',
@@ -114,6 +116,12 @@ export function createWeather(world: World, scene: Scene) {
 	if (look?.snow)
 		controllers.push(
 			overScreen('snow', 'snow', (ctx, image) => paintSnow(ctx, image, world)),
+		)
+	if (look?.leaves)
+		controllers.push(
+			overScreen('leaves', 'leaves', (ctx, image) =>
+				paintLeaves(ctx, image, world),
+			),
 		)
 	if (look?.fog) {
 		controllers.push(

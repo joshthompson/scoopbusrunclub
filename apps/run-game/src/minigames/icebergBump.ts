@@ -6,7 +6,7 @@ import {
 	arcticFar,
 	arcticNear,
 } from '../courses/kit/arcticScenery'
-import { START_X, TICK_MS, VIEW_WIDTH } from '../game/constants'
+import { START_X, TICK_MS, VIEW_HEIGHT, VIEW_WIDTH } from '../game/constants'
 import type { Terrain } from '../game/terrain'
 import type { Racer, World } from '../game/world'
 import { play } from '../sfx'
@@ -166,6 +166,7 @@ const terrain: Terrain = {
 export const icebergBump: Minigame = {
 	id: 'iceberg-bump',
 	name: 'Iceberg Bump',
+	tagline: 'Last one on the iceberg',
 	blurb:
 		'Stay on the iceberg! It tips wherever everyone stands, and it’s slippy. Bump the others into the sea. Last one on wins!',
 	tune: 'slopes',
@@ -275,6 +276,8 @@ function startIcebergBump(world: World): MinigameRun {
 			left: ARENA_LEFT + SWIM_IN,
 			right: ARENA_LEFT + VIEW_WIDTH - SWIM_IN,
 			splash: (x) => show.splashes.push({ x, at: world.ticks() }),
+			// Diving: no deeper than still shows, at the bottom of the screen.
+			bottom: VIEW_HEIGHT,
 		})
 	}
 

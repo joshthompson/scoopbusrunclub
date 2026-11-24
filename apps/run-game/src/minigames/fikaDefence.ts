@@ -277,6 +277,7 @@ const TABLE_PLATFORMS: PlatformDefinition[] = [0, 1].map((team) => ({
 export const fikaDefence: Minigame = {
 	id: 'fika-defence',
 	name: 'Fika Defence',
+	tagline: 'Guard your team’s fika',
 	blurb:
 		'Geese, gulls, squirrels and a moose are after your team’s fika! Bounce on geese, jump into gulls, catch squirrels, shove the moose. Carry dropped fika home. Most fika on your table after a minute wins!',
 	tune: 'haga',

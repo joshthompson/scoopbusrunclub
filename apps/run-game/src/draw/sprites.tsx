@@ -496,6 +496,9 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			body.board > 0 ||
 			!!body.skate ||
 			(!!stood && body.mount > 0))
+	/** In a minigame's water, how far up from their feet their middle is, `lie` of the way from stood up to lying along. */
+	const waterMiddle = (lie: number) =>
+		runSize.height / 2 + (SWIM_TALL / 2 - runSize.height / 2) * lie
 	/** How they're tipped, lying on a glider: nose up climbing, down diving. */
 	let was = body.feetY
 	let tilt = 0
@@ -871,6 +874,12 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 			}
 			// Tipped over as a minigame says: off balance on a pogo stick, or fallen off it.
 			if (body.tilt !== undefined) $.setRotation(body.tilt)
+			// In a minigame's water, stood up, turning over: tipped on over
+			// toward lying along, about their middle, lower the further over.
+			if (body.lie !== undefined && !body.paddling) {
+				$.setRotation(body.lie * 90 * body.facing + (body.tilt ?? 0))
+				$.setY(body.feetY - waterMiddle(body.lie) - $.height() / 2)
+			}
 			// In a cart: turned with it, sat in it, tipped up the secret line
 			// and round a coaster's loop. Turned about their middle, so that
 			// put where it is turned, their feet on its seat.
@@ -954,6 +963,14 @@ export function createPlayer(world: World, racer: Racer = world.racers[0]) {
 				$.setXScale(xScale)
 				$.setRotation((lean + steer + dive) * body.facing)
 				$.setY(body.feetY - SWIM_TALL / 2 - $.height() / 2)
+				if (body.lie !== undefined) {
+					// In a minigame's water: turning over from stood up, the rest
+					// of the way to lying along; and nose up or down, as it says.
+					$.setRotation(
+						(lean + (body.lie - 1) * 90) * body.facing + (body.tilt ?? 0),
+					)
+					$.setY(body.feetY - waterMiddle(body.lie) - $.height() / 2)
+				}
 				$.setState('pause')
 				// Stroke and kick, by the tick, quicker the faster they swim.
 				const strokes = Math.abs(body.vx) > 0.5 || diving()
@@ -3721,6 +3738,11 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 			// Recoloured, and cut, by its Draw Hooks, which keep it pale or grey
 			// on WebKit too.
 			const foliage = world.course.look?.foliage
+			// The course's own tree and limb, if it has them: autumn's.
+			const art = world.course.look?.branch ?? {
+				tree: lowBranchTreeAsset,
+				limb: lowBranchLimbAsset,
+			}
 			const knocked = () => world.ticks() >= 0 && !!state.scooped
 			// Jumping it: its near end's drawn behind you, not over you.
 			const over = () =>
@@ -3744,7 +3766,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 				paintPixelArt(
 					ctx,
 					image,
-					lowBranchLimbAsset,
+					art.limb,
 					BRANCH_TREE_WIDTH,
 					BRANCH_TREE_HEIGHT,
 					foliage,
@@ -3789,7 +3811,7 @@ export function createObstacle(world: World, state: ObstacleState, i: number) {
 						paintPixelArt(
 							ctx,
 							image,
-							lowBranchTreeAsset,
+							art.tree,
 							BRANCH_TREE_WIDTH,
 							BRANCH_TREE_HEIGHT,
 							foliage,

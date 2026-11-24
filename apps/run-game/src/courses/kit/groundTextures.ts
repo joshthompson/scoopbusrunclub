@@ -168,52 +168,99 @@ export const HAGA_TRAIL = gritty({
 	dark: 'rgba(95, 60, 25, 0.26)',
 }).pattern('haga-trail')
 
-// --- Huddinge: deep in the forest -------------------------------------------------
+// --- Huddinge: deep in the forest, in autumn --------------------------------------
+
+/** Fallen leaves, as they lie: rust, orange, gold, crimson, and brown gone over. */
+const AUTUMN_LEAVES = [
+	{ leaf: 'rgba(196, 92, 32, 0.8)', lit: 'rgba(238, 150, 66, 0.75)' },
+	{ leaf: 'rgba(216, 160, 44, 0.8)', lit: 'rgba(246, 212, 96, 0.75)' },
+	{ leaf: 'rgba(168, 46, 36, 0.75)', lit: 'rgba(214, 86, 56, 0.7)' },
+	{ leaf: 'rgba(128, 80, 40, 0.65)', lit: 'rgba(170, 118, 64, 0.6)' },
+]
 
 /**
- * Huddinge's forest floor: moss in tufts, pine needles, and fallen leaves,
- * no flowers.
+ * `count` fallen leaves scattered over `tile`, `width` by `height`: each a
+ * few cells, lying every which way, lit along its top, from `seed`'s
+ * numbers.
+ */
+function strewLeaves(
+	ground: ReturnType<typeof tile>,
+	options: { seed: number; width: number; height: number; count: number },
+) {
+	const random = seeded(options.seed)
+	for (let n = 0; n < options.count; n++) {
+		const x = even(random() * options.width)
+		const y = even(random() * options.height)
+		const { leaf, lit } =
+			AUTUMN_LEAVES[Math.floor(random() * AUTUMN_LEAVES.length)]
+		if (random() < 0.5) {
+			// Lying along: a long oval, lit at its top left.
+			ground.rect(x, y + 2, 6, 2, leaf)
+			ground.rect(x + 2, y, 2, 2, lit)
+		} else {
+			// Lying across: a diamond, lit at its top.
+			ground.rect(x, y, 2, 2, lit)
+			ground.rect(x - 2, y + 2, 6, 2, leaf)
+			ground.rect(x, y + 4, 2, 2, leaf)
+		}
+	}
+}
+
+/**
+ * Huddinge's forest floor in autumn: tufts of grass gone dry and tan,
+ * moss still green in patches, needles, and fallen leaves everywhere,
+ * rust and gold and red, more of them than anything.
  */
 export const HUDDINGE_FLOOR = (() => {
 	const floor = tufted({
 		seed: 5200,
 		width: 360,
 		height: 110,
-		tufts: 52,
-		dark: 'rgba(20, 45, 15, 0.38)',
-		lit: 'rgba(150, 200, 90, 0.34)',
-		flowers: 10,
-		// Fallen leaves, brown and gold, in place of flowers.
-		petals: ['rgba(150, 95, 40, 0.6)', 'rgba(190, 140, 50, 0.55)'],
+		tufts: 40,
+		dark: 'rgba(70, 52, 20, 0.34)',
+		lit: 'rgba(222, 196, 120, 0.4)',
 	})
 	const random = seeded(5201)
-	for (let n = 0; n < 80; n++)
+	// Moss, low and still green, a cushion here and there.
+	for (let n = 0; n < 7; n++) {
+		const x = even(random() * 360)
+		const y = even(random() * 110)
+		floor.rect(x, y, 8, 2, 'rgba(78, 112, 40, 0.42)')
+		floor.rect(x + 2, y - 2, 4, 2, 'rgba(118, 150, 62, 0.4)')
+	}
+	// Needles, brown, lying about.
+	for (let n = 0; n < 50; n++)
 		floor.rect(
 			even(random() * 360),
 			even(random() * 110),
 			random() < 0.5 ? 4 : 2,
 			2,
-			'rgba(120, 80, 40, 0.3)',
+			'rgba(90, 58, 26, 0.3)',
 		)
+	strewLeaves(floor, { seed: 5203, width: 360, height: 110, count: 46 })
 	return floor.pattern('huddinge-floor')
 })()
 
-/** Huddinge's trail: grit, pebbles, pine needles, and roots across it. */
-export const HUDDINGE_TRAIL = gritty({
-	seed: 5202,
-	width: 220,
-	height: 32,
-	grains: 34,
-	pebbles: 3,
-	light: 'rgba(240, 215, 175, 0.26)',
-	dark: 'rgba(60, 38, 18, 0.3)',
-	needles: { count: 26, colour: 'rgba(95, 60, 25, 0.42)' },
-	roots: {
-		count: 1,
-		colour: 'rgba(70, 42, 20, 0.6)',
-		lit: 'rgba(170, 120, 70, 0.4)',
-	},
-}).pattern('huddinge-trail')
+/** Huddinge's trail: grit, pebbles, pine needles, roots across it, and leaves trodden into it. */
+export const HUDDINGE_TRAIL = (() => {
+	const trail = gritty({
+		seed: 5202,
+		width: 220,
+		height: 32,
+		grains: 34,
+		pebbles: 3,
+		light: 'rgba(240, 215, 175, 0.26)',
+		dark: 'rgba(60, 38, 18, 0.3)',
+		needles: { count: 22, colour: 'rgba(95, 60, 25, 0.42)' },
+		roots: {
+			count: 1,
+			colour: 'rgba(70, 42, 20, 0.6)',
+			lit: 'rgba(170, 120, 70, 0.4)',
+		},
+	})
+	strewLeaves(trail, { seed: 5204, width: 220, height: 28, count: 7 })
+	return trail.pattern('huddinge-trail')
+})()
 
 // --- Furby Fields: a land made of sweets ------------------------------------------
 

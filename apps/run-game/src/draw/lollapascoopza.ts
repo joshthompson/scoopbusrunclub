@@ -30,7 +30,7 @@ import { headFromFeetOf } from './sprites'
 
 /**
  * Lollapascoopza, drawn: everyone's podium, its front an LED panel saying
- * how their last note went, and over each, hung from the rig, their own
+ * how their last note went (and at the end, where they came), and over each, hung from the rig, their own
  * track of arrows scrolling down to its line (a long note's arrow with a
  * tail up behind it, to hold down till it's gone), edged in their colour,
  * their multiplier along its bottom, and their score over it; and, for the songs that have one, what's
@@ -260,6 +260,10 @@ const SHORT_WORDS: Record<string, string> = {
 	'Let go': 'Drop',
 }
 
+/** Where someone came, said short: 2nd, 3rd, 4th. */
+const placeOf = (place: number) =>
+	`${place}${['th', 'st', 'nd', 'rd'][place % 100 >= 11 && place % 100 <= 13 ? 0 : place % 10] ?? 'th'}`
+
 /** Rounds to the grid. */
 const snap = (n: number) => Math.round(n / CELL) * CELL
 
@@ -358,13 +362,15 @@ export function createLollapascoopza(world: World) {
 				paintText(ctx, text, tx, ty, CELL, fill)
 			}
 			if (decided) {
-				// The winner, saying so; everyone else, their score.
-				if (decided[0] === racer)
+				// The winner, saying so; everyone else, where they came (their
+				// scores are over their tracks).
+				const place = decided.indexOf(racer)
+				if (place === 0)
 					say(
 						'WINNER',
 						Math.floor(world.ticks() / 8) % 2 ? '#ffd23c' : '#fff6c8',
 					)
-				else say(`${pointsOf(r)}`, colour)
+				else if (place > 0) say(placeOf(place + 1), colour)
 				continue
 			}
 			const since = now - r.gradeAt

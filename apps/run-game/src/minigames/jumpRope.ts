@@ -109,6 +109,7 @@ const course = {
 export const jumpRope: Minigame = {
 	id: 'jump-rope',
 	name: 'Jump Rope',
+	tagline: 'Don’t trip on the rope',
 	blurb:
 		'Jump the rope as it comes round under you. It gets faster! Last one jumping wins!',
 	tune: 'dino-island:volcano',

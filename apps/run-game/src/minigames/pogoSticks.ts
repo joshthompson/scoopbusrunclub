@@ -128,6 +128,7 @@ export interface Pogo {
 export const pogoSticks: Minigame = {
 	id: 'pogo-sticks',
 	name: 'Pogo Sticks',
+	tagline: 'Boing, balance, bump',
 	blurb:
 		'Keep your balance on a pogo stick: lean the other way when you tip. Bump the others over! Last one standing wins!',
 	tune: 'city-rooftop',

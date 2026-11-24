@@ -68,7 +68,14 @@ export function MinigameBoard(props: {
 								background: row.racer.colour ?? 'var(--ink)',
 							}}
 						/>
-						<span style={styles.name}>{row.racer.runner.name}</span>
+						<span
+							style={{
+								...styles.name,
+								color: props.minigame.nameColour?.(row.racer),
+							}}
+						>
+							{row.racer.runner.name}
+						</span>
 						<span style={styles.score}>{row.chip}</span>
 					</div>
 				)}

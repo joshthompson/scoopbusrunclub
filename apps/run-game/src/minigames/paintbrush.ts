@@ -357,6 +357,7 @@ export const WALL_TOTAL = WALL_WORTH.reduce((n, w) => n + w, 0)
 export const paintbrush: Minigame = {
 	id: 'paintbrush',
 	name: 'Paintbrush',
+	tagline: 'Paint the most wall',
 	blurb:
 		'Your hat’s a paintbrush: wherever it goes, it paints the warehouse wall in your colour. Grab paint cans for a big brush, bounce on heads to splat, and climb to the panels up top before their planks crumble. Most of the wall after a minute wins!',
 	tune: 'sewers',
